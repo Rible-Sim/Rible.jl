@@ -82,8 +82,8 @@ end
 
 constraint_jacobian(jo,s,u,rb1,rb2,pid1,pid2)
 function newton_euler_coords(rb)
-    @unpack state,coords = rb
-    @unpack ṙ,R,ω = state
+    @unpack state = rb
+    @unpack ṙ,R,ω,coords = state
     @unpack x,q = coords
     r = x
     v = ṙ

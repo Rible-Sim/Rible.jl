@@ -5,6 +5,7 @@ using Parameters
 using Quats
 using StaticArrays
 using Rotations
+using .CollisionDetection
 export BallJoint
 export quat_multiply, point_position, tilde, numberofconstraint
 struct AnchorPoint{T}
@@ -34,44 +35,6 @@ end
 struct RigidBodyGeometry
     id::Int64
     # To be implemented
-end
-
-abstract type AbstractState end
-
-struct RigidBodyState{T,NP} <: AbstractState
-    r::MArray{Tuple{3},T,1,3}
-    R::MArray{Tuple{3,3},T,2,9}
-    ṙ::MArray{Tuple{3},T,1,3}
-    ω::MArray{Tuple{3},T,1,3}
-    p::SArray{Tuple{NP},MArray{Tuple{3},T,1,3},1,NP}
-    F::MArray{Tuple{3},T,1,3}
-    τ::MArray{Tuple{3},T,1,3}
-    Fext::SArray{Tuple{NP},MArray{Tuple{3},T,1,3},1,NP}
-    τext::SArray{Tuple{NP},MArray{Tuple{3},T,1,3},1,NP}
-end
-
-function point_position(prop,id,r,R)
-    p = prop.anchorpoints[id].p
-    r + R*p
-end
-
-function RigidBodyState(rb1prop,r1,R1,ṙ1,ω1)
-    T = typeof(rb1prop).parameters[1]
-    @assert T == eltype(r1) == eltype(R1) == eltype(ṙ1) == eltype(ω1)
-    r = MVector{3}(r1)
-    R = MMatrix{3,3}(R1)
-    ṙ = MVector{3}(ṙ1)
-    ω = MVector{3}(ω1)
-    np = length(rb1prop.anchorpoints)
-    p = SVector{np,MArray{Tuple{3},T,1,3}}(
-        [point_position(rb1prop,id,r,R) for id = 1:np])
-    F = @MVector zeros(T,3)
-    τ = @MVector zeros(T,3)
-    Fext = SVector{np,MArray{Tuple{3},T,1,3}}(
-            [@MVector zeros(T,3) for id = 1:np])
-    τext = SVector{np,MArray{Tuple{3},T,1,3}}(
-            [@MVector zeros(T,3) for id = 1:np])
-    RigidBodyState(r,R,ṙ,ω,p,F,τ,Fext,τext)
 end
 
 abstract type RigidBodyCoordinates{T} end
@@ -106,15 +69,29 @@ struct RigidBodyNaturalCoordinates{T,qT,CpT} <: RigidBodyCoordinates{T}
     Cp::CpT
 end
 
-struct RigidBody{T,NP,CoordinatesType}
-    prop::RigidBodyProperty{T,NP}
-    state::RigidBodyState{T}
+abstract type AbstractState end
+
+struct RigidBodyState{T,NP,CoordinatesType} <: AbstractState
+    r::MArray{Tuple{3},T,1,3}
+    R::MArray{Tuple{3,3},T,2,9}
+    ṙ::MArray{Tuple{3},T,1,3}
+    ω::MArray{Tuple{3},T,1,3}
+    p::SArray{Tuple{NP},MArray{Tuple{3},T,1,3},1,NP}
+    F::MArray{Tuple{3},T,1,3}
+    τ::MArray{Tuple{3},T,1,3}
+    Fanc::SArray{Tuple{NP},MArray{Tuple{3},T,1,3},1,NP}
+    τanc::SArray{Tuple{NP},MArray{Tuple{3},T,1,3},1,NP}
     coords::CoordinatesType
 end
 
-function RigidBodyEberlyCoordinates(rb,rbstate)
-    @unpack r,ṙ,R,ω = rbstate
-    @unpack mass,inertia = rb
+function point_position(prop,id,r,R)
+    p = prop.anchorpoints[id].p
+    r + R*p
+end
+
+
+function RigidBodyEberlyCoordinates(prop,r,ṙ,R,ω)
+    @unpack mass,inertia = prop
     x = copy(r)
     quaternion = Quat(R)
     q = MVector{4}(quaternion.w,quaternion.x,quaternion.y,quaternion.z)
@@ -128,9 +105,8 @@ function RigidBodyEberlyCoordinates(rb,rbstate)
     RigidBodyEberlyCoordinates(x,q,p,L,ẋ,q̇,ṗ,L̇)
 end
 
-function RigidBodyErlebenCoordinates(rb,rbstate)
-    @unpack r,ṙ,R,ω = rbstate
-    @unpack mass,inertia = rb
+function RigidBodyErlebenCoordinates(prop,r,ṙ,R,ω)
+    @unpack mass,inertia = prop
     copyr = copy(r)
     quaternion = Quat(R)
     q = MVector{4}(quaternion.w,quaternion.x,quaternion.y,quaternion.z)
@@ -144,14 +120,48 @@ function RigidBodyErlebenCoordinates(rb,rbstate)
     RigidBodyErlebenCoordinates(copyr,q,v,copyω,copyṙ,q̇,v̇,ω̇)
 end
 
+function RigidBodyState(rb1prop,r1,R1,ṙ1,ω1,coordstype=Val(:Eberly))
+    T = typeof(rb1prop).parameters[1]
+    @assert T == eltype(r1) == eltype(R1) == eltype(ṙ1) == eltype(ω1)
+    r = MVector{3}(r1)
+    R = MMatrix{3,3}(R1)
+    ṙ = MVector{3}(ṙ1)
+    ω = MVector{3}(ω1)
+    np = length(rb1prop.anchorpoints)
+    p = SVector{np,MArray{Tuple{3},T,1,3}}(
+        [point_position(rb1prop,id,r,R) for id = 1:np])
+    F = @MVector zeros(T,3)
+    τ = @MVector zeros(T,3)
+    Fanc = SVector{np,MArray{Tuple{3},T,1,3}}(
+            [@MVector zeros(T,3) for id = 1:np])
+    τanc = SVector{np,MArray{Tuple{3},T,1,3}}(
+            [@MVector zeros(T,3) for id = 1:np])
+    if typeof(coordstype) <: Val{:Eberly}
+        coords = RigidBodyEberlyCoordinates(rb1prop,r,ṙ,R,ω)
+    elseif typeof(coordstype) <: Val{:Erleben}
+        coords = RigidBodyErlebenCoordinates(rb1prop,r,ṙ,R,ω)
+    else
+        error("No such $coordstype implemented")
+    end
+    RigidBodyState(r,R,ṙ,ω,p,F,τ,Fanc,τanc,coords)
+end
 
+struct RigidBody{T,NP,CoordinatesType,ObjectType}
+    prop::RigidBodyProperty{T,NP}
+    state::RigidBodyState{T,CoordinatesType}
+    object::ObjectType
+end
+function RigidBody(prop,state;r=1.0)
+    sphere = CollisionDetection.sphere_object(r,state.r)
+    RigidBody(prop,state,sphere)
+end
 function multibodystate(rbs)
     nbody = length(rbs)
     nc = 13
     statevector = Vector{Float64}(undef,nc*nbody)
     statedotvector = Vector{Float64}(undef,nc*nbody)
     for i in eachindex(rbs)
-        Eb = rbs[i].coords
+        Eb = rbs[i].state.coords
         state = @view statevector[(i-1)*nc+1:(i-1)*nc+13]
         state[1:3] = Eb.x
         state[4:7] = Eb.q

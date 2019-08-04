@@ -3,8 +3,8 @@ using GeometryTypes
 
 function coords2state(rb)
     @unpack mass,inertia = rb.prop
-    @unpack r,ṙ,R,ω = rb.state
-    @unpack x,q,p,L = rb.coords
+    @unpack r,ṙ,R,ω,coords = rb.state
+    @unpack x,q,p,L = coords
     r .= x
     ṙ .= p/mass
     R .= SMatrix(Quat(q[1],q[2],q[3],q[4]))
@@ -18,7 +18,7 @@ function sol2state!(tgsys,sol)
     cnt = tgsys.connectivity
     nc = 13
     for i in eachindex(rbs)
-        @unpack x,q,p,L = rbs[i].coords
+        @unpack x,q,p,L = rbs[i].state.coords
         coords_sol = @view sol[(i-1)*nc+1:(i-1)*nc+13]
         x .= coords_sol[1:3]
         q .= coords_sol[4:7]
@@ -39,32 +39,37 @@ function sol2state!(tgsys,sol)
         st.𝐬 .= rb2.state.p[pid2] - rb1.state.p[pid1]
     end
 end
-sol2state!(tgsys,sol[:,1])
-
+#sol2state!(tgsys,sol[:,1])
+sol = solution
+sol2state!(tgsys,sol[1])
 color_list = [RGBAf0(1,0,0,1),RGBAf0(0,1,0,1),RGBAf0(0,0,1,1)]
-scene = Scene(show_axis=false)
+scene = Scene(show_axis=false,limits=FRect3D((-100., -100.,-100.),(200., 200., 200.)))
 function initialplot(s,rbs)
     for i in eachindex(rbs)
-        box = HyperRectangle(Vec3f0(-0.25,-0.25,-1.0), Vec3f0(0.5,0.5,2.0))
-        rbmesh = mesh!(scene,box,color = color_list[i],show_axis = false, center=false)[end]
+        #box = HyperRectangle(Vec3f0(-0.25,-0.25,-1.0), Vec3f0(0.5,0.5,2.0))
+        ball = HyperSphere(Point(0.0,0.0,0.0),rbs[i].object.shape.radius)
+        rbmesh = mesh!(scene,ball,color = RGBAf0(1,0,0,1),show_axis = false, center=false)[end]
         x = rbs[i].state.r
         translate!(rbmesh,x...)
-        q = rbs[i].coords.q
+        q = rbs[i].state.coords.q
         rotate!(rbmesh,Quaternion(q[2],q[3],q[4],q[1]))
     end
+    ground = HyperRectangle(Vec(-10.,-10.,-0.1), Vec(20.,20.,0.1))
+    gmesh = mesh!(scene,ground,color = RGBAf0(0,1,0,1),show_axis = false, center=false)[end]
 end
 
-initialplot(scene,rbs)
+initialplot(scene,tgsys.rigidbodies)
 scene
 
 tslider,tt = textslider(1:length(sol), "t",start = 1)
 on(tt) do t
-    sol2state!(tgsys,sol[:,t])
+    sol2state!(tgsys,sol[t])
+    rbs = tgsys.rigidbodies
     for i in eachindex(rbs)
         rbmesh = scene.plots[i]
         x = rbs[i].state.r
         translate!(rbmesh,x...)
-        q = rbs[i].coords.q
+        q = rbs[i].state.coords.q
         rotate!(rbmesh,Quaternion(q[2],q[3],q[4],q[1]))
     end
 end
