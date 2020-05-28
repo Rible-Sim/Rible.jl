@@ -134,7 +134,7 @@ function tailstructure(n)
 end
 tailstruct = tailstructure(4)
 
-function tail_spark(st2d)
+function tail_spark(n,st2d)
     rbs = st2d.rigidbodies
     vss = st2d.strings
     cnt = st2d.connectivity
@@ -213,7 +213,7 @@ function tail_spark(st2d)
     A,Φ,∂T∂q̇!,F!,M!,nothing
 end
 
-A,Φ,∂T∂q̇!,F!,M!,jacs = tail_spark(tailstruct)
+A,Φ,∂T∂q̇!,F!,M!,jacs = tail_spark(n,tailstruct)
 
 function initial(n,st2d)
     rbs = st2d.rigidbodies
