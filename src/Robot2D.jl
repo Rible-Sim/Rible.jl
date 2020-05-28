@@ -22,14 +22,6 @@ struct DString{T}
     tensions::MArray{Tuple{4},T,1,4}
 end
 
-struct AnchorPoint2D{T}
-    p::SArray{Tuple{2},T,1,2}
-end
-function AnchorPoint2D(sp)
-    p = SVector{2,eltype(sp)}(sp[1], sp[2])
-    AnchorPoint2D{eltype(p)}(p)
-end
-
 struct RigidBody2DProperty{T}
     movable::Bool
     name::Symbol
@@ -41,15 +33,15 @@ struct RigidBody2DProperty{T}
     anchorpoints::Vector{SArray{Tuple{2},T,1,2}}
 end
 
-struct RigidBody2DState{T,NP,CoordinatesType,AuxiliariesType}
+struct RigidBody2DState{T,CoordinatesType,AuxiliariesType}
     r::MArray{Tuple{2},T,1,2}
     θ::T
     ṙ::MArray{Tuple{2},T,1,2}
     ω::T
-    p::SArray{Tuple{NP},MArray{Tuple{2},T,1,2},1,NP} # Anchor Points in global frame
+    p::Vector{MArray{Tuple{2},T,1,2}} # Anchor Points in global frame
     F::MArray{Tuple{2},T,1,2}
     τ::T
-    Fanc::SArray{Tuple{NP},MArray{Tuple{2},T,1,2},1,NP}
+    Fanc::Vector{MArray{Tuple{2},T,1,2}}
     coords::CoordinatesType
     auxs::AuxiliariesType
 end
@@ -77,14 +69,13 @@ function RigidBody2DState(prop,ri,rj)
     τanc = MVector(0.0,0.0)
     aux = NCaux(prop,ri,rj)
     nap = prop.number_aps
-    p = SVector{nap}(
-        [MVector{2}(aux.Cp[i]*q) for i in 1:nap])
-    Fanc = zero(p)
+    p = [MVector{2}(aux.Cp[i]*q) for i in 1:nap]
+    Fanc = [zeros(MVector{2}) for i in 1:nap]
     RigidBody2DState(r,θ,ṙ,ω,p,F,τ,Fanc,coords,aux)
 end
-struct RigidBody2D{T,NP,CoordinatesType,AuxiliariesType}
+struct RigidBody2D{T,CoordinatesType,AuxiliariesType}
     prop::RigidBody2DProperty{T}
-    state::RigidBody2DState{T,NP,CoordinatesType,AuxiliariesType}
+    state::RigidBody2DState{T,CoordinatesType,AuxiliariesType}
 end
 
 struct NaturalCoordinatesAuxiliaries2D{T,cT,ΦT,ΦqT}
