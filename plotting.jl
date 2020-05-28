@@ -1,7 +1,7 @@
 using Makie
 bars = [Node([
     Point(rb.state.p[1]) => Point(rb.state.p[2]);
-    ]) for rb in rbs]
+    ]) for rb in tailstruct.rigidbodies]
 function AbstractPlotting.plot!(scene::Scene,bars)
     for (lineid,line) in enumerate(bars)
         linesegments!(scene,line, color = :black, linewidth = 4)
@@ -14,9 +14,10 @@ plot!(scene,bars)
 xlims!(scene, -0.1,0.1)
 ylims!(scene, -0.2,0.0)
 
+
 function update_scene!(scene,q,st2d,bars)
     cnt = st2d.connectivity
-    for (id,rb) in enumerate(rbs)
+    for (id,rb) in enumerate(st2d.rigidbodies)
         pindex = cnt[id]
         auxs = rb.state.auxs
         p = rb.state.p

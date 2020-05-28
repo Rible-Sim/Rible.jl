@@ -3,7 +3,6 @@ module Robot2D
 using LinearAlgebra
 using Parameters
 using StaticArrays
-using Makie
 
 greet() = print("Hello World!")
 
