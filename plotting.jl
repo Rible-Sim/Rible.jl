@@ -35,13 +35,3 @@ on(tstep) do this_step
     update_scene!(scene,state.qs[this_step],tailstruct,bars)
 end
 bigscene = hbox(step_slider,scene)
-
-record(scene, "four_vert.mp4", 1:10:length(state.ts); framerate = 10) do istep
-    update_scene!(scene,state.qs[istep],rbs,bars)
-end
-
-PackageCompiler.create_sysimage(
-    :Makie;
-    sysimage_path="MakieSys.so",
-    precompile_execution_file="precompile_file.jl")
-)

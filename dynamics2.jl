@@ -119,9 +119,6 @@ function tail(n)
 end
 
 n = 4
-rbs,vss = tail(n)
-
-@code_warntype tail(4)
 
 function tailstructure(n)
     rbs,vss = tail(n)
@@ -136,11 +133,7 @@ function tailstructure(n)
     R2.Structure2D(rbs,vss,p_connectivity)
 end
 tailstruct = tailstructure(4)
-@code_warntype tailstructure(4)
 
-R2.reset_forces!(tailstruct.rigidbodies)
-R2.update_forces!(tailstruct)
-tailstruct.rigidbodies
 function tail_spark(st2d)
     rbs = st2d.rigidbodies
     vss = st2d.strings
@@ -244,40 +237,10 @@ function initial(n,st2d)
     q0,q̇0,λ0
 end
 q0,q̇0,λ0 = initial(n,tailstruct)
-Φ(q0)
-A(q0)
-@code_warntype Φ(q0)
-@code_warntype A(q0)
-F0 = similar(q0)
-F!(F0,q0,q̇0,0.0)
-@code_warntype F!(F0,q0,q̇0,0.0)
 
-mm = zeros(length(q0),length(q0))
-M!(mm,q0)
-@code_warntype M!(mm,q0)
-
-p0 = similar(q0)
-∂T∂q̇!(p0,mm,q0,q̇0)
-@code_warntype ∂T∂q̇!(p0,mm,q0,q̇0)
-size(A(q0))
 s = 1
 tab = SPARKTableau(s)
 tspan = (0.0,20.0)
 cache = SPARKCache(size(A(q0))[2],size(A(q0))[1],0.01,tspan,s,(A,Φ,∂T∂q̇!,F!,M!,jacs))
 
 state = SPARKsolve!(q0,q̇0,λ0,cache,tab)
-
-
-@code_warntype SPARKsolve!(q0,q̇0,λ0,cache,tab)
-te = [energy(state.qs[i],state.q̇s[i],rbs,vss) for i = 1:length(state.ts)]
-
-
-
-
-
-@unpack mass,inertia = rbs[1].prop
-
-Ic = inertia[2,2]
-T = 1/2*ω*Ic*ω
-
-1/2*transpose(q̇0)*M*q̇0
