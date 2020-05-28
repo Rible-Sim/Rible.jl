@@ -35,7 +35,7 @@ struct RigidBody2DProperty{T,NP}
     name::Symbol
     type::Symbol
     mass::T
-    inertia::SArray{Tuple{2,2},T,2,4}
+    inertia::T
     CoM::SArray{Tuple{2},T,1,2}
     anchorpoints::SArray{Tuple{NP},AnchorPoint2D{T},1,NP}
 end
@@ -73,7 +73,6 @@ function RigidBody2DState(prop,ri,rj)
     τ = 0.0
     f1 = MVector(0.0,0.0)
     f2 = MVector(0.0,0.0)
-    Fanc = SVector(f1,f2)
     τanc = MVector(0.0,0.0)
     aux = NCaux(prop,ri,rj)
     nap = length(prop.anchorpoints)
@@ -83,14 +82,14 @@ function RigidBody2DState(prop,ri,rj)
     RigidBody2DState(r,θ,ṙ,ω,p,F,τ,Fanc,coords,aux)
 end
 struct RigidBody2D{T,NP,CoordinatesType,AuxiliariesType}
-    prop::RigidBody2DProperty{T}
+    prop::RigidBody2DProperty{T,NP}
     state::RigidBody2DState{T,NP,CoordinatesType,AuxiliariesType}
 end
 
-struct NaturalCoordinatesAuxiliaries2D{T,NP,cT,ΦT,ΦqT}
+struct NaturalCoordinatesAuxiliaries2D{T,cT,ΦT,ΦqT}
     M::SArray{Tuple{4,4},T,2,16}
     CG::SArray{Tuple{2,4},T,2,8}
-    Cp::SArray{Tuple{NP},SArray{Tuple{2,4},T,2,8},1,NP}
+    Cp::Vector{SArray{Tuple{2,4},T,2,8}}
     Q::MArray{Tuple{4},T,1,4}
     Lij::T
     c::cT
@@ -105,18 +104,11 @@ struct Structure2D{BodyType,StringType,ConnectType}
 end
 
 function inertia2Z(inertia,Lij)
-    Z = similar(inertia)
-    _Lij2 = 1/Lij^2
-    Z[1,1] = inertia[2,2]*_Lij2
-    Z[1,2] = -inertia[1,2]*_Lij2
-    Z[2,1] = Z[1,2]
-    Z[2,2] = inertia[1,1]*_Lij2
-    Z
+    z = 1/Lij^2*inertia
 end
-function form_mass_matrix(m,CoM,Lij,Z)
+function form_mass_matrix(m,CoM,Lij,z)
     M = zeros(4,4)
     a = CoM./Lij
-    z = Z[1,1] + Z[2,2]
     M[1,1] = m - 2m*a[1] + z
     M[1,2] = 0.0
     M[1,3] = m*a[1] - z
@@ -146,8 +138,8 @@ end
 function NCaux(prop,ri,rj)
     @unpack mass,CoM,inertia,anchorpoints = prop
     Lij = norm(ri-rj)
-    Z = inertia2Z(inertia,Lij)
-    M = form_mass_matrix(mass,CoM,Lij,Z)
+    z = inertia2Z(inertia,Lij)
+    M = form_mass_matrix(mass,CoM,Lij,z)
     X̄⁻¹ = 1/Lij*Matrix(1.0I,2,2)
     function c(r̄)
         ret = X̄⁻¹*r̄
@@ -168,11 +160,12 @@ function NCaux(prop,ri,rj)
         ret
     end
     nap = length(anchorpoints)
-    ap = [SMatrix{2,4}(C(c(p.p))) for p in anchorpoints]
+    Cp = [SMatrix{2,4}(C(c(anchorpoints[i].p)))
+            for i in 1:nap]
     aux = NaturalCoordinatesAuxiliaries2D(
     SMatrix{4,4}(M),
     SMatrix{2,4}(CG),
-    SVector{nap}(ap),
+    Cp,
     MVector{4}(Q),
     Lij,c,Φ,Φq
     )
