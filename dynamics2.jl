@@ -2,7 +2,8 @@ using SPARK
 using LinearAlgebra
 using StaticArrays
 using Revise
-using Vert
+using Robot2D
+const R2 = Robot2D
 function tail(n)
     nver = n
     nhor = n + 1
@@ -36,12 +37,12 @@ function tail(n)
     for (i,j) in enumerate(ver_index)
         CoM[j] .= [ver_lengths[i]/2,0.0]
     end
-    inertia = [zeros(2,2) for i = 1:nb]
+    inertia = zeros(nb)
     for (i,j) in enumerate(ver_index)
-        inertia[j] .= [0.0 0.0; 0.0 m[j]*L[j]^2/3]
+        inertia[j] = m[j]*L[j]^2/3
     end
     for (i,j) in enumerate(hor_index)
-        inertia[j] .= [0.0 0.0; 0.0 m[j]*L[j]^2/12]
+        inertia[j] = m[j]*L[j]^2/12
     end
     ri = [zeros(2) for i = 1:nb]
     rj = [zeros(2) for i = 1:nb]
@@ -65,24 +66,24 @@ function tail(n)
     end
     # aps = [p1[i],p2[i]]
     # nap = length(aps)
-    # ap = [Vert.AnchorPoint2D(p) for p in aps]
+    # ap = [R2.AnchorPoint2D(p) for p in aps]
     #
-    # prop = Vert.RigidBody2DProperty(movable,name,type,
+    # prop = R2.RigidBody2DProperty(movable,name,type,
     #             m[i],
     #             SMatrix{2,2}(inertia[i]),
     #             SVector{2}(CoM[i]),
     #             SVector{nap}(ap)
     #             )
-    # @code_warntype Vert.RigidBody2DProperty(movable,name,type,
+    # @code_warntype R2.RigidBody2DProperty(movable,name,type,
     #             m[i],
     #             SMatrix{2,2}(inertia[i]),
     #             SVector{2}(CoM[i]),
     #             SVector{nap}(ap)
     #             )
-    # state = Vert.RigidBody2DState(prop,ri[i],rj[i])
-    # @code_warntype Vert.RigidBody2DState(prop,ri[i],rj[i])
-    # rb = Vert.RigidBody2D(prop,state)
-    # @code_warntype Vert.RigidBody2D(prop,state)
+    # state = R2.RigidBody2DState(prop,ri[i],rj[i])
+    # @code_warntype R2.RigidBody2DState(prop,ri[i],rj[i])
+    # rb = R2.RigidBody2D(prop,state)
+    # @code_warntype R2.RigidBody2D(prop,state)
     function rigidbody(i,CoM,m,inertia,ri,rj,aps)
         name = Symbol("rb"*string(i))
         type = :generic
@@ -91,15 +92,16 @@ function tail(n)
         else
             movable = true
         end
-        nap = 2
-        ap = [Vert.AnchorPoint2D(p) for p in aps]
-        prop = Vert.RigidBody2DProperty(movable,name,type,
-                    m,SMatrix{2,2}(inertia),
+        nap = length(aps)
+        anchorpoints = [SVector{2}(aps[i]) for i = 1:nap]
+        prop = R2.RigidBody2DProperty(movable,name,type,
+                    m,inertia,
                     SVector{2}(CoM),
-                    SVector{nap}(ap)
+                    nap,
+                    anchorpoints
                     )
-        state = Vert.RigidBody2DState(prop,ri,rj)
-        rb = Vert.RigidBody2D(prop,state)
+        state = R2.RigidBody2DState(prop,ri,rj)
+        rb = R2.RigidBody2D(prop,state)
     end
     i = 1
     rb1 = rigidbody(i,CoM[i],m[i],inertia[i],ri[i],rj[i],[p1[i],p2[i]])
@@ -109,9 +111,9 @@ function tail(n)
     restlength = fill(MVector(0.04,√3*0.02,√3*0.02,0.04),n)
     actuallength = fill(MVector(0.04,√3*0.02,√3*0.02,0.04),n)
     k = fill(100.0,n)
-    vss = [Vert.DString(k[i],original_restlength[i],
+    vss = [R2.DString(k[i],original_restlength[i],
         restlength[i],actuallength[i],zeros(MVector{4})) for i = 1:n]
-    # @code_warntype   Vert.DString(k[i],original_restlength[i],
+    # @code_warntype   R2.DString(k[i],original_restlength[i],
     #         restlength[i],actuallength[i],zeros(MVector{4}))
     rbs,vss
 end
@@ -131,11 +133,14 @@ function tailstructure(n)
         [2pid[1]-1,2pid[1],2pid[2]-1,2pid[2]] for pid in connectivity
     ]
 
-    Vert.Structure2D(rbs,vss,p_connectivity)
+    R2.Structure2D(rbs,vss,p_connectivity)
 end
 tailstruct = tailstructure(4)
 @code_warntype tailstructure(4)
 
+R2.reset_forces!(tailstruct.rigidbodies)
+R2.update_forces!(tailstruct)
+tailstruct.rigidbodies
 function tail_spark(st2d)
     rbs = st2d.rigidbodies
     vss = st2d.strings
@@ -176,10 +181,10 @@ function tail_spark(st2d)
         rls[2] = orls[2]*(1+0.2Δ)
         rls[3] = orls[3]*(1-0.2Δ)
         rls[4] = orls[4]*(1-0.2Δ)
-        Vert.reset_forces!(rbs)
-        Vert.q2rbstate!(st2d,q,q̇)
-        Vert.update_forces!(st2d)
-        Vert.genforces!(rbs)
+        R2.reset_forces!(rbs)
+        R2.q2rbstate!(st2d,q,q̇)
+        R2.update_forces!(st2d)
+        R2.genforces!(rbs)
         F .= 0.0
         for (rbid,rb) in enumerate(rbs)
             pindex = cnt[rbid]
@@ -262,6 +267,8 @@ cache = SPARKCache(size(A(q0))[2],size(A(q0))[1],0.01,tspan,s,(A,Φ,∂T∂q̇!,
 
 state = SPARKsolve!(q0,q̇0,λ0,cache,tab)
 
+
+@code_warntype SPARKsolve!(q0,q̇0,λ0,cache,tab)
 te = [energy(state.qs[i],state.q̇s[i],rbs,vss) for i = 1:length(state.ts)]
 
 

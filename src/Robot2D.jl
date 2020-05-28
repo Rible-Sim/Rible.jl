@@ -30,14 +30,15 @@ function AnchorPoint2D(sp)
     AnchorPoint2D{eltype(p)}(p)
 end
 
-struct RigidBody2DProperty{T,NP}
+struct RigidBody2DProperty{T}
     movable::Bool
     name::Symbol
     type::Symbol
     mass::T
     inertia::T
     CoM::SArray{Tuple{2},T,1,2}
-    anchorpoints::SArray{Tuple{NP},AnchorPoint2D{T},1,NP}
+    number_aps::Int
+    anchorpoints::Vector{SArray{Tuple{2},T,1,2}}
 end
 
 struct RigidBody2DState{T,NP,CoordinatesType,AuxiliariesType}
@@ -75,14 +76,14 @@ function RigidBody2DState(prop,ri,rj)
     f2 = MVector(0.0,0.0)
     τanc = MVector(0.0,0.0)
     aux = NCaux(prop,ri,rj)
-    nap = length(prop.anchorpoints)
+    nap = prop.number_aps
     p = SVector{nap}(
         [MVector{2}(aux.Cp[i]*q) for i in 1:nap])
     Fanc = zero(p)
     RigidBody2DState(r,θ,ṙ,ω,p,F,τ,Fanc,coords,aux)
 end
 struct RigidBody2D{T,NP,CoordinatesType,AuxiliariesType}
-    prop::RigidBody2DProperty{T,NP}
+    prop::RigidBody2DProperty{T}
     state::RigidBody2DState{T,NP,CoordinatesType,AuxiliariesType}
 end
 
@@ -159,8 +160,8 @@ function NCaux(prop,ri,rj)
         ret[4] =  2(yj-yi)
         ret
     end
-    nap = length(anchorpoints)
-    Cp = [SMatrix{2,4}(C(c(anchorpoints[i].p)))
+    nap = prop.number_aps
+    Cp = [SMatrix{2,4}(C(c(anchorpoints[i])))
             for i in 1:nap]
     aux = NaturalCoordinatesAuxiliaries2D(
     SMatrix{4,4}(M),
