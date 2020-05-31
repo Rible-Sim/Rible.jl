@@ -1,8 +1,11 @@
 using Makie
 AbstractPlotting.__init__()
+
 function plotstructure(st2d,state)
     bars = [Node([
         Point(rb.state.p[1]) => Point(rb.state.p[2]);
+        Point(rb.state.p[2]) => Point(rb.state.p[3]);
+        Point(rb.state.p[3]) => Point(rb.state.p[1]);
         ]) for rb in st2d.rigidbodies]
     function plot!(scene::Scene,bars)
         for (lineid,line) in enumerate(bars)
@@ -13,8 +16,8 @@ function plotstructure(st2d,state)
     scene = Scene(resolution=(1200,1200))
     plot!(scene,bars)
 
-    xlims!(scene, -0.1,0.1)
-    ylims!(scene, -0.2,0.0)
+    xlims!(scene, -0.1,1.0)
+    ylims!(scene, -0.5,0.6)
 
 
     function update_scene!(scene,q,st2d,bars)
@@ -28,6 +31,8 @@ function plotstructure(st2d,state)
             end
             bars[id][] = [
                     Point(rb.state.p[1]) => Point(rb.state.p[2]);
+                    Point(rb.state.p[2]) => Point(rb.state.p[3]);
+                    Point(rb.state.p[3]) => Point(rb.state.p[1]);
                 ]
         end
     end
@@ -39,4 +44,9 @@ function plotstructure(st2d,state)
     end
     bigscene = hbox(step_slider,scene)
 end
-plotstructure(tailstruct,state)
+
+plotstructure(manipulator,state)
+
+energys = [R2.energy(state.qs[it],state.q̇s[it],manipulator) for it = 1:length(state.ts)]
+plot(energys)
+ylims!(0.0,0.002)

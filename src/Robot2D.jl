@@ -21,6 +21,30 @@ struct DString{T}
     tensions::MArray{Tuple{4},T,1,4}
 end
 
+struct NString{T,N}
+    k::SArray{Tuple{N},T,1,N}
+    original_restlengths::SArray{Tuple{N},T,1,N}
+    restlengths::MArray{Tuple{N},T,1,N}
+    lengths::MArray{Tuple{N},T,1,N}
+    tensions::MArray{Tuple{N},T,1,N}
+end
+
+mutable struct SStringState{T}
+    restlength::T
+    length::T
+    tension::T
+end
+
+struct SString{T}
+    k::T
+    original_restlength::T
+    state::SStringState{T}
+end
+
+struct Actuator{T}
+    strings::Vector{SString{T}}
+end
+
 struct RigidBody2DProperty{T}
     movable::Bool
     name::Symbol
@@ -30,6 +54,16 @@ struct RigidBody2DProperty{T}
     CoM::SArray{Tuple{2},T,1,2}
     number_aps::Int
     anchorpoints::Vector{SArray{Tuple{2},T,1,2}}
+end
+
+struct ID
+    rbid::Int
+    apid::Int
+end
+
+struct Connectivity{BPConnectType,StringConnectType}
+    body2q::BPConnectType
+    string2bp::StringConnectType
 end
 
 struct RigidBody2DState{T,CoordinatesType,AuxiliariesType}
@@ -72,6 +106,7 @@ function RigidBody2DState(prop,ri,rj)
     Fanc = [zeros(MVector{2}) for i in 1:nap]
     RigidBody2DState(r,θ,ṙ,ω,p,F,τ,Fanc,coords,aux)
 end
+
 struct RigidBody2D{T,CoordinatesType,AuxiliariesType}
     prop::RigidBody2DProperty{T}
     state::RigidBody2DState{T,CoordinatesType,AuxiliariesType}
@@ -88,15 +123,31 @@ struct NaturalCoordinatesAuxiliaries2D{T,cT,ΦT,ΦqT}
     Φq::ΦqT
 end
 
-struct Structure2D{BodyType,StringType,ConnectType}
+struct Structure2D{BodyType,StringType,ActuatorType,ConnectType}
+    nbody::Int
+    nmovablebody::Int
+    nfixbody::Int
+    nstring::Int
     rigidbodies::Vector{BodyType}
     strings::Vector{StringType}
+    actuators::Vector{ActuatorType}
     connectivity::ConnectType
+end
+
+function Structure2D(rbs,ss,acs,cnt)
+    nbody = length(rbs)
+    mvbodies = [rb for rb in rbs if rb.prop.movable]
+    nmovablebody = length(mvbodies)
+    nfixbody = nbody - nmovablebody
+    nstring = length(ss)
+    Structure2D(nbody,nmovablebody,nfixbody,nstring,
+                rbs,ss,acs,cnt)
 end
 
 function inertia2Z(inertia,Lij)
     z = 1/Lij^2*inertia
 end
+
 function form_mass_matrix(m,CoM,Lij,z)
     M = zeros(4,4)
     a = CoM./Lij
@@ -167,6 +218,7 @@ function lengthdir(v)
     τ = v/l
     l,τ
 end
+
 function reset_forces!(rbs)
     for (rbid,rb) in enumerate(rbs)
         for f in rb.state.Fanc
@@ -174,52 +226,38 @@ function reset_forces!(rbs)
         end
     end
 end
+
 function update_forces!(st2d)
     rbs = st2d.rigidbodies
-    vss = st2d.strings
+    ss = st2d.strings
     cnt = st2d.connectivity
-    for (i,vs) in enumerate(vss)
-        @unpack k,restlengths,lengths,tensions = vs
-        rb1,rb2,rb3 = rbs[2i-1:2i+1]
-        P1 = rb1.state.p[1]
-        P2 = rb1.state.p[2]
-        O1 = rb2.state.p[1]
-        O2 = rb2.state.p[2]
-        P3 = rb3.state.p[1]
-        P4 = rb3.state.p[2]
-        P3P1 = P1-P3
-        P3O1 = O1-P3
-        P4P2 = P2-P4
-        P4O1 = O1-P4
-        lP3P1,τP3P1 = lengthdir(P3P1)
-        lP3O1,τP3O1 = lengthdir(P3O1)
-        lP4P2,τP4P2 = lengthdir(P4P2)
-        lP4O1,τP4O1 = lengthdir(P4O1)
-        lengths[1] = lP3P1
-        lengths[2] = lP3O1
-        lengths[3] = lP4O1
-        lengths[4] = lP4P2
-        for i = 1:4
-            Δi = lengths[i] - restlengths[i]
-            tensions[i] = ifelse(Δi > 0.0, Δi*k, 0.0)
-        end
-        fP1 = rb1.state.Fanc[1]
-        fP2 = rb1.state.Fanc[2]
-        fO1 = rb2.state.Fanc[1]
-        fP3 = rb3.state.Fanc[1]
-        fP4 = rb3.state.Fanc[2]
-        fP1 .+= -τP3P1*tensions[1]
-        fP3 .+=  τP3P1*tensions[1] + τP3O1*tensions[2]
-        fP2 .+= -τP4P2*tensions[4]
-        fP4 .+=  τP4P2*tensions[4] + τP4O1*tensions[3]
-        fO1 .+= -τP3O1*tensions[2] - τP4O1*tensions[3]
+    for (istr,sstring) in enumerate(ss)
+        @unpack k = sstring
+        sstate = sstring.state
+        a,b = cnt.string2bp[istr]
+        rb1 = rbs[a.rbid]
+        p1 = rb1.state.p[a.apid]
+        f1 = rb1.state.Fanc[a.apid]
+        rb2 = rbs[b.rbid]
+        p2 = rb2.state.p[b.apid]
+        f2 = rb2.state.Fanc[b.apid]
+        sstate.length,τ = lengthdir(p2-p1)
+        Δi = sstate.length - sstate.restlength
+        sstate.tension = ifelse(Δi > 0.0, Δi*k, 0.0)
+        f = τ*sstate.tension
+        f1 .+= f
+        f2 .+= -f
+        # if istr∈[5,6,7,8]
+        #     @show istr,sstate.tension
+        # end
     end
 end
+
 function q2rbstate!(st2d,globalq,globalq̇)
     rbs = st2d.rigidbodies
     cnt = st2d.connectivity
     for (rbid,rb) in enumerate(rbs)
-        pindex = cnt[rbid]
+        pindex = cnt.body2q[rbid]
         @unpack q, q̇ = rb.state.coords
         q .= globalq[pindex]
         q̇ .= globalq̇[pindex]
@@ -252,27 +290,26 @@ function kineticenergy(rbs)
     ke
 end
 
-function potentialenergy(vss)
+function potentialenergy(ss)
     pe = 0.0
-    for (vsid,vs) in enumerate(vss)
-        @unpack k,l0,lengths = vs
-        Δ1 = lengths[1]-l0[1]
-        Δ2 = lengths[2]-l0[2]
+    for (ssid,sstring) in enumerate(ss)
+        @unpack k,original_restlength = sstring
+        sstate = sstring.state
+        Δ1 = sstate.length-original_restlength
         if Δ1 > 0.0
             pe += 1/2*k*Δ1^2
-        end
-        if Δ2 > 0.0
-            pe += 1/2*k*Δ2^2
         end
     end
     pe
 end
 
-function energy(q,q̇,rbs,vss)
-    q2rbstate!(rbs,q,q̇)
-    update_forces!(vss,rbs)
+function energy(q,q̇,st2d)
+    q2rbstate!(st2d,q,q̇)
+    ss = st2d.strings
+    rbs = st2d.rigidbodies
+    update_forces!(st2d)
     ke = kineticenergy(rbs)
-    pe = potentialenergy(vss)
+    pe = potentialenergy(ss)
     ke + pe
 end
 
