@@ -184,9 +184,9 @@ function tail_spark(n,st2d)
         end
     end
     function F!(F,q,q̇,t)
-        for i = 1:4
-            actuate!(st2d.actuators[i],t)
-        end
+        # for i = 1:4
+        #     actuate!(st2d.actuators[i],t)
+        # end
         R2.reset_forces!(rbs)
         R2.q2rbstate!(st2d,q,q̇)
         R2.update_forces!(st2d)
@@ -241,7 +241,7 @@ function initial(n,st2d)
     end
     q̇0 = zero(q0)
     #q̇0[end] = 0.01
-    #q̇0[end-3:end] .= [0.01,0.0,0.01,0.0]
+    q̇0[end-3:end] .= [0.1,0.0,0.1,0.0]
     ninconstraint = nbody
     nexconstraint = 3nfixbody
     nconstraint = ninconstraint + nexconstraint
@@ -257,6 +257,3 @@ dt = 0.01
 cache = SPARKCache(size(A(q0))[2],size(A(q0))[1],dt,tspan,s,(A,Φ,∂T∂q̇!,F!,M!,jacs))
 
 state = SPARKsolve!(q0,q̇0,λ0,cache,tab)
-state
-q20 = [state.qs[tstep][20] for tstep = 1:length(state.ts)]
-plot(state.ts,q20)

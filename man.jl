@@ -7,7 +7,6 @@ using Robot2D
 const R2 = Robot2D
 function man(n)
     nbody = 2n - 1
-    n_revolute = 2(n-1)
     nbp = 2 + 2(n-1)
     a_lower = fill(0.1,n)
     a_upper = fill(0.08,n-1)
@@ -88,18 +87,17 @@ function man(n)
                actuallengths[i] =  ifelse(j∈[1,0],upstringlen,lostringlen)
         ks[i] = ifelse(j∈[1,0],1.3e2,1.6e2)
     end
-    vss = [R2.SString(ks[i],0.95original_restlengths[i],
+    ss = [R2.SString(ks[i],0.95original_restlengths[i],
         R2.SStringState(restlengths[i],actuallengths[i],0.0)) for i = 1:nstring]
     # @code_warntype   R2.DString(k[i],original_restlength[i],
     #         restlength[i],actuallength[i],zeros(MVector{4}))
-    rbs,vss
-end
+    rbs,ss
 
-n = 4
-man(4)
-#@code_warntype man(4)
-function manstructure(n)
-    rbs,vss = man(n)
+    acs = [
+        ifelse(isodd(i),R2.Actuator(ss[2(i-1)+1:2i]),
+                        R2.Actuator(ss[2i:-1:2(i-1)+1]))
+        for i = 1:n
+    ]
 
     rb2p = [
         [i,i+1] for i = 1:length(rbs)
@@ -109,7 +107,7 @@ function manstructure(n)
     ]
 
     string2p_raw = [
-        [zeros(Int,2),zeros(Int,2)] for i = 1:length(vss)
+        [zeros(Int,2),zeros(Int,2)] for i = 1:length(ss)
     ]
     string2p = Vector{Tuple{R2.ID,R2.ID}}()
     for i = 1:length(rbs)-1
@@ -121,15 +119,15 @@ function manstructure(n)
         push!(string2p,(R2.ID(i,3),R2.ID(i+1,2)))
     end
     cnt = R2.Connectivity(body2q,string2p)
-    R2.Structure2D(rbs,vss,cnt)
+    R2.Structure2D(rbs,ss,acs,cnt)
 end
 
-manipulator = manstructure(4)
+manipulator = man(4)
 R2.reset_forces!(manipulator.rigidbodies)
 R2.update_forces!(manipulator)
 [ss.state.tension for ss in manipulator.strings]
 manipulator.rigidbodies[2].state.Fanc[3]
-function spark(n,st2d)
+function tail_spark(n,st2d)
     rbs = st2d.rigidbodies
     vss = st2d.strings
     cnt = st2d.connectivity
@@ -138,9 +136,7 @@ function spark(n,st2d)
     ninconstraint = nbody
     nexconstraint = 3nfixbody
     nconstraint = ninconstraint + nexconstraint
-    n_revolute = 2(n-1)
     nq = body2q[end][end]
-    @assert nq == 4nbody - 2n_revolute
     #total_mass_matrix = zeros(4nbody,4nbody)
     mass_matrix = zeros(nq,nq)
     for (rbid,rb) in enumerate(rbs)
@@ -196,12 +192,11 @@ function spark(n,st2d)
     A,Φ,∂T∂q̇!,F!,M!,nothing
 end
 
-A,Φ,∂T∂q̇!,F!,M!,jacs = spark(n,manipulator)
+A,Φ,∂T∂q̇!,F!,M!,jacs = tail_spark(n,manipulator)
 
 function initial(n,st2d)
     rbs = st2d.rigidbodies
     cnt = st2d.connectivity
-    n_revolute = 2(n-1)
     @unpack nbody,nfixbody = st2d
     nq = cnt.body2q[end][end]
     q0 = zeros(nq)
@@ -222,7 +217,7 @@ q0,q̇0,λ0 = initial(n,manipulator)
 
 s = 1
 tab = SPARKTableau(s)
-tspan = (0.0,20.0)
+tspan = (0.0,100.0)
 cache = SPARKCache(size(A(q0))[2],size(A(q0))[1],0.01,tspan,s,(A,Φ,∂T∂q̇!,F!,M!,jacs))
 
 state = SPARKsolve!(q0,q̇0,λ0,cache,tab)
