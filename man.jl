@@ -30,8 +30,9 @@ function man(n)
         Ia[k] = Ic_upper[i] + m[k]*1/3*a[k]^2
     end
     A = zeros(2,nbp)
+    θ = -π/12
     for i in 2:nbp
-        A[:,i] .= A[:,i-1] .+ [a[i-1],0.0]
+        A[:,i] .= A[:,i-1] .+ a[i-1]*[cos(θ*(i-1)),sin(θ*(i-1))]
     end
 
     function rigidbody(i,m,a,Ia,ri,rj)
@@ -42,7 +43,6 @@ function man(n)
         else
             movable = true
         end
-        @show ri[1],rj[1]
         CoM_x = a/2
         CoM_y = √3/6*a
         if isodd(i)
@@ -74,20 +74,22 @@ function man(n)
             Ia[i],A[:,i],A[:,i+1]) for i = 1:nbody]
 
     nstring = 2(nbody-1)
-    upstringlen = norm(rbs[2].state.p[3] - rbs[1].state.p[1])
+    upstringlen = 0.9*norm(rbs[2].state.p[3] - rbs[1].state.p[1])
     lostringlen = norm(rbs[2].state.p[2] - rbs[1].state.p[3])
     original_restlengths = zeros(nstring)
     restlengths = zeros(nstring)
     actuallengths = zeros(nstring)
     ks = zeros(nstring)
+    cs = zeros(nstring)
+    cs .= 100.0
     for i = 1:nstring
         j = i % 4
         original_restlengths[i] =
                  restlengths[i] =
                actuallengths[i] =  ifelse(j∈[1,0],upstringlen,lostringlen)
-        ks[i] = ifelse(j∈[1,0],1.3e2,1.6e2)
+        ks[i] = ifelse(j∈[1,0],1.6e2,1.6e2)
     end
-    ss = [R2.SString(ks[i],0.95original_restlengths[i],
+    ss = [R2.SString(ks[i],cs[i],original_restlengths[i],
         R2.SStringState(restlengths[i],actuallengths[i],0.0)) for i = 1:nstring]
     # @code_warntype   R2.DString(k[i],original_restlength[i],
     #         restlength[i],actuallength[i],zeros(MVector{4}))
@@ -121,13 +123,9 @@ function man(n)
     cnt = R2.Connectivity(body2q,string2p)
     R2.Structure2D(rbs,ss,acs,cnt)
 end
-
-manipulator = man(4)
-R2.reset_forces!(manipulator.rigidbodies)
-R2.update_forces!(manipulator)
-[ss.state.tension for ss in manipulator.strings]
-manipulator.rigidbodies[2].state.Fanc[3]
-function tail_spark(n,st2d)
+n = 4
+manipulator = man(n)
+function man_spark(n,st2d)
     rbs = st2d.rigidbodies
     vss = st2d.strings
     cnt = st2d.connectivity
@@ -137,7 +135,12 @@ function tail_spark(n,st2d)
     nexconstraint = 3nfixbody
     nconstraint = ninconstraint + nexconstraint
     nq = body2q[end][end]
-    #total_mass_matrix = zeros(4nbody,4nbody)
+    q0 = zeros(nq)
+    for (rbid,rb) in enumerate(rbs)
+        pindex = body2q[rbid]
+        q0[pindex] .= rbs[rbid].state.coords.q
+    end
+
     mass_matrix = zeros(nq,nq)
     for (rbid,rb) in enumerate(rbs)
         pindex = body2q[rbid]
@@ -170,10 +173,10 @@ function tail_spark(n,st2d)
             pindex = body2q[rbid]
             ret[3nfixbody+rbid] = rb.state.auxs.Φ(q[pindex])
         end
-        xi,yi,xj,yj = q[1:4]
-        ret[1] = xi - 0.0
-        ret[2] = yi - 0.0
-        ret[3] = yj - 0.0
+        for (fixid,rbid) in enumerate(st2d.fixbodyindex)
+            pindex = body2q[rbid]
+            ret[3(fixid-1)+1:3fixid] .= q[pindex[[1,2,4]]] - q0[pindex[[1,2,4]]]
+        end
         ret
     end
 
@@ -183,16 +186,18 @@ function tail_spark(n,st2d)
             pindex = body2q[rbid]
             ret[3nfixbody+rbid,pindex] .= rb.state.auxs.Φq(q[pindex])
         end
-        ret[1,1:4] = [1.0,0.0,0.0,0.0]
-        ret[2,1:4] = [0.0,1.0,0.0,0.0]
-        ret[3,1:4] = [0.0,0.0,0.0,1.0]
+        for (fixid,rbid) in enumerate(st2d.fixbodyindex)
+            ret[3(fixid-1)+1,1:4] .= [1.0,0.0,0.0,0.0]
+            ret[3(fixid-1)+2,1:4] .= [0.0,1.0,0.0,0.0]
+            ret[3(fixid-1)+3,1:4] .= [0.0,0.0,0.0,1.0]
+        end
         ret
     end
 
     A,Φ,∂T∂q̇!,F!,M!,nothing
 end
 
-A,Φ,∂T∂q̇!,F!,M!,jacs = tail_spark(n,manipulator)
+A,Φ,∂T∂q̇!,F!,M!,jacs = man_spark(n,manipulator)
 
 function initial(n,st2d)
     rbs = st2d.rigidbodies
@@ -206,7 +211,7 @@ function initial(n,st2d)
     end
     q̇0 = zero(q0)
     #q̇0[end] = 0.01
-    q̇0[end-1:end] .= [0.0,0.001]
+    #q̇0[end-1:end] .= [0.0,0.001]
     ninconstraint = nbody
     nexconstraint = 3nfixbody
     nconstraint = ninconstraint + nexconstraint
@@ -214,10 +219,12 @@ function initial(n,st2d)
     q0,q̇0,λ0
 end
 q0,q̇0,λ0 = initial(n,manipulator)
-
+# @code_warntype Φ(q0)
+# @code_warntype A(q0)
+# @code_warntype
 s = 1
 tab = SPARKTableau(s)
-tspan = (0.0,100.0)
+tspan = (0.0,40.0)
 cache = SPARKCache(size(A(q0))[2],size(A(q0))[1],0.01,tspan,s,(A,Φ,∂T∂q̇!,F!,M!,jacs))
 
 state = SPARKsolve!(q0,q̇0,λ0,cache,tab)

@@ -32,13 +32,23 @@ end
 mutable struct SStringState{T}
     restlength::T
     length::T
+    lengthdot::T
     tension::T
+end
+
+function SStringState(restlength,length,tension)
+    SStringState(restlength,length,zero(length),tension)
 end
 
 struct SString{T}
     k::T
+    c::T
     original_restlength::T
     state::SStringState{T}
+end
+
+function SString(k,origin_restlength,state)
+    SString(k,zero(k),origin_restlength,state)
 end
 
 struct Actuator{T}
@@ -126,7 +136,9 @@ end
 struct Structure2D{BodyType,StringType,ActuatorType,ConnectType}
     nbody::Int
     nmovablebody::Int
+    mvbodyindex::Vector{Int}
     nfixbody::Int
+    fixbodyindex::Vector{Int}
     nstring::Int
     rigidbodies::Vector{BodyType}
     strings::Vector{StringType}
@@ -136,11 +148,14 @@ end
 
 function Structure2D(rbs,ss,acs,cnt)
     nbody = length(rbs)
-    mvbodies = [rb for rb in rbs if rb.prop.movable]
-    nmovablebody = length(mvbodies)
-    nfixbody = nbody - nmovablebody
+    mvbodyindex = [i for i in eachindex(rbs) if rbs[i].prop.movable]
+    nmvbody = length(mvbodyindex)
+    fixbodyindex = [i for i in eachindex(rbs) if !rbs[i].prop.movable]
+    nfixbody = length(fixbodyindex)
     nstring = length(ss)
-    Structure2D(nbody,nmovablebody,nfixbody,nstring,
+    Structure2D(nbody,nmvbody,mvbodyindex,
+                      nfixbody,fixbodyindex,
+                      nstring,
                 rbs,ss,acs,cnt)
 end
 
@@ -232,24 +247,28 @@ function update_forces!(st2d)
     ss = st2d.strings
     cnt = st2d.connectivity
     for (istr,sstring) in enumerate(ss)
-        @unpack k = sstring
+        @unpack k,c = sstring
         sstate = sstring.state
         a,b = cnt.string2bp[istr]
-        rb1 = rbs[a.rbid]
-        p1 = rb1.state.p[a.apid]
-        f1 = rb1.state.Fanc[a.apid]
-        rb2 = rbs[b.rbid]
-        p2 = rb2.state.p[b.apid]
-        f2 = rb2.state.Fanc[b.apid]
-        sstate.length,τ = lengthdir(p2-p1)
-        Δi = sstate.length - sstate.restlength
-        sstate.tension = ifelse(Δi > 0.0, Δi*k, 0.0)
+        state1 = rbs[a.rbid].state
+        p1 = state1.p[a.apid]
+        ṗ1 = state1.auxs.Cp[a.apid]*state1.coords.q̇
+        f1 = state1.Fanc[a.apid]
+        state2 = rbs[b.rbid].state
+        p2 = state2.p[b.apid]
+        ṗ2 = state2.auxs.Cp[b.apid]*state2.coords.q̇
+        f2 = state2.Fanc[b.apid]
+        Δr = p2 - p1
+        Δṙ = ṗ2 - ṗ1
+        l,τ = lengthdir(p2-p1)
+        sstate.length = l
+        l̇ = 1/l*(Δr[1]*Δṙ[1] + Δr[2]*Δṙ[2])
+        f_raw = k*(l - sstate.restlength) +
+                c*l̇
+        sstate.tension = ifelse(f_raw > 0.0, f_raw, 0.0)
         f = τ*sstate.tension
         f1 .+= f
         f2 .+= -f
-        # if istr∈[5,6,7,8]
-        #     @show istr,sstate.tension
-        # end
     end
 end
 
