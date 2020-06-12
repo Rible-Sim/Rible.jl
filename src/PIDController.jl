@@ -1,4 +1,5 @@
 module PIDController
+export PID,update!
 using Parameters
 mutable struct PID{T,limitType}
     Kp::T
@@ -46,13 +47,23 @@ function (pid::PID)(arg...)
     update!(pid,arg...)
 end
 
-# function update!(pid,input;t)
+# function update!(pid,input,t)
 #     pid.input = input
 #     pid.currentTime = t
 #     pid.dt = t - pid.lastTime
 #     @assert pid.dt > 0.0
 #     update!(pid)
 # end
+
+function update!(pid,input,t)
+    if t - pid.lastTime > pid.dt
+        pid.input = input
+        pid.currentTime = t
+        update!(pid)
+    else
+        return pid.lastOutput
+    end
+end
 
 function update!(pid,input;dt)
     @assert dt > 0.0
@@ -62,11 +73,11 @@ function update!(pid,input;dt)
     update!(pid)
 end
 
-function update!(pid,input)
-    pid.input = input
-    pid.currentTime = pid.lastTime + pid.dt
-    update!(pid)
-end
+# function update!(pid,input)
+#     pid.input = input
+#     pid.currentTime = pid.lastTime + pid.dt
+#     update!(pid)
+# end
 function update!(pid)
     @unpack Kp,Ki,Kd,setpoint = pid
     @unpack input,dt,output_limits = pid
@@ -110,7 +121,6 @@ function update!(pid,::Val{:OnMeasurement})
     pid.lastTime = pid.currentTime
     return pid.output
 end
-pid = PID(1.0,0.1,0.05;setpoint=1.0,lastInput=1.1)
-update!(pid,1.1)
+
 
 end

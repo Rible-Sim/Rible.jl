@@ -74,7 +74,7 @@ function man(n,θ=0.0)
             Ia[i],A[:,i],A[:,i+1]) for i = 1:nbody]
 
     nstring = 2(nbody-1)
-    upstringlen = 0.95norm(rbs[2].state.p[3] - rbs[1].state.p[1])
+    upstringlen = norm(rbs[2].state.p[3] - rbs[1].state.p[1])
     lostringlen = norm(rbs[2].state.p[2] - rbs[1].state.p[3])
     original_restlengths = zeros(nstring)
     restlengths = zeros(nstring)
@@ -124,7 +124,7 @@ function man(n,θ=0.0)
     R2.Structure2D(rbs,ss,acs,cnt)
 end
 n = 4
-manipulator = man(n,-π/12)
+manipulator = man(n,0.0)
 refman = man(n,-π/12)
 function update_angles(st2d)
     rbs = st2d.rigidbodies
@@ -202,9 +202,9 @@ function man_wend(n,st2d)
     Φ = R2.build_Φ(st2d)
     A = R2.build_A(st2d)
 
-    #M,Φ,A,F!,nothing
+    M,Φ,A,F!,nothing
 
-    A,Φ,∂T∂q̇!,F!,M!,nothing
+    #A,Φ,∂T∂q̇!,F!,M!,nothing
 end
 M,Φ,A,F!,Jacs = man_wend(n,manipulator)
 A,Φ,∂T∂q̇!,F!,M!,Jacs = man_wend(n,manipulator)
@@ -214,9 +214,24 @@ q0,q̇0,λ0 = R2.get_initial(manipulator,Φ)
 F(q0,q̇0,0.0)
 @code_warntype F(q0,q̇0,0.0)
 dt = 0.01
-prob = SPARK.DyProblem(man_wend(n,manipulator),q0,q̇0,λ0,(0.0,40.0))
+prob = SPARK.DyProblem(man_wend(n,manipulator),q0,q̇0,λ0,(0.0,10.0))
+state = SPARK.solve(prob,dt=dt,ftol=1e-13,verbose=true)
 state = SPARK.solve(prob,dt=dt,ftol=1e-13)
 
+function make_affect!(st2d)
+    function inner_affect!(intor)
+        ac1 = st2d.actuators[1]
+        ss1 = ac1.strings[1]
+        ss1.state.restlength = ss1.original_restlength*(1-0.01intor.t)
+        @show ss1.state.restlength
+    end
+end
+
+cb = SPARK.DiscreteCallback((x)->true,make_affect!(manipulator))
+state = SPARK.solve(prob,dt=dt,ftol=1e-13,callback=cb)
+state = SPARK.solve(prob,dt=dt,ftol=1e-13,verbose=true,callback=cb)
+
+@time SPARK.solve(prob,dt=dt,ftol=1e-13)
 s = 1
 tab = SPARKTableau(s)
 tspan = (0.0,20.0)
