@@ -47,6 +47,8 @@ function plotstructure(st2d,state,func)
                     Point(rb.state.p[3]) => Point(rb.state.p[1]);
                 ]
         end
+        angles = update_angles(st2d)
+        @show angles
     end
     func(scene,update_scene!,state)
 end

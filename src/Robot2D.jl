@@ -3,7 +3,7 @@ module Robot2D
 using LinearAlgebra
 using Parameters
 using StaticArrays
-
+include("PIDController.jl")
 greet() = print("Hello World!")
 
 struct VString{T}
@@ -107,8 +107,6 @@ function RigidBody2DState(prop,ri,rj)
     ω = 0.0
     F = MVector(0.0,0.0)
     τ = 0.0
-    f1 = MVector(0.0,0.0)
-    f2 = MVector(0.0,0.0)
     τanc = MVector(0.0,0.0)
     aux = NCaux(prop,ri,rj)
     nap = prop.number_aps
@@ -239,6 +237,7 @@ function reset_forces!(rbs)
         for f in rb.state.Fanc
             f .= 0.0
         end
+        rb.state.F .= 0.0
     end
 end
 
@@ -287,15 +286,36 @@ function q2rbstate!(st2d,globalq,globalq̇)
     end
 end
 
-function genforces!(rbs)
+function generate_forces!(rbs)
     for (rbid,rb) in enumerate(rbs)
         @unpack state = rb
         @unpack Fanc = state
-        @unpack Q,Cp = state.auxs
+        @unpack Q,Cp,CG = state.auxs
         Q .= 0.0
         for (pid,f) in enumerate(Fanc)
             Q .+= transpose(Cp[pid])*f
         end
+        Q .+= transpose(CG)*state.F
+    end
+end
+
+function assemble_forces!(F,st2d)
+    rbs = st2d.rigidbodies
+    @unpack body2q = st2d.connectivity
+    generate_forces!(rbs)
+    F .= 0.0
+    for (rbid,rb) in enumerate(rbs)
+        pindex = body2q[rbid]
+        F[pindex] .+= rb.state.auxs.Q
+    end
+end
+
+function apply_gravity!(st2d)
+    rbs = st2d.rigidbodies
+    for (rbid,rb) in enumerate(rbs)
+        @unpack state = rb
+        g = 9.8
+        rb.state.F .= [0.0,-g]
     end
 end
 
@@ -330,6 +350,113 @@ function energy(q,q̇,st2d)
     ke = kineticenergy(rbs)
     pe = potentialenergy(ss)
     ke + pe
+end
+
+function build_body2q(rbs::Vector{RigidBody2D{T,CT,AT}}) where {T,CT,AT}
+    bps = Vector{Vector{T}}()
+    bp_number = Vector{Int}()
+    push!(bp_number,0)
+    body2q = Vector{Vector{Int}}()
+    for (rbid,rb) in enumerate(rbs)
+        @unpack state = rb
+        xi,yi,xj,yj = state.coords.q
+        bp1 = [xi,yi]
+        bp2 = [xj,yj]
+        bp1_find = findfirst(x->x==bp1,bps)
+        if bp1_find === nothing
+            push!(bps,bp1)
+            push!(bp_number,bp_number[end]+1)
+            bp1_number = bp_number[end]
+        else
+            bp1_number = bp1_find
+        end
+        bp2_find = findfirst(x->x==bp2,bps)
+        if bp2_find === nothing
+            push!(bps,bp2)
+            push!(bp_number,bp_number[end]+1)
+            bp2_number = bp_number[end]
+        else
+            bp2_number = bp2_find
+        end
+        push!(body2q,[2bp1_number-1,2bp1_number,
+                      2bp2_number-1,2bp2_number])
+    end
+    body2q
+end
+
+function build_massmatrix(rbs,body2q)
+    nq = body2q[end][end]
+    mass_matrix = zeros(nq,nq)
+    for (rbid,rb) in enumerate(rbs)
+        pindex = body2q[rbid]
+        mass_matrix[pindex,pindex] .+= rbs[rbid].state.auxs.M
+    end
+    mass_matrix
+end
+
+function build_Φ(st2d)
+    rbs = st2d.rigidbodies
+    q0,q̇0 = get_q(st2d)
+    @unpack body2q = st2d.connectivity
+    @unpack nbody,nfixbody = st2d
+    ninconstraint = nbody
+    nexconstraint = 3nfixbody
+    nconstraint = ninconstraint + nexconstraint
+    function inner_Φ(q)
+        ret = Vector{eltype(q)}(undef,nconstraint)
+        for (rbid,rb) in enumerate(rbs)
+            pindex = body2q[rbid]
+            ret[3nfixbody+rbid] = rb.state.auxs.Φ(q[pindex])
+        end
+        for (fixid,rbid) in enumerate(st2d.fixbodyindex)
+            pindex = body2q[rbid]
+            ret[3(fixid-1)+1:3fixid] .= q[pindex[[1,2,4]]] - q0[pindex[[1,2,4]]]
+        end
+        ret
+    end
+end
+
+function build_A(st2d)
+    rbs = st2d.rigidbodies
+    @unpack body2q = st2d.connectivity
+    @unpack nbody,nfixbody = st2d
+    ninconstraint = nbody
+    nexconstraint = 3nfixbody
+    nconstraint = ninconstraint + nexconstraint
+    nq = body2q[end][end]
+    function inner_Φ(q)
+        ret = zeros(eltype(q),nconstraint,nq)
+        for (rbid,rb) in enumerate(rbs)
+            pindex = body2q[rbid]
+            ret[3nfixbody+rbid,pindex] .= rb.state.auxs.Φq(q[pindex])
+        end
+        for (fixid,rbid) in enumerate(st2d.fixbodyindex)
+            ret[3(fixid-1)+1,1:4] .= [1.0,0.0,0.0,0.0]
+            ret[3(fixid-1)+2,1:4] .= [0.0,1.0,0.0,0.0]
+            ret[3(fixid-1)+3,1:4] .= [0.0,0.0,0.0,1.0]
+        end
+        ret
+    end
+end
+
+function get_q(st2d)
+    rbs = st2d.rigidbodies
+    @unpack body2q = st2d.connectivity
+    nq = body2q[end][end]
+    q = zeros(nq)
+    q̇ = zeros(nq)
+    for (rbid,rb) in enumerate(rbs)
+        pindex = body2q[rbid]
+        q[pindex] .= rbs[rbid].state.coords.q
+        q̇[pindex] .= rbs[rbid].state.coords.q̇
+    end
+    return q,q̇
+end
+
+function get_initial(st2d,Φ)
+    q0,q̇0 = get_q(st2d)
+    λ0 = zero(Φ(q0))
+    q0,q̇0,λ0
 end
 
 end # module
