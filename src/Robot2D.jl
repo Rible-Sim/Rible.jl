@@ -1,43 +1,23 @@
 module Robot2D
-
+using SparseArrays
 using LinearAlgebra
 using Parameters
 using StaticArrays
+using NLsolve
 include("PIDController.jl")
+include("NC.jl")
 greet() = print("Hello World!")
-
-struct VString{T}
-    k::T
-    l0::MArray{Tuple{2},T,1,2}
-    lengths::MArray{Tuple{2},T,1,2}
-    tensions::MArray{Tuple{2},T,1,2}
-end
-
-struct DString{T}
-    k::T
-    original_restlengths::SArray{Tuple{4},T,1,4}
-    restlengths::MArray{Tuple{4},T,1,4}
-    lengths::MArray{Tuple{4},T,1,4}
-    tensions::MArray{Tuple{4},T,1,4}
-end
-
-struct NString{T,N}
-    k::SArray{Tuple{N},T,1,N}
-    original_restlengths::SArray{Tuple{N},T,1,N}
-    restlengths::MArray{Tuple{N},T,1,N}
-    lengths::MArray{Tuple{N},T,1,N}
-    tensions::MArray{Tuple{N},T,1,N}
-end
 
 mutable struct SStringState{T}
     restlength::T
     length::T
     lengthdot::T
     tension::T
+    direction::MArray{Tuple{2},T,1,2}
 end
 
 function SStringState(restlength,length,tension)
-    SStringState(restlength,length,zero(length),tension)
+    SStringState(restlength,length,zero(length),tension,MVector(1.0,0.0))
 end
 
 struct SString{T}
@@ -132,12 +112,14 @@ struct NaturalCoordinatesAuxiliaries2D{T,cT,ΦT,ΦqT}
 end
 
 struct Structure2D{BodyType,StringType,ActuatorType,ConnectType}
+    ndim::Int
     nbody::Int
     nmovablebody::Int
     mvbodyindex::Vector{Int}
     nfixbody::Int
     fixbodyindex::Vector{Int}
     nstring::Int
+    npoints::Int
     rigidbodies::Vector{BodyType}
     strings::Vector{StringType}
     actuators::Vector{ActuatorType}
@@ -145,85 +127,26 @@ struct Structure2D{BodyType,StringType,ActuatorType,ConnectType}
 end
 
 function Structure2D(rbs,ss,acs,cnt)
+    ndim = 2
     nbody = length(rbs)
     mvbodyindex = [i for i in eachindex(rbs) if rbs[i].prop.movable]
     nmvbody = length(mvbodyindex)
     fixbodyindex = [i for i in eachindex(rbs) if !rbs[i].prop.movable]
     nfixbody = length(fixbodyindex)
     nstring = length(ss)
-    Structure2D(nbody,nmvbody,mvbodyindex,
-                      nfixbody,fixbodyindex,
-                      nstring,
-                rbs,ss,acs,cnt)
-end
-
-function inertia2Z(inertia,Lij)
-    z = 1/Lij^2*inertia
-end
-
-function form_mass_matrix(m,CoM,Lij,z)
-    M = zeros(4,4)
-    a = CoM./Lij
-    M[1,1] = m - 2m*a[1] + z
-    M[1,2] = 0.0
-    M[1,3] = m*a[1] - z
-    M[1,4] = -m*a[2]
-    M[2,2] = m - 2m*a[1] + z
-    M[2,3] = m*a[2]
-    M[2,4] = m*a[1] - z
-    M[3,3] = z
-    M[3,4] = 0.0
-    M[4,4] = z
-    SymM = Matrix(Symmetric(M))
-end
-
-function C(c)
-    ret = Matrix{eltype(c)}(undef,2,4)
-    ret[1,1] = 1-c[1]
-    ret[1,2] = c[2]
-    ret[1,3] = c[1]
-    ret[1,4] = -c[2]
-    ret[2,1] = -c[2]
-    ret[2,2] = 1-c[1]
-    ret[2,3] = c[2]
-    ret[2,4] = c[1]
-    ret
-end
-
-function NCaux(prop,ri,rj)
-    @unpack mass,CoM,inertia,anchorpoints = prop
-    Lij = norm(ri-rj)
-    z = inertia2Z(inertia,Lij)
-    M = form_mass_matrix(mass,CoM,Lij,z)
-    X̄⁻¹ = 1/Lij*Matrix(1.0I,2,2)
-    function c(r̄)
-        ret = X̄⁻¹*r̄
+    npoints = 0
+    for (rbid,rb) in enumerate(rbs)
+        npoints += rb.prop.number_aps
     end
-    CG = C(c(CoM))
-    Q = zeros(4)
-    function Φ(q)
-        xi,yi,xj,yj = q
-        (xj-xi)^2 + (yj-yi)^2 - Lij^2
-    end
-    function Φq(q)
-        xi,yi,xj,yj = q
-        ret = similar(q)
-        ret[1] =  2(xi-xj)
-        ret[2] =  2(yi-yj)
-        ret[3] =  2(xj-xi)
-        ret[4] =  2(yj-yi)
-        ret
-    end
-    nap = prop.number_aps
-    Cp = [SMatrix{2,4}(C(c(anchorpoints[i])))
-            for i in 1:nap]
-    aux = NaturalCoordinatesAuxiliaries2D(
-    SMatrix{4,4}(M),
-    SMatrix{2,4}(CG),
-    Cp,
-    MVector{4}(Q),
-    Lij,c,Φ,Φq
-    )
+    Structure2D(ndim,nbody,nmvbody,mvbodyindex,
+                    nfixbody,fixbodyindex,
+                    nstring,npoints,
+                    rbs,ss,acs,cnt)
+end
+
+struct TGRobot2D{ST,CT}
+    st2d::ST
+    ctrl::CT
 end
 
 function lengthdir(v)
@@ -232,6 +155,9 @@ function lengthdir(v)
     l,τ
 end
 
+function reset_forces!(st2d::Structure2D)
+    reset_forces!(st2d.rigidbodies)
+end
 function reset_forces!(rbs)
     for (rbid,rb) in enumerate(rbs)
         for f in rb.state.Fanc
@@ -261,6 +187,7 @@ function update_forces!(st2d)
         Δṙ = ṗ2 - ṗ1
         l,τ = lengthdir(p2-p1)
         sstate.length = l
+        sstate.direction = τ
         l̇ = 1/l*(Δr[1]*Δṙ[1] + Δr[2]*Δṙ[2])
         f_raw = k*(l - sstate.restlength) +
                 c*l̇
@@ -319,6 +246,7 @@ function apply_gravity!(st2d)
     end
 end
 
+include("inverse.jl")
 function kineticenergy(rbs)
     ke = 0.0
     for (rbid,rb) in enumerate(rbs)
@@ -384,6 +312,11 @@ function build_body2q(rbs::Vector{RigidBody2D{T,CT,AT}}) where {T,CT,AT}
     body2q
 end
 
+function build_massmatrix(st2d::Structure2D)
+    rbs = st2d.rigidbodies
+    body2q = st2d.connectivity.body2q
+    build_massmatrix(rbs,body2q)
+end
 function build_massmatrix(rbs,body2q)
     nq = body2q[end][end]
     mass_matrix = zeros(nq,nq)
@@ -394,14 +327,19 @@ function build_massmatrix(rbs,body2q)
     mass_matrix
 end
 
-function build_Φ(st2d)
-    rbs = st2d.rigidbodies
-    q0,q̇0 = get_q(st2d)
-    @unpack body2q = st2d.connectivity
+function get_nconstraint(st2d)
     @unpack nbody,nfixbody = st2d
     ninconstraint = nbody
     nexconstraint = 3nfixbody
     nconstraint = ninconstraint + nexconstraint
+end
+
+function build_Φ(st2d)
+    rbs = st2d.rigidbodies
+    q0,q̇0 = get_q(st2d)
+    @unpack body2q = st2d.connectivity
+    nfixbody = st2d.nfixbody
+    nconstraint = get_nconstraint(st2d)
     function inner_Φ(q)
         ret = Vector{eltype(q)}(undef,nconstraint)
         for (rbid,rb) in enumerate(rbs)
@@ -419,10 +357,8 @@ end
 function build_A(st2d)
     rbs = st2d.rigidbodies
     @unpack body2q = st2d.connectivity
-    @unpack nbody,nfixbody = st2d
-    ninconstraint = nbody
-    nexconstraint = 3nfixbody
-    nconstraint = ninconstraint + nexconstraint
+    nfixbody = st2d.nfixbody
+    nconstraint = get_nconstraint(st2d)
     nq = body2q[end][end]
     function inner_Φ(q)
         ret = zeros(eltype(q),nconstraint,nq)
@@ -453,10 +389,24 @@ function get_q(st2d)
     return q,q̇
 end
 
-function get_initial(st2d,Φ)
+function get_initial(st2d)
     q0,q̇0 = get_q(st2d)
-    λ0 = zero(Φ(q0))
+    λ0 = zeros(get_nconstraint(st2d))
     q0,q̇0,λ0
 end
 
+function actuate!(st2d::Structure2D,u)
+    for (actuator,u) in zip(st2d.actuators,u)
+        actuate!(actuator,u)
+    end
+end
+function actuate!(actuator::Actuator,u)
+    @unpack strings = actuator
+    str1 = strings[1]
+    str1.state.restlength = str1.original_restlength + u
+    str2 = strings[2]
+    str2.state.restlength = str2.original_restlength - u
+end
+function get_u(st2d)
+end
 end # module

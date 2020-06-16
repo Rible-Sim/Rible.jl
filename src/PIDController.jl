@@ -47,6 +47,18 @@ function (pid::PID)(arg...)
     update!(pid,arg...)
 end
 
+function reset!(pid::PID)
+    pid.input = 0.0
+    pid.output = 0.0
+    pid.pTerm = 0.0
+    pid.iTerm = 0.0
+    pid.dTerm = 0.0
+    pid.lastErr = 0.0
+    pid.lastInput = 0.0
+    pid.lastOutput = 0.0
+    pid.lastTime = 0.0
+    pid.currentTime = 0.0
+end
 # function update!(pid,input,t)
 #     pid.input = input
 #     pid.currentTime = t
@@ -83,17 +95,18 @@ function update!(pid)
     @unpack input,dt,output_limits = pid
     # Compute all the working error variables
     err = setpoint - input
-    #@show pid.lastInput
+    # Compute PID every term
     dInput = input-pid.lastInput
     pid.pTerm = Kp*err
     pid.iTerm += Ki*err*dt
-    pid.dTerm = -Kd*dInput/dt
+    pid.dTerm = -Kd*dInput/dt # Because setpoint doesn't change
     # Compute PID Output
     pid.output = pid.pTerm + pid.iTerm + pid.dTerm
     if typeof(output_limits)!=Nothing
         pid.output = clamp(pid.output,output_limits[1],output_limits[2])
     end
     # Remember some variables for next time
+    pid.lastErr = err
     pid.lastOutput = pid.output
     pid.lastInput = pid.input
     pid.lastTime = pid.currentTime
@@ -122,5 +135,15 @@ function update!(pid,::Val{:OnMeasurement})
     return pid.output
 end
 
+function tune!(pid::PID,p,i,d)
+    pid.Kp = p
+    pid.Ki = i
+    pid.Kd = d
+end
 
+function tune!(pid::PID;p=pid.Kp,i=pid.Ki,d=pid.Kd)
+    pid.Kp = p
+    pid.Ki = i
+    pid.Kd = d
+end
 end

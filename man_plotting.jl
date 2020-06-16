@@ -10,7 +10,7 @@ function sliderplot(scene,update_scene!,state)
 end
 
 function recordplot(scene,update_scene!,state)
-    record(scene, "relax.mp4", 1:10:length(state.ts); framerate = 20) do istep
+    record(scene, "relax2.mp4", 1:25:length(state.ts); framerate = 30) do istep
         update_scene!(scene,state.qs[istep])
     end
 end
@@ -47,14 +47,14 @@ function plotstructure(st2d,state,func)
                     Point(rb.state.p[3]) => Point(rb.state.p[1]);
                 ]
         end
-        angles = update_angles(st2d)
-        @show angles
+        # angles = update_angles(st2d)
+        # @show angles
     end
     func(scene,update_scene!,state)
 end
 
-plotstructure(manipulator,state,sliderplot)
-plotstructure(manipulator,state,recordplot)
+plotstructure(manipulator,sol,sliderplot)
+plotstructure(manipulator,sol,recordplot)
 
 energys = [R2.energy(state.qs[it],state.q̇s[it],manipulator) for it = 1:length(state.ts)]
 plot(energys)
