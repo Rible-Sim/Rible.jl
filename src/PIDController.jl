@@ -136,12 +136,14 @@ function update!(pid,::Val{:OnMeasurement})
 end
 
 function tune!(pid::PID,p,i,d)
+    reset!(pid)
     pid.Kp = p
     pid.Ki = i
     pid.Kd = d
 end
 
 function tune!(pid::PID;p=pid.Kp,i=pid.Ki,d=pid.Kd)
+    reset!(pid)
     pid.Kp = p
     pid.Ki = i
     pid.Kd = d

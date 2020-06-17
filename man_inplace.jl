@@ -9,15 +9,17 @@ using SPARK
 using Robot2D
 const R2 = Robot2D
 
-function man(n,θ=0.0)
-    nbody = 2n - 1
-    nbp = 2 + 2(n-1)
-    a_lower = fill(0.1,n)
-    a_upper = fill(0.08,n-1)
-    m_lower = fill(0.02,n)
-    m_upper = fill(0.013,n-1)
-    Ic_lower = fill(11.3,n)
-    Ic_upper = fill(5.4,n-1)
+function man_ndof(ndof,θ=0.0)
+    nbody = ndof + 1
+    nbp = 2nbody - ndof
+    n_lower = count(isodd,1:nbody)
+    n_upper = count(iseven,1:nbody)
+    a_lower = fill(0.1,n_lower)
+    a_upper = fill(0.08,n_upper)
+    m_lower = fill(0.02,n_lower)
+    m_upper = fill(0.013,n_upper)
+    Ic_lower = fill(11.3,n_lower)
+    Ic_upper = fill(5.4,n_upper)
     lower_index = 1:2:nbody
     upper_index = 2:2:nbody
     a = zeros(nbody)
@@ -34,13 +36,12 @@ function man(n,θ=0.0)
         Ia[k] = Ic_upper[i] + m[k]*1/3*a[k]^2
     end
     A = zeros(2,nbp)
-    for i in 2:nbp
-        A[:,i] .= A[:,i-1] .+ a[i-1]*[cos(θ*(i-1)),sin(θ*(i-1))]
+    A[:,2] .= A[:,1] .+ a[1]*[1.0,0.0]
+    for i in 3:nbp
+        A[:,i] .= A[:,i-1] .+ a[i-1]*[cos(θ*(i-2)),sin(θ*(i-2))]
     end
 
     function rigidbody(i,m,a,Ia,ri,rj)
-        name = Symbol("rb"*string(i))
-        type = :generic
         if i == 1
             movable = false
         else
@@ -64,10 +65,8 @@ function man(n,θ=0.0)
         ap3 = SVector{2}([ap3_x,ap3_y])
         anchorpoints = [ap1,ap2,ap3]
 
-        prop = R2.RigidBody2DProperty(movable,name,type,
-                    m,Ia,
-                    CoM,
-                    nap,
+        prop = R2.RigidBody2DProperty(i,movable,m,Ia,
+                    CoM,nap,
                     anchorpoints
                     )
         state = R2.RigidBody2DState(prop,ri,rj)
@@ -126,11 +125,11 @@ function man(n,θ=0.0)
     cnt = R2.Connectivity(body2q,string2ap)
     R2.Structure2D(rbs,ss,acs,cnt)
 end
-
+man_ndof(2)
 # ------------------Create Tensegrity Struture --------------------------
-n = 4
-refman = man(n,-π/12) # reference
-manipulator = man(n,-π/13)
+ndof = 1
+refman = man_ndof(ndof,-π/12) # reference
+manipulator = man_ndof(ndof,0.0)
 # ------------------Create Tensegrity Struture\\-------------------------
 
 q0,q̇0,λ0 = R2.get_initial(manipulator) #backup
@@ -165,9 +164,26 @@ R2.actuate!(manipulator,zero(u)) # reverse to initial
 # ----------------------Inverse Kinematics\\-----------------------------
 
 dt = 0.01 # Same dt used for PID AND Dynamics solver
-# ---------------------Create Controllers -------------------------------
-pids = [R2.PIDController.PID(0.01,0.0,0.0,
-            setpoint=ui,dt=dt) for ui in u]
+# ---------------------Create Controllers --------------------------------
+# use angles to define errors
+function get_angles(st2d)
+    rbs = st2d.rigidbodies
+    angles = zeros(st2d.nbody-1)
+    for (rbid,rb) in enumerate(rbs)
+        if rbid > 1
+            state0 = rbs[rbid-1].state
+            V0 = state0.p[2]-state0.p[1]
+            state1 = rbs[rbid].state
+            V1 = state1.p[2]-state1.p[1]
+            angles[rbid-1] = atan(V1[1]*V0[2]-V1[2]*V0[1],V0[1]*V1[1]+V0[2]*V1[2])
+        end
+    end
+    angles
+end
+refangles = get_angles(refman)
+refman
+pids = [R2.PIDController.PID(0.01,0.0,0.01,
+            setpoint=ui,dt=dt) for ui in refangles]
 # ---------------------Create Controllers\\-------------------------------
 
 # --------------------Create Robot ---------------------------------------
@@ -175,14 +191,20 @@ rob = R2.TGRobot2D(manipulator,pids)
 # --------------------Create Robot\\--------------------------------------
 
 # --------------------Define Control Action-------------------------------
-function control!(robot2d,t)
-    @unpack st2d, ctrl = robot2d
-    for (pid,actuator) in zip(ctrl,st2d.actuators)
-        input = actuator.strings[1].state.restlength
-        output = R2.PIDController.update!(pid,input,t)
-        R2.actuate!(actuator,output)
+function make_control!(get_feedback)
+    function inner_control!(robot2d,t)
+        @unpack st2d, ctrl = robot2d
+        inputs = get_feedback(st2d)
+        for (id,pid,actuator) in zip(eachindex(ctrl),ctrl,st2d.actuators)
+            input = inputs[id]
+            output = R2.PIDController.update!(pid,input,t)
+            R2.actuate!(actuator,output,inc=true)
+            @show pid.lastErr,actuator.strings[1].state.restlength
+        end
     end
 end
+
+control! = make_control!(get_angles)
 # --------------------Define Control Action\\-----------------------------
 
 # ----------------------------Dynamics-----------------------------------
@@ -211,17 +233,20 @@ function dynfuncs(st2d)
 end
 M,Φ,A,F!,Jacs = dynfuncs(manipulator)
 prob = SPARK.DyProblem(dynfuncs(manipulator),q0,q̇0,λ0,(0.0,200.0))
-R2.actuate!(manipulator,u)
+#R2.actuate!(manipulator,u)
 sol = SPARK.solve(prob,dt=dt,ftol=1e-13,verbose=true)
 
-function make_affect!(robot2d)
+function make_affect!(robot2d,control!)
     function inner_affect!(intor)
         R2.q2rbstate!(robot2d.st2d,intor.qprev,intor.q̇prev)
         R2.update_forces!(robot2d.st2d)
-        #control!(robot2d,intor.t)
+        control!(robot2d,intor.t)
     end
 end
-cb = SPARK.DiscreteCallback((x)->true,make_affect!(rob))
+cb = SPARK.DiscreteCallback((x)->true,make_affect!(rob,make_control!(get_angles)))
+R2.PIDController.tune!(rob.ctrl[1],0.01,0.0,0.01)
+R2.reset!(rob.st2d.actuators)
+sol = SPARK.solve(prob,dt=dt,ftol=1e-13,callback=cb)
 sol = SPARK.solve(prob,dt=dt,ftol=1e-13,callback=cb,verbose=true)
 # ----------------------------Dynamics-----------------------------------
 
@@ -234,9 +259,6 @@ sol = SPARK.solve(prob,dt=dt,ftol=1e-13,callback=cb,verbose=true)
 # @code_warntype F!(Fholder,q0,q̇0,0.0)
 # F!(Fholder,q0,q̇0,0.0)
 
-
-R2.PIDController.reset!(rob.ctrl[end])
-R2.PIDController.tune!(rob.ctrl[end],0.02,0.2,20.0)
 sol = SPARK.solve(prob,dt=dt,ftol=1e-13,verbose=true)
 sol = SPARK.solve(prob,dt=dt,ftol=1e-13)
 
@@ -274,20 +296,3 @@ function showactuator(st2d)
 end
 showactuator(manipulator)
 R2.actuate!(manipulator,0.1*ones(6))
-
-
-
-function get_angles(st2d)
-    rbs = st2d.rigidbodies
-    angles = zeros(st2d.nbody)
-    for (rbid,rb) in enumerate(rbs)
-        if rbid > 1
-            state0 = rbs[rbid-1].state
-            V0 = state0.p[2]-state0.p[1]
-            state1 = rbs[rbid].state
-            V1 = state1.p[2]-state1.p[1]
-            angles[rbid] = atan(V1[1]*V0[2]-V1[2]*V0[1],V0[1]*V1[1]+V0[2]*V1[2])
-        end
-    end
-    angles
-end

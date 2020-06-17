@@ -46,6 +46,12 @@ struct RigidBody2DProperty{T}
     anchorpoints::Vector{SArray{Tuple{2},T,1,2}}
 end
 
+function RigidBody2DProperty(i,movable,mass,inertia,CoM,naps,aps)
+    name = Symbol("rb"*string(i))
+    type = :generic
+    RigidBody2DProperty(movable,name,type,mass,inertia,CoM,naps,aps)
+end
+
 struct ID
     rbid::Int
     apid::Int
@@ -395,17 +401,31 @@ function get_initial(st2d)
     q0,q̇0,λ0
 end
 
-function actuate!(st2d::Structure2D,u)
-    for (actuator,u) in zip(st2d.actuators,u)
-        actuate!(actuator,u)
+function reset!(actuators::Vector{T}) where T<:Actuator
+    for actuator in actuators
+        @unpack strings = actuator
+        str1 = strings[1]
+        str2 = strings[2]
+        str1.state.restlength = str1.original_restlength
+        str2.state.restlength = str2.original_restlength
     end
 end
-function actuate!(actuator::Actuator,u)
+function actuate!(st2d::Structure2D,u;inc=false)
+    for (actuator,u) in zip(st2d.actuators,u)
+        actuate!(actuator,u,inc=inc)
+    end
+end
+function actuate!(actuator::Actuator,u;inc=false)
     @unpack strings = actuator
     str1 = strings[1]
-    str1.state.restlength = str1.original_restlength + u
     str2 = strings[2]
-    str2.state.restlength = str2.original_restlength - u
+    if inc
+        str1.state.restlength += u
+        str2.state.restlength -= u
+    else
+        str1.state.restlength = str1.original_restlength + u
+        str2.state.restlength = str2.original_restlength - u
+    end
 end
 function get_u(st2d)
 end
