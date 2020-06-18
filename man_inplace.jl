@@ -3,7 +3,9 @@ using SparseArrays
 using Parameters
 using StaticArrays
 using BenchmarkTools
-using NLsolve
+import PyPlot; const plt = PyPlot
+using LaTeXStrings
+# using NLsolve
 using Revise
 using SPARK
 using Robot2D
@@ -125,9 +127,8 @@ function man_ndof(ndof,θ=0.0)
     cnt = R2.Connectivity(body2q,string2ap)
     R2.Structure2D(rbs,ss,acs,cnt)
 end
-man_ndof(2)
 # ------------------Create Tensegrity Struture --------------------------
-ndof = 1
+ndof = 6
 refman = man_ndof(ndof,-π/12) # reference
 manipulator = man_ndof(ndof,0.0)
 # ------------------Create Tensegrity Struture\\-------------------------
@@ -187,19 +188,20 @@ pids = [R2.PIDController.PID(0.01,0.0,0.01,
 # ---------------------Create Controllers\\-------------------------------
 
 # --------------------Create Robot ---------------------------------------
-rob = R2.TGRobot2D(manipulator,pids)
+rob = R2.TGRobot2D(manipulator,R2.ControlHub(pids))
 # --------------------Create Robot\\--------------------------------------
 
 # --------------------Define Control Action-------------------------------
 function make_control!(get_feedback)
     function inner_control!(robot2d,t)
-        @unpack st2d, ctrl = robot2d
+        @unpack st2d, hub = robot2d
+        @unpack ctrls,trajs = hub
         inputs = get_feedback(st2d)
-        for (id,pid,actuator) in zip(eachindex(ctrl),ctrl,st2d.actuators)
+        for (id,pid,traj,actuator) in zip(eachindex(ctrls),ctrls,trajs,st2d.actuators)
             input = inputs[id]
-            output = R2.PIDController.update!(pid,input,t)
-            R2.actuate!(actuator,output,inc=true)
-            @show pid.lastErr,actuator.strings[1].state.restlength
+            output = R2.PIDController.update!(pid,input)
+            R2.actuate!(actuator,output)
+            R2.record!(traj,pid)
         end
     end
 end
@@ -232,9 +234,9 @@ function dynfuncs(st2d)
     #A,Φ,∂T∂q̇!,F!,M!,nothing
 end
 M,Φ,A,F!,Jacs = dynfuncs(manipulator)
-prob = SPARK.DyProblem(dynfuncs(manipulator),q0,q̇0,λ0,(0.0,200.0))
-#R2.actuate!(manipulator,u)
-sol = SPARK.solve(prob,dt=dt,ftol=1e-13,verbose=true)
+prob = SPARK.DyProblem(dynfuncs(manipulator),q0,q̇0,λ0,(0.0,40.0))
+# R2.actuate!(manipulator,u)
+# sol = SPARK.solve(prob,dt=dt,ftol=1e-13,verbose=true)
 
 function make_affect!(robot2d,control!)
     function inner_affect!(intor)
@@ -244,13 +246,48 @@ function make_affect!(robot2d,control!)
     end
 end
 cb = SPARK.DiscreteCallback((x)->true,make_affect!(rob,make_control!(get_angles)))
-R2.PIDController.tune!(rob.ctrl[1],0.01,0.0,0.01)
-R2.reset!(rob.st2d.actuators)
+R2.PIDController.tune!(rob.hub.ctrls[1],1.4,0.004,13)
+R2.PIDController.tune!(rob.hub.ctrls[2],1.3,0.004,12)
+R2.PIDController.tune!(rob.hub.ctrls[3],1.2,0.004,11)
+R2.PIDController.tune!(rob.hub.ctrls[4],1.1,0.004,10)
+R2.PIDController.tune!(rob.hub.ctrls[5],1.0,0.005,8.5)
+R2.PIDController.tune!(rob.hub.ctrls[6],0.9,0.005,7.0)
+R2.reset!.(rob.st2d.actuators)
+R2.reset!.(rob.hub.trajs)
 sol = SPARK.solve(prob,dt=dt,ftol=1e-13,callback=cb)
+pltfig.clear(); pltfig = controlplot(rob.hub.trajs)
+pltfig = controlplot(rob.hub.trajs)
 sol = SPARK.solve(prob,dt=dt,ftol=1e-13,callback=cb,verbose=true)
 # ----------------------------Dynamics-----------------------------------
 
+function controlplot(trajs)
+    ntraj = length(trajs)
+    fig,axs_raw = plt.subplots(ntraj,1,num="PID",figsize=(5,15))
 
+    if typeof(axs_raw)<:Array
+        axs = axs_raw
+    else
+        axs = [axs_raw]
+    end
+    for (id,ax) in enumerate(axs)
+        @unpack ts,es,us = trajs[id]
+        bx = ax.twinx()
+        ep = ax.plot(ts,es,label=latexstring("\\epsilon_$id"), lw = 3)
+        up = bx.plot(ts,us,label=latexstring("u_$id"), lw = 3, color=:orange)
+        ps = [ep[1],up[1]]
+        bx.set_ylabel(L"u")
+        bx.set_ylim([-0.1,0.4])
+        ax.set_ylim(es[1].*[-0.1,1.1])
+        ax.yaxis.set_major_locator(plt.matplotlib.ticker.MultipleLocator(0.2es[1]))
+        ax.yaxis.set_major_formatter(plt.matplotlib.ticker.PercentFormatter(xmax=es[1]))
+        ax.set_ylabel(L"\epsilon(\%)")
+        ax.set_xlabel(L"t")
+        ax.legend(ps, [p_.get_label() for p_ in ps])
+        ax.grid("on")
+    end
+    fig.savefig("manpid.png",dpi=300,bbox_inches="tight")
+    plt.close(fig)
+end
 # @code_warntype man_wend(n,manipulator)
 # A,Φ,∂T∂q̇!,F!,M!,Jacs = man_wend(n,manipulator)
 # @code_warntype Φ(q0)

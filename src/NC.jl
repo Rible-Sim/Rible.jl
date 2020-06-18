@@ -32,6 +32,18 @@ function C(c)
     ret
 end
 
+
+struct NaturalCoordinatesAuxiliaries2D{T,cT,ΦT,ΦqT}
+    M::SArray{Tuple{4,4},T,2,16}
+    CG::SArray{Tuple{2,4},T,2,8}
+    Cp::Vector{SArray{Tuple{2,4},T,2,8}}
+    Q::MArray{Tuple{4},T,1,4}
+    Lij::T
+    c::cT
+    Φ::ΦT
+    Φq::ΦqT
+end
+
 function NCaux(prop,ri,rj)
     @unpack mass,CoM,inertia,anchorpoints = prop
     Lij = norm(ri-rj)

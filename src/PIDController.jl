@@ -1,5 +1,5 @@
 module PIDController
-export PID,update!
+export PID,update!,tune!,reset!
 using Parameters
 mutable struct PID{T,limitType}
     Kp::T
@@ -67,29 +67,30 @@ end
 #     update!(pid)
 # end
 
-function update!(pid,input,t)
-    if t - pid.lastTime > pid.dt
-        pid.input = input
-        pid.currentTime = t
-        update!(pid)
-    else
-        return pid.lastOutput
-    end
-end
+# function update!(pid,input,t)
+#     if t - pid.lastTime > pid.dt
+#         pid.input = input
+#         pid.currentTime = t
+#         update!(pid)
+#     else
+#         return pid.lastOutput
+#     end
+# end
+#
+# function update!(pid,input;dt)
+#     @assert dt > 0.0
+#     pid.input = input
+#     pid.dt = dt
+#     pid.currentTime = pid.lastTime + pid.dt
+#     update!(pid)
+# end
 
-function update!(pid,input;dt)
-    @assert dt > 0.0
+function update!(pid,input)
     pid.input = input
-    pid.dt = dt
     pid.currentTime = pid.lastTime + pid.dt
     update!(pid)
 end
 
-# function update!(pid,input)
-#     pid.input = input
-#     pid.currentTime = pid.lastTime + pid.dt
-#     update!(pid)
-# end
 function update!(pid)
     @unpack Kp,Ki,Kd,setpoint = pid
     @unpack input,dt,output_limits = pid
@@ -112,28 +113,28 @@ function update!(pid)
     pid.lastTime = pid.currentTime
     return pid.output
 end
-function update!(pid,::Val{:OnMeasurement})
-    @unpack Kp,Ki,Kd,setpoint = pid
-    @unpack input,dt,output_limits = pid
-    # How long since we last calculated
-    @assert dt > 0.0
-    # Compute all the working error variables
-    err = setpoint - input
-    dInput = input-pid.lastInput
-    pid.pTerm -= Kp*dInput
-    pid.iTerm += Ki*err*dt
-    pid.dTerm = -Kd*dInput/dt
-    # Compute PID Output
-    pid.output = pid.pTerm + pid.iTerm + pid.dTerm
-    if typeof(output_limits)!=Nothing
-        pid.output = clamp(pid.output,output_limits[1],output_limits[2])
-    end
-    # Remember some variables for next time
-    pid.lastOutput = pid.output
-    pid.lastInput = pid.input
-    pid.lastTime = pid.currentTime
-    return pid.output
-end
+# function update!(pid,::Val{:OnMeasurement})
+#     @unpack Kp,Ki,Kd,setpoint = pid
+#     @unpack input,dt,output_limits = pid
+#     # How long since we last calculated
+#     @assert dt > 0.0
+#     # Compute all the working error variables
+#     err = setpoint - input
+#     dInput = input-pid.lastInput
+#     pid.pTerm -= Kp*dInput
+#     pid.iTerm += Ki*err*dt
+#     pid.dTerm = -Kd*dInput/dt
+#     # Compute PID Output
+#     pid.output = pid.pTerm + pid.iTerm + pid.dTerm
+#     if typeof(output_limits)!=Nothing
+#         pid.output = clamp(pid.output,output_limits[1],output_limits[2])
+#     end
+#     # Remember some variables for next time
+#     pid.lastOutput = pid.output
+#     pid.lastInput = pid.input
+#     pid.lastTime = pid.currentTime
+#     return pid.output
+# end
 
 function tune!(pid::PID,p,i,d)
     reset!(pid)

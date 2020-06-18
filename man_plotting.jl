@@ -10,7 +10,7 @@ function sliderplot(scene,update_scene!,state)
 end
 
 function recordplot(scene,update_scene!,state)
-    record(scene, "relax2.mp4", 1:25:length(state.ts); framerate = 30) do istep
+    record(scene, "pid.mp4", 1:20:length(state.ts); framerate = 20) do istep
         update_scene!(scene,state.qs[istep])
     end
 end
