@@ -35,11 +35,11 @@ end
 # C = build_C(manipulator)
 # Array(C)
 # @code_warntype build_C(manipulator)
-# manipulator.connectivity.string2bp[1]
+# manipulator.connectivity.string2ap[1]
 
 function build_D(st2d)
     @unpack nstring,npoints,ndim = st2d
-    @unpack body2q,string2bp = st2d.connectivity
+    @unpack body2q,string2ap = st2d.connectivity
     D = spzeros(Int,npoints*ndim,nstring*ndim)
     D_raw = spzeros(Int,npoints,nstring)
     iss = [0]
@@ -47,9 +47,9 @@ function build_D(st2d)
         push!(iss,iss[end]+rb.prop.number_aps)
     end
 
-    for (sid,bp) in enumerate(string2bp)
-        D_raw[iss[bp[1].rbid]+bp[1].apid,sid] = 1
-        D_raw[iss[bp[2].rbid]+bp[2].apid,sid] = -1
+    for (sid,ap) in enumerate(string2ap)
+        D_raw[iss[ap[1].rbid]+ap[1].apid,sid] = 1
+        D_raw[iss[ap[2].rbid]+ap[2].apid,sid] = -1
     end
     D .= kron(D_raw,Matrix(1I,2,2))
 end

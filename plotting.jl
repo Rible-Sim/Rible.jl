@@ -39,4 +39,7 @@ function plotstructure(st2d,state)
     end
     bigscene = hbox(step_slider,scene)
 end
-plotstructure(tailstruct,state)
+plotstructure(tail,sol)
+
+energys = [R2.energy(sol.qs[it],sol.q̇s[it],tail) for it = 1:length(sol.ts)]
+plot(energys)

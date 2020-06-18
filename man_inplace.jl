@@ -95,10 +95,6 @@ function man_ndof(ndof,θ=0.0)
     end
     ss = [R2.SString(ks[i],cs[i],original_restlengths[i],
         R2.SStringState(restlengths[i],actuallengths[i],0.0)) for i = 1:nstring]
-    # @code_warntype   R2.DString(k[i],original_restlength[i],
-    #         restlength[i],actuallength[i],zeros(MVector{4}))
-    rbs,ss
-
     acs = [
         ifelse(isodd(i),R2.Actuator(ss[2(i-1)+1:2i]),
                         R2.Actuator(ss[2i:-1:2(i-1)+1]))
@@ -117,10 +113,6 @@ function man_ndof(ndof,θ=0.0)
     ]
     string2ap = Vector{Tuple{R2.ID,R2.ID}}()
     for i = 1:length(rbs)-1
-        # string2ap_raw[2i-1][1] .= [i  ,1]
-        # string2ap_raw[2i-1][2] .= [i+1,3]
-        # string2ap_raw[2i][1]   .= [i  ,3]
-        # string2ap_raw[2i][2]   .= [i+1,2]
         push!(string2ap,(R2.ID(i,1),R2.ID(i+1,3)))
         push!(string2ap,(R2.ID(i,3),R2.ID(i+1,2)))
     end

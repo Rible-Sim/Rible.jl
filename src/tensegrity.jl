@@ -6,7 +6,7 @@ end
 
 struct Connectivity{BPConnectType,StringConnectType}
     body2q::BPConnectType
-    string2bp::StringConnectType
+    string2ap::StringConnectType
 end
 
 
@@ -62,7 +62,7 @@ function update_forces!(st2d)
     for (istr,sstring) in enumerate(ss)
         @unpack k,c = sstring
         sstate = sstring.state
-        a,b = cnt.string2bp[istr]
+        a,b = cnt.string2ap[istr]
         state1 = rbs[a.rbid].state
         p1 = state1.p[a.apid]
         ṗ1 = state1.auxs.Cp[a.apid]*state1.coords.q̇
