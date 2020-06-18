@@ -1,0 +1,13 @@
+name = "TensegrityRobot"
+uuid = "7320ced1-f959-433f-bc23-ba762b3b6b43"
+authors = ["Praxist <luo229@qq.com> and contributors"]
+version = "0.1.0"
+
+[compat]
+julia = "1.4"
+
+[extras]
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[targets]
+test = ["Test"]
