@@ -66,7 +66,8 @@ connectivity = [
     [2,2],
     [3,1],
     [3,2]]
-tgsys = TRS.TensegritySystem(rbs,[s1,s2,s3],[j1,j2],connectivity)
+#tgsys = TRS.TensegritySystem(rbs,[s1,s2,s3],[j1,j2],connectivity)
+tgsys = TRS.TensegritySystem([rb1,rb2],[s1],[j1],connectivity)
 
 twobodystate = TRS.multibodystate(tgsys.rigidbodies)
 

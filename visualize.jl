@@ -46,23 +46,28 @@ color_list = [RGBAf0(1,0,0,1),RGBAf0(0,1,0,1),RGBAf0(0,0,1,1)]
 scene = Scene(show_axis=false,limits=FRect3D((-100., -100.,-100.),(200., 200., 200.)))
 function initialplot(s,rbs)
     for i in eachindex(rbs)
-        #box = HyperRectangle(Vec3f0(-0.25,-0.25,-1.0), Vec3f0(0.5,0.5,2.0))
-        ball = HyperSphere(Point(0.0,0.0,0.0),rbs[i].object.shape.radius)
-        rbmesh = mesh!(scene,ball,color = RGBAf0(1,0,0,1),show_axis = false, center=false)[end]
+        box = HyperRectangle(Vec3f0(-0.25,-0.25,-1.0), Vec3f0(0.5,0.5,2.0))
+        #ball = HyperSphere(Point(0.0,0.0,0.0),rbs[i].object.shape.radius)
+        #rbmesh = mesh!(scene,box,color = RGBAf0(1,0,0,1),show_axis = false, center=false)[end]
+        rbmesh = mesh!(scene,box,color = color_list[i],show_axis = false, center=false)[end]
         x = rbs[i].state.r
         translate!(rbmesh,x...)
         q = rbs[i].state.coords.q
         rotate!(rbmesh,Quaternion(q[2],q[3],q[4],q[1]))
     end
-    ground = HyperRectangle(Vec(-10.,-10.,-0.1), Vec(20.,20.,0.1))
-    gmesh = mesh!(scene,ground,color = RGBAf0(0,1,0,1),show_axis = false, center=false)[end]
+    #ground = HyperRectangle(Vec(-10.,-10.,-0.1), Vec(20.,20.,0.1))
+    #gmesh = mesh!(scene,ground,color = RGBAf0(0,1,0,1),show_axis = false, center=false)[end]
 end
 
 initialplot(scene,tgsys.rigidbodies)
 scene
-
+using AbstractPlotting
 tslider,tt = textslider(1:length(sol), "t",start = 1)
 on(tt) do t
+    func(t)
+end
+
+function func(t)
     sol2state!(tgsys,sol[t])
     rbs = tgsys.rigidbodies
     for i in eachindex(rbs)
@@ -72,6 +77,10 @@ on(tt) do t
         q = rbs[i].state.coords.q
         rotate!(rbmesh,Quaternion(q[2],q[3],q[4],q[1]))
     end
+end
+
+record(scene, "video.mp4", 1:200) do i
+    func(i) # or some other manipulation of the Scene
 end
 hbox(scene,tslider)
 

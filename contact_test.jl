@@ -1,3 +1,4 @@
+using Makie
 using StaticArrays
 using Revise
 using TensegrityRobotSimulator
