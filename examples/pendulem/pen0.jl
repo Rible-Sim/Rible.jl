@@ -32,8 +32,8 @@ function penfunc()
     g = 9.8
     fg = [0, -g]
     const_F = SVector{4}(transpose(CG)*fg)
-    function F(q,q̇,t)
-       const_F
+    function F!(F,q,q̇,t)
+       F .=const_F
     end
 
 
@@ -55,9 +55,9 @@ function penfunc()
       ret[3,4] = 2(yj-yi)
       ret
     end
-    M,Φ,A,F,nothing
+    M,Φ,A,F!,nothing
 end
-M,Φ,A,F,Jacs = penfunc()
+M,Φ,A,F!,Jacs = penfunc()
 θ = -π/3
 q0 = [0,0,cos(θ),sin(θ)]
 q̇0 = zeros(4)
@@ -67,4 +67,6 @@ nλ = length(λ0)
 dt = 0.01
 prob = SPARK.DyProblem(penfunc(),q0,q̇0,λ0,(0.0,0.02))
 
-state = SPARK.solve(prob,dt=dt,ftol=1e-12)
+state = SPARK.solve(prob,dt=dt,ftol=1e-13)
+using Traceur
+@trace SPARK.solve(prob,dt=dt,ftol=1e-13)

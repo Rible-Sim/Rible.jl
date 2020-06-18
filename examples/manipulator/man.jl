@@ -1,11 +1,11 @@
-using SPARK
 using LinearAlgebra
 using Parameters
 using StaticArrays
 using Revise
+using SPARK
 using Robot2D
 const R2 = Robot2D
-function man(n)
+function man(n,θ=0.0)
     nbody = 2n - 1
     nbp = 2 + 2(n-1)
     a_lower = fill(0.1,n)
@@ -30,7 +30,6 @@ function man(n)
         Ia[k] = Ic_upper[i] + m[k]*1/3*a[k]^2
     end
     A = zeros(2,nbp)
-    θ = -π/12
     for i in 2:nbp
         A[:,i] .= A[:,i-1] .+ a[i-1]*[cos(θ*(i-1)),sin(θ*(i-1))]
     end
@@ -74,20 +73,20 @@ function man(n)
             Ia[i],A[:,i],A[:,i+1]) for i = 1:nbody]
 
     nstring = 2(nbody-1)
-    upstringlen = 0.9*norm(rbs[2].state.p[3] - rbs[1].state.p[1])
+    upstringlen = norm(rbs[2].state.p[3] - rbs[1].state.p[1])
     lostringlen = norm(rbs[2].state.p[2] - rbs[1].state.p[3])
     original_restlengths = zeros(nstring)
     restlengths = zeros(nstring)
     actuallengths = zeros(nstring)
     ks = zeros(nstring)
     cs = zeros(nstring)
-    cs .= 100.0
+    cs .= 1.0
     for i = 1:nstring
         j = i % 4
         original_restlengths[i] =
                  restlengths[i] =
                actuallengths[i] =  ifelse(j∈[1,0],upstringlen,lostringlen)
-        ks[i] = ifelse(j∈[1,0],1.6e2,1.6e2)
+        ks[i] = ifelse(j∈[1,0],1.0e2,1.0e2)
     end
     ss = [R2.SString(ks[i],cs[i],original_restlengths[i],
         R2.SStringState(restlengths[i],actuallengths[i],0.0)) for i = 1:nstring]
@@ -123,8 +122,23 @@ function man(n)
     cnt = R2.Connectivity(body2q,string2p)
     R2.Structure2D(rbs,ss,acs,cnt)
 end
-n = 4
+n = 2
 manipulator = man(n)
+refman = man(n,-π/12)
+function update_angles(st2d)
+    rbs = st2d.rigidbodies
+    angles = zeros(st2d.nbody)
+    for (rbid,rb) in enumerate(rbs)
+        if rbid > 1
+            state0 = rbs[rbid-1].state
+            V0 = state0.p[2]-state0.p[1]
+            state1 = rbs[rbid].state
+            V1 = state1.p[2]-state1.p[1]
+            angles[rbid] = atan(V1[1]*V0[2]-V1[2]*V0[1],V0[1]*V1[1]+V0[2]*V1[2])
+        end
+    end
+    angles
+end
 function man_spark(n,st2d)
     rbs = st2d.rigidbodies
     vss = st2d.strings
@@ -134,18 +148,10 @@ function man_spark(n,st2d)
     ninconstraint = nbody
     nexconstraint = 3nfixbody
     nconstraint = ninconstraint + nexconstraint
-    nq = body2q[end][end]
-    q0 = zeros(nq)
-    for (rbid,rb) in enumerate(rbs)
-        pindex = body2q[rbid]
-        q0[pindex] .= rbs[rbid].state.coords.q
-    end
 
-    mass_matrix = zeros(nq,nq)
-    for (rbid,rb) in enumerate(rbs)
-        pindex = body2q[rbid]
-        mass_matrix[pindex,pindex] .+= rbs[rbid].state.auxs.M
-    end
+
+    mass_matrix = R2.build_massmatrix(rbs,body2q)
+
     function M!(mm,q)
         mm .= mass_matrix
     end
@@ -155,61 +161,119 @@ function man_spark(n,st2d)
         mul!(p,mass_matrix,q̇)
     end
 
+    ref_angles = update_angles(refman)
+    pids = [R2.PIDController.PID(0.01,0.1,1.0,
+            setpoint=ref_angles[i+1],dt=0.01) for i = 1:2]
+    function actuate!(st2d,pids,t)
+        acs = st2d.actuators
+        angles = update_angles(st2d)
+        for (id,ac) = enumerate(acs)
+            pid = pids[id]
+            input_angle = angles[id]
+            output = R2.PIDController.update!(pid,input_angle,t)
+            #@show id,output
+            @unpack strings = ac
+            for i in [1]
+                str = strings[i]
+                #str.state.restlength = str.original_restlength*(1+0.02Δ)
+                str.state.restlength = str.original_restlength + output
+                #@show i,str.state.restlength
+            end
+            for i in [2]
+                str = strings[i]
+                #str.state.restlength = str.original_restlength*(1-0.02Δ)
+                str.state.restlength = str.original_restlength - output
+                #@show i,str.state.restlength
+            end
+        end
+    end
+
     function F!(F,q,q̇,t)
         R2.reset_forces!(rbs)
         R2.q2rbstate!(st2d,q,q̇)
+        actuate!(st2d,pids,t)
         R2.update_forces!(st2d)
-        R2.genforces!(rbs)
         F .= 0.0
-        for (rbid,rb) in enumerate(rbs)
-            pindex = body2q[rbid]
-            F[pindex] .+= rb.state.auxs.Q
-        end
+        R2.assemble_forces!(F,st2d)
     end
 
-    function Φ(q)
-        ret = Vector{eltype(q)}(undef,nconstraint)
-        for (rbid,rb) in enumerate(rbs)
-            pindex = body2q[rbid]
-            ret[3nfixbody+rbid] = rb.state.auxs.Φ(q[pindex])
-        end
-        for (fixid,rbid) in enumerate(st2d.fixbodyindex)
-            pindex = body2q[rbid]
-            ret[3(fixid-1)+1:3fixid] .= q[pindex[[1,2,4]]] - q0[pindex[[1,2,4]]]
-        end
-        ret
-    end
-
-    function A(q)
-        ret = zeros(eltype(q),nconstraint,nq)
-        for (rbid,rb) in enumerate(rbs)
-            pindex = body2q[rbid]
-            ret[3nfixbody+rbid,pindex] .= rb.state.auxs.Φq(q[pindex])
-        end
-        for (fixid,rbid) in enumerate(st2d.fixbodyindex)
-            ret[3(fixid-1)+1,1:4] .= [1.0,0.0,0.0,0.0]
-            ret[3(fixid-1)+2,1:4] .= [0.0,1.0,0.0,0.0]
-            ret[3(fixid-1)+3,1:4] .= [0.0,0.0,0.0,1.0]
-        end
-        ret
-    end
+    Φ = R2.build_Φ(st2d)
+    A = R2.build_A(st2d)
 
     A,Φ,∂T∂q̇!,F!,M!,nothing
 end
 
 A,Φ,∂T∂q̇!,F!,M!,jacs = man_spark(n,manipulator)
 
+q0,q̇0,λ0 = R2.get_initial(manipulator,Φ)
+
+Φ(q0)
+A(q0)
+
+function man_wend(n,st2d)
+    rbs = st2d.rigidbodies
+    vss = st2d.strings
+    cnt = st2d.connectivity
+    @unpack body2q = cnt
+    @unpack nbody,nfixbody,nstring = st2d
+    ninconstraint = nbody
+    nexconstraint = 3nfixbody
+    nconstraint = ninconstraint + nexconstraint
+    nq = body2q[end][end]
+    q0,q̇0 = R2.get_q(st2d)
+
+    M = R2.build_massmatrix(rbs,body2q)
+
+    ref_angles = update_angles(refman)
+    pids = [R2.PIDController.PID(0.01,0.1,1.0,
+            setpoint=ref_angles[i+1],dt=0.01) for i = 1:2]
+    function actuate!(st2d,pids,t)
+        acs = st2d.actuators
+        angles = update_angles(st2d)
+        for (id,ac) = enumerate(acs)
+            pid = pids[id]
+            input_angle = angles[id]
+            output = R2.PIDController.update!(pid,input_angle,t)
+            #@show id,output
+            @unpack strings = ac
+            for i in [1]
+                str = strings[i]
+                #str.state.restlength = str.original_restlength*(1+0.02Δ)
+                str.state.restlength = str.original_restlength + output
+                #@show i,str.state.restlength
+            end
+            for i in [2]
+                str = strings[i]
+                #str.state.restlength = str.original_restlength*(1-0.02Δ)
+                str.state.restlength = str.original_restlength - output
+                #@show i,str.state.restlength
+            end
+        end
+    end
+
+    function F(q,q̇,t)
+        R2.reset_forces!(rbs)
+        R2.q2rbstate!(st2d,q,q̇)
+        actuate!(st2d,pids,t)
+        R2.update_forces!(st2d)
+        ret = zero(q)
+        R2.assemble_forces!(ret,st2d)
+        ret
+    end
+
+    Φ = R2.build_Φ(st2d)
+    A = R2.build_A(st2d)
+
+    M,Φ,A,F,nothing
+end
+M,Φ,A,F,Jacs = man_wend(n,manipulator)
+
 function initial(n,st2d)
     rbs = st2d.rigidbodies
     cnt = st2d.connectivity
     @unpack nbody,nfixbody = st2d
     nq = cnt.body2q[end][end]
-    q0 = zeros(nq)
-    for (rbid,rb) in enumerate(rbs)
-        pindex = cnt.body2q[rbid]
-        q0[pindex] .= rb.state.coords.q
-    end
-    q̇0 = zero(q0)
+    q0,q̇0 = get_q(st2d)
     #q̇0[end] = 0.01
     #q̇0[end-1:end] .= [0.0,0.001]
     ninconstraint = nbody
@@ -219,12 +283,25 @@ function initial(n,st2d)
     q0,q̇0,λ0
 end
 q0,q̇0,λ0 = initial(n,manipulator)
-# @code_warntype Φ(q0)
-# @code_warntype A(q0)
-# @code_warntype
+@code_warntype Φ(q0)
+@code_warntype A(q0)
+F(q0,q̇0,0.0)
+@code_warntype F(q0,q̇0,0.0)
+dt = 0.01
+prob = SPARK.DyProblem(man_wend(n,manipulator),q0,q̇0,λ0,(0.0,100dt))
+state = SPARK.solve(prob,dt=dt,verbose=true)
+@btime SPARK.solve_oop(prob,dt=dt)
+@time SPARK.solve(prob,dt=dt)
 s = 1
 tab = SPARKTableau(s)
-tspan = (0.0,40.0)
+tspan = (0.0,20.0)
 cache = SPARKCache(size(A(q0))[2],size(A(q0))[1],0.01,tspan,s,(A,Φ,∂T∂q̇!,F!,M!,jacs))
 
-state = SPARKsolve!(q0,q̇0,λ0,cache,tab)
+state = SPARKsolve!(q0,q̇0,λ0,cache,tab,ftol=1e-13)
+using BenchmarkTools
+cn = [cond(A(state.qs[i])) for i = 1:length(state.ts)]
+plot(cn)
+function angle_errors(st2d,ref)
+    angles = update!(st2d)
+    errors = ref - angles
+end
