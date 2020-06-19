@@ -1,3 +1,5 @@
+abstract type AbstractRigidBody end
+abstract type TensegrityStructure end
 
 struct RigidBody2DProperty{T}
     movable::Bool
@@ -10,9 +12,10 @@ struct RigidBody2DProperty{T}
     anchorpoints::Vector{SArray{Tuple{2},T,1,2}}
 end
 
-function RigidBody2DProperty(i,movable,mass,inertia,CoM,naps,aps)
+function RigidBody2DProperty(i,movable,mass,inertia,CoM,aps)
     name = Symbol("rb"*string(i))
     type = :generic
+    naps = length(aps)
     RigidBody2DProperty(movable,name,type,mass,inertia,CoM,naps,aps)
 end
 
@@ -56,16 +59,14 @@ function RigidBody2DState(prop,ri,rj)
     RigidBody2DState(r,θ,ṙ,ω,p,F,τ,Fanc,coords,aux)
 end
 
-struct RigidBody2D{T,CoordinatesType,AuxiliariesType}
+struct RigidBody2D{T,CoordinatesType,AuxiliariesType} <: AbstractRigidBody
     prop::RigidBody2DProperty{T}
     state::RigidBody2DState{T,CoordinatesType,AuxiliariesType}
 end
 
-function reset_forces!(rbs)
-    for (rbid,rb) in enumerate(rbs)
-        for f in rb.state.Fanc
-            f .= 0.0
-        end
-        rb.state.F .= 0.0
+function reset_forces!(rb::RigidBody2D)
+    for f in rb.state.Fanc
+        f .= 0.0
     end
+    rb.state.F .= 0.0
 end

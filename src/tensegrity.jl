@@ -50,8 +50,8 @@ function lengthdir(v)
     l,τ
 end
 
-function reset_forces!(st2d::Structure2D)
-    reset_forces!(st2d.rigidbodies)
+function reset_forces!(tgst::Structure2D)
+    reset_forces!.(tgst.rigidbodies)
 end
 
 

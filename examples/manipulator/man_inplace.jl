@@ -68,8 +68,7 @@ function man_ndof(ndof,θ=0.0)
         anchorpoints = [ap1,ap2,ap3]
 
         prop = R2.RigidBody2DProperty(i,movable,m,Ia,
-                    CoM,nap,
-                    anchorpoints
+                    CoM,anchorpoints
                     )
         state = R2.RigidBody2DState(prop,ri,rj)
         rb = R2.RigidBody2D(prop,state)

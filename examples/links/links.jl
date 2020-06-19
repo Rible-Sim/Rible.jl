@@ -2,13 +2,12 @@ using LinearAlgebra
 using StaticArrays
 using Rotations
 using Parameters
-using GeometryTypes, Makie, AbstractPlotting
 #using DifferentialEquations
 #using ForwardDiff
 using Revise
 using SPARK
 using TensegrityRobotSimulator
-const TRS = TensegrityRobotSimulator
+const TR = TensegrityRobotSimulator
 
 function RigidBody(name;mass = 1.0,
                         inertia = SMatrix{3,3}(1.0I),
@@ -26,19 +25,19 @@ function RigidBody(name;mass = 1.0,
 
     # Configuration
     offset = [0.0, 0.0, h]
-    ap1 = TRS.AnchorPoint([a, 0.0, 0.0] + offset)
-    ap2 = TRS.AnchorPoint([a*cos(θ), a*sin(θ), 0.0] + offset)
-    ap3 = TRS.AnchorPoint([a*cos(θ), -a*sin(θ), 0.0] + offset)
-    ap4 = TRS.AnchorPoint([0.0, 0.0, -h] + offset)
+    ap1 = SVector{3}([a, 0.0, 0.0] + offset)
+    ap2 = SVector{3}([a*cos(θ), a*sin(θ), 0.0] + offset)
+    ap3 = SVector{3}([a*cos(θ), -a*sin(θ), 0.0] + offset)
+    ap4 = SVector{3}([0.0, 0.0, -h] + offset)
 
-    prop = TRS.RigidBodyProperty(movable,name,:generic,mass,
+    prop = TR.RigidBody3DProperty(i,movable,mass,
                 SMatrix{3,3}(inertia),
                 SVector(CoM...),
-                SVector(ap1,ap2,ap3,ap4))
+                [ap1,ap2,ap3,ap4])
 
-    state = TRS.RigidBodyState(prop,r,R,ṙ,ω,Val(:NC))
+    state = TR.RigidBody3DState(prop,r,R,ṙ,ω,Val(:NC))
 
-    TRS.RigidBody(prop,state)
+    TR.RigidBody(prop,state)
 end
 
 mass = 1.0 #kg
@@ -72,28 +71,28 @@ rbs = [rb1,rb2,rb3]
 mvbodyindex = [i for i in eachindex(rbs) if rbs[i].prop.movable]
 mvrbs = [rbs[i] for i in mvbodyindex]
 
-rbv = TRS.RBVector(rbs,mvbodyindex,mvrbs)
+rbv = TR.RBVector(rbs,mvbodyindex,mvrbs)
 
 
 s0_inner =0.2 #m
 k_inner = 10.0 #N/m
 s0_outer = 0.8 #m
 k_outer = 10.0 #N/m
-s1 = TRS.LinearString(k_inner,s0_inner,1,8)
-s2 = TRS.LinearString(k_inner,s0_inner,2,8)
-s3 = TRS.LinearString(k_inner,s0_inner,3,8)
-s4 = TRS.LinearString(k_outer,s0_outer,4,8)
-s5 = TRS.LinearString(k_outer,s0_outer,1,5)
-s6 = TRS.LinearString(k_outer,s0_outer,2,6)
-s7 = TRS.LinearString(k_outer,s0_outer,3,7)
+s1 = TR.LinearString(k_inner,s0_inner,1,8)
+s2 = TR.LinearString(k_inner,s0_inner,2,8)
+s3 = TR.LinearString(k_inner,s0_inner,3,8)
+s4 = TR.LinearString(k_outer,s0_outer,4,8)
+s5 = TR.LinearString(k_outer,s0_outer,1,5)
+s6 = TR.LinearString(k_outer,s0_outer,2,6)
+s7 = TR.LinearString(k_outer,s0_outer,3,7)
 
-s8 = TRS.LinearString(k_inner,s0_inner,5,12)
-s9 = TRS.LinearString(k_inner,s0_inner,6,12)
-s10 = TRS.LinearString(k_inner,s0_inner,7,12)
-s11 = TRS.LinearString(k_outer,s0_outer,8,12)
-s12 = TRS.LinearString(k_outer,s0_outer,5,9)
-s13 = TRS.LinearString(k_outer,s0_outer,6,10)
-s14 = TRS.LinearString(k_outer,s0_outer,7,11)
+s8 = TR.LinearString(k_inner,s0_inner,5,12)
+s9 = TR.LinearString(k_inner,s0_inner,6,12)
+s10 = TR.LinearString(k_inner,s0_inner,7,12)
+s11 = TR.LinearString(k_outer,s0_outer,8,12)
+s12 = TR.LinearString(k_outer,s0_outer,5,9)
+s13 = TR.LinearString(k_outer,s0_outer,6,10)
+s14 = TR.LinearString(k_outer,s0_outer,7,11)
 
 sts = [s1,s2,s3,s4,s5,s6,s7,s8,s9,s10,s11,s12,s13,s14]
 # global to local
@@ -102,8 +101,8 @@ connectivity = [
     [2,1], [2,2], [2,3], [2,4],
     [3,1], [3,2], [3,3], [3,4],
     ]
-#tgsys = TRS.TensegritySystem(rbs,[s1,s2,s3],[j1,j2],connectivity)
-tgsys = TRS.TensegritySystem(rbv,sts,nothing,connectivity)
+#tgsys = TR.TensegritySystem(rbs,[s1,s2,s3],[j1,j2],connectivity)
+tgsys = TR.TensegritySystem(rbv,sts,nothing,connectivity)
 
 
 function tg_spark(tgsys)
@@ -131,9 +130,9 @@ function tg_spark(tgsys)
 
 
     function F!(F,q,q̇,t)
-        TRS.reset_forces!(rigidbodies)
-        TRS.q2rbstate!(mvrigidbodies,q,q̇)
-        TRS.compute_string_forces!(tgsys)
+        TR.reset_forces!.(rigidbodies)
+        TR.q2rbstate!(mvrigidbodies,q,q̇)
+        TR.compute_string_forces!(tgsys)
         for (rbid,rb) = enumerate(mvrigidbodies)
             is = 12*(rbid-1)
             F[is+1:is+12] .= rb.state.auxs.Q
@@ -146,7 +145,7 @@ function tg_spark(tgsys)
         for (rbid,rb) in enumerate(mvrigidbodies)
             is = 6*(rbid-1)
             ks = 12*(rbid-1)
-            ret[is+1:is+6] .= TRS.NC.Φ(q[ks+1:ks+12])
+            ret[is+1:is+6] .= TR.NC.Φ(q[ks+1:ks+12])
         end
         ret
     end
@@ -156,7 +155,7 @@ function tg_spark(tgsys)
         for (rbid,rb) in enumerate(mvrigidbodies)
             is = 6*(rbid-1)
             ks = 12*(rbid-1)
-            ret[is+1:is+6,ks+1:ks+12] .= TRS.NC.Φq(q[ks+1:ks+12])
+            ret[is+1:is+6,ks+1:ks+12] .= TR.NC.Φq(q[ks+1:ks+12])
         end
         ret
     end
@@ -183,7 +182,7 @@ state = SPARKsolve!(q0,q̇0,λ0,cache,tab)
 function potential_energy(tgsys)
     pe = 0.0
     for (stid,st) in enumerate(tgsys.strings)
-        pe_st = TRS.potential_energy(st)
+        pe_st = TR.potential_energy(st)
         pe += pe_st
     end
     pe
@@ -192,16 +191,16 @@ potential_energy(tgsys)
 function kinetic_energy(tgsys)
     ke = 0.0
     for (rbid,rb) in enumerate(tgsys.rigidbodies)
-        ke_rb = TRS.kinetic_energy(rb)
+        ke_rb = TR.kinetic_energy(rb)
         ke += ke_rb
     end
     ke
 end
 kinetic_energy(tgsys)
 function energy(tgsys,q,q̇)
-    TRS.reset_forces!(tgsys.rigidbodies)
-    TRS.q2rbstate!(tgsys.rigidbodies.movables,q,q̇)
-    TRS.compute_string_forces!(tgsys)
+    TR.reset_forces!.(tgsys.rigidbodies)
+    TR.q2rbstate!(tgsys.rigidbodies.movables,q,q̇)
+    TR.compute_string_forces!(tgsys)
     ke = kinetic_energy(tgsys)
     pe = potential_energy(tgsys)
     ke,pe,ke + pe

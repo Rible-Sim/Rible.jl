@@ -63,7 +63,6 @@ function man(n,θ=0.0)
         prop = R2.RigidBody2DProperty(movable,name,type,
                     m,Ia,
                     CoM,
-                    nap,
                     anchorpoints
                     )
         state = R2.RigidBody2DState(prop,ri,rj)
@@ -189,7 +188,7 @@ function man_spark(n,st2d)
     end
 
     function F!(F,q,q̇,t)
-        R2.reset_forces!(rbs)
+        R2.reset_forces!(st2d)
         R2.q2rbstate!(st2d,q,q̇)
         actuate!(st2d,pids,t)
         R2.update_forces!(st2d)
@@ -252,7 +251,7 @@ function man_wend(n,st2d)
     end
 
     function F(q,q̇,t)
-        R2.reset_forces!(rbs)
+        R2.reset_forces!(st2d)
         R2.q2rbstate!(st2d,q,q̇)
         actuate!(st2d,pids,t)
         R2.update_forces!(st2d)

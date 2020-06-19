@@ -36,7 +36,6 @@ function npen(n)
         prop = R2.RigidBody2DProperty(movable,name,type,
                     m,I,
                     CoM,
-                    nap,
                     anchorpoints
                     )
         state = R2.RigidBody2DState(prop,ri,rj)
@@ -58,7 +57,7 @@ function npen_wend(st2d)
     Φ = R2.build_Φ(st2d)
     A = R2.build_A(st2d)
     function F(q,q̇,t)
-        R2.reset_forces!(st2d.rigidbodies)
+        R2.reset_forces!(st2d)
         R2.q2rbstate!(st2d,q,q̇)
         R2.apply_gravity!(st2d)
         ret = similar(q)

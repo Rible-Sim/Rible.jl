@@ -7,9 +7,9 @@ import PyPlot; const plt = PyPlot
 using LaTeXStrings
 # using NLsolve
 using Revise
-using SPARK
-using Robot2D
-const R2 = Robot2D
+using TensegritySolvers; const TS = TensegritySolvers
+using TensegrityRobot
+const TR = TensegrityRobot
 
 function make_tail(n)
     nver = n
@@ -79,13 +79,13 @@ function make_tail(n)
         end
         nap = length(aps)
         anchorpoints = [SVector{2}(aps[i]) for i = 1:nap]
-        prop = R2.RigidBody2DProperty(i,movable,
+        prop = TR.RigidBody2DProperty(i,movable,
                     m,inertia,
                     SVector{2}(CoM),
-                    nap,anchorpoints
+                    anchorpoints
                     )
-        state = R2.RigidBody2DState(prop,ri,rj)
-        rb = R2.RigidBody2D(prop,state)
+        state = TR.RigidBody2DState(prop,ri,rj)
+        rb = TR.RigidBody2D(prop,state)
     end
     rbs = [rigidbody(i,CoM[i],m[i],inertia[i],ri[i],rj[i],[p1[i],p2[i]]) for i = 1:nb]
 
@@ -100,46 +100,46 @@ function make_tail(n)
                actuallengths[i] = ifelse(j∈[1,0],0.04,√3*0.02)
     end
     ks = fill(100.0,nstring)
-    ss = [R2.SString(ks[i],original_restlengths[i],
-        R2.SStringState(restlengths[i],actuallengths[i],0.0)) for i = 1:nstring]
-    # @code_warntype   R2.DString(k[i],original_restlength[i],
+    ss = [TR.SString(ks[i],original_restlengths[i],
+        TR.SStringState(restlengths[i],actuallengths[i],0.0)) for i = 1:nstring]
+    # @code_warntype   TR.DString(k[i],original_restlength[i],
     #         restlength[i],actuallength[i],zeros(MVector{4}))
 
-    acs = [R2.Actuator(ss[4(i-1)+1:4i]) for i = 1:n]
+    acs = [TR.Actuator(ss[4(i-1)+1:4i]) for i = 1:n]
 
     rb2p = [
         ifelse(isodd(i),[i,i+1],[i-1,i+1]) for i = 1:length(rbs)
     ]
     body2q = [[2pid[1]-1,2pid[1],2pid[2]-1,2pid[2]] for pid in rb2p]
 
-    string2ap = Vector{Tuple{R2.ID,R2.ID}}()
+    string2ap = Vector{Tuple{TR.ID,TR.ID}}()
     for i = 1:n
-        push!(string2ap,(R2.ID(2i+1,1),R2.ID(2i-1,1)))
-        push!(string2ap,(R2.ID(2i+1,1),R2.ID(2i  ,1)))
-        push!(string2ap,(R2.ID(2i+1,2),R2.ID(2i  ,1)))
-        push!(string2ap,(R2.ID(2i+1,2),R2.ID(2i-1,2)))
+        push!(string2ap,(TR.ID(2i+1,1),TR.ID(2i-1,1)))
+        push!(string2ap,(TR.ID(2i+1,1),TR.ID(2i  ,1)))
+        push!(string2ap,(TR.ID(2i+1,2),TR.ID(2i  ,1)))
+        push!(string2ap,(TR.ID(2i+1,2),TR.ID(2i-1,2)))
     end
-    cnt = R2.Connectivity(body2q,string2ap)
-    R2.Structure2D(rbs,ss,acs,cnt)
+    cnt = TR.Connectivity(body2q,string2ap)
+    TR.Structure2D(rbs,ss,acs,cnt)
 end
 n = 4
 tail = make_tail(n)
 
 function dynfuncs(st2d)
 
-    M = R2.build_massmatrix(st2d)
-    Φ = R2.build_Φ(st2d)
-    A = R2.build_A(st2d)
+    M = TR.build_massmatrix(st2d)
+    Φ = TR.build_Φ(st2d)
+    A = TR.build_A(st2d)
 
-    Q̃=R2.build_Q̃(st2d)
+    Q̃=TR.build_Q̃(st2d)
 
     function F!(F,q,q̇,t)
-        R2.reset_forces!(st2d)
-        R2.q2rbstate!(st2d,q,q̇)
-        R2.update_forces!(st2d)
-        # F .= Q̃*R2.fvector(st2d)
+        TR.reset_forces!(st2d)
+        TR.q2rbstate!(st2d,q,q̇)
+        TR.update_forces!(st2d)
+        # F .= Q̃*TR.fvector(st2d)
         F .= 0.0
-        R2.assemble_forces!(F,st2d)
+        TR.assemble_forces!(F,st2d)
     end
 
     M,Φ,A,F!,nothing
@@ -147,9 +147,10 @@ end
 
 
 M,Φ,A,F!,Jacs = dynfuncs(tail)
-q0,q̇0,λ0 = R2.get_initial(tail)
+q0,q̇0,λ0 = TR.get_initial(tail)
 q̇0[end-3:end] .= [0.1,0.0,0.1,0.0]
 
 dt = 0.01
-prob = SPARK.DyProblem(dynfuncs(tail),q0,q̇0,λ0,(0.0,20.0))
-sol = SPARK.solve(prob,dt=dt,ftol=1e-14,verbose=true)
+prob = TS.DyProblem(dynfuncs(tail),q0,q̇0,λ0,(0.0,20.0))
+sol = TS.solve(prob,TS.Wendlandt(),dt=dt,ftol=1e-14,verbose=true)
+sol = TS.solve(prob,TS.ConstSPARK(1),dt=dt,ftol=1e-12,verbose=true)

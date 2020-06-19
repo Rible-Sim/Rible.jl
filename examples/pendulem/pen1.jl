@@ -14,7 +14,6 @@ function penfunc()
     prop = R2.RigidBody2DProperty(true,:rb1,:generic,
                 m,m*L,
                 SVector(L,0.0),
-                2,
                 [SVector(0.0,0.0),SVector(L,0.0)]
                 )
     θ = -π/3
