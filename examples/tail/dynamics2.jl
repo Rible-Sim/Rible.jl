@@ -135,8 +135,8 @@ function dynfuncs(st2d)
 
     function F!(F,q,q̇,t)
         TR.reset_forces!(st2d)
-        TR.q2rbstate!(st2d,q,q̇)
-        TR.update_forces!(st2d)
+        TR.distribute_q_to_rbs!(st2d,q,q̇)
+        TR.update_strings_apply_forces!(st2d)
         # F .= Q̃*TR.fvector(st2d)
         F .= 0.0
         TR.assemble_forces!(F,st2d)
@@ -144,7 +144,6 @@ function dynfuncs(st2d)
 
     M,Φ,A,F!,nothing
 end
-
 
 M,Φ,A,F!,Jacs = dynfuncs(tail)
 q0,q̇0,λ0 = TR.get_initial(tail)

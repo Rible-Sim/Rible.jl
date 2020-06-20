@@ -381,7 +381,7 @@ function compute_string_forces!(tgsys)
     end
 end
 
-function q2rbstate!(rbs,q,q̇)
+function distribute_q_to_rbs!(rbs,q,q̇)
     for (rbid,rb) = enumerate(rbs)
         is = 12*(rbid-1)
         rb.state.coords.q .= q[is+1:is+12]

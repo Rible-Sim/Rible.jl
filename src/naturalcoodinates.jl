@@ -15,6 +15,13 @@ struct BasicPoints1P1V{T}
     ū::SArray{Tuple{2},T,1,2}
 end
 
+function BasicPoints2P(Lij::Real)
+    o = zero(Lij)
+    r̄i = SVector(o,o)
+    r̄j = SVector(Lij,o)
+    BasicPoints2P(r̄i,r̄j)
+end
+
 
 function transform_to_1P1V(bps::BasicPoints2P{T}) where T
     I2 = make_I(T,2)
@@ -29,8 +36,15 @@ end
 struct BasicPoints2P2V{T}
     r̄i::SArray{Tuple{3},T,1,3}
     r̄j::SArray{Tuple{3},T,1,3}
-    ū::SArray{Tuple{3},T,1,3}
     v̄::SArray{Tuple{3},T,1,3}
+    w̄::SArray{Tuple{3},T,1,3}
+end
+
+struct BasicPoints3P1V{T}
+    r̄i::SArray{Tuple{3},T,1,3}
+    r̄j::SArray{Tuple{3},T,1,3}
+    r̄k::SArray{Tuple{3},T,1,3}
+    w̄::SArray{Tuple{3},T,1,3}
 end
 
 struct BasicPoints4P{T}
@@ -38,13 +52,6 @@ struct BasicPoints4P{T}
     r̄j::SArray{Tuple{3},T,1,3}
     r̄k::SArray{Tuple{3},T,1,3}
     r̄l::SArray{Tuple{3},T,1,3}
-end
-
-struct BasicPoints3P1V{T}
-    r̄i::SArray{Tuple{3},T,1,3}
-    r̄j::SArray{Tuple{3},T,1,3}
-    r̄k::SArray{Tuple{3},T,1,3}
-    u::SArray{Tuple{3},T,1,3}
 end
 
 function transform_to_2P2V(bps::BasicPoints3P1V{T}) where T
@@ -70,66 +77,62 @@ end
 
 function make_X̄(bps::BasicPoints2P{T}) where T
     @unpack r̄i,r̄j = bps
-    ret = Matrix{T}(undef,2,2)
-    ret[:,1] .= r̄j - r̄i
-    ret[1,2] = -ret[2,1]
-    ret[2,2] =  ret[1,1]
-    ret
+    ū = r̄j-r̄i
+    X̄_raw = hcat(ū,[-ū[2],ū[1]])
+    X̄ = SMatrix{2,2}(X̄_raw)
 end
 
 function make_X̄(bps::BasicPoints1P1V{T}) where T
     @unpack ū = bps
-    ret = Matrix{T}(undef,2,2)
-    ret[:,1] .= ū
-    ret[1,2] = -ret[2,1]
-    ret[2,2] =  ret[1,1]
-    ret
+    X̄_raw = hcat(ū,[-ū[2],ū[1]])
+    X̄ = SMatrix{2,2}(X̄_raw)
 end
 
 function make_X̄(bps::BasicPoints2P2V{T}) where T
-    @unpack r̄i,r̄j,ū,v̄ = bps
-    ret = Matrix{T}(undef,3,3)
-    ret[:,1] .= r̄j .- r̄i
-    ret[:,2] .= ū
-    ret[:,3] .= v̄
-    ret
+    @unpack r̄i,r̄j,v̄,w̄ = bps
+    ū = r̄j-r̄i
+    X̄_raw = hcat(ū,v̄,w̄)
+    X̄ = SMatrix{3,3}(X̄_raw)
 end
 
 function make_Φ(bps::BasicPoints2P)
-    Lij = norm(bps.r̄i-bps.r̄j)
-    function inner_Φ(q)
+    ū = bps.r̄j-bps.r̄i
+    u_square = ū⋅ū
+    @inline @inbounds function inner_Φ(q)
         xi,yi,xj,yj = q
-        (xj-xi)^2 + (yj-yi)^2 - Lij^2
+        (xj-xi)^2 + (yj-yi)^2 - u_square
     end
 end
 
 function make_Φ(bps::BasicPoints1P1V)
-    function inner_Φ(q)
+    @inline @inbounds function inner_Φ(q)
         u1,u2 = q[3],q[4]
-        u1^2 + u2 - 1
+        u1^2 + u2^2 - 1
     end
 end
 
 function make_Φ(bps::BasicPoints2P2V)
-    Lij2 = norm(bps.r̄i-bps.r̄j)^2
-    function inner_Φ(q)
+    ū = bps.r̄j-bps.r̄i
+    u_square = ū⋅ū
+    @inline @inbounds function inner_Φ(q)
         ri = @view q[1:3]
         rj = @view q[4:6]
-        u  = @view q[7:9]
-        v  = @view q[10:12]
+        u = rj-ri
+        v  = @view q[7:9]
+        w  = @view q[10:12]
         [
-        (rj-ri)⋅(rj-ri) - Lij2,
-        (rj-ri)⋅u,
-        (rj-ri)⋅v,
+        u⋅u - u_square,
         u⋅v,
-        u⋅u - 1,
-        v⋅v - 1
+        u⋅w,
+        v⋅w,
+        v⋅v - 1,
+        w⋅w - 1
         ]
     end
 end
 
 function make_Φq(bps::BasicPoints2P)
-    function inner_Φq(q)
+    @inline @inbounds function inner_Φq(q)
         xi,yi,xj,yj = q
         ret = similar(q)
         ret[1] = 2(xi-xj)
@@ -141,29 +144,29 @@ function make_Φq(bps::BasicPoints2P)
 end
 
 function make_Φq(bps::BasicPoints2P2V)
-    function inner_Φq(q)
+    @inline @inbounds function inner_Φq(q)
         ri = @view q[1:3]
         rj = @view q[4:6]
-        u  = @view q[7:9]
-        v  = @view q[10:12]
+        u  = rj-ri
+        v  = @view q[7:9]
+        w  = @view q[10:12]
         ret = zeros(eltype(q), 6, 12)
-        rirj = rj-ri
-        ret[1,1:3] = -2rirj
-        ret[1,4:6] =  2rirj
+        ret[1,1:3] = -2u
+        ret[1,4:6] =  2u
 
-        ret[2,1:3] = -u
-        ret[2,4:6] =  u
-        ret[2,7:9] = rirj
+        ret[2,1:3] = -v
+        ret[2,4:6] =  v
+        ret[2,7:9] =  u
 
-        ret[3,1:3] = -v
-        ret[3,4:6] =  v
-        ret[3,10:12] = rirj
+        ret[3,1:3] = -w
+        ret[3,4:6] =  w
+        ret[3,10:12] = u
 
-        ret[4,7:9]   = v
-        ret[4,10:12] = u
+        ret[4,7:9]   = w
+        ret[4,10:12] = v
 
-        ret[5,7:9]   = 2u
-        ret[6,10:12] = 2v
+        ret[5,7:9]   = 2v
+        ret[6,10:12] = 2w
         ret
     end
 end
@@ -177,16 +180,16 @@ end
 
 function make_C(bps::BasicPoints2P)
     function C(c)
-        ret = Matrix{eltype(c)}(undef,2,4)
-        ret[1,1] = 1-c[1]
-        ret[1,2] =   c[2]
-        ret[1,3] =   c[1]
-        ret[1,4] =  -c[2]
-        ret[2,1] =  -c[2]
-        ret[2,2] = 1-c[1]
-        ret[2,3] =   c[2]
-        ret[2,4] =   c[1]
-        ret
+        C_raw = Matrix{eltype(c)}(undef,2,4)
+        C_raw[1,1] = 1-c[1]
+        C_raw[1,2] =   c[2]
+        C_raw[1,3] =   c[1]
+        C_raw[1,4] =  -c[2]
+        C_raw[2,1] =  -c[2]
+        C_raw[2,2] = 1-c[1]
+        C_raw[2,3] =   c[2]
+        C_raw[2,4] =   c[1]
+        SMatrix{2,4}(C_raw)
     end
 end
 
@@ -194,17 +197,17 @@ function make_C(bps::BasicPoints2P2V{T}) where T
     I3 = make_I(T,3)
     function C(c)
         C_raw = [1-c[1], c[1], c[2], c[3]]
-        C_ret = kron(C_raw,I3)
+        SMatrix{3,12}(kron(C_raw,I3))
     end
 end
 
-struct CoordinateFunctions{bpsType,XT,CT,cT,ΦT,ΦqT}
+struct CoordinateFunctions{bpsType,XT,cT,CT,ΦT,ΦqT}
     bps::bpsType
     invX̄::XT
     c::cT
     C::CT
-    ΦT::ΦT
-    ΦqT::ΦqT
+    Φ::ΦT
+    Φq::ΦqT
 end
 
 function CoordinateFunctions(bps)
@@ -214,16 +217,17 @@ function CoordinateFunctions(bps)
     C = make_C(bps)
     Φ = make_Φ(bps)
     Φq = make_Φq(bps)
-    NaturalCoordinates(bps,invX̄,c,C,Φ,Φq)
+    CoordinateFunctions(bps,invX̄,c,C,Φ,Φq)
 end
 
-function make_M(cf::CoordinateFunctions{T,BasicPoints2P{T},CT,cT,ΦT,ΦqT},
-                m::T,polar::T,r̄G) where {T,CT,cT,ΦT,ΦqT}
+function make_M(cf::CoordinateFunctions{BasicPoints2P{T},XT,cT,CT,ΦT,ΦqT},
+                m::T,polar::T,r̄G) where {T,XT,cT,CT,ΦT,ΦqT}
     @unpack invX̄,bps = cf
     @unpack r̄i,r̄j = bps
-    Lij = norm(r̄i-r̄j)
-    a = invX̄*r̄G
-    z = polar/Lij^2
+    ū = r̄j-r̄i
+    u_square = ū⋅ū
+    a = invX̄*(r̄G-r̄i)
+    z = polar/u_square
     M = zeros(T,4,4)
     M[1,1] = m - 2m*a[1] + z
     M[1,2] = 0.0
@@ -235,9 +239,8 @@ function make_M(cf::CoordinateFunctions{T,BasicPoints2P{T},CT,cT,ΦT,ΦqT},
     M[3,3] = z
     M[3,4] = 0.0
     M[4,4] = z
-    M_ret = Matrix(Symmetric(M))
+    M_ret = SMatrix{4,4}(Symmetric(M))
 end
-
 
 function inertia2z(inertia::AbstractVector{T},bps) where T
     invX̄ = bps.invX̄
@@ -248,8 +251,8 @@ function inertia2z(inertia::AbstractVector{T},bps) where T
     invX̄*Ji*transpose(invX̄)
 end
 
-function make_M(cf::CoordinateFunctions{T,BasicPoints2P2V{T},CT,cT,ΦT,ΦqT},
-                m::T,inertia::AbstractVector{T},r̄G) where {T,CT,cT,ΦT,ΦqT}
+function make_M(cf::CoordinateFunctions{BasicPoints2P2V{T},XT,cT,CT,ΦT,ΦqT},
+                m::T,inertia::AbstractVector{T},r̄G) where {T,XT,cT,CT,ΦT,ΦqT}
     I3 = make_I(T,3)
     @unpack bps,invX̄ = cf
     @unpack r̄i = bps
@@ -262,7 +265,7 @@ function make_M(cf::CoordinateFunctions{T,BasicPoints2P2V{T},CT,cT,ΦT,ΦqT},
                         m*a[3]-z[3,1]]
     M_raw[1,2:4] .= M_raw[2:4,1]
     M_raw[2:4,2:4] .= z
-    M = kron(M_raw,I3)
+    M = SMatrix{12,12}(kron(M_raw,I3))
 end
 
 

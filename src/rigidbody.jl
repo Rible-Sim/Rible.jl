@@ -49,19 +49,19 @@ function RigidBodyState(prop,ri,rj)
     coords = RigidBodyCoordinates(q,q̇,q̈,Q)
     r = MVector{2}(ri)
     ṙ = zero(r)
-    rirj = rj-ri
-    θ = atan(rirj[2],rirj[1])
+    u = rj-ri
+    θ = atan(u[2],u[1])
     R = MMatrix{2,2}(cos(θ), -sin(θ), sin(θ), cos(θ))
     ω = 0.0
     F = MVector(0.0,0.0)
     τ = 0.0
     τanc = MVector(0.0,0.0)
-    aux = NCaux(prop,ri,rj)
+    cache = NaturalCoordinatesCache(prop,norm(u))
     nap = prop.naps
-    p = [MVector{2}(aux.Cp[i]*q) for i in 1:nap]
+    p = [MVector{2}(cache.Cp[i]*q) for i in 1:nap]
     Fanc = [zeros(MVector{2}) for i in 1:nap]
     τanc = [zeros(MVector{2}) for i in 1:nap]
-    RigidBodyState(r,R,ṙ,ω,p,F,τ,Fanc,τanc,coords,aux)
+    RigidBodyState(r,R,ṙ,ω,p,F,τ,Fanc,τanc,coords,cache)
 end
 
 struct RigidBody{N,T,iT,L,ωT,CoordinatesType,cacheType} <: AbstractRigidBody

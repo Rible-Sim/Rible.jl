@@ -189,9 +189,9 @@ function man_spark(n,st2d)
 
     function F!(F,q,q̇,t)
         R2.reset_forces!(st2d)
-        R2.q2rbstate!(st2d,q,q̇)
+        R2.distribute_q_to_rbs!(st2d,q,q̇)
         actuate!(st2d,pids,t)
-        R2.update_forces!(st2d)
+        R2.update_strings_apply_forces!(st2d)
         F .= 0.0
         R2.assemble_forces!(F,st2d)
     end
@@ -252,9 +252,9 @@ function man_wend(n,st2d)
 
     function F(q,q̇,t)
         R2.reset_forces!(st2d)
-        R2.q2rbstate!(st2d,q,q̇)
+        R2.distribute_q_to_rbs!(st2d,q,q̇)
         actuate!(st2d,pids,t)
-        R2.update_forces!(st2d)
+        R2.update_strings_apply_forces!(st2d)
         ret = zero(q)
         R2.assemble_forces!(ret,st2d)
         ret

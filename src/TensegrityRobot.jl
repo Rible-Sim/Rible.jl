@@ -6,8 +6,8 @@ using Parameters
 using StaticArrays
 using NLsolve
 
-include("NC.jl")
 include("naturalcoodinates.jl")
+include("NC.jl")
 include("string.jl")
 
 include("rigidbody.jl")

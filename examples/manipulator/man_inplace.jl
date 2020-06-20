@@ -7,9 +7,12 @@ import PyPlot; const plt = PyPlot
 using LaTeXStrings
 # using NLsolve
 using Revise
-using SPARK
-using Robot2D
-const R2 = Robot2D
+# using TS
+# using Robot2D
+# const TR = Robot2D
+using TensegritySolvers; const TS = TensegritySolvers
+using TensegrityRobot
+const TR = TensegrityRobot
 
 function man_ndof(ndof,θ=0.0)
     nbody = ndof + 1
@@ -67,11 +70,11 @@ function man_ndof(ndof,θ=0.0)
         ap3 = SVector{2}([ap3_x,ap3_y])
         aps = [ap1,ap2,ap3]
 
-        prop = R2.RigidBodyProperty(i,movable,m,Ia,
+        prop = TR.RigidBodyProperty(i,movable,m,Ia,
                     CoM,aps
                     )
-        state = R2.RigidBodyState(prop,ri,rj)
-        rb = R2.RigidBody(prop,state)
+        state = TR.RigidBodyState(prop,ri,rj)
+        rb = TR.RigidBody(prop,state)
     end
     rbs = [rigidbody(i,m[i],a[i],
             Ia[i],A[:,i],A[:,i+1]) for i = 1:nbody]
@@ -92,11 +95,11 @@ function man_ndof(ndof,θ=0.0)
                actuallengths[i] =  ifelse(j∈[1,0],upstringlen,lostringlen)
         ks[i] = ifelse(j∈[1,0],1.0e2,1.0e2)
     end
-    ss = [R2.SString(ks[i],cs[i],original_restlengths[i],
-        R2.SStringState(restlengths[i],actuallengths[i],0.0)) for i = 1:nstring]
+    ss = [TR.SString(ks[i],cs[i],original_restlengths[i],
+        TR.SStringState(restlengths[i],actuallengths[i],0.0)) for i = 1:nstring]
     acs = [
-        ifelse(isodd(i),R2.Actuator(ss[2(i-1)+1:2i]),
-                        R2.Actuator(ss[2i:-1:2(i-1)+1]))
+        ifelse(isodd(i),TR.Actuator(ss[2(i-1)+1:2i]),
+                        TR.Actuator(ss[2i:-1:2(i-1)+1]))
         for i = 1:nbody-1
     ]
 
@@ -110,13 +113,13 @@ function man_ndof(ndof,θ=0.0)
     string2ap_raw = [
         [zeros(Int,2),zeros(Int,2)] for i = 1:length(ss)
     ]
-    string2ap = Vector{Tuple{R2.ID,R2.ID}}()
+    string2ap = Vector{Tuple{TR.ID,TR.ID}}()
     for i = 1:length(rbs)-1
-        push!(string2ap,(R2.ID(i,1),R2.ID(i+1,3)))
-        push!(string2ap,(R2.ID(i,3),R2.ID(i+1,2)))
+        push!(string2ap,(TR.ID(i,1),TR.ID(i+1,3)))
+        push!(string2ap,(TR.ID(i,3),TR.ID(i+1,2)))
     end
-    cnt = R2.Connectivity(body2q,string2ap)
-    R2.TensegrityStructure(rbs,ss,acs,cnt)
+    cnt = TR.Connectivity(body2q,string2ap)
+    TR.TensegrityStructure(rbs,ss,acs,cnt)
 end
 # ------------------Create Tensegrity Struture --------------------------
 ndof = 6
@@ -124,35 +127,35 @@ refman = man_ndof(ndof,-π/12) # reference
 manipulator = man_ndof(ndof,0.0)
 # ------------------Create Tensegrity Struture\\-------------------------
 
-q0,q̇0,λ0 = R2.get_initial(manipulator) #backup
+q0,q̇0,λ0 = TR.get_initial(manipulator) #backup
 # ----------------------Inverse Kinematics ------------------------------
 function inverse(st2d,refst2d)
     function ikfuncs(st2d)
 
-        A = R2.build_A(st2d)
+        A = TR.build_A(st2d)
 
-        Q̃=R2.build_Q̃(st2d)
+        Q̃=TR.build_Q̃(st2d)
 
         function F!(F,u)
-            R2.reset_forces!(st2d)
-            R2.actuate!(st2d,u)
-            R2.update_forces!(st2d)
-            F .= Q̃*R2.fvector(st2d)
+            TR.reset_forces!(st2d)
+            TR.actuate!(st2d,u)
+            TR.update_strings_apply_forces!(st2d)
+            F .= Q̃*TR.fvector(st2d)
         end
 
         A,F!
     end
-    q0,q̇0,λ0 = R2.get_initial(refst2d)
-    R2.q2rbstate!(st2d,q0,q̇0)
+    q0,q̇0,λ0 = TR.get_initial(refst2d)
+    TR.distribute_q_to_rbs!(st2d,q0,q̇0)
     nu = length(st2d.actuators)
     u0 = zeros(nu)
-    ikprob = SPARK.IKProblem(ikfuncs(st2d),q0,u0,λ0)
-    R2.iksolve(ikprob)
+    ikprob = TS.IKProblem(ikfuncs(st2d),q0,u0,λ0)
+    TR.iksolve(ikprob)
 end
 u,_ = inverse(manipulator,refman) # PID setpoints
 
-R2.q2rbstate!(manipulator,q0,q̇0)
-R2.actuate!(manipulator,zero(u)) # reverse to initial
+TR.distribute_q_to_rbs!(manipulator,q0,q̇0)
+TR.actuate!(manipulator,zero(u)) # reverse to initial
 # ----------------------Inverse Kinematics\\-----------------------------
 
 dt = 0.01 # Same dt used for PID AND Dynamics solver
@@ -174,12 +177,12 @@ function get_angles(st2d)
 end
 refangles = get_angles(refman)
 refman
-pids = [R2.PIDController.PID(0.01,0.0,0.01,
+pids = [TR.PIDController.PID(0.01,0.0,0.01,
             setpoint=ui,dt=dt) for ui in refangles]
 # ---------------------Create Controllers\\-------------------------------
 
 # --------------------Create Robot ---------------------------------------
-rob = R2.TGRobot2D(manipulator,R2.ControlHub(pids))
+rob = TR.TGRobot2D(manipulator,TR.ControlHub(pids))
 # --------------------Create Robot\\--------------------------------------
 
 # --------------------Define Control Action-------------------------------
@@ -190,9 +193,9 @@ function make_control!(get_feedback)
         inputs = get_feedback(st2d)
         for (id,pid,traj,actuator) in zip(eachindex(ctrls),ctrls,trajs,st2d.actuators)
             input = inputs[id]
-            output = R2.PIDController.update!(pid,input)
-            R2.actuate!(actuator,output)
-            R2.record!(traj,pid)
+            output = TR.PIDController.update!(pid,input)
+            TR.actuate!(actuator,output)
+            TR.record!(traj,pid)
         end
     end
 end
@@ -203,20 +206,20 @@ control! = make_control!(get_angles)
 # ----------------------------Dynamics-----------------------------------
 function dynfuncs(st2d)
 
-    M = R2.build_massmatrix(st2d)
-    M!, ∂T∂q̇! = SPARK.const_massmatrix_functions(M)
-    Φ = R2.build_Φ(st2d)
-    A = R2.build_A(st2d)
+    M = TR.build_massmatrix(st2d)
+    #M!, ∂T∂q̇! = TS.const_massmatrix_functions(M)
+    Φ = TR.build_Φ(st2d)
+    A = TR.build_A(st2d)
 
-    Q̃=R2.build_Q̃(st2d)
+    Q̃=TR.build_Q̃(st2d)
 
     function F!(F,q,q̇,t)
-        R2.reset_forces!(st2d)
-        R2.q2rbstate!(st2d,q,q̇)
-        R2.update_forces!(st2d)
-        F .= Q̃*R2.fvector(st2d)
+        TR.reset_forces!(st2d)
+        TR.distribute_q_to_rbs!(st2d,q,q̇)
+        TR.update_strings_apply_forces!(st2d)
+        F .= Q̃*TR.fvector(st2d)
         #F .= 0.0
-        #R2.assemble_forces!(F,st2d)
+        #TR.assemble_forces!(F,st2d)
         #@show isapprox(F,)
     end
 
@@ -225,30 +228,30 @@ function dynfuncs(st2d)
     #A,Φ,∂T∂q̇!,F!,M!,nothing
 end
 M,Φ,A,F!,Jacs = dynfuncs(manipulator)
-prob = SPARK.DyProblem(dynfuncs(manipulator),q0,q̇0,λ0,(0.0,40.0))
-# R2.actuate!(manipulator,u)
-# sol = SPARK.solve(prob,dt=dt,ftol=1e-13,verbose=true)
+prob = TS.DyProblem(dynfuncs(manipulator),q0,q̇0,λ0,(0.0,40.0))
+# TR.actuate!(manipulator,u)
+# sol = TS.solve(prob,dt=dt,ftol=1e-13,verbose=true)
 
 function make_affect!(robot2d,control!)
     function inner_affect!(intor)
-        R2.q2rbstate!(robot2d.st2d,intor.qprev,intor.q̇prev)
-        R2.update_forces!(robot2d.st2d)
+        TR.distribute_q_to_rbs!(robot2d.st2d,intor.qprev,intor.q̇prev)
+        TR.update_strings_apply_forces!(robot2d.st2d)
         control!(robot2d,intor.t)
     end
 end
-cb = SPARK.DiscreteCallback((x)->true,make_affect!(rob,make_control!(get_angles)))
-R2.PIDController.tune!(rob.hub.ctrls[1],1.4,0.004,13)
-R2.PIDController.tune!(rob.hub.ctrls[2],1.3,0.004,12)
-R2.PIDController.tune!(rob.hub.ctrls[3],1.2,0.004,11)
-R2.PIDController.tune!(rob.hub.ctrls[4],1.1,0.004,10)
-R2.PIDController.tune!(rob.hub.ctrls[5],1.0,0.005,8.5)
-R2.PIDController.tune!(rob.hub.ctrls[6],0.9,0.005,7.0)
-R2.reset!.(rob.st2d.actuators)
-R2.reset!.(rob.hub.trajs)
-sol = SPARK.solve(prob,dt=dt,ftol=1e-13,callback=cb)
+cb = TS.DiscreteCallback((x)->true,make_affect!(rob,make_control!(get_angles)))
+TR.PIDController.tune!(rob.hub.ctrls[1],1.4,0.004,13)
+TR.PIDController.tune!(rob.hub.ctrls[2],1.3,0.004,12)
+TR.PIDController.tune!(rob.hub.ctrls[3],1.2,0.004,11)
+TR.PIDController.tune!(rob.hub.ctrls[4],1.1,0.004,10)
+TR.PIDController.tune!(rob.hub.ctrls[5],1.0,0.005,8.5)
+TR.PIDController.tune!(rob.hub.ctrls[6],0.9,0.005,7.0)
+TR.reset!.(rob.st2d.actuators)
+TR.reset!.(rob.hub.trajs)
+sol = TS.solve(prob,TS.Wendlandt(),dt=dt,ftol=1e-13,callback=cb)
 pltfig.clear(); pltfig = controlplot(rob.hub.trajs)
 pltfig = controlplot(rob.hub.trajs)
-sol = SPARK.solve(prob,dt=dt,ftol=1e-13,callback=cb,verbose=true)
+sol = TS.solve(prob,dt=dt,ftol=1e-13,callback=cb,verbose=true)
 # ----------------------------Dynamics-----------------------------------
 
 function controlplot(trajs)
@@ -287,30 +290,30 @@ end
 # @code_warntype F!(Fholder,q0,q̇0,0.0)
 # F!(Fholder,q0,q̇0,0.0)
 
-sol = SPARK.solve(prob,dt=dt,ftol=1e-13,verbose=true)
-sol = SPARK.solve(prob,dt=dt,ftol=1e-13)
+sol = TS.solve(prob,dt=dt,ftol=1e-13,verbose=true)
+sol = TS.solve(prob,dt=dt,ftol=1e-13)
 
 
 
 
 
 
-R2.q2rbstate!(manipulator,sol.qs[end],sol.q̇s[end])
+TR.distribute_q_to_rbs!(manipulator,sol.qs[end],sol.q̇s[end])
 endangles = get_angles(manipulator)
 
-sol = SPARK.solve(prob,dt=dt,ftol=1e-13,verbose=true,callback=cb)
+sol = TS.solve(prob,dt=dt,ftol=1e-13,verbose=true,callback=cb)
 
-@time SPARK.solve(prob,dt=dt,ftol=1e-13)
+@time TS.solve(prob,dt=dt,ftol=1e-13)
 s = 1
 tab = SPARKTableau(s)
 tspan = (0.0,20.0)
 cache = SPARKCache(size(A(q0))[2],size(A(q0))[1],dt,tspan,s,man_wend(n,manipulator))
 state = SPARKsolve!(q0,q̇0,λ0,cache,tab,ftol=1e-14)
 
-@btime SPARK.solve(prob,dt=dt)
-@time SPARK.solve(prob,dt=dt)
-SPARK.solve(prob,dt=dt)
-@code_warntype SPARK.solve(prob,dt=dt)
+@btime TS.solve(prob,dt=dt)
+@time TS.solve(prob,dt=dt)
+TS.solve(prob,dt=dt)
+@code_warntype TS.solve(prob,dt=dt)
 
 function showactuator(st2d)
     for (acid,actuator) in enumerate(st2d.actuators)
@@ -323,4 +326,4 @@ function showactuator(st2d)
     end
 end
 showactuator(manipulator)
-R2.actuate!(manipulator,0.1*ones(6))
+TR.actuate!(manipulator,0.1*ones(6))

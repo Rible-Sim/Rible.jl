@@ -93,7 +93,7 @@ function tg_spark(tgsys)
         end
     end
 
-    function q2rbstate!(rbs,q,q̇)
+    function distribute_q_to_rbs!(rbs,q,q̇)
         for (rbid,rb) = enumerate(rbs)
             is = 12*(rbid-1)
             rb.state.coords.q .= q[is+1:is+12]
@@ -102,7 +102,7 @@ function tg_spark(tgsys)
         end
     end
     function F!(F,q,q̇,t)
-        q2rbstate!(rigidbodies,q,q̇)
+        distribute_q_to_rbs!(rigidbodies,q,q̇)
         compute_string_forces!(rigidbodies,strings)
         for (rbid,rb) = enumerate(rigidbodies)
             is = 12*(rbid-1)

@@ -16,7 +16,7 @@ end
 draw_rbs!(scene,rbs)
 
 function update_scene!(scene,rbs,q,q̇)
-    TRS.q2rbstate!(rbs,q,q̇)
+    TRS.distribute_q_to_rbs!(rbs,q,q̇)
     update_rb_position!(scene,1,cube)
 end
 update_scene!(scene,rbs,qs[1],q̇s[1])

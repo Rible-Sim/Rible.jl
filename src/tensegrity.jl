@@ -55,7 +55,7 @@ function reset_forces!(tgst::TensegrityStructure)
 end
 
 
-function update_forces!(st2d)
+function update_strings_apply_forces!(st2d)
     rbs = st2d.rigidbodies
     ss = st2d.strings
     cnt = st2d.connectivity
@@ -86,7 +86,7 @@ function update_forces!(st2d)
     end
 end
 
-function q2rbstate!(st2d,globalq,globalq̇)
+function distribute_q_to_rbs!(st2d,globalq,globalq̇)
     rbs = st2d.rigidbodies
     cnt = st2d.connectivity
     for (rbid,rb) in enumerate(rbs)
@@ -158,10 +158,10 @@ function potentialenergy(ss)
 end
 
 function energy(q,q̇,st2d)
-    q2rbstate!(st2d,q,q̇)
+    distribute_q_to_rbs!(st2d,q,q̇)
     ss = st2d.strings
     rbs = st2d.rigidbodies
-    update_forces!(st2d)
+    update_strings_apply_forces!(st2d)
     ke = kineticenergy(rbs)
     pe = potentialenergy(ss)
     ke + pe
@@ -231,7 +231,7 @@ function build_Φ(st2d)
         ret = Vector{eltype(q)}(undef,nconstraint)
         for (rbid,rb) in enumerate(rbs)
             pindex = body2q[rbid]
-            ret[3nfixbody+rbid] = rb.state.cache.Φ(q[pindex])
+            ret[3nfixbody+rbid] = rb.state.cache.funcs.Φ(q[pindex])
         end
         for (fixid,rbid) in enumerate(st2d.fixbodyindex)
             pindex = body2q[rbid]
@@ -251,7 +251,7 @@ function build_A(st2d)
         ret = zeros(eltype(q),nconstraint,nq)
         for (rbid,rb) in enumerate(rbs)
             pindex = body2q[rbid]
-            ret[3nfixbody+rbid,pindex] .= rb.state.cache.Φq(q[pindex])
+            ret[3nfixbody+rbid,pindex] .= rb.state.cache.funcs.Φq(q[pindex])
         end
         for (fixid,rbid) in enumerate(st2d.fixbodyindex)
             ret[3(fixid-1)+1,1:4] .= [1.0,0.0,0.0,0.0]

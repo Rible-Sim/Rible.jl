@@ -90,7 +90,7 @@ update_strings!(scene,sts)
 
 function update_scene!(scene,tgsys,q,q̇)
     TRS.reset_forces!.(tgsys.rigidbodies)
-    TRS.q2rbstate!(tgsys.rigidbodies.movables,q,q̇)
+    TRS.distribute_q_to_rbs!(tgsys.rigidbodies.movables,q,q̇)
     TRS.compute_string_forces!(tgsys)
     update_rbs_position!(scene,tgsys.rigidbodies)
     update_strings!(scene,tgsys.strings)
