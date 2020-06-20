@@ -10,7 +10,7 @@ struct Connectivity{BPConnectType,StringConnectType}
 end
 
 
-struct Structure2D{BodyType,StringType,ActuatorType,ConnectType}
+struct TensegrityStructure{BodyType,StringType,ActuatorType,ConnectType}
     ndim::Int
     nbody::Int
     nmovablebody::Int
@@ -25,7 +25,7 @@ struct Structure2D{BodyType,StringType,ActuatorType,ConnectType}
     connectivity::ConnectType
 end
 
-function Structure2D(rbs,ss,acs,cnt)
+function TensegrityStructure(rbs,ss,acs,cnt)
     ndim = 2
     nbody = length(rbs)
     mvbodyindex = [i for i in eachindex(rbs) if rbs[i].prop.movable]
@@ -35,9 +35,9 @@ function Structure2D(rbs,ss,acs,cnt)
     nstring = length(ss)
     npoints = 0
     for (rbid,rb) in enumerate(rbs)
-        npoints += rb.prop.number_aps
+        npoints += rb.prop.naps
     end
-    Structure2D(ndim,nbody,nmvbody,mvbodyindex,
+    TensegrityStructure(ndim,nbody,nmvbody,mvbodyindex,
                     nfixbody,fixbodyindex,
                     nstring,npoints,
                     rbs,ss,acs,cnt)
@@ -50,7 +50,7 @@ function lengthdir(v)
     l,τ
 end
 
-function reset_forces!(tgst::Structure2D)
+function reset_forces!(tgst::TensegrityStructure)
     reset_forces!.(tgst.rigidbodies)
 end
 
@@ -65,11 +65,11 @@ function update_forces!(st2d)
         a,b = cnt.string2ap[istr]
         state1 = rbs[a.rbid].state
         p1 = state1.p[a.apid]
-        ṗ1 = state1.auxs.Cp[a.apid]*state1.coords.q̇
+        ṗ1 = state1.cache.Cp[a.apid]*state1.coords.q̇
         f1 = state1.Fanc[a.apid]
         state2 = rbs[b.rbid].state
         p2 = state2.p[b.apid]
-        ṗ2 = state2.auxs.Cp[b.apid]*state2.coords.q̇
+        ṗ2 = state2.cache.Cp[b.apid]*state2.coords.q̇
         f2 = state2.Fanc[b.apid]
         Δr = p2 - p1
         Δṙ = ṗ2 - ṗ1
@@ -94,9 +94,9 @@ function q2rbstate!(st2d,globalq,globalq̇)
         @unpack q, q̇ = rb.state.coords
         q .= globalq[pindex]
         q̇ .= globalq̇[pindex]
-        @unpack auxs,p = rb.state
+        @unpack cache,p = rb.state
         for (i,ap) in enumerate(p)
-            ap .= auxs.Cp[i]*q
+            ap .= cache.Cp[i]*q
         end
     end
 end
@@ -105,7 +105,8 @@ function generate_forces!(rbs)
     for (rbid,rb) in enumerate(rbs)
         @unpack state = rb
         @unpack Fanc = state
-        @unpack Q,Cp,CG = state.auxs
+        @unpack Cp,CG = state.cache
+        @unpack Q = state.coords
         Q .= 0.0
         for (pid,f) in enumerate(Fanc)
             Q .+= transpose(Cp[pid])*f
@@ -121,7 +122,7 @@ function assemble_forces!(F,st2d)
     F .= 0.0
     for (rbid,rb) in enumerate(rbs)
         pindex = body2q[rbid]
-        F[pindex] .+= rb.state.auxs.Q
+        F[pindex] .+= rb.state.coords.Q
     end
 end
 
@@ -137,7 +138,7 @@ function kineticenergy(rbs)
     ke = 0.0
     for (rbid,rb) in enumerate(rbs)
         @unpack q̇ = rb.state.coords
-        @unpack M = rb.state.auxs
+        @unpack M = rb.state.cache
         ke += 1/2*transpose(q̇)*M*q̇
     end
     ke
@@ -166,7 +167,7 @@ function energy(q,q̇,st2d)
     ke + pe
 end
 
-function build_body2q(rbs::Vector{RigidBody2D{T,CT,AT}}) where {T,CT,AT}
+function build_body2q(rbs::Vector{RigidBody{T,CT,AT}}) where {T,CT,AT}
     bps = Vector{Vector{T}}()
     bp_number = Vector{Int}()
     push!(bp_number,0)
@@ -198,7 +199,7 @@ function build_body2q(rbs::Vector{RigidBody2D{T,CT,AT}}) where {T,CT,AT}
     body2q
 end
 
-function build_massmatrix(st2d::Structure2D)
+function build_massmatrix(st2d::TensegrityStructure)
     rbs = st2d.rigidbodies
     body2q = st2d.connectivity.body2q
     build_massmatrix(rbs,body2q)
@@ -208,7 +209,7 @@ function build_massmatrix(rbs,body2q)
     mass_matrix = zeros(nq,nq)
     for (rbid,rb) in enumerate(rbs)
         pindex = body2q[rbid]
-        mass_matrix[pindex,pindex] .+= rbs[rbid].state.auxs.M
+        mass_matrix[pindex,pindex] .+= rbs[rbid].state.cache.M
     end
     mass_matrix
 end
@@ -230,7 +231,7 @@ function build_Φ(st2d)
         ret = Vector{eltype(q)}(undef,nconstraint)
         for (rbid,rb) in enumerate(rbs)
             pindex = body2q[rbid]
-            ret[3nfixbody+rbid] = rb.state.auxs.Φ(q[pindex])
+            ret[3nfixbody+rbid] = rb.state.cache.Φ(q[pindex])
         end
         for (fixid,rbid) in enumerate(st2d.fixbodyindex)
             pindex = body2q[rbid]
@@ -250,7 +251,7 @@ function build_A(st2d)
         ret = zeros(eltype(q),nconstraint,nq)
         for (rbid,rb) in enumerate(rbs)
             pindex = body2q[rbid]
-            ret[3nfixbody+rbid,pindex] .= rb.state.auxs.Φq(q[pindex])
+            ret[3nfixbody+rbid,pindex] .= rb.state.cache.Φq(q[pindex])
         end
         for (fixid,rbid) in enumerate(st2d.fixbodyindex)
             ret[3(fixid-1)+1,1:4] .= [1.0,0.0,0.0,0.0]

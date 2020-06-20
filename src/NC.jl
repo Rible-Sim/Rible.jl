@@ -37,7 +37,6 @@ struct NaturalCoordinatesAuxiliaries2D{T,cT,ΦT,ΦqT}
     M::SArray{Tuple{4,4},T,2,16}
     CG::SArray{Tuple{2,4},T,2,8}
     Cp::Vector{SArray{Tuple{2,4},T,2,8}}
-    Q::MArray{Tuple{4},T,1,4}
     Lij::T
     c::cT
     Φ::ΦT
@@ -45,7 +44,7 @@ struct NaturalCoordinatesAuxiliaries2D{T,cT,ΦT,ΦqT}
 end
 
 function NCaux(prop,ri,rj)
-    @unpack mass,CoM,inertia,anchorpoints = prop
+    @unpack mass,CoM,inertia,aps = prop
     Lij = norm(ri-rj)
     z = inertia2Z(inertia,Lij)
     M = form_mass_matrix(mass,CoM,Lij,z)
@@ -54,7 +53,6 @@ function NCaux(prop,ri,rj)
         ret = X̄⁻¹*r̄
     end
     CG = C(c(CoM))
-    Q = zeros(4)
     function Φ(q)
         xi,yi,xj,yj = q
         (xj-xi)^2 + (yj-yi)^2 - Lij^2
@@ -68,14 +66,13 @@ function NCaux(prop,ri,rj)
         ret[4] =  2(yj-yi)
         ret
     end
-    nap = prop.number_aps
-    Cp = [SMatrix{2,4}(C(c(anchorpoints[i])))
+    nap = prop.naps
+    Cp = [SMatrix{2,4}(C(c(aps[i])))
             for i in 1:nap]
     aux = NaturalCoordinatesAuxiliaries2D(
     SMatrix{4,4}(M),
     SMatrix{2,4}(CG),
     Cp,
-    MVector{4}(Q),
     Lij,c,Φ,Φq
     )
 end

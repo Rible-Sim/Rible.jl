@@ -65,13 +65,13 @@ function man_ndof(ndof,θ=0.0)
             ap3_y = -ap3_y
         end
         ap3 = SVector{2}([ap3_x,ap3_y])
-        anchorpoints = [ap1,ap2,ap3]
+        aps = [ap1,ap2,ap3]
 
-        prop = R2.RigidBody2DProperty(i,movable,m,Ia,
-                    CoM,anchorpoints
+        prop = R2.RigidBodyProperty(i,movable,m,Ia,
+                    CoM,aps
                     )
-        state = R2.RigidBody2DState(prop,ri,rj)
-        rb = R2.RigidBody2D(prop,state)
+        state = R2.RigidBodyState(prop,ri,rj)
+        rb = R2.RigidBody(prop,state)
     end
     rbs = [rigidbody(i,m[i],a[i],
             Ia[i],A[:,i],A[:,i+1]) for i = 1:nbody]
@@ -116,7 +116,7 @@ function man_ndof(ndof,θ=0.0)
         push!(string2ap,(R2.ID(i,3),R2.ID(i+1,2)))
     end
     cnt = R2.Connectivity(body2q,string2ap)
-    R2.Structure2D(rbs,ss,acs,cnt)
+    R2.TensegrityStructure(rbs,ss,acs,cnt)
 end
 # ------------------Create Tensegrity Struture --------------------------
 ndof = 6

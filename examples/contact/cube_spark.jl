@@ -45,7 +45,7 @@ q̇0 = copy(cube.state.coords.q̇)
 
 function cube_dynamics()
     function M!(mass_matrix,q)
-        mass_matrix .= cube.state.auxs.M
+        mass_matrix .= cube.state.cache.M
     end
     function ∂T∂q̇!(p,mass_matrix,q,q̇)
         M!(mass_matrix,q)
@@ -54,7 +54,7 @@ function cube_dynamics()
 
     # External forces (Gravity)
     fG = [0,0,-9.8]
-    QG = transpose(cube.state.auxs.CG)*fG
+    QG = transpose(cube.state.cache.CG)*fG
     function F!(F,q,q̇,t)
         F .= QG
     end

@@ -58,8 +58,8 @@ end
 S2 = S2_matrix(s)
 ForwardDiff.jacobian(S2_matrix,s)
 function constraint(jo::BallJoint,rb1,rb2,pid1,pid2)
-    p1 = rb1.prop.anchorpoints[pid1].p
-    p2 = rb2.prop.anchorpoints[pid2].p
+    p1 = rb1.prop.aps[pid1].p
+    p2 = rb2.prop.aps[pid2].p
     function inner_Φ(s)
         ri = s[1:3]
         qi = s[4:7]

@@ -48,11 +48,11 @@ twobodystate = TRS.multibodystate(tgsys.rigidbodies)
 
 
 function Aandb(rb,id,Fext,τext)
-    @unpack mass,inertia,anchorpoints = rb.prop
+    @unpack mass,inertia,aps = rb.prop
     @unpack R,ω = rb.state
     L = rb.coords.L
     invJt = R*inv(inertia)*transpose(R)
-    point = anchorpoints[id]
+    point = aps[id]
     x = R*point.p
     x̃ = tilde(x)
     A = I/mass - x̃*invJt*x̃
@@ -61,7 +61,7 @@ function Aandb(rb,id,Fext,τext)
     A,b
 end
 function force2torque(force,rb,pointid)
-    x = rb.prop.anchorpoints[pointid].p
+    x = rb.prop.aps[pointid].p
     R = rb.state.R
     τ = (R*x × force)
 end
@@ -90,7 +90,7 @@ function twobody(tgsys)
         # State pass
         for i in eachindex(rbs)
             @unpack prop,state,coords = rbs[i]
-            @unpack mass,inertia,anchorpoints = prop
+            @unpack mass,inertia,aps = prop
             @unpack r,R,ṙ,ω = state
             @unpack x,q,p,L = coords
             rb_cstate = @view system_cstate[(i-1)*nc+1:(i-1)*nc+13]
@@ -105,14 +105,14 @@ function twobody(tgsys)
             invJt = R*inv(inertia)*transpose(R)
             ω .= invJt*L
 
-            for ip in eachindex(anchorpoints)
+            for ip in eachindex(aps)
                 state.p[ip] .= point_position(prop,ip,r,R)
             end
         end
         # External Force Pass
         for i in eachindex(rbs)
             rbstate = rbs[i].state
-            for ip in eachindex(rbs[i].prop.anchorpoints)
+            for ip in eachindex(rbs[i].prop.aps)
                 rbstate.Fext[ip] .= 0.0
                 rbstate.τext[ip] .= 0.0
             end

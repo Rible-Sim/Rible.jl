@@ -62,7 +62,7 @@ function step_manyballs!(u1,u,tgsys,dt)
     # State pass
     for i in eachindex(rbs)
         @unpack prop,state = rbs[i]
-        @unpack mass,inertia,anchorpoints = prop
+        @unpack mass,inertia,aps = prop
         @unpack r,R,ṙ,ω,coords = state
         @unpack x,q,p,L = coords
         state2bodystate!(x,q,p,L,u,i,ncstate)
@@ -72,14 +72,14 @@ function step_manyballs!(u1,u,tgsys,dt)
         invJt = R*inv(inertia)*transpose(R)
         ω .= invJt*L
 
-        for ip in eachindex(anchorpoints)
+        for ip in eachindex(aps)
             state.p[ip] .= point_position(prop,ip,r,R)
         end
     end
     # External Force Pass
     for i in eachindex(rbs)
         rbstate = rbs[i].state
-        for ip in eachindex(rbs[i].prop.anchorpoints)
+        for ip in eachindex(rbs[i].prop.aps)
             rbstate.Fanc[ip] .= 0.0
             rbstate.τanc[ip] .= 0.0
         end

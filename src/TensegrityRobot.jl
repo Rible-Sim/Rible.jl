@@ -11,7 +11,7 @@ include("naturalcoodinates.jl")
 include("string.jl")
 
 include("rigidbody.jl")
-include("rigidbody3d.jl")
+#include("rigidbody3d.jl")
 
 include("tensegrity.jl")
 

@@ -25,7 +25,7 @@ function sol2state!(tgsys,sol)
         p .= coords_sol[8:10]
         L .= coords_sol[11:13]
         coords2state(rbs[i])
-        for ip in eachindex(rbs[i].prop.anchorpoints)
+        for ip in eachindex(rbs[i].prop.aps)
             rbs[i].state.p[ip] .= point_position(rbs[i].prop,ip,
                                     rbs[i].state.r,rbs[i].state.R)
         end

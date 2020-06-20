@@ -58,7 +58,7 @@ function tg_spark(tgsys)
     mass_matrix = zeros(nq,nq)
     for (rbid,rb) in enumerate(rigidbodies)
         is = 12*(rbid - 1)
-        mass_matrix[is+1:is+12,is+1:is+12] .= rigidbodies[rbid].state.auxs.M
+        mass_matrix[is+1:is+12,is+1:is+12] .= rigidbodies[rbid].state.cache.M
     end
     function M!(mm,q)
         mm .= mass_matrix
@@ -83,13 +83,13 @@ function tg_spark(tgsys)
             τ .= 𝐬./s_norm
             f .= ifelse( s_norm > s0, k*(s_norm-s0).*τ, zero(τ))
             # on body a
-            Ca = rba.state.auxs.Cp[pida]
+            Ca = rba.state.cache.Cp[pida]
             Qa = transpose(Ca)*f
-            rba.state.auxs.Q .+= Qa
+            rba.state.coords.Q .+= Qa
             # on body b
-            Cb = rbb.state.auxs.Cp[pidb]
+            Cb = rbb.state.cache.Cp[pidb]
             Qb = transpose(Cb)*(-f)
-            rbb.state.auxs.Q .+= Qb
+            rbb.state.coords.Q .+= Qb
         end
     end
 
@@ -106,7 +106,7 @@ function tg_spark(tgsys)
         compute_string_forces!(rigidbodies,strings)
         for (rbid,rb) = enumerate(rigidbodies)
             is = 12*(rbid-1)
-            F[is+1:is+12] .= rb.state.auxs.Q
+            F[is+1:is+12] .= rb.state.coords.Q
         end
     end
 

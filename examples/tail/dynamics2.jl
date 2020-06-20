@@ -2,9 +2,9 @@ using LinearAlgebra
 using SparseArrays
 using Parameters
 using StaticArrays
-using BenchmarkTools
-import PyPlot; const plt = PyPlot
-using LaTeXStrings
+# using BenchmarkTools
+# import PyPlot; const plt = PyPlot
+# using LaTeXStrings
 # using NLsolve
 using Revise
 using TensegritySolvers; const TS = TensegritySolvers
@@ -78,14 +78,14 @@ function make_tail(n)
             movable = true
         end
         nap = length(aps)
-        anchorpoints = [SVector{2}(aps[i]) for i = 1:nap]
-        prop = TR.RigidBody2DProperty(i,movable,
+        aps = [SVector{2}(aps[i]) for i = 1:nap]
+        prop = TR.RigidBodyProperty(i,movable,
                     m,inertia,
                     SVector{2}(CoM),
-                    anchorpoints
+                    aps
                     )
-        state = TR.RigidBody2DState(prop,ri,rj)
-        rb = TR.RigidBody2D(prop,state)
+        state = TR.RigidBodyState(prop,ri,rj)
+        rb = TR.RigidBody(prop,state)
     end
     rbs = [rigidbody(i,CoM[i],m[i],inertia[i],ri[i],rj[i],[p1[i],p2[i]]) for i = 1:nb]
 
@@ -120,7 +120,7 @@ function make_tail(n)
         push!(string2ap,(TR.ID(2i+1,2),TR.ID(2i-1,2)))
     end
     cnt = TR.Connectivity(body2q,string2ap)
-    TR.Structure2D(rbs,ss,acs,cnt)
+    TR.TensegrityStructure(rbs,ss,acs,cnt)
 end
 n = 4
 tail = make_tail(n)

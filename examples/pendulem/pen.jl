@@ -31,22 +31,22 @@ function npen(n)
         nap = 2
         ap1 = SVector{2}([0.0,0.0])
         ap2 = SVector{2}([L,0.0])
-        anchorpoints = [ap1,ap2]
+        aps = [ap1,ap2]
 
-        prop = R2.RigidBody2DProperty(movable,name,type,
+        prop = R2.RigidBodyProperty(movable,name,type,
                     m,I,
                     CoM,
-                    anchorpoints
+                    aps
                     )
-        state = R2.RigidBody2DState(prop,ri,rj)
-        rb = R2.RigidBody2D(prop,state)
+        state = R2.RigidBodyState(prop,ri,rj)
+        rb = R2.RigidBody(prop,state)
     end
     rbs = [rigidbody(i,ms[i],Ls[i],
             Is[i],A[:,i],A[:,i+1]) for i = 1:n]
 
     body2q = R2.build_body2q(rbs)
     cnt = R2.Connectivity(body2q,nothing)
-    R2.Structure2D(rbs,Vector{Int}(),Vector{Int}(),cnt)
+    R2.TensegrityStructure(rbs,Vector{Int}(),Vector{Int}(),cnt)
 end
 
 function npen_wend(st2d)

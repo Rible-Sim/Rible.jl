@@ -21,10 +21,10 @@ function plotstructure(st2d,state)
         cnt = st2d.connectivity
         for (id,rb) in enumerate(st2d.rigidbodies)
             pindex = cnt.body2q[id]
-            auxs = rb.state.auxs
+            cache = rb.state.cache
             p = rb.state.p
             for (i,ap) in enumerate(p)
-                ap .= auxs.Cp[i]*q[pindex]
+                ap .= cache.Cp[i]*q[pindex]
             end
             bars[id][] = [
                     Point(rb.state.p[1]) => Point(rb.state.p[2]);

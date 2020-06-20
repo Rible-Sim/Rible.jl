@@ -23,7 +23,7 @@ function build_C(st2d)
     js = 0
     for (rbid,rb) in enumerate(st2d.rigidbodies)
         is = (rbid-1)*nq_per_body
-        for (apid,Cp) in enumerate(rb.state.auxs.Cp)
+        for (apid,Cp) in enumerate(rb.state.cache.Cp)
             jlen,_ = size(Cp)
             C[is+1:is+nq_per_body,js+1:js+jlen] .= transpose(Cp)
             # @show is+1:is+nq_per_body, js+1:js+jlen
@@ -44,7 +44,7 @@ function build_D(st2d)
     D_raw = spzeros(Int,npoints,nstring)
     iss = [0]
     for (rbid,rb) in enumerate(st2d.rigidbodies)
-        push!(iss,iss[end]+rb.prop.number_aps)
+        push!(iss,iss[end]+rb.prop.naps)
     end
 
     for (sid,ap) in enumerate(string2ap)

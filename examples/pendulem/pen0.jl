@@ -11,23 +11,23 @@ const R2 = Robot2D
 function penfunc()
     m = 1.0
     L = 1.0
-    prop = R2.RigidBody2DProperty(true,:rb1,:generic,
+    prop = R2.RigidBodyProperty(true,:rb1,:generic,
                 m,m*L,
                 SVector(L,0.0),
                 [SVector(0.0,0.0),SVector(L,0.0)]
                 )
     θ = -π/3
-    state = R2.RigidBody2DState(prop,[0.0,0.0],[cos(θ),sin(θ)])
-    rb = R2.RigidBody2D(prop,state)
+    state = R2.RigidBodyState(prop,[0.0,0.0],[cos(θ),sin(θ)])
+    rb = R2.RigidBody(prop,state)
     const_mass_matrix = @SMatrix [m/3   0 m/6   0;
                    0 m/3   0 m/6;
                  m/6   0 m/3   0;
                    0 m/6   0 m/3]
     #M = const_mass_matrix
-    M = rb.state.auxs.M
+    M = rb.state.cache.M
     # CG = [1/2   0 1/2   0;
     #        0 1/2   0 1/2;]
-    CG = rb.state.auxs.CG
+    CG = rb.state.cache.CG
     g = 9.8
     fg = [0, -g]
     const_F = SVector{4}(transpose(CG)*fg)

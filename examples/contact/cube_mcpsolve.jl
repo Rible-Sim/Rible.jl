@@ -73,7 +73,7 @@ function mcpsolve_alphastepping(h,tspan,q0,q̇0,cube)
     # collision related
     e = fill(0.5,8)
     function gap_function(cube,j)
-        C = cube.state.auxs.Cp[j]
+        C = cube.state.cache.Cp[j]
         function g(q)
             r = C*q
             ret = zero(r)
@@ -90,12 +90,13 @@ function mcpsolve_alphastepping(h,tspan,q0,q̇0,cube)
     q̇s = [copy(q̇0)]
 
     # mass matrix
-    @unpack M,Q = cube.state.auxs
+    @unpack M = cube.state.cache
+    @unpack Q = cube.state.coords
     invM = inv(M)
 
     # External forces (Gravity)
     fG = [0,0,-9.8]
-    QG = transpose(cube.state.auxs.CG)*fG
+    QG = transpose(cube.state.cache.CG)*fG
     Q .= QG
     #Q .= 0.0
 
@@ -137,7 +138,7 @@ function mcpsolve_alphastepping(h,tspan,q0,q̇0,cube)
         CN = zeros(ν,12)
         ee = zeros(ν)
         for α = 1:ν
-            C = cube.state.auxs.Cp[active_index[α]]
+            C = cube.state.cache.Cp[active_index[α]]
             CN[α,:] .= C[3,:]
             ee[α] = e[active_index[α]]
         end

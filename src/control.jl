@@ -58,7 +58,7 @@ function reset!(actuator::Actuator)
     str2.state.restlength = str2.original_restlength
 end
 
-function actuate!(st2d::Structure2D,us;inc=false)
+function actuate!(st2d::TensegrityStructure,us;inc=false)
     for (actuator,u) in zip(st2d.actuators,us)
         actuate!(actuator,u,inc=inc)
     end

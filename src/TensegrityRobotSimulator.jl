@@ -34,7 +34,7 @@ struct RigidBodyProperty{T,NP}
     mass::T
     inertia::SArray{Tuple{3,3},T,2,9}
     CoM::SArray{Tuple{3},T,1,3}
-    anchorpoints::SArray{Tuple{NP},AnchorPoint{T},1,NP}
+    aps::SArray{Tuple{NP},AnchorPoint{T},1,NP}
 end
 
 struct RigidBodyGeometry
@@ -77,19 +77,17 @@ struct NaturalCoordinatesAuxiliaries{T,NP} <: RigidBodyAuxiliaries
     M::SArray{Tuple{12,12},T,2,144}
     CG::SArray{Tuple{3,12},T,2,36}
     Cp::SArray{Tuple{NP},SArray{Tuple{3,12},T,2,36},1,NP}
-    Q::MArray{Tuple{12},T,1,12}
 end
 function NaturalCoordinatesAuxiliaries(M,CG,Cp)
     StaticM =SMatrix{12,12}(M)
     StaticCG = SMatrix{3,12}(CG)
     numberofpoints = length(Cp)
     StaticCp = SArray{Tuple{numberofpoints},SArray{Tuple{3,12},eltype(M),2,36},1,numberofpoints}(Cp)
-    Q = @MVector zeros(12)
-    NaturalCoordinatesAuxiliaries(StaticM,StaticCG,StaticCp,Q)
+    NaturalCoordinatesAuxiliaries(StaticM,StaticCG,StaticCp)
 end
 abstract type AbstractState end
 
-struct RigidBodyState{T,NP,CoordinatesType,AuxiliariesType} <: AbstractState
+struct RigidBodyState{T,NP,CoordinatesType,cacheType} <: AbstractState
     r::MArray{Tuple{3},T,1,3}
     R::MArray{Tuple{3,3},T,2,9}
     ṙ::MArray{Tuple{3},T,1,3}
@@ -100,11 +98,11 @@ struct RigidBodyState{T,NP,CoordinatesType,AuxiliariesType} <: AbstractState
     Fanc::SArray{Tuple{NP},MArray{Tuple{3},T,1,3},1,NP}
     τanc::SArray{Tuple{NP},MArray{Tuple{3},T,1,3},1,NP}
     coords::CoordinatesType
-    auxs::AuxiliariesType
+    cache::cacheType
 end
 
 function point_position(prop,id,r,R)
-    p = prop.anchorpoints[id].p
+    p = prop.aps[id].p
     r + R*p
 end
 
@@ -156,12 +154,12 @@ function coords2state_kinetic!(rb)
     Ω = Ṙ*transpose(R)
     ω .= [Ω[3,2],Ω[1,3],Ω[2,1]]
     for (id,point) = enumerate(rb.state.p)
-        point .= r + R*rb.prop.anchorpoints[id].p
+        point .= r + R*rb.prop.aps[id].p
     end
 end
 
 function RigidBodyNaturalCoordinates(prop,r,ṙ,R,ω)
-    @unpack mass,CoM,inertia,anchorpoints = prop
+    @unpack mass,CoM,inertia,aps = prop
     ri = r
     rj = R[:,1] + ri
     u = R[:,2]
@@ -178,10 +176,10 @@ function RigidBodyNaturalCoordinates(prop,r,ṙ,R,ω)
     Ji = NC.inertia2Ji(inertia)
     M = NC.form_mass_matrix(mass,CoM,Ji)
     CG = NC.C(NC.c(CoM))
-    Cp = [NC.C(NC.c(ap.p)) for ap in anchorpoints]
+    Cp = [NC.C(NC.c(ap.p)) for ap in aps]
 
-    auxs = NaturalCoordinatesAuxiliaries(M,CG,Cp)
-    coords,auxs
+    cache = NaturalCoordinatesAuxiliaries(M,CG,Cp)
+    coords,cache
 end
 
 function RigidBodyState(rb1prop,r1,R1,ṙ1,ω1,::Val{:Eberly})
@@ -191,7 +189,7 @@ function RigidBodyState(rb1prop,r1,R1,ṙ1,ω1,::Val{:Eberly})
     R = MMatrix{3,3}(R1)
     ṙ = MVector{3}(ṙ1)
     ω = MVector{3}(ω1)
-    np = length(rb1prop.anchorpoints)
+    np = length(rb1prop.aps)
     p = SVector{np,MArray{Tuple{3},T,1,3}}(
         [point_position(rb1prop,id,r,R) for id = 1:np])
     F = @MVector zeros(T,3)
@@ -216,7 +214,7 @@ function RigidBodyState(rb1prop,r1,R1,ṙ1,ω1,::Val{:NC})
     R = MMatrix{3,3}(R1)
     ṙ = MVector{3}(ṙ1)
     ω = MVector{3}(ω1)
-    np = length(rb1prop.anchorpoints)
+    np = length(rb1prop.aps)
     p = SVector{np,MArray{Tuple{3},T,1,3}}(
         [point_position(rb1prop,id,r,R) for id = 1:np])
     F = @MVector zeros(T,3)
@@ -226,9 +224,9 @@ function RigidBodyState(rb1prop,r1,R1,ṙ1,ω1,::Val{:NC})
     τanc = SVector{np,MArray{Tuple{3},T,1,3}}(
             [@MVector zeros(T,3) for id = 1:np])
 
-    coords,auxs = RigidBodyNaturalCoordinates(rb1prop,r,ṙ,R,ω)
+    coords,cache = RigidBodyNaturalCoordinates(rb1prop,r,ṙ,R,ω)
 
-    RigidBodyState(r,R,ṙ,ω,p,F,τ,Fanc,τanc,coords,auxs)
+    RigidBodyState(r,R,ṙ,ω,p,F,τ,Fanc,τanc,coords,cache)
 end
 struct RigidBody{T,NP,CoordinatesType,ObjectType}
     prop::RigidBodyProperty{T,NP}
@@ -373,13 +371,13 @@ function compute_string_forces!(tgsys)
         τ .= 𝐬./s_norm
         f .= ifelse( s_norm > s0, k*(s_norm-s0).*τ, zero(τ))
         # on body a
-        Ca = rba.state.auxs.Cp[pida]
+        Ca = rba.state.cache.Cp[pida]
         Qa = transpose(Ca)*f
-        rba.state.auxs.Q .+= Qa
+        rba.state.coords.Q .+= Qa
         # on body b
-        Cb = rbb.state.auxs.Cp[pidb]
+        Cb = rbb.state.cache.Cp[pidb]
         Qb = transpose(Cb)*(-f)
-        rbb.state.auxs.Q .+= Qb
+        rbb.state.coords.Q .+= Qb
     end
 end
 
@@ -394,7 +392,7 @@ end
 
 function reset_forces!(rbs)
     for (rbid,rb) in enumerate(rbs)
-        rb.state.auxs.Q .= 0.0
+        rb.state.coords.Q .= 0.0
     end
 end
 end # module

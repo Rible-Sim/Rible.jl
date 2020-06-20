@@ -66,7 +66,7 @@ function onestepping(h,tspan,q0,q̇0,cube)
     # collision related
     e = fill(1.0,8)
     function gap_function(cube,j)
-        C = cube.state.auxs.Cp[j]
+        C = cube.state.cache.Cp[j]
         function g(q)
             r = C*q
             ret = zero(r)
@@ -88,11 +88,12 @@ function onestepping(h,tspan,q0,q̇0,cube)
         vₖ₊₁ = copy(q̇s[1])
         qₖ = qs[end]
         vₖ = q̇s[end]
-        @unpack M,Q = cube.state.auxs
+        @unpack M = cube.state.cache
+        @unpack Q = cube.state.coords
         invM = inv(M)
         # External forces (Gravity)
         fG = [0,0,-9.8]
-        QG = transpose(cube.state.auxs.CG)*fG
+        QG = transpose(cube.state.cache.CG)*fG
         Q .= QG
         # "Free" velocity
         v_free = vₖ + invM*h*Q
@@ -117,7 +118,7 @@ function onestepping(h,tspan,q0,q̇0,cube)
             UN = zeros(ν)
             ee = zeros(ν)
             for α = 1:ν
-                C = cube.state.auxs.Cp[active_index[α]]
+                C = cube.state.cache.Cp[active_index[α]]
                 CN[α,:] .= C[3,:]
                 UN[α] = (C*vₖ)[3]
                 @info "Pre-contact velocity: $α, $(UN[α])"

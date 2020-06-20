@@ -76,12 +76,13 @@ function alphastepping(h,tspan,q0,q̇0,cube)
     q̇s = [copy(q̇0)]
 
     # mass matrix
-    @unpack M,Q = cube.state.auxs
+    @unpack M = cube.state.cache
+    @unpack Q = cube.state.coords
     invM = inv(M)
 
     # External forces (Gravity)
     fG = [0,0,-9.8]
-    QG = transpose(cube.state.auxs.CG)*fG
+    QG = transpose(cube.state.cache.CG)*fG
     #Q .= QG
     Q .= 0.0
 
@@ -107,7 +108,7 @@ function alphastepping(h,tspan,q0,q̇0,cube)
         Φq₂, AᵀΛq = Φq_jacobians(qₖ₊₁,vₖ₊₁,Λᵇₖ₊₁)
         Kₜ = AᵀΛq
         Φqₖ₊₁ = TRS.NC.Φq(qₖ₊₁)
-        M = cube.state.auxs.M
+        M = cube.state.cache.M
         St = zeros(nq+ncon,nq+ncon)
         St[1:nq,        1:nq] .= M.*β̃ + Kₜ
         St[nq+1:nq+ncon,1:nq] .= Φqₖ₊₁

@@ -28,7 +28,7 @@ gap2(rb1)
 scene = Scene()
 function update_rb_position!(scene,rbid,rb)
     for (id,point) = enumerate(rb.state.p)
-        point .= rb.state.r + rb.state.R*rb.prop.anchorpoints[id].p
+        point .= rb.state.r + rb.state.R*rb.prop.aps[id].p
     end
     qtn = Rotations.Quat(rb.state.R)
     rotate!(scene[rbid],AbstractPlotting.Quaternion(qtn.x,qtn.y,qtn.z,qtn.w))

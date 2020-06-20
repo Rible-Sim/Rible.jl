@@ -37,9 +37,9 @@ struct RigidBodyCoordinates{T,N}
 end
 
 
-struct RigidBody3D{T,CoordinatesType,AuxiliariesType} <: AbstractRigidBody
+struct RigidBody3D{T,CoordinatesType,cacheType} <: AbstractRigidBody
     prop::RigidBody3DProperty{T}
-    state::RigidBody3DState{T,CoordinatesType,AuxiliariesType}
+    state::RigidBody3DState{T,CoordinatesType,cacheType}
 end
 
 struct NaturalCoordinatesCache{ArrayT,MT,fT}
@@ -54,8 +54,7 @@ function NaturalCoordinatesAuxiliaries(M,CG,Cp)
     StaticCG = SMatrix{3,12}(CG)
     numberofpoints = length(Cp)
     StaticCp = SArray{Tuple{numberofpoints},SArray{Tuple{3,12},eltype(M),2,36},1,numberofpoints}(Cp)
-    Q = @MVector zeros(12)
-    NaturalCoordinatesAuxiliaries(StaticM,StaticCG,StaticCp,Q)
+    NaturalCoordinatesAuxiliaries(StaticM,StaticCG,StaticCp)
 end
 
 function quat_multiply(q0,q1)

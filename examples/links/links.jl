@@ -117,7 +117,7 @@ function tg_spark(tgsys)
     mass_matrix = zeros(nq,nq)
     for (rbid,rb) in enumerate(mvrigidbodies)
         is = 12*(rbid - 1)
-        mass_matrix[is+1:is+12,is+1:is+12] .= mvrigidbodies[rbid].state.auxs.M
+        mass_matrix[is+1:is+12,is+1:is+12] .= mvrigidbodies[rbid].state.cache.M
     end
     function M!(mm,q)
         mm .= mass_matrix
@@ -135,7 +135,7 @@ function tg_spark(tgsys)
         TR.compute_string_forces!(tgsys)
         for (rbid,rb) = enumerate(mvrigidbodies)
             is = 12*(rbid-1)
-            F[is+1:is+12] .= rb.state.auxs.Q
+            F[is+1:is+12] .= rb.state.coords.Q
         end
     end
 
