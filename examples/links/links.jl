@@ -9,14 +9,11 @@ using SPARK
 using TensegrityRobotSimulator
 const TR = TensegrityRobotSimulator
 
-function RigidBody(name;mass = 1.0,
-                        inertia = SMatrix{3,3}(1.0I),
-                        CoM = zeros(3),
-                        r = [0.0,0.0,-1.0],
-                        R = Matrix(1.0I,3,3),
-                        ṙ = [0.0,0.0,0.0],
-                        ω = [0.0,0.0,0.0],
-                        movable = true)
+function RigidBody(id;r = [0.0,0.0,-1.0],
+                      R = Matrix(1.0I,3,3),
+                      ṙ = [0.0,0.0,0.0],
+                      ω = [0.0,0.0,0.0],
+                      movable = true)
     a = 0.5 #m
     h = 1.0 #m
     θ = 2π/3
@@ -30,21 +27,21 @@ function RigidBody(name;mass = 1.0,
     ap3 = SVector{3}([a*cos(θ), -a*sin(θ), 0.0] + offset)
     ap4 = SVector{3}([0.0, 0.0, -h] + offset)
 
-    prop = TR.RigidBody3DProperty(i,movable,mass,
+    prop = TR.RigidBodyProperty(id,movable,mass,
                 SMatrix{3,3}(inertia),
                 SVector(CoM...),
                 [ap1,ap2,ap3,ap4])
-
-    state = TR.RigidBody3DState(prop,r,R,ṙ,ω,Val(:NC))
-
-    TR.RigidBody(prop,state)
+    cache = TR.NaturalCoordinatesCache(prop)
+    #state = TR.RigidBodyState(prop,r,R,ṙ,ω,Val(:NC))
+    prop,cache
+    #TR.RigidBody(prop,state)
 end
 
 mass = 1.0 #kg
 #inertia = Matrix(Diagonal([45.174,45.174,25.787]))*1e-8 # N/m^2
 inertia = Matrix(Diagonal([45.174,45.174,25.787]))*1e-1
 CoM = [0.0, 0.0, 17.56] .* 1e-4 # m
-rb1 = RigidBody(:rb1,mass = mass, inertia = inertia, CoM = CoM,
+rb1prop,rb1cache = RigidBody(1,mass = mass, inertia = inertia, CoM = CoM,
                      r = [0.0,0.0, -1.0], movable = false)
 rb2 = RigidBody(:rb2,mass = mass, inertia = inertia, CoM = CoM,
                      r = [0.0,0.0,  -0.1], R = Matrix(RotX(0.45)))

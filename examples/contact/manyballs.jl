@@ -85,8 +85,8 @@ function step_manyballs!(u1,u,tgsys,dt)
     for i in eachindex(rbs)
         rbstate = rbs[i].state
         for ip in eachindex(rbs[i].prop.aps)
-            rbstate.Fanc[ip] .= 0.0
-            rbstate.τanc[ip] .= 0.0
+            rbstate.Faps[ip] .= 0.0
+            rbstate.τaps[ip] .= 0.0
         end
         rbstate.F .= [0.0,0.0,-g]
         rbstate.τ .= 0.0

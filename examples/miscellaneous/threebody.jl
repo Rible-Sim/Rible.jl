@@ -72,7 +72,7 @@ tgsys = TRS.TensegritySystem([rb1,rb2],[s1],[j1],connectivity)
 twobodystate = TRS.multibodystate(tgsys.rigidbodies)
 
 
-function Aandb(rb,id,Fanc,τanc)
+function Aandb(rb,id,Faps,τaps)
     @unpack mass,inertia,aps = rb.prop
     @unpack R,ω = rb.state
     L = rb.state.coords.L
@@ -81,7 +81,7 @@ function Aandb(rb,id,Fanc,τanc)
     x = R*point.p
     x̃ = tilde(x)
     A = I/mass - x̃*invJt*x̃
-    b = Fanc/mass + (invJt*(τanc + L×ω)) × x +
+    b = Faps/mass + (invJt*(τaps + L×ω)) × x +
         ω × (ω × x)
     A,b
 end
@@ -156,14 +156,14 @@ function threebody(tgsys)
         for i in eachindex(rbs)
             rbstate = rbs[i].state
             for ip in eachindex(rbs[i].prop.aps)
-                rbstate.Fanc[ip] .= 0.0
-                rbstate.τanc[ip] .= 0.0
+                rbstate.Faps[ip] .= 0.0
+                rbstate.τaps[ip] .= 0.0
             end
             rbstate.F .= 0.0
             rbstate.τ .= 0.0
         end
         #[0.0,0.0,-0.1]
-        #force2torque(Fanc2,rb2,2)
+        #force2torque(Faps2,rb2,2)
         # String Pass
         for is in eachindex(sts)
             st = sts[is]
@@ -180,15 +180,15 @@ function threebody(tgsys)
                 fs = zeros(eltype(Δs),3)
             end
 
-            rb1.state.Fanc[pid1] .+= fs
-            rb1.state.τanc[pid1] .+= force2torque( fs,rb1,pid1)
+            rb1.state.Faps[pid1] .+= fs
+            rb1.state.τaps[pid1] .+= force2torque( fs,rb1,pid1)
 
-            rb2.state.Fanc[pid2] .+= -fs
-            rb2.state.τanc[pid2] .+= force2torque(-fs,rb2,pid2)
+            rb2.state.Faps[pid2] .+= -fs
+            rb2.state.τaps[pid2] .+= force2torque(-fs,rb2,pid2)
         end
         for i in eachindex(rbs)
-            rbs[i].state.F .= sum(rbs[i].state.Fanc)
-            rbs[i].state.τ .= sum(rbs[i].state.τanc)
+            rbs[i].state.F .= sum(rbs[i].state.Faps)
+            rbs[i].state.τ .= sum(rbs[i].state.τaps)
         end
         # Joints Pass
         M = constant_mass_matrix(rbs)
@@ -236,20 +236,20 @@ function threebody(tgsys)
         #     rb1 = rbs[rbid1]
         #     rb2 = rbs[rbid2]
         #     A1,b1 = Aandb(rb1,pid1,
-        #                 sum(rb1.state.Fanc),sum(rb1.state.τanc))
+        #                 sum(rb1.state.Faps),sum(rb1.state.τaps))
         #     A2,b2 = Aandb(rb2,pid2,
-        #                 sum(rb2.state.Fanc),sum(rb2.state.τanc))
+        #                 sum(rb2.state.Faps),sum(rb2.state.τaps))
         #     Fc = (A1+A2)\(b2-b1)
-        #     rb1.state.Fanc[pid1] .+=  Fc
-        #     rb2.state.Fanc[pid2] .+= -Fc
-        #     rb1.state.τanc[pid1] .+= force2torque( Fc,rb1,pid1)
-        #     rb2.state.τanc[pid2] .+= force2torque(-Fc,rb2,pid2)
+        #     rb1.state.Faps[pid1] .+=  Fc
+        #     rb2.state.Faps[pid2] .+= -Fc
+        #     rb1.state.τaps[pid1] .+= force2torque( Fc,rb1,pid1)
+        #     rb2.state.τaps[pid2] .+= force2torque(-Fc,rb2,pid2)
         #     FF = vcat(Fc,force2torque( Fc,rb1,pid1),-Fc,force2torque(-Fc,rb2,pid2))
         #     @show FF
         # end
         # for i in eachindex(rbs)
-        #     rbs[i].state.F .= sum(rbs[i].state.Fanc)
-        #     rbs[i].state.τ .= sum(rbs[i].state.τanc)
+        #     rbs[i].state.F .= sum(rbs[i].state.Faps)
+        #     rbs[i].state.τ .= sum(rbs[i].state.τaps)
         # end
         for i in eachindex(rbs)
             @unpack mass,inertia = rbs[i].prop

@@ -66,11 +66,11 @@ function update_strings_apply_forces!(st2d)
         state1 = rbs[a.rbid].state
         p1 = state1.p[a.apid]
         ṗ1 = state1.cache.Cp[a.apid]*state1.coords.q̇
-        f1 = state1.Fanc[a.apid]
+        f1 = state1.Faps[a.apid]
         state2 = rbs[b.rbid].state
         p2 = state2.p[b.apid]
         ṗ2 = state2.cache.Cp[b.apid]*state2.coords.q̇
-        f2 = state2.Fanc[b.apid]
+        f2 = state2.Faps[b.apid]
         Δr = p2 - p1
         Δṙ = ṗ2 - ṗ1
         l,τ = lengthdir(p2-p1)
@@ -104,11 +104,11 @@ end
 function generate_forces!(rbs)
     for (rbid,rb) in enumerate(rbs)
         @unpack state = rb
-        @unpack Fanc = state
+        @unpack Faps = state
         @unpack Cp,CG = state.cache
         @unpack Q = state.coords
         Q .= 0.0
-        for (pid,f) in enumerate(Fanc)
+        for (pid,f) in enumerate(Faps)
             Q .+= transpose(Cp[pid])*f
         end
         Q .+= transpose(CG)*state.F

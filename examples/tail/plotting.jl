@@ -41,5 +41,5 @@ function plotstructure(st2d,state)
 end
 plotstructure(tail,sol)
 
-energys = [R2.energy(sol.qs[it],sol.q̇s[it],tail) for it = 1:length(sol.ts)]
+energys = [TR.energy(sol.qs[it],sol.q̇s[it],tail) for it = 1:length(sol.ts)]
 plot(energys)

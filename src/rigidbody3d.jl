@@ -23,8 +23,8 @@ struct RigidBody3DState{T,CoordinatesType,cacheType}
     ω::MArray{Tuple{3},T,1,3}
     p::Vector{MArray{Tuple{3},T,1,3}} # Anchor Points in global frame
     τ::MArray{Tuple{3},T,1,3}
-    Fanc::Vector{MArray{Tuple{3},T,1,3}}
-    τanc::Vector{MArray{Tuple{3},T,1,3}}
+    Faps::Vector{MArray{Tuple{3},T,1,3}}
+    τaps::Vector{MArray{Tuple{3},T,1,3}}
     coords::CoordinatesType
     cache::cacheType
 end

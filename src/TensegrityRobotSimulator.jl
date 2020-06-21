@@ -95,8 +95,8 @@ struct RigidBodyState{T,NP,CoordinatesType,cacheType} <: AbstractState
     p::SArray{Tuple{NP},MArray{Tuple{3},T,1,3},1,NP} # Anchor Points in global frame
     F::MArray{Tuple{3},T,1,3}
     τ::MArray{Tuple{3},T,1,3}
-    Fanc::SArray{Tuple{NP},MArray{Tuple{3},T,1,3},1,NP}
-    τanc::SArray{Tuple{NP},MArray{Tuple{3},T,1,3},1,NP}
+    Faps::SArray{Tuple{NP},MArray{Tuple{3},T,1,3},1,NP}
+    τaps::SArray{Tuple{NP},MArray{Tuple{3},T,1,3},1,NP}
     coords::CoordinatesType
     cache::cacheType
 end
@@ -194,9 +194,9 @@ function RigidBodyState(rb1prop,r1,R1,ṙ1,ω1,::Val{:Eberly})
         [point_position(rb1prop,id,r,R) for id = 1:np])
     F = @MVector zeros(T,3)
     τ = @MVector zeros(T,3)
-    Fanc = SVector{np,MArray{Tuple{3},T,1,3}}(
+    Faps = SVector{np,MArray{Tuple{3},T,1,3}}(
             [@MVector zeros(T,3) for id = 1:np])
-    τanc = SVector{np,MArray{Tuple{3},T,1,3}}(
+    τaps = SVector{np,MArray{Tuple{3},T,1,3}}(
             [@MVector zeros(T,3) for id = 1:np])
     if typeof(coordstype) <: Val{:Eberly}
         coords = RigidBodyEberlyCoordinates(rb1prop,r,ṙ,R,ω)
@@ -205,7 +205,7 @@ function RigidBodyState(rb1prop,r1,R1,ṙ1,ω1,::Val{:Eberly})
     else
         error("No such $coordstype implemented")
     end
-    RigidBodyState(r,R,ṙ,ω,p,F,τ,Fanc,τanc,coords)
+    RigidBodyState(r,R,ṙ,ω,p,F,τ,Faps,τaps,coords)
 end
 function RigidBodyState(rb1prop,r1,R1,ṙ1,ω1,::Val{:NC})
     T = typeof(rb1prop).parameters[1]
@@ -219,14 +219,14 @@ function RigidBodyState(rb1prop,r1,R1,ṙ1,ω1,::Val{:NC})
         [point_position(rb1prop,id,r,R) for id = 1:np])
     F = @MVector zeros(T,3)
     τ = @MVector zeros(T,3)
-    Fanc = SVector{np,MArray{Tuple{3},T,1,3}}(
+    Faps = SVector{np,MArray{Tuple{3},T,1,3}}(
             [@MVector zeros(T,3) for id = 1:np])
-    τanc = SVector{np,MArray{Tuple{3},T,1,3}}(
+    τaps = SVector{np,MArray{Tuple{3},T,1,3}}(
             [@MVector zeros(T,3) for id = 1:np])
 
     coords,cache = RigidBodyNaturalCoordinates(rb1prop,r,ṙ,R,ω)
 
-    RigidBodyState(r,R,ṙ,ω,p,F,τ,Fanc,τanc,coords,cache)
+    RigidBodyState(r,R,ṙ,ω,p,F,τ,Faps,τaps,coords,cache)
 end
 struct RigidBody{T,NP,CoordinatesType,ObjectType}
     prop::RigidBodyProperty{T,NP}

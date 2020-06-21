@@ -1,7 +1,9 @@
-abstract type AbstractRigidBody end
-abstract type AbstractTensegrityStructure end
+abstract type AbstractRigidBody{N,T,CType} end
+abstract type AbstractRigidBodyProperty{N,T} end
+abstract type AbstractRigidBodyState{N,T,CType} end
+abstract type AbstractTensegrityStructure{N,T} end
 
-struct RigidBodyProperty{N,T,iT}
+struct RigidBodyProperty{N,T,iT} <: AbstractRigidBodyProperty{N,T}
     movable::Bool
     name::Symbol
     type::Symbol
@@ -12,15 +14,7 @@ struct RigidBodyProperty{N,T,iT}
     aps::Vector{SArray{Tuple{N},T,1,N}}
 end
 
-function RigidBodyProperty(i,movable,mass,inertia,CoM,aps)
-    name = Symbol("rb"*string(i))
-    type = :generic
-    naps = length(aps)
-    RigidBodyProperty(movable,name,type,mass,inertia,CoM,naps,aps)
-end
-
-
-struct RigidBodyState{N,T,L,ωT,CoordinatesType,cacheType}
+struct RigidBodyState{N,T,L,ωT,CType,cacheType} <: AbstractRigidBodyState{N,T,CType}
     r::MArray{Tuple{N},T,1,N}
     R::MArray{Tuple{N,N},T,2,L}
     ṙ::MArray{Tuple{N},T,1,N}
@@ -28,9 +22,9 @@ struct RigidBodyState{N,T,L,ωT,CoordinatesType,cacheType}
     p::Vector{MArray{Tuple{N},T,1,N}} # Anchor Points in global frame
     F::MArray{Tuple{N},T,1,N}
     τ::ωT
-    Fanc::Vector{MArray{Tuple{N},T,1,N}}
-    τanc::Vector{MArray{Tuple{N},T,1,N}}
-    coords::CoordinatesType
+    Faps::Vector{MArray{Tuple{N},T,1,N}}
+    τaps::Vector{MArray{Tuple{N},T,1,N}}
+    coords::CType
     cache::cacheType
 end
 
@@ -39,6 +33,54 @@ struct RigidBodyCoordinates{N,T}
     q̇::MArray{Tuple{N},T,1,N}
     q̈::MArray{Tuple{N},T,1,N}
     Q::MArray{Tuple{N},T,1,N}
+end
+
+struct RigidBody{N,T,iT,L,ωT,CType,cacheType} <: AbstractRigidBody{N,T,CType}
+    prop::RigidBodyProperty{N,T,iT}
+    state::RigidBodyState{N,T,L,ωT,CType,cacheType}
+end
+
+struct NaturalCoordinatesCache{ArrayT,MT,fT}
+    CG::ArrayT
+    Cp::Vector{ArrayT}
+    M::MT
+    funcs::fT
+end
+
+# 2D and 3D
+function RigidBodyProperty(i::Integer,movable::Bool,
+                            mass::Real,inertia_input,
+                            CoM::AbstractVector,aps)
+    name = Symbol("rb"*string(i))
+    type = :generic
+    naps = length(aps)
+    if typeof(inertia_input)<:Real
+        return RigidBodyProperty(movable,name,type,mass,
+                                inertia_input,CoM,naps,aps)
+    else
+        @assert size(inertia_input) == (3,3)
+        inertia = SMatrix{3,3}(inertia_input)
+        return RigidBodyProperty(movable,name,type,mass,
+                                inertia,CoM,naps,aps)
+    end
+end
+
+function NaturalCoordinatesCache(prop::RigidBodyProperty{N,T,iT},
+                                 bps::NaturalCoordinates.BasicPoints) where {N,T,iT}
+    cf = NaturalCoordinates.CoordinateFunctions(bps)
+    @unpack mass,inertia,CoM,naps,aps = prop
+    M = NaturalCoordinates.make_M(cf,mass,inertia,CoM)
+    @unpack C,c = cf
+    CG = C(c(CoM))
+    Cp = [typeof(CG)(C(c(aps[i]))) for i in 1:naps]
+    NaturalCoordinatesCache(CG,Cp,M,cf)
+end
+
+# 2D
+function NaturalCoordinatesCache(prop::RigidBodyProperty,
+                                 L::Real)
+    bps = NaturalCoordinates.BasicPoints2P(L)
+    NaturalCoordinatesCache(prop,bps)
 end
 
 function RigidBodyState(prop,ri,rj)
@@ -55,23 +97,72 @@ function RigidBodyState(prop,ri,rj)
     ω = 0.0
     F = MVector(0.0,0.0)
     τ = 0.0
-    τanc = MVector(0.0,0.0)
+    τaps = MVector(0.0,0.0)
     cache = NaturalCoordinatesCache(prop,norm(u))
+    naps = prop.naps
+    p = [MVector{2}(cache.Cp[i]*q) for i in 1:naps]
+    Faps = [zeros(MVector{2}) for i in 1:naps]
+    τaps = [zeros(MVector{2}) for i in 1:naps]
+    RigidBodyState(r,R,ṙ,ω,p,F,τ,Faps,τaps,coords,cache)
+end
+
+# 3D
+function NaturalCoordinatesCache(prop::RigidBodyProperty{3,T,iT},r::AbstractVector{T}...) where {T,iT}
+    bps = NaturalCoordinates.BasicPoints3D(r...)
+    NaturalCoordinatesCache(prop,bps)
+end
+
+function RigidBodyState(prop::RigidBodyProperty{3,T,iT},bps::NaturalCoordinates.BasicPoints,
+                        r_input,R_input,ṙ_input,ω_input,
+                        q_input,q̇_input=zero(q_input)) where {T,iT}
+    q = MVector{12}(q_input)
+    q̇ = MVector{12}(q̇_input)
+    q̈ = zero(q)
+    Q = zero(q)
+    coords = RigidBodyCoordinates(q,q̇,q̈,Q)
+    cache = NaturalCoordinatesCache(prop,bps)
+    @unpack CoM,naps,aps = prop
+    @unpack C,c = cache.funcs
+    CG = C(c(CoM))
+    Cp = [C(c(ap)) for ap in aps]
+    p = [Cp[i]*q for i in 1:naps]
     nap = prop.naps
-    p = [MVector{2}(cache.Cp[i]*q) for i in 1:nap]
-    Fanc = [zeros(MVector{2}) for i in 1:nap]
-    τanc = [zeros(MVector{2}) for i in 1:nap]
-    RigidBodyState(r,R,ṙ,ω,p,F,τ,Fanc,τanc,coords,cache)
+    p = [MVector{3}(cache.Cp[i]*q) for i in 1:nap]
+    F = @MVector zeros(T,3)
+    τ = @MVector zeros(T,3) ###
+    Faps = [@MVector zeros(T,3) for i in 1:nap]
+    τaps = [@MVector zeros(T,3) for i in 1:nap]
+    r = MVector{3,T}(r_input)
+    R = MMatrix{3,3,T,9}(R_input)
+    ṙ = MVector{3,T}(ṙ_input)
+    ω = MVector{3,T}(ω_input) ###
+    RigidBodyState(r,R,ṙ,ω,p,F,τ,Faps,τaps,coords,cache)
 end
 
-struct RigidBody{N,T,iT,L,ωT,CoordinatesType,cacheType} <: AbstractRigidBody
-    prop::RigidBodyProperty{N,T,iT}
-    state::RigidBodyState{N,T,L,ωT,CoordinatesType,cacheType}
-end
-
+# operations on rigid body
 function reset_forces!(rb::RigidBody)
-    for f in rb.state.Fanc
+    for f in rb.state.Faps
         f .= 0.0
     end
     rb.state.F .= 0.0
 end
+
+function get_initial(rb::AbstractRigidBody{3,T,CT}) where {T,CT}
+    @unpack q,q̇ = rb.state.coords
+    λ0 = zeros(T,6)
+    Array(q),Array(q̇),λ0
+end
+
+function kinetic_energy_coords(state::AbstractRigidBodyState,q̇)
+    M = state.cache.M
+    T = 1/2*transpose(q̇)*M*q̇
+end
+
+function kinetic_energy_coords(state::AbstractRigidBodyState)
+    M = state.cache.M
+    q̇ = state.coords.q̇
+    T = 1/2*transpose(q̇)*M*q̇
+end
+
+kinetic_energy_coords(rb::AbstractRigidBody) = kinetic_energy_coords(rb.state)
+kinetic_energy_coords(rb::AbstractRigidBody,q̇) = kinetic_energy_coords(rb.state,q̇)
