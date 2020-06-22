@@ -104,7 +104,7 @@ function make_tail(n)
     # @code_warntype   TR.DString(k[i],original_restlen[i],
     #         restlen[i],actuallength[i],zeros(MVector{4}))
 
-    acs = [TR.Actuator(ss[4(i-1)+1:4i]) for i = 1:n]
+    acs = [TR.Actuator(SVector{4}(ss[4(i-1)+1:4i])) for i = 1:n]
 
     rb2p = [
         ifelse(isodd(i),[i,i+1],[i-1,i+1]) for i = 1:length(rbs)

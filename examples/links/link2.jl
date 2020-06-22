@@ -129,14 +129,38 @@ end
 nlink = 2
 linkn = links(nlink)
 q0,q̇0,λ0 = TR.get_initial(linkn)
-# @code_warntype links(nlink)
-α = 0.0
+#
+# function dynfuncs(tg,q0)
+#     M = TR.build_massmatrix(tg)
+#     Φ = TR.build_Φ(tg,q0)
+#     A = TR.build_A(tg)
+#     Q̃ = TR.build_Q̃(tg)
+#     function F!(F,q,q̇,t)
+#         TR.reset_forces!(tg)
+#         TR.distribute_q_to_rbs!(tg,q,q̇)
+#         TR.update_strings_apply_forces!(tg)
+#         F .= Q̃*TR.fvector(tg)
+#         # TR.assemble_forces!(F,tg)
+#     end
+#     M,Φ,A,F!,nothing
+# end
+# M,Φ,A,F!,Jacs = dynfuncs(linkn,q0)
+# dt = 0.01
+# prob = TS.DyProblem(dynfuncs(linkn,q0),q0,q̇0,λ0,(0.0,10.0))
+# sol = TS.solve(prob,TS.Wendlandt(),dt=dt,ftol=1e-13,verbose=true)
+#
+
 a2 = 1
 a1 = 0.0
-# compute_offset(nlink,α,0.1*0.5,a1,a2)
-
 reflinkn = links(nlink,a1,a2)
-# @code_warntype links(nlink,a1,a2)
+qr,q̇r,λr = TR.get_initial(reflinkn)
+#
+# q0,q̇0,λ0 = TR.get_initial(reflinkn)
+# M,Φ,A,F!,Jacs = dynfuncs(reflinkn,q0)
+# dt = 0.01
+# prob = TS.DyProblem(dynfuncs(reflinkn,q0),q0,q̇0,λ0,(0.0,3.0))
+# sol = TS.solve(prob,TS.Wendlandt(),dt=dt,ftol=1e-12,verbose=true)
+#
 
 function inverse(tgstruct,refstruct)
     function ikfuncs(tgstruct)
@@ -155,75 +179,42 @@ function inverse(tgstruct,refstruct)
         A,F!
     end
     q0,q̇0,λ0 = TR.get_initial(refstruct)
-    TR.distribute_q_to_rbs!(tgstruct,q0,q̇0)
+    TR.distribute_q_to_rbs!(tgstruct,q0,zero(q̇0))
     nu = length(tgstruct.actuators)
     u0 = zeros(nu)
     ikprob = TS.IKProblem(ikfuncs(tgstruct),q0,u0,λ0)
     TR.iksolve(ikprob)
 end
 u,_ = inverse(linkn,reflinkn)
-TR.actuate!(linkn,zero(u))
-# TR.actuate!(linkn,zeros(12))
-# @code_warntype links(nlink)
-# link3.ndim
-# link3.connectivity.body2q[end][end]
+TR.actuate!(reflinkn,u)
+TR.update_strings_apply_forces!(reflinkn)
+[s.state.tension for s in reflinkn.strings]
 
-function dynfuncs(tg)
+TR.actuate!(linkn,u)
+function linearload(tg,q0,u,tend)
     M = TR.build_massmatrix(tg)
-    Φ = TR.build_Φ(tg)
+    Φ = TR.build_Φ(tg,q0)
     A = TR.build_A(tg)
     Q̃ = TR.build_Q̃(tg)
     function F!(F,q,q̇,t)
+        ut = t/tend*u
+        #TR.actuate!(tg,ut)
         TR.reset_forces!(tg)
         TR.distribute_q_to_rbs!(tg,q,q̇)
         TR.update_strings_apply_forces!(tg)
+        # tensions = [s.state.tension for s in tg.strings]
+        # @show tensions
         F .= Q̃*TR.fvector(tg)
         # TR.assemble_forces!(F,tg)
     end
     M,Φ,A,F!,nothing
 end
-
-function linearload(tg,u,tend)
-    M = TR.build_massmatrix(tg)
-    Φ = TR.build_Φ(tg)
-    A = TR.build_A(tg)
-    Q̃ = TR.build_Q̃(tg)
-    function F!(F,q,q̇,t)
-        ut = u/tend*t
-        TR.reset_forces!(tg)
-        #TR.actuate!(tg,ut)
-        TR.distribute_q_to_rbs!(tg,q,q̇)
-        TR.update_strings_apply_forces!(tg)
-        F .= Q̃*TR.fvector(tg)
-        #TR.assemble_forces!(F,tg)
-    end
-    M,Φ,A,F!,nothing
-end
-#
-# M,Φ,A,F!,Jacs = dynfuncs(linkn)
-# Φ(q0)
-# @code_warntype Φ(q0)
-# A(q0)*q̇0
-# @code_warntype A(q0)
-
-
-
 dt = 0.01
-tend = 10.0
-prob = TS.DyProblem(linearload(linkn,u,tend),q0,q̇0,λ0,(0.0,tend))
-sol = TS.solve(prob,TS.Wendlandt(),dt=dt,ftol=1e-13,verbose=true)
-sol = TS.solve(prob,TS.ConstSPARK(1),dt=dt,ftol=1e-12,verbose=true)
+tend = 1.0
+prob = TS.DyProblem(linearload(linkn,q0,u,tend),q0,q̇0,λ0,(0.0,tend))
 
-
-M,Φ,A,F!,Jacs = dynfuncs(linkn)
-dt = 0.01
-prob = TS.DyProblem(dynfuncs(linkn),q0,q̇0,λ0,(0.0,10.0))
-sol = TS.solve(prob,TS.Wendlandt(),dt=dt,ftol=1e-12,verbose=true)
-
-
-
-q0,q̇0,λ0 = TR.get_initial(reflinkn)
-M,Φ,A,F!,Jacs = dynfuncs(reflinkn)
-dt = 0.01
-prob = TS.DyProblem(dynfuncs(reflinkn),q0,q̇0,λ0,(0.0,3.0))
-sol = TS.solve(prob,TS.Wendlandt(),dt=dt,ftol=1e-12,verbose=true)
+sol = TS.solve(prob,TS.Wendlandt(),dt=dt,ftol=1e-14,verbose=true)
+TR.distribute_q_to_rbs!(linkn,qr,q̇r)
+TR.actuate!(linkn,u)
+TR.update_strings_apply_forces!(linkn)
+[s.state.tension for s in linkn.strings]

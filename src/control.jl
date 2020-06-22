@@ -46,11 +46,11 @@ function reset!(hub::ControlHub)
     reset!.(trajs)
 end
 
-struct Actuator{N,T}
-    strings::Vector{SString{N,T}}
+struct Actuator{N,NS,T}
+    strings::SArray{Tuple{NS},SString{N,T},1,NS}
 end
 
-function reset!(actuator::Actuator)
+function reset!(actuator::Actuator{N,2,T}) where {N,T}
     @unpack strings = actuator
     str1 = strings[1]
     str2 = strings[2]
@@ -64,7 +64,7 @@ function actuate!(tgstruct::TensegrityStructure,us;inc=false)
     end
 end
 
-function actuate!(actuator::Actuator,u;inc=false)
+function actuate!(actuator::Actuator{N,2,T},u;inc=false) where {N,T}
     @unpack strings = actuator
     str1 = strings[1]
     str2 = strings[2]
@@ -74,5 +74,15 @@ function actuate!(actuator::Actuator,u;inc=false)
     else
         str1.state.restlen = str1.original_restlen + u
         str2.state.restlen = str2.original_restlen - u
+    end
+end
+
+function actuate!(actuator::Actuator{N,1,T},u;inc=false) where {N,T}
+    @unpack strings = actuator
+    str1 = strings[1]
+    if inc
+        str1.state.restlen += u
+    else
+        str1.state.restlen = str1.original_restlen + u
     end
 end

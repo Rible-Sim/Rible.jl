@@ -226,9 +226,9 @@ function get_nconstraint(tgstruct)
     nconstraint = ninconstraint + nexconstraint
 end
 
-function build_Φ(tgstruct)
+function build_Φ(tgstruct,q0)
     rbs = tgstruct.rigidbodies
-    q0,q̇0 = get_q(tgstruct)
+    #q0,q̇0 = get_q(tgstruct)
     @unpack body2q = tgstruct.connectivity
     nfixbody = tgstruct.nfixbody
     nconstraint = get_nconstraint(tgstruct)
@@ -311,11 +311,17 @@ get_nbodycoords(rb::AbstractRigidBody{3,T,CType}) where {T,CType} = 12
 get_nbodycoords(rb::AbstractRigidBody{2,T,CType}) where {T,CType} = 4
 
 get_fixindex(tg::TensegrityStructure) = get_fixindex(tg.rigidbodies[1])
-get_fixindex(rb::AbstractRigidBody{3,T,CType}) where {T,CType} = 1:6
+get_fixindex(rb::AbstractRigidBody{3,T,CType}) where {T,CType} = 2:2:12
 get_fixindex(rb::AbstractRigidBody{2,T,CType}) where {T,CType} = [1,2,4]
 
 get_fixA(tg::TensegrityStructure) = get_fixA(tg.rigidbodies[1])
-get_fixA(rb::AbstractRigidBody{3,T,CType}) where {T,CType} = hcat(Matrix(1.0I,6,6),zeros(6,6))
+function get_fixA(rb::AbstractRigidBody{3,T,CType}) where {T,CType}
+    A = zeros(6,12)
+    for (i,j) in zip(1:6,2:2:12)
+        A[i,j] = 1
+    end
+    A
+end
 get_fixA(rb::AbstractRigidBody{2,T,CType}) where {T,CType} = [1.0 0.0 0.0 0.0;
                                                                 0.0 1.0 0.0 0.0;
                                                                 0.0 0.0 0.0 1.0]

@@ -97,8 +97,8 @@ function man_ndof(ndof,θ=0.0)
     end
     ss = [TR.SString2D(original_restlens[i],ks[i],cs[i]) for i = 1:nstring]
     acs = [
-        ifelse(isodd(i),TR.Actuator(ss[2(i-1)+1:2i]),
-                        TR.Actuator(ss[2i:-1:2(i-1)+1]))
+        ifelse(isodd(i),TR.Actuator(SVector{2}(ss[2(i-1)+1:2i])),
+                        TR.Actuator(SVector{2}(ss[2i:-1:2(i-1)+1])))
         for i = 1:nbody-1
     ]
 
@@ -153,7 +153,7 @@ function inverse(tgstruct,refst2d)
     ikprob = TS.IKProblem(ikfuncs(tgstruct),q0,u0,λ0)
     TR.iksolve(ikprob)
 end
-u,_ = inverse(manipulator,refman) 
+u,_ = inverse(manipulator,refman)
 
 TR.distribute_q_to_rbs!(manipulator,q0,q̇0)
 TR.actuate!(manipulator,zero(u)) # reverse to initial
@@ -205,11 +205,11 @@ control! = make_control!(get_angles)
 # --------------------Define Control Action\\-----------------------------
 
 # ----------------------------Dynamics-----------------------------------
-function dynfuncs(tgstruct)
+function dynfuncs(tgstruct,q0)
 
     M = TR.build_massmatrix(tgstruct)
     #M!, ∂T∂q̇! = TS.const_massmatrix_functions(M)
-    Φ = TR.build_Φ(tgstruct)
+    Φ = TR.build_Φ(tgstruct,q0)
     A = TR.build_A(tgstruct)
 
     Q̃=TR.build_Q̃(tgstruct)
@@ -228,8 +228,8 @@ function dynfuncs(tgstruct)
 
     #A,Φ,∂T∂q̇!,F!,M!,nothing
 end
-M,Φ,A,F!,Jacs = dynfuncs(manipulator)
-prob = TS.DyProblem(dynfuncs(manipulator),q0,q̇0,λ0,(0.0,40.0))
+M,Φ,A,F!,Jacs = dynfuncs(manipulator,q0)
+prob = TS.DyProblem(dynfuncs(manipulator,q0),q0,q̇0,λ0,(0.0,40.0))
 # TR.actuate!(manipulator,u)
 # sol = TS.solve(prob,dt=dt,ftol=1e-13,verbose=true)
 
