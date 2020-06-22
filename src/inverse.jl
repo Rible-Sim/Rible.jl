@@ -1,12 +1,12 @@
 function build_T(tgstruct)
-    nq_per_body = 4
+    nbodycoords = get_nbodycoords(tgstruct)
     body2q = tgstruct.connectivity.body2q
     nbody = tgstruct.nbody
     nq = body2q[end][end]
-    T = spzeros(Int,nq,nbody*nq_per_body)
+    T = spzeros(Int,nq,nbody*nbodycoords)
     for (rbid,rb) in enumerate(tgstruct.rigidbodies)
         pindex = body2q[rbid]
-        js = (rbid-1)*nq_per_body
+        js = (rbid-1)*nbodycoords
         for (j,index) in enumerate(pindex)
             T[index,js+j] = 1
         end
@@ -17,16 +17,16 @@ end
 # Array(T)
 # @code_warntype build_T(manipulator)
 function build_C(tgstruct)
-    nq_per_body = 4
+    nbodycoords = get_nbodycoords(tgstruct)
     @unpack nbody,npoints,ndim = tgstruct
-    C = spzeros(nbody*nq_per_body,npoints*ndim)
+    C = spzeros(nbody*nbodycoords,npoints*ndim)
     js = 0
     for (rbid,rb) in enumerate(tgstruct.rigidbodies)
-        is = (rbid-1)*nq_per_body
+        is = (rbid-1)*nbodycoords
         for (apid,Cp) in enumerate(rb.state.cache.Cp)
             jlen,_ = size(Cp)
-            C[is+1:is+nq_per_body,js+1:js+jlen] .= transpose(Cp)
-            # @show is+1:is+nq_per_body, js+1:js+jlen
+            C[is+1:is+nbodycoords,js+1:js+jlen] .= transpose(Cp)
+            # @show is+1:is+nbodycoords, js+1:js+jlen
             js += jlen
         end
     end
@@ -51,7 +51,7 @@ function build_D(tgstruct)
         D_raw[iss[ap[1].rbid]+ap[1].apid,sid] = 1
         D_raw[iss[ap[2].rbid]+ap[2].apid,sid] = -1
     end
-    D .= kron(D_raw,Matrix(1I,2,2))
+    D .= kron(D_raw,Matrix(1I,ndim,ndim))
 end
 
 function build_Q̃(tgstruct)

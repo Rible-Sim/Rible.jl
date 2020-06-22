@@ -135,36 +135,38 @@ function apply_gravity!(tgstruct)
         rb.state.F .= [0.0,-g]
     end
 end
-function kineticenergy(rbs)
-    ke = 0.0
-    for (rbid,rb) in enumerate(rbs)
-        @unpack q̇ = rb.state.coords
-        @unpack M = rb.state.cache
-        ke += 1/2*transpose(q̇)*M*q̇
-    end
-    ke
+function kinetic_energy_coords(rb::RigidBody)
+    @unpack q̇ = rb.state.coords
+    @unpack M = rb.state.cache
+    ke = 1/2*transpose(q̇)*M*q̇
 end
 
-function potentialenergy(ss)
+function potential_energy(s::SString)
     pe = 0.0
-    for (ssid,sstring) in enumerate(ss)
-        @unpack k,original_restlen = sstring
-        sstate = sstring.state
-        Δ1 = sstate.length-original_restlen
-        if Δ1 > 0.0
-            pe += 1/2*k*Δ1^2
-        end
+    @unpack k,state = s
+    Δlen = s.state.length-s.state.restlen
+    if Δlen > 0.0
+        pe += 1/2*k*Δlen^2
     end
     pe
 end
 
-function energy(q,q̇,tgstruct)
+function kinetic_energy_coords(tgstruct::TensegrityStructure,q,q̇)
     distribute_q_to_rbs!(tgstruct,q,q̇)
-    ss = tgstruct.strings
-    rbs = tgstruct.rigidbodies
+    ke = sum(kinetic_energy_coords.(tgstruct.rigidbodies))
+end
+
+function potential_energy(tgstruct::TensegrityStructure,q,q̇)
+    distribute_q_to_rbs!(tgstruct,q,q̇)
     update_strings_apply_forces!(tgstruct)
-    ke = kineticenergy(rbs)
-    pe = potentialenergy(ss)
+    pe = sum(potential_energy.(tgstruct.strings))
+end
+
+function energy(tgstruct,q,q̇)
+    distribute_q_to_rbs!(tgstruct,q,q̇)
+    ke = sum(kinetic_energy_coords.(tgstruct.rigidbodies))
+    update_strings_apply_forces!(tgstruct)
+    pe = sum(potential_energy.(tgstruct.strings))
     ke + pe
 end
 
@@ -217,8 +219,10 @@ end
 
 function get_nconstraint(tgstruct)
     @unpack nbody,nfixbody = tgstruct
-    ninconstraint = nbody
-    nexconstraint = 3nfixbody
+    nbodyconstraint = get_nbodyconstraint(tgstruct)
+    nbodydof = get_nbodydof(tgstruct)
+    ninconstraint = nbodyconstraint*nbody
+    nexconstraint = nbodydof*nfixbody
     nconstraint = ninconstraint + nexconstraint
 end
 

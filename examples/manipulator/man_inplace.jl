@@ -153,7 +153,7 @@ function inverse(tgstruct,refst2d)
     ikprob = TS.IKProblem(ikfuncs(tgstruct),q0,u0,λ0)
     TR.iksolve(ikprob)
 end
-u,_ = inverse(manipulator,refman) # PID setpoints
+u,_ = inverse(manipulator,refman) 
 
 TR.distribute_q_to_rbs!(manipulator,q0,q̇0)
 TR.actuate!(manipulator,zero(u)) # reverse to initial
