@@ -20,7 +20,7 @@ include("inverse.jl")
 include("control.jl")
 
 struct TGRobot2D{ST,CT}
-    st2d::ST
+    tgstruct::ST
     hub::CT
 end
 # Write your package code here.

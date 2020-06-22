@@ -1,23 +1,31 @@
 
-mutable struct SStringState{T}
-    restlength::T
+mutable struct SStringState{N,T}
+    restlen::T
     length::T
     lengthdot::T
     tension::T
-    direction::MArray{Tuple{2},T,1,2}
+    direction::MArray{Tuple{N},T,1,N}
 end
 
-function SStringState(restlength,length,tension)
-    SStringState(restlength,length,zero(length),tension,MVector(1.0,0.0))
+function SStringState(restlen,direction)
+    SStringState(restlen,restlen,zero(restlen),zero(restlen),direction)
 end
 
-struct SString{T}
+struct SString{N,T}
     k::T
     c::T
-    original_restlength::T
-    state::SStringState{T}
+    original_restlen::T
+    state::SStringState{N,T}
 end
 
-function SString(k,origin_restlength,state)
-    SString(k,zero(k),origin_restlength,state)
+function SString2D(origin_restlen::T,k::T,c=zero(k)) where T
+    direction = MVector{2}(one(T),zero(T))
+    state = SStringState(origin_restlen,direction)
+    SString(k,c,origin_restlen,state)
+end
+
+function SString3D(origin_restlen::T,k::T,c=zero(k)) where T
+    direction = MVector{3}(one(T),zero(T),zero(T))
+    state = SStringState(origin_restlen,direction)
+    SString(k,c,origin_restlen,state)
 end

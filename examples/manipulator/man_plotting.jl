@@ -15,12 +15,12 @@ function recordplot(scene,update_scene!,state)
     end
 end
 
-function plotstructure(st2d,state,func)
+function plotstructure(tgstruct,state,func)
     bars = [Node([
         Point(rb.state.p[1]) => Point(rb.state.p[2]);
         Point(rb.state.p[2]) => Point(rb.state.p[3]);
         Point(rb.state.p[3]) => Point(rb.state.p[1]);
-        ]) for rb in st2d.rigidbodies]
+        ]) for rb in tgstruct.rigidbodies]
     function plot!(scene::Scene,bars)
         for (lineid,line) in enumerate(bars)
             linesegments!(scene,line, color = :black, linewidth = 4)
@@ -33,8 +33,8 @@ function plotstructure(st2d,state,func)
     ylims!(-0.5,0.6)
 
     function update_scene!(scene,q)
-        cnt = st2d.connectivity
-        for (id,rb) in enumerate(st2d.rigidbodies)
+        cnt = tgstruct.connectivity
+        for (id,rb) in enumerate(tgstruct.rigidbodies)
             pindex = cnt.body2q[id]
             cache = rb.state.cache
             p = rb.state.p
@@ -47,7 +47,7 @@ function plotstructure(st2d,state,func)
                     Point(rb.state.p[3]) => Point(rb.state.p[1]);
                 ]
         end
-        # angles = update_angles(st2d)
+        # angles = update_angles(tgstruct)
         # @show angles
     end
     func(scene,update_scene!,state)

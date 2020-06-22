@@ -46,20 +46,20 @@ function reset!(hub::ControlHub)
     reset!.(trajs)
 end
 
-struct Actuator{T}
-    strings::Vector{SString{T}}
+struct Actuator{N,T}
+    strings::Vector{SString{N,T}}
 end
 
 function reset!(actuator::Actuator)
     @unpack strings = actuator
     str1 = strings[1]
     str2 = strings[2]
-    str1.state.restlength = str1.original_restlength
-    str2.state.restlength = str2.original_restlength
+    str1.state.restlen = str1.original_restlen
+    str2.state.restlen = str2.original_restlen
 end
 
-function actuate!(st2d::TensegrityStructure,us;inc=false)
-    for (actuator,u) in zip(st2d.actuators,us)
+function actuate!(tgstruct::TensegrityStructure,us;inc=false)
+    for (actuator,u) in zip(tgstruct.actuators,us)
         actuate!(actuator,u,inc=inc)
     end
 end
@@ -69,10 +69,10 @@ function actuate!(actuator::Actuator,u;inc=false)
     str1 = strings[1]
     str2 = strings[2]
     if inc
-        str1.state.restlength += u
-        str2.state.restlength -= u
+        str1.state.restlen += u
+        str2.state.restlen -= u
     else
-        str1.state.restlength = str1.original_restlength + u
-        str2.state.restlength = str2.original_restlength - u
+        str1.state.restlen = str1.original_restlen + u
+        str2.state.restlen = str2.original_restlen - u
     end
 end

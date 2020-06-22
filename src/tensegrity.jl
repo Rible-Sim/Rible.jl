@@ -25,8 +25,9 @@ struct TensegrityStructure{BodyType,StringType,ActuatorType,ConnectType}
     connectivity::ConnectType
 end
 
-function TensegrityStructure(rbs,ss,acs,cnt)
-    ndim = 2
+function TensegrityStructure(rbs::Vector{rbType},ss,acs,cnt
+                ) where rbType<:AbstractRigidBody{N,T,CType} where {N,T,CType}
+    ndim = N
     nbody = length(rbs)
     mvbodyindex = [i for i in eachindex(rbs) if rbs[i].prop.movable]
     nmvbody = length(mvbodyindex)
@@ -55,10 +56,10 @@ function reset_forces!(tgst::TensegrityStructure)
 end
 
 
-function update_strings_apply_forces!(st2d)
-    rbs = st2d.rigidbodies
-    ss = st2d.strings
-    cnt = st2d.connectivity
+function update_strings_apply_forces!(tgstruct)
+    rbs = tgstruct.rigidbodies
+    ss = tgstruct.strings
+    cnt = tgstruct.connectivity
     for (istr,sstring) in enumerate(ss)
         @unpack k,c = sstring
         sstate = sstring.state
@@ -77,7 +78,7 @@ function update_strings_apply_forces!(st2d)
         sstate.length = l
         sstate.direction = τ
         l̇ = 1/l*(Δr[1]*Δṙ[1] + Δr[2]*Δṙ[2])
-        f_raw = k*(l - sstate.restlength) +
+        f_raw = k*(l - sstate.restlen) +
                 c*l̇
         sstate.tension = ifelse(f_raw > 0.0, f_raw, 0.0)
         f = τ*sstate.tension
@@ -86,9 +87,9 @@ function update_strings_apply_forces!(st2d)
     end
 end
 
-function distribute_q_to_rbs!(st2d,globalq,globalq̇)
-    rbs = st2d.rigidbodies
-    cnt = st2d.connectivity
+function distribute_q_to_rbs!(tgstruct,globalq,globalq̇)
+    rbs = tgstruct.rigidbodies
+    cnt = tgstruct.connectivity
     for (rbid,rb) in enumerate(rbs)
         pindex = cnt.body2q[rbid]
         @unpack q, q̇ = rb.state.coords
@@ -115,9 +116,9 @@ function generate_forces!(rbs)
     end
 end
 
-function assemble_forces!(F,st2d)
-    rbs = st2d.rigidbodies
-    @unpack body2q = st2d.connectivity
+function assemble_forces!(F,tgstruct)
+    rbs = tgstruct.rigidbodies
+    @unpack body2q = tgstruct.connectivity
     generate_forces!(rbs)
     F .= 0.0
     for (rbid,rb) in enumerate(rbs)
@@ -126,8 +127,8 @@ function assemble_forces!(F,st2d)
     end
 end
 
-function apply_gravity!(st2d)
-    rbs = st2d.rigidbodies
+function apply_gravity!(tgstruct)
+    rbs = tgstruct.rigidbodies
     for (rbid,rb) in enumerate(rbs)
         @unpack state = rb
         g = 9.8
@@ -147,9 +148,9 @@ end
 function potentialenergy(ss)
     pe = 0.0
     for (ssid,sstring) in enumerate(ss)
-        @unpack k,original_restlength = sstring
+        @unpack k,original_restlen = sstring
         sstate = sstring.state
-        Δ1 = sstate.length-original_restlength
+        Δ1 = sstate.length-original_restlen
         if Δ1 > 0.0
             pe += 1/2*k*Δ1^2
         end
@@ -157,11 +158,11 @@ function potentialenergy(ss)
     pe
 end
 
-function energy(q,q̇,st2d)
-    distribute_q_to_rbs!(st2d,q,q̇)
-    ss = st2d.strings
-    rbs = st2d.rigidbodies
-    update_strings_apply_forces!(st2d)
+function energy(q,q̇,tgstruct)
+    distribute_q_to_rbs!(tgstruct,q,q̇)
+    ss = tgstruct.strings
+    rbs = tgstruct.rigidbodies
+    update_strings_apply_forces!(tgstruct)
     ke = kineticenergy(rbs)
     pe = potentialenergy(ss)
     ke + pe
@@ -199,9 +200,9 @@ function build_body2q(rbs::Vector{RigidBody{T,CT,AT}}) where {T,CT,AT}
     body2q
 end
 
-function build_massmatrix(st2d::TensegrityStructure)
-    rbs = st2d.rigidbodies
-    body2q = st2d.connectivity.body2q
+function build_massmatrix(tgstruct::TensegrityStructure)
+    rbs = tgstruct.rigidbodies
+    body2q = tgstruct.connectivity.body2q
     build_massmatrix(rbs,body2q)
 end
 function build_massmatrix(rbs,body2q)
@@ -214,57 +215,65 @@ function build_massmatrix(rbs,body2q)
     mass_matrix
 end
 
-function get_nconstraint(st2d)
-    @unpack nbody,nfixbody = st2d
+function get_nconstraint(tgstruct)
+    @unpack nbody,nfixbody = tgstruct
     ninconstraint = nbody
     nexconstraint = 3nfixbody
     nconstraint = ninconstraint + nexconstraint
 end
 
-function build_Φ(st2d)
-    rbs = st2d.rigidbodies
-    q0,q̇0 = get_q(st2d)
-    @unpack body2q = st2d.connectivity
-    nfixbody = st2d.nfixbody
-    nconstraint = get_nconstraint(st2d)
+function build_Φ(tgstruct)
+    rbs = tgstruct.rigidbodies
+    q0,q̇0 = get_q(tgstruct)
+    @unpack body2q = tgstruct.connectivity
+    nfixbody = tgstruct.nfixbody
+    nconstraint = get_nconstraint(tgstruct)
+    nbodyc = get_nbodyconstraint(tgstruct)
+    nbodydof = get_nbodydof(tgstruct)
+    fixindex = get_fixindex(tgstruct)
     function inner_Φ(q)
         ret = Vector{eltype(q)}(undef,nconstraint)
         for (rbid,rb) in enumerate(rbs)
             pindex = body2q[rbid]
-            ret[3nfixbody+rbid] = rb.state.cache.funcs.Φ(q[pindex])
+            is = nbodydof*nfixbody
+            ret[is+nbodyc*(rbid-1)+1:is+nbodyc*rbid] .= rb.state.cache.funcs.Φ(q[pindex])
         end
-        for (fixid,rbid) in enumerate(st2d.fixbodyindex)
+        for (fixid,rbid) in enumerate(tgstruct.fixbodyindex)
             pindex = body2q[rbid]
-            ret[3(fixid-1)+1:3fixid] .= q[pindex[[1,2,4]]] - q0[pindex[[1,2,4]]]
+            ret[nbodydof*(fixid-1)+1:nbodydof*fixid] .= q[pindex[fixindex]] - q0[pindex[fixindex]]
         end
         ret
     end
 end
 
-function build_A(st2d)
-    rbs = st2d.rigidbodies
-    @unpack body2q = st2d.connectivity
-    nfixbody = st2d.nfixbody
-    nconstraint = get_nconstraint(st2d)
+function build_A(tgstruct)
+    rbs = tgstruct.rigidbodies
+    @unpack body2q = tgstruct.connectivity
+    nfixbody = tgstruct.nfixbody
+    nconstraint = get_nconstraint(tgstruct)
+    nbodyc = get_nbodyconstraint(tgstruct)
+    nbodydof = get_nbodydof(tgstruct)
+    fixindex = get_fixindex(tgstruct)
+    fixA = get_fixA(tgstruct)
     nq = body2q[end][end]
-    function inner_Φ(q)
+    function inner_A(q)
         ret = zeros(eltype(q),nconstraint,nq)
         for (rbid,rb) in enumerate(rbs)
             pindex = body2q[rbid]
-            ret[3nfixbody+rbid,pindex] .= rb.state.cache.funcs.Φq(q[pindex])
+            is = nbodydof*nfixbody
+            ret[is+nbodyc*(rbid-1)+1:is+nbodyc*rbid,pindex] .= rb.state.cache.funcs.Φq(q[pindex])
         end
-        for (fixid,rbid) in enumerate(st2d.fixbodyindex)
-            ret[3(fixid-1)+1,1:4] .= [1.0,0.0,0.0,0.0]
-            ret[3(fixid-1)+2,1:4] .= [0.0,1.0,0.0,0.0]
-            ret[3(fixid-1)+3,1:4] .= [0.0,0.0,0.0,1.0]
+        for (fixid,rbid) in enumerate(tgstruct.fixbodyindex)
+            pindex = body2q[rbid]
+            ret[nbodydof*(fixid-1)+1:nbodydof*fixid,pindex] .= fixA
         end
         ret
     end
 end
 
-function get_q(st2d)
-    rbs = st2d.rigidbodies
-    @unpack body2q = st2d.connectivity
+function get_q(tgstruct)
+    rbs = tgstruct.rigidbodies
+    @unpack body2q = tgstruct.connectivity
     nq = body2q[end][end]
     q = zeros(nq)
     q̇ = zeros(nq)
@@ -276,11 +285,33 @@ function get_q(st2d)
     return q,q̇
 end
 
-function get_initial(st2d)
-    q0,q̇0 = get_q(st2d)
-    λ0 = zeros(get_nconstraint(st2d))
+function get_initial(tgstruct)
+    q0,q̇0 = get_q(tgstruct)
+    λ0 = zeros(get_nconstraint(tgstruct))
     q0,q̇0,λ0
 end
 
-function get_u(st2d)
+function get_u(tgstruct)
 end
+
+get_nbodyconstraint(tg::TensegrityStructure) = get_nbodyconstraint(tg.rigidbodies[1])
+get_nbodyconstraint(rb::AbstractRigidBody{3,T,CType}) where {T,CType} = 6
+get_nbodyconstraint(rb::AbstractRigidBody{2,T,CType}) where {T,CType} = 1
+
+get_nbodydof(tg::TensegrityStructure) = get_nbodydof(tg.rigidbodies[1])
+get_nbodydof(rb::AbstractRigidBody{3,T,CType}) where {T,CType} = 6
+get_nbodydof(rb::AbstractRigidBody{2,T,CType}) where {T,CType} = 3
+
+get_nbodycoords(tg::TensegrityStructure) = get_nbodycoords(tg.rigidbodies[1])
+get_nbodycoords(rb::AbstractRigidBody{3,T,CType}) where {T,CType} = 12
+get_nbodycoords(rb::AbstractRigidBody{2,T,CType}) where {T,CType} = 4
+
+get_fixindex(tg::TensegrityStructure) = get_fixindex(tg.rigidbodies[1])
+get_fixindex(rb::AbstractRigidBody{3,T,CType}) where {T,CType} = 1:6
+get_fixindex(rb::AbstractRigidBody{2,T,CType}) where {T,CType} = [1,2,4]
+
+get_fixA(tg::TensegrityStructure) = get_fixA(tg.rigidbodies[1])
+get_fixA(rb::AbstractRigidBody{3,T,CType}) where {T,CType} = hcat(Matrix(1.0I,6,6),zeros(6,6))
+get_fixA(rb::AbstractRigidBody{2,T,CType}) where {T,CType} = [1.0 0.0 0.0 0.0;
+                                                                0.0 1.0 0.0 0.0;
+                                                                0.0 0.0 0.0 1.0]

@@ -49,19 +49,19 @@ function npen(n)
     R2.TensegrityStructure(rbs,Vector{Int}(),Vector{Int}(),cnt)
 end
 
-function npen_wend(st2d)
-    rbs = st2d.rigidbodies
-    cnt = st2d.connectivity
+function npen_wend(tgstruct)
+    rbs = tgstruct.rigidbodies
+    cnt = tgstruct.connectivity
     @unpack body2q = cnt
     M = R2.build_massmatrix(rbs,body2q)
-    Φ = R2.build_Φ(st2d)
-    A = R2.build_A(st2d)
+    Φ = R2.build_Φ(tgstruct)
+    A = R2.build_A(tgstruct)
     function F(q,q̇,t)
-        R2.reset_forces!(st2d)
-        R2.distribute_q_to_rbs!(st2d,q,q̇)
-        R2.apply_gravity!(st2d)
+        R2.reset_forces!(tgstruct)
+        R2.distribute_q_to_rbs!(tgstruct,q,q̇)
+        R2.apply_gravity!(tgstruct)
         ret = similar(q)
-        R2.assemble_forces!(ret,st2d)
+        R2.assemble_forces!(ret,tgstruct)
         ret
     end
     M,Φ,A,F,nothing

@@ -1,9 +1,9 @@
 using Makie
 AbstractPlotting.__init__()
-function plotstructure(st2d,state)
+function plotstructure(tgstruct,state)
     bars = [Node([
         Point(rb.state.p[1]) => Point(rb.state.p[2]);
-        ]) for rb in st2d.rigidbodies]
+        ]) for rb in tgstruct.rigidbodies]
     function plot!(scene::Scene,bars)
         for (lineid,line) in enumerate(bars)
             linesegments!(scene,line, color = :black, linewidth = 4)
@@ -17,9 +17,9 @@ function plotstructure(st2d,state)
     ylims!(scene, -0.2,0.0)
 
 
-    function update_scene!(scene,q,st2d,bars)
-        cnt = st2d.connectivity
-        for (id,rb) in enumerate(st2d.rigidbodies)
+    function update_scene!(scene,q,tgstruct,bars)
+        cnt = tgstruct.connectivity
+        for (id,rb) in enumerate(tgstruct.rigidbodies)
             pindex = cnt.body2q[id]
             cache = rb.state.cache
             p = rb.state.p
@@ -35,7 +35,7 @@ function plotstructure(st2d,state)
 
     step_slider,tstep = textslider(1:length(state.ts),"step",start=1)
     on(tstep) do this_step
-        update_scene!(scene,state.qs[this_step],st2d,bars)
+        update_scene!(scene,state.qs[this_step],tgstruct,bars)
     end
     bigscene = hbox(step_slider,scene)
 end

@@ -1,10 +1,10 @@
-function build_T(st2d)
+function build_T(tgstruct)
     nq_per_body = 4
-    body2q = st2d.connectivity.body2q
-    nbody = st2d.nbody
+    body2q = tgstruct.connectivity.body2q
+    nbody = tgstruct.nbody
     nq = body2q[end][end]
     T = spzeros(Int,nq,nbody*nq_per_body)
-    for (rbid,rb) in enumerate(st2d.rigidbodies)
+    for (rbid,rb) in enumerate(tgstruct.rigidbodies)
         pindex = body2q[rbid]
         js = (rbid-1)*nq_per_body
         for (j,index) in enumerate(pindex)
@@ -16,12 +16,12 @@ end
 # T = build_T(manipulator)
 # Array(T)
 # @code_warntype build_T(manipulator)
-function build_C(st2d)
+function build_C(tgstruct)
     nq_per_body = 4
-    @unpack nbody,npoints,ndim = st2d
+    @unpack nbody,npoints,ndim = tgstruct
     C = spzeros(nbody*nq_per_body,npoints*ndim)
     js = 0
-    for (rbid,rb) in enumerate(st2d.rigidbodies)
+    for (rbid,rb) in enumerate(tgstruct.rigidbodies)
         is = (rbid-1)*nq_per_body
         for (apid,Cp) in enumerate(rb.state.cache.Cp)
             jlen,_ = size(Cp)
@@ -37,13 +37,13 @@ end
 # @code_warntype build_C(manipulator)
 # manipulator.connectivity.string2ap[1]
 
-function build_D(st2d)
-    @unpack nstring,npoints,ndim = st2d
-    @unpack body2q,string2ap = st2d.connectivity
+function build_D(tgstruct)
+    @unpack nstring,npoints,ndim = tgstruct
+    @unpack body2q,string2ap = tgstruct.connectivity
     D = spzeros(Int,npoints*ndim,nstring*ndim)
     D_raw = spzeros(Int,npoints,nstring)
     iss = [0]
-    for (rbid,rb) in enumerate(st2d.rigidbodies)
+    for (rbid,rb) in enumerate(tgstruct.rigidbodies)
         push!(iss,iss[end]+rb.prop.naps)
     end
 
@@ -54,12 +54,12 @@ function build_D(st2d)
     D .= kron(D_raw,Matrix(1I,2,2))
 end
 
-function build_Q̃(st2d)
-    Q̃=build_T(st2d)*build_C(st2d)*build_D(st2d)
+function build_Q̃(tgstruct)
+    Q̃=build_T(tgstruct)*build_C(tgstruct)*build_D(tgstruct)
 end
 
-function fvector(st2d)
-    @unpack strings = st2d
+function fvector(tgstruct)
+    @unpack strings = tgstruct
     ret = vcat([str.state.tension*str.state.direction for str in strings]...)
 end
 

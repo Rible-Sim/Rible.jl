@@ -132,10 +132,10 @@ function RigidBodyState(prop::RigidBodyProperty{3,T,iT},bps::NaturalCoordinates.
     τ = @MVector zeros(T,3) ###
     Faps = [@MVector zeros(T,3) for i in 1:nap]
     τaps = [@MVector zeros(T,3) for i in 1:nap]
-    r = MVector{3,T}(r_input)
     R = MMatrix{3,3,T,9}(R_input)
-    ṙ = MVector{3,T}(ṙ_input)
+    r = MVector{3}(r_input+R*CoM)
     ω = MVector{3,T}(ω_input) ###
+    ṙ = MVector{3}(ṙ_input+ω×(r-r_input))
     RigidBodyState(r,R,ṙ,ω,p,F,τ,Faps,τaps,coords,cache)
 end
 

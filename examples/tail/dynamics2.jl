@@ -90,20 +90,19 @@ function make_tail(n)
     rbs = [rigidbody(i,CoM[i],m[i],inertia[i],ri[i],rj[i],[p1[i],p2[i]]) for i = 1:nb]
 
     nstring = 4n
-    original_restlengths = zeros(nstring)
-    restlengths = zeros(nstring)
+    original_restlens = zeros(nstring)
+    restlens = zeros(nstring)
     actuallengths = zeros(nstring)
     for i = 1:nstring
         j = i % 4
-        original_restlengths[i] =
-                 restlengths[i] =
+        original_restlens[i] =
+                 restlens[i] =
                actuallengths[i] = ifelse(j∈[1,0],0.04,√3*0.02)
     end
     ks = fill(100.0,nstring)
-    ss = [TR.SString(ks[i],original_restlengths[i],
-        TR.SStringState(restlengths[i],actuallengths[i],0.0)) for i = 1:nstring]
-    # @code_warntype   TR.DString(k[i],original_restlength[i],
-    #         restlength[i],actuallength[i],zeros(MVector{4}))
+    ss = [TR.SString2D(original_restlens[i],ks[i],1.0) for i = 1:nstring]
+    # @code_warntype   TR.DString(k[i],original_restlen[i],
+    #         restlen[i],actuallength[i],zeros(MVector{4}))
 
     acs = [TR.Actuator(ss[4(i-1)+1:4i]) for i = 1:n]
 
@@ -120,26 +119,36 @@ function make_tail(n)
         push!(string2ap,(TR.ID(2i+1,2),TR.ID(2i-1,2)))
     end
     cnt = TR.Connectivity(body2q,string2ap)
-    TR.TensegrityStructure(rbs,ss,acs,cnt)
+    tg = TR.TensegrityStructure(rbs,ss,acs,cnt)
+    TR.update_strings_apply_forces!(tg)
+    tg
 end
 n = 4
 tail = make_tail(n)
 
-function dynfuncs(st2d)
+TR.get_nbodyconstraint(tail)
+TR.get_nbodydof(tail)
+TR.get_nbodycoords(tail)
+TR.get_fixindex(tail)
+TR.get_fixA(tail)
 
-    M = TR.build_massmatrix(st2d)
-    Φ = TR.build_Φ(st2d)
-    A = TR.build_A(st2d)
+@code_warntype make_tail(n)
 
-    Q̃=TR.build_Q̃(st2d)
+function dynfuncs(tgstruct)
+
+    M = TR.build_massmatrix(tgstruct)
+    Φ = TR.build_Φ(tgstruct)
+    A = TR.build_A(tgstruct)
+
+    Q̃=TR.build_Q̃(tgstruct)
 
     function F!(F,q,q̇,t)
-        TR.reset_forces!(st2d)
-        TR.distribute_q_to_rbs!(st2d,q,q̇)
-        TR.update_strings_apply_forces!(st2d)
-        # F .= Q̃*TR.fvector(st2d)
+        TR.reset_forces!(tgstruct)
+        TR.distribute_q_to_rbs!(tgstruct,q,q̇)
+        TR.update_strings_apply_forces!(tgstruct)
+        # F .= Q̃*TR.fvector(tgstruct)
         F .= 0.0
-        TR.assemble_forces!(F,st2d)
+        TR.assemble_forces!(F,tgstruct)
     end
 
     M,Φ,A,F!,nothing

@@ -377,11 +377,11 @@ end
 function make_Φq(bps::BasicPoints2P)
     @inline @inbounds function inner_Φq(q)
         xi,yi,xj,yj = q
-        ret = similar(q)
-        ret[1] = 2(xi-xj)
-        ret[2] = 2(yi-yj)
-        ret[3] = 2(xj-xi)
-        ret[4] = 2(yj-yi)
+        ret = zeros(eltype(q),1,4)
+        ret[1,1] = 2(xi-xj)
+        ret[1,2] = 2(yi-yj)
+        ret[1,3] = 2(xj-xi)
+        ret[1,4] = 2(yj-yi)
         ret
     end
 end

@@ -74,23 +74,23 @@ function man(n,θ=0.0)
     nstring = 2(nbody-1)
     upstringlen = norm(rbs[2].state.p[3] - rbs[1].state.p[1])
     lostringlen = norm(rbs[2].state.p[2] - rbs[1].state.p[3])
-    original_restlengths = zeros(nstring)
-    restlengths = zeros(nstring)
+    original_restlens = zeros(nstring)
+    restlens = zeros(nstring)
     actuallengths = zeros(nstring)
     ks = zeros(nstring)
     cs = zeros(nstring)
     cs .= 1.0
     for i = 1:nstring
         j = i % 4
-        original_restlengths[i] =
-                 restlengths[i] =
+        original_restlens[i] =
+                 restlens[i] =
                actuallengths[i] =  ifelse(j∈[1,0],upstringlen,lostringlen)
         ks[i] = ifelse(j∈[1,0],1.0e2,1.0e2)
     end
-    ss = [R2.SString(ks[i],cs[i],original_restlengths[i],
-        R2.SStringState(restlengths[i],actuallengths[i],0.0)) for i = 1:nstring]
-    # @code_warntype   R2.DString(k[i],original_restlength[i],
-    #         restlength[i],actuallength[i],zeros(MVector{4}))
+    ss = [R2.SString(ks[i],cs[i],original_restlens[i],
+        R2.SStringState(restlens[i],actuallengths[i],0.0)) for i = 1:nstring]
+    # @code_warntype   R2.DString(k[i],original_restlen[i],
+    #         restlen[i],actuallength[i],zeros(MVector{4}))
     rbs,ss
 
     acs = [
@@ -124,9 +124,9 @@ end
 n = 2
 manipulator = man(n)
 refman = man(n,-π/12)
-function update_angles(st2d)
-    rbs = st2d.rigidbodies
-    angles = zeros(st2d.nbody)
+function update_angles(tgstruct)
+    rbs = tgstruct.rigidbodies
+    angles = zeros(tgstruct.nbody)
     for (rbid,rb) in enumerate(rbs)
         if rbid > 1
             state0 = rbs[rbid-1].state
@@ -138,12 +138,12 @@ function update_angles(st2d)
     end
     angles
 end
-function man_spark(n,st2d)
-    rbs = st2d.rigidbodies
-    vss = st2d.strings
-    cnt = st2d.connectivity
+function man_spark(n,tgstruct)
+    rbs = tgstruct.rigidbodies
+    vss = tgstruct.strings
+    cnt = tgstruct.connectivity
     @unpack body2q = cnt
-    @unpack nbody,nfixbody,nstring = st2d
+    @unpack nbody,nfixbody,nstring = tgstruct
     ninconstraint = nbody
     nexconstraint = 3nfixbody
     nconstraint = ninconstraint + nexconstraint
@@ -163,9 +163,9 @@ function man_spark(n,st2d)
     ref_angles = update_angles(refman)
     pids = [R2.PIDController.PID(0.01,0.1,1.0,
             setpoint=ref_angles[i+1],dt=0.01) for i = 1:2]
-    function actuate!(st2d,pids,t)
-        acs = st2d.actuators
-        angles = update_angles(st2d)
+    function actuate!(tgstruct,pids,t)
+        acs = tgstruct.actuators
+        angles = update_angles(tgstruct)
         for (id,ac) = enumerate(acs)
             pid = pids[id]
             input_angle = angles[id]
@@ -174,30 +174,30 @@ function man_spark(n,st2d)
             @unpack strings = ac
             for i in [1]
                 str = strings[i]
-                #str.state.restlength = str.original_restlength*(1+0.02Δ)
-                str.state.restlength = str.original_restlength + output
-                #@show i,str.state.restlength
+                #str.state.restlen = str.original_restlen*(1+0.02Δ)
+                str.state.restlen = str.original_restlen + output
+                #@show i,str.state.restlen
             end
             for i in [2]
                 str = strings[i]
-                #str.state.restlength = str.original_restlength*(1-0.02Δ)
-                str.state.restlength = str.original_restlength - output
-                #@show i,str.state.restlength
+                #str.state.restlen = str.original_restlen*(1-0.02Δ)
+                str.state.restlen = str.original_restlen - output
+                #@show i,str.state.restlen
             end
         end
     end
 
     function F!(F,q,q̇,t)
-        R2.reset_forces!(st2d)
-        R2.distribute_q_to_rbs!(st2d,q,q̇)
-        actuate!(st2d,pids,t)
-        R2.update_strings_apply_forces!(st2d)
+        R2.reset_forces!(tgstruct)
+        R2.distribute_q_to_rbs!(tgstruct,q,q̇)
+        actuate!(tgstruct,pids,t)
+        R2.update_strings_apply_forces!(tgstruct)
         F .= 0.0
-        R2.assemble_forces!(F,st2d)
+        R2.assemble_forces!(F,tgstruct)
     end
 
-    Φ = R2.build_Φ(st2d)
-    A = R2.build_A(st2d)
+    Φ = R2.build_Φ(tgstruct)
+    A = R2.build_A(tgstruct)
 
     A,Φ,∂T∂q̇!,F!,M!,nothing
 end
@@ -209,26 +209,26 @@ q0,q̇0,λ0 = R2.get_initial(manipulator,Φ)
 Φ(q0)
 A(q0)
 
-function man_wend(n,st2d)
-    rbs = st2d.rigidbodies
-    vss = st2d.strings
-    cnt = st2d.connectivity
+function man_wend(n,tgstruct)
+    rbs = tgstruct.rigidbodies
+    vss = tgstruct.strings
+    cnt = tgstruct.connectivity
     @unpack body2q = cnt
-    @unpack nbody,nfixbody,nstring = st2d
+    @unpack nbody,nfixbody,nstring = tgstruct
     ninconstraint = nbody
     nexconstraint = 3nfixbody
     nconstraint = ninconstraint + nexconstraint
     nq = body2q[end][end]
-    q0,q̇0 = R2.get_q(st2d)
+    q0,q̇0 = R2.get_q(tgstruct)
 
     M = R2.build_massmatrix(rbs,body2q)
 
     ref_angles = update_angles(refman)
     pids = [R2.PIDController.PID(0.01,0.1,1.0,
             setpoint=ref_angles[i+1],dt=0.01) for i = 1:2]
-    function actuate!(st2d,pids,t)
-        acs = st2d.actuators
-        angles = update_angles(st2d)
+    function actuate!(tgstruct,pids,t)
+        acs = tgstruct.actuators
+        angles = update_angles(tgstruct)
         for (id,ac) = enumerate(acs)
             pid = pids[id]
             input_angle = angles[id]
@@ -237,42 +237,42 @@ function man_wend(n,st2d)
             @unpack strings = ac
             for i in [1]
                 str = strings[i]
-                #str.state.restlength = str.original_restlength*(1+0.02Δ)
-                str.state.restlength = str.original_restlength + output
-                #@show i,str.state.restlength
+                #str.state.restlen = str.original_restlen*(1+0.02Δ)
+                str.state.restlen = str.original_restlen + output
+                #@show i,str.state.restlen
             end
             for i in [2]
                 str = strings[i]
-                #str.state.restlength = str.original_restlength*(1-0.02Δ)
-                str.state.restlength = str.original_restlength - output
-                #@show i,str.state.restlength
+                #str.state.restlen = str.original_restlen*(1-0.02Δ)
+                str.state.restlen = str.original_restlen - output
+                #@show i,str.state.restlen
             end
         end
     end
 
     function F(q,q̇,t)
-        R2.reset_forces!(st2d)
-        R2.distribute_q_to_rbs!(st2d,q,q̇)
-        actuate!(st2d,pids,t)
-        R2.update_strings_apply_forces!(st2d)
+        R2.reset_forces!(tgstruct)
+        R2.distribute_q_to_rbs!(tgstruct,q,q̇)
+        actuate!(tgstruct,pids,t)
+        R2.update_strings_apply_forces!(tgstruct)
         ret = zero(q)
-        R2.assemble_forces!(ret,st2d)
+        R2.assemble_forces!(ret,tgstruct)
         ret
     end
 
-    Φ = R2.build_Φ(st2d)
-    A = R2.build_A(st2d)
+    Φ = R2.build_Φ(tgstruct)
+    A = R2.build_A(tgstruct)
 
     M,Φ,A,F,nothing
 end
 M,Φ,A,F,Jacs = man_wend(n,manipulator)
 
-function initial(n,st2d)
-    rbs = st2d.rigidbodies
-    cnt = st2d.connectivity
-    @unpack nbody,nfixbody = st2d
+function initial(n,tgstruct)
+    rbs = tgstruct.rigidbodies
+    cnt = tgstruct.connectivity
+    @unpack nbody,nfixbody = tgstruct
     nq = cnt.body2q[end][end]
-    q0,q̇0 = get_q(st2d)
+    q0,q̇0 = get_q(tgstruct)
     #q̇0[end] = 0.01
     #q̇0[end-1:end] .= [0.0,0.001]
     ninconstraint = nbody
@@ -300,7 +300,7 @@ state = SPARKsolve!(q0,q̇0,λ0,cache,tab,ftol=1e-13)
 using BenchmarkTools
 cn = [cond(A(state.qs[i])) for i = 1:length(state.ts)]
 plot(cn)
-function angle_errors(st2d,ref)
-    angles = update!(st2d)
+function angle_errors(tgstruct,ref)
+    angles = update!(tgstruct)
     errors = ref - angles
 end

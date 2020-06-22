@@ -82,21 +82,20 @@ function man_ndof(ndof,θ=0.0)
     nstring = 2(nbody-1)
     upstringlen = norm(rbs[2].state.p[3] - rbs[1].state.p[1])
     lostringlen = norm(rbs[2].state.p[2] - rbs[1].state.p[3])
-    original_restlengths = zeros(nstring)
-    restlengths = zeros(nstring)
+    original_restlens = zeros(nstring)
+    restlens = zeros(nstring)
     actuallengths = zeros(nstring)
     ks = zeros(nstring)
     cs = zeros(nstring)
     cs .= 10.0
     for i = 1:nstring
         j = i % 4
-        original_restlengths[i] =
-                 restlengths[i] =
+        original_restlens[i] =
+                 restlens[i] =
                actuallengths[i] =  ifelse(j∈[1,0],upstringlen,lostringlen)
         ks[i] = ifelse(j∈[1,0],1.0e2,1.0e2)
     end
-    ss = [TR.SString(ks[i],cs[i],original_restlengths[i],
-        TR.SStringState(restlengths[i],actuallengths[i],0.0)) for i = 1:nstring]
+    ss = [TR.SString2D(original_restlens[i],ks[i],cs[i]) for i = 1:nstring]
     acs = [
         ifelse(isodd(i),TR.Actuator(ss[2(i-1)+1:2i]),
                         TR.Actuator(ss[2i:-1:2(i-1)+1]))
@@ -119,7 +118,9 @@ function man_ndof(ndof,θ=0.0)
         push!(string2ap,(TR.ID(i,3),TR.ID(i+1,2)))
     end
     cnt = TR.Connectivity(body2q,string2ap)
-    TR.TensegrityStructure(rbs,ss,acs,cnt)
+    tg = TR.TensegrityStructure(rbs,ss,acs,cnt)
+    TR.update_strings_apply_forces!(tg)
+    tg
 end
 # ------------------Create Tensegrity Struture --------------------------
 ndof = 6
@@ -129,27 +130,27 @@ manipulator = man_ndof(ndof,0.0)
 
 q0,q̇0,λ0 = TR.get_initial(manipulator) #backup
 # ----------------------Inverse Kinematics ------------------------------
-function inverse(st2d,refst2d)
-    function ikfuncs(st2d)
+function inverse(tgstruct,refst2d)
+    function ikfuncs(tgstruct)
 
-        A = TR.build_A(st2d)
+        A = TR.build_A(tgstruct)
 
-        Q̃=TR.build_Q̃(st2d)
+        Q̃=TR.build_Q̃(tgstruct)
 
         function F!(F,u)
-            TR.reset_forces!(st2d)
-            TR.actuate!(st2d,u)
-            TR.update_strings_apply_forces!(st2d)
-            F .= Q̃*TR.fvector(st2d)
+            TR.reset_forces!(tgstruct)
+            TR.actuate!(tgstruct,u)
+            TR.update_strings_apply_forces!(tgstruct)
+            F .= Q̃*TR.fvector(tgstruct)
         end
 
         A,F!
     end
     q0,q̇0,λ0 = TR.get_initial(refst2d)
-    TR.distribute_q_to_rbs!(st2d,q0,q̇0)
-    nu = length(st2d.actuators)
+    TR.distribute_q_to_rbs!(tgstruct,q0,q̇0)
+    nu = length(tgstruct.actuators)
     u0 = zeros(nu)
-    ikprob = TS.IKProblem(ikfuncs(st2d),q0,u0,λ0)
+    ikprob = TS.IKProblem(ikfuncs(tgstruct),q0,u0,λ0)
     TR.iksolve(ikprob)
 end
 u,_ = inverse(manipulator,refman) # PID setpoints
@@ -161,9 +162,9 @@ TR.actuate!(manipulator,zero(u)) # reverse to initial
 dt = 0.01 # Same dt used for PID AND Dynamics solver
 # ---------------------Create Controllers --------------------------------
 # use angles to define errors
-function get_angles(st2d)
-    rbs = st2d.rigidbodies
-    angles = zeros(st2d.nbody-1)
+function get_angles(tgstruct)
+    rbs = tgstruct.rigidbodies
+    angles = zeros(tgstruct.nbody-1)
     for (rbid,rb) in enumerate(rbs)
         if rbid > 1
             state0 = rbs[rbid-1].state
@@ -188,10 +189,10 @@ rob = TR.TGRobot2D(manipulator,TR.ControlHub(pids))
 # --------------------Define Control Action-------------------------------
 function make_control!(get_feedback)
     function inner_control!(robot2d,t)
-        @unpack st2d, hub = robot2d
+        @unpack tgstruct, hub = robot2d
         @unpack ctrls,trajs = hub
-        inputs = get_feedback(st2d)
-        for (id,pid,traj,actuator) in zip(eachindex(ctrls),ctrls,trajs,st2d.actuators)
+        inputs = get_feedback(tgstruct)
+        for (id,pid,traj,actuator) in zip(eachindex(ctrls),ctrls,trajs,tgstruct.actuators)
             input = inputs[id]
             output = TR.PIDController.update!(pid,input)
             TR.actuate!(actuator,output)
@@ -204,22 +205,22 @@ control! = make_control!(get_angles)
 # --------------------Define Control Action\\-----------------------------
 
 # ----------------------------Dynamics-----------------------------------
-function dynfuncs(st2d)
+function dynfuncs(tgstruct)
 
-    M = TR.build_massmatrix(st2d)
+    M = TR.build_massmatrix(tgstruct)
     #M!, ∂T∂q̇! = TS.const_massmatrix_functions(M)
-    Φ = TR.build_Φ(st2d)
-    A = TR.build_A(st2d)
+    Φ = TR.build_Φ(tgstruct)
+    A = TR.build_A(tgstruct)
 
-    Q̃=TR.build_Q̃(st2d)
+    Q̃=TR.build_Q̃(tgstruct)
 
     function F!(F,q,q̇,t)
-        TR.reset_forces!(st2d)
-        TR.distribute_q_to_rbs!(st2d,q,q̇)
-        TR.update_strings_apply_forces!(st2d)
-        F .= Q̃*TR.fvector(st2d)
-        #F .= 0.0
-        #TR.assemble_forces!(F,st2d)
+        TR.reset_forces!(tgstruct)
+        TR.distribute_q_to_rbs!(tgstruct,q,q̇)
+        TR.update_strings_apply_forces!(tgstruct)
+        #F .= Q̃*TR.fvector(tgstruct)
+        F .= 0.0
+        TR.assemble_forces!(F,tgstruct)
         #@show isapprox(F,)
     end
 
@@ -234,8 +235,8 @@ prob = TS.DyProblem(dynfuncs(manipulator),q0,q̇0,λ0,(0.0,40.0))
 
 function make_affect!(robot2d,control!)
     function inner_affect!(intor)
-        TR.distribute_q_to_rbs!(robot2d.st2d,intor.qprev,intor.q̇prev)
-        TR.update_strings_apply_forces!(robot2d.st2d)
+        TR.distribute_q_to_rbs!(robot2d.tgstruct,intor.qprev,intor.q̇prev)
+        TR.update_strings_apply_forces!(robot2d.tgstruct)
         control!(robot2d,intor.t)
     end
 end
@@ -246,7 +247,7 @@ TR.PIDController.tune!(rob.hub.ctrls[3],1.2,0.004,11)
 TR.PIDController.tune!(rob.hub.ctrls[4],1.1,0.004,10)
 TR.PIDController.tune!(rob.hub.ctrls[5],1.0,0.005,8.5)
 TR.PIDController.tune!(rob.hub.ctrls[6],0.9,0.005,7.0)
-TR.reset!.(rob.st2d.actuators)
+TR.reset!.(rob.tgstruct.actuators)
 TR.reset!.(rob.hub.trajs)
 sol = TS.solve(prob,TS.Wendlandt(),dt=dt,ftol=1e-13,callback=cb)
 pltfig.clear(); pltfig = controlplot(rob.hub.trajs)
@@ -315,13 +316,13 @@ state = SPARKsolve!(q0,q̇0,λ0,cache,tab,ftol=1e-14)
 TS.solve(prob,dt=dt)
 @code_warntype TS.solve(prob,dt=dt)
 
-function showactuator(st2d)
-    for (acid,actuator) in enumerate(st2d.actuators)
+function showactuator(tgstruct)
+    for (acid,actuator) in enumerate(tgstruct.actuators)
         @unpack strings = actuator
         str1 = strings[1]
-        u1 = str1.state.restlength - str1.original_restlength
+        u1 = str1.state.restlen - str1.original_restlen
         str2 = strings[2]
-        u2 = str2.state.restlength - str2.original_restlength
+        u2 = str2.state.restlen - str2.original_restlen
         @show acid,u1,u2
     end
 end
