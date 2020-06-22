@@ -129,10 +129,10 @@ end
 
 function apply_gravity!(tgstruct)
     rbs = tgstruct.rigidbodies
+    gravity_force = get_gravity(tgstruct)
     for (rbid,rb) in enumerate(rbs)
         @unpack state = rb
-        g = 9.8
-        rb.state.F .= [0.0,-g]
+        rb.state.F .= gravity_force
     end
 end
 function kinetic_energy_coords(rb::RigidBody)
@@ -325,3 +325,6 @@ end
 get_fixA(rb::AbstractRigidBody{2,T,CType}) where {T,CType} = [1.0 0.0 0.0 0.0;
                                                                 0.0 1.0 0.0 0.0;
                                                                 0.0 0.0 0.0 1.0]
+get_gravity(tg::TensegrityStructure) = get_gravity(tg.rigidbodies[1])
+get_gravity(::AbstractRigidBody{3,T,CType}) where {T,CType} = [zero(T),zero(T),-9.8*one(T)]
+get_gravity(::AbstractRigidBody{2,T,CType}) where {T,CType} = [zero(T),-9.8*one(T)]

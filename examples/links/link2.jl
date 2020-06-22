@@ -61,9 +61,9 @@ function links(n,a1=0.0,a2=0.0,α=0.0)
     l = √(a^2+h^2)
     b = √3a
 
-    mass = 0.1 #kg
+    mass = 0.05 #kg
     #inertia = Matrix(Diagonal([45.174,45.174,25.787]))*1e-8 # N/m^2
-    inertia = Matrix(Diagonal([45.174,45.174,25.787]))*1e-2
+    inertia = Matrix(Diagonal([45.174,45.174,25.787]))*1e-3
     CoM = [0.0, 0.0, 0.0]
 
 
@@ -101,10 +101,10 @@ function links(n,a1=0.0,a2=0.0,α=0.0)
     stringlenH = 0.5h
     stringlenR = 0.09433981132056604
     stringlens = repeat(vcat(fill(stringlenH,4),fill(stringlenR,3)),n-1)
-    kH = 1e1
-    kR = 1e1
+    kH = 1e3
+    kR = 1e3
     ks = repeat(vcat(fill(kH,4),fill(kR,3)),n-1)
-    c = 1.0
+    c = 1000.0
     cs = repeat(fill(c,7),n-1)
     ss = [TR.SString3D(stringlens[i],ks[i],cs[i]) for i = 1:nstrings]
     acs = [TR.Actuator(SVector{1}(ss[7(i-1)+j])) for j = 2:7 for i = 1:n-1]
@@ -173,7 +173,10 @@ function inverse(tgstruct,refstruct)
             TR.reset_forces!(tgstruct)
             TR.actuate!(tgstruct,u)
             TR.update_strings_apply_forces!(tgstruct)
-            F .= Q̃*TR.fvector(tgstruct)
+            TR.apply_gravity!(tgstruct)
+            F .= 0
+            #F .= Q̃*TR.fvector(tgstruct)
+            TR.assemble_forces!(F,tgstruct)
         end
 
         A,F!
@@ -198,19 +201,21 @@ function linearload(tg,q0,u,tend)
     Q̃ = TR.build_Q̃(tg)
     function F!(F,q,q̇,t)
         ut = t/tend*u
-        #TR.actuate!(tg,ut)
+        TR.actuate!(tg,ut)
         TR.reset_forces!(tg)
         TR.distribute_q_to_rbs!(tg,q,q̇)
         TR.update_strings_apply_forces!(tg)
         # tensions = [s.state.tension for s in tg.strings]
         # @show tensions
-        F .= Q̃*TR.fvector(tg)
-        # TR.assemble_forces!(F,tg)
+        TR.apply_gravity!(tg)
+        #F .= Q̃*TR.fvector(tg)
+        F .= 0
+        TR.assemble_forces!(F,tg)
     end
     M,Φ,A,F!,nothing
 end
 dt = 0.01
-tend = 1.0
+tend = 10.0
 prob = TS.DyProblem(linearload(linkn,q0,u,tend),q0,q̇0,λ0,(0.0,tend))
 
 sol = TS.solve(prob,TS.Wendlandt(),dt=dt,ftol=1e-14,verbose=true)
