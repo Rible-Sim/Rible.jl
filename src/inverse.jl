@@ -85,3 +85,22 @@ end
 
 # Q̃=build_T(manipulator)*build_C(manipulator)*build_D(manipulator)
 # Array(Q̃)
+
+function compensate_gravity_funcs(tgstruct)
+
+    A = build_A(tgstruct)
+
+    Q̃=build_Q̃(tgstruct)
+
+    function F!(F,u)
+        reset_forces!(tgstruct)
+        actuate!(tgstruct,u)
+        update_strings_apply_forces!(tgstruct)
+        apply_gravity!(tgstruct)
+        F .= 0
+        #F .= Q̃*fvector(tgstruct)
+        assemble_forces!(F,tgstruct)
+    end
+
+    A,F!
+end

@@ -61,7 +61,7 @@ function links(n,a1=0.0,a2=0.0,α=0.0)
     l = √(a^2+h^2)
     b = √3a
 
-    mass = 0.05 #kg
+    mass = 0.025 #kg
     #inertia = Matrix(Diagonal([45.174,45.174,25.787]))*1e-8 # N/m^2
     inertia = Matrix(Diagonal([45.174,45.174,25.787]))*1e-3
     CoM = [0.0, 0.0, 0.0]
@@ -99,7 +99,7 @@ function links(n,a1=0.0,a2=0.0,α=0.0)
 
     nstrings = 7*(n-1)
     stringlenH = 0.5h
-    stringlenR = 0.09433981132056604
+    stringlenR = 0.09433981132056604-0.006163534339610306
     stringlens = repeat(vcat(fill(stringlenH,4),fill(stringlenR,3)),n-1)
     kH = 1e3
     kR = 1e3
@@ -150,8 +150,8 @@ q0,q̇0,λ0 = TR.get_initial(linkn)
 # sol = TS.solve(prob,TS.Wendlandt(),dt=dt,ftol=1e-13,verbose=true)
 #
 
-a2 = 1
-a1 = 0.0
+a2 = 1.1
+a1 = 0.00
 reflinkn = links(nlink,a1,a2)
 qr,q̇r,λr = TR.get_initial(reflinkn)
 #
@@ -161,6 +161,35 @@ qr,q̇r,λr = TR.get_initial(reflinkn)
 # prob = TS.DyProblem(dynfuncs(reflinkn,q0),q0,q̇0,λ0,(0.0,3.0))
 # sol = TS.solve(prob,TS.Wendlandt(),dt=dt,ftol=1e-12,verbose=true)
 #
+
+function compensate_gravity(tgstruct)
+    # reset velocity
+    q0,q̇0,λ0 = TR.get_initial(tgstruct)
+    TR.distribute_q_to_rbs!(tgstruct,q0,zero(q̇0))
+    nu = length(tgstruct.actuators)
+    u0 = zeros(nu)
+    ikprob = TS.IKProblem(TR.compensate_gravity_funcs(tgstruct),q0,u0,λ0)
+    TR.iksolve(ikprob)
+end
+
+# ug,_ = compensate_gravity(linkn)
+# ug[4:6]
+ur,_ = compensate_gravity(reflinkn)
+lensr = TR.get_strings_len(reflinkn,qr)
+lens0 = TR.get_strings_len(linkn,q0)
+dlens = lensr[2:7]-lens0[2:7]
+
+function no_more_extending!(ur,dlens)
+    for i in eachindex(ur)
+        if ur[i] > 0.0
+            if ur[i] > dlens[i]
+                ur[i] = dlens[i]
+            end
+        end
+    end
+    ur
+end
+no_more_extending!(ur,dlens)
 
 function inverse(tgstruct,refstruct)
     function ikfuncs(tgstruct)
@@ -193,14 +222,19 @@ TR.actuate!(reflinkn,u)
 TR.update_strings_apply_forces!(reflinkn)
 [s.state.tension for s in reflinkn.strings]
 
-TR.actuate!(linkn,u)
-function linearload(tg,q0,u,tend)
+TR.actuate!(linkn,ug)
+TR.actuate!(linkn,ur)
+function linearload(tg,q0,initial_u,target_u,target_t)
     M = TR.build_massmatrix(tg)
     Φ = TR.build_Φ(tg,q0)
     A = TR.build_A(tg)
     Q̃ = TR.build_Q̃(tg)
     function F!(F,q,q̇,t)
-        ut = t/tend*u
+        if t < target_t
+            ut = initial_u + t/target_t*(target_u-initial_u)
+        else
+            ut = target_u
+        end
         TR.actuate!(tg,ut)
         TR.reset_forces!(tg)
         TR.distribute_q_to_rbs!(tg,q,q̇)
@@ -215,8 +249,9 @@ function linearload(tg,q0,u,tend)
     M,Φ,A,F!,nothing
 end
 dt = 0.01
-tend = 10.0
-prob = TS.DyProblem(linearload(linkn,q0,u,tend),q0,q̇0,λ0,(0.0,tend))
+target_t = 5.0
+prob = TS.DyProblem(linearload(linkn,q0,zero(ur),ur,target_t),q0,q̇0,λ0,(0.0,15.0))
+prob = TS.DyProblem(linearload(linkn,qr,u,tend),qr,q̇r,λr,(0.0,tend))
 
 sol = TS.solve(prob,TS.Wendlandt(),dt=dt,ftol=1e-14,verbose=true)
 TR.distribute_q_to_rbs!(linkn,qr,q̇r)

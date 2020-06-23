@@ -328,3 +328,13 @@ get_fixA(rb::AbstractRigidBody{2,T,CType}) where {T,CType} = [1.0 0.0 0.0 0.0;
 get_gravity(tg::TensegrityStructure) = get_gravity(tg.rigidbodies[1])
 get_gravity(::AbstractRigidBody{3,T,CType}) where {T,CType} = [zero(T),zero(T),-9.8*one(T)]
 get_gravity(::AbstractRigidBody{2,T,CType}) where {T,CType} = [zero(T),-9.8*one(T)]
+
+
+function get_strings_len(tg::TensegrityStructure,q)
+    distribute_q_to_rbs!(tg,q,zero(q))
+    update_strings_apply_forces!(tg)
+    get_strings_len(tg)
+end
+function get_strings_len(tg::TensegrityStructure)
+    [s.state.length for s in tg.strings]
+end
