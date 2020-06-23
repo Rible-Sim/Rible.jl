@@ -90,12 +90,12 @@ end
 function distribute_q_to_rbs!(tgstruct,globalq,globalq̇)
     rbs = tgstruct.rigidbodies
     cnt = tgstruct.connectivity
-    for (rbid,rb) in enumerate(rbs)
+    for rbid in tgstruct.mvbodyindex
         pindex = cnt.body2q[rbid]
-        @unpack q, q̇ = rb.state.coords
+        @unpack q, q̇ = rbs[rbid].state.coords
         q .= globalq[pindex]
         q̇ .= globalq̇[pindex]
-        @unpack cache,p = rb.state
+        @unpack cache,p = rbs[rbid].state
         for (i,ap) in enumerate(p)
             ap .= cache.Cp[i]*q
         end
@@ -121,9 +121,9 @@ function assemble_forces!(F,tgstruct)
     @unpack body2q = tgstruct.connectivity
     generate_forces!(rbs)
     F .= 0.0
-    for (rbid,rb) in enumerate(rbs)
+    for rbid in tgstruct.mvbodyindex
         pindex = body2q[rbid]
-        F[pindex] .+= rb.state.coords.Q
+        F[pindex] .+= rbs[rbid].state.coords.Q
     end
 end
 
@@ -203,26 +203,25 @@ function build_body2q(rbs::Vector{rbType}) where rbType<:AbstractRigidBody{N,T,C
 end
 
 function build_massmatrix(tgstruct::TensegrityStructure)
-    rbs = tgstruct.rigidbodies
     body2q = tgstruct.connectivity.body2q
-    build_massmatrix(rbs,body2q)
-end
-function build_massmatrix(rbs,body2q)
     nq = body2q[end][end]
     mass_matrix = zeros(nq,nq)
-    for (rbid,rb) in enumerate(rbs)
+    for rbid in tgstruct.mvbodyindex
         pindex = body2q[rbid]
-        mass_matrix[pindex,pindex] .+= rbs[rbid].state.cache.M
+        mass_matrix[pindex,pindex] .+= tgstruct.rigidbodies[rbid].state.cache.M
     end
     mass_matrix
 end
 
 function get_nconstraint(tgstruct)
-    @unpack nbody,nfixbody = tgstruct
+    @unpack nmovablebody,nfixbody = tgstruct
     nbodyconstraint = get_nbodyconstraint(tgstruct)
     nbodydof = get_nbodydof(tgstruct)
-    ninconstraint = nbodyconstraint*nbody
-    nexconstraint = nbodydof*nfixbody
+    ninconstraint = nbodyconstraint*nmovablebody
+    nexconstraint = 0  #nbodydof*nfixbody
+    for rb in tgstruct.rigidbodies
+        nexconstraint += rb.state.cache.nc
+    end
     nconstraint = ninconstraint + nexconstraint
 end
 
@@ -237,15 +236,21 @@ function build_Φ(tgstruct,q0)
     fixindex = get_fixindex(tgstruct)
     function inner_Φ(q)
         ret = Vector{eltype(q)}(undef,nconstraint)
-        for (rbid,rb) in enumerate(rbs)
+        is = 0
+        #is += nbodydof*nfixbody
+        for rbid in tgstruct.mvbodyindex
             pindex = body2q[rbid]
-            is = nbodydof*nfixbody
-            ret[is+nbodyc*(rbid-1)+1:is+nbodyc*rbid] .= rb.state.cache.funcs.Φ(q[pindex])
+            rb = rbs[rbid]
+            nc = rb.state.cache.nc
+            ret[is+1:nc] = rb.state.cache.cfuncs.Φ(q[pindex])
+            is += nc
+            ret[is+1:is+nbodyc] .=rb.state.cache.funcs.Φ(q[pindex])
+            is += nbodyc
         end
-        for (fixid,rbid) in enumerate(tgstruct.fixbodyindex)
-            pindex = body2q[rbid]
-            ret[nbodydof*(fixid-1)+1:nbodydof*fixid] .= q[pindex[fixindex]] - q0[pindex[fixindex]]
-        end
+        # for (fixid,rbid) in enumerate(tgstruct.fixbodyindex)
+        #     pindex = body2q[rbid]
+        #     ret[nbodydof*(fixid-1)+1:nbodydof*fixid] .= q[pindex[fixindex]] - q0[pindex[fixindex]]
+        # end
         ret
     end
 end
@@ -262,15 +267,21 @@ function build_A(tgstruct)
     nq = body2q[end][end]
     function inner_A(q)
         ret = zeros(eltype(q),nconstraint,nq)
-        for (rbid,rb) in enumerate(rbs)
+        is = 0
+        #is += nbodydof*nfixbody
+        for rbid in tgstruct.mvbodyindex
             pindex = body2q[rbid]
-            is = nbodydof*nfixbody
-            ret[is+nbodyc*(rbid-1)+1:is+nbodyc*rbid,pindex] .= rb.state.cache.funcs.Φq(q[pindex])
+            rb = rbs[rbid]
+            nc = rb.state.cache.nc
+            ret[is+1:nc,pindex] = rb.state.cache.cfuncs.Φq(q[pindex])
+            is += nc
+            ret[is+1:is+nbodyc,pindex] .= rb.state.cache.funcs.Φq(q[pindex])
+            is += nbodyc
         end
-        for (fixid,rbid) in enumerate(tgstruct.fixbodyindex)
-            pindex = body2q[rbid]
-            ret[nbodydof*(fixid-1)+1:nbodydof*fixid,pindex] .= fixA
-        end
+        # for (fixid,rbid) in enumerate(tgstruct.fixbodyindex)
+        #     pindex = body2q[rbid]
+        #     ret[nbodydof*(fixid-1)+1:nbodydof*fixid,pindex] .= fixA
+        # end
         ret
     end
 end
@@ -281,7 +292,7 @@ function get_q(tgstruct)
     nq = body2q[end][end]
     q = zeros(nq)
     q̇ = zeros(nq)
-    for (rbid,rb) in enumerate(rbs)
+    for rbid in tgstruct.mvbodyindex
         pindex = body2q[rbid]
         q[pindex] .= rbs[rbid].state.coords.q
         q̇[pindex] .= rbs[rbid].state.coords.q̇
@@ -337,4 +348,36 @@ function get_strings_len(tg::TensegrityStructure,q)
 end
 function get_strings_len(tg::TensegrityStructure)
     [s.state.length for s in tg.strings]
+end
+
+function find_remaining_index(body2q,rbs)
+    original_nq = body2q[end][end]
+    switch_index = zeros(Int,original_nq)
+    for (rbid,rb) in enumerate(rbs)
+        qindex = body2q[rbid]
+        if rb.prop.movable
+            for i in qindex
+                switch_index[i] = i
+            end
+        end
+    end
+    remaining_index = findall((x)->x!=0,switch_index)
+end
+
+function filter_body2q(body2q,rbs)
+    original_nq = body2q[end][end]
+    remaining_index = find_remaining_index(body2q,rbs)
+    qpointer = collect(1:original_nq)[remaining_index]
+    filtered_body2q = Vector{Vector{Int}}()
+    for (rbid,rb) in enumerate(rbs)
+        qindex = body2q[rbid]
+        filtered_index = zero(qindex)
+        if rb.prop.movable
+            for (j,i) in enumerate(qindex)
+                filtered_index[j] = findfirst((x)->x==i,qpointer)
+            end
+        end
+        push!(filtered_body2q,filtered_index)
+    end
+    filtered_body2q
 end

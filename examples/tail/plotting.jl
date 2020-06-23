@@ -19,7 +19,8 @@ function plotstructure(tgstruct,state)
 
     function update_scene!(scene,q,tgstruct,bars)
         cnt = tgstruct.connectivity
-        for (id,rb) in enumerate(tgstruct.rigidbodies)
+        for id in tgstruct.mvbodyindex
+            rb = tgstruct.rigidbodies[id]
             pindex = cnt.body2q[id]
             cache = rb.state.cache
             p = rb.state.p

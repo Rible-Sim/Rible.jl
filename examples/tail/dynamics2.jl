@@ -77,14 +77,21 @@ function make_tail(n)
         else
             movable = true
         end
+        if i == 2
+            constrained = true
+            constrained_index = [1,2]
+        else
+            constrained = false
+            constrained_index = Vector{Int}()
+        end
         nap = length(aps)
         aps = [SVector{2}(aps[i]) for i = 1:nap]
         prop = TR.RigidBodyProperty(i,movable,
                     m,inertia,
                     SVector{2}(CoM),
-                    aps
+                    aps;constrained=constrained
                     )
-        state = TR.RigidBodyState(prop,ri,rj)
+        state = TR.RigidBodyState(prop,ri,rj,constrained_index)
         rb = TR.RigidBody(prop,state)
     end
     rbs = [rigidbody(i,CoM[i],m[i],inertia[i],ri[i],rj[i],[p1[i],p2[i]]) for i = 1:nb]
@@ -109,8 +116,8 @@ function make_tail(n)
     rb2p = [
         ifelse(isodd(i),[i,i+1],[i-1,i+1]) for i = 1:length(rbs)
     ]
-    body2q = [[2pid[1]-1,2pid[1],2pid[2]-1,2pid[2]] for pid in rb2p]
-
+    body2q_raw = [[2pid[1]-1,2pid[1],2pid[2]-1,2pid[2]] for pid in rb2p]
+    body2q = TR.filter_body2q(body2q_raw,rbs)
     string2ap = Vector{Tuple{TR.ID,TR.ID}}()
     for i = 1:n
         push!(string2ap,(TR.ID(2i+1,1),TR.ID(2i-1,1)))
@@ -125,6 +132,9 @@ function make_tail(n)
 end
 n = 4
 tail = make_tail(n)
+@code_warntype make_tail(n)
+q0,q̇0,λ0 = TR.get_initial(tail)
+q̇0[end-3:end] .= [0.1,0.0,0.1,0.0]
 
 TR.get_nbodyconstraint(tail)
 TR.get_nbodydof(tail)
@@ -134,13 +144,13 @@ TR.get_fixA(tail)
 
 @code_warntype make_tail(n)
 
-function dynfuncs(tgstruct)
+function dynfuncs(tgstruct,q0)
 
     M = TR.build_massmatrix(tgstruct)
-    Φ = TR.build_Φ(tgstruct)
+    Φ = TR.build_Φ(tgstruct,q0)
     A = TR.build_A(tgstruct)
 
-    Q̃=TR.build_Q̃(tgstruct)
+    #Q̃=TR.build_Q̃(tgstruct)
 
     function F!(F,q,q̇,t)
         TR.reset_forces!(tgstruct)
@@ -154,11 +164,11 @@ function dynfuncs(tgstruct)
     M,Φ,A,F!,nothing
 end
 
-M,Φ,A,F!,Jacs = dynfuncs(tail)
-q0,q̇0,λ0 = TR.get_initial(tail)
-q̇0[end-3:end] .= [0.1,0.0,0.1,0.0]
-
+M,Φ,A,F!,Jacs = dynfuncs(tail,q0)
+Φ(q0)
+A(q0)
 dt = 0.01
-prob = TS.DyProblem(dynfuncs(tail),q0,q̇0,λ0,(0.0,20.0))
+prob = TS.DyProblem(dynfuncs(tail,q0),q0,q̇0,λ0,(0.0,20.0))
 sol = TS.solve(prob,TS.Wendlandt(),dt=dt,ftol=1e-14,verbose=true)
 sol = TS.solve(prob,TS.ConstSPARK(1),dt=dt,ftol=1e-12,verbose=true)
+@code_warntype A(q0)

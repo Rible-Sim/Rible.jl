@@ -1,5 +1,6 @@
 module TensegrityRobot
 
+using Logging
 using SparseArrays
 using LinearAlgebra
 using Parameters
