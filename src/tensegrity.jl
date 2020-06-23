@@ -170,7 +170,7 @@ function energy(tgstruct,q,q̇)
     ke + pe
 end
 
-function build_body2q(rbs::Vector{RigidBody{T,CT,AT}}) where {T,CT,AT}
+function build_body2q(rbs::Vector{rbType}) where rbType<:AbstractRigidBody{N,T,CType} where {N,T,CType}
     bps = Vector{Vector{T}}()
     bp_number = Vector{Int}()
     push!(bp_number,0)
@@ -312,7 +312,7 @@ get_nbodycoords(rb::AbstractRigidBody{2,T,CType}) where {T,CType} = 4
 
 get_fixindex(tg::TensegrityStructure) = get_fixindex(tg.rigidbodies[1])
 get_fixindex(rb::AbstractRigidBody{3,T,CType}) where {T,CType} = 2:2:12
-get_fixindex(rb::AbstractRigidBody{2,T,CType}) where {T,CType} = [1,2,4]
+get_fixindex(rb::AbstractRigidBody{2,T,CType}) where {T,CType} = [2,3,4]
 
 get_fixA(tg::TensegrityStructure) = get_fixA(tg.rigidbodies[1])
 function get_fixA(rb::AbstractRigidBody{3,T,CType}) where {T,CType}
@@ -322,9 +322,9 @@ function get_fixA(rb::AbstractRigidBody{3,T,CType}) where {T,CType}
     end
     A
 end
-get_fixA(rb::AbstractRigidBody{2,T,CType}) where {T,CType} = [1.0 0.0 0.0 0.0;
-                                                                0.0 1.0 0.0 0.0;
-                                                                0.0 0.0 0.0 1.0]
+get_fixA(rb::AbstractRigidBody{2,T,CType}) where {T,CType} = [0.0 1.0 0.0 0.0;
+                                                              0.0 0.0 1.0 0.0;
+                                                              0.0 0.0 0.0 1.0]
 get_gravity(tg::TensegrityStructure) = get_gravity(tg.rigidbodies[1])
 get_gravity(::AbstractRigidBody{3,T,CType}) where {T,CType} = [zero(T),zero(T),-9.8*one(T)]
 get_gravity(::AbstractRigidBody{2,T,CType}) where {T,CType} = [zero(T),-9.8*one(T)]
