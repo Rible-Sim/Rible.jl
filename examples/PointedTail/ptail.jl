@@ -36,7 +36,7 @@ function make_tail(n)
         A[:,js+1] = A[:,js] + [ hor_lengths[2i],0.0]
     end
 
-    m = fill(1.3e-2,nb)
+    m = fill(1.3e-1,nb)
     ri = [zeros(2) for i = 1:nb]
     rj = [zeros(2) for i = 1:nb]
     for (i,k) in enumerate(hor_index)
@@ -57,42 +57,40 @@ function make_tail(n)
     end
     ri,rj
 
-    # p1 = [zeros(2) for i = 1:nb]
-    # p2 = [zeros(2) for i = 1:nb]
-    # for (i,j) in enumerate(ver_index)
-    #     p1[j] .= [-ver_lengths[i]/2,0.0]
-    #     p2[j] .= [ ver_lengths[i]/2,0.0]
-    # end
-    # for (i,j) in enumerate(hor_index)
-    #     p1[j] .= [-hor_lengths[i]/2,0.0]
-    #     p2[j] .= [ hor_lengths[i]/2,0.0]
-    # end
     movable = ones(Bool,nb)
+    constrained = zeros(Bool,nb)
     movable[1:2] .= false
-    function rigidbody(i,movable,m,ri,rj)
+    constrained[1:3] .= true
+    function rigidbody(i,movable,constrained,m,ri,rj)
         L = norm(ri-rj)
         CoM = SVector(L/2,0.0)
-        inertia = m*L^2/12
+        inertia = m*L^2/3
         ap1 = SVector(0.0,0.0)
         ap2 = SVector(L,0.0)
         aps = [ap1,ap2]
         prop = TR.RigidBodyProperty(i,movable,
                     m,inertia,
-                    CoM,aps
+                    CoM,aps;constrained=constrained
                     )
-        state = TR.RigidBodyState(prop,ri,rj)
+        if constrained
+            constrained_index = [1,2]
+        else
+            constrained_index = Vector{Int}()
+        end
+        state = TR.RigidBodyState(prop,ri,rj,constrained_index)
         rb = TR.RigidBody(prop,state)
     end
-    rbs = [rigidbody(i,movable[i],m[i],ri[i],rj[i]) for i = 1:nb]
+    rbs = [rigidbody(i,movable[i],constrained[i],
+                    m[i],ri[i],rj[i]) for i = 1:nb]
 
     nstrings = 4(n)+2
     original_restlens = sqrt(2)*0.04
-    ks = fill(100.0,nstrings)
-    ss = [TR.SString2D(original_restlens,ks[i]) for i = 1:nstrings]
+    ks = fill(1000.0,nstrings)
+    ss = [TR.SString2D(original_restlens,ks[i],0.0) for i = 1:nstrings]
 
     acs = [TR.Actuator(SVector{1}(ss[i])) for i = 1:nstrings]
 
-    body2q = TR.build_body2q(rbs)
+    body2q = TR.filter_body2q(TR.build_body2q(rbs),rbs)
 
     string2ap = Vector{Tuple{TR.ID,TR.ID}}()
     for i = 1:n
@@ -110,10 +108,10 @@ function make_tail(n)
     TR.update_strings_apply_forces!(tg)
     tg
 end
-n = 1
+n = 3
 tail = make_tail(n)
 q0,q̇0,λ0 = TR.get_initial(tail)
-@code_warntype make_tail(n)
+# @code_warntype make_tail(n)
 
 function dynfuncs(tgstruct,q0)
 
@@ -121,7 +119,7 @@ function dynfuncs(tgstruct,q0)
     Φ = TR.build_Φ(tgstruct,q0)
     A = TR.build_A(tgstruct)
 
-    Q̃=TR.build_Q̃(tgstruct)
+    #Q̃=TR.build_Q̃(tgstruct)
 
     function F!(F,q,q̇,t)
         TR.reset_forces!(tgstruct)
@@ -137,7 +135,8 @@ end
 
 M,Φ,A,F!,Jacs = dynfuncs(tail,q0)
 q̇0[end-1:end] .= [0.01,0.0]
-
+Φ(q0)
+A(q0)*q̇0
 dt = 0.01
 prob = TS.DyProblem(dynfuncs(tail,q0),q0,q̇0,λ0,(0.0,10.0))
 sol = TS.solve(prob,TS.Wendlandt(),dt=dt,ftol=1e-14,verbose=true)

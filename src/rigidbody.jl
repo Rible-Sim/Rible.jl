@@ -158,9 +158,11 @@ end
 #     NaturalCoordinatesCache(prop,bps)
 # end
 
-function RigidBodyState(prop::RigidBodyProperty{3,T,iT},bps::NaturalCoordinates.BasicPoints,
+function RigidBodyState(prop::RigidBodyProperty{3,T,iT},
+                        bps::NaturalCoordinates.BasicPoints,
                         r_input,R_input,ṙ_input,ω_input,
-                        q_input,q̇_input=zero(q_input)) where {T,iT}
+                        q_input,q̇_input=zero(q_input),
+                        constrained_index=Vector{Int}()) where {T,iT}
     q = MVector{12}(q_input)
     q̇ = MVector{12}(q̇_input)
     q̈ = zero(q)

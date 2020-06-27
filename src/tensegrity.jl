@@ -141,6 +141,13 @@ function kinetic_energy_coords(rb::RigidBody)
     ke = 1/2*transpose(q̇)*M*q̇
 end
 
+function gravity_potential_energy(rb::RigidBody,q)
+    @unpack CG = rb.state.cache
+    r = CG*q
+    fg = [0.0,0.0,-9.8]
+    -transpose(r)*fg
+end
+
 function potential_energy(s::SString)
     pe = 0.0
     @unpack k,state = s
@@ -219,8 +226,8 @@ function get_nconstraint(tgstruct)
     nbodydof = get_nbodydof(tgstruct)
     ninconstraint = nbodyconstraint*nmovablebody
     nexconstraint = 0  #nbodydof*nfixbody
-    for rb in tgstruct.rigidbodies
-        nexconstraint += rb.state.cache.nc
+    for id in tgstruct.mvbodyindex
+        nexconstraint += tgstruct.rigidbodies[id].state.cache.nc
     end
     nconstraint = ninconstraint + nexconstraint
 end

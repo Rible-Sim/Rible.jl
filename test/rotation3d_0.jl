@@ -108,8 +108,8 @@ es = [TR.kinetic_energy_coords(rb2,q̇) for q̇ in sol.q̇s]
 m = 1.0
 # inertia = Symmetric(rand(3,3))
 #inertia = Matrix(Diagonal([0.04,0.0008,0.002]))
-# inertia = Matrix(Diagonal([0.8,0.4,0.4])).*1e-3
-inertia = Matrix(Diagonal([1.0,1.0,1.0]))
+inertia = Matrix(Diagonal([0.8,0.4,0.4])).*1e-3
+# inertia = Matrix(Diagonal([1.0,1.0,1.0]))
 r0 = zeros(3)
 R0 = [0 1 0;
 -0.500000000000000 0 0.866025403784439;
@@ -118,8 +118,8 @@ ṙ0 = zeros(3)
 omega_0 = [40π,0,0]
 ω0 = R0*omega_0
 ri = zeros(3)
-# rj = [0,-0.0200000000000000,0.0346410161513775]
-rj = R0*[1.0,0.0,0.0]
+rj = [0,-0.0200000000000000,0.0346410161513775]
+# rj = R0*[1.0,0.0,0.0]
 rk = rand(3)#[0.0,1.0,0.0]
 rl = rand(3)#[0.0,0.0,1.0]
 r̄i = @SVector zeros(3)
@@ -156,8 +156,10 @@ function dynfuncs(tgstruct,q0)
     M = TR.build_massmatrix(tgstruct)
     Φ = TR.build_Φ(tgstruct,q0)
     A = TR.build_A(tgstruct)
+    CG = Matrix(tgstruct.rigidbodies[1].state.cache.CG)
+    fg = [0.0,0.0,-9.81]
     function F!(F,q,q̇,t)
-        F .= 0.0
+        F .= transpose(CG)*fg
     end
 
     M,Φ,A,F!,nothing
@@ -185,7 +187,7 @@ isapprox(Φ(q0),zeros(6);atol=1e-15)
 
 dt = 0.002
 prob = TS.DyProblem(rbfuncs(rb1),q0,q̇0,λ0,(0.0,0.0001))
-prob = TS.DyProblem(dynfuncs(tgrb1,q0),q0,q̇0,λ0,(0.0,0.03))
+prob = TS.DyProblem(dynfuncs(tgrb1,q0),q0,q̇0,λ0,(0.0,0.2))
 sol = TS.solve(prob,TS.Wendlandt(),dt=dt,ftol=1e-14,verbose=true)
 sol = TS.solve(prob,TS.Xu2014(),dt=dt,ftol=1e-14,verbose=true)
 sol = TS.solve(prob,TS.ConstSPARK(1),dt=dt,ftol=1e-13,verbose=true)
@@ -194,10 +196,12 @@ sol = TS.solve(prob,TS.ConstSPARK(1),dt=dt,ftol=1e-13,verbose=true)
 
 TR.kinetic_energy_coords(rb1.state)
 W_es = [TR.kinetic_energy_coords(rb1,q̇) for q̇ in sol.q̇s]
-X_es = [TR.kinetic_energy_coords(rb1,q̇) for q̇ in sol.q̇s]
-
+X_kes = [TR.kinetic_energy_coords(rb1,q̇) for q̇ in sol.q̇s]
+X_pes = [TR.gravity_potential_energy(rb1,q) for q in sol.qs]
+X_es = X_kes .+ X_pes[1:end-1]
 plt.plot(es)
 plt.plot(W_es)
+plt.plot((X_es.-X_es[1])./X_es[1])
 plt.plot(X_es)
 
 function rb_rotate_funcs(rb)

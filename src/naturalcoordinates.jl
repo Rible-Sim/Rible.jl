@@ -72,7 +72,7 @@ function BP1P3V(ri::AbstractVector{T},
     v = SVector(o,i,o)
     w = SVector(o,o,i)
     invR = transpose(R) # because this is a rotation matrix
-    r̄i = invR*(ri-ro)
+    r̄i = invR*(ri-ro) #
     ū = invR*u
     v̄ = invR*v
     w̄ = invR*w
@@ -623,28 +623,33 @@ function make_M(cf::CoordinateFunctions{BasicPoints2P{T},XT,cT,CT,ΦT,ΦqT},
     M_ret = SMatrix{4,4}(Symmetric(M))
 end
 
-@inline @inbounds function inertia2z(inertia::AbstractMatrix{T},
-                                      invX̄) where T
-    Ji = -MMatrix(inertia)
-    Ji[1,1] = (inertia[2,2] + inertia[3,3] - inertia[1,1])/2
-    Ji[2,2] = (inertia[1,1] + inertia[3,3] - inertia[2,2])/2
-    Ji[3,3] = (inertia[1,1] + inertia[2,2] - inertia[3,3])/2
+@inline @inbounds function inertia2z(m,inertia_o::AbstractMatrix{T},
+                                        r̄G,r̄i,invX̄) where T
+    Jo = -MMatrix(inertia_o)
+    Jo[1,1] = (inertia_o[2,2] + inertia_o[3,3] - inertia_o[1,1])/2
+    Jo[2,2] = (inertia_o[1,1] + inertia_o[3,3] - inertia_o[2,2])/2
+    Jo[3,3] = (inertia_o[1,1] + inertia_o[2,2] - inertia_o[3,3])/2
+    Ji = Jo -
+         m*r̄i*transpose(r̄G) -
+         m*r̄G*transpose(r̄i) +
+         m*r̄i*transpose(r̄i)
     z = invX̄*Ji*transpose(invX̄)
     Symmetric(z)
 end
 
-function compute_a_z(mass,inertia,r̄G,cf)
+function compute_a_z(mass,inertia_o,r̄G,cf)
     @unpack bps,invX̄ = cf
     @unpack r̄i = bps
     a = invX̄*(r̄G-r̄i)
-    z = inertia2z(inertia,invX̄)
+    z = inertia2z(mass,inertia_o,r̄G,r̄i,invX̄)
     a,z
 end
 
 function make_M(cf::CoordinateFunctions{BasicPoints1P3V{T},XT,cT,CT,ΦT,ΦqT},
                 m::T,inertia::AbstractMatrix{T},r̄G) where {T,XT,cT,CT,ΦT,ΦqT}
     I3 = make_I(T,3)
-    a,z = compute_a_z(m,inertia,r̄G,cf)
+    inertia_o = inertia - m*skew(r̄G)
+    a,z = compute_a_z(m,inertia_o,r̄G,cf)
     M_raw = zeros(T,4,4)
     M_raw[1,1] = m
     M_raw[2:4,1] = m*a
@@ -656,7 +661,8 @@ end
 function make_M(cf::CoordinateFunctions{BasicPoints2P2V{T},XT,cT,CT,ΦT,ΦqT},
                 m::T,inertia::AbstractMatrix{T},r̄G) where {T,XT,cT,CT,ΦT,ΦqT}
     I3 = make_I(T,3)
-    a,z = compute_a_z(m,inertia,r̄G,cf)
+    inertia_o = inertia - m*skew(r̄G)^2
+    a,z = compute_a_z(m,inertia_o,r̄G,cf)
     M_raw = zeros(T,4,4)
     M_raw[1,1] = m-2m*a[1]+z[1,1]
     M_raw[2:4,1] = m*a-z[1:3,1]
@@ -668,7 +674,8 @@ end
 function make_M(cf::CoordinateFunctions{BasicPoints3P1V{T},XT,cT,CT,ΦT,ΦqT},
                 m::T,inertia::AbstractMatrix{T},r̄G) where {T,XT,cT,CT,ΦT,ΦqT}
     I3 = make_I(T,3)
-    a,z = compute_a_z(m,inertia,r̄G,cf)
+    inertia_o = inertia - m*skew(r̄G)
+    a,z = compute_a_z(m,inertia_o,r̄G,cf)
     M_raw = zeros(T,4,4)
     M_raw[1,1] = m-2m*a[1]-2m*a[2]+
                      2z[1,2]+
@@ -682,7 +689,8 @@ end
 function make_M(cf::CoordinateFunctions{BasicPoints4P{T},XT,cT,CT,ΦT,ΦqT},
                 m::T,inertia::AbstractMatrix{T},r̄G) where {T,XT,cT,CT,ΦT,ΦqT}
     I3 = make_I(T,3)
-    a,z = compute_a_z(m,inertia,r̄G,cf)
+    inertia_o = inertia - m*skew(r̄G)
+    a,z = compute_a_z(m,inertia_o,r̄G,cf)
     M_raw = zeros(T,4,4)
     M_raw[1,1] = m-2m*a[1]-2m*a[2]-2m*a[3]+
                      2z[1,2]+2z[1,3]+2z[2,3]+
@@ -693,4 +701,11 @@ function make_M(cf::CoordinateFunctions{BasicPoints4P{T},XT,cT,CT,ΦT,ΦqT},
     M = SMatrix{12,12}(kron(M_raw,I3))
 end
 
+function skew(w)
+    w1,w2,w3 = w
+    o = zero(w1)
+    [o -w3 w2;
+     w3 o -w1;
+    -w2 w1 o]
+end
 end
