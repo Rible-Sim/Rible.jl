@@ -111,38 +111,41 @@ m = 1.0
 inertia = Matrix(Diagonal([0.8,0.4,0.4])).*1e-3
 # inertia = Matrix(Diagonal([1.0,1.0,1.0]))
 r0 = zeros(3)
+ṙ0 = zeros(3)
 R0 = [0 1 0;
 -0.500000000000000 0 0.866025403784439;
 0.866025403784439 0 0.500000000000000]
-ṙ0 = zeros(3)
-omega_0 = [40π,0,0]
-ω0 = R0*omega_0
+ω_bar0 = [40π,0,0]
+ω0 = R0*ω_bar0
+
+rG = [0,-0.0200000000000000,0.0346410161513775]
+r̄G = inv(R0)*(rG-r0)
+
 ri = zeros(3)
 rj = [0,-0.0200000000000000,0.0346410161513775]
 # rj = R0*[1.0,0.0,0.0]
-rk = rand(3)#[0.0,1.0,0.0]
-rl = rand(3)#[0.0,0.0,1.0]
-r̄i = @SVector zeros(3)
-r̄j = SVector{3}(inv(R0)*(rj-ri))
-CoM = r̄j
-v̄ = SVector(0.0,1.0,0.0)
-w̄ = SVector(0.0,0.0,1.0)
-bps2 = TR.NaturalCoordinates.BasicPoints2P2V(r̄i,r̄j,v̄,w̄)
-q0 = vcat(ri,rj,R0*v̄,R0*w̄)
-q̇0 = vcat(ω0×ri,ω0×rj,ω0×q0[7:9],ω0×q0[10:12])
-cf2 = TR.NaturalCoordinates.CoordinateFunctions(bps2)
-M = TR.NaturalCoordinates.make_M(cf2,m,SMatrix{3,3}(inertia),CoM)
+rk = R0*[0.0,1.0,0.0]
+rl = R0*[0.0,0.0,1.0]
+# r̄i = @SVector zeros(3)
+# r̄j = SVector{3}(inv(R0)*(rj-ri))
+# v̄ = SVector(0.0,1.0,0.0)
+# w̄ = SVector(0.0,0.0,1.0)
+# bps2 = TR.NaturalCoordinates.BasicPoints2P2V(r̄i,r̄j,v̄,w̄)
+# q0 = vcat(ri,rj,R0*v̄,R0*w̄)
+# q̇0 = vcat(ω0×ri,ω0×rj,ω0×q0[7:9],ω0×q0[10:12])
+# cf2 = TR.NaturalCoordinates.CoordinateFunctions(bps2)
+# M = TR.NaturalCoordinates.make_M(cf2,m,SMatrix{3,3}(inertia),CoM)
 # bps1,q1,q̇1 = TR.NaturalCoordinates.BP1P3V(ri,r0,R0,ṙ0,ω0)
-# bps1,q1,q̇1 = TR.NaturalCoordinates.BP2P2V(ri,rj,r0,R0,ṙ0,ω0)
+bps1,q1,q̇1 = TR.NaturalCoordinates.BP2P2V(ri,rj,r0,R0,ṙ0,ω0)
 # bps1,q1,q̇1 = TR.NaturalCoordinates.BP3P1V(ri,rj,rk,r0,R0,ṙ0,ω0)
 # bps1,q1,q̇1 = TR.NaturalCoordinates.BP4P(ri,rj,rk,rl,r0,R0,ṙ0,ω0)
 # q1
 # q̇1
-1/2*transpose(q̇0)*M*q̇0
+# 1/2*transpose(q̇0)*M*q̇0
 prop = TR.RigidBodyProperty(1,true,m,inertia,
                     SVector{3}(CoM),[SVector{3}(CoM)];constrained=true)
-# state1 = TR.RigidBodyState(prop,bps1,r0,R0,ṙ0,ω0,q1,q̇1,[1,2,3])
-state1 = TR.RigidBodyState(prop,bps2,r0,R0,ṙ0,ω0,q0,q̇0,[1,2,3])
+state1 = TR.RigidBodyState(prop,bps1,r0,R0,ṙ0,ω0,q1,q̇1,[1,2,3])
+# state1 = TR.RigidBodyState(prop,bps2,r0,R0,ṙ0,ω0,q0,q̇0,[1,2,3])
 TR.kinetic_energy_coords(state1)
 
 
@@ -169,40 +172,59 @@ M
 Φ(q0)
 Φq(q0)
 
-function rbfuncs(rb)
-    @unpack cache = rb.state
-    @unpack M,CG,funcs = cache
-    @unpack Φ,Φq = funcs
-    f = [0.0,0.0,-9.8]
-    function F!(F,q,q̇,t)
-        # F .= transpose(CG)*f
-        F .= 0.0
-    end
-    M,Φ,Φq,F!,nothing
-end
-M,Φ,Φq,F! = rbfuncs(rb1)
-q0,q̇0,λ0  = TR.get_initial(rb1)
-isapprox(Φ(q0),zeros(6);atol=1e-15)
-Φq(q0)*q̇0
+F0 = similar(q0)
+F!(F0,q0,q̇0,0.0)
+# function rbfuncs(rb)
+#     @unpack cache = rb.state
+#     @unpack M,CG,funcs = cache
+#     @unpack Φ,Φq = funcs
+#     f = [0.0,0.0,-9.8]
+#     function F!(F,q,q̇,t)
+#         # F .= transpose(CG)*f
+#         F .= 0.0
+#     end
+#     M,Φ,Φq,F!,nothing
+# end
+# M,Φ,Φq,F! = rbfuncs(rb1)
+# q0,q̇0,λ0  = TR.get_initial(rb1)
+# isapprox(Φ(q0),zeros(6);atol=1e-15)
+# Φq(q0)*q̇0
 
 dt = 0.002
-prob = TS.DyProblem(rbfuncs(rb1),q0,q̇0,λ0,(0.0,0.0001))
-prob = TS.DyProblem(dynfuncs(tgrb1,q0),q0,q̇0,λ0,(0.0,0.2))
-sol = TS.solve(prob,TS.Wendlandt(),dt=dt,ftol=1e-14,verbose=true)
+# prob = TS.DyProblem(rbfuncs(rb1),q0,q̇0,λ0,(0.0,0.0001))
+prob = TS.DyProblem(dynfuncs(tgrb1,q0),q0,q̇0,λ0,(0.0,0.004))
+# sol = TS.solve(prob,TS.Wendlandt(),dt=dt,ftol=1e-14,verbose=true)
 sol = TS.solve(prob,TS.Xu2014(),dt=dt,ftol=1e-14,verbose=true)
+sol = TS.solve(prob,TS.Zhong06(),dt=dt,ftol=1e-14,verbose=true)
 sol = TS.solve(prob,TS.ConstSPARK(1),dt=dt,ftol=1e-13,verbose=true)
+
+λ1 = sol.λs[2]
+sol.qs[2] - refq2
+sol.q̇s[2] - refq̇2
+sol.ps[2] - refp2
+transpose(Φq(q0))*λ1
+1/dt*transpose(Φq(sol.qs[2]))*λ1
+
+refq2 = sol.qs[2]
+refp2 = sol.ps[2]
+refq̇2 = sol.q̇s[2]
+refq3 = sol.qs[3]
+M*refq̇2
 
 
 
 TR.kinetic_energy_coords(rb1.state)
-W_es = [TR.kinetic_energy_coords(rb1,q̇) for q̇ in sol.q̇s]
+# W_es = [TR.kinetic_energy_coords(rb1,q̇) for q̇ in sol.q̇s]
 X_kes = [TR.kinetic_energy_coords(rb1,q̇) for q̇ in sol.q̇s]
 X_pes = [TR.gravity_potential_energy(rb1,q) for q in sol.qs]
 X_es = X_kes .+ X_pes[1:end-1]
-plt.plot(es)
-plt.plot(W_es)
+X_es = X_kes .+ X_pes
+# plt.plot(es)
+# plt.plot(W_es)
+X_err = (X_es.-X_es[1])./X_es[1]
 plt.plot((X_es.-X_es[1])./X_es[1])
-plt.plot(X_es)
+plt.plot(X_kes)
+plt.plot(X_err[2:end])
 
 function rb_rotate_funcs(rb)
     @unpack cache = rb.state
