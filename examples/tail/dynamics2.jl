@@ -98,15 +98,12 @@ function make_tail(n)
 
     nstring = 4n
     original_restlens = zeros(nstring)
-    restlens = zeros(nstring)
-    actuallengths = zeros(nstring)
+    ks = zeros(nstring)
     for i = 1:nstring
         j = i % 4
-        original_restlens[i] =
-                 restlens[i] =
-               actuallengths[i] = ifelse(j∈[1,0],0.04,√3*0.02)
+        original_restlens[i] = ifelse(j∈[1,0],0.04,√3*0.02)
+        ks[i] = ifelse(j∈[1,0],50.0,100.0)
     end
-    ks = fill(100.0,nstring)
     ss = [TR.SString2D(original_restlens[i],ks[i],1.0) for i = 1:nstring]
     # @code_warntype   TR.DString(k[i],original_restlen[i],
     #         restlen[i],actuallength[i],zeros(MVector{4}))
@@ -134,7 +131,7 @@ n = 4
 tail = make_tail(n)
 @code_warntype make_tail(n)
 q0,q̇0,λ0 = TR.get_initial(tail)
-q̇0[end-3:end] .= [0.1,0.0,0.1,0.0]
+q̇0[end-3:end] .= 5*[0.1,0.0,0.1,0.0]
 
 TR.get_nbodyconstraint(tail)
 TR.get_nbodydof(tail)
@@ -169,6 +166,6 @@ M,Φ,A,F!,Jacs = dynfuncs(tail,q0)
 A(q0)
 dt = 0.01
 prob = TS.DyProblem(dynfuncs(tail,q0),q0,q̇0,λ0,(0.0,20.0))
-sol = TS.solve(prob,TS.Wendlandt(),dt=dt,ftol=1e-14,verbose=true)
+sol = TS.solve(prob,TS.Zhong06(),dt=dt,ftol=1e-14,verbose=true)
 sol = TS.solve(prob,TS.ConstSPARK(1),dt=dt,ftol=1e-12,verbose=true)
 @code_warntype A(q0)

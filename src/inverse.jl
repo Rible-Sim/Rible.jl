@@ -1,34 +1,51 @@
+function build_Ti(tgstruct::TensegrityStructure,i::Int)
+    nbodycoords = get_nbodycoords(tgstruct)
+    body2q = tgstruct.connectivity.body2q
+    nq = body2q[end][end]
+    build_Ti(nbodycoords,nq,body2q[i])
+end
+
+function build_Ti(nbodycoords,nq,q_index)
+    Ti = spzeros(Int,nbodycoords,nq)
+    for (body_q_id,q_id) in enumerate(q_index)
+        Ti[body_q_id,q_id] = 1
+    end
+    Ti
+end
+
 function build_T(tgstruct)
     nbodycoords = get_nbodycoords(tgstruct)
     body2q = tgstruct.connectivity.body2q
-    nbody = tgstruct.nbody
+    nmovablebody = tgstruct.nmovablebody
     nq = body2q[end][end]
-    T = spzeros(Int,nq,nbody*nbodycoords)
-    for (rbid,rb) in enumerate(tgstruct.rigidbodies)
-        pindex = body2q[rbid]
-        js = (rbid-1)*nbodycoords
-        for (j,index) in enumerate(pindex)
-            T[index,js+j] = 1
-        end
-    end
-    T
+    T = hcat([
+        transpose(build_Ti(nbodycoords,nq,q_index))
+        for q_index in body2q[tgstruct.mvbodyindex]
+    ]...)
 end
 # T = build_T(manipulator)
 # Array(T)
 # @code_warntype build_T(manipulator)
+
+function build_Ci(rb)
+    Ci = hcat([
+        transpose(Cpi)
+        for Cpi in rb.state.cache.Cp
+    ]...)
+end
+
 function build_C(tgstruct)
     nbodycoords = get_nbodycoords(tgstruct)
-    @unpack nbody,npoints,ndim = tgstruct
-    C = spzeros(nbody*nbodycoords,npoints*ndim)
-    js = 0
-    for (rbid,rb) in enumerate(tgstruct.rigidbodies)
-        is = (rbid-1)*nbodycoords
-        for (apid,Cp) in enumerate(rb.state.cache.Cp)
-            jlen,_ = size(Cp)
-            C[is+1:is+nbodycoords,js+1:js+jlen] .= transpose(Cp)
-            # @show is+1:is+nbodycoords, js+1:js+jlen
-            js += jlen
-        end
+    rbs = tgstruct.rigidbodies
+    @unpack nmovablebody,mvbodyindex,ndim = tgstruct
+    block_size1 = repeat([nbodycoords],nmovablebody)
+    block_size2 = [rb.prop.naps*ndim for rb in tgstruct.rigidbodies[mvbodyindex]]
+    block_size1,block_size2
+    T = get_numbertype(tgstruct)
+    C = BlockArray{T}(undef,block_size1,block_size2)
+    C .= 0
+    for (mvrbid,rbid) in enumerate(mvbodyindex)
+        setblock!(C,build_Ci(rbs[rbid]),mvrbid,mvrbid)
     end
     C
 end
@@ -36,20 +53,30 @@ end
 # Array(C)
 # @code_warntype build_C(manipulator)
 # manipulator.connectivity.string2ap[1]
+function rbid2mvrbid(mvbodyindex)
+
+end
 
 function build_D(tgstruct)
-    @unpack nstring,npoints,ndim = tgstruct
+    @unpack nstring,nmvpoints,ndim,mvbodyindex = tgstruct
     @unpack body2q,string2ap = tgstruct.connectivity
-    D = spzeros(Int,npoints*ndim,nstring*ndim)
-    D_raw = spzeros(Int,npoints,nstring)
+    D = spzeros(Int,nmvpoints*ndim,nstring*ndim)
+    D_raw = spzeros(Int,nmvpoints,nstring)
     iss = [0]
-    for (rbid,rb) in enumerate(tgstruct.rigidbodies)
+    for rbid in tgstruct.mvbodyindex
+        rb = tgstruct.rigidbodies[rbid]
         push!(iss,iss[end]+rb.prop.naps)
     end
 
     for (sid,ap) in enumerate(string2ap)
-        D_raw[iss[ap[1].rbid]+ap[1].apid,sid] = 1
-        D_raw[iss[ap[2].rbid]+ap[2].apid,sid] = -1
+        mvrbid1 = findfirst((x)->x==ap[1].rbid, mvbodyindex)
+        if mvrbid1 != nothing
+            D_raw[iss[mvrbid1]+ap[1].apid,sid] = 1
+        end
+        mvrbid2 = findfirst((x)->x==ap[2].rbid, mvbodyindex)
+        if mvrbid2 != nothing
+            D_raw[iss[mvrbid2]+ap[2].apid,sid] = -1
+        end
     end
     D .= kron(D_raw,Matrix(1I,ndim,ndim))
 end
@@ -85,6 +112,86 @@ end
 
 # Q̃=build_T(manipulator)*build_C(manipulator)*build_D(manipulator)
 # Array(Q̃)
+
+
+function build_L̂(tgstruct)
+    @unpack nstring, ndim, strings = tgstruct
+    reset_forces!(tgstruct)
+    update_strings_apply_forces!(tgstruct)
+    T = get_numbertype(tgstruct)
+    L̂ = spzeros(T, nstring*ndim, nstring)
+    for (i,ss) in enumerate(strings)
+        is = (i-1)*ndim
+        L̂[is+1:is+ndim,i] = ss.state.direction
+    end
+    L̂
+end
+
+function build_ℓ(tgstruct)
+    reset_forces!(tgstruct)
+    update_strings_apply_forces!(tgstruct)
+    ℓ = [s.state.length for s in tgstruct.strings]
+end
+
+function build_K̂(tgstruct)
+     ks = [s.k for s in tgstruct.strings]
+     K̂ = build_L̂(tgstruct)*Diagonal(ks)
+end
+
+function build_W(tgstruct)
+    q,_ = get_q(tgstruct)
+    A = build_A(tgstruct)
+    Aq = A(q)
+    W = transpose(Aq)*inv(Aq*transpose(Aq))*Aq
+end
+
+function build_K(tgstruct)
+    q,_ = get_q(tgstruct)
+    A = build_A(tgstruct)
+    Q̃ = build_Q̃(tgstruct)
+    K̂ = build_K̂(tgstruct)
+    # ℓ = build_ℓ(tgstruct)
+    K = hcat(
+        transpose(A(q)),
+        Q̃*K̂
+        )
+end
+
+function build_G(tgstruct)
+    reset_forces!(tgstruct)
+    apply_gravity!(tgstruct)
+    G = assemble_forces(tgstruct)
+end
+
+function build_Q̂(tgstruct)
+    q,_ = get_q(tgstruct)
+    A = build_A(tgstruct)
+    Q̃ = build_Q̃(tgstruct)
+    L̂ = build_L̂(tgstruct)
+    Q̂ = hcat(
+        transpose(A(q)),
+        -Q̃*L̂
+    )
+end
+function build_RHS(tgstruct)
+    Q̃ = build_Q̃(tgstruct)
+    K̂ = build_K̂(tgstruct)
+    ℓ = build_ℓ(tgstruct)
+    G = build_G(tgstruct)
+    RHS = Q̃*K̂*ℓ + G
+end
+# Not ready
+function build_Ji(tgstruct,i)
+    rbs = tgstruct.rigidbodies
+    cnt = tgstruct.connectivity
+    @unpack string2ap = cnt
+    ap = string2ap[i]
+    C1 = rbs[ap[1].rbid].state.cache.Cp[ap[1].apid]
+    C2 = rbs[ap[2].rbid].state.cache.Cp[ap[2].apid]
+    T1 = build_Ti(tgstruct,ap[1].rbid)
+    T2 = bulid_Ti(tgstruct,ap[2].rbid)
+    Ji = C1*T1-C2*T2
+end
 
 function compensate_gravity_funcs(tgstruct)
 

@@ -88,12 +88,12 @@ function RigidBodyProperty(i::Integer,movable::Bool,
     end
     if typeof(inertia_input)<:Real
         return RigidBodyProperty(movable,constrained,name,type,mass,
-                                inertia_input,CoM,naps,aps)
+                                inertia_input,SVector{2}(CoM),naps,SVector{2}.(aps))
     else
         @assert size(inertia_input) == (3,3)
         inertia = SMatrix{3,3}(inertia_input)
         return RigidBodyProperty(movable,constrained,name,type,mass,
-                                inertia,CoM,naps,aps)
+                                inertia,SVector{3}(CoM),naps,SVector{3}.(aps))
     end
 end
 
@@ -128,8 +128,34 @@ function NaturalCoordinatesCache(prop::RigidBodyProperty,
     bps = NaturalCoordinates.BasicPoints2P(L)
     NaturalCoordinatesCache(prop,bps,q,constrained_index)
 end
+function RigidBodyState(prop,ri::AbstractVector{T},
+                             θ::T=zero(T),
+                             constrained_index=Vector{Int}()) where {T}
+    u = [cos(θ),sin(θ)]
+    q = MVector{4}(vcat(ri,u))
+    q̇ = zero(q)
+    q̈ = zero(q)
+    Q = zero(q)
+    coords = RigidBodyCoordinates(q,q̇,q̈,Q)
+    r = MVector{2}(ri)
+    ṙ = zero(r)
+    R = MMatrix{2,2}(cos(θ), -sin(θ), sin(θ), cos(θ))
+    ω = 0.0
+    F = MVector(0.0,0.0)
+    τ = 0.0
+    τaps = MVector(0.0,0.0)
+    bps = NaturalCoordinates.BasicPoints1P1V{T}()
+    cache = NaturalCoordinatesCache(prop,bps,q,constrained_index)
+    naps = prop.naps
+    p = [MVector{2}(cache.Cp[i]*q) for i in 1:naps]
+    Faps = [zeros(MVector{2}) for i in 1:naps]
+    τaps = [zeros(MVector{2}) for i in 1:naps]
+    RigidBodyState(r,R,ṙ,ω,p,F,τ,Faps,τaps,coords,cache)
+end
 
-function RigidBodyState(prop,ri,rj,constrained_index=Vector{Int}())
+function RigidBodyState(prop,ri::AbstractVector{T},
+                             rj::AbstractVector{T},
+                             constrained_index=Vector{Int}()) where {T}
     q = MVector{4}(vcat(ri,rj))
     q̇ = zero(q)
     q̈ = zero(q)

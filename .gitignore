@@ -1,3 +1,6 @@
 Manifest.toml
 .vscode/
 result/
+*.mp4
+*.png
+*.zip

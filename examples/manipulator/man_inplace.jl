@@ -7,121 +7,13 @@ import PyPlot; const plt = PyPlot
 using LaTeXStrings
 # using NLsolve
 using Revise
-# using TS
-# using Robot2D
-# const TR = Robot2D
+
 using TensegritySolvers; const TS = TensegritySolvers
 using TensegrityRobot
 const TR = TensegrityRobot
 
-function man_ndof(ndof,θ=0.0)
-    nbody = ndof + 1
-    nbp = 2nbody - ndof
-    n_lower = count(isodd,1:nbody)
-    n_upper = count(iseven,1:nbody)
-    a_lower = fill(0.1,n_lower)
-    a_upper = fill(0.08,n_upper)
-    m_lower = fill(0.02,n_lower)
-    m_upper = fill(0.013,n_upper)
-    Ic_lower = fill(11.3,n_lower)
-    Ic_upper = fill(5.4,n_upper)
-    lower_index = 1:2:nbody
-    upper_index = 2:2:nbody
-    a = zeros(nbody)
-    m = zeros(nbody)
-    Ia = zeros(nbody)
-    for (i,j) in enumerate(lower_index)
-        a[j] = a_lower[i]
-        m[j] = m_lower[i]
-        Ia[j] = Ic_lower[i] + m[j]*1/3*a[j]^2
-    end
-    for (i,k) in enumerate(upper_index)
-        a[k] = a_upper[i]
-        m[k] = m_lower[i]
-        Ia[k] = Ic_upper[i] + m[k]*1/3*a[k]^2
-    end
-    A = zeros(2,nbp)
-    A[:,2] .= A[:,1] .+ a[1]*[1.0,0.0]
-    for i in 3:nbp
-        A[:,i] .= A[:,i-1] .+ a[i-1]*[cos(θ*(i-2)),sin(θ*(i-2))]
-    end
+include("man_define.jl")
 
-    function rigidbody(i,m,a,Ia,ri,rj)
-        if i == 1
-            movable = false
-        else
-            movable = true
-        end
-        CoM_x = a/2
-        CoM_y = √3/6*a
-        if isodd(i)
-            CoM_y = -CoM_y
-        end
-        CoM = SVector{2}([CoM_x,CoM_y])
-
-        nap = 3
-        ap1 = SVector{2}([0.0,0.0])
-        ap2 = SVector{2}([a,0.0])
-        ap3_x = a/2
-        ap3_y = √3/2*a
-        if isodd(i)
-            ap3_y = -ap3_y
-        end
-        ap3 = SVector{2}([ap3_x,ap3_y])
-        aps = [ap1,ap2,ap3]
-
-        prop = TR.RigidBodyProperty(i,movable,m,Ia,
-                    CoM,aps
-                    )
-        state = TR.RigidBodyState(prop,ri,rj)
-        rb = TR.RigidBody(prop,state)
-    end
-    rbs = [rigidbody(i,m[i],a[i],
-            Ia[i],A[:,i],A[:,i+1]) for i = 1:nbody]
-
-    nstring = 2(nbody-1)
-    upstringlen = norm(rbs[2].state.p[3] - rbs[1].state.p[1])
-    lostringlen = norm(rbs[2].state.p[2] - rbs[1].state.p[3])
-    original_restlens = zeros(nstring)
-    restlens = zeros(nstring)
-    actuallengths = zeros(nstring)
-    ks = zeros(nstring)
-    cs = zeros(nstring)
-    cs .= 10.0
-    for i = 1:nstring
-        j = i % 4
-        original_restlens[i] =
-                 restlens[i] =
-               actuallengths[i] =  ifelse(j∈[1,0],upstringlen,lostringlen)
-        ks[i] = ifelse(j∈[1,0],1.0e2,1.0e2)
-    end
-    ss = [TR.SString2D(original_restlens[i],ks[i],cs[i]) for i = 1:nstring]
-    acs = [
-        ifelse(isodd(i),TR.Actuator(SVector{2}(ss[2(i-1)+1:2i])),
-                        TR.Actuator(SVector{2}(ss[2i:-1:2(i-1)+1])))
-        for i = 1:nbody-1
-    ]
-
-    rb2p = [
-        [i,i+1] for i = 1:length(rbs)
-    ]
-    body2q = [
-        SVector(2pid[1]-1,2pid[1],2pid[2]-1,2pid[2]) for pid in rb2p
-    ]
-
-    string2ap_raw = [
-        [zeros(Int,2),zeros(Int,2)] for i = 1:length(ss)
-    ]
-    string2ap = Vector{Tuple{TR.ID,TR.ID}}()
-    for i = 1:length(rbs)-1
-        push!(string2ap,(TR.ID(i,1),TR.ID(i+1,3)))
-        push!(string2ap,(TR.ID(i,3),TR.ID(i+1,2)))
-    end
-    cnt = TR.Connectivity(body2q,string2ap)
-    tg = TR.TensegrityStructure(rbs,ss,acs,cnt)
-    TR.update_strings_apply_forces!(tg)
-    tg
-end
 # ------------------Create Tensegrity Struture --------------------------
 ndof = 6
 refman = man_ndof(ndof,-π/12) # reference
@@ -218,10 +110,10 @@ function dynfuncs(tgstruct,q0)
         TR.reset_forces!(tgstruct)
         TR.distribute_q_to_rbs!(tgstruct,q,q̇)
         TR.update_strings_apply_forces!(tgstruct)
-        #F .= Q̃*TR.fvector(tgstruct)
-        F .= 0.0
-        TR.assemble_forces!(F,tgstruct)
-        #@show isapprox(F,)
+        F .= Q̃*TR.fvector(tgstruct)
+        # F .= 0.0
+        # TR.assemble_forces!(F,tgstruct)
+        # @show isapprox(F,Q̃*TR.fvector(tgstruct))
     end
 
     M,Φ,A,F!,nothing
@@ -229,7 +121,27 @@ function dynfuncs(tgstruct,q0)
     #A,Φ,∂T∂q̇!,F!,M!,nothing
 end
 M,Φ,A,F!,Jacs = dynfuncs(manipulator,q0)
-prob = TS.DyProblem(dynfuncs(manipulator,q0),q0,q̇0,λ0,(0.0,40.0))
+Φ(q0)
+Φq = A(q0)
+nconstraint = TR.get_nconstraint(manipulator)
+coordinates_index = TR.GECP(Φq)
+dependent_index = coordinates_index[1:nconstraint]
+independent_index = coordinates_index[nconstraint+1:end]
+Φu = Φq[:,dependent_index]
+Φv = Φq[:,independent_index]
+D = -inv(Φu)*Φv
+B = spzeros(Int,length(q0)-nconstraint,length(q0))
+for (i,j) in enumerate(independent_index)
+    B[i,j] = 1
+end
+SR = inv(Array(vcat(Φq,B)))
+S = SR[:,1:nconstraint]
+R = SR[:,nconstraint+1:end]
+
+for i,j =
+
+end
+prob = TS.DyProblem(dynfuncs(manipulator,q0),q0,q̇0,λ0,(0.0,1.0))
 # TR.actuate!(manipulator,u)
 # sol = TS.solve(prob,dt=dt,ftol=1e-13,verbose=true)
 
@@ -237,7 +149,7 @@ function make_affect!(robot2d,control!)
     function inner_affect!(intor)
         TR.distribute_q_to_rbs!(robot2d.tgstruct,intor.qprev,intor.q̇prev)
         TR.update_strings_apply_forces!(robot2d.tgstruct)
-        control!(robot2d,intor.t)
+        control!(robot2d,intor.tprev)
     end
 end
 cb = TS.DiscreteCallback((x)->true,make_affect!(rob,make_control!(get_angles)))
@@ -249,7 +161,8 @@ TR.PIDController.tune!(rob.hub.ctrls[5],1.0,0.005,8.5)
 TR.PIDController.tune!(rob.hub.ctrls[6],0.9,0.005,7.0)
 TR.reset!.(rob.tgstruct.actuators)
 TR.reset!.(rob.hub.trajs)
-sol = TS.solve(prob,TS.Wendlandt(),dt=dt,ftol=1e-13,callback=cb)
+sol = TS.solve(prob,TS.Wendlandt(),dt=dt,ftol=1e-13,callback=cb,verbose=true)
+sol = TS.solve(prob,TS.Zhong06(),dt=dt,ftol=1e-12,callback=cb,verbose=true)
 pltfig.clear(); pltfig = controlplot(rob.hub.trajs)
 pltfig = controlplot(rob.hub.trajs)
 sol = TS.solve(prob,dt=dt,ftol=1e-13,callback=cb,verbose=true)

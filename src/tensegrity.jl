@@ -4,11 +4,14 @@ struct ID
     apid::Int
 end
 
-struct Connectivity{BPConnectType,StringConnectType}
-    body2q::BPConnectType
-    string2ap::StringConnectType
+struct Connectivity{bType,sType,cType}
+    body2q::bType
+    string2ap::sType
+    contacts::cType
 end
 
+Connectivity(b) = Connectivity(b,nothing,nothing)
+Connectivity(b,s) = Connectivity(b,s,nothing)
 
 struct TensegrityStructure{BodyType,StringType,ActuatorType,ConnectType}
     ndim::Int
@@ -19,6 +22,7 @@ struct TensegrityStructure{BodyType,StringType,ActuatorType,ConnectType}
     fixbodyindex::Vector{Int}
     nstring::Int
     npoints::Int
+    nmvpoints::Int
     rigidbodies::Vector{BodyType}
     strings::Vector{StringType}
     actuators::Vector{ActuatorType}
@@ -38,9 +42,15 @@ function TensegrityStructure(rbs::Vector{rbType},ss,acs,cnt
     for (rbid,rb) in enumerate(rbs)
         npoints += rb.prop.naps
     end
-    TensegrityStructure(ndim,nbody,nmvbody,mvbodyindex,
+    nmvpoints = 0
+    for rbid in mvbodyindex
+        nmvpoints += rbs[rbid].prop.naps
+    end
+    TensegrityStructure(ndim,nbody,
+                    nmvbody,mvbodyindex,
                     nfixbody,fixbodyindex,
-                    nstring,npoints,
+                    nstring,
+                    npoints,nmvpoints,
                     rbs,ss,acs,cnt)
 end
 
@@ -95,9 +105,11 @@ function distribute_q_to_rbs!(tgstruct,globalq,globalq̇)
         @unpack q, q̇ = rbs[rbid].state.coords
         q .= globalq[pindex]
         q̇ .= globalq̇[pindex]
-        @unpack cache,p = rbs[rbid].state
+        @unpack cache,p,r = rbs[rbid].state
+        @unpack CG,Cp = cache
+        r .= CG*q
         for (i,ap) in enumerate(p)
-            ap .= cache.Cp[i]*q
+            ap .= Cp[i]*q
         end
     end
 end
@@ -127,6 +139,14 @@ function assemble_forces!(F,tgstruct)
     end
 end
 
+function assemble_forces(tgstruct)
+    T = get_numbertype(tgstruct)
+    @unpack body2q = tgstruct.connectivity
+    F = zeros(T,body2q[end][end])
+    assemble_forces!(F,tgstruct)
+    F
+end
+
 function apply_gravity!(tgstruct)
     rbs = tgstruct.rigidbodies
     gravity_force = get_gravity(tgstruct)
@@ -135,17 +155,26 @@ function apply_gravity!(tgstruct)
         rb.state.F .= gravity_force
     end
 end
+
 function kinetic_energy_coords(rb::RigidBody)
     @unpack q̇ = rb.state.coords
     @unpack M = rb.state.cache
     ke = 1/2*transpose(q̇)*M*q̇
 end
 
+function gravity_potential_energy(rb)
+    @unpack CG = rb.state.cache
+    q = rb.state.coords.q
+    r = CG*q
+    gravity = get_gravity(rb)
+    -transpose(r)*gravity
+end
+
 function gravity_potential_energy(rb::RigidBody,q)
     @unpack CG = rb.state.cache
     r = CG*q
-    fg = [0.0,0.0,-9.8]
-    -transpose(r)*fg
+    gravity = get_gravity(rb)
+    -transpose(r)*gravity
 end
 
 function potential_energy(s::SString)
@@ -161,6 +190,11 @@ end
 function kinetic_energy_coords(tgstruct::TensegrityStructure,q,q̇)
     distribute_q_to_rbs!(tgstruct,q,q̇)
     ke = sum(kinetic_energy_coords.(tgstruct.rigidbodies))
+end
+
+function gravity_potential_energy(tgstruct::TensegrityStructure,q)
+    distribute_q_to_rbs!(tgstruct,q,zero(q))
+    sum(gravity_potential_energy.(tgstruct.rigidbodies))
 end
 
 function potential_energy(tgstruct::TensegrityStructure,q,q̇)
@@ -307,14 +341,21 @@ function get_q(tgstruct)
     return q,q̇
 end
 
+get_λ(tgstruct) = zeros(get_nconstraint(tgstruct))
 function get_initial(tgstruct)
     q0,q̇0 = get_q(tgstruct)
-    λ0 = zeros(get_nconstraint(tgstruct))
+    λ0 = get_λ(tgstruct)
     q0,q̇0,λ0
 end
 
 function get_u(tgstruct)
 end
+
+get_ncoords(tg::TensegrityStructure) = tg.connectivity.body2q[end][end]
+get_ndim(rb::AbstractRigidBody{N,T,CType}) where {N,T,CType} = N
+
+get_numbertype(tg::TensegrityStructure) = get_numbertype(tg.rigidbodies[1])
+get_numbertype(rb::AbstractRigidBody{N,T,CType}) where {N,T,CType} = T
 
 get_nbodyconstraint(tg::TensegrityStructure) = get_nbodyconstraint(tg.rigidbodies[1])
 get_nbodyconstraint(rb::AbstractRigidBody{3,T,CType}) where {T,CType} = 6
@@ -369,6 +410,11 @@ function find_remaining_index(body2q,rbs)
         end
     end
     remaining_index = findall((x)->x!=0,switch_index)
+end
+
+function filter_body2q(rbs)
+    body2q_raw = build_body2q(rbs)
+    body2q = filter_body2q(body2q_raw,rbs)
 end
 
 function filter_body2q(body2q,rbs)

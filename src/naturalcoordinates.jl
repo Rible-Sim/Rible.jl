@@ -4,16 +4,57 @@ using StaticArrays
 using Parameters
 
 abstract type BasicPoints end
+abstract type BasicPoints2D <: BasicPoints end
+abstract type BasicPoints3D <: BasicPoints end
 make_I(T,N) = Matrix(one(T)*I,N,N)
 
-struct BasicPoints2P{T} <: BasicPoints
+struct BasicPoints2P{T} <: BasicPoints2D
     r̄i::SArray{Tuple{2},T,1,2}
     r̄j::SArray{Tuple{2},T,1,2}
 end
 
-struct BasicPoints1P1V{T} <: BasicPoints
+struct BasicPoints1P1V{T} <: BasicPoints2D
     r̄i::SArray{Tuple{2},T,1,2}
     ū::SArray{Tuple{2},T,1,2}
+end
+
+struct BasicPoints1P3V{T} <: BasicPoints3D
+    r̄i::SArray{Tuple{3},T,1,3}
+    ū::SArray{Tuple{3},T,1,3}
+    v̄::SArray{Tuple{3},T,1,3}
+    w̄::SArray{Tuple{3},T,1,3}
+end
+
+struct BasicPoints2P2V{T} <: BasicPoints3D
+    r̄i::SArray{Tuple{3},T,1,3}
+    r̄j::SArray{Tuple{3},T,1,3}
+    v̄::SArray{Tuple{3},T,1,3}
+    w̄::SArray{Tuple{3},T,1,3}
+end
+
+struct BasicPoints3P1V{T} <: BasicPoints3D
+    r̄i::SArray{Tuple{3},T,1,3}
+    r̄j::SArray{Tuple{3},T,1,3}
+    r̄k::SArray{Tuple{3},T,1,3}
+    w̄::SArray{Tuple{3},T,1,3}
+end
+
+struct BasicPoints4P{T} <: BasicPoints3D
+    r̄i::SArray{Tuple{3},T,1,3}
+    r̄j::SArray{Tuple{3},T,1,3}
+    r̄k::SArray{Tuple{3},T,1,3}
+    r̄l::SArray{Tuple{3},T,1,3}
+end
+
+# Constructors
+
+# 2D
+function BasicPoints1P1V{T}() where T
+    o = zero(T)
+    i = one(T)
+    r̄i = SVector(o,o)
+    ū = SVector(i,o)
+    BasicPoints1P1V(r̄i,ū)
 end
 
 function BasicPoints2P(Lij::Real)
@@ -34,35 +75,8 @@ function transform_to_1P1V(bps::BasicPoints2P{T}) where T
     )
 end
 
-struct BasicPoints1P3V{T} <: BasicPoints
-    r̄i::SArray{Tuple{3},T,1,3}
-    ū::SArray{Tuple{3},T,1,3}
-    v̄::SArray{Tuple{3},T,1,3}
-    w̄::SArray{Tuple{3},T,1,3}
-end
+# 3D
 
-struct BasicPoints2P2V{T} <: BasicPoints
-    r̄i::SArray{Tuple{3},T,1,3}
-    r̄j::SArray{Tuple{3},T,1,3}
-    v̄::SArray{Tuple{3},T,1,3}
-    w̄::SArray{Tuple{3},T,1,3}
-end
-
-struct BasicPoints3P1V{T} <: BasicPoints
-    r̄i::SArray{Tuple{3},T,1,3}
-    r̄j::SArray{Tuple{3},T,1,3}
-    r̄k::SArray{Tuple{3},T,1,3}
-    w̄::SArray{Tuple{3},T,1,3}
-end
-
-struct BasicPoints4P{T} <: BasicPoints
-    r̄i::SArray{Tuple{3},T,1,3}
-    r̄j::SArray{Tuple{3},T,1,3}
-    r̄k::SArray{Tuple{3},T,1,3}
-    r̄l::SArray{Tuple{3},T,1,3}
-end
-
-# Constructors
 function BP1P3V(ri::AbstractVector{T},
                ro=zeros(T,3),R=Matrix(one(T)*I,3,3)
                ) where T
@@ -262,8 +276,8 @@ function make_Φ(bps::BasicPoints1P1V)
     ū = bps.ū
     u_square = ū⋅ū
     @inline @inbounds function inner_Φ(q)
-        u1,u2 = q[3],q[4]
-        u1^2 + u2^2 - u_square
+        u = q[3:4]
+        u⋅u - u_square
     end
 end
 
@@ -375,14 +389,23 @@ function make_Φ(bps::BasicPoints4P)
     end
 end
 
+function make_Φq(bps::BasicPoints1P1V)
+    @inline @inbounds function inner_Φq(q)
+        ret = zeros(eltype(q),1,4)
+        u = q[3:4]
+        ret[1,3:4] =  2u
+        ret
+    end
+end
+
 function make_Φq(bps::BasicPoints2P)
     @inline @inbounds function inner_Φq(q)
-        xi,yi,xj,yj = q
+        ri = @view q[1:2]
+        rj = @view q[3:4]
+        u = rj - ri
         ret = zeros(eltype(q),1,4)
-        ret[1,1] = 2(xi-xj)
-        ret[1,2] = 2(yi-yj)
-        ret[1,3] = 2(xj-xi)
-        ret[1,4] = 2(yj-yi)
+        ret[1,1:2] = -2u
+        ret[1,3:4] =  2u
         ret
     end
 end
@@ -512,6 +535,21 @@ function make_c(bps,invX̄)
     @unpack r̄i = bps
     function c(r̄)
         invX̄*(r̄-r̄i)
+    end
+end
+
+function make_C(bps::BasicPoints1P1V)
+    function C(c)
+        C_raw = Matrix{eltype(c)}(undef,2,4)
+        C_raw[1,1] =    1
+        C_raw[1,2] =    0
+        C_raw[1,3] =  c[1]
+        C_raw[1,4] = -c[2]
+        C_raw[2,1] =    0
+        C_raw[2,2] =    1
+        C_raw[2,3] =  c[2]
+        C_raw[2,4] =  c[1]
+        SMatrix{2,4}(C_raw)
     end
 end
 

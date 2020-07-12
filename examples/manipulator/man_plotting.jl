@@ -21,20 +21,25 @@ function plotstructure(tgstruct,state,func)
         Point(rb.state.p[2]) => Point(rb.state.p[3]);
         Point(rb.state.p[3]) => Point(rb.state.p[1]);
         ]) for rb in tgstruct.rigidbodies]
-    function plot!(scene::Scene,bars)
+
+
+    strings = Node(TR.get_strings())
+    function plot!(scene::Scene,bars,strings)
         for (lineid,line) in enumerate(bars)
-            linesegments!(scene,line, color = :black, linewidth = 4)
+            linesegments!(scene, line, color = :black, linewidth = 4)
         end
+        linesegments!(scene, strings, color = :deepskyblue, linewidth = 2)
     end
 
     scene = Scene(resolution=(1200,1200))
-    plot!(scene,bars)
-    xlims!(-0.1,1.0)
-    ylims!(-0.5,0.6)
+    plot!(scene,bars,strings)
+    xlims!(-0.2,0.8)
+    ylims!(-0.7,0.3)
 
     function update_scene!(scene,q)
         cnt = tgstruct.connectivity
-        for (id,rb) in enumerate(tgstruct.rigidbodies)
+        for id in tgstruct.mvbodyindex
+            rb = tgstruct.rigidbodies[id]
             pindex = cnt.body2q[id]
             cache = rb.state.cache
             p = rb.state.p
@@ -47,6 +52,7 @@ function plotstructure(tgstruct,state,func)
                     Point(rb.state.p[3]) => Point(rb.state.p[1]);
                 ]
         end
+        strings[] = get_strings()
         # angles = update_angles(tgstruct)
         # @show angles
     end

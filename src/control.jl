@@ -86,3 +86,9 @@ function actuate!(actuator::Actuator{N,1,T},u;inc=false) where {N,T}
         str1.state.restlen = str1.original_restlen + u
     end
 end
+
+function set_restlen!(tgstruct,u)
+    for (i,s) in enumerate(tgstruct.strings)
+        s.state.restlen = u[i]
+    end
+end

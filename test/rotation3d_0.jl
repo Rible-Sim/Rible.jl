@@ -192,7 +192,7 @@ F!(F0,q0,q̇0,0.0)
 
 dt = 0.002
 # prob = TS.DyProblem(rbfuncs(rb1),q0,q̇0,λ0,(0.0,0.0001))
-prob = TS.DyProblem(dynfuncs(tgrb1,q0),q0,q̇0,λ0,(0.0,0.004))
+prob = TS.DyProblem(dynfuncs(tgrb1,q0),q0,q̇0,λ0,(0.0,0.2))
 # sol = TS.solve(prob,TS.Wendlandt(),dt=dt,ftol=1e-14,verbose=true)
 sol = TS.solve(prob,TS.Xu2014(),dt=dt,ftol=1e-14,verbose=true)
 sol = TS.solve(prob,TS.Zhong06(),dt=dt,ftol=1e-14,verbose=true)
