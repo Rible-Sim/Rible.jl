@@ -37,3 +37,122 @@ function GECP(A_input)
     end
     col_index
 end
+
+
+function ∂Aᵀλ∂q(tgstruct,λ)
+    body2q = tgstruct.connectivity.body2q
+    ncoords = tgstruct.ncoords
+    nbodyc = get_nbodyconstraint(tgstruct)
+    ret = zeros(eltype(λ),ncoords,ncoords)
+    is = 0
+    for rbid in tgstruct.mvbodyindex
+        pindex = body2q[rbid]
+        rb = tgstruct.rigidbodies[rbid]
+        nc = rb.state.cache.nc
+        if nc > 0
+            is += nc
+        end
+        ret[pindex,pindex] .+= rb.state.cache.cfuncs.∂Aᵀλ∂q(λ[is+1:is+nbodyc])
+        is += nbodyc
+    end
+    ret
+end
+
+function test_fvector(tgstruct,q0)
+    function L(q)
+        reset_forces!(tgstruct)
+        distribute_q_to_rbs!(tgstruct,q,zero(q))
+        update_strings_apply_forces!(tgstruct)
+        fvector(tgstruct)
+        [tgstruct.strings[i].state.length for i = 1:2]
+    end
+    FiniteDiff.finite_difference_jacobian(L,q0)
+end
+
+function linearize(tgstruct,q,q̇,λ)
+    M = build_massmatrix(tgstruct)
+    A = build_A(tgstruct)
+    Q̃ = build_Q̃(tgstruct)
+    ∂L∂q,∂L∂q̇ = build_tangent(tgstruct,q,q̇)
+    @unpack ncoords,nconstraint = tgstruct
+    nz = ncoords + nconstraint
+    M̂ = zeros(eltype(q),nz,nz)
+    Ĉ  = zeros(eltype(q),nz,nz)
+    K̂ = zeros(eltype(q),nz,nz)
+    M̂[1:ncoords,1:ncoords] .= M
+    Ĉ[1:ncoords,1:ncoords] .= -Q̃*∂L∂q̇
+
+    # fjac = test_fvector(tgstruct,q)
+    K̂[1:ncoords,1:ncoords] .= -Q̃*∂L∂q/2 .+ ∂Aᵀλ∂q(tgstruct,λ)
+    Aq = A(q)
+    c = 1.0 #maximum(abs.(K̂[1:ncoords,1:ncoords]))
+    K̂[1:ncoords,ncoords+1:nz] .= c.*transpose(Aq)
+    K̂[ncoords+1:nz,1:ncoords] .= c.*Aq
+    M̂,Ĉ,K̂
+end
+
+
+function frequencyshift(M̂,Ĉ,K̂,α)
+    M̄ = M̂
+    C̄ = 2α*M̂ + Ĉ
+    K̄ = α^2*M̂ + α*Ĉ + K̂
+    M̄,C̄,K̄
+end
+
+function enlarge(M̄,C̄,K̄)
+    T = eltype(M̄)
+    nz = size(M̄)[1]
+    M̃ = zeros(T,2nz,2nz)
+    M̃[1:nz,1:nz] .= -C̄
+    M̃[1:nz,nz+1:2nz] .= -M̄
+    M̃[nz+1:2nz,1:nz] .= Matrix(one(T)*I,nz,nz)
+    K̃ = zeros(T,2nz,2nz)
+    K̃[1:nz,1:nz] .= K̄
+    K̃[nz+1:2nz,nz+1:2nz] .= Matrix(one(T)*I,nz,nz)
+    M̃,K̃
+end
+
+function find_finite(ω2,Z)
+    finite_index = findall(isfinite,ω2)
+    finite_ω2 = ω2[finite_index]
+    finite_Z = Z[:,finite_index]
+    finite_ω2,finite_Z
+end
+
+function normalize_wrt_mass!(Z,M)
+    n = size(Z)[2]
+    for i = 1:n
+        zmz = transpose(Z[:,i])*M*Z[:,i]
+        Z[:,i] ./= sqrt(zmz)
+    end
+    Z
+end
+
+function undamped_modal_solve!(tgstruct,q0,q̇0,λ0,tf,dt)
+    M̂,Ĉ,K̂ = linearize(tgstruct,q0,zero(q0),λ0)
+    # show(stdout,"text/plain",K̂)
+    # showtable(K̂)
+    # M̄,C̄,K̄ = TR.frequencyshift(M̂,Ĉ,K̂,0.1)
+    # M̃,K̃ = TR.enlarge(M̄,C̄,K̄)
+    aug_ω2,aug_Z = eigen(K̂,M̂)
+    ω2,Z = find_finite(aug_ω2,aug_Z)
+    @show aug_ω2,ω2
+    normalize_wrt_mass!(Z,M̂)
+    # @show transpose(Z)*M̂*Z
+    # @show transpose(Z)*K̂*Z
+    ω = sqrt.(ω2)
+    z0 = vcat(zero(q0),λ0)
+    ż0 = vcat(q̇0,zero(λ0))
+    ζ0 = transpose(Z)*M̂*z0
+    ζd0 = transpose(Z)*M̂*ż0
+
+    d = length(ζ0)
+    step = Integer(tf/dt)
+    ζ = Matrix{eltype(q0)}(undef,d,step+1)
+    for it in 0:step
+        t = dt*it
+        ζ[:,it+1] .= ζ0.*cos.(ω.*t) .+ ζd0./ω.*sin.(ω.*t)
+    end
+    z = Z*ζ
+    q = z[1:length(q0),:]
+end

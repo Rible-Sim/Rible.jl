@@ -23,7 +23,7 @@ function plotstructure(tg,sol)
             ) for rb in tg.rigidbodies]
     rbs = tg.rigidbodies
     cables = [Node(tg_cables(rbs[i],rbs[i+1])
-            ) for i in 1:tg.nbody-1]
+            ) for i in 1:tg.nbodies-1]
     #return bars,cables
     function plot!(scene::Scene,bars,cables)
         for (lineid,line) in enumerate(bars)
@@ -46,7 +46,7 @@ function plotstructure(tg,sol)
         for (id,rb) in enumerate(tg.rigidbodies)
             bars[id][] = rb_bars(rb)
         end
-        for id in 1:tg.nbody-1
+        for id in 1:tg.nbodies-1
             cables[id][] = tg_cables(rbs[id],rbs[id+1])
         end
         # angles = update_angles(tg)

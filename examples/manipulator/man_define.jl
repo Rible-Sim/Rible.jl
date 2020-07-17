@@ -1,20 +1,20 @@
 
 function man_ndof(ndof,θ=0.0)
-    nbody = ndof + 1
-    nbp = 2nbody - ndof
-    n_lower = count(isodd,1:nbody)
-    n_upper = count(iseven,1:nbody)
+    nbodies = ndof + 1
+    nbp = 2nbodies - ndof
+    n_lower = count(isodd,1:nbodies)
+    n_upper = count(iseven,1:nbodies)
     a_lower = fill(0.1,n_lower)
     a_upper = fill(0.08,n_upper)
     m_lower = fill(0.02,n_lower)
     m_upper = fill(0.013,n_upper)
     Ic_lower = fill(11.3,n_lower)
     Ic_upper = fill(5.4,n_upper)
-    lower_index = 1:2:nbody
-    upper_index = 2:2:nbody
-    a = zeros(nbody)
-    m = zeros(nbody)
-    Ia = zeros(nbody)
+    lower_index = 1:2:nbodies
+    upper_index = 2:2:nbodies
+    a = zeros(nbodies)
+    m = zeros(nbodies)
+    Ia = zeros(nbodies)
     for (i,j) in enumerate(lower_index)
         a[j] = a_lower[i]
         m[j] = m_lower[i]
@@ -33,14 +33,11 @@ function man_ndof(ndof,θ=0.0)
 
     function rigidbody(i,m,a,Ia,ri,rj)
         if i == 1
-            movable = false
+            movable = true
+            constrained = true
+            constrained_index = [1,2,4]
         else
             movable = true
-        end
-        if i == 2
-            constrained = true
-            constrained_index = [1,2]
-        else
             constrained = false
             constrained_index = Vector{Int}()
         end
@@ -69,29 +66,27 @@ function man_ndof(ndof,θ=0.0)
         rb = TR.RigidBody(prop,state)
     end
     rbs = [rigidbody(i,m[i],a[i],
-            Ia[i],A[:,i],A[:,i+1]) for i = 1:nbody]
+            Ia[i],A[:,i],A[:,i+1]) for i = 1:nbodies]
 
-    nstring = 2(nbody-1)
-    upstringlen = norm(rbs[2].state.p[3] - rbs[1].state.p[1])
-    lostringlen = norm(rbs[2].state.p[2] - rbs[1].state.p[3])
-    original_restlens = zeros(nstring)
-    restlens = zeros(nstring)
-    actuallengths = zeros(nstring)
-    ks = zeros(nstring)
-    cs = zeros(nstring)
-    cs .= 10.0
-    for i = 1:nstring
+    nstrings = 2(nbodies-1)
+    upstringlen = 0.9norm(rbs[2].state.p[3] - rbs[1].state.p[1])
+    lostringlen = 0.9norm(rbs[2].state.p[2] - rbs[1].state.p[3])
+    original_restlens = zeros(nstrings)
+    restlens = zeros(nstrings)
+    actuallengths = zeros(nstrings)
+    ks = zeros(nstrings)
+    cs = zeros(nstrings)
+    cs .= 0.0
+    for i = 1:nstrings
         j = i % 4
-        original_restlens[i] =
-                 restlens[i] =
-               actuallengths[i] =  ifelse(j∈[1,0],upstringlen,lostringlen)
+        original_restlens[i] = ifelse(j∈[1,0],upstringlen,lostringlen)
         ks[i] = ifelse(j∈[1,0],1.0e2,1.0e2)
     end
-    ss = [TR.SString2D(original_restlens[i],ks[i],cs[i]) for i = 1:nstring]
+    ss = [TR.SString2D(original_restlens[i],ks[i],cs[i]) for i = 1:nstrings]
     acs = [
         ifelse(isodd(i),TR.Actuator(SVector{2}(ss[2(i-1)+1:2i])),
                         TR.Actuator(SVector{2}(ss[2i:-1:2(i-1)+1])))
-        for i = 1:nbody-1
+        for i = 1:nbodies-1
     ]
 
     rb2p = [

@@ -8,6 +8,8 @@ using StaticArrays
 using NLsolve
 using BlockArrays
 using GeometryTypes
+using ForwardDiff
+using FiniteDiff
 
 include("naturalcoordinates.jl")
 using .NaturalCoordinates
@@ -30,5 +32,5 @@ end
 include("plotting.jl")
 include("contact.jl")
 include("linearization.jl")
-
+include("tangent.jl")
 end

@@ -29,3 +29,7 @@ function SString3D(origin_restlen::T,k::T,c=zero(k)) where T
     state = SStringState(origin_restlen,direction)
     SString(k,c,origin_restlen,state)
 end
+
+struct Actuator{N,NS,T}
+    strings::SArray{Tuple{NS},SString{N,T},1,NS}
+end

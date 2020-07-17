@@ -6,7 +6,7 @@ using SPARK
 using Robot2D
 const R2 = Robot2D
 function man(n,θ=0.0)
-    nbody = 2n - 1
+    nbodies = 2n - 1
     nbp = 2 + 2(n-1)
     a_lower = fill(0.1,n)
     a_upper = fill(0.08,n-1)
@@ -14,11 +14,11 @@ function man(n,θ=0.0)
     m_upper = fill(0.013,n-1)
     Ic_lower = fill(11.3,n)
     Ic_upper = fill(5.4,n-1)
-    lower_index = 1:2:nbody
-    upper_index = 2:2:nbody
-    a = zeros(nbody)
-    m = zeros(nbody)
-    Ia = zeros(nbody)
+    lower_index = 1:2:nbodies
+    upper_index = 2:2:nbodies
+    a = zeros(nbodies)
+    m = zeros(nbodies)
+    Ia = zeros(nbodies)
     for (i,j) in enumerate(lower_index)
         a[j] = a_lower[i]
         m[j] = m_lower[i]
@@ -69,18 +69,18 @@ function man(n,θ=0.0)
         rb = R2.RigidBody(prop,state)
     end
     rbs = [rigidbody(i,m[i],a[i],
-            Ia[i],A[:,i],A[:,i+1]) for i = 1:nbody]
+            Ia[i],A[:,i],A[:,i+1]) for i = 1:nbodies]
 
-    nstring = 2(nbody-1)
+    nstrings = 2(nbodies-1)
     upstringlen = norm(rbs[2].state.p[3] - rbs[1].state.p[1])
     lostringlen = norm(rbs[2].state.p[2] - rbs[1].state.p[3])
-    original_restlens = zeros(nstring)
-    restlens = zeros(nstring)
-    actuallengths = zeros(nstring)
-    ks = zeros(nstring)
-    cs = zeros(nstring)
+    original_restlens = zeros(nstrings)
+    restlens = zeros(nstrings)
+    actuallengths = zeros(nstrings)
+    ks = zeros(nstrings)
+    cs = zeros(nstrings)
     cs .= 1.0
-    for i = 1:nstring
+    for i = 1:nstrings
         j = i % 4
         original_restlens[i] =
                  restlens[i] =
@@ -88,7 +88,7 @@ function man(n,θ=0.0)
         ks[i] = ifelse(j∈[1,0],1.0e2,1.0e2)
     end
     ss = [R2.SString(ks[i],cs[i],original_restlens[i],
-        R2.SStringState(restlens[i],actuallengths[i],0.0)) for i = 1:nstring]
+        R2.SStringState(restlens[i],actuallengths[i],0.0)) for i = 1:nstrings]
     # @code_warntype   R2.DString(k[i],original_restlen[i],
     #         restlen[i],actuallength[i],zeros(MVector{4}))
     rbs,ss
@@ -126,7 +126,7 @@ manipulator = man(n)
 refman = man(n,-π/12)
 function update_angles(tgstruct)
     rbs = tgstruct.rigidbodies
-    angles = zeros(tgstruct.nbody)
+    angles = zeros(tgstruct.nbodies)
     for (rbid,rb) in enumerate(rbs)
         if rbid > 1
             state0 = rbs[rbid-1].state
@@ -143,8 +143,8 @@ function man_spark(n,tgstruct)
     vss = tgstruct.strings
     cnt = tgstruct.connectivity
     @unpack body2q = cnt
-    @unpack nbody,nfixbody,nstring = tgstruct
-    ninconstraint = nbody
+    @unpack nbodies,nfixbodies,nstrings = tgstruct
+    ninconstraint = nbodies
     nexconstraint = 3nfixbody
     nconstraint = ninconstraint + nexconstraint
 
@@ -214,11 +214,11 @@ function man_wend(n,tgstruct)
     vss = tgstruct.strings
     cnt = tgstruct.connectivity
     @unpack body2q = cnt
-    @unpack nbody,nfixbody,nstring = tgstruct
-    ninconstraint = nbody
+    @unpack nbodies,nfixbodies,nstrings = tgstruct
+    ninconstraint = nbodies
     nexconstraint = 3nfixbody
     nconstraint = ninconstraint + nexconstraint
-    nq = body2q[end][end]
+    nq = tgstruct.ncoords
     q0,q̇0 = R2.get_q(tgstruct)
 
     M = R2.build_massmatrix(rbs,body2q)
@@ -270,12 +270,12 @@ M,Φ,A,F,Jacs = man_wend(n,manipulator)
 function initial(n,tgstruct)
     rbs = tgstruct.rigidbodies
     cnt = tgstruct.connectivity
-    @unpack nbody,nfixbody = tgstruct
+    @unpack nbodies,nfixbodies = tgstruct
     nq = cnt.body2q[end][end]
     q0,q̇0 = get_q(tgstruct)
     #q̇0[end] = 0.01
     #q̇0[end-1:end] .= [0.0,0.001]
-    ninconstraint = nbody
+    ninconstraint = nbodies
     nexconstraint = 3nfixbody
     nconstraint = ninconstraint + nexconstraint
     λ0 = zeros(nconstraint)

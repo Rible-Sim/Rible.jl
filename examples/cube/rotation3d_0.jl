@@ -3,6 +3,7 @@ using StaticArrays
 using SparseArrays
 using Parameters
 using Rotations
+using Cthulhu
 using Revise
 using TensegritySolvers; const TS = TensegritySolvers
 using TensegrityRobot
@@ -71,7 +72,7 @@ function confuncs(tgstruct)
     function get_HNb(afcs,active_index,q̇)
         active_afcs = afcs[active_index]
         nactive = length(active_index)
-        ncoordinates = TR.get_ncoords(tgstruct)
+        ncoords = tgstruct.ncoords
         nactive_βs = sum(afc.m for afc in active_afcs)
         ncomplementarity = nactive+nactive_βs+nactive
         H = zeros(ncoordinates,ncomplementarity)
@@ -119,7 +120,7 @@ dt = 0.001
 prob = TS.DyProblem(dynfuncs(tgrb1,q0),q0,q̇0,λ0,(0.0,3.0))
 sol = TS.solve(prob,TS.Linear(confuncs(tgrb1)),dt=dt,ftol=1e-14,verbose=true)
 
-@d TS.solve(prob,TS.Linear(confuncs(tgrb1)),dt=dt,ftol=1e-14,verbose=true)
+@descend  TS.solve(prob,TS.Linear(confuncs(tgrb1)),dt=dt,ftol=1e-14,verbose=true)
 TR.kinetic_energy_coords(rb1.state)
 
 X_kes = [TR.kinetic_energy_coords(rb1,q̇) for q̇ in sol.q̇s]

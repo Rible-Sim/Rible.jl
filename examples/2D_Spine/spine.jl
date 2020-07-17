@@ -73,7 +73,7 @@ W = TR.build_W(spine)
 
 Q̃ = TR.build_Q̃(spine)
 # G = TR.build_G(spine)
-nλ = TR.get_nconstraint(spine)
+nλ = spine.nconstraint
 
 K = TR.build_K(spine)
 RHS = TR.build_RHS(spine)

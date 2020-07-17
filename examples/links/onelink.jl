@@ -50,11 +50,11 @@ tgsys = TRS.TensegritySystem(rbs,sts,nothing,connectivity)
 
 function tg_spark(tgsys)
     @unpack rigidbodies,strings,joints,connectivity = tgsys
-    nbody = length(rigidbodies)
-    ninconstraint = nbody*6
+    nbodies = length(rigidbodies)
+    ninconstraint = nbodies*6
     nexconstraint = 0
     nconstraint = ninconstraint + nexconstraint
-    nq = nbody*12
+    nq = nbodies*12
     mass_matrix = zeros(nq,nq)
     for (rbid,rb) in enumerate(rigidbodies)
         is = 12*(rbid - 1)
@@ -112,7 +112,7 @@ function tg_spark(tgsys)
 
 
     function Φ(q)
-        ret = Vector{eltype(q)}(undef,nbody*6)
+        ret = Vector{eltype(q)}(undef,nbodies*6)
         for (rbid,rb) in enumerate(rigidbodies)
             is = 6*(rbid-1)
             ks = 12*(rbid-1)

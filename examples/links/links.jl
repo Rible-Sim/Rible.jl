@@ -106,11 +106,11 @@ function tg_spark(tgsys)
     @unpack rigidbodies,strings,joints,connectivity = tgsys
     ntotalbody = length(rigidbodies)
     mvrigidbodies = rigidbodies.movables
-    nbody = length(mvrigidbodies)
-    ninconstraint = nbody*6
+    nbodies = length(mvrigidbodies)
+    ninconstraint = nbodies*6
     nexconstraint = 0
     nconstraint = ninconstraint + nexconstraint
-    nq = nbody*12
+    nq = nbodies*12
     mass_matrix = zeros(nq,nq)
     for (rbid,rb) in enumerate(mvrigidbodies)
         is = 12*(rbid - 1)
@@ -138,7 +138,7 @@ function tg_spark(tgsys)
 
 
     function Φ(q)
-        ret = Vector{eltype(q)}(undef,nbody*6)
+        ret = Vector{eltype(q)}(undef,nbodies*6)
         for (rbid,rb) in enumerate(mvrigidbodies)
             is = 6*(rbid-1)
             ks = 12*(rbid-1)

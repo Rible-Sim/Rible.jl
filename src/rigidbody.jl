@@ -41,9 +41,10 @@ struct RigidBody{N,T,iT,L,ωT,CType,cacheType} <: AbstractRigidBody{N,T,CType}
     state::RigidBodyState{N,T,L,ωT,CType,cacheType}
 end
 
-struct ConstrainedFunctions{ΦT,ΦqT}
+struct ConstrainedFunctions{ΦT,ΦqT,∂Aᵀλ∂qT}
     Φ::ΦT
     Φq::ΦqT
+    ∂Aᵀλ∂q::∂Aᵀλ∂qT
 end
 
 struct NaturalCoordinatesCache{ArrayT,MT,fT,cfT}
@@ -118,7 +119,8 @@ function NaturalCoordinatesCache(prop::RigidBodyProperty{N,T,iT},
     q0 = copy(q)
     cfuns = ConstrainedFunctions(
                 make_index_Φ(constrained_index,q0),
-                make_index_A(constrained_index,nq))
+                make_index_A(constrained_index,nq),
+                NaturalCoordinates.∂Φqᵀ∂q_forwarddiff(cf))
     NaturalCoordinatesCache(CG,Cp,M,cf,nc,constrained_index,cfuns)
 end
 

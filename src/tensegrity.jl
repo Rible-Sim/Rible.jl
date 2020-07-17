@@ -15,12 +15,15 @@ Connectivity(b,s) = Connectivity(b,s,nothing)
 
 struct TensegrityStructure{BodyType,StringType,ActuatorType,ConnectType}
     ndim::Int
-    nbody::Int
-    nmovablebody::Int
+    ncoords::Int
+    nconstraint::Int
+    ndof::Int
+    nbodies::Int
+    nmvbodies::Int
     mvbodyindex::Vector{Int}
-    nfixbody::Int
+    nfixbodies::Int
     fixbodyindex::Vector{Int}
-    nstring::Int
+    nstrings::Int
     npoints::Int
     nmvpoints::Int
     rigidbodies::Vector{BodyType}
@@ -29,15 +32,21 @@ struct TensegrityStructure{BodyType,StringType,ActuatorType,ConnectType}
     connectivity::ConnectType
 end
 
-function TensegrityStructure(rbs::Vector{rbType},ss,acs,cnt
-                ) where rbType<:AbstractRigidBody{N,T,CType} where {N,T,CType}
+function TensegrityStructure(rbs::Vector{rbT},ss::Vector{sT},cnt::Connectivity
+                ) where {sT<:SString,rbT<:AbstractRigidBody{N,T,CType}} where {N,T,CType}
+    acs = [Actuator(SVector{1}(s)) for s in ss]
+    TensegrityStructure(rbs,ss,acs,cnt)
+end
+
+function TensegrityStructure(rbs::Vector{rbT},ss::Vector{sT},acs::Vector{aT},cnt::Connectivity
+                ) where {sT<:SString,aT<:Actuator,rbT<:AbstractRigidBody{N,T,CType}} where {N,T,CType}
     ndim = N
-    nbody = length(rbs)
+    nbodies = length(rbs)
     mvbodyindex = [i for i in eachindex(rbs) if rbs[i].prop.movable]
-    nmvbody = length(mvbodyindex)
+    nmvbodies = length(mvbodyindex)
     fixbodyindex = [i for i in eachindex(rbs) if !rbs[i].prop.movable]
-    nfixbody = length(fixbodyindex)
-    nstring = length(ss)
+    nfixbodies = length(fixbodyindex)
+    nstrings = length(ss)
     npoints = 0
     for (rbid,rb) in enumerate(rbs)
         npoints += rb.prop.naps
@@ -46,10 +55,15 @@ function TensegrityStructure(rbs::Vector{rbType},ss,acs,cnt
     for rbid in mvbodyindex
         nmvpoints += rbs[rbid].prop.naps
     end
-    TensegrityStructure(ndim,nbody,
-                    nmvbody,mvbodyindex,
-                    nfixbody,fixbodyindex,
-                    nstring,
+    ncoords = maximum(maximum.(cnt.body2q))
+    nconstraint = get_nconstraint(rbs,mvbodyindex,nmvbodies,nfixbodies)
+    ndof = ncoords - nconstraint
+    TensegrityStructure(ndim,
+                    ncoords,nconstraint,ndof,
+                    nbodies,
+                    nmvbodies,mvbodyindex,
+                    nfixbodies,fixbodyindex,
+                    nstrings,
                     npoints,nmvpoints,
                     rbs,ss,acs,cnt)
 end
@@ -87,7 +101,7 @@ function update_strings_apply_forces!(tgstruct)
         l,τ = lengthdir(p2-p1)
         sstate.length = l
         sstate.direction = τ
-        l̇ = 1/l*(Δr[1]*Δṙ[1] + Δr[2]*Δṙ[2])
+        l̇ = (transpose(Δr)*Δṙ)/l
         f_raw = k*(l - sstate.restlen) +
                 c*l̇
         sstate.tension = ifelse(f_raw > 0.0, f_raw, 0.0)
@@ -142,7 +156,7 @@ end
 function assemble_forces(tgstruct)
     T = get_numbertype(tgstruct)
     @unpack body2q = tgstruct.connectivity
-    F = zeros(T,body2q[end][end])
+    F = zeros(T,tgstruct.ncoords)
     assemble_forces!(F,tgstruct)
     F
 end
@@ -245,8 +259,8 @@ end
 
 function build_massmatrix(tgstruct::TensegrityStructure)
     body2q = tgstruct.connectivity.body2q
-    nq = body2q[end][end]
-    mass_matrix = zeros(nq,nq)
+    ncoords = tgstruct.ncoords
+    mass_matrix = zeros(ncoords,ncoords)
     for rbid in tgstruct.mvbodyindex
         pindex = body2q[rbid]
         mass_matrix[pindex,pindex] .+= tgstruct.rigidbodies[rbid].state.cache.M
@@ -254,14 +268,13 @@ function build_massmatrix(tgstruct::TensegrityStructure)
     mass_matrix
 end
 
-function get_nconstraint(tgstruct)
-    @unpack nmovablebody,nfixbody = tgstruct
-    nbodyconstraint = get_nbodyconstraint(tgstruct)
-    nbodydof = get_nbodydof(tgstruct)
-    ninconstraint = nbodyconstraint*nmovablebody
-    nexconstraint = 0  #nbodydof*nfixbody
-    for id in tgstruct.mvbodyindex
-        nexconstraint += tgstruct.rigidbodies[id].state.cache.nc
+function get_nconstraint(rbs,mvbodyindex,nmvbodies,nfixbodies)
+    nbodyconstraint = get_nbodyconstraint(rbs)
+    nbodydof = get_nbodydof(rbs)
+    ninconstraint = nbodyconstraint*nmvbodies
+    nexconstraint = 0  #nbodydof*nfixbodies
+    for id in mvbodyindex
+        nexconstraint += rbs[id].state.cache.nc
     end
     nconstraint = ninconstraint + nexconstraint
 end
@@ -270,28 +283,25 @@ function build_Φ(tgstruct,q0)
     rbs = tgstruct.rigidbodies
     #q0,q̇0 = get_q(tgstruct)
     @unpack body2q = tgstruct.connectivity
-    nfixbody = tgstruct.nfixbody
-    nconstraint = get_nconstraint(tgstruct)
+    nfixbodies = tgstruct.nfixbodies
+    nconstraint = tgstruct.nconstraint
     nbodyc = get_nbodyconstraint(tgstruct)
     nbodydof = get_nbodydof(tgstruct)
-    fixindex = get_fixindex(tgstruct)
-    function inner_Φ(q)
+    @inline @inbounds function inner_Φ(q)
         ret = Vector{eltype(q)}(undef,nconstraint)
         is = 0
-        #is += nbodydof*nfixbody
+        #is += nbodydof*nfixbodies
         for rbid in tgstruct.mvbodyindex
             pindex = body2q[rbid]
             rb = rbs[rbid]
             nc = rb.state.cache.nc
-            ret[is+1:nc] = rb.state.cache.cfuncs.Φ(q[pindex])
-            is += nc
+            if nc > 0
+                ret[is+1:nc] = rb.state.cache.cfuncs.Φ(q[pindex])
+                is += nc
+            end
             ret[is+1:is+nbodyc] .=rb.state.cache.funcs.Φ(q[pindex])
             is += nbodyc
         end
-        # for (fixid,rbid) in enumerate(tgstruct.fixbodyindex)
-        #     pindex = body2q[rbid]
-        #     ret[nbodydof*(fixid-1)+1:nbodydof*fixid] .= q[pindex[fixindex]] - q0[pindex[fixindex]]
-        # end
         ret
     end
 end
@@ -299,30 +309,25 @@ end
 function build_A(tgstruct)
     rbs = tgstruct.rigidbodies
     @unpack body2q = tgstruct.connectivity
-    nfixbody = tgstruct.nfixbody
-    nconstraint = get_nconstraint(tgstruct)
+    nfixbodies = tgstruct.nfixbodies
+    nconstraint = tgstruct.nconstraint
     nbodyc = get_nbodyconstraint(tgstruct)
     nbodydof = get_nbodydof(tgstruct)
-    fixindex = get_fixindex(tgstruct)
-    fixA = get_fixA(tgstruct)
-    nq = body2q[end][end]
-    function inner_A(q)
-        ret = zeros(eltype(q),nconstraint,nq)
+    ncoords = tgstruct.ncoords
+    @inline @inbounds function inner_A(q)
+        ret = zeros(eltype(q),nconstraint,ncoords)
         is = 0
-        #is += nbodydof*nfixbody
         for rbid in tgstruct.mvbodyindex
             pindex = body2q[rbid]
             rb = rbs[rbid]
             nc = rb.state.cache.nc
-            ret[is+1:nc,pindex] = rb.state.cache.cfuncs.Φq(q[pindex])
-            is += nc
+            if nc > 0
+                ret[is+1:nc,pindex] = rb.state.cache.cfuncs.Φq(q[pindex])
+                is += nc
+            end
             ret[is+1:is+nbodyc,pindex] .= rb.state.cache.funcs.Φq(q[pindex])
             is += nbodyc
         end
-        # for (fixid,rbid) in enumerate(tgstruct.fixbodyindex)
-        #     pindex = body2q[rbid]
-        #     ret[nbodydof*(fixid-1)+1:nbodydof*fixid,pindex] .= fixA
-        # end
         ret
     end
 end
@@ -330,9 +335,9 @@ end
 function get_q(tgstruct)
     rbs = tgstruct.rigidbodies
     @unpack body2q = tgstruct.connectivity
-    nq = body2q[end][end]
-    q = zeros(nq)
-    q̇ = zeros(nq)
+    ncoords = tgstruct.ncoords
+    q = zeros(ncoords)
+    q̇ = zeros(ncoords)
     for rbid in tgstruct.mvbodyindex
         pindex = body2q[rbid]
         q[pindex] .= rbs[rbid].state.coords.q
@@ -341,7 +346,7 @@ function get_q(tgstruct)
     return q,q̇
 end
 
-get_λ(tgstruct) = zeros(get_nconstraint(tgstruct))
+get_λ(tgstruct) = zeros(tgstruct.nconstraint)
 function get_initial(tgstruct)
     q0,q̇0 = get_q(tgstruct)
     λ0 = get_λ(tgstruct)
@@ -351,43 +356,32 @@ end
 function get_u(tgstruct)
 end
 
-get_ncoords(tg::TensegrityStructure) = tg.connectivity.body2q[end][end]
 get_ndim(rb::AbstractRigidBody{N,T,CType}) where {N,T,CType} = N
 
-get_numbertype(tg::TensegrityStructure) = get_numbertype(tg.rigidbodies[1])
-get_numbertype(rb::AbstractRigidBody{N,T,CType}) where {N,T,CType} = T
+get_numbertype(tg::TensegrityStructure) = get_numbertype(tg.rigidbodies)
+get_numbertype(rbs::Vector{rbT}) where rbT<:AbstractRigidBody{N,T,CType}  where {N,T,CType} = T
 
-get_nbodyconstraint(tg::TensegrityStructure) = get_nbodyconstraint(tg.rigidbodies[1])
+get_nbodyconstraint(tg::TensegrityStructure) = get_nbodyconstraint(tg.rigidbodies)
+get_nbodyconstraint(rbs::Vector{rbT}) where rbT<:AbstractRigidBody{3,T,CType} where {T,CType} = 6
+get_nbodyconstraint(rbs::Vector{rbT}) where rbT<:AbstractRigidBody{2,T,CType} where {T,CType} = 1
 get_nbodyconstraint(rb::AbstractRigidBody{3,T,CType}) where {T,CType} = 6
 get_nbodyconstraint(rb::AbstractRigidBody{2,T,CType}) where {T,CType} = 1
 
-get_nbodydof(tg::TensegrityStructure) = get_nbodydof(tg.rigidbodies[1])
+get_nbodydof(tg::TensegrityStructure) = get_nbodydof(tg.rigidbodies)
+get_nbodydof(rbs::Vector{rbT}) where rbT<:AbstractRigidBody{3,T,CType} where {T,CType} = 6
+get_nbodydof(rbs::Vector{rbT}) where rbT<:AbstractRigidBody{2,T,CType} where {T,CType} = 3
 get_nbodydof(rb::AbstractRigidBody{3,T,CType}) where {T,CType} = 6
 get_nbodydof(rb::AbstractRigidBody{2,T,CType}) where {T,CType} = 3
 
-get_nbodycoords(tg::TensegrityStructure) = get_nbodycoords(tg.rigidbodies[1])
+get_nbodycoords(tg::TensegrityStructure) = get_nbodycoords(tg.rigidbodies)
+get_nbodycoords(rbs::Vector{rbT}) where rbT<:AbstractRigidBody{3,T,CType} where {T,CType} = 12
+get_nbodycoords(rbs::Vector{rbT}) where rbT<:AbstractRigidBody{2,T,CType} where {T,CType} = 4
 get_nbodycoords(rb::AbstractRigidBody{3,T,CType}) where {T,CType} = 12
 get_nbodycoords(rb::AbstractRigidBody{2,T,CType}) where {T,CType} = 4
 
-get_fixindex(tg::TensegrityStructure) = get_fixindex(tg.rigidbodies[1])
-get_fixindex(rb::AbstractRigidBody{3,T,CType}) where {T,CType} = 2:2:12
-get_fixindex(rb::AbstractRigidBody{2,T,CType}) where {T,CType} = [2,3,4]
-
-get_fixA(tg::TensegrityStructure) = get_fixA(tg.rigidbodies[1])
-function get_fixA(rb::AbstractRigidBody{3,T,CType}) where {T,CType}
-    A = zeros(6,12)
-    for (i,j) in zip(1:6,2:2:12)
-        A[i,j] = 1
-    end
-    A
-end
-get_fixA(rb::AbstractRigidBody{2,T,CType}) where {T,CType} = [0.0 1.0 0.0 0.0;
-                                                              0.0 0.0 1.0 0.0;
-                                                              0.0 0.0 0.0 1.0]
-get_gravity(tg::TensegrityStructure) = get_gravity(tg.rigidbodies[1])
-get_gravity(::AbstractRigidBody{3,T,CType}) where {T,CType} = [zero(T),zero(T),-9.8*one(T)]
-get_gravity(::AbstractRigidBody{2,T,CType}) where {T,CType} = [zero(T),-9.8*one(T)]
-
+get_gravity(tg::TensegrityStructure) = get_gravity(tg.rigidbodies)
+get_gravity(rbs::Vector{rbT}) where rbT<:AbstractRigidBody{3,T,CType} where {T,CType} = [zero(T),zero(T),-9.8*one(T)]
+get_gravity(rbs::Vector{rbT}) where rbT<:AbstractRigidBody{2,T,CType} where {T,CType} = [zero(T),-9.8*one(T)]
 
 function get_strings_len(tg::TensegrityStructure,q)
     distribute_q_to_rbs!(tg,q,zero(q))
@@ -399,7 +393,7 @@ function get_strings_len(tg::TensegrityStructure)
 end
 
 function find_remaining_index(body2q,rbs)
-    original_nq = body2q[end][end]
+    original_nq = maximum(maximum.(body2q))
     switch_index = zeros(Int,original_nq)
     for (rbid,rb) in enumerate(rbs)
         qindex = body2q[rbid]
@@ -418,7 +412,7 @@ function filter_body2q(rbs)
 end
 
 function filter_body2q(body2q,rbs)
-    original_nq = body2q[end][end]
+    original_nq = maximum(maximum.(body2q))
     remaining_index = find_remaining_index(body2q,rbs)
     qpointer = collect(1:original_nq)[remaining_index]
     filtered_body2q = Vector{Vector{Int}}()

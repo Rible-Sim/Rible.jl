@@ -2,6 +2,7 @@ module NaturalCoordinates
 using LinearAlgebra
 using StaticArrays
 using Parameters
+using ForwardDiff
 
 abstract type BasicPoints end
 abstract type BasicPoints2D <: BasicPoints end
@@ -617,6 +618,25 @@ function CoordinateFunctions(bps)
     Φ = make_Φ(bps)
     Φq = make_Φq(bps)
     CoordinateFunctions(bps,invX̄,c,C,Φ,Φq)
+end
+
+
+function ∂Φqᵀ∂q_forwarddiff(cf::CoordinateFunctions{bpsType,XT,cT,CT,ΦT,ΦqT}) where {bpsType<:BasicPoints2D,XT,cT,CT,ΦT,ΦqT}
+    function ∂Aᵀλ∂q(λ)
+        function ATλ(q)
+            transpose(cf.Φq(q))*λ
+        end
+        ForwardDiff.jacobian(ATλ,ones(4))
+    end
+end
+
+function ∂Φqᵀ∂q_forwarddiff(cf::CoordinateFunctions{bpsType,XT,cT,CT,ΦT,ΦqT}) where {bpsType<:BasicPoints3D,XT,cT,CT,ΦT,ΦqT}
+    function ∂Aᵀλ∂q(λ)
+        function ATλ(q)
+            transpose(cf.Φq(q))*λ
+        end
+        ForwardDiff.jacobian(ATλ,ones(12))
+    end
 end
 
 function make_M(cf::CoordinateFunctions{BasicPoints1P1V{T},XT,cT,CT,ΦT,ΦqT},

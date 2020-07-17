@@ -12,11 +12,11 @@ using TensegrityRobot
 const TR = TensegrityRobot
 
 function make_tail(n)
-    nbody = 2 + 1 + 3n
+    nbodies = 2 + 1 + 3n
     nver = n+1
     nhor = 2(n+1)
     nb = nver + nhor
-    @assert nb == nbody
+    @assert nb == nbodies
     ver_lengths = zeros(nver)
     hor_lengths = zeros(nhor)
     ver_lengths .= 0.04

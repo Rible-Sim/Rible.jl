@@ -52,7 +52,7 @@ function compute_offset(n,α,Δr,a1,a2)
     rs,Rs
 end
 function links(n,a1=0.0,a2=0.0,α=0.0)
-    nbody = n
+    nbodies = n
     nbp = 4*n
 
     a = 0.08 #m

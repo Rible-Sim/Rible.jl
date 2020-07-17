@@ -1,8 +1,8 @@
 function build_Ti(tgstruct::TensegrityStructure,i::Int)
     nbodycoords = get_nbodycoords(tgstruct)
     body2q = tgstruct.connectivity.body2q
-    nq = body2q[end][end]
-    build_Ti(nbodycoords,nq,body2q[i])
+    ncoords = tgstruct.ncoords
+    build_Ti(nbodycoords,ncoords,body2q[i])
 end
 
 function build_Ti(nbodycoords,nq,q_index)
@@ -16,12 +16,15 @@ end
 function build_T(tgstruct)
     nbodycoords = get_nbodycoords(tgstruct)
     body2q = tgstruct.connectivity.body2q
-    nmovablebody = tgstruct.nmovablebody
-    nq = body2q[end][end]
-    T = hcat([
-        transpose(build_Ti(nbodycoords,nq,q_index))
-        for q_index in body2q[tgstruct.mvbodyindex]
-    ]...)
+    nmvbodies = tgstruct.nmvbodies
+    ncoords = tgstruct.ncoords
+    T = spzeros(Int,ncoords,nbodycoords*tgstruct.nmvbodies)
+    for (mvrbid,rbid) in enumerate(tgstruct.mvbodyindex)
+        q_index = body2q[rbid]
+        Ti = build_Ti(nbodycoords,ncoords,q_index)
+        T[:,(mvrbid-1)*nbodycoords+1:mvrbid*nbodycoords] = transpose(Ti)
+    end
+    T
 end
 # T = build_T(manipulator)
 # Array(T)
@@ -37,8 +40,8 @@ end
 function build_C(tgstruct)
     nbodycoords = get_nbodycoords(tgstruct)
     rbs = tgstruct.rigidbodies
-    @unpack nmovablebody,mvbodyindex,ndim = tgstruct
-    block_size1 = repeat([nbodycoords],nmovablebody)
+    @unpack nmvbodies,mvbodyindex,ndim = tgstruct
+    block_size1 = repeat([nbodycoords],nmvbodies)
     block_size2 = [rb.prop.naps*ndim for rb in tgstruct.rigidbodies[mvbodyindex]]
     block_size1,block_size2
     T = get_numbertype(tgstruct)
@@ -58,10 +61,10 @@ function rbid2mvrbid(mvbodyindex)
 end
 
 function build_D(tgstruct)
-    @unpack nstring,nmvpoints,ndim,mvbodyindex = tgstruct
+    @unpack nstrings,nmvpoints,ndim,mvbodyindex = tgstruct
     @unpack body2q,string2ap = tgstruct.connectivity
-    D = spzeros(Int,nmvpoints*ndim,nstring*ndim)
-    D_raw = spzeros(Int,nmvpoints,nstring)
+    D = spzeros(Int,nmvpoints*ndim,nstrings*ndim)
+    D_raw = spzeros(Int,nmvpoints,nstrings)
     iss = [0]
     for rbid in tgstruct.mvbodyindex
         rb = tgstruct.rigidbodies[rbid]
@@ -86,8 +89,12 @@ function build_Q̃(tgstruct)
 end
 
 function fvector(tgstruct)
-    @unpack strings = tgstruct
-    ret = vcat([str.state.tension*str.state.direction for str in strings]...)
+    @unpack ndim, nstrings, strings = tgstruct
+    ret = zeros(get_numbertype(tgstruct),ndim*nstrings)
+    for (i,stri) in enumerate(strings)
+        ret[(i-1)*ndim+1:i*ndim] = stri.state.tension*stri.state.direction
+    end
+    ret
 end
 
 function iksolve(prob;ftol=1e-14)
@@ -115,11 +122,11 @@ end
 
 
 function build_L̂(tgstruct)
-    @unpack nstring, ndim, strings = tgstruct
+    @unpack nstrings, ndim, strings = tgstruct
     reset_forces!(tgstruct)
     update_strings_apply_forces!(tgstruct)
     T = get_numbertype(tgstruct)
-    L̂ = spzeros(T, nstring*ndim, nstring)
+    L̂ = spzeros(T, nstrings*ndim, nstrings)
     for (i,ss) in enumerate(strings)
         is = (i-1)*ndim
         L̂[is+1:is+ndim,i] = ss.state.direction
@@ -189,8 +196,8 @@ function build_Ji(tgstruct,i)
     C1 = rbs[ap[1].rbid].state.cache.Cp[ap[1].apid]
     C2 = rbs[ap[2].rbid].state.cache.Cp[ap[2].apid]
     T1 = build_Ti(tgstruct,ap[1].rbid)
-    T2 = bulid_Ti(tgstruct,ap[2].rbid)
-    Ji = C1*T1-C2*T2
+    T2 = build_Ti(tgstruct,ap[2].rbid)
+    Ji = C2*T2-C1*T1
 end
 
 function compensate_gravity_funcs(tgstruct)

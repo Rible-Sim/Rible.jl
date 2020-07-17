@@ -46,9 +46,6 @@ function reset!(hub::ControlHub)
     reset!.(trajs)
 end
 
-struct Actuator{N,NS,T}
-    strings::SArray{Tuple{NS},SString{N,T},1,NS}
-end
 
 function reset!(actuator::Actuator{N,2,T}) where {N,T}
     @unpack strings = actuator

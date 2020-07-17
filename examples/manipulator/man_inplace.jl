@@ -45,8 +45,7 @@ function inverse(tgstruct,refst2d)
     ikprob = TS.IKProblem(ikfuncs(tgstruct),q0,u0,λ0)
     TR.iksolve(ikprob)
 end
-u,_ = inverse(manipulator,refman)
-
+u,refλ0 = inverse(manipulator,deepcopy(manipulator))
 TR.distribute_q_to_rbs!(manipulator,q0,q̇0)
 TR.actuate!(manipulator,zero(u)) # reverse to initial
 # ----------------------Inverse Kinematics\\-----------------------------
@@ -56,7 +55,7 @@ dt = 0.01 # Same dt used for PID AND Dynamics solver
 # use angles to define errors
 function get_angles(tgstruct)
     rbs = tgstruct.rigidbodies
-    angles = zeros(tgstruct.nbody-1)
+    angles = zeros(tgstruct.nbodies-1)
     for (rbid,rb) in enumerate(rbs)
         if rbid > 1
             state0 = rbs[rbid-1].state
@@ -123,27 +122,16 @@ end
 M,Φ,A,F!,Jacs = dynfuncs(manipulator,q0)
 Φ(q0)
 Φq = A(q0)
-nconstraint = TR.get_nconstraint(manipulator)
-coordinates_index = TR.GECP(Φq)
-dependent_index = coordinates_index[1:nconstraint]
-independent_index = coordinates_index[nconstraint+1:end]
-Φu = Φq[:,dependent_index]
-Φv = Φq[:,independent_index]
-D = -inv(Φu)*Φv
-B = spzeros(Int,length(q0)-nconstraint,length(q0))
-for (i,j) in enumerate(independent_index)
-    B[i,j] = 1
-end
-SR = inv(Array(vcat(Φq,B)))
-S = SR[:,1:nconstraint]
-R = SR[:,nconstraint+1:end]
 
-for i,j =
-
+function perturbation!(q0,q̇0)
+    q̇0[end] = 0.0001
 end
-prob = TS.DyProblem(dynfuncs(manipulator,q0),q0,q̇0,λ0,(0.0,1.0))
+perturbation!(q0,q̇0)
+prob = TS.DyProblem(dynfuncs(manipulator,q0),q0,q̇0,λ0,(0.0,50.0))
 # TR.actuate!(manipulator,u)
 # sol = TS.solve(prob,dt=dt,ftol=1e-13,verbose=true)
+q = TR.undamped_modal_solve!(manipulator,q0,q̇0,λ0,50.0,dt)
+plot(transpose(q))
 
 function make_affect!(robot2d,control!)
     function inner_affect!(intor)
@@ -196,38 +184,17 @@ function controlplot(trajs)
     fig.savefig("manpid.png",dpi=300,bbox_inches="tight")
     plt.close(fig)
 end
-# @code_warntype man_wend(n,manipulator)
-# A,Φ,∂T∂q̇!,F!,M!,Jacs = man_wend(n,manipulator)
-# @code_warntype Φ(q0)
-# @code_warntype A(q0)
-# Fholder = similar(q0)
-# @code_warntype F!(Fholder,q0,q̇0,0.0)
-# F!(Fholder,q0,q̇0,0.0)
 
-sol = TS.solve(prob,dt=dt,ftol=1e-13,verbose=true)
-sol = TS.solve(prob,dt=dt,ftol=1e-13)
+sol = TS.solve(prob,TS.Zhong06(),dt=dt,ftol=1e-12,verbose=true)
+δq = [q-q0 for q in sol.qs]
+PyPlot.plot()
+using Plots
+plot(transpose(hcat(δq...)))
+pyplot()
 
-
-
-
-
-
-TR.distribute_q_to_rbs!(manipulator,sol.qs[end],sol.q̇s[end])
-endangles = get_angles(manipulator)
-
-sol = TS.solve(prob,dt=dt,ftol=1e-13,verbose=true,callback=cb)
-
-@time TS.solve(prob,dt=dt,ftol=1e-13)
-s = 1
-tab = SPARKTableau(s)
-tspan = (0.0,20.0)
-cache = SPARKCache(size(A(q0))[2],size(A(q0))[1],dt,tspan,s,man_wend(n,manipulator))
-state = SPARKsolve!(q0,q̇0,λ0,cache,tab,ftol=1e-14)
-
-@btime TS.solve(prob,dt=dt)
-@time TS.solve(prob,dt=dt)
-TS.solve(prob,dt=dt)
-@code_warntype TS.solve(prob,dt=dt)
+kes = [TR.kinetic_energy_coords(manipulator,q,q̇) for (q,q̇) in zip(sol.qs,sol.q̇s)]
+pes = [TR.potential_energy(manipulator,q,q̇) for (q,q̇) in zip(sol.qs,sol.q̇s)]
+es = kes .+ pes
 
 function showactuator(tgstruct)
     for (acid,actuator) in enumerate(tgstruct.actuators)
