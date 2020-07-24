@@ -200,6 +200,28 @@ function build_Ji(tgstruct,i)
     Ji = C2*T2-C1*T1
 end
 
+function build_U(tgstruct,a,u)
+    @unpack ncoords,nstrings,ndim,strings = tgstruct
+    ret = zeros(eltype(a),nstrings*ndim,ncoords)
+    for i = 1:nstrings
+        k = strings[i].k
+        Ji = Array(build_Ji(tgstruct,i))
+        ret[(i-1)*ndim+1:i*ndim,:] = k*Ji*(1-a[i]*u[i])
+    end
+    ret
+end
+
+function build_S(tgstruct,a,q)
+    @unpack nstrings = tgstruct
+    ret = zeros(eltype(a),nstrings)
+    for i = 1:nstrings
+        Ji = build_Ji(tgstruct,i)
+        Wi = Array(transpose(Ji)*Ji)
+        ret[i] = transpose(q)*Wi*q*a[i]^2 - 1
+    end
+    ret
+end
+
 function compensate_gravity_funcs(tgstruct)
 
     A = build_A(tgstruct)
