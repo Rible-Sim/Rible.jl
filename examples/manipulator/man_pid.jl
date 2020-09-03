@@ -4,6 +4,7 @@ using Parameters
 using StaticArrays
 using BenchmarkTools
 import PyPlot; const plt = PyPlot
+plt.pygui(true)
 using LaTeXStrings
 # using NLsolve
 using Revise
@@ -12,42 +13,19 @@ using TensegritySolvers; const TS = TensegritySolvers
 using TensegrityRobot
 const TR = TensegrityRobot
 
+cd("examples/manipulator")
 include("man_define.jl")
+include("man_plotting.jl")
 
 # ------------------Create Tensegrity Struture --------------------------
 ndof = 6
-refman = man_ndof(ndof,-π/12) # reference
-manipulator = man_ndof(ndof,0.0)
+refman = man_ndof(ndof,θ=-π/12) # reference
+manipulator = man_ndof(ndof,θ=0.0)
 # ------------------Create Tensegrity Struture\\-------------------------
-
+Y = build_Y(manipulator)
 q0,q̇0,λ0 = TR.get_initial(manipulator) #backup
 # ----------------------Inverse Kinematics ------------------------------
-function inverse(tgstruct,refst2d)
-    function ikfuncs(tgstruct)
-
-        A = TR.build_A(tgstruct)
-
-        Q̃=TR.build_Q̃(tgstruct)
-
-        function F!(F,u)
-            TR.reset_forces!(tgstruct)
-            TR.actuate!(tgstruct,u)
-            TR.update_strings_apply_forces!(tgstruct)
-            F .= Q̃*TR.fvector(tgstruct)
-        end
-
-        A,F!
-    end
-    q0,q̇0,λ0 = TR.get_initial(refst2d)
-    TR.distribute_q_to_rbs!(tgstruct,q0,q̇0)
-    nu = length(tgstruct.actuators)
-    u0 = zeros(nu)
-    ikprob = TS.IKProblem(ikfuncs(tgstruct),q0,u0,λ0)
-    TR.iksolve(ikprob)
-end
-u,refλ0 = inverse(manipulator,deepcopy(manipulator))
-TR.distribute_q_to_rbs!(manipulator,q0,q̇0)
-TR.actuate!(manipulator,zero(u)) # reverse to initial
+refλ0,_,a = TR.inverse(manipulator,refman,Y)
 # ----------------------Inverse Kinematics\\-----------------------------
 
 dt = 0.01 # Same dt used for PID AND Dynamics solver
@@ -123,15 +101,7 @@ M,Φ,A,F!,Jacs = dynfuncs(manipulator,q0)
 Φ(q0)
 Φq = A(q0)
 
-function perturbation!(q0,q̇0)
-    q̇0[end] = 0.0001
-end
-perturbation!(q0,q̇0)
-prob = TS.DyProblem(dynfuncs(manipulator,q0),q0,q̇0,λ0,(0.0,50.0))
-# TR.actuate!(manipulator,u)
-# sol = TS.solve(prob,dt=dt,ftol=1e-13,verbose=true)
-q = TR.undamped_modal_solve!(manipulator,q0,q̇0,λ0,50.0,dt)
-plot(transpose(q))
+prob = TS.DyProblem(dynfuncs(manipulator,q0),q0,q̇0,λ0,(0.0,50.1))
 
 function make_affect!(robot2d,control!)
     function inner_affect!(intor)
@@ -149,25 +119,27 @@ TR.PIDController.tune!(rob.hub.ctrls[5],1.0,0.005,8.5)
 TR.PIDController.tune!(rob.hub.ctrls[6],0.9,0.005,7.0)
 TR.reset!.(rob.tgstruct.actuators)
 TR.reset!.(rob.hub.trajs)
-sol = TS.solve(prob,TS.Wendlandt(),dt=dt,ftol=1e-13,callback=cb,verbose=true)
+# sol = TS.solve(prob,TS.Wendlandt(),dt=dt,ftol=1e-13,callback=cb,verbose=true)
 sol = TS.solve(prob,TS.Zhong06(),dt=dt,ftol=1e-12,callback=cb,verbose=true)
 pltfig.clear(); pltfig = controlplot(rob.hub.trajs)
 pltfig = controlplot(rob.hub.trajs)
-sol = TS.solve(prob,dt=dt,ftol=1e-13,callback=cb,verbose=true)
+pltfig.savefig("manpid_error.png",dpi=300,bbox_inches="tight")
+plt.close(pltfig)
 # ----------------------------Dynamics-----------------------------------
-
 function controlplot(trajs)
     ntraj = length(trajs)
-    fig,axs_raw = plt.subplots(ntraj,1,num="PID",figsize=(5,15))
+    fig,axs_raw = plt.subplots(2,3,num="PID",figsize=(15,6))
 
     if typeof(axs_raw)<:Array
-        axs = axs_raw
+        axs = permutedims(axs_raw,[2,1])
     else
         axs = [axs_raw]
     end
     for (id,ax) in enumerate(axs)
         @unpack ts,es,us = trajs[id]
         bx = ax.twinx()
+        ax.grid(which="major", axis="both")
+        # bx.grid("on")
         ep = ax.plot(ts,es,label=latexstring("\\epsilon_$id"), lw = 3)
         up = bx.plot(ts,us,label=latexstring("u_$id"), lw = 3, color=:orange)
         ps = [ep[1],up[1]]
@@ -179,11 +151,28 @@ function controlplot(trajs)
         ax.set_ylabel(L"\epsilon(\%)")
         ax.set_xlabel(L"t")
         ax.legend(ps, [p_.get_label() for p_ in ps])
-        ax.grid("on")
+        if id <= 3
+            ax.set_xticklabels([])
+            ax.xaxis.label.set_visible(false)
+        end
+        if !(id ∈[1,4])
+            ax.set_yticklabels([])
+            ax.yaxis.label.set_visible(false)
+        end
+        if !(id ∈ [3,6])
+            bx.set_yticklabels([])
+            bx.yaxis.label.set_visible(false)
+        end
+
+
     end
-    fig.savefig("manpid.png",dpi=300,bbox_inches="tight")
-    plt.close(fig)
+    fig
 end
+
+tstops = [0,10,20,30,40,50]
+man_fig = pyplotstructure(manipulator,sol,tstops)
+man_fig.savefig("manpid.png",dpi=300,bbox_inches="tight")
+plt.close(man_fig)
 
 sol = TS.solve(prob,TS.Zhong06(),dt=dt,ftol=1e-12,verbose=true)
 δq = [q-q0 for q in sol.qs]

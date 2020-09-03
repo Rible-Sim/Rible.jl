@@ -12,7 +12,7 @@ using TensegrityRobot
 const TR = TensegrityRobot
 include("tail_define.jl")
 
-n = 1
+n = 4
 tail = make_tail(n)
 # @code_warntype make_tail(n)
 q0,q̇0,λ0 = TR.get_initial(tail)

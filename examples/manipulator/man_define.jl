@@ -1,5 +1,5 @@
 
-function man_ndof(ndof,θ=0.0)
+function man_ndof(ndof;θ=0.0,k=1.0e2,c=0.0)
     nbodies = ndof + 1
     nbp = 2nbodies - ndof
     n_lower = count(isodd,1:nbodies)
@@ -76,11 +76,11 @@ function man_ndof(ndof,θ=0.0)
     actuallengths = zeros(nstrings)
     ks = zeros(nstrings)
     cs = zeros(nstrings)
-    cs .= 0.0
+    cs .= c
     for i = 1:nstrings
         j = i % 4
         original_restlens[i] = ifelse(j∈[1,0],upstringlen,lostringlen)
-        ks[i] = ifelse(j∈[1,0],1.0e2,1.0e2)
+        ks[i] = ifelse(j∈[1,0],k,k)
     end
     ss = [TR.SString2D(original_restlens[i],ks[i],cs[i]) for i = 1:nstrings]
     acs = [
@@ -108,4 +108,20 @@ function man_ndof(ndof,θ=0.0)
     tg = TR.TensegrityStructure(rbs,ss,acs,cnt)
     TR.update_strings_apply_forces!(tg)
     tg
+end
+
+
+
+function build_Y(tgstruct)
+    @unpack nstrings,strings,actuators = tgstruct
+    nact = length(actuators)
+    ret = spzeros(Int,nstrings,nact)
+    for (i,act) in enumerate(actuators)
+        s1,s2 = act.strings
+        is1 = findfirst((x)->x==s1,strings)
+        is2 = findfirst((x)->x==s2,strings)
+        ret[is1,i] = 1
+        ret[is2,i] = -1
+    end
+    ret
 end
