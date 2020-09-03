@@ -69,11 +69,11 @@ function test_fvector(tgstruct,q0)
     FiniteDiff.finite_difference_jacobian(L,q0)
 end
 
-function linearize(tgstruct,q,q̇,λ)
+function linearize(tgstruct,q,λ)
     M = build_massmatrix(tgstruct)
     A = build_A(tgstruct)
     Q̃ = build_Q̃(tgstruct)
-    ∂L∂q,∂L∂q̇ = build_tangent(tgstruct,q,q̇)
+    ∂L∂q,∂L∂q̇ = build_tangent(tgstruct,q,zero(q))
     @unpack ncoords,nconstraint = tgstruct
     nz = ncoords + nconstraint
     M̂ = zeros(eltype(q),nz,nz)
@@ -83,7 +83,7 @@ function linearize(tgstruct,q,q̇,λ)
     Ĉ[1:ncoords,1:ncoords] .= -Q̃*∂L∂q̇
 
     # fjac = test_fvector(tgstruct,q)
-    K̂[1:ncoords,1:ncoords] .= -Q̃*∂L∂q/2 .+ ∂Aᵀλ∂q(tgstruct,λ)
+    K̂[1:ncoords,1:ncoords] .= -Q̃*∂L∂q .+ ∂Aᵀλ∂q(tgstruct,λ)
     Aq = A(q)
     c = 1.0 #maximum(abs.(K̂[1:ncoords,1:ncoords]))
     K̂[1:ncoords,ncoords+1:nz] .= c.*transpose(Aq)
@@ -112,8 +112,14 @@ function enlarge(M̄,C̄,K̄)
     M̃,K̃
 end
 
-function find_finite(ω2,Z)
-    finite_index = findall(isfinite,ω2)
+function find_finite(ω2,Z;positive=false)
+    ispositive(x) = x > 0
+    nottoolarge(x) = x < 1.e16
+    if positive
+        finite_index = findall((x)->nottoolarge(x)&&ispositive(x),ω2)
+    else
+        finite_index = findall(isfinite,ω2)
+    end
     finite_ω2 = ω2[finite_index]
     finite_Z = Z[:,finite_index]
     finite_ω2,finite_Z
@@ -127,16 +133,25 @@ function normalize_wrt_mass!(Z,M)
     end
     Z
 end
+function undamped_eigen(tgstruct,q0,λ0)
+    M̂,Ĉ,K̂ = linearize(tgstruct,q0,λ0)
+    aug_ω2,aug_Z = eigen(K̂,M̂)
+    ω2,Z = find_finite(aug_ω2,aug_Z,positive=true)
+    @unpack ndof = tgstruct
+    @assert length(ω2) == ndof "Degree of freedom $ndof, while number of freq. $(length(ω2))"
+    ω = sqrt.(ω2)
+    ω,Z
+end
 
 function undamped_modal_solve!(tgstruct,q0,q̇0,λ0,tf,dt)
-    M̂,Ĉ,K̂ = linearize(tgstruct,q0,zero(q0),λ0)
+    M̂,Ĉ,K̂ = linearize(tgstruct,q0,λ0)
     # show(stdout,"text/plain",K̂)
     # showtable(K̂)
     # M̄,C̄,K̄ = TR.frequencyshift(M̂,Ĉ,K̂,0.1)
     # M̃,K̃ = TR.enlarge(M̄,C̄,K̄)
     aug_ω2,aug_Z = eigen(K̂,M̂)
     ω2,Z = find_finite(aug_ω2,aug_Z)
-    @show aug_ω2,ω2
+    # @show aug_ω2,ω2
     normalize_wrt_mass!(Z,M̂)
     # @show transpose(Z)*M̂*Z
     # @show transpose(Z)*K̂*Z

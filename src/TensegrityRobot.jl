@@ -10,6 +10,8 @@ using BlockArrays
 using GeometryTypes
 using ForwardDiff
 using FiniteDiff
+using HomotopyContinuation
+using DynamicPolynomials
 
 include("naturalcoordinates.jl")
 using .NaturalCoordinates

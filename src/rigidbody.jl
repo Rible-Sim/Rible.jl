@@ -155,11 +155,13 @@ function RigidBodyState(prop,ri::AbstractVector{T},
     RigidBodyState(r,R,ṙ,ω,p,F,τ,Faps,τaps,coords,cache)
 end
 
-function RigidBodyState(prop,ri::AbstractVector{T},
-                             rj::AbstractVector{T},
+RigidBodyState(prop,ri,rj,constrained_index) = RigidBodyState(prop,ri,rj,zero(ri),zero(rj),constrained_index)
+
+function RigidBodyState(prop,ri::AbstractVector{T},rj::AbstractVector{T},
+                             vi::AbstractVector{T},vj::AbstractVector{T},
                              constrained_index=Vector{Int}()) where {T}
     q = MVector{4}(vcat(ri,rj))
-    q̇ = zero(q)
+    q̇ = MVector{4}(vcat(vi,vj))
     q̈ = zero(q)
     Q = zero(q)
     coords = RigidBodyCoordinates(q,q̇,q̈,Q)

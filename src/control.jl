@@ -61,6 +61,23 @@ function actuate!(tgstruct::TensegrityStructure,us;inc=false)
     end
 end
 
+function actuate!(actuator::Actuator{N,4,T},u;inc=false) where {N,T}
+    @unpack strings = actuator
+    str1,str2 = strings[1:2]
+    str3,str4 = strings[3:4]
+    if inc
+        str1.state.restlen += u
+        str2.state.restlen += u
+        str3.state.restlen -= u
+        str4.state.restlen -= u
+    else
+        str1.state.restlen = str1.original_restlen + u
+        str2.state.restlen = str2.original_restlen + u
+        str3.state.restlen = str3.original_restlen - u
+        str4.state.restlen = str4.original_restlen - u
+    end
+end
+
 function actuate!(actuator::Actuator{N,2,T},u;inc=false) where {N,T}
     @unpack strings = actuator
     str1 = strings[1]

@@ -240,3 +240,89 @@ function compensate_gravity_funcs(tgstruct)
 
     A,F!
 end
+
+
+
+function inverse(tgstruct_input,refstruct,Y;gravity=false)
+    tgstruct = deepcopy(tgstruct_input)
+    refq0,_,_ = get_initial(refstruct)
+
+    reset_forces!(tgstruct)
+    distribute_q_to_rbs!(tgstruct,refq0)
+    update_strings_apply_forces!(tgstruct)
+
+    L̂ = build_L̂(tgstruct)
+    K̂ = build_K̂(tgstruct)
+    ℓ = build_ℓ(tgstruct)
+    Q̃ = build_Q̃(tgstruct)
+    A = build_A(tgstruct)
+    Aq = A(refq0)
+    u0 = [s.original_restlen for s in tgstruct.strings]
+    rhs = Q̃*K̂*(ℓ-u0)
+    if gravity == true
+        G = build_G(tgstruct)
+        rhs += G
+    end
+    lhs = hcat(transpose(Aq),Q̃*K̂*Y)
+    # @show rank(lhs),size(lhs)
+    x = lhs\rhs
+    λ = x[1:tgstruct.nconstraint]
+    a = x[tgstruct.nconstraint+1:end]
+    Δu = Y*a
+
+    original_restlens = [s.original_restlen for s in tgstruct.strings]
+    restlens = original_restlens + Δu
+    if any((x)->x<0,restlens)
+        @error "Negative rest lengths"
+    end
+    lengths = [s.state.length for s in tgstruct.strings]
+    if any((x)->x<0,lengths-restlens)
+        @error "Zero tension"
+    end
+    # s = 1 ./ lengths
+    λ,Δu,a
+end
+
+function forward(tgstruct,starts,targets)
+    @var q[1:tgstruct.ncoords]
+    @var a[1:tgstruct.nstrings]
+    @var λ[1:tgstruct.nconstraint]
+    @var u[1:tgstruct.nstrings]
+    @var g
+    polyq = 1.0q
+    polya = 1.0a
+    polyλ = 1.0λ
+    polyu = 1.0u
+
+    q0,a0,λ0,u0,g0 = starts
+    u1,g1 = targets
+
+    Φ = build_Φ(tgstruct,q0)
+    A = build_A(tgstruct)
+    Q̃ = build_Q̃(tgstruct)
+    U = build_U(tgstruct,polya,polyu)
+    S = build_S(tgstruct,polya,polyq)
+
+    G = build_G(tgstruct)
+    F = [-transpose(A(polyq))*polyλ  + g*G + Q̃*U*polyq;
+        S;
+        Φ(polyq)]
+
+    # reset_forces!(tgstruct)
+    # update_strings_apply_forces!(tgstruct)
+    # l = [s.state.length for s = tgstruct.strings]
+    # u1 = u0
+    # g0 = 1.0
+    # g1 = 0.0
+
+    startparas = vcat(u0,g0)
+    endparas = vcat(u1,g1)
+    startsols = [[q0; a0; λ0]]
+    vg = [q,a,λ]
+    # FFF = [subs(f, u=>l,g=>0.0) for f in F]
+    Fsys = System(F; variable_groups=vg, parameters = [u;g])
+
+    ParameterHomotopy(Fsys,startparas,endparas),startsols
+    # [subs(f, q=>q0,λ=>λ0,a=>a0,u=>u0,g=>1.0) for f in F]
+    result = solve(Fsys, startsols; start_parameters=startparas, target_parameters=endparas)
+end

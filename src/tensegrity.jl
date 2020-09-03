@@ -110,7 +110,7 @@ function update_strings_apply_forces!(tgstruct)
         f2 .+= -f
     end
 end
-
+distribute_q_to_rbs!(tgstruct,globalq) = distribute_q_to_rbs!(tgstruct,globalq,zero(globalq))
 function distribute_q_to_rbs!(tgstruct,globalq,globalq̇)
     rbs = tgstruct.rigidbodies
     cnt = tgstruct.connectivity
@@ -161,9 +161,9 @@ function assemble_forces(tgstruct)
     F
 end
 
-function apply_gravity!(tgstruct)
+function apply_gravity!(tgstruct;factor=1.0)
     rbs = tgstruct.rigidbodies
-    gravity_force = get_gravity(tgstruct)
+    gravity_force = factor*get_gravity(tgstruct)
     for (rbid,rb) in enumerate(rbs)
         @unpack state = rb
         rb.state.F .= gravity_force
@@ -177,11 +177,8 @@ function kinetic_energy_coords(rb::RigidBody)
 end
 
 function gravity_potential_energy(rb)
-    @unpack CG = rb.state.cache
     q = rb.state.coords.q
-    r = CG*q
-    gravity = get_gravity(rb)
-    -transpose(r)*gravity
+    gravity_potential_energy(rb,q)
 end
 
 function gravity_potential_energy(rb::RigidBody,q)
@@ -207,22 +204,27 @@ function kinetic_energy_coords(tgstruct::TensegrityStructure,q,q̇)
 end
 
 function gravity_potential_energy(tgstruct::TensegrityStructure,q)
-    distribute_q_to_rbs!(tgstruct,q,zero(q))
+    distribute_q_to_rbs!(tgstruct,q)
     sum(gravity_potential_energy.(tgstruct.rigidbodies))
 end
 
-function potential_energy(tgstruct::TensegrityStructure,q,q̇)
-    distribute_q_to_rbs!(tgstruct,q,q̇)
+function elastic_potential_energy(tgstruct::TensegrityStructure,q)
+    distribute_q_to_rbs!(tgstruct,q)
     update_strings_apply_forces!(tgstruct)
     pe = sum(potential_energy.(tgstruct.strings))
 end
 
-function energy(tgstruct,q,q̇)
+function energy(tgstruct,q,q̇;gravity=false)
     distribute_q_to_rbs!(tgstruct,q,q̇)
     ke = sum(kinetic_energy_coords.(tgstruct.rigidbodies))
     update_strings_apply_forces!(tgstruct)
-    pe = sum(potential_energy.(tgstruct.strings))
-    ke + pe
+    epe = sum(potential_energy.(tgstruct.strings))
+    if gravity
+        gpe = gravity_potential_energy(tgstruct,q)
+    else
+        gpe = 0
+    end
+    ke + epe + gpe
 end
 
 function build_body2q(rbs::Vector{rbType}) where rbType<:AbstractRigidBody{N,T,CType} where {N,T,CType}
@@ -296,7 +298,7 @@ function build_Φ(tgstruct,q0)
             rb = rbs[rbid]
             nc = rb.state.cache.nc
             if nc > 0
-                ret[is+1:nc] = rb.state.cache.cfuncs.Φ(q[pindex])
+                ret[is+1:is+nc] = rb.state.cache.cfuncs.Φ(q[pindex])
                 is += nc
             end
             ret[is+1:is+nbodyc] .=rb.state.cache.funcs.Φ(q[pindex])
@@ -322,7 +324,7 @@ function build_A(tgstruct)
             rb = rbs[rbid]
             nc = rb.state.cache.nc
             if nc > 0
-                ret[is+1:nc,pindex] = rb.state.cache.cfuncs.Φq(q[pindex])
+                ret[is+1:is+nc,pindex] = rb.state.cache.cfuncs.Φq(q[pindex])
                 is += nc
             end
             ret[is+1:is+nbodyc,pindex] .= rb.state.cache.funcs.Φq(q[pindex])
@@ -380,8 +382,10 @@ get_nbodycoords(rb::AbstractRigidBody{3,T,CType}) where {T,CType} = 12
 get_nbodycoords(rb::AbstractRigidBody{2,T,CType}) where {T,CType} = 4
 
 get_gravity(tg::TensegrityStructure) = get_gravity(tg.rigidbodies)
-get_gravity(rbs::Vector{rbT}) where rbT<:AbstractRigidBody{3,T,CType} where {T,CType} = [zero(T),zero(T),-9.8*one(T)]
-get_gravity(rbs::Vector{rbT}) where rbT<:AbstractRigidBody{2,T,CType} where {T,CType} = [zero(T),-9.8*one(T)]
+get_gravity(rb::Vector{rbT}) where rbT<:AbstractRigidBody{3,T,CType} where {T,CType} = [zero(T),zero(T),-9.81*one(T)]
+get_gravity(rb::Vector{rbT}) where rbT<:AbstractRigidBody{2,T,CType} where {T,CType} = [zero(T),-9.81*one(T)]
+get_gravity(rb::rbT) where rbT<:AbstractRigidBody{3,T,CType} where {T,CType} = [zero(T),zero(T),-9.81*one(T)]
+get_gravity(rb::rbT) where rbT<:AbstractRigidBody{2,T,CType} where {T,CType} = [zero(T),-9.81*one(T)]
 
 function get_strings_len(tg::TensegrityStructure,q)
     distribute_q_to_rbs!(tg,q,zero(q))
