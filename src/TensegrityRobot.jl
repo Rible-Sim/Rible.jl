@@ -12,6 +12,7 @@ using ForwardDiff
 using FiniteDiff
 using HomotopyContinuation
 using DynamicPolynomials
+using EzXML
 
 include("naturalcoordinates.jl")
 using .NaturalCoordinates
@@ -35,4 +36,6 @@ include("plotting.jl")
 include("contact.jl")
 include("linearization.jl")
 include("tangent.jl")
+include("miscellaneous.jl")
+
 end

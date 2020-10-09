@@ -137,10 +137,11 @@ function undamped_eigen(tgstruct,q0,λ0)
     M̂,Ĉ,K̂ = linearize(tgstruct,q0,λ0)
     aug_ω2,aug_Z = eigen(K̂,M̂)
     ω2,Z = find_finite(aug_ω2,aug_Z,positive=true)
-    @unpack ndof = tgstruct
+    @unpack ncoords, ndof = tgstruct
     @assert length(ω2) == ndof "Degree of freedom $ndof, while number of freq. $(length(ω2))"
     ω = sqrt.(ω2)
-    ω,Z
+    Zq = Z[1:ncoords,:]
+    ω, Zq, Z
 end
 
 function undamped_modal_solve!(tgstruct,q0,q̇0,λ0,tf,dt)

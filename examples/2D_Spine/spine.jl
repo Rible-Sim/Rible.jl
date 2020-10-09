@@ -2,13 +2,9 @@ using LinearAlgebra
 using SparseArrays
 using Parameters
 using StaticArrays
-using BenchmarkTools
 import PyPlot; const plt = PyPlot
 using LaTeXStrings
-using Cthulhu
-# using NLsolve
-using Convex
-using MosekTools
+
 using Revise
 # using TS
 # using Robot2D

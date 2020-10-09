@@ -83,11 +83,11 @@ function eigenanalysis(n)
 
     fig = plt.figure(figsize=(9,6))
     axs = [fig.add_subplot(2,3,i,projection="3d") for i = 1:n]
-    α = π/15
+    α = π/12
     θ = α/(n-1).*collect(0:n-1)
     θstrings = [latexstring("\\theta=0")]
     for i = 1:n-1
-        raco = 1//15*i/(n-1)
+        raco = 1//12*i/(n-1)
         raco_n = numerator(raco)
         raco_d = denominator(raco)
         if raco_n == 1

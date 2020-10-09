@@ -23,13 +23,11 @@ cd("examples/manipulator")
 include("man_define.jl")
 include("man_plotting.jl")
 
-function simulate_linearactuating(ndof=6;k=3.e2,c=2.e2)
+
+function simulate_linearactuating(ndof=6;k,c)
     manipulator = man_ndof(ndof,k=k,c=c)
     Y = build_Y(manipulator)
-    # manipulator = man_ndof(ndof,k=3.e2,c=0.0)
     q0,q̇0,λ0 = TR.get_initial(manipulator)
-
-    dt = 0.01 # Same dt used for PID AND Dynamics solver
 
     refman = man_ndof(ndof,θ=-π/12,k=k) # reference
 
@@ -51,15 +49,10 @@ function simulate_linearactuating(ndof=6;k=3.e2,c=2.e2)
             if t < target_t
                 TR.actuate!(tgstruct,t/target_t*target_u)
             end
-
             TR.reset_forces!(tgstruct)
             TR.distribute_q_to_rbs!(tgstruct,q,q̇)
             TR.update_strings_apply_forces!(tgstruct)
-            # F .= Q̃*TR.fvector(tgstruct)
-            # TR.apply_gravity!(tgstruct,factor=0.01)
-            # F .= G
             TR.assemble_forces!(F,tgstruct)
-            # @show isapprox(F,Q̃*TR.fvector(tgstruct))
         end
 
         M,Φ,A,F!,nothing
@@ -68,38 +61,51 @@ function simulate_linearactuating(ndof=6;k=3.e2,c=2.e2)
     end
 
 
-    prob = TS.DyProblem(linearactuate(manipulator,q0,a,30.0),q0,q̇0,λ0,(0.0,100.0))
 
-    sol = TS.solve(prob,TS.Zhong06(),dt=dt,ftol=1e-12,verbose=true)
+    dt = 0.01 # Same dt used for PID AND Dynamics solver
+    prob = TS.DyProblem(linearactuate(manipulator,q0,a,20.0),q0,q̇0,λ0,(0.0,100.0))
+
+    sol = TS.solve(prob,TS.Zhong06(),dt=dt,ftol=1e-9,verbose=true)
     manipulator, sol
 end
 
 # bars_and_strings_segs(man_linear)
-man_linear, sol_linear = simulate_linearactuating()
-plotstructure(man_linear,sol_linear,recordplot;filename="linearactuating.mp4")
+k = 1.e4; c = 1.e5
+man_linear, sol_linear = simulate_linearactuating(;k,c)
+plotstructure(man_linear,sol_linear,sliderplot)
+# plotstructure(man_linear,sol_linear,recordplot;filename="linearactuating.mp4")
 
 tstops = [0,20,40,60,80,100]
-fig = pyplotstructure(man_linear, sol_linear, tstops)
-fig.savefig("linearactuating.png",dpi=300,bbox_inches="tight")
 
 function pyplot2(man_linear, sol_linear, tstops)
 
     steps = [findfirst((x)->x>i,sol_linear.ts) for i = tstops]
 
-    fig,axs_raw = plt.subplots(2,1,figsize=(9,6))
-    axs = axs_raw
+    fig,axs_raw = plt.subplots(2,3,figsize=(9,6))
+    axs = permutedims(axs_raw,[2,1])
     for (i,step) in enumerate(steps)
         TR.distribute_q_to_rbs!(man_linear,sol_linear.qs[step])
         bars_segs,strings_segs = bars_and_strings_segs(man_linear)
         ax = axs[i]
-        ax.axes.xaxis.set_visible(false)
-        ax.axes.yaxis.set_visible(false)
         ax.add_collection(bars_segs)
         ax.add_collection(strings_segs)
-        ax.set_ylim(-0.7,0.2)
-        ax.set_xlim(-0.1,0.8)
+        ax.set_ylim(-150,20)
+        ax.set_xlim(-20,150)
         ax.set_aspect("equal")
+        ax.set_title("t=$(tstops[i])s")
+        ax.grid(true)
+        ax.set_yticks(collect(0:-50:-150))
+        if i <= 3
+            ax.set_xticklabels([])
+            ax.xaxis.label.set_visible(false)
+        end
+        if !(i ∈[1,4])
+            ax.set_yticklabels([])
+            ax.yaxis.label.set_visible(false)
+        end
     end
     fig
 end
-pyplot2(man_linear, sol_linear, [0,100])
+
+fig = pyplot2(man_linear, sol_linear, tstops)
+fig.savefig("linearactuating_c=$c.png",dpi=300,bbox_inches="tight")

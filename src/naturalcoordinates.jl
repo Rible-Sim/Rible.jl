@@ -667,7 +667,8 @@ function make_M(cf::CoordinateFunctions{BasicPoints2P{T},XT,cT,CT,ΦT,ΦqT},
     ū = r̄j-r̄i
     u_square = ū⋅ū
     a = invX̄*(r̄G-r̄i)
-    z = polar/u_square
+    polar_o = polar + m*(r̄G⋅r̄G)
+    z = polar_o/u_square
     M = zeros(T,4,4)
     M[1,1] = m - 2m*a[1] + z
     M[1,2] = 0.0

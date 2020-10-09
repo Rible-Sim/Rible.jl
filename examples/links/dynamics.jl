@@ -11,6 +11,7 @@ plt.pygui(true)
 # using HomotopyContinuation
 using Printf
 using CoordinateTransformations
+using CSV
 using Makie
 AbstractPlotting.__init__()
 using Revise
@@ -25,7 +26,7 @@ include("../analysis.jl")
 
 function simulate_linkn(;c=0.0)
     n = 2
-    h = 6.6
+    h = 6.6e-2
     R = RotX(0.0)
     linkn = links(n,h,R;c)
     q0,q̇0,λ0 = TR.get_initial(linkn)
@@ -55,7 +56,7 @@ function simulate_linkn(;c=0.0)
 
     dt = 0.01
     prob = TS.DyProblem(dynfuncs(linkn,refq0),refq0,refq̇0,refλ0,(0.0,100.0))
-    sol = TS.solve(prob,TS.Zhong06(),dt=dt,ftol=1e-11,verbose=true)
+    sol = TS.solve(prob,TS.Zhong06(),dt=dt,ftol=1e-14,verbose=true)
 
     linkn,sol
 end

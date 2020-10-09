@@ -26,20 +26,18 @@ function links(n,di,rm;c=0.0)
     nbodies = n
     nbp = 4*n
 
-    a = 8.0 #cm
-    h = 10.0 #cm
+    a = 8.0e-2 #m
+    h = 10.0e-2 #m
     θ = 2π/3
     l = √(a^2+h^2)
     b = √3a
 
-    mass = 93.562831 #g
-    #inertia = Matrix(Diagonal([45.174,45.174,25.787]))*1e-8 # N/m^2
-    # inertia = Matrix(Diagonal([45.174,45.174,25.787]))*1e-2
+    mass = 93.562831e-3 #kg
     # inertia = [2175.129	1.164e-05 6.58e-06;
 	# 		   1.164e-05 2175.129 8.24e-06;
     #            6.58e-06	8.24e-06 2460.3283]
-   	inertia = Matrix(Diagonal([2175.129,2175.129,2460.3283]))
-    CoM = [0.0, 0.0, 7.5932384]
+   	inertia = Matrix(Diagonal([2175.129,2175.129,2460.3283]))*1.e-7
+    CoM = [0.0, 0.0, 7.5932384]*1.e-2
 
 
     ap1 = SVector{3}([0.0, 0.0, 0.0])
@@ -78,10 +76,10 @@ function links(n,di,rm;c=0.0)
 
     nstrings = 6*(n-1)
     stringlenH = 0.6h
-    stringlenR = 6 #cm
+    stringlenR = 6e-2 #m
     stringlens = repeat(vcat(fill(stringlenH,3),fill(stringlenR,3)),n-1)
-    kH = 2e4 #g/s²
-    kR = 3e4 #g/s²
+    kH = 3e1 #N/m
+    kR = 3e1 #N/m
     ks = repeat(vcat(fill(kH,3),fill(kR,3)),n-1)
     # c = 0.0
     cs = repeat(fill(c,6),n-1)
@@ -121,9 +119,9 @@ end
 
 
 function inverse2actuation(tgstruct,refstruct=deepcopy(tgstruct))
-    Rx = RotY(π/18)
+    # Rx = RotY(π/18)
     # Rx = RotY(0.0)
-    reflinkn = links(n,h,Rx)
+    # reflinkn = links(n,h,Rx)
     refq0,_,_ = TR.get_initial(refstruct)
     refλ0,Δu,a = TR.inverse(tgstruct,refstruct,build_Y(tgstruct),gravity=false)
 

@@ -22,9 +22,9 @@ function plotstructure!(scene,tg)
     #return bars,cables
     function plot!(scene,bars,cables)
         for (lineid,line) in enumerate(bars)
-            linesegments!(scene,line, color = :black, linewidth = 10)
+            linesegments!(scene,line, color = :black, linewidth = 2)
         end
-        linesegments!(scene,cables, color = :deepskyblue, linewidth = 4)
+        linesegments!(scene,cables, color = :deepskyblue, linewidth = 2)
     end
 
     p = plot!(scene,bars,cables)

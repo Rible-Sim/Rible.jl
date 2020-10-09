@@ -1,5 +1,3 @@
-
-
 function sliderplot(scene,bars,strings,update_scene!,sol;kwargs...)
     step_slider,tstep = textslider(1:length(sol.ts),"step",start=1)
     on(tstep) do this_step
@@ -36,8 +34,8 @@ function plotstructure(tgstruct)
 
     scene = Scene(resolution=(1000,1000))
     plot!(scene,bars,strings)
-    xlims!(-0.2,0.8)
-    ylims!(-0.7,0.3)
+    xlims!(-0.4,1.6)
+    ylims!(-1.4,0.6)
     scene,bars,strings
 end
 
@@ -47,6 +45,7 @@ function plotstructure(tgstruct,state,func;filename="pid.mp4")
 
     function update_scene!(bars,strings,q)
         cnt = tgstruct.connectivity
+        analyse_slackness(tgstruct,q)
         for id in tgstruct.mvbodyindex
             rb = tgstruct.rigidbodies[id]
             pindex = cnt.body2q[id]

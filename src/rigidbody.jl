@@ -130,6 +130,7 @@ function NaturalCoordinatesCache(prop::RigidBodyProperty,
     bps = NaturalCoordinates.BasicPoints2P(L)
     NaturalCoordinatesCache(prop,bps,q,constrained_index)
 end
+
 function RigidBodyState(prop,ri::AbstractVector{T},
                              θ::T=zero(T),
                              constrained_index=Vector{Int}()) where {T}

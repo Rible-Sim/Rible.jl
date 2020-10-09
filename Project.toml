@@ -6,6 +6,7 @@ version = "0.1.0"
 [deps]
 BlockArrays = "8e7c35d0-a365-5155-bbbb-fb81a777f24e"
 DynamicPolynomials = "7c1d4256-1411-5781-91ec-d7bc3513ac07"
+EzXML = "8f5d6c58-4d21-5cfd-889c-e3ad7ee6a615"
 FiniteDiff = "6a86dc24-6348-571c-b903-95158fe2bd41"
 ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
 GeometryTypes = "4d00f742-c7ba-57c2-abde-4428a4b178cb"

@@ -164,10 +164,10 @@ function build_K(tgstruct)
         )
 end
 
-function build_G(tgstruct)
+function build_G(tgstruct;factor=1.0)
     reset_forces!(tgstruct)
     apply_gravity!(tgstruct)
-    G = assemble_forces(tgstruct)
+    G = assemble_forces(tgstruct;factor=factor)
 end
 
 function build_Q̂(tgstruct)
@@ -243,7 +243,7 @@ end
 
 
 
-function inverse(tgstruct_input,refstruct,Y;gravity=false)
+function inverse(tgstruct_input,refstruct,Y;gravity=false,recheck=true)
     tgstruct = deepcopy(tgstruct_input)
     refq0,_,_ = get_initial(refstruct)
 
@@ -280,6 +280,11 @@ function inverse(tgstruct_input,refstruct,Y;gravity=false)
         @error "Zero tension"
     end
     # s = 1 ./ lengths
+    actuate!(tgstruct,a)
+    reset_forces!(tgstruct)
+    update_strings_apply_forces!(tgstruct)
+    appproximated = transpose(build_A(tgstruct)(refq0))*λ ≈ build_Q̃(tgstruct)*fvector(tgstruct)
+    @info "Recheck result: $appproximated"
     λ,Δu,a
 end
 

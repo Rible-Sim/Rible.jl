@@ -20,20 +20,21 @@ mutable struct PID{T,limitType}
     lastTime::T
     currentTime::T
 end
-function PID(Kp,Ki,Kd;setpoint,dt=one(Kp)/100,initialInput=zero(Kp))
+function PID(Kp,Ki,Kd;setpoint,dt,initialInput=zero(Kp))
     @assert typeof(Kp)==typeof(Ki)==typeof(Kd)==typeof(setpoint)
+    T = typeof(Kp)
     output_limits = nothing
     #
-    input = zero(Kp)
-    output = zero(Kp)
-    pTerm = zero(Kp)
-    iTerm = zero(Kp)
-    dTerm = zero(Kp)
-    lastErr = zero(Kp)
+    input = zero(T)
+    output = zero(T)
+    pTerm = zero(T)
+    iTerm = zero(T)
+    dTerm = zero(T)
+    lastErr = zero(T)
     lastInput = initialInput
-    lastOutput = zero(Kp)
-    lastTime = zero(Kp)
-    currentTime = zero(Kp)
+    lastOutput = zero(T)
+    lastTime = -dt
+    currentTime = zero(T)
     PID(Kp,Ki,Kd,setpoint,
                 dt,output_limits,
                 input,output,
@@ -56,7 +57,7 @@ function reset!(pid::PID)
     pid.lastErr = 0.0
     pid.lastInput = 0.0
     pid.lastOutput = 0.0
-    pid.lastTime = 0.0
+    pid.lastTime = -pid.dt
     pid.currentTime = 0.0
 end
 # function update!(pid,input,t)
@@ -67,15 +68,15 @@ end
 #     update!(pid)
 # end
 
-# function update!(pid,input,t)
-#     if t - pid.lastTime > pid.dt
-#         pid.input = input
-#         pid.currentTime = t
-#         update!(pid)
-#     else
-#         return pid.lastOutput
-#     end
-# end
+function update!(pid,input,t)
+    if t - pid.lastTime >= pid.dt
+        pid.input = input
+        pid.currentTime = t
+        update!(pid)
+    else
+        return pid.lastOutput
+    end
+end
 #
 # function update!(pid,input;dt)
 #     @assert dt > 0.0

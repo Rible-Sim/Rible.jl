@@ -1,29 +1,36 @@
 
-function man_ndof(ndof;θ=0.0,k=1.0e2,c=0.0)
+function man_ndof(ndof;θ=0.0,k=0.0,c=0.0,unit="mks")
     nbodies = ndof + 1
     nbp = 2nbodies - ndof
     n_lower = count(isodd,1:nbodies)
     n_upper = count(iseven,1:nbodies)
-    a_lower = fill(0.1,n_lower)
-    a_upper = fill(0.08,n_upper)
-    m_lower = fill(0.02,n_lower)
-    m_upper = fill(0.013,n_upper)
-    Ic_lower = fill(11.3,n_lower)
-    Ic_upper = fill(5.4,n_upper)
     lower_index = 1:2:nbodies
     upper_index = 2:2:nbodies
     a = zeros(nbodies)
     m = zeros(nbodies)
     Ia = zeros(nbodies)
+    if unit == "cgs"
+        unit_L = 1e2
+        unit_M = 1e3
+        unit_I = unit_M*unit_L^2
+    else
+        unit_L = 1
+        unit_M = 1
+        unit_I = 1
+    end
     for (i,j) in enumerate(lower_index)
-        a[j] = a_lower[i]
-        m[j] = m_lower[i]
-        Ia[j] = Ic_lower[i] + m[j]*1/3*a[j]^2
+        a[j] = 20.0e-2unit_L
+        m[j] = 835.90254985e-3unit_M
+        # Ia[j] = Ic_lower[i] + m[j]*1/3*a[j]^2
+        Ia[j] = 28130.53053840*2e-7unit_I
+        @show a[j],m[j],Ia[j]
     end
     for (i,k) in enumerate(upper_index)
-        a[k] = a_upper[i]
-        m[k] = m_lower[i]
-        Ia[k] = Ic_upper[i] + m[k]*1/3*a[k]^2
+        a[k] = 16.0e-2unit_L
+        m[k] = 666.25659673e-3unit_M
+        # Ia[k] = Ic_upper[i] + m[k]*1/3*a[k]^2
+        Ia[k] = 14490.67513310*2e-7unit_I
+        @show a[k],m[k],Ia[k]
     end
     A = zeros(2,nbp)
     A[:,2] .= A[:,1] .+ a[1]*[1.0,0.0]

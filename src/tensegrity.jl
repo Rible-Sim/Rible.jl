@@ -142,31 +142,31 @@ function generate_forces!(rbs)
     end
 end
 
-function assemble_forces!(F,tgstruct)
+function assemble_forces!(F,tgstruct;factor=1.0)
     rbs = tgstruct.rigidbodies
     @unpack body2q = tgstruct.connectivity
     generate_forces!(rbs)
     F .= 0.0
     for rbid in tgstruct.mvbodyindex
         pindex = body2q[rbid]
-        F[pindex] .+= rbs[rbid].state.coords.Q
+        F[pindex] .+= factor*rbs[rbid].state.coords.Q
     end
 end
 
-function assemble_forces(tgstruct)
+function assemble_forces(tgstruct;factor=1.0)
     T = get_numbertype(tgstruct)
     @unpack body2q = tgstruct.connectivity
     F = zeros(T,tgstruct.ncoords)
-    assemble_forces!(F,tgstruct)
+    assemble_forces!(F,tgstruct,factor=factor)
     F
 end
 
-function apply_gravity!(tgstruct;factor=1.0)
+function apply_gravity!(tgstruct)
     rbs = tgstruct.rigidbodies
-    gravity_force = factor*get_gravity(tgstruct)
+    gravity_acceleration = get_gravity(tgstruct)
     for (rbid,rb) in enumerate(rbs)
-        @unpack state = rb
-        rb.state.F .= gravity_force
+        @unpack prop, state = rb
+        rb.state.F .+= gravity_acceleration*prop.mass
     end
 end
 
@@ -184,8 +184,8 @@ end
 function gravity_potential_energy(rb::RigidBody,q)
     @unpack CG = rb.state.cache
     r = CG*q
-    gravity = get_gravity(rb)
-    -transpose(r)*gravity
+    gravity_acceleration = get_gravity(rb)
+    -transpose(r)*gravity_acceleration*rb.prop.mass
 end
 
 function potential_energy(s::SString)

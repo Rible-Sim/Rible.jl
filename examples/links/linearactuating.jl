@@ -23,15 +23,17 @@ include("links_define.jl")
 include("link_u_plotting.jl")
 include("../analysis.jl")
 n = 4
-h = 6.6
+h = 0.066
 R = RotX(0.0)
 linkn = links(n,h,R,c=50.0)
 plotstructure(linkn)
 q0,q̇0,λ0 = TR.get_initial(linkn)
 
-rl,a = inverse2actuation(linkn;n=n,h=h)
-# @code_warntype inverse2actuation(linkn;n,h)
 
+reflinkn = links(n,6.5,RotY(π/15),c=50.0)
+rl,a = inverse2actuation(linkn,reflinkn)
+# @code_warntype inverse2actuation(linkn;n,h)
+plotstructure(reflinkn)
 function linearactuate(tg,q0,target_u,target_t)
     M = TR.build_massmatrix(tg)
     Φ = TR.build_Φ(tg,q0)

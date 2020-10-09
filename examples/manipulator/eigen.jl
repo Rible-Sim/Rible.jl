@@ -6,30 +6,31 @@ using BenchmarkTools
 import PyPlot; const plt = PyPlot
 plt.pygui(true)
 using LaTeXStrings
-# using NLsolve
-# using DifferentialEquations
-# using Sundials
-# using DASKR
+using Makie
+AbstractPlotting.__init__()
+
+using Dierckx
+
 using Revise
 
 using TensegritySolvers; const TS = TensegritySolvers
 using TensegrityRobot
 const TR = TensegrityRobot
 
+cd("examples/manipulator")
 include("man_define.jl")
-function eigenanalysis(n,α=π/6,k=3.e2)
+include("man_plotting.jl")
+function eigenanalysis(n,α=π/6,k=1.e4)
     ndof = 6
     manipulator = man_ndof(ndof,k=k,c=0.0)
+    as = Vector{Vector{Float64}}()
 
     Y = build_Y(manipulator)
 
     q0,_,_ = TR.get_initial(manipulator)
 
-    λ0,Δu,_= TR.inverse(manipulator,deepcopy(manipulator),Y)
-    TR.actuate!(manipulator,Δu)
-    TR.reset_forces!(manipulator)
-    TR.update_strings_apply_forces!(manipulator)
-    @show transpose(TR.build_A(manipulator)(q0))*λ0 ≈ TR.build_Q̃(manipulator)*TR.fvector(manipulator)
+    λ0,_,a= TR.inverse(manipulator,deepcopy(manipulator),Y)
+    push!(as,a)
 
     ωs = Vector{Vector{Float64}}()
     Zs = Vector{Matrix{Float64}}()
@@ -44,25 +45,68 @@ function eigenanalysis(n,α=π/6,k=3.e2)
         refman = man_ndof(ndof,θ=iθ,k=k,c=0.0) # reference
         refqi,_,_ = TR.get_initial(refman)
         refλi,Δu,a= TR.inverse(manipulator,refman,Y)
-
+        push!(as,a)
         actmani = deepcopy(manipulator)
-        TR.actuate!(actmani,a)
-        TR.reset_forces!(actmani)
-        TR.distribute_q_to_rbs!(actmani,refqi)
-        TR.update_strings_apply_forces!(actmani)
-
-        @show transpose(TR.build_A(actmani)(refqi))*refλi ≈ TR.build_Q̃(actmani)*TR.fvector(actmani)
 
         ωi,Zi = TR.undamped_eigen(actmani,refqi,refλi)
         push!(ωs,ωi)
         push!(Zs,Zi)
     end
-    ωs,Zs
+    ωs,Zs,as
 end
 
-n = 5
-ωs,Zs = eigenanalysis(n,π/4)
+n = 10
+ωs,Zs,as = eigenanalysis(n,π/12)
+x = 0:(30/n):30
+y = [a[1] for a in as]
+spl = Spline1D(z,y,k=1)
+plt.plot(0:0.1:30,spl(0:0.1:30))
+at = 30
+f(x) = at*(x/at)^5
+z = f.(x)
+spl = Spline1D(z,y)
+plt.plot(0:0.1:at,f.(0:0.1:at))
 
+
+function simulate_interpolation(spl,ndof=6;k=4.e3,c=0.0)
+    manipulator = man_ndof(ndof,k=k,c=c)
+
+    q0,q̇0,λ0 = TR.get_initial(manipulator)
+
+    function interpolation_actuate(tgstruct,q0,target_t)
+
+        M = TR.build_massmatrix(tgstruct)
+        Φ = TR.build_Φ(tgstruct,q0)
+        A = TR.build_A(tgstruct)
+
+        function F!(F,q,q̇,t)
+            if t < target_t
+                # TR.actuate!(tgstruct,fill(spl(t),6))
+                TR.actuate!(tgstruct,t/target_t*fill(spl(target_t),6))
+            end
+            TR.reset_forces!(tgstruct)
+            TR.distribute_q_to_rbs!(tgstruct,q,q̇)
+            TR.update_strings_apply_forces!(tgstruct)
+            TR.assemble_forces!(F,tgstruct)
+        end
+
+        M,Φ,A,F!,nothing
+
+        #A,Φ,∂T∂q̇!,F!,M!,nothing
+    end
+
+
+
+    dt = 0.01 # Same dt used for PID AND Dynamics solver
+    prob = TS.DyProblem(interpolation_actuate(manipulator,q0,30.0),q0,q̇0,λ0,(0.0,100.0))
+
+    sol = TS.solve(prob,TS.Zhong06(),dt=dt,ftol=1e-10,verbose=true)
+    manipulator, sol
+end
+
+# bars_and_strings_segs(man_linear)
+man_interpolation, sol_interpolation = simulate_interpolation(spl)
+plotstructure(man_interpolation,sol_interpolation,sliderplot)
 
 for i = 1:n+1
     plt.plot(ωs[i],label="$i,k=300")
@@ -76,8 +120,10 @@ plt.plot(ωs6)
 plt.legend()
 
 
-
-
+x = [0., 1., 2., 3., 4.]
+y = [-1., 0., 7., 26., 63.]  # x.^3 - 1.
+spl = Spline1D(x, y; k = 3)
+plt.plot(0:0.1:4,spl(0:0.1:4))
 
 function freevibra(tgstruct,q0)
 

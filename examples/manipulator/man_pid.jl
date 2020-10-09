@@ -7,6 +7,8 @@ import PyPlot; const plt = PyPlot
 plt.pygui(true)
 using LaTeXStrings
 # using NLsolve
+using Makie
+AbstractPlotting.__init__()
 using Revise
 
 using TensegritySolvers; const TS = TensegritySolvers
@@ -20,7 +22,7 @@ include("man_plotting.jl")
 # ------------------Create Tensegrity Struture --------------------------
 ndof = 6
 refman = man_ndof(ndof,θ=-π/12) # reference
-manipulator = man_ndof(ndof,θ=0.0)
+manipulator = man_ndof(ndof,k=4.e3,c=1.e3,θ=0.0)
 # ------------------Create Tensegrity Struture\\-------------------------
 Y = build_Y(manipulator)
 q0,q̇0,λ0 = TR.get_initial(manipulator) #backup
@@ -28,7 +30,7 @@ q0,q̇0,λ0 = TR.get_initial(manipulator) #backup
 refλ0,_,a = TR.inverse(manipulator,refman,Y)
 # ----------------------Inverse Kinematics\\-----------------------------
 
-dt = 0.01 # Same dt used for PID AND Dynamics solver
+dt = 0.01 # Same dt used for Dynamics solver
 # ---------------------Create Controllers --------------------------------
 # use angles to define errors
 function get_angles(tgstruct)
@@ -47,8 +49,8 @@ function get_angles(tgstruct)
 end
 refangles = get_angles(refman)
 refman
-pids = [TR.PIDController.PID(0.01,0.0,0.01,
-            setpoint=ui,dt=dt) for ui in refangles]
+pids = [TR.PIDController.PID(0.0,0.0,0.0,
+            setpoint=ui,dt=0.1) for ui in refangles]
 # ---------------------Create Controllers\\-------------------------------
 
 # --------------------Create Robot ---------------------------------------
@@ -63,7 +65,7 @@ function make_control!(get_feedback)
         inputs = get_feedback(tgstruct)
         for (id,pid,traj,actuator) in zip(eachindex(ctrls),ctrls,trajs,tgstruct.actuators)
             input = inputs[id]
-            output = TR.PIDController.update!(pid,input)
+            output = TR.PIDController.update!(pid,input,t)
             TR.actuate!(actuator,output)
             TR.record!(traj,pid)
         end
@@ -77,31 +79,22 @@ control! = make_control!(get_angles)
 function dynfuncs(tgstruct,q0)
 
     M = TR.build_massmatrix(tgstruct)
-    #M!, ∂T∂q̇! = TS.const_massmatrix_functions(M)
     Φ = TR.build_Φ(tgstruct,q0)
     A = TR.build_A(tgstruct)
-
-    Q̃=TR.build_Q̃(tgstruct)
 
     function F!(F,q,q̇,t)
         TR.reset_forces!(tgstruct)
         TR.distribute_q_to_rbs!(tgstruct,q,q̇)
         TR.update_strings_apply_forces!(tgstruct)
-        F .= Q̃*TR.fvector(tgstruct)
-        # F .= 0.0
-        # TR.assemble_forces!(F,tgstruct)
+        TR.assemble_forces!(F,tgstruct)
         # @show isapprox(F,Q̃*TR.fvector(tgstruct))
     end
 
     M,Φ,A,F!,nothing
-
-    #A,Φ,∂T∂q̇!,F!,M!,nothing
 end
-M,Φ,A,F!,Jacs = dynfuncs(manipulator,q0)
-Φ(q0)
-Φq = A(q0)
+M,Φ,A,F!,_ = dynfuncs(manipulator,q0)
 
-prob = TS.DyProblem(dynfuncs(manipulator,q0),q0,q̇0,λ0,(0.0,50.1))
+prob = TS.DyProblem(dynfuncs(manipulator,q0),q0,q̇0,λ0,(0.0,25.01))
 
 function make_affect!(robot2d,control!)
     function inner_affect!(intor)
@@ -111,24 +104,26 @@ function make_affect!(robot2d,control!)
     end
 end
 cb = TS.DiscreteCallback((x)->true,make_affect!(rob,make_control!(get_angles)))
-TR.PIDController.tune!(rob.hub.ctrls[1],1.4,0.004,13)
-TR.PIDController.tune!(rob.hub.ctrls[2],1.3,0.004,12)
-TR.PIDController.tune!(rob.hub.ctrls[3],1.2,0.004,11)
-TR.PIDController.tune!(rob.hub.ctrls[4],1.1,0.004,10)
-TR.PIDController.tune!(rob.hub.ctrls[5],1.0,0.005,8.5)
-TR.PIDController.tune!(rob.hub.ctrls[6],0.9,0.005,7.0)
+# TR.PIDController.tune!(rob.hub.ctrls[1],0.2,0.8,3.0)
+# TR.PIDController.tune!(rob.hub.ctrls[2],0.1,1.0,1.2)
+# TR.PIDController.tune!(rob.hub.ctrls[3],0.1,1.4,1.0)
+TR.PIDController.tune!(rob.hub.ctrls[1],5.0,0.0,10.0)
+TR.PIDController.tune!(rob.hub.ctrls[2],5.0,0.0,15.0)
+TR.PIDController.tune!(rob.hub.ctrls[3],5.0,0.0,10.0)
+TR.PIDController.tune!(rob.hub.ctrls[4],5.0,0.0,6.0)
+TR.PIDController.tune!(rob.hub.ctrls[5],5.0,0.0,4.0)
+TR.PIDController.tune!(rob.hub.ctrls[6],5.0,0.0,2.0)
 TR.reset!.(rob.tgstruct.actuators)
 TR.reset!.(rob.hub.trajs)
-# sol = TS.solve(prob,TS.Wendlandt(),dt=dt,ftol=1e-13,callback=cb,verbose=true)
-sol = TS.solve(prob,TS.Zhong06(),dt=dt,ftol=1e-12,callback=cb,verbose=true)
-pltfig.clear(); pltfig = controlplot(rob.hub.trajs)
-pltfig = controlplot(rob.hub.trajs)
+sol = TS.solve(prob,TS.Zhong06(),dt=dt,ftol=1e-9,callback=cb,verbose=true)
+pltfig = controlplot(rob.hub.trajs,6)
 pltfig.savefig("manpid_error.png",dpi=300,bbox_inches="tight")
 plt.close(pltfig)
+plotstructure(manipulator,sol,sliderplot)
 # ----------------------------Dynamics-----------------------------------
-function controlplot(trajs)
+function controlplot(trajs,n=6)
     ntraj = length(trajs)
-    fig,axs_raw = plt.subplots(2,3,num="PID",figsize=(15,6))
+    fig,axs_raw = plt.subplots(2,3,figsize=(15,6))
 
     if typeof(axs_raw)<:Array
         axs = permutedims(axs_raw,[2,1])
@@ -136,34 +131,36 @@ function controlplot(trajs)
         axs = [axs_raw]
     end
     for (id,ax) in enumerate(axs)
-        @unpack ts,es,us = trajs[id]
-        bx = ax.twinx()
-        ax.grid(which="major", axis="both")
-        # bx.grid("on")
-        ep = ax.plot(ts,es,label=latexstring("\\epsilon_$id"), lw = 3)
-        up = bx.plot(ts,us,label=latexstring("u_$id"), lw = 3, color=:orange)
-        ps = [ep[1],up[1]]
-        bx.set_ylabel(L"u")
-        bx.set_ylim([-0.1,0.4])
-        ax.set_ylim(es[1].*[-0.1,1.1])
-        ax.yaxis.set_major_locator(plt.matplotlib.ticker.MultipleLocator(0.2es[1]))
-        ax.yaxis.set_major_formatter(plt.matplotlib.ticker.PercentFormatter(xmax=es[1]))
-        ax.set_ylabel(L"\epsilon(\%)")
-        ax.set_xlabel(L"t")
-        ax.legend(ps, [p_.get_label() for p_ in ps])
-        if id <= 3
-            ax.set_xticklabels([])
-            ax.xaxis.label.set_visible(false)
-        end
-        if !(id ∈[1,4])
-            ax.set_yticklabels([])
-            ax.yaxis.label.set_visible(false)
-        end
-        if !(id ∈ [3,6])
-            bx.set_yticklabels([])
-            bx.yaxis.label.set_visible(false)
-        end
+        if id <= n
+            @unpack ts,es,us = trajs[id]
+            bx = ax.twinx()
+            ax.grid(which="major", axis="both")
+            # bx.grid("on")
+            ep = ax.plot(ts,es,label=latexstring("\\epsilon_$id"), lw = 3)
+            up = bx.plot(ts,us,label=latexstring("u_$id"), lw = 0.02, color=:orange)
+            ps = [ep[1],up[1]]
+            bx.set_ylabel(L"u")
+            bx.set_ylim([0.0,1.0])
+            ax.set_ylim(es[1].*[-0.2,1.2])
+            ax.yaxis.set_major_locator(plt.matplotlib.ticker.MultipleLocator(0.2es[1]))
+            ax.yaxis.set_major_formatter(plt.matplotlib.ticker.PercentFormatter(xmax=es[1]))
+            ax.set_ylabel(L"\epsilon(\%)")
+            ax.set_xlabel(L"t")
+            ax.legend(ps, [p_.get_label() for p_ in ps])
+            if id <= 3
+                ax.set_xticklabels([])
+                ax.xaxis.label.set_visible(false)
+            end
+            if !(id ∈[1,4])
+                ax.set_yticklabels([])
+                ax.yaxis.label.set_visible(false)
+            end
+            if !(id ∈ [3,6])
+                bx.set_yticklabels([])
+                bx.yaxis.label.set_visible(false)
+            end
 
+        end
 
     end
     fig
