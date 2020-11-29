@@ -1,11 +1,15 @@
 using LinearAlgebra
 using Parameters
 using StaticArrays
+import PyPlot; const plt = PyPlot
+plt.pygui(true)
+using LaTeXStrings
 using Revise
-using NLsolve
 using TensegritySolvers; const TS = TensegritySolvers
 using TensegrityRobot
 const TR = TensegrityRobot
+include("..\\analysis.jl")
+
 function npen(n)
     Ls = zeros(n)
     Ls .= 1.0
@@ -47,10 +51,10 @@ function npen(n)
     end
     rbs = [rigidbody(i,ms[i],Ls[i],
             Is[i],A[:,i],A[:,i+1]) for i = 1:n]
-
+    ss = [TR.SString2D(1.0,1.0,0.0)]
     body2q = TR.filter_body2q(TR.build_body2q(rbs),rbs)
     cnt = TR.Connectivity(body2q,nothing)
-    TR.TensegrityStructure(rbs,Vector{Int}(),Vector{Int}(),cnt)
+    TR.TensegrityStructure(rbs,ss,cnt)
 end
 
 pen2 = npen(2)
@@ -68,20 +72,15 @@ function dynfuncs(tgstruct,q0)
     end
     M,Φ,A,F!,nothing
 end
-M,Φ,A,F!,Jacs = dynfuncs(pen2,q0)
-Φ(q0)
-# @code_warntype Φ(q0)
-# @time Φ(q0)
-A(q0)
-# @time A(q0)
-F = similar(q0)
-F!(F,q0,q̇0,0.0)
+
 q̇0[end-1] = 0.01
 prob = TS.DyProblem(dynfuncs(pen2,q0),q0,q̇0,λ0,(0.0,10.0))
 dt = 0.01
-sol = TS.solve(prob,TS.Wendlandt(),dt=dt,ftol=1e-14,verbose=true)
-using Plots
-pyplot()
-plot([sol.qs[i][4] for i = 1:length(sol.qs)])
-plot!([sol.qs[i][4]+2 for i = 1:length(sol.qs)])
-[sol.qs[i][4] for i = 1:length(sol.qs)]
+sol = TS.solve(prob,TS.Zhong06(),dt=dt,ftol=1e-14,verbose=true)
+
+plt.plot([sol.qs[i][4] for i = 1:length(sol.qs)])
+plt.plot(sol.ts,[sol.qs[i][4]+2 for i = 1:length(sol.qs)])
+
+kes,epes,gpes,es,es_err = analyse_energy(pen2,sol;gravity=true,elasticity=false)
+es
+plt.plot(sol.ts,es_err)

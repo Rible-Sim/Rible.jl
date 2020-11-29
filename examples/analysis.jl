@@ -1,13 +1,15 @@
 function analyse_energy(tgstruct,sol;gravity=false,elasticity=false,factor=1)
     kes = [TR.kinetic_energy_coords(tgstruct,q,q̇) for (q,q̇) in zip(sol.qs,sol.q̇s)]
-    epes = factor.*[TR.elastic_potential_energy(tgstruct,q) for q in sol.qs]
-    gpes = factor.*[TR.gravity_potential_energy(tgstruct,q) for q in sol.qs]
+    epes = 0.0
+    gpes = 0.0
 
     es = kes
     if elasticity
+        epes = factor.*[TR.elastic_potential_energy(tgstruct,q) for q in sol.qs]
         es += epes
     end
     if gravity
+        gpes = factor.*[TR.gravity_potential_energy(tgstruct,q) for q in sol.qs]
         es += gpes
     end
     es1 = es[1]
@@ -34,6 +36,8 @@ function analyse_slackness(tgstruct,q)
         restlen = s.state.restlen
         if len < restlen
             @info "String $i is slack."
+        else
+            @info "Slackness check pass."
         end
     end
 end

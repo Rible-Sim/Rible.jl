@@ -22,7 +22,7 @@ function bend(n,di,rm)
     os,Xs
 end
 
-function links(n,di,rm;c=0.0)
+function links(n,di,rm;k=3e1,c=0.0)
     nbodies = n
     nbp = 4*n
 
@@ -78,8 +78,8 @@ function links(n,di,rm;c=0.0)
     stringlenH = 0.6h
     stringlenR = 6e-2 #m
     stringlens = repeat(vcat(fill(stringlenH,3),fill(stringlenR,3)),n-1)
-    kH = 3e1 #N/m
-    kR = 3e1 #N/m
+    kH = k #N/m
+    kR = k #N/m
     ks = repeat(vcat(fill(kH,3),fill(kR,3)),n-1)
     # c = 0.0
     cs = repeat(fill(c,6),n-1)
@@ -118,7 +118,7 @@ function build_Y(tgstruct)
 end
 
 
-function inverse2actuation(tgstruct,refstruct=deepcopy(tgstruct))
+function inverse2actuation(tgstruct,refstruct=deepcopy(tgstruct);gravity=false)
     # Rx = RotY(π/18)
     # Rx = RotY(0.0)
     # reflinkn = links(n,h,Rx)

@@ -48,12 +48,24 @@ function recordplot(scene,update_scene!,state)
     end
 end
 
-function sliderplot(scene,bars,cables,update_scene!,sol)
+function sliderplot(scene,tg,bars,cables,update_scene!,sol)
     step_slider,tstep = textslider(1:length(sol.ts),"step",start=1)
     on(tstep) do this_step
+        analyse_slackness(tg,sol.qs[this_step])
         update_scene!(bars,cables,sol.qs[this_step])
     end
     bigscene = hbox(step_slider,scene)
+end
+
+function update_scene!(tg,bars,cables,q)
+    cnt = tg.connectivity
+    TR.distribute_q_to_rbs!(tg,q)
+    for (id,rb) in enumerate(tg.rigidbodies)
+        bars[id][] = rb_bars(rb)
+    end
+    cables[] = TR.get_strings(tg)
+    # angles = update_angles(tg)
+    # @show angles
 end
 
 function plotstructure(tg,sol,func)
@@ -73,7 +85,7 @@ function plotstructure(tg,sol,func)
         # angles = update_angles(tg)
         # @show angles
     end
-    func(scene,bars,cables,update_scene!,sol)
+    func(scene,tg,bars,cables,update_scene!,sol)
 end
 
 # plotstructure(linkn)

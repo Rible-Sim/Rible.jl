@@ -3,7 +3,7 @@ using StaticArrays
 using SparseArrays
 using Parameters
 using Rotations
-using Cthulhu
+# using Cthulhu
 using Revise
 using TensegritySolvers; const TS = TensegritySolvers
 using TensegrityRobot
@@ -28,7 +28,8 @@ rb1 = TR.RigidBody(prop,state1)
 body2q = [collect(1:12)]
 contacts = [TR.ID(1,i) for i = 1:8]
 cnt = TR.Connectivity(body2q,nothing,contacts)
-tgrb1 = TR.TensegrityStructure([rb1],Vector{Int}(),Vector{Int}(),cnt)
+strings = [TR.SString3D(0.0,0.0,0.0)]
+tgrb1 = TR.TensegrityStructure([rb1],strings,cnt)
 q0,q̇0,λ0 = TR.get_initial(tgrb1)
 function dynfuncs(tgstruct,q0)
     M = TR.build_massmatrix(tgstruct)

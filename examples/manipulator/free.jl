@@ -2,14 +2,14 @@ using LinearAlgebra
 using SparseArrays
 using Parameters
 using StaticArrays
-using BenchmarkTools
-import PyPlot; const plt = PyPlot
-plt.pygui(true)
-using LaTeXStrings
+# using BenchmarkTools
 # using NLsolve
 # using DifferentialEquations
 using Makie
-AbstractPlotting.__init__()
+scene = plot(rand(10))
+import PyPlot; const plt = PyPlot
+plt.pygui(true)
+using LaTeXStrings
 using CSV
 using Revise
 using TensegritySolvers; const TS = TensegritySolvers
@@ -21,6 +21,10 @@ include("man_plotting.jl")
 include("../analysis.jl")
 
 k = 2.e3; c = 0.0
+
+# manipulator = man_ndof(2)
+# scene,_ = plotstructure(manipulator)
+# scene
 """
     function simulate_freefall(ndof;k,c,unit="mks")
         manipulator = man_ndof(ndof;k,c,unit)
@@ -78,7 +82,7 @@ k = 2.e3; c = 0.0
 
     bscene = plotstructure(man_freefall,sol_freefall,sliderplot)
 """
-function simulate_freevibra(ndof;k,c,unit="mks",dt=0.01)
+function simulate_freevibra(ndof;k,c,unit="mks",dt=0.01,tend=10.0)
     manipulator = man_ndof(ndof;k,c,unit)
     q0,q̇0,λ0 = TR.get_initial(manipulator)
 
@@ -104,7 +108,7 @@ function simulate_freevibra(ndof;k,c,unit="mks",dt=0.01)
 
     M,Φ,A,F!,Jacs = freevibra(manipulator,q0)
 
-    prob = TS.DyProblem(freevibra(manipulator,q0),q0,q̇0,λ0,(0.0,10.0))
+    prob = TS.DyProblem(freevibra(manipulator,q0),q0,q̇0,λ0,(0.0,tend))
 
     sol = TS.solve(prob,TS.Zhong06(),dt=dt,ftol=1e-14)
 
@@ -125,22 +129,57 @@ M4Y = adams("M4Y")
 # M4Y001 = adams001("M4Y")
 # t001_9 = adams001_9("time")
 # M4Y001_9 = adams001_9("M4Y")
-p3x = [q[5] for q in sol_freevibra.qs]
-p3y = [q[6] for q in sol_freevibra.qs]
-p4x = [q[7] for q in sol_freevibra.qs]
-plt.plot(sol_freevibra.ts,p3x)
-plt.plot(sol_freevibra.ts,p3y)
-plt.plot(sol_freevibra.ts,p4x)
+# p3x = [q[5] for q in sol_freevibra.qs]
+# p3y = [q[6] for q in sol_freevibra.qs]
+# p4x = [q[7] for q in sol_freevibra.qs]
+# plt.plot(sol_freevibra.ts,p3x)
+# plt.plot(sol_freevibra.ts,p3y)
+# plt.plot(sol_freevibra.ts,p4x)
 # p4y01 = [q[8] for q in sol_freevibra.qs]
 # plt.plot(sol_freevibra.ts,p4y01)
+fig,ax = plt.subplots(1,1,figsize=(4,3))
 p4y001 = [q[8] for q in sol_freevibra001.qs]
-plt.plot(sol_freevibra001.ts,p4y001)
+ax.plot(sol_freevibra001.ts,p4y001,label="Zu")
 # p4y0001 = [q[8] for q in sol_freevibra0001.qs]
 # plt.plot(sol_freevibra0001.ts,p4y0001)
 # plt.plot(t001_9,M4Y001_9)
 # plt.plot(t001,M4Y001)
-plt.plot(t,M4Y)
+ax.plot(t,M4Y,label="Adams")
+ax.set_xlabel("Time(s)")
+ax.set_ylabel("y(m)")
+ax.set_xlim(sol_freevibra001.ts[1],sol_freevibra001.ts[end])
+ax.set_ylim(-0.2,0.1)
 plt.legend()
+fig.savefig("m4y.png",dpi=300,bbox_inches="tight")
+
+fig,ax = plt.subplots(1,1,figsize=(4,3))
+p4y001 = [q[8] for q in sol_freevibra001.qs]
+ax.plot(sol_freevibra001.ts,p4y001,label="Zu")
+# p4y0001 = [q[8] for q in sol_freevibra0001.qs]
+# plt.plot(sol_freevibra0001.ts,p4y0001)
+# plt.plot(t001_9,M4Y001_9)
+# plt.plot(t001,M4Y001)
+ax.plot(t,M4Y,label="Adams")
+ax.set_xlabel("Time(s)")
+ax.set_ylabel("y(m)")
+# ax.set_xlim(sol_freevibra001.ts[9000],sol_freevibra001.ts[end])
+ax.set_xlim(sol_freevibra001.ts[1],sol_freevibra001.ts[1001])
+ax.set_ylim(-0.14,0.04)
+plt.legend(loc="lower right")
+# fig.savefig("m4y9000.png",dpi=300,bbox_inches="tight")
+fig.savefig("m4y1000.png",dpi=300,bbox_inches="tight")
+
+
+man_freevibra_long, sol_freevibra_long = simulate_freevibra(2;k,c,dt=0.01,tend=1000.0)
+
+kes,epes,gpes,es,es_err = analyse_energy(man_freevibra_long,sol_freevibra_long,gravity=true,elasticity=true,factor=1)
+fig,ax = plt.subplots(1,1,num = 1,figsize=(4,3))
+ax.plot(sol_freevibra_long.ts[1:100:end],es_err[1:100:end],linewidth=0.5)
+ax.set_xlabel("Time (s)")
+ax.set_ylabel("Energy Rel. Err. ")
+ax.set_ylim(-1e-2,1e-2)
+ax.set_xlim(sol_freevibra_long.ts[1],sol_freevibra_long.ts[end])
+fig.savefig("rel_energy_err_long.png",dpi=300,bbox_inches="tight")
 
 MB1G = adams("MB1G")
 MA2G = adams("MA2G")
@@ -157,26 +196,31 @@ MB1E
 ps = string_potential(man_freevibra001,sol_freevibra001)
 
 kes,epes,gpes,es,es_err = analyse_energy(man_freevibra001,sol_freevibra001,gravity=true,elasticity=true,factor=1)
-fig,ax = plt.subplots(3,1,num = 1,figsize=(4,3))
-ax[1].plot(sol_freevibra001.ts,kes)
-ax[1].plot(t,MB1E+MA2E)
-ax.plot(sol_freevibra001.ts,sum(ps))
-ax.plot(t,cable_energy)
-
-SA1E = adams("SA1E")
-SA2E = adams("SA2E")
-SB1E = adams("SB1E")
-SB2E = adams("SB2E")
-
-ax.plot(sol_freevibra001.ts,ps[1])
-ax.plot(t,SA1E)
-ax.plot(sol_freevibra001.ts,es.-es[1])
-ax.plot(t,adams_es.-adams_es[1])
+fig,ax = plt.subplots(1,1,num = 1,figsize=(8,6))
+# ax.plot(sol_freevibra001.ts,es)
+#
+# ax[1].plot(sol_freevibra001.ts,kes)
+# ax[1].plot(t,MB1E+MA2E)
+# ax.plot(sol_freevibra001.ts,sum(ps))
+# ax.plot(t,cable_energy)
+#
+# SA1E = adams("SA1E")
+# SA2E = adams("SA2E")
+# SB1E = adams("SB1E")
+# SB2E = adams("SB2E")
+#
+# ax.plot(sol_freevibra001.ts,ps[1])
+# ax.plot(t,SA1E)
+# ax.plot(sol_freevibra001.ts,es.-es[1])
+# ax.plot(t,adams_es.-adams_es[1])
 
 ax.plot(sol_freevibra001.ts,es_err)
 ax.set_xlabel("Time (s)")
 ax.set_ylabel("Rel. Energy Error")
-ax.set_ylim(-8e-4,8e-4)
+ax.set_ylim(-2e-5,2e-5)
+ax.set_xlim(sol_freevibra001.ts[1],sol_freevibra001.ts[end])
+fig.savefig("rel_energy_err.png",dpi=300,bbox_inches="tight")
+
 
 
 ax.set_xlim(sol_freevibra.ts[1],sol_freevibra.ts[end])
