@@ -31,7 +31,7 @@ q0,q̇0,λ0 = TR.get_initial(linkn)
 
 Y = Array(build_Y(linkn))
 
-λ,Δu,a= TR.inverse(linkn,linkn,Y,gravity=true)
+λ,Δu,a= TR.inverse(linkn,linkn,Y,gravity=true,scale=false)
 u0 = [s.original_restlen for s in linkn.strings]
 rl = u0 + Δu
 ℓ = [s.state.length for s in linkn.strings]

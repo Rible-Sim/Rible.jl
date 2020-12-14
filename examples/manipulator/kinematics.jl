@@ -2,16 +2,14 @@ using LinearAlgebra
 using SparseArrays
 using Parameters
 using StaticArrays
-using BenchmarkTools
+using Makie
+AbstractPlotting.__init__()
 import PyPlot; const plt = PyPlot
 plt.pygui(true)
 using LaTeXStrings
 # using NLsolve
 # using DifferentialEquations
 using Printf
-using TableView
-using Makie
-AbstractPlotting.__init__()
 using Revise
 using TensegritySolvers; const TS = TensegritySolvers
 using TensegrityRobot
@@ -76,7 +74,7 @@ function pyplot2(θs;k,c,ndof = 6)
         ax.set_ylim(-1.10,0.20)
         ax.set_xlim(-0.20,1.30)
         ax.set_aspect("equal")
-                ax.set_title(latexstring("\\theta=",@sprintf "%3.2f" θ))
+        ax.set_title(latexstring("\\theta=",@sprintf "%3.2f" θ))
         ax.grid(true)
         # ax.set_yticks(collect(0:-50:-150))
         if i ∈[1,2,3]
@@ -131,7 +129,7 @@ function plotfrequency(x,ys)
     for (i,y) in enumerate(ys)
         ax.plot(x,y,marker="o",fillstyle="none",label="Mode $i")
     end
-    ax.set_xlabel("Rest length (m)")
+    ax.set_xlabel(L"\theta\ (\mathrm{rad})")
     ax.set_ylabel("Frequency (Hz)")
     ax.set_xlim(x[1],x[end])
     # ax.set_ylim(0,8)
@@ -140,7 +138,7 @@ function plotfrequency(x,ys)
     fig.tight_layout()
     fig
 end
-fig = plotfrequency(y,ys)
+fig = plotfrequency(abs.(θs),ys)
 fig.savefig("man_frequency_k=$k.png",dpi=300,bbox_inches="tight")
 
 function plotfrequency_ratio(x,ys)
@@ -149,7 +147,7 @@ function plotfrequency_ratio(x,ys)
     for (i,y) in enumerate(ys_ratio)
         ax.plot(x,y,marker="o",fillstyle="none",label="Mode $i")
     end
-    ax.set_xlabel("Rest length (m)")
+    ax.set_xlabel(L"\theta\ (\mathrm{rad})")
     ax.set_ylabel("Ratio")
     ax.set_xlim(x[1],x[end])
     # ax.set_ylim(0,8)
@@ -158,36 +156,45 @@ function plotfrequency_ratio(x,ys)
     fig.tight_layout()
     fig
 end
-fig = plotfrequency_ratio(y,ys)
+fig = plotfrequency_ratio(θs,ys)
 fig.savefig("man_frequency_ratio_k=$k.png",dpi=300,bbox_inches="tight")
 
-function pyplot_mode(tgstruct,Z,xlim,ylim)
-    fig,axs = plt.subplots(3,1,figsize=(6,9))
-    q0,q̇0 = TR.get_q(tgstruct)
-    for i = 1:3
-        TR.distribute_q_to_rbs!(tgstruct,q0+0.2Z[:,i])
-        bars_segs,strings_segs = bars_and_strings_segs(tgstruct)
-        ax = axs[i]
+function pyplot_mode(tgstruct,θ,Z,xlim,ylim)
+    function plot2ax!(ax,tgstruct,q;ref=false)
+        TR.distribute_q_to_rbs!(tgstruct,q)
+        bars_segs,strings_segs = bars_and_strings_segs(tgstruct;ref)
         ax.add_collection(bars_segs)
         ax.add_collection(strings_segs)
         ax.set_xlim(xlim[1],xlim[2])
         ax.set_ylim(ylim[1],ylim[2])
         ax.set_aspect("equal")
-        ax.set_title("Mode $i")
         ax.grid(true)
+    end
+    fig = plt.figure(figsize=(9,5))
+    grid = (1,3)
+    q0,q̇0 = TR.get_q(tgstruct)
+    # ax = plt.subplot2grid(grid,(0,1),1,1,fig=fig)
+    # ax.set_title("Initial pose, "*latexstring("\\theta=",@sprintf "%3.2f" θ))
+    # plot2ax!(ax,tgstruct,q0;ref=true)
+    for i = 1:3
+        ax = plt.subplot2grid(grid,(0,i-1),1,1,fig=fig)
+        qmode = q0+0.2Z[:,i]
+        plot2ax!(ax,tgstruct,q0;ref=true)
+        plot2ax!(ax,tgstruct,qmode)
+        ax.set_title("Mode $i")
+        if i >= 2
+            ax.set_yticklabels([])
+            ax.yaxis.label.set_visible(false)
+        end
     end
     fig.tight_layout()
     fig
 end
 
 manipulator = man_ndof(ndof;θ = θs[1], k, c)
-fig = pyplot_mode(manipulator,Zs[1],(-0.20,1.50),(-0.60,0.60))
-fig.savefig("man_mode1_k=$k.png",dpi=300,bbox_inches="tight")
+fig = pyplot_mode(manipulator,θs[1],Zs[1],(-0.20,1.50),(-1.00,0.50))
+fig.savefig("man_pose1_mode_k=$k.png",dpi=300,bbox_inches="tight")
 
 manipulator = man_ndof(ndof;θ = θs[5], k, c)
-fig = pyplot_mode(manipulator,Zs[5],(-0.20,1.10),(-1.00,0.20))
-fig.savefig("man_mode2_k=$k.png",dpi=300,bbox_inches="tight")
-
-manipulator = man_ndof(ndof;θ = θs[10], k, c)
-fig = pyplot_mode(manipulator,Zs[10],(-0.50,0.70),(-0.80,0.40))
-fig.savefig("man_mode3_k=$k.png",dpi=300,bbox_inches="tight")
+fig = pyplot_mode(manipulator,θs[5],Zs[5],(-0.20,1.50),(-1.00,0.50))
+fig.savefig("man_pose5_mode_k=$k.png",dpi=300,bbox_inches="tight")

@@ -102,12 +102,18 @@ function update_strings_apply_forces!(tgstruct)
         sstate.length = l
         sstate.direction = τ
         l̇ = (transpose(Δr)*Δṙ)/l
-        f_raw = k*(l - sstate.restlen) +
-                c*l̇
-        sstate.tension = ifelse(f_raw > 0.0, f_raw, 0.0)
-        f = τ*sstate.tension
-        f1 .+= f
-        f2 .+= -f
+        Δl = l - sstate.restlen
+        f = k*Δl + c*l̇
+        if Δl < 0
+            sstate.tension = 0.0
+        elseif f < 0
+            sstate.tension = 0.0
+        else
+            sstate.tension = f
+        end
+        𝐟 = τ*sstate.tension
+        f1 .+=  𝐟
+        f2 .+= -𝐟
     end
 end
 distribute_q_to_rbs!(tgstruct,globalq) = distribute_q_to_rbs!(tgstruct,globalq,zero(globalq))
@@ -208,10 +214,19 @@ function gravity_potential_energy(tgstruct::TensegrityStructure,q)
     sum(gravity_potential_energy.(tgstruct.rigidbodies))
 end
 
-function elastic_potential_energy(tgstruct::TensegrityStructure,q)
-    distribute_q_to_rbs!(tgstruct,q)
+function elastic_potential_energy(tgstruct::TensegrityStructure)
     update_strings_apply_forces!(tgstruct)
     pe = sum(potential_energy.(tgstruct.strings))
+end
+
+function elastic_potential_energy(tgstruct::TensegrityStructure,q)
+    distribute_q_to_rbs!(tgstruct,q)
+    elastic_potential_energy(tgstruct)
+end
+
+function elastic_potential_energy(tgstruct::TensegrityStructure,q,a)
+    actuate!(tgstruct,a)
+    elastic_potential_energy(tgstruct,q)
 end
 
 function energy(tgstruct,q,q̇;gravity=false)

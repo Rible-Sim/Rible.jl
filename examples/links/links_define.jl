@@ -118,22 +118,22 @@ function build_Y(tgstruct)
 end
 
 
-function inverse2actuation(tgstruct,refstruct=deepcopy(tgstruct);gravity=false)
-    # Rx = RotY(π/18)
-    # Rx = RotY(0.0)
-    # reflinkn = links(n,h,Rx)
-    refq0,_,_ = TR.get_initial(refstruct)
-    refλ0,Δu,a = TR.inverse(tgstruct,refstruct,build_Y(tgstruct),gravity=false)
-
-    u0 = [s.original_restlen for s in tgstruct.strings]
-    rl = u0 + Δu
-    if any((x)->x<0,rl)
-        @error "Negative rest lengths"
-    end
-    ℓ = [s.state.length for s in tgstruct.strings]
-    if any((x)->x<0,ℓ-rl)
-        @error "Zero tension"
-    end
-    s = 1 ./ℓ
-    rl,a
-end
+# function inverse2actuation(tgstruct,refstruct=deepcopy(tgstruct);gravity=false)
+#     # Rx = RotY(π/18)
+#     # Rx = RotY(0.0)
+#     # reflinkn = links(n,h,Rx)
+#     refq0,_,_ = TR.get_initial(refstruct)
+#     refλ0,Δu,a = TR.inverse(tgstruct,refstruct,build_Y(tgstruct),gravity=false)
+#
+#     u0 = [s.original_restlen for s in tgstruct.strings]
+#     rl = u0 + Δu
+#     if any((x)->x<0,rl)
+#         @error "Negative rest lengths"
+#     end
+#     ℓ = [s.state.length for s in tgstruct.strings]
+#     if any((x)->x<0,ℓ-rl)
+#         @error "Zero tension"
+#     end
+#     s = 1 ./ℓ
+#     rl,a
+# end

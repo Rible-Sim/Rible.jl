@@ -69,11 +69,11 @@ function test_fvector(tgstruct,q0)
     FiniteDiff.finite_difference_jacobian(L,q0)
 end
 
-function linearize(tgstruct,q,λ)
+function linearize!(tgstruct,q,λ)
     M = build_massmatrix(tgstruct)
     A = build_A(tgstruct)
     Q̃ = build_Q̃(tgstruct)
-    ∂L∂q,∂L∂q̇ = build_tangent(tgstruct,q,zero(q))
+    ∂L∂q,∂L∂q̇ = build_tangent!(tgstruct,q,zero(q))
     @unpack ncoords,nconstraint = tgstruct
     nz = ncoords + nconstraint
     M̂ = zeros(eltype(q),nz,nz)
@@ -85,19 +85,26 @@ function linearize(tgstruct,q,λ)
     # fjac = test_fvector(tgstruct,q)
     K̂[1:ncoords,1:ncoords] .= -Q̃*∂L∂q .+ ∂Aᵀλ∂q(tgstruct,λ)
     Aq = A(q)
-    c = 1.0 #maximum(abs.(K̂[1:ncoords,1:ncoords]))
+    c = maximum(abs.(K̂[1:ncoords,1:ncoords]))
     K̂[1:ncoords,ncoords+1:nz] .= c.*transpose(Aq)
     K̂[ncoords+1:nz,1:ncoords] .= c.*Aq
     M̂,Ĉ,K̂
 end
 
 
-function frequencyshift(M̂,Ĉ,K̂,α)
+function frequencyshift(M̂,Ĉ,K̂,α::Real)
     M̄ = M̂
     C̄ = 2α*M̂ + Ĉ
     K̄ = α^2*M̂ + α*Ĉ + K̂
     M̄,C̄,K̄
 end
+
+function frequencyshift(M̂,K̂,α::Real)
+    M̄ = M̂
+    K̄ = α^2*M̂ + K̂
+    M̄,K̄
+end
+
 
 function enlarge(M̄,C̄,K̄)
     T = eltype(M̄)
@@ -112,16 +119,10 @@ function enlarge(M̄,C̄,K̄)
     M̃,K̃
 end
 
-function find_finite(ω2,Z;positive=false)
-    ispositive(x) = x > 0
-    nottoolarge(x) = x < 1.e16
-    if positive
-        finite_index = findall((x)->nottoolarge(x)&&ispositive(x),ω2)
-    else
-        finite_index = findall(isfinite,ω2)
-    end
-    finite_ω2 = ω2[finite_index]
-    finite_Z = Z[:,finite_index]
+function find_finite(ω2,Z,ndof)
+    first_frequency_index = findfirst((x)->x>0,ω2)
+    finite_ω2 = ω2[first_frequency_index:first_frequency_index+ndof-1]
+    finite_Z = Z[:,first_frequency_index:first_frequency_index+ndof-1]
     finite_ω2,finite_Z
 end
 
@@ -133,15 +134,21 @@ function normalize_wrt_mass!(Z,M)
     end
     Z
 end
-function undamped_eigen(tgstruct,q0,λ0)
-    M̂,Ĉ,K̂ = linearize(tgstruct,q0,λ0)
-    aug_ω2,aug_Z = eigen(K̂,M̂)
-    ω2,Z = find_finite(aug_ω2,aug_Z,positive=true)
+function undamped_eigen!(tgstruct,q0,λ0)
+    M̂,Ĉ,K̂ = linearize!(tgstruct,q0,λ0)
+    α = 1
+    M̄,K̄ = frequencyshift(M̂,K̂,α)
+    # @show size(K̄),rank(K̄),cond(K̄),rank(M̄)
+    aug_ω2,aug_Z = eigen(K̄,M̄)
+    aug_ω2 .+= α
     @unpack ncoords, ndof = tgstruct
-    @assert length(ω2) == ndof "Degree of freedom $ndof, while number of freq. $(length(ω2))"
+    # @show aug_ω2
+    ω2,Z = find_finite(aug_ω2,aug_Z,ndof)
     ω = sqrt.(ω2)
     Zq = Z[1:ncoords,:]
-    ω, Zq, Z
+    M = build_massmatrix(tgstruct)
+    normalize_wrt_mass!(Zq,M)
+    ω, Zq#, Z
 end
 
 function undamped_modal_solve!(tgstruct,q0,q̇0,λ0,tf,dt)

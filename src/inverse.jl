@@ -241,50 +241,83 @@ function compensate_gravity_funcs(tgstruct)
     A,F!
 end
 
-
-
-function inverse(tgstruct_input,refstruct,Y;gravity=false,recheck=true)
+function statics_equation_for_actuation(tgstruct_input,refstruct,Y;gravity=false,scale=true)
     tgstruct = deepcopy(tgstruct_input)
-    refq0,_,_ = get_initial(refstruct)
-
+    refq0,_ = get_q(refstruct)
     reset_forces!(tgstruct)
     distribute_q_to_rbs!(tgstruct,refq0)
     update_strings_apply_forces!(tgstruct)
-
-    L̂ = build_L̂(tgstruct)
+    # L̂ = build_L̂(tgstruct)
     K̂ = build_K̂(tgstruct)
     ℓ = build_ℓ(tgstruct)
     Q̃ = build_Q̃(tgstruct)
     A = build_A(tgstruct)
     Aq = A(refq0)
     u0 = [s.original_restlen for s in tgstruct.strings]
+
+    # Right hand side
     rhs = Q̃*K̂*(ℓ-u0)
     if gravity == true
         G = build_G(tgstruct)
         rhs += G
     end
-    lhs = hcat(transpose(Aq),Q̃*K̂*Y)
-    # @show rank(lhs),size(lhs)
-    x = lhs\rhs
-    λ = x[1:tgstruct.nconstraint]
-    a = x[tgstruct.nconstraint+1:end]
-    Δu = Y*a
 
+    # Left hand side
+    K̃ = Q̃*K̂*Y
+    if scale
+        c = maximum(abs.(K̃))
+    else
+        c = 1
+    end
+    lhs = hcat(c*transpose(Aq),K̃)
+
+    tgstruct,lhs,rhs
+end
+
+function get_solution_set(lhs,rhs)
+    # A Particular solution
+    x = pinv(lhs)*rhs
+    # A basis for the null space of lhs
+    nb = nullspace(lhs)
+    return x,nb
+end
+
+function actuation_check(tgstruct,Y,a)
+    Δu = Y*a
     original_restlens = [s.original_restlen for s in tgstruct.strings]
     restlens = original_restlens + Δu
     if any((x)->x<0,restlens)
-        @error "Negative rest lengths"
+        @warn "Negative rest lengths"
     end
     lengths = [s.state.length for s in tgstruct.strings]
-    if any((x)->x<0,lengths-restlens)
-        @error "Zero tension"
+    if any((x)->x<=0,lengths-restlens)
+        @warn "Nonpositive tension"
     end
+end
+
+
+function inverse(tgstruct_input,refstruct,Y;gravity=false,recheck=true,scale=true)
+    # We only use the $q$ of the reference structure.
+    actstruct,lhs,rhs = statics_equation_for_actuation(tgstruct_input,refstruct,Y;gravity,scale)
+    if rank(lhs) < minimum(size(lhs))
+        @warn "LHS is singular: rank(lhs)=$(rank(lhs)) < $(minimum(size(lhs)))"
+        @info "Using Moore-Penrose pseudoinverse"
+        x = pinv(lhs)*rhs
+    else
+        x = lhs\rhs
+    end
+    # W = I-transpose(c*Aq)*inv(c*Aq*transpose(c*Aq))*c*Aq
+    # new_lhs = W*Q̃*K̂*Y
+
+    λ = x[1:actstruct.nconstraint]
+    a = x[actstruct.nconstraint+1:end]
+    actuation_check(actstruct,Y,a)
     # s = 1 ./ lengths
-    actuate!(tgstruct,a)
-    reset_forces!(tgstruct)
-    update_strings_apply_forces!(tgstruct)
-    appproximated = transpose(build_A(tgstruct)(refq0))*λ ≈ build_Q̃(tgstruct)*fvector(tgstruct)
-    @info "Recheck result: $appproximated"
+    # actuate!(tgstruct,a)
+    # reset_forces!(tgstruct)
+    # update_strings_apply_forces!(tgstruct)
+    # appproximated = transpose(build_A(tgstruct)(refq0))*λ ≈ build_Q̃(tgstruct)*fvector(tgstruct)
+    # @info "Recheck result: $appproximated"
     λ,Δu,a
 end
 

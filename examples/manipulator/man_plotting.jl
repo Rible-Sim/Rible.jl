@@ -74,7 +74,7 @@ end
 
 # plotstructure(manipulator)
 
-function bars_and_strings_segs(tgstruct)
+function bars_and_strings_segs(tgstruct;ref=false)
     bars,strings = bars_and_strings(tgstruct)
 
     bars_lines = Vector{Vector{Tuple{Float64,Float64}}}()
@@ -89,10 +89,17 @@ function bars_and_strings_segs(tgstruct)
         lines = [s.first.data,s.second.data]
         push!(strings_lines,lines)
     end
-    color_black = plt.matplotlib.colors.to_rgba("black")
-    color_blue = plt.matplotlib.colors.to_rgba("deepskyblue")
-    bars_segs = plt.matplotlib.collections.LineCollection(bars_lines,linewidths=2,colors=color_black)
-    strings_segs = plt.matplotlib.collections.LineCollection(strings_lines,linewidths=1,colors=color_blue)
+    if ref
+        bar_color_name = "lightgrey"
+        string_color_name = "lightgrey"
+    else
+        bar_color_name = "black"
+        string_color_name = "deepskyblue"
+    end
+    bar_color = plt.matplotlib.colors.to_rgba(bar_color_name)
+    string_color = plt.matplotlib.colors.to_rgba(string_color_name)
+    bars_segs = plt.matplotlib.collections.LineCollection(bars_lines,linewidths=2,colors=bar_color)
+    strings_segs = plt.matplotlib.collections.LineCollection(strings_lines,linewidths=1,colors=string_color)
     bars_segs, strings_segs
 end
 
