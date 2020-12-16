@@ -99,6 +99,7 @@ linkn,fig = eigen_freq()
 fig.savefig("link4_freq_zero.png",dpi=300,bbox_inches="tight")
 
 mode_index = [[1,2],[3],[4],[5,6],[7],[8],[9],[10],[11],[12],[13],[14,15],[16],[17,18]]
+mode_index = [[i] for i = 1:18]
 linkn,fig = eigen_freq(LinRange(0.0,0.0,9),LinRange(0.05,0.20,9);mode_index)
 fig.savefig("link4_freq_energy.png",dpi=300,bbox_inches="tight")
 

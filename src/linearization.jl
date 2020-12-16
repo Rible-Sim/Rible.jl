@@ -100,8 +100,9 @@ function frequencyshift(M̂,Ĉ,K̂,α::Real)
 end
 
 function frequencyshift(M̂,K̂,α::Real)
+    @show α
     M̄ = M̂
-    K̄ = α^2*M̂ + K̂
+    K̄ = α*M̂ + K̂
     M̄,K̄
 end
 
@@ -136,11 +137,11 @@ function normalize_wrt_mass!(Z,M)
 end
 function undamped_eigen!(tgstruct,q0,λ0)
     M̂,Ĉ,K̂ = linearize!(tgstruct,q0,λ0)
-    α = 1
+    α = 1000
     M̄,K̄ = frequencyshift(M̂,K̂,α)
     # @show size(K̄),rank(K̄),cond(K̄),rank(M̄)
-    aug_ω2,aug_Z = eigen(K̄,M̄)
-    aug_ω2 .+= α
+    d,aug_Z = eigen(K̄,M̄)
+    aug_ω2 = d .- α
     @unpack ncoords, ndof = tgstruct
     # @show aug_ω2
     ω2,Z = find_finite(aug_ω2,aug_Z,ndof)

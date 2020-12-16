@@ -109,12 +109,10 @@ function eigenanalysis(θs; k, c)
     for θ in θs
         refman = man_ndof(ndof;θ,k,c) # reference
         refqi,_,_ = TR.get_initial(refman)
-        refλi,_,_= TR.inverse(manipulator,refman,Y)
+        refλi,_,a= TR.inverse(manipulator,refman,Y)
         actmani = deepcopy(manipulator)
-
-        ωi,Zi,_ = TR.undamped_eigen(actmani,refqi,refλi)
-        M = TR.build_massmatrix(actmani)
-        TR.normalize_wrt_mass!(Zi,M)
+        TR.actuate!(actmani,a)
+        ωi,Zi = TR.undamped_eigen!(actmani,refqi,refλi)
         push!(ωs,ωi)
         push!(Zs,Zi)
     end
@@ -125,7 +123,7 @@ end
 ys = [[ω[i] for ω in ωs] for i = 1:length(ωs[1])]
 
 function plotfrequency(x,ys)
-    fig,ax = plt.subplots(1,1,num = 2,figsize=(5.5,3))
+    fig,ax = plt.subplots(1,1,figsize=(5.5,3))
     for (i,y) in enumerate(ys)
         ax.plot(x,y,marker="o",fillstyle="none",label="Mode $i")
     end
@@ -142,7 +140,7 @@ fig = plotfrequency(abs.(θs),ys)
 fig.savefig("man_frequency_k=$k.png",dpi=300,bbox_inches="tight")
 
 function plotfrequency_ratio(x,ys)
-    fig,ax = plt.subplots(1,1,num = 2,figsize=(5.5,3))
+    fig,ax = plt.subplots(1,1,figsize=(5.5,3))
     ys_ratio = [[y[i]/y[1] for i = eachindex(y)] for y in ys]
     for (i,y) in enumerate(ys_ratio)
         ax.plot(x,y,marker="o",fillstyle="none",label="Mode $i")

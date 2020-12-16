@@ -318,7 +318,9 @@ function inverse(tgstruct_input,refstruct,Y;gravity=false,recheck=true,scale=tru
     # update_strings_apply_forces!(tgstruct)
     # appproximated = transpose(build_A(tgstruct)(refq0))*λ ≈ build_Q̃(tgstruct)*fvector(tgstruct)
     # @info "Recheck result: $appproximated"
-    λ,Δu,a
+    u0 = [s.original_restlen for s in actstruct.strings]
+    rl = u0 + Y*a
+    λ,rl,a
 end
 
 function forward(tgstruct,starts,targets)
