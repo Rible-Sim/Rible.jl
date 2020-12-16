@@ -4,3 +4,10 @@ result/
 *.mp4
 *.png
 *.zip
+*.bin
+*.biq
+*.html
+*.xml
+*.eps
+*.agx
+*.csv
