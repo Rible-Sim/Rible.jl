@@ -411,6 +411,10 @@ function get_strings_len(tg::TensegrityStructure)
     [s.state.length for s in tg.strings]
 end
 
+function get_original_restlen(tg::TensegrityStructure)
+    [s.original_restlen for s in tg.strings]
+end
+
 function find_remaining_index(body2q,rbs)
     original_nq = maximum(maximum.(body2q))
     switch_index = zeros(Int,original_nq)

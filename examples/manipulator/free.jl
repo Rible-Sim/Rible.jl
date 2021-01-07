@@ -2,9 +2,6 @@ using LinearAlgebra
 using SparseArrays
 using Parameters
 using StaticArrays
-# using BenchmarkTools
-# using NLsolve
-# using DifferentialEquations
 using Makie
 scene = plot(rand(10))
 import PyPlot; const plt = PyPlot

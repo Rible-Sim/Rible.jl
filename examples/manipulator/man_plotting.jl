@@ -90,8 +90,8 @@ function bars_and_strings_segs(tgstruct;ref=false)
         push!(strings_lines,lines)
     end
     if ref
-        bar_color_name = "lightgrey"
-        string_color_name = "lightgrey"
+        bar_color_name = "orange"
+        string_color_name = "orange"
     else
         bar_color_name = "black"
         string_color_name = "deepskyblue"

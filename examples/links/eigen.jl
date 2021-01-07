@@ -6,27 +6,9 @@ using Parameters
 using Makie
 AbstractPlotting.__init__()
 plot(rand(10))
-import PyPlot; const plt = PyPlot
-plt.pygui(true)
-using LaTeXStrings
-#using DifferentialEquations
-#using ForwardDiff
-# using DynamicPolynomials
-# using Printf
-using CoordinateTransformations
-# using HomotopyContinuation
-using RecursiveArrayTools
-using NLsolve
-using Revise
-using TensegritySolvers; const TS = TensegritySolvers
-using TensegrityRobot
-const TR = TensegrityRobot
-cd("examples/links")
-include("links_define.jl")
-include("link_u_plotting.jl")
-include("link_inverse.jl")
 
-function eigen_freq(θs = [0.0], epes = [0.05]; mode_index)
+
+function eigen_freq(θs = [0.0], epes = [0.05]; mode_index = nothing)
     R = RotY(0.0)
     nstage = 4
     h = 0.066
@@ -60,35 +42,35 @@ function eigen_freq(θs = [0.0], epes = [0.05]; mode_index)
     # ax.set_ylabel("Frequency (Hz)")
 
     # V_E
-    fig,ax = plt.subplots(1,1,figsize=(6.5,5))
-    ax.set_prop_cycle(color=vcat(default_colors,default_colors),
-                     marker=vcat(fill("o",10),fill("v",10))
-                     )
-    for group = mode_index
-        label = "Mode "*join(["$m" for m in group],",")
-        ax.plot(epes,freqs[group[1],:],fillstyle="none";label)
-        ax.set_ylabel("Frequency (Hz)")
-        ax.set_xlabel(L"V_E\ (\mathrm{J})")
-        ax.set_xticks([0.05,0.1,0.15,0.2])
-        # ax.set_xlim(1,20)
-        # ax.set_ylim(0,100)
-    end
-    ax.legend(loc="upper left", bbox_to_anchor=(1.0, 1.0))
-
-    # θ
     # fig,ax = plt.subplots(1,1,figsize=(6.5,5))
     # ax.set_prop_cycle(color=vcat(default_colors,default_colors),
     #                  marker=vcat(fill("o",10),fill("v",10))
     #                  )
-    # for i = 1:nfirstmodes
-    #     ax.plot(θs,freqs[i,:],fillstyle="none",label="Mode $i")
+    # for group = mode_index
+    #     label = "Mode "*join(["$m" for m in group],",")
+    #     ax.plot(epes,freqs[group[1],:],fillstyle="none";label)
     #     ax.set_ylabel("Frequency (Hz)")
-    #     ax.set_xlabel(L"\theta\ (\mathrm{rad})")
-    #     ax.set_xticks(LinRange(0.0,0.25,6))
+    #     ax.set_xlabel(L"V_E\ (\mathrm{J})")
+    #     ax.set_xticks([0.05,0.1,0.15,0.2])
     #     # ax.set_xlim(1,20)
     #     # ax.set_ylim(0,100)
     # end
-    # ax.legend(loc="upper right", bbox_to_anchor=(1.3, 1.0))
+    # ax.legend(loc="upper left", bbox_to_anchor=(1.0, 1.0))
+
+    # θ
+    fig,ax = plt.subplots(1,1,figsize=(6.5,5))
+    ax.set_prop_cycle(color=vcat(default_colors,default_colors),
+                     marker=vcat(fill("o",10),fill("v",10))
+                     )
+    for i = 1:nfirstmodes
+        ax.plot(θs,freqs[i,:],fillstyle="none",label="Mode $i")
+        ax.set_ylabel("Frequency (Hz)")
+        ax.set_xlabel(L"\theta\ (\mathrm{rad})")
+        ax.set_xticks(LinRange(0.0,0.25,6))
+        # ax.set_xlim(1,20)
+        # ax.set_ylim(0,100)
+    end
+    ax.legend(loc="upper right", bbox_to_anchor=(1.3, 1.0))
 
 
     ax.grid("on")

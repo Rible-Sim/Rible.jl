@@ -47,7 +47,7 @@ rl_indexes = [
 [[1,2,3],[4,5,6]],
 [[1],[2,3],[4],[5,6]]
 ]
-inverse2energy_plot(θs2,rl_indexes)
+linkn = inverse2energy_plot(θs2,rl_indexes)
 
 rl_index = [[1],[2,3],[4],[5,6]]
 inverse_with_energy_plot(θs32,rl_index)

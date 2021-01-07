@@ -195,6 +195,7 @@ function inverse2energy_plot(θs,rl_indexes)
         fig.tight_layout()
         fig.savefig("link2_inv_pose$(i)_energy.png",dpi=300,bbox_inches="tight")
     end
+    linkn
 end
 
 
@@ -255,7 +256,7 @@ end
 
 
 function inverse_with_energy_3(tgstruct,refstruct,Y,epes)
-    actstruct,lhs,rhs = TR.statics_equation_for_actuation(tgstruct,refstruct,Y,gravity=false,scale=false)
+    actstruct,lhs,rhs,c = TR.statics_equation_for_actuation(tgstruct,refstruct,Y,gravity=false,scale=false)
     # @show rank(lhs),size(lhs)
     xp,nb = TR.get_solution_set(lhs,rhs)
     Vfuncs = [build_EPE_from_actuation(actstruct,Y,6(i-1)+1:6i) for i = 1:3]
@@ -271,9 +272,12 @@ function inverse_with_energy_3(tgstruct,refstruct,Y,epes)
         @error "Not converged!"
     end
     x_result = (xp + nb*nl_result.zero)
-    λ_result = x_result[1:actstruct.nconstraint]
+    λ_result = x_result[1:actstruct.nconstraint].*c
     a_result = x_result[actstruct.nconstraint+1:end]
     TR.actuation_check(actstruct,Y,a_result)
+    refq,_ = TR.get_q(refstruct)
+    TR.actuate!(actstruct,a_result)
+    @assert TR.check_static_equilibrium(actstruct,refq,λ_result)
     u0 = [s.original_restlen for s in actstruct.strings]
     rl_result = u0 + Y*a_result
     λ_result,rl_result,a_result

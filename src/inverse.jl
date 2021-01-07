@@ -271,7 +271,7 @@ function statics_equation_for_actuation(tgstruct_input,refstruct,Y;gravity=false
     end
     lhs = hcat(c*transpose(Aq),K̃)
 
-    tgstruct,lhs,rhs
+    tgstruct,lhs,rhs,c
 end
 
 function get_solution_set(lhs,rhs)
@@ -298,7 +298,7 @@ end
 
 function inverse(tgstruct_input,refstruct,Y;gravity=false,recheck=true,scale=true)
     # We only use the $q$ of the reference structure.
-    actstruct,lhs,rhs = statics_equation_for_actuation(tgstruct_input,refstruct,Y;gravity,scale)
+    actstruct,lhs,rhs,c = statics_equation_for_actuation(tgstruct_input,refstruct,Y;gravity,scale)
     if rank(lhs) < minimum(size(lhs))
         @warn "LHS is singular: rank(lhs)=$(rank(lhs)) < $(minimum(size(lhs)))"
         @info "Using Moore-Penrose pseudoinverse"
@@ -309,18 +309,31 @@ function inverse(tgstruct_input,refstruct,Y;gravity=false,recheck=true,scale=tru
     # W = I-transpose(c*Aq)*inv(c*Aq*transpose(c*Aq))*c*Aq
     # new_lhs = W*Q̃*K̂*Y
 
-    λ = x[1:actstruct.nconstraint]
+    λ = x[1:actstruct.nconstraint].*c
     a = x[actstruct.nconstraint+1:end]
     actuation_check(actstruct,Y,a)
-    # s = 1 ./ lengths
-    # actuate!(tgstruct,a)
-    # reset_forces!(tgstruct)
-    # update_strings_apply_forces!(tgstruct)
-    # appproximated = transpose(build_A(tgstruct)(refq0))*λ ≈ build_Q̃(tgstruct)*fvector(tgstruct)
-    # @info "Recheck result: $appproximated"
+    refq,_ = get_q(refstruct)
+    actuate!(actstruct,a)
+    @assert check_static_equilibrium(actstruct,refq,λ)
     u0 = [s.original_restlen for s in actstruct.strings]
     rl = u0 + Y*a
     λ,rl,a
+end
+
+function check_static_equilibrium(tgstruct,q,λ;gravity=false)
+    reset_forces!(tgstruct)
+    distribute_q_to_rbs!(tgstruct,q)
+    update_strings_apply_forces!(tgstruct)
+    constraint_forces = transpose(build_A(tgstruct)(q))*λ
+    if gravity
+        apply_gravity!(tgstruct)
+    end
+    generalized_forces = assemble_forces(tgstruct)
+    static_equilibrium = constraint_forces ≈ generalized_forces
+    if !static_equilibrium
+        @error "System not in static equilibrium."
+    end
+    static_equilibrium
 end
 
 function forward(tgstruct,starts,targets)
