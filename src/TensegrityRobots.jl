@@ -1,4 +1,4 @@
-module TensegrityRobot
+module TensegrityRobots
 
 using Logging
 using SparseArrays
@@ -13,6 +13,9 @@ using FiniteDiff
 using HomotopyContinuation
 using DynamicPolynomials
 using EzXML
+using Cubature
+using GaussQuadrature
+using ProgressMeter, Printf
 
 include("naturalcoordinates.jl")
 using .NaturalCoordinates
@@ -37,5 +40,6 @@ include("contact.jl")
 include("linearization.jl")
 include("tangent.jl")
 include("miscellaneous.jl")
+include("solvers.jl")
 
 end
