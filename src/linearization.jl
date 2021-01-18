@@ -69,6 +69,13 @@ function test_fvector(tgstruct,q0)
     FiniteDiff.finite_difference_jacobian(L,q0)
 end
 
+function build_K(tgstruct)
+    Q̃ = build_Q̃(tgstruct)
+    q,_ = get_q(tgstruct)
+    ∂L∂q,_ = build_tangent!(tgstruct,q)
+    K = -Q̃*∂L∂q
+end
+
 function linearize!(tgstruct,q,λ)
     M = build_massmatrix(tgstruct)
     A = build_A(tgstruct)
@@ -179,4 +186,13 @@ function undamped_modal_solve!(tgstruct,q0,q̇0,λ0,tf,dt)
     end
     z = Z*ζ
     q = z[1:length(q0),:]
+end
+
+function stability(tg)
+    K = build_K(tg)
+    A = build_A(tg)
+    q,_ = get_q(tg)
+    N = nullspace(A(q))
+    Ǩ = transpose(N)*K*N
+    eigen(Ǩ)
 end

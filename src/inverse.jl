@@ -152,19 +152,19 @@ function build_W(tgstruct)
     W = transpose(Aq)*inv(Aq*transpose(Aq))*Aq
 end
 
-function build_K(tgstruct)
-    q,_ = get_q(tgstruct)
-    A = build_A(tgstruct)
-    Q̃ = build_Q̃(tgstruct)
-    K̂ = build_K̂(tgstruct)
-    # ℓ = build_ℓ(tgstruct)
-    K = hcat(
-        transpose(A(q)),
-        Q̃*K̂
-        )
-end
+# function build_K(tgstruct)
+#     q,_ = get_q(tgstruct)
+#     A = build_A(tgstruct)
+#     Q̃ = build_Q̃(tgstruct)
+#     K̂ = build_K̂(tgstruct)
+#     # ℓ = build_ℓ(tgstruct)
+#     K = hcat(
+#         transpose(A(q)),
+#         Q̃*K̂
+#         )
+# end
 
-function build_G(tgstruct;factor=1.0)
+function build_G!(tgstruct;factor=1.0)
     reset_forces!(tgstruct)
     apply_gravity!(tgstruct)
     G = assemble_forces(tgstruct;factor=factor)
@@ -184,7 +184,7 @@ function build_RHS(tgstruct)
     Q̃ = build_Q̃(tgstruct)
     K̂ = build_K̂(tgstruct)
     ℓ = build_ℓ(tgstruct)
-    G = build_G(tgstruct)
+    G = build_G!(tgstruct)
     RHS = Q̃*K̂*ℓ + G
 end
 # Not ready
@@ -257,9 +257,9 @@ function statics_equation_for_actuation(tgstruct_input,refstruct,Y;gravity=false
 
     # Right hand side
     rhs = Q̃*K̂*(ℓ-u0)
-    if gravity == true
-        G = build_G(tgstruct)
-        rhs += G
+    if gravity
+        G = build_G!(tgstruct)
+        rhs .+= G
     end
 
     # Left hand side
@@ -267,7 +267,7 @@ function statics_equation_for_actuation(tgstruct_input,refstruct,Y;gravity=false
     if scale
         c = maximum(abs.(K̃))
     else
-        c = 1
+        c = one(eltype(K̃))
     end
     lhs = hcat(c*transpose(Aq),K̃)
 
@@ -303,6 +303,7 @@ function inverse(tgstruct_input,refstruct,Y;gravity=false,recheck=true,scale=tru
         @warn "LHS is singular: rank(lhs)=$(rank(lhs)) < $(minimum(size(lhs)))"
         @info "Using Moore-Penrose pseudoinverse"
         x = pinv(lhs)*rhs
+        @debug "Inv. Res. $(lhs*x-rhs)"
     else
         x = lhs\rhs
     end
@@ -314,22 +315,44 @@ function inverse(tgstruct_input,refstruct,Y;gravity=false,recheck=true,scale=tru
     actuation_check(actstruct,Y,a)
     refq,_ = get_q(refstruct)
     actuate!(actstruct,a)
-    @assert check_static_equilibrium(actstruct,refq,λ)
+    check_static_equilibrium(actstruct,refq,λ;gravity)
     u0 = [s.original_restlen for s in actstruct.strings]
     rl = u0 + Y*a
     λ,rl,a
 end
 
-function check_static_equilibrium(tgstruct,q,λ;gravity=false)
+function get_inverse_func(tgstruct_input,refstruct,Y;gravity=false,recheck=true,scale=true)
+    # We only use the $q$ of the reference structure.
+    actstruct,lhs,rhs,c = statics_equation_for_actuation(tgstruct_input,refstruct,Y;gravity,scale)
+    ncoeffs = maximum(size(lhs))- rank(lhs)
+    xp,nb = get_solution_set(lhs,rhs)
+    @info "Number of coefficients = $ncoeffs"
+    function inner_inverse_func(ξ)
+        x = xp + nb*ξ
+        λ = x[1:actstruct.nconstraint].*c
+        a = x[actstruct.nconstraint+1:end]
+        actuation_check(actstruct,Y,a)
+        refq,_ = get_q(refstruct)
+        actuate!(actstruct,a)
+        check_static_equilibrium(actstruct,refq,λ;gravity)
+        u0 = [s.original_restlen for s in actstruct.strings]
+        rl = u0 + Y*a
+        λ,rl,a
+    end
+end
+
+function check_static_equilibrium(tgstruct_input,q,λ;gravity=false)
+    tgstruct = deepcopy(tgstruct_input)
     reset_forces!(tgstruct)
     distribute_q_to_rbs!(tgstruct,q)
     update_strings_apply_forces!(tgstruct)
-    constraint_forces = transpose(build_A(tgstruct)(q))*λ
     if gravity
         apply_gravity!(tgstruct)
     end
     generalized_forces = assemble_forces(tgstruct)
+    constraint_forces = transpose(build_A(tgstruct)(q))*λ
     static_equilibrium = constraint_forces ≈ generalized_forces
+    @debug "Res. forces = $(generalized_forces-constraint_forces)"
     if !static_equilibrium
         @error "System not in static equilibrium."
     end
@@ -356,11 +379,12 @@ function forward(tgstruct,starts,targets)
     U = build_U(tgstruct,polya,polyu)
     S = build_S(tgstruct,polya,polyq)
 
-    G = build_G(tgstruct)
+    G = build_G!(tgstruct)
+
     F = [-transpose(A(polyq))*polyλ  + g*G + Q̃*U*polyq;
         S;
         Φ(polyq)]
-
+    @show maximum(abs.(to_number.(subs(F, q=>q0, a=>a0, λ=>λ0, u=>u0, g=>g0))))
     # reset_forces!(tgstruct)
     # update_strings_apply_forces!(tgstruct)
     # l = [s.state.length for s = tgstruct.strings]
@@ -368,14 +392,15 @@ function forward(tgstruct,starts,targets)
     # g0 = 1.0
     # g1 = 0.0
 
-    startparas = vcat(u0,g0)
-    endparas = vcat(u1,g1)
+    start_parameters = vcat(u0,g0)
+    target_parameters = vcat(u1,g1)
     startsols = [[q0; a0; λ0]]
     vg = [q,a,λ]
     # FFF = [subs(f, u=>l,g=>0.0) for f in F]
     Fsys = System(F; variable_groups=vg, parameters = [u;g])
 
-    ParameterHomotopy(Fsys,startparas,endparas),startsols
+    # ParameterHomotopy(Fsys,start_parameters,target_parameters),startsols
     # [subs(f, q=>q0,λ=>λ0,a=>a0,u=>u0,g=>1.0) for f in F]
-    result = solve(Fsys, startsols; start_parameters=startparas, target_parameters=endparas)
+    result = HomotopyContinuation.solve(Fsys, startsols; start_parameters, target_parameters, threading = false)
+    # result = HomotopyContinuation.solve(Fsys, startsols)
 end
