@@ -373,34 +373,49 @@ end
 function get_u(tgstruct)
 end
 
-get_ndim(rb::AbstractRigidBody{N,T,CType}) where {N,T,CType} = N
+get_ndim(tg::TensegrityStructure) = get_ndim(tg.rigidbodies)
+get_ndim(rbs::AbstractVector{<:AbstractRigidBody}) = get_ndim(eltype(rbs))
+get_ndim(rb::AbstractRigidBody) = get_ndim(typeof(rb))
+get_ndim(::Type{<:AbstractRigidBody{N,T,C}}) where {N,T,C} = N
 
 get_numbertype(tg::TensegrityStructure) = get_numbertype(tg.rigidbodies)
-get_numbertype(rbs::Vector{rbT}) where rbT<:AbstractRigidBody{N,T,CType}  where {N,T,CType} = T
+get_numbertype(rbs::AbstractVector{<:AbstractRigidBody}) = get_numbertype(eltype(rbs))
+get_numbertype(rb::AbstractRigidBody) = get_numbertype(typeof(rb))
+get_numbertype(::Type{<:AbstractRigidBody{N,T,C}}) where {N,T,C} = T
 
 get_nbodyconstraint(tg::TensegrityStructure) = get_nbodyconstraint(tg.rigidbodies)
-get_nbodyconstraint(rbs::Vector{rbT}) where rbT<:AbstractRigidBody{3,T,CType} where {T,CType} = 6
-get_nbodyconstraint(rbs::Vector{rbT}) where rbT<:AbstractRigidBody{2,T,CType} where {T,CType} = 1
-get_nbodyconstraint(rb::AbstractRigidBody{3,T,CType}) where {T,CType} = 6
-get_nbodyconstraint(rb::AbstractRigidBody{2,T,CType}) where {T,CType} = 1
-
-get_nbodydof(tg::TensegrityStructure) = get_nbodydof(tg.rigidbodies)
-get_nbodydof(rbs::Vector{rbT}) where rbT<:AbstractRigidBody{3,T,CType} where {T,CType} = 6
-get_nbodydof(rbs::Vector{rbT}) where rbT<:AbstractRigidBody{2,T,CType} where {T,CType} = 3
-get_nbodydof(rb::AbstractRigidBody{3,T,CType}) where {T,CType} = 6
-get_nbodydof(rb::AbstractRigidBody{2,T,CType}) where {T,CType} = 3
+get_nbodyconstraint(rbs::AbstractVector{<:AbstractRigidBody}) = get_nbodyconstraint(eltype(rbs))
+get_nbodyconstraint(rb::AbstractRigidBody) = get_nbodyconstraint(typeof(rb))
+get_nbodyconstraint(::Type{<:RigidBody{N,T,L,C,
+                <:NaturalCoordinatesCache{ArrayT,MT,
+                <:NaturalCoordinates.CoordinateFunctions{lncsType},
+                cfT}}}) where {N,T,L,C,ArrayT,MT,lncsType,cfT} = get_nbodyconstraint(lncsType)
+get_nbodyconstraint(::Type{<:NaturalCoordinates.LocalNaturalCoordinates2D4C}) = 1
+get_nbodyconstraint(::Type{<:NaturalCoordinates.LocalNaturalCoordinates2D6C}) = 3
+get_nbodyconstraint(::Type{<:NaturalCoordinates.LocalNaturalCoordinates3D12C}) = 6
 
 get_nbodycoords(tg::TensegrityStructure) = get_nbodycoords(tg.rigidbodies)
-get_nbodycoords(rbs::Vector{rbT}) where rbT<:AbstractRigidBody{3,T,CType} where {T,CType} = 12
-get_nbodycoords(rbs::Vector{rbT}) where rbT<:AbstractRigidBody{2,T,CType} where {T,CType} = 4
-get_nbodycoords(rb::AbstractRigidBody{3,T,CType}) where {T,CType} = 12
-get_nbodycoords(rb::AbstractRigidBody{2,T,CType}) where {T,CType} = 4
+get_nbodycoords(rbs::AbstractVector{<:AbstractRigidBody}) = get_nbodycoords(eltype(rbs))
+get_nbodycoords(rb::AbstractRigidBody) = get_nbodycoords(typeof(rb))
+get_nbodycoords(::Type{<:RigidBody{N,T,L,C,
+                <:NaturalCoordinatesCache{ArrayT,MT,
+                <:NaturalCoordinates.CoordinateFunctions{lncsType},
+                cfT}}}) where {N,T,L,C,ArrayT,MT,lncsType,cfT} = get_nbodycoords(lncsType)
+get_nbodycoords(::Type{<:NaturalCoordinates.LocalNaturalCoordinates2D4C}) = 4
+get_nbodycoords(::Type{<:NaturalCoordinates.LocalNaturalCoordinates2D6C}) = 6
+get_nbodycoords(::Type{<:NaturalCoordinates.LocalNaturalCoordinates3D12C}) = 12
+
+get_nbodydof(tg::TensegrityStructure) = get_nbodydof(tg.rigidbodies)
+get_nbodydof(rbs::AbstractVector{<:AbstractRigidBody}) = get_nbodydof(eltype(rbs))
+get_nbodydof(rb::AbstractRigidBody) = get_nbodydof(typeof(rb))
+get_nbodydof(::Type{<:AbstractRigidBody{2,T,C}}) where {T,C} = 3
+get_nbodydof(::Type{<:AbstractRigidBody{3,T,C}}) where {T,C} = 6
 
 get_gravity(tg::TensegrityStructure) = get_gravity(tg.rigidbodies)
-get_gravity(rb::Vector{rbT}) where rbT<:AbstractRigidBody{3,T,CType} where {T,CType} = [zero(T),zero(T),-9.81*one(T)]
-get_gravity(rb::Vector{rbT}) where rbT<:AbstractRigidBody{2,T,CType} where {T,CType} = [zero(T),-9.81*one(T)]
-get_gravity(rb::rbT) where rbT<:AbstractRigidBody{3,T,CType} where {T,CType} = [zero(T),zero(T),-9.81*one(T)]
-get_gravity(rb::rbT) where rbT<:AbstractRigidBody{2,T,CType} where {T,CType} = [zero(T),-9.81*one(T)]
+get_gravity(rbs::AbstractVector{<:AbstractRigidBody}) = get_gravity(eltype(rbs))
+get_gravity(rb::AbstractRigidBody) = get_gravity(typeof(rb))
+get_gravity(::Type{<:AbstractRigidBody{2,T,C}}) where {T,C} = [zero(T),-9.81*one(T)]
+get_gravity(::Type{<:AbstractRigidBody{3,T,C}}) where {T,C} = [zero(T),zero(T),-9.81*one(T)]
 
 function get_strings_len(tg::TensegrityStructure,q)
     distribute_q_to_rbs!(tg,q,zero(q))

@@ -13,10 +13,10 @@ uuid = "d9960996-1013-53c9-9ba4-74a4155039c3"
 version = "2.18.1+1"
 
 [[Arblib]]
-deps = ["Arb_jll", "LinearAlgebra", "Random", "Test"]
-git-tree-sha1 = "b405db37175b993ecca7096ed3be0bdc3e52939a"
+deps = ["Arb_jll", "FLINT_jll", "LinearAlgebra", "Random", "Test"]
+git-tree-sha1 = "e67b5ad969e242f7f5ac832a5de499d53bb2acc9"
 uuid = "fb37089c-8514-4489-9461-98f9c8763369"
-version = "0.2.1"
+version = "0.2.2"
 
 [[ArrayInterface]]
 deps = ["LinearAlgebra", "Requires", "SparseArrays"]
@@ -124,9 +124,9 @@ version = "1.0.2"
 
 [[Distances]]
 deps = ["LinearAlgebra", "Statistics"]
-git-tree-sha1 = "a5b88815e6984e9f3256b6ca0dc63109b16a506f"
+git-tree-sha1 = "e8b13ba5f166e11df2de6fc283e5db7864245df0"
 uuid = "b4f34e82-e78d-54a5-968a-f98e89d6e8f7"
-version = "0.9.2"
+version = "0.10.0"
 
 [[Distributed]]
 deps = ["Random", "Serialization", "Sockets"]
@@ -158,9 +158,9 @@ version = "1.1.0"
 
 [[FLINT_jll]]
 deps = ["Artifacts", "GMP_jll", "JLLWrappers", "Libdl", "MPFR_jll", "Pkg"]
-git-tree-sha1 = "648891e837baafba25dd81a129fbef9b1f191d47"
+git-tree-sha1 = "f9930b0050cd60d854b10c1de88aae0dac37d44a"
 uuid = "e134572f-a0d5-539d-bddf-3cad8db41a82"
-version = "200.700.0+0"
+version = "2.6.3+1"
 
 [[FillArrays]]
 deps = ["LinearAlgebra", "Random", "SparseArrays"]
@@ -216,9 +216,9 @@ version = "0.8.4"
 
 [[HomotopyContinuation]]
 deps = ["Arblib", "DelimitedFiles", "DynamicPolynomials", "ElasticArrays", "FiniteDiff", "LRUCache", "LinearAlgebra", "LoopVectorization", "MixedSubdivisions", "MultivariatePolynomials", "Parameters", "PrettyTables", "Printf", "ProgressMeter", "ProjectiveVectors", "Random", "Reexport", "StructArrays", "SymEngine_jll", "TreeViews"]
-git-tree-sha1 = "a9836f5cb5dd2f4f71d93d48a4f46a3230460bb5"
+git-tree-sha1 = "97548472f13addaf10d51f36a2d823f88e6d9196"
 uuid = "f213a82b-91d6-5c5d-acf7-10f1c761b327"
-version = "2.3.2"
+version = "2.3.3"
 
 [[Hwloc]]
 deps = ["Hwloc_jll"]
@@ -345,9 +345,9 @@ version = "7.7.1"
 
 [[NLsolve]]
 deps = ["Distances", "LineSearches", "LinearAlgebra", "NLSolversBase", "Printf", "Reexport"]
-git-tree-sha1 = "650f266dcb5a24b4095fdab92f0137c0f4ee9392"
+git-tree-sha1 = "019f12e9a1a7880459d0173c182e6a99365d7ac1"
 uuid = "2774e3e8-f4cf-5e23-947b-6d7e65073b56"
-version = "4.4.1"
+version = "4.5.1"
 
 [[NaNMath]]
 git-tree-sha1 = "bfe47e760d60b82b66b61d2d44128b62e3a369fb"

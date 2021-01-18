@@ -4,108 +4,23 @@ using StaticArrays
 using Parameters
 using ForwardDiff
 
-abstract type BasicPoints end
-abstract type BasicPoints2D <: BasicPoints end
-abstract type BasicPoints3D <: BasicPoints end
-make_I(T,N) = Matrix(one(T)*I,N,N)
+abstract type LocalNaturalCoordinates{T} end
+abstract type LocalNaturalCoordinates2D{T} <: LocalNaturalCoordinates{T} end
+abstract type LocalNaturalCoordinates3D{T} <: LocalNaturalCoordinates{T} end
+abstract type LocalNaturalCoordinates2D4C{T} <: LocalNaturalCoordinates2D{T} end
+abstract type LocalNaturalCoordinates2D6C{T} <: LocalNaturalCoordinates2D{T} end
+abstract type LocalNaturalCoordinates3D12C{T} <: LocalNaturalCoordinates3D{T} end
 
-struct BasicPoints2P{T} <: BasicPoints2D
-    r̄i::SArray{Tuple{2},T,1,2}
-    r̄j::SArray{Tuple{2},T,1,2}
+make_I(T,N) = SMatrix{N,N}(one(T)*I)
+
+function LinearAlgebra.cross(a::Number,b::AbstractVector)
+    ret = similar(b)
+    ret[1] = -a*b[2]
+    ret[2] =  a*b[1]
+    ret
 end
 
-struct BasicPoints1P1V{T} <: BasicPoints2D
-    r̄i::SArray{Tuple{2},T,1,2}
-    ū::SArray{Tuple{2},T,1,2}
-end
-
-struct BasicPoints1P3V{T} <: BasicPoints3D
-    r̄i::SArray{Tuple{3},T,1,3}
-    ū::SArray{Tuple{3},T,1,3}
-    v̄::SArray{Tuple{3},T,1,3}
-    w̄::SArray{Tuple{3},T,1,3}
-end
-
-struct BasicPoints2P2V{T} <: BasicPoints3D
-    r̄i::SArray{Tuple{3},T,1,3}
-    r̄j::SArray{Tuple{3},T,1,3}
-    v̄::SArray{Tuple{3},T,1,3}
-    w̄::SArray{Tuple{3},T,1,3}
-end
-
-struct BasicPoints3P1V{T} <: BasicPoints3D
-    r̄i::SArray{Tuple{3},T,1,3}
-    r̄j::SArray{Tuple{3},T,1,3}
-    r̄k::SArray{Tuple{3},T,1,3}
-    w̄::SArray{Tuple{3},T,1,3}
-end
-
-struct BasicPoints4P{T} <: BasicPoints3D
-    r̄i::SArray{Tuple{3},T,1,3}
-    r̄j::SArray{Tuple{3},T,1,3}
-    r̄k::SArray{Tuple{3},T,1,3}
-    r̄l::SArray{Tuple{3},T,1,3}
-end
-
-# Constructors
-
-# 2D
-function BasicPoints1P1V{T}() where T
-    o = zero(T)
-    i = one(T)
-    r̄i = SVector(o,o)
-    ū = SVector(i,o)
-    BasicPoints1P1V(r̄i,ū)
-end
-
-function BasicPoints2P(Lij::Real)
-    o = zero(Lij)
-    r̄i = SVector(o,o)
-    r̄j = SVector(Lij,o)
-    BasicPoints2P(r̄i,r̄j)
-end
-
-
-function transform_to_1P1V(bps::BasicPoints2P{T}) where T
-    I2 = make_I(T,2)
-    Lij = norm(bps.r̄i-bps.r̄j)
-    V = kron(
-        [1     0;
-        -1/Lij 1/Lij],
-        I2
-    )
-end
-
-# 3D
-
-function BP1P3V(ri::AbstractVector{T},
-               ro=zeros(T,3),R=Matrix(one(T)*I,3,3)
-               ) where T
-    o = zero(T)
-    i = one(T)
-    ū = SVector(i,o,o)
-    v̄ = SVector(o,i,o)
-    w̄ = SVector(o,o,i)
-    invR = transpose(R) # because this is a rotation matrix
-    r̄i = invR*(ri-ro) #
-    u = R*ū
-    v = R*v̄
-    w = R*w̄
-    bps = BasicPoints1P3V(SVector{3}(r̄i),SVector{3}(ū),
-                          SVector{3}(v̄), SVector{3}(w̄))
-    q = vcat(ri,u,v,w)
-    bps,q
-end
-
-function BP1P3V(ri,ro,R,ṙo,ω)
-    bps,q = BP1P3V(ri,ro,R)
-    ṙi = ṙo + ω×(ri-ro)
-    u̇ = ω×q[4:6]
-    v̇ = ω×q[7:9]
-    ẇ = ω×q[10:12]
-    q̇ = vcat(ṙi,u̇,v̇,ẇ)
-    bps,q,q̇
-end
+rotation_matrix(θ) = @SMatrix [cos(θ) -sin(θ); sin(θ) cos(θ)]
 
 @inline @inbounds function HouseholderOrthogonalization(n)
     n̄ = norm(n)
@@ -119,7 +34,228 @@ end
     t,b
 end
 
-function BP2P2V(ri::AbstractVector{T},rj::AbstractVector{T},
+function skew(w)
+    w1,w2,w3 = w
+    o = zero(w1)
+    @SMatrix [o -w3 w2;
+              w3 o -w1;
+             -w2 w1 o]
+end
+
+struct LocalNaturalCoordinates1P1V{T} <: LocalNaturalCoordinates2D4C{T}
+    r̄i::SArray{Tuple{2},T,1,2}
+    ū::SArray{Tuple{2},T,1,2}
+    X̄::SArray{Tuple{2,2},T,2,4}
+    invX̄::SArray{Tuple{2,2},T,2,4}
+end
+
+struct LocalNaturalCoordinates2P{T} <: LocalNaturalCoordinates2D4C{T}
+    r̄i::SArray{Tuple{2},T,1,2}
+    r̄j::SArray{Tuple{2},T,1,2}
+    X̄::SArray{Tuple{2,2},T,2,4}
+    invX̄::SArray{Tuple{2,2},T,2,4}
+end
+
+struct LocalNaturalCoordinates1P2V{T} <: LocalNaturalCoordinates2D6C{T}
+    r̄i::SArray{Tuple{2},T,1,2}
+    ū::SArray{Tuple{2},T,1,2}
+    v̄::SArray{Tuple{2},T,1,2}
+    X̄::SArray{Tuple{2,2},T,2,4}
+    invX̄::SArray{Tuple{2,2},T,2,4}
+end
+
+struct LocalNaturalCoordinates2P1V{T} <: LocalNaturalCoordinates2D6C{T}
+    r̄i::SArray{Tuple{2},T,1,2}
+    r̄j::SArray{Tuple{2},T,1,2}
+    v̄::SArray{Tuple{2},T,1,2}
+    X̄::SArray{Tuple{2,2},T,2,4}
+    invX̄::SArray{Tuple{2,2},T,2,4}
+end
+
+struct LocalNaturalCoordinates3P{T} <: LocalNaturalCoordinates2D6C{T}
+    r̄i::SArray{Tuple{2},T,1,2}
+    r̄j::SArray{Tuple{2},T,1,2}
+    r̄k::SArray{Tuple{2},T,1,2}
+    X̄::SArray{Tuple{2,2},T,2,4}
+    invX̄::SArray{Tuple{2,2},T,2,4}
+end
+
+struct LocalNaturalCoordinates1P3V{T} <: LocalNaturalCoordinates3D12C{T}
+    r̄i::SArray{Tuple{3},T,1,3}
+    ū::SArray{Tuple{3},T,1,3}
+    v̄::SArray{Tuple{3},T,1,3}
+    w̄::SArray{Tuple{3},T,1,3}
+    X̄::SArray{Tuple{3,3},T,2,9}
+    invX̄::SArray{Tuple{3,3},T,2,9}
+end
+
+struct LocalNaturalCoordinates2P2V{T} <: LocalNaturalCoordinates3D12C{T}
+    r̄i::SArray{Tuple{3},T,1,3}
+    r̄j::SArray{Tuple{3},T,1,3}
+    v̄::SArray{Tuple{3},T,1,3}
+    w̄::SArray{Tuple{3},T,1,3}
+    X̄::SArray{Tuple{3,3},T,2,9}
+    invX̄::SArray{Tuple{3,3},T,2,9}
+end
+
+struct LocalNaturalCoordinates3P1V{T} <: LocalNaturalCoordinates3D12C{T}
+    r̄i::SArray{Tuple{3},T,1,3}
+    r̄j::SArray{Tuple{3},T,1,3}
+    r̄k::SArray{Tuple{3},T,1,3}
+    w̄::SArray{Tuple{3},T,1,3}
+    X̄::SArray{Tuple{3,3},T,2,9}
+    invX̄::SArray{Tuple{3,3},T,2,9}
+end
+
+struct LocalNaturalCoordinates4P{T} <: LocalNaturalCoordinates3D12C{T}
+    r̄i::SArray{Tuple{3},T,1,3}
+    r̄j::SArray{Tuple{3},T,1,3}
+    r̄k::SArray{Tuple{3},T,1,3}
+    r̄l::SArray{Tuple{3},T,1,3}
+    X̄::SArray{Tuple{3,3},T,2,9}
+    invX̄::SArray{Tuple{3,3},T,2,9}
+end
+
+# Constructors
+
+# 2D
+function LocalNaturalCoordinates1P1V{T}(r̄i = SVector{2}(zeros(T,2))) where T
+    ū = SVector(one(T),zero(T))
+    X̄ = hcat(ū,[-ū[2],ū[1]])
+    LocalNaturalCoordinates1P1V(SVector{2}(r̄i),SVector{2}(ū),SMatrix{2,2}(X̄),SMatrix{2,2}(inv(X̄)))
+end
+
+function LocalNaturalCoordinates2P(Lij::Real)
+    o = zero(Lij)
+    r̄i = SVector(o,o)
+    r̄j = SVector(Lij,o)
+    ū = r̄j-r̄i
+    X̄ = hcat(ū,[-ū[2],ū[1]])
+    LocalNaturalCoordinates2P(SVector{2}(r̄i),SVector{2}(r̄j),SMatrix{2,2}(X̄),SMatrix{2,2}(inv(X̄)))
+end
+
+function transform_to_1P1V(lncs::LocalNaturalCoordinates2P{T}) where T
+    I2 = make_I(T,2)
+    Lij = norm(lncs.r̄i-lncs.r̄j)
+    V = kron(
+        [1     0;
+        -1/Lij 1/Lij],
+        I2
+    )
+end
+
+function NC1P2V(ri::AbstractVector{T},
+               ro=SVector{2}(zeros(T,2)),R=SMatrix{2,2}(one(T)*I)
+               ) where T
+    o = zero(T)
+    i = one(T)
+    ū = SVector(i,o)
+    v̄ = SVector(o,i)
+    invR = transpose(R) # because this is a rotation matrix
+    r̄i = invR*(ri-ro) #
+    u = R*ū
+    v = R*v̄
+    X̄ = hcat(ū,v̄)
+    lncs = LocalNaturalCoordinates1P2V(SVector{2}(r̄i),SVector{2}(ū),SVector{2}(v̄),
+                                        SMatrix{2,2}(X̄),SMatrix{2,2}(inv(X̄)))
+    q = vcat(ri,u,v)
+    lncs,q
+end
+
+function NC1P2V(ri,ro,θ,ṙo,ω)
+    R = rotation_matrix(θ)
+    lncs,q = NC1P2V(ri,ro,R)
+    ṙi = ṙo + ω×(ri-ro)
+    u̇ = ω×q[3:4]
+    v̇ = ω×q[5:6]
+    q̇ = vcat(ṙi,u̇,v̇)
+    lncs,SVector{6}(q),SVector{6}(q̇)
+end
+
+function NC2P1V(ri::AbstractVector{T},rj::AbstractVector{T},
+                ro=SVector{2}(zeros(T,2)),R=SMatrix{2,2}(one(T)*I)) where T
+    invR = transpose(R) # because this is a rotation matrix
+    r̄i = invR*(ri-ro)
+    r̄j = invR*(rj-ro)
+    u = rj-ri
+    ū = invR*u
+    v̄ = rotation_matrix(π/2)*ū
+    v = R*v̄
+    X̄ = hcat(ū,v̄)
+    lncs = LocalNaturalCoordinates2P1V(SVector{2}(r̄i),SVector{2}(r̄j),SVector{2}(v̄),
+                                        SMatrix{2,2}(X̄),SMatrix{2,2}(inv(X̄)))
+    q = vcat(ri,rj,v)
+    lncs,q
+end
+
+function NC2P1V(ri,rj,ro,θ,ṙo,ω)
+    R = rotation_matrix(θ)
+    lncs,q = NC2P1V(ri,rj,ro,R)
+    ṙi = ṙo + ω×(ri-ro)
+    ṙj = ṙo + ω×(rj-ro)
+    v̇ = ω×q[5:6]
+    q̇ = vcat(ṙi,ṙj,v̇)
+    lncs,SVector{6}(q),SVector{6}(q̇)
+end
+
+function NC3P(ri::AbstractVector{T},rj::AbstractVector{T},rk::AbstractVector{T},
+              ro=SVector{2}(zeros(T,2)),R=SMatrix{2,2}(one(T)*I)) where T
+    invR = transpose(R) # because this is a rotation matrix
+    r̄i = invR*(ri-ro)
+    r̄j = invR*(rj-ro)
+    r̄k = invR*(rk-ro)
+    ū = r̄j - r̄i
+    v̄ = r̄k - r̄i
+    X̄ = hcat(ū,v̄)
+    lncs = LocalNaturalCoordinates3P(SVector{2}(r̄i),SVector{2}(r̄j),SVector{2}(r̄k),
+                                        SMatrix{2,2}(X̄),SMatrix{2,2}(inv(X̄)))
+    q = vcat(ri,rj,rk)
+    lncs,q
+end
+
+function NC3P(ri,rj,rk,ro,θ,ṙo,ω)
+    R = rotation_matrix(θ)
+    lncs,q = NC3P(ri,rj,rk,ro,R)
+    ṙi = ṙo + ω×(ri-ro)
+    ṙj = ṙo + ω×(rj-ro)
+    ṙk = ṙo + ω×(rk-ro)
+    q̇ = vcat(ṙi,ṙj,ṙk)
+    lncs,SVector{6}(q),SVector{6}(q̇)
+end
+
+# 3D
+
+function NC1P3V(ri::AbstractVector{T},
+               ro=zeros(T,3),R=Matrix(one(T)*I,3,3)
+               ) where T
+    o = zero(T)
+    i = one(T)
+    ū = SVector(i,o,o)
+    v̄ = SVector(o,i,o)
+    w̄ = SVector(o,o,i)
+    invR = transpose(R) # because this is a rotation matrix
+    r̄i = invR*(ri-ro) #
+    u = R*ū
+    v = R*v̄
+    w = R*w̄
+    X̄ = hcat(ū,v̄,w̄)
+    lncs = LocalNaturalCoordinates1P3V(SVector{3}(r̄i),SVector{3}(ū),SVector{3}(v̄),
+                                        SVector{3}(w̄),SMatrix{3,3}(X̄),SMatrix{3,3}(inv(X̄)))
+    q = vcat(ri,u,v,w)
+    lncs,q
+end
+
+function NC1P3V(ri,ro,R,ṙo,ω)
+    lncs,q = NC1P3V(ri,ro,R)
+    ṙi = ṙo + ω×(ri-ro)
+    u̇ = ω×q[4:6]
+    v̇ = ω×q[7:9]
+    ẇ = ω×q[10:12]
+    q̇ = vcat(ṙi,u̇,v̇,ẇ)
+    lncs,SVector{12}(q),SVector{12}(q̇)
+end
+
+function NC2P2V(ri::AbstractVector{T},rj::AbstractVector{T},
                        ro=zeros(T,3),R=Matrix(one(T)*I,3,3)
                        ) where T
     invR = transpose(R) # because this is a rotation matrix
@@ -130,52 +266,57 @@ function BP2P2V(ri::AbstractVector{T},rj::AbstractVector{T},
     v̄,w̄ = HouseholderOrthogonalization(ū)
     v = R*v̄
     w = R*w̄
-    bps = BasicPoints2P2V(SVector{3}(r̄i),SVector{3}(r̄j),
-                          SVector{3}(v̄), SVector{3}(w̄))
+    X̄ = hcat(ū,v̄,w̄)
+    lncs = LocalNaturalCoordinates2P2V(SVector{3}(r̄i),SVector{3}(r̄j),SVector{3}(v̄),
+                                        SVector{3}(w̄),SMatrix{3,3}(X̄),SMatrix{3,3}(inv(X̄)))
     q = vcat(ri,rj,v,w)
-    bps,q
+    lncs,q
 end
 
-function BP2P2V(ri,rj,ro,R,ṙo,ω)
-    bps,q = BP2P2V(ri,rj,ro,R)
+function NC2P2V(ri,rj,ro,R,ṙo,ω)
+    lncs,q = NC2P2V(ri,rj,ro,R)
     ṙi = ṙo + ω×(ri-ro)
     ṙj = ṙo + ω×(rj-ro)
     v̇ = ω×q[7:9]
     ẇ = ω×q[10:12]
     q̇ = vcat(ṙi,ṙj,v̇,ẇ)
-    bps,q,q̇
+    lncs,SVector{12}(q),SVector{12}(q̇)
 end
 
-function BP3P1V(ri::AbstractVector{T},rj::AbstractVector{T},
+function NC3P1V(ri::AbstractVector{T},rj::AbstractVector{T},
                        rk::AbstractVector{T},
                        ro=zeros(T,3),R=Matrix(one(T)*I,3,3)
                        ) where T
     u = rj-ri
     v = rk-ri
-    w_raw = cross(u,v)
-    w = w_raw/norm(w_raw)
+    # w_raw = cross(u,v)
+    # w = w_raw/norm(w_raw)
+    w = u×v
     invR = transpose(R) # because this is a rotation matrix
     r̄i = invR*(ri-ro)
     r̄j = invR*(rj-ro)
     r̄k = invR*(rk-ro)
+    ū = r̄j-r̄i
+    v̄ = r̄k-r̄i
     w̄ = invR*w
-    bps = BasicPoints3P1V(SVector{3}(r̄i),SVector{3}(r̄j),
-                          SVector{3}(r̄k),SVector{3}(w̄))
+    X̄ = hcat(ū,v̄,w̄)
+    lncs = LocalNaturalCoordinates3P1V(SVector{3}(r̄i),SVector{3}(r̄j),SVector{3}(r̄k),
+                                        SVector{3}(w̄),SMatrix{3,3}(X̄),SMatrix{3,3}(inv(X̄)))
     q = vcat(ri,rj,rk,w)
-    bps,q
+    lncs,q
 end
 
-function BP3P1V(ri,rj,rk,ro,R,ṙo,ω)
-    bps,q = BP3P1V(ri,rj,rk,ro,R)
+function NC3P1V(ri,rj,rk,ro,R,ṙo,ω)
+    lncs,q = NC3P1V(ri,rj,rk,ro,R)
     ṙi = ṙo + ω×(ri-ro)
     ṙj = ṙo + ω×(rj-ro)
     ṙk = ṙo + ω×(rk-ro)
     ẇ = ω×q[10:12]
     q̇ = vcat(ṙi,ṙj,ṙk,ẇ)
-    bps,q,q̇
+    lncs,SVector{12}(q),SVector{12}(q̇)
 end
 
-function BP4P(ri::AbstractVector{T},rj::AbstractVector{T},
+function NC4P(ri::AbstractVector{T},rj::AbstractVector{T},
                        rk::AbstractVector{T},rl::AbstractVector{T},
                        ro=zeros(T,3),R=Matrix(one(T)*I,3,3)
                        ) where T
@@ -184,25 +325,29 @@ function BP4P(ri::AbstractVector{T},rj::AbstractVector{T},
     r̄j = invR*(rj-ro)
     r̄k = invR*(rk-ro)
     r̄l = invR*(rl-ro)
-    bps = BasicPoints4P(SVector{3}(r̄i),SVector{3}(r̄j),
-                        SVector{3}(r̄k),SVector{3}(r̄l))
+    ū = r̄j - r̄i
+    v̄ = r̄k - r̄i
+    w̄ = r̄l - r̄i
+    X̄ = hcat(ū,v̄,w̄)
+    lncs = LocalNaturalCoordinates4P(SVector{3}(r̄i),SVector{3}(r̄j),SVector{3}(r̄k),
+                                        SVector{3}(r̄l),SMatrix{3,3}(X̄),SMatrix{3,3}(inv(X̄)))
     q = vcat(ri,rj,rk,rl)
-    bps,q
+    lncs,q
 end
 
-function BP4P(ri,rj,rk,rl,ro,R,ṙo,ω)
-    bps,q = BP4P(ri,rj,rk,rl,ro,R)
+function NC4P(ri,rj,rk,rl,ro,R,ṙo,ω)
+    lncs,q = NC4P(ri,rj,rk,rl,ro,R)
     ṙi = ṙo + ω×(ri-ro)
     ṙj = ṙo + ω×(rj-ro)
     ṙk = ṙo + ω×(rk-ro)
     ṙl = ṙo + ω×(rl-ro)
     q̇ = vcat(ṙi,ṙj,ṙk,ṙl)
-    bps,q,q̇
+    lncs,SVector{12}(q),SVector{12}(q̇)
 end
 
-function transform_to_2P2V(bps::BasicPoints3P1V{T}) where T
+function transform_to_2P2V(lncs::LocalNaturalCoordinates3P1V{T}) where T
     I3 = make_I(T,3)
-    Lij = norm(bps.r̄i-bps.r̄j)
+    Lij = norm(lncs.r̄i-lncs.r̄j)
     V_raw = [1      0       0        0;
              0      1       0        0;
              0      0       0        1;
@@ -210,9 +355,9 @@ function transform_to_2P2V(bps::BasicPoints3P1V{T}) where T
     V = kron(V_raw,I3)
 end
 
-function transform_to_2P2V(bps::BasicPoints4P{T}) where T
+function transform_to_2P2V(lncs::LocalNaturalCoordinates4P{T}) where T
     I3 = make_I(T,3)
-    Lij = norm(bps.r̄i-bps.r̄j)
+    Lij = norm(lncs.r̄i-lncs.r̄j)
     V_raw = [1      0       0        0;
              0      1       0        0;
             -1/Lij  0       1/Lij   0;
@@ -220,61 +365,8 @@ function transform_to_2P2V(bps::BasicPoints4P{T}) where T
     V = kron(V_raw,I3)
 end
 
-
-function make_X̄(bps::BasicPoints2P{T}) where T
-    @unpack r̄i,r̄j = bps
-    ū = r̄j-r̄i
-    X̄_raw = hcat(ū,[-ū[2],ū[1]])
-    X̄ = SMatrix{2,2}(X̄_raw)
-end
-
-function make_X̄(bps::BasicPoints1P1V{T}) where T
-    @unpack ū = bps
-    X̄_raw = hcat(ū,[-ū[2],ū[1]])
-    X̄ = SMatrix{2,2}(X̄_raw)
-end
-
-function make_X̄(bps::BasicPoints1P3V{T}) where T
-    @unpack r̄i,ū,v̄,w̄ = bps
-    X̄_raw = hcat(ū,v̄,w̄)
-    X̄ = SMatrix{3,3}(X̄_raw)
-end
-
-function make_X̄(bps::BasicPoints2P2V{T}) where T
-    @unpack r̄i,r̄j,v̄,w̄ = bps
-    ū = r̄j-r̄i
-    X̄_raw = hcat(ū,v̄,w̄)
-    X̄ = SMatrix{3,3}(X̄_raw)
-end
-
-function make_X̄(bps::BasicPoints3P1V{T}) where T
-    @unpack r̄i,r̄j,r̄k,w̄ = bps
-    ū = r̄j-r̄i
-    v̄ = r̄k-r̄i
-    X̄_raw = hcat(ū,v̄,w̄)
-    X̄ = SMatrix{3,3}(X̄_raw)
-end
-
-function make_X̄(bps::BasicPoints4P{T}) where T
-    @unpack r̄i,r̄j,r̄k,r̄l = bps
-    ū = r̄j-r̄i
-    v̄ = r̄k-r̄i
-    w̄ = r̄l-r̄i
-    X̄_raw = hcat(ū,v̄,w̄)
-    X̄ = SMatrix{3,3}(X̄_raw)
-end
-
-function make_Φ(bps::BasicPoints2P)
-    ū = bps.r̄j-bps.r̄i
-    u_square = ū⋅ū
-    @inline @inbounds function inner_Φ(q)
-        xi,yi,xj,yj = q
-        (xj-xi)^2 + (yj-yi)^2 - u_square
-    end
-end
-
-function make_Φ(bps::BasicPoints1P1V)
-    ū = bps.ū
+function make_Φ(lncs::LocalNaturalCoordinates1P1V)
+    ū = lncs.ū
     u_square = ū⋅ū
     @inline @inbounds function inner_Φ(q)
         u = q[3:4]
@@ -282,8 +374,62 @@ function make_Φ(bps::BasicPoints1P1V)
     end
 end
 
-function make_Φ(bps::BasicPoints1P3V)
-    @unpack r̄i,ū,v̄,w̄ = bps
+function make_Φ(lncs::LocalNaturalCoordinates2P)
+    @unpack r̄i,r̄j = lncs
+    ū = r̄j-r̄i
+    u_square = ū⋅ū
+    @inline @inbounds function inner_Φ(q)
+        xi,yi,xj,yj = q
+        (xj-xi)^2 + (yj-yi)^2 - u_square
+    end
+end
+
+function make_Φ(lncs::LocalNaturalCoordinates1P2V)
+    @unpack ū,v̄ = lncs
+    u_square = ū⋅ū
+    v_square = v̄⋅v̄
+    uv_dotprod = ū⋅v̄
+    @inline @inbounds function inner_Φ(q)
+        u = @view q[3:4]
+        v = @view q[5:6]
+        [u⋅u - u_square, v⋅v - v_square, u⋅v - uv_dotprod]
+    end
+end
+
+function make_Φ(lncs::LocalNaturalCoordinates2P1V)
+    @unpack r̄i,r̄j,v̄ = lncs
+    ū = r̄j-r̄i
+    u_square = ū⋅ū
+    v_square = v̄⋅v̄
+    uv_dotprod = ū⋅v̄
+    @inline @inbounds function inner_Φ(q)
+        ri = @view q[1:2]
+        rj = @view q[3:4]
+        u = rj-ri
+        v = @view q[5:6]
+        [u⋅u - u_square, v⋅v - v_square, u⋅v - uv_dotprod]
+    end
+end
+
+function make_Φ(lncs::LocalNaturalCoordinates3P)
+    @unpack r̄i,r̄j,r̄k = lncs
+    ū = r̄j-r̄i
+    v̄ = r̄k-r̄i
+    u_square = ū⋅ū
+    v_square = v̄⋅v̄
+    uv_dotprod = ū⋅v̄
+    @inline @inbounds function inner_Φ(q)
+        ri = @view q[1:2]
+        rj = @view q[3:4]
+        rk = @view q[5:6]
+        u = rj-ri
+        v = rk-ri
+        [u⋅u - u_square, v⋅v - v_square, u⋅v - uv_dotprod]
+    end
+end
+
+function make_Φ(lncs::LocalNaturalCoordinates1P3V)
+    @unpack r̄i,ū,v̄,w̄ = lncs
     u_square = ū⋅ū
     v_square = v̄⋅v̄
     w_square = w̄⋅w̄
@@ -306,8 +452,8 @@ function make_Φ(bps::BasicPoints1P3V)
     end
 end
 
-function make_Φ(bps::BasicPoints2P2V)
-    @unpack r̄i,r̄j,v̄,w̄ = bps
+function make_Φ(lncs::LocalNaturalCoordinates2P2V)
+    @unpack r̄i,r̄j,v̄,w̄ = lncs
     ū = r̄j-r̄i
     u_square = ū⋅ū
     v_square = v̄⋅v̄
@@ -332,8 +478,8 @@ function make_Φ(bps::BasicPoints2P2V)
     end
 end
 
-function make_Φ(bps::BasicPoints3P1V)
-    @unpack r̄i,r̄j,r̄k,w̄ = bps
+function make_Φ(lncs::LocalNaturalCoordinates3P1V)
+    @unpack r̄i,r̄j,r̄k,w̄ = lncs
     ū = r̄j-r̄i
     v̄ = r̄k-r̄i
     u_square = ū⋅ū
@@ -360,8 +506,8 @@ function make_Φ(bps::BasicPoints3P1V)
     end
 end
 
-function make_Φ(bps::BasicPoints4P)
-    @unpack r̄i,r̄j,r̄k,r̄l = bps
+function make_Φ(lncs::LocalNaturalCoordinates4P)
+    @unpack r̄i,r̄j,r̄k,r̄l = lncs
     ū = r̄j-r̄i
     v̄ = r̄k-r̄i
     w̄ = r̄l-r̄i
@@ -390,7 +536,7 @@ function make_Φ(bps::BasicPoints4P)
     end
 end
 
-function make_Φq(bps::BasicPoints1P1V)
+function make_Φq(lncs::LocalNaturalCoordinates1P1V)
     @inline @inbounds function inner_Φq(q)
         ret = zeros(eltype(q),1,4)
         u = q[3:4]
@@ -399,7 +545,7 @@ function make_Φq(bps::BasicPoints1P1V)
     end
 end
 
-function make_Φq(bps::BasicPoints2P)
+function make_Φq(lncs::LocalNaturalCoordinates2P)
     @inline @inbounds function inner_Φq(q)
         ri = @view q[1:2]
         rj = @view q[3:4]
@@ -411,7 +557,56 @@ function make_Φq(bps::BasicPoints2P)
     end
 end
 
-function make_Φq(bps::BasicPoints1P3V)
+function make_Φq(lncs::LocalNaturalCoordinates1P2V)
+    @inline @inbounds function inner_Φq(q)
+        u = @view q[3:4]
+        v = @view q[5:6]
+        ret = zeros(eltype(q),3,6)
+        ret[1,3:4] = 2u
+        ret[2,5:6] = 2v
+        ret[3,3:4] = v
+        ret[3,5:6] = u
+        ret
+    end
+end
+
+function make_Φq(lncs::LocalNaturalCoordinates2P1V)
+    @inline @inbounds function inner_Φq(q)
+        ri = @view q[1:2]
+        rj = @view q[3:4]
+        u = rj-ri
+        v = @view q[5:6]
+        ret = zeros(eltype(q),3,6)
+        ret[1,1:2] = -2u
+        ret[1,3:4] = 2u
+        ret[2,5:6] = 2v
+        ret[3,1:2] = -v
+        ret[3,3:4] = v
+        ret[3,5:6] = u
+        ret
+    end
+end
+
+function make_Φq(lncs::LocalNaturalCoordinates3P)
+    @inline @inbounds function inner_Φq(q)
+        ri = @view q[1:2]
+        rj = @view q[3:4]
+        u = rj-ri
+        rk = @view q[5:6]
+        v = rk-ri
+        ret = zeros(eltype(q),3,6)
+        ret[1,1:2] = -2u
+        ret[1,3:4] = 2u
+        ret[2,1:2] = -2v
+        ret[2,5:6] = 2v
+        ret[3,1:2] = -v-u
+        ret[3,3:4] = v
+        ret[3,5:6] = u
+        ret
+    end
+end
+
+function make_Φq(lncs::LocalNaturalCoordinates1P3V)
     @inline @inbounds function inner_Φq(q)
         ri = @view q[1:3]
         u  = @view q[4:6]
@@ -435,7 +630,7 @@ function make_Φq(bps::BasicPoints1P3V)
     end
 end
 
-function make_Φq(bps::BasicPoints2P2V)
+function make_Φq(lncs::LocalNaturalCoordinates2P2V)
     @inline @inbounds function inner_Φq(q)
         ri = @view q[1:3]
         rj = @view q[4:6]
@@ -464,7 +659,7 @@ function make_Φq(bps::BasicPoints2P2V)
     end
 end
 
-function make_Φq(bps::BasicPoints3P1V)
+function make_Φq(lncs::LocalNaturalCoordinates3P1V)
     @inline @inbounds function inner_Φq(q)
         ri = @view q[1:3]
         rj = @view q[4:6]
@@ -497,7 +692,7 @@ function make_Φq(bps::BasicPoints3P1V)
     end
 end
 
-function make_Φq(bps::BasicPoints4P)
+function make_Φq(lncs::LocalNaturalCoordinates4P)
     @inline @inbounds function inner_Φq(q)
         ri = @view q[1:3]
         rj = @view q[4:6]
@@ -532,14 +727,14 @@ function make_Φq(bps::BasicPoints4P)
     end
 end
 
-function make_c(bps,invX̄)
-    @unpack r̄i = bps
+function make_c(lncs)
+    @unpack r̄i,invX̄ = lncs
     function c(r̄)
         invX̄*(r̄-r̄i)
     end
 end
 
-function make_C(bps::BasicPoints1P1V)
+function make_C(lncs::LocalNaturalCoordinates1P1V)
     function C(c)
         C_raw = Matrix{eltype(c)}(undef,2,4)
         C_raw[1,1] =    1
@@ -554,7 +749,7 @@ function make_C(bps::BasicPoints1P1V)
     end
 end
 
-function make_C(bps::BasicPoints2P)
+function make_C(lncs::LocalNaturalCoordinates2P)
     function C(c)
         C_raw = Matrix{eltype(c)}(undef,2,4)
         C_raw[1,1] = 1-c[1]
@@ -569,7 +764,31 @@ function make_C(bps::BasicPoints2P)
     end
 end
 
-function make_C(bps::BasicPoints1P3V{T}) where T
+function make_C(lncs::LocalNaturalCoordinates1P2V{T}) where T
+    I2 = make_I(T,2)
+    function C(c)
+        C_raw = [1  c[1]  c[2]]
+        SMatrix{2,6}(kron(C_raw,I2))
+    end
+end
+
+function make_C(lncs::LocalNaturalCoordinates2P1V{T}) where T
+    I2 = make_I(T,2)
+    function C(c)
+        C_raw = [1-c[1]  c[1]  c[2]]
+        SMatrix{2,6}(kron(C_raw,I2))
+    end
+end
+
+function make_C(lncs::LocalNaturalCoordinates3P{T}) where T
+    I2 = make_I(T,2)
+    function C(c)
+        C_raw = [1-c[1]-c[2]  c[1]  c[2]]
+        SMatrix{2,6}(kron(C_raw,I2))
+    end
+end
+
+function make_C(lncs::LocalNaturalCoordinates1P3V{T}) where T
     I3 = make_I(T,3)
     function C(c)
         C_raw = [1  c[1]  c[2]  c[3]]
@@ -577,7 +796,7 @@ function make_C(bps::BasicPoints1P3V{T}) where T
     end
 end
 
-function make_C(bps::BasicPoints2P2V{T}) where T
+function make_C(lncs::LocalNaturalCoordinates2P2V{T}) where T
     I3 = make_I(T,3)
     function C(c)
         C_raw = [1-c[1]  c[1]  c[2]  c[3]]
@@ -585,7 +804,7 @@ function make_C(bps::BasicPoints2P2V{T}) where T
     end
 end
 
-function make_C(bps::BasicPoints3P1V{T}) where T
+function make_C(lncs::LocalNaturalCoordinates3P1V{T}) where T
     I3 = make_I(T,3)
     function C(c)
         C_raw = [1-c[1]-c[2]  c[1]  c[2]  c[3]]
@@ -593,7 +812,7 @@ function make_C(bps::BasicPoints3P1V{T}) where T
     end
 end
 
-function make_C(bps::BasicPoints4P{T}) where T
+function make_C(lncs::LocalNaturalCoordinates4P{T}) where T
     I3 = make_I(T,3)
     function C(c)
         C_raw = [1-c[1]-c[2]-c[3]  c[1]  c[2]  c[3]]
@@ -601,50 +820,38 @@ function make_C(bps::BasicPoints4P{T}) where T
     end
 end
 
-struct CoordinateFunctions{bpsType,XT,cT,CT,ΦT,ΦqT}
-    bps::bpsType
-    invX̄::XT
+struct CoordinateFunctions{lncsType,cT,CT,ΦT,ΦqT}
+    lncs::lncsType
     c::cT
     C::CT
     Φ::ΦT
     Φq::ΦqT
 end
 
-function CoordinateFunctions(bps)
-    X̄ = make_X̄(bps)
-    invX̄ = inv(X̄)
-    c = make_c(bps,invX̄)
-    C = make_C(bps)
-    Φ = make_Φ(bps)
-    Φq = make_Φq(bps)
-    CoordinateFunctions(bps,invX̄,c,C,Φ,Φq)
+function CoordinateFunctions(lncs)
+    c = make_c(lncs)
+    C = make_C(lncs)
+    Φ = make_Φ(lncs)
+    Φq = make_Φq(lncs)
+    CoordinateFunctions(lncs,c,C,Φ,Φq)
 end
 
 
-function ∂Φqᵀ∂q_forwarddiff(cf::CoordinateFunctions{bpsType,XT,cT,CT,ΦT,ΦqT}) where {bpsType<:BasicPoints2D,XT,cT,CT,ΦT,ΦqT}
+function ∂Φqᵀ∂q_forwarddiff(cf::CoordinateFunctions{<:LocalNaturalCoordinates})
     function ∂Aᵀλ∂q(λ)
         function ATλ(q)
             transpose(cf.Φq(q))*λ
         end
-        ForwardDiff.jacobian(ATλ,ones(4))
+        ForwardDiff.jacobian(ATλ,one(q))
     end
 end
 
-function ∂Φqᵀ∂q_forwarddiff(cf::CoordinateFunctions{bpsType,XT,cT,CT,ΦT,ΦqT}) where {bpsType<:BasicPoints3D,XT,cT,CT,ΦT,ΦqT}
-    function ∂Aᵀλ∂q(λ)
-        function ATλ(q)
-            transpose(cf.Φq(q))*λ
-        end
-        ForwardDiff.jacobian(ATλ,ones(12))
-    end
-end
-
-function make_M(cf::CoordinateFunctions{BasicPoints1P1V{T},XT,cT,CT,ΦT,ΦqT},
-                m::T,polar::T,r̄G) where {T,XT,cT,CT,ΦT,ΦqT}
-    @unpack invX̄,bps = cf
-    @unpack r̄i,ū = bps
+function make_M(cf::CoordinateFunctions{LocalNaturalCoordinates1P1V{T}},
+                m::T,polar::T,r̄g) where {T}
+    @unpack lncs = cf
+    @unpack r̄i,ū,invX̄ = lncs
     u_square = ū⋅ū
-    a = invX̄*(r̄G-r̄i)
+    a = invX̄*(r̄g-r̄i)
     z = polar/u_square
     M = zeros(T,4,4)
     M[1,1] = m
@@ -660,14 +867,14 @@ function make_M(cf::CoordinateFunctions{BasicPoints1P1V{T},XT,cT,CT,ΦT,ΦqT},
     M_ret = SMatrix{4,4}(Symmetric(M))
 end
 
-function make_M(cf::CoordinateFunctions{BasicPoints2P{T},XT,cT,CT,ΦT,ΦqT},
-                m::T,polar::T,r̄G) where {T,XT,cT,CT,ΦT,ΦqT}
-    @unpack invX̄,bps = cf
-    @unpack r̄i,r̄j = bps
+function make_M(cf::CoordinateFunctions{LocalNaturalCoordinates2P{T}},
+                m::T,polar::T,r̄g) where {T}
+    @unpack lncs = cf
+    @unpack r̄i,r̄j,invX̄ = lncs
     ū = r̄j-r̄i
     u_square = ū⋅ū
-    a = invX̄*(r̄G-r̄i)
-    polar_o = polar + m*(r̄G⋅r̄G)
+    a = invX̄*(r̄g-r̄i)
+    polar_o = polar + m*(r̄g⋅r̄g)
     z = polar_o/u_square
     M = zeros(T,4,4)
     M[1,1] = m - 2m*a[1] + z
@@ -683,30 +890,80 @@ function make_M(cf::CoordinateFunctions{BasicPoints2P{T},XT,cT,CT,ΦT,ΦqT},
     M_ret = SMatrix{4,4}(Symmetric(M))
 end
 
-@inline @inbounds function inertia2z(m,inertia_o::AbstractMatrix{T},
-                                        r̄G,r̄i,invX̄) where T
-    Jo = 1/2*tr(inertia_o)*I-inertia_o
-    Ji = Jo -
-         m*r̄i*transpose(r̄G) -
-         m*r̄G*transpose(r̄i) +
-         m*r̄i*transpose(r̄i)
+inertia2J(inertia) = _inertia2J(Size(inertia),inertia)
+_inertia2J(::Size{(2,2)},inertia) =     tr(inertia)*I-inertia
+_inertia2J(::Size{(3,3)},inertia) = 1/2*tr(inertia)*I-inertia
+
+@inline @inbounds function inertia2z(m,inertia_o::AbstractMatrix{T},r̄g,r̄i,invX̄) where T
+    Jo = inertia2J(inertia_o)
+    Ji = Jo - m*r̄i*transpose(r̄g) - m*r̄g*transpose(r̄i) + m*r̄i*transpose(r̄i)
     z = invX̄*Ji*transpose(invX̄)
     Symmetric(z)
 end
 
-function compute_a_z(mass,inertia_o,r̄G,cf)
-    @unpack bps,invX̄ = cf
-    @unpack r̄i = bps
-    a = invX̄*(r̄G-r̄i)
-    z = inertia2z(mass,inertia_o,r̄G,r̄i,invX̄)
+@inline @inbounds function Jg2az(m,Jg::AbstractMatrix{T},r̄g,cf) where T
+    @unpack r̄i,invX̄ = cf.lncs
+    a = invX̄*(r̄g-r̄i)
+    Jo = Jg + m*r̄g*transpose(r̄g)
+    Ji = Jo - m*r̄i*transpose(r̄g) - m*r̄g*transpose(r̄i) + m*r̄i*transpose(r̄i)
+    z = invX̄*Ji*transpose(invX̄)
+    a,Symmetric(z)
+end
+
+function compute_a_z(mass,inertia_o,r̄g,cf)
+    @unpack r̄i,invX̄ = cf.lncs
+    a = invX̄*(r̄g-r̄i)
+    z = inertia2z(mass,inertia_o,r̄g,r̄i,invX̄)
     a,z
 end
 
-function make_M(cf::CoordinateFunctions{BasicPoints1P3V{T},XT,cT,CT,ΦT,ΦqT},
-                m::T,inertia::AbstractMatrix{T},r̄G) where {T,XT,cT,CT,ΦT,ΦqT}
+function make_M(cf::CoordinateFunctions{LocalNaturalCoordinates1P2V{T}},
+                m::T,ami::AbstractMatrix{T},r̄g) where {T}
+                # ami (area moment of inertia tensor)
+    I2 = make_I(T,2)
+    Jg = inertia2J(ami)
+    a,z = Jg2az(m,Jg,r̄g,cf)
+    M_raw = zeros(T,3,3)
+    M_raw[1,1] = m
+    M_raw[2:3,1] = m*a
+    M_raw[1,2:3] = M_raw[2:3,1]
+    M_raw[2:3,2:3] .= z
+    M = SMatrix{6,6}(kron(M_raw,I2))
+end
+
+function make_M(cf::CoordinateFunctions{LocalNaturalCoordinates2P1V{T}},
+                m::T,ami::AbstractMatrix{T},r̄g) where {T}
+    I2 = make_I(T,2)
+    # ami (area moment of inertia tensor)
+    Jg = inertia2J(ami)
+    a,z = Jg2az(m,Jg,r̄g,cf)
+    M_raw = zeros(T,3,3)
+    M_raw[1,1] = m-2m*a[1]+z[1,1]
+    M_raw[2:3,1] = m*a-z[1:2,1]
+    M_raw[1,2:3] = M_raw[2:3,1]
+    M_raw[2:3,2:3] .= z
+    M = SMatrix{6,6}(kron(M_raw,I2))
+end
+
+function make_M(cf::CoordinateFunctions{LocalNaturalCoordinates3P{T}},
+                m::T,ami::AbstractMatrix{T},r̄g) where {T}
+    I2 = make_I(T,2)
+    # ami (area moment of inertia tensor)
+    Jg = inertia2J(ami)
+    a,z = Jg2az(m,Jg,r̄g,cf)
+    M_raw = zeros(T,3,3)
+    M_raw[1,1] = m-2m*a[1]-2m*a[2]+2z[1,2]+z[1,1]+z[2,2]
+    M_raw[2:3,1] = m*a-z[1:2,1]-z[1:2,2]
+    M_raw[1,2:3] = M_raw[2:3,1]
+    M_raw[2:3,2:3] .= z
+    M = SMatrix{6,6}(kron(M_raw,I2))
+end
+
+function make_M(cf::CoordinateFunctions{LocalNaturalCoordinates1P3V{T}},
+                m::T,inertia::AbstractMatrix{T},r̄g) where {T}
     I3 = make_I(T,3)
-    inertia_o = inertia - m*skew(r̄G)^2
-    a,z = compute_a_z(m,inertia_o,r̄G,cf)
+    inertia_o = inertia - m*skew(r̄g)^2
+    a,z = compute_a_z(m,inertia_o,r̄g,cf)
     M_raw = zeros(T,4,4)
     M_raw[1,1] = m
     M_raw[2:4,1] = m*a
@@ -715,11 +972,11 @@ function make_M(cf::CoordinateFunctions{BasicPoints1P3V{T},XT,cT,CT,ΦT,ΦqT},
     M = SMatrix{12,12}(kron(M_raw,I3))
 end
 
-function make_M(cf::CoordinateFunctions{BasicPoints2P2V{T},XT,cT,CT,ΦT,ΦqT},
-                m::T,inertia::AbstractMatrix{T},r̄G) where {T,XT,cT,CT,ΦT,ΦqT}
+function make_M(cf::CoordinateFunctions{LocalNaturalCoordinates2P2V{T}},
+                m::T,inertia::AbstractMatrix{T},r̄g) where {T}
     I3 = make_I(T,3)
-    inertia_o = inertia - m*skew(r̄G)^2
-    a,z = compute_a_z(m,inertia_o,r̄G,cf)
+    inertia_o = inertia - m*skew(r̄g)^2
+    a,z = compute_a_z(m,inertia_o,r̄g,cf)
     M_raw = zeros(T,4,4)
     M_raw[1,1] = m-2m*a[1]+z[1,1]
     M_raw[2:4,1] = m*a-z[1:3,1]
@@ -728,11 +985,11 @@ function make_M(cf::CoordinateFunctions{BasicPoints2P2V{T},XT,cT,CT,ΦT,ΦqT},
     M = SMatrix{12,12}(kron(M_raw,I3))
 end
 
-function make_M(cf::CoordinateFunctions{BasicPoints3P1V{T},XT,cT,CT,ΦT,ΦqT},
-                m::T,inertia::AbstractMatrix{T},r̄G) where {T,XT,cT,CT,ΦT,ΦqT}
+function make_M(cf::CoordinateFunctions{LocalNaturalCoordinates3P1V{T}},
+                m::T,inertia::AbstractMatrix{T},r̄g) where {T}
     I3 = make_I(T,3)
-    inertia_o = inertia - m*skew(r̄G)^2
-    a,z = compute_a_z(m,inertia_o,r̄G,cf)
+    inertia_o = inertia - m*skew(r̄g)^2
+    a,z = compute_a_z(m,inertia_o,r̄g,cf)
     M_raw = zeros(T,4,4)
     M_raw[1,1] = m-2m*a[1]-2m*a[2]+
                      2z[1,2]+
@@ -743,11 +1000,11 @@ function make_M(cf::CoordinateFunctions{BasicPoints3P1V{T},XT,cT,CT,ΦT,ΦqT},
     M = SMatrix{12,12}(kron(M_raw,I3))
 end
 
-function make_M(cf::CoordinateFunctions{BasicPoints4P{T},XT,cT,CT,ΦT,ΦqT},
-                m::T,inertia::AbstractMatrix{T},r̄G) where {T,XT,cT,CT,ΦT,ΦqT}
+function make_M(cf::CoordinateFunctions{LocalNaturalCoordinates4P{T}},
+                m::T,inertia::AbstractMatrix{T},r̄g) where {T}
     I3 = make_I(T,3)
-    inertia_o = inertia - m*skew(r̄G)^2
-    a,z = compute_a_z(m,inertia_o,r̄G,cf)
+    inertia_o = inertia - m*skew(r̄g)^2
+    a,z = compute_a_z(m,inertia_o,r̄g,cf)
     M_raw = zeros(T,4,4)
     M_raw[1,1] = m-2m*a[1]-2m*a[2]-2m*a[3]+
                      2z[1,2]+2z[1,3]+2z[2,3]+
@@ -758,11 +1015,4 @@ function make_M(cf::CoordinateFunctions{BasicPoints4P{T},XT,cT,CT,ΦT,ΦqT},
     M = SMatrix{12,12}(kron(M_raw,I3))
 end
 
-function skew(w)
-    w1,w2,w3 = w
-    o = zero(w1)
-    [o -w3 w2;
-     w3 o -w1;
-    -w2 w1 o]
-end
 end

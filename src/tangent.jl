@@ -11,7 +11,7 @@ struct TensionTangent{T}
     ∂l̂∂q::Vector{Array{T,2}}
 end
 
-function build_tangent!(tgstruct,q,q̇)
+function build_tangent!(tgstruct,q,q̇=zero(q))
     reset_forces!(tgstruct)
     distribute_q_to_rbs!(tgstruct,q,q̇)
     update_strings_apply_forces!(tgstruct)
