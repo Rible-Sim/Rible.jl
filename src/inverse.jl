@@ -359,7 +359,9 @@ function check_static_equilibrium(tgstruct_input,q,λ;gravity=false)
     static_equilibrium
 end
 
-function forward(tgstruct,starts,targets)
+function forward(tgstruct,startsols_input,
+                        start_parameters_input,
+                        target_parameters_input)
     @var q[1:tgstruct.ncoords]
     @var a[1:tgstruct.nstrings]
     @var λ[1:tgstruct.nconstraint]
@@ -370,8 +372,9 @@ function forward(tgstruct,starts,targets)
     polyλ = 1.0λ
     polyu = 1.0u
 
-    q0,a0,λ0,u0,g0 = starts
-    u1,g1 = targets
+    q0,a0,λ0 = startsols_input
+    u0,g0 = start_parameters_input
+    u1,g1 = target_parameters_input
 
     Φ = build_Φ(tgstruct,q0)
     A = build_A(tgstruct)
@@ -403,4 +406,48 @@ function forward(tgstruct,starts,targets)
     # [subs(f, q=>q0,λ=>λ0,a=>a0,u=>u0,g=>1.0) for f in F]
     result = HomotopyContinuation.solve(Fsys, startsols; start_parameters, target_parameters, threading = false)
     # result = HomotopyContinuation.solve(Fsys, startsols)
+end
+
+function defrom_forward(tgstruct,startsols_input,
+                        start_parameters_input,
+                        target_parameters_input)
+    @var q[1:tgstruct.ncoords]
+    @var a[1:tgstruct.nstrings]
+    @var λ[1:tgstruct.nconstraint]
+    @var d[1:tgstruct.nconstraint]
+    @var u[1:tgstruct.nstrings]
+    @var g
+    polyq = 1.0q
+    polya = 1.0a
+    polyλ = 1.0λ
+    polyd = 1.0d
+    polyu = 1.0u
+
+    q0,a0,λ0 = startsols_input
+    d0,u0,g0 = start_parameters_input
+    d1,u1,g1 = target_parameters_input
+
+    Φ = build_Φ(tgstruct,q0)
+    A = build_A(tgstruct)
+    Q̃ = build_Q̃(tgstruct)
+    U = build_U(tgstruct,polya,polyu)
+    S = build_S(tgstruct,polya,polyq)
+
+    G = build_G!(tgstruct)
+
+    F = [-transpose(A(polyq))*polyλ  + g*G + Q̃*U*polyq;
+        S;
+        Φ(polyq,polyd)]
+
+    @debug "$(maximum(abs.(to_number.(subs(F, q=>q0, a=>a0, λ=>λ0, d=>d0, u=>u0, g=>g0)))))"
+
+    start_parameters = vcat(d0,u0,g0)
+    target_parameters = vcat(d1,u1,g1)
+    startsols = [[q0; a0; λ0]]
+    vg = [q,a,λ]
+
+    Fsys = System(F; variable_groups=vg, parameters = [d;u;g])
+
+    result = HomotopyContinuation.solve(Fsys, startsols; start_parameters, target_parameters, threading = false)
+
 end

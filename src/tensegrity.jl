@@ -321,6 +321,24 @@ function build_Φ(tgstruct,q0)
         end
         ret
     end
+    @inline @inbounds function inner_Φ(q,d)
+        ret = Vector{eltype(q)}(undef,nconstraint)
+        is = 0
+        #is += nbodydof*nfixbodies
+        for rbid in tgstruct.mvbodyindex
+            pindex = body2q[rbid]
+            rb = rbs[rbid]
+            nc = rb.state.cache.nc
+            if nc > 0
+                ret[is+1:is+nc] = rb.state.cache.cfuncs.Φ(q[pindex],d[is+1:is+nc])
+                is += nc
+            end
+            ret[is+1:is+nbodyc] .=rb.state.cache.funcs.Φ(q[pindex],d[is+1:is+nbodyc])
+            is += nbodyc
+        end
+        ret
+    end
+    inner_Φ
 end
 
 function build_A(tgstruct)
@@ -370,7 +388,24 @@ function get_initial(tgstruct)
     q0,q̇0,λ0
 end
 
-function get_u(tgstruct)
+function get_d(tg)
+    @unpack nconstraint = tg
+    rbs = tg.rigidbodies
+    T = get_numbertype(tg)
+    d = Vector{T}(undef,nconstraint)
+    nbodyc = get_nbodyconstraint(tg)
+    is = 0
+    for rbid in tg.mvbodyindex
+        rb = rbs[rbid]
+        nc = rb.state.cache.nc
+        if nc > 0
+            d[is+1:is+nc] .= get_index_Φ_q0(rb)
+            is += nc
+        end
+        d[is+1:is+nbodyc] .= NaturalCoordinates.get_deform(rb.state.cache.funcs.lncs)
+        is += nbodyc
+    end
+    d
 end
 
 get_ndim(tg::TensegrityStructure) = get_ndim(tg.rigidbodies)

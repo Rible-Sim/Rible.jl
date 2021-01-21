@@ -58,13 +58,17 @@ struct NaturalCoordinatesCache{ArrayT,MT,fT,cfT}
     cfuncs::cfT
 end
 
+function get_index_Φ_q0(rb)
+    q0 = rb.state.coords.q
+    index = rb.state.cache.constrained_index
+    q0[index]
+end
+
 function make_index_Φ(index,q0)
     nΦ = length(index)
-    @inline function inner_Φ(q)
-        ret = zeros(eltype(q),nΦ)
-        ret .= q[index]-q0[index]
-        ret
-    end
+    @inline @inbounds inner_Φ(q)   = q[index]-q0[index]
+    @inline @inbounds inner_Φ(q,d) = q[index]-d
+    inner_Φ
 end
 
 function make_index_A(index,nq)
