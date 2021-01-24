@@ -408,7 +408,7 @@ function forward(tgstruct,startsols_input,
     # result = HomotopyContinuation.solve(Fsys, startsols)
 end
 
-function defrom_forward(tgstruct,startsols_input,
+function deform_forward(tgstruct,startsols_input,
                         start_parameters_input,
                         target_parameters_input)
     @var q[1:tgstruct.ncoords]

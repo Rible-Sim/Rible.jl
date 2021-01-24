@@ -382,11 +382,34 @@ function get_q(tgstruct)
 end
 
 get_λ(tgstruct) = zeros(tgstruct.nconstraint)
+
 function get_initial(tgstruct)
     q0,q̇0 = get_q(tgstruct)
     λ0 = get_λ(tgstruct)
     q0,q̇0,λ0
 end
+
+function jac_singularity_check(tg)
+    q,_ = get_q(tg)
+    A = build_A(tg)
+    Aq = A(q)
+    sys_rank = rank(Aq)
+    if sys_rank < minimum(size(Aq))
+        @warn "System's Jacobian is singular: rank(A(q))=$(sys_rank)<$(minimum(size(Aq)))"
+    end
+    for (rbid,rb) in enumerate(tg.rigidbodies)
+        if rb.prop.movable && rb.prop.constrained
+            q_rb = rb.state.coords.q
+            Aq_rb = vcat(rb.state.cache.cfuncs.Φq(q_rb),
+                         rb.state.cache.funcs.Φq(q_rb))
+            rb_rank = rank(Aq_rb)
+            if rb_rank < minimum(size(Aq_rb))
+                @warn "The $(rbid)th rigid body's Jacobian is singular: rank(A(q))=$(rb_rank)<$(minimum(size(Aq_rb)))"
+            end
+        end
+    end
+end
+
 
 function get_d(tg)
     @unpack nconstraint = tg
