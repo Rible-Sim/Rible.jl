@@ -21,7 +21,7 @@ function AdamsResults(url)
     AdamsResults(variable_names, steps)
 end
 
-function (ar::AdamsResults)(name::String)
-    index = findfirst((x)->x==name,ar.names)
-    [step[index] for step in ar.steps]
+function (ar::AdamsResults)(name::String,i=1)
+    index = findall((x)->x==name,ar.names)
+    [step[index[i]] for step in ar.steps]
 end

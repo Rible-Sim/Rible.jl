@@ -125,9 +125,10 @@ function distribute_q_to_rbs!(tgstruct,globalq,globalq̇)
         @unpack q, q̇ = rbs[rbid].state.coords
         q .= globalq[pindex]
         q̇ .= globalq̇[pindex]
-        @unpack cache,p,r = rbs[rbid].state
+        @unpack cache,p,r,ṙ = rbs[rbid].state
         @unpack CG,Cp = cache
         r .= CG*q
+        ṙ .= CG*q̇
         for (i,ap) in enumerate(p)
             ap .= Cp[i]*q
         end
@@ -204,6 +205,8 @@ function potential_energy(s::SString)
     pe
 end
 
+potential_energy(rb::AbstractRigidBody) = gravity_potential_energy(rb)
+
 function kinetic_energy_coords(tgstruct::TensegrityStructure,q,q̇)
     distribute_q_to_rbs!(tgstruct,q,q̇)
     ke = sum(kinetic_energy_coords.(tgstruct.rigidbodies))
@@ -215,6 +218,7 @@ function gravity_potential_energy(tgstruct::TensegrityStructure,q)
 end
 
 function elastic_potential_energy(tgstruct::TensegrityStructure)
+    reset_forces!(tgstruct)
     update_strings_apply_forces!(tgstruct)
     pe = sum(potential_energy.(tgstruct.strings))
 end
@@ -296,7 +300,7 @@ function get_nconstraint(rbs,mvbodyindex,nmvbodies,nfixbodies)
     nconstraint = ninconstraint + nexconstraint
 end
 
-function build_Φ(tgstruct,q0)
+function build_Φ(tgstruct)
     rbs = tgstruct.rigidbodies
     #q0,q̇0 = get_q(tgstruct)
     @unpack body2q = tgstruct.connectivity
