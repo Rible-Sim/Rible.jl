@@ -300,6 +300,8 @@ function get_nconstraint(rbs,mvbodyindex,nmvbodies,nfixbodies)
     nconstraint = ninconstraint + nexconstraint
 end
 
+get_nconstraint(tg) = tg.nconstraint
+
 function build_Φ(tgstruct)
     rbs = tgstruct.rigidbodies
     #q0,q̇0 = get_q(tgstruct)

@@ -28,7 +28,9 @@ include("rigidbody.jl")
 
 include("tensegrity.jl")
 
-include("inverse.jl")
+include("inverse_statics.jl")
+
+include("forward_statics.jl")
 
 include("control.jl")
 
