@@ -9,7 +9,7 @@ const TR = TensegrityRobot
 import PyPlot; const plt = PyPlot
 
 m = rand()
-CoM = rand(3)
+r̄g = rand(3)
 inertia = Matrix(1.0I,3,3)
 r0 = rand(3)
 ṙ0 = rand(3)
@@ -17,7 +17,7 @@ R0 = rand(RotMatrix{3})
 ω0 = rand(3)
 
 prop = TR.RigidBodyProperty(1,true,m,inertia,
-                    SVector{3}(CoM),[SVector{3}(CoM)])
+                    SVector{3}(r̄g),[SVector{3}(r̄g)])
 
 ri = @SVector rand(3)
 rj = @SVector rand(3)
@@ -82,11 +82,11 @@ TR.kinetic_energy_coords(state4)
 
 # F0 = zeros(12)
 # F!(F0,q0,q̇0,0.0)
-# rb1.state.cache.CG
+# rb1.state.cache.Cg
 # rb1.state.cache.Cp[1]
-# CG*q0
-# CoM
-# CG - rb1.state.cache.Cp[1]
+# Cg*q0
+# r̄g
+# Cg - rb1.state.cache.Cp[1]
 
 
 
@@ -124,14 +124,14 @@ rk = rand(3)#[0.0,1.0,0.0]
 rl = rand(3)#[0.0,0.0,1.0]
 r̄i = @SVector zeros(3)
 r̄j = SVector{3}(inv(R0)*(rj-ri))
-CoM = r̄j
+r̄g = r̄j
 v̄ = SVector(0.0,1.0,0.0)
 w̄ = SVector(0.0,0.0,1.0)
 bps2 = TR.NaturalCoordinates.LocalNaturalCoordinates2P2V(r̄i,r̄j,v̄,w̄)
 q0 = vcat(ri,rj,R0*v̄,R0*w̄)
 q̇0 = vcat(ω0×ri,ω0×rj,ω0×q0[7:9],ω0×q0[10:12])
 cf2 = TR.NaturalCoordinates.CoordinateFunctions(bps2)
-M = TR.NaturalCoordinates.make_M(cf2,m,SMatrix{3,3}(inertia),CoM)
+M = TR.NaturalCoordinates.make_M(cf2,m,SMatrix{3,3}(inertia),r̄g)
 # bps1,q1,q̇1 = TR.NaturalCoordinates.BP1P3V(ri,r0,R0,ṙ0,ω0)
 # bps1,q1,q̇1 = TR.NaturalCoordinates.BP2P2V(ri,rj,r0,R0,ṙ0,ω0)
 # bps1,q1,q̇1 = TR.NaturalCoordinates.BP3P1V(ri,rj,rk,r0,R0,ṙ0,ω0)
@@ -140,7 +140,7 @@ M = TR.NaturalCoordinates.make_M(cf2,m,SMatrix{3,3}(inertia),CoM)
 # q̇1
 1/2*transpose(q̇0)*M*q̇0
 prop = TR.RigidBodyProperty(1,true,m,inertia,
-                    SVector{3}(CoM),[SVector{3}(CoM)];constrained=true)
+                    SVector{3}(r̄g),[SVector{3}(r̄g)];constrained=true)
 # state1 = TR.RigidBodyState(prop,bps1,r0,R0,ṙ0,ω0,q1,q̇1,[1,2,3])
 state1 = TR.RigidBodyState(prop,bps2,r0,R0,ṙ0,ω0,q0,q̇0,[1,2,3])
 TR.kinetic_energy_coords(state1)
@@ -169,11 +169,11 @@ M
 
 function rbfuncs(rb)
     @unpack cache = rb.state
-    @unpack M,CG,funcs = cache
+    @unpack M,Cg,funcs = cache
     @unpack Φ,Φq = funcs
     f = [0.0,0.0,-9.8]
     function F!(F,q,q̇,t)
-        # F .= transpose(CG)*f
+        # F .= transpose(Cg)*f
         F .= 0.0
     end
     M,Φ,Φq,F!,nothing
@@ -202,15 +202,15 @@ plt.plot(X_es)
 
 function rb_rotate_funcs(rb)
     @unpack cache = rb.state
-    @unpack M,CG,funcs = cache
+    @unpack M,Cg,funcs = cache
     reduceM = M[4:12,4:12]
     f = [0.0,0.0,-9.8]
     function F!(F,q,q̇,t)
-        # F .= transpose(CG)*f
+        # F .= transpose(Cg)*f
         F .= 0.0
     end
 
-    @unpack r̄i,ū,v̄,w̄ = funcs.bps
+    @unpack r̄i,ū,v̄,w̄ = funcs.lncs
     u_square = ū⋅ū
     v_square = v̄⋅v̄
     w_square = w̄⋅w̄

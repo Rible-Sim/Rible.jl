@@ -55,11 +55,11 @@ function freefall()
     # lncs,q,q̇ = NC.NC3P(ri,rj,rk,ro,θ,ṙo,ω)
     λ0 = zeros(eltype(q0),3)
     function dynfuncs()
-        @unpack CoM = rb.prop
+        @unpack r̄g = rb.prop
         @unpack C,c = rb.state.cache.funcs
-        Cg = rb.state.cache.CG
+        Cg = rb.state.cache.Cg
         ū1 = [1.0,0.0]
-        C1 = C(c(CoM.+ū1))
+        C1 = C(c(r̄g.+ū1))
         M = Array(NC.make_M(cf,m,ami_g,r̄g))
         Φ = cf.Φ
         A = cf.Φq
@@ -82,7 +82,7 @@ end
 rb1, sol1 = freefall()
 function get_state(rb,q,q̇)
     @unpack C,c = rb.state.cache.funcs
-    r̄g = rb.prop.CoM
+    r̄g = rb.prop.r̄g
     Cg = C(c(r̄g))
     rg = Cg*q
     ṙg = Cg*q̇
@@ -143,8 +143,8 @@ function odesolve(rb,force,torque)
     end
     θ = 0.1
     ω = rb.state.ω
-    u0 = vcat(rb.state.r,θ)
-    du0 = vcat(rb.state.ṙ,ω)
+    u0 = vcat(rb.state.rps,θ)
+    du0 = vcat(rb.state.rpṡ,ω)
     prob = SecondOrderODEProblem(rbd!,du0,u0,(0.0,100.0))
     sol = solve(prob,DPRKN6())
 end

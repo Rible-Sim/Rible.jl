@@ -385,14 +385,17 @@ function get_solution_set(B,F̃)
     return x,nb
 end
 
-function actuation_check(tgstruct,Y,a)
+
+
+function actuation_check(tr,Y,a)
+    @unpack tg = tr
     Δu = Y*a
-    original_restlens = [s.original_restlen for s in tgstruct.strings]
+    original_restlens = get_original_restlen(tr)
     restlens = original_restlens + Δu
     if any((x)->x<0,restlens)
         @warn "Negative rest lengths"
     end
-    lengths = [s.state.length for s in tgstruct.strings]
+    lengths = get_strings_len(tg)
     if any((x)->x<=0,lengths-restlens)
         @warn "Nonpositive tension"
     end
@@ -434,9 +437,10 @@ function inverse_for_actuation(tg,reftg,Y;gravity=false,recheck=true,scale=true)
     λ,rl,a
 end
 
-function inverse(tgstruct_input,refstruct,Y;gravity=false,recheck=true,scale=true)
+function inverse(tr,reftr,Y;gravity=false,recheck=true,scale=true)
     # We only use the $q$ of the reference structure.
-    actstruct,lhs,rhs,c = statics_equation_for_actuation(tgstruct_input,refstruct,Y;gravity,scale)
+    acttg,lhs,rhs,c = statics_equation_for_actuation(tr.tg,reftr.tg,Y;gravity,scale)
+    acttr = TensegrityRobot(acttg,deepcopy(tr.hub))
     if rank(lhs) < minimum(size(lhs))
         @warn "LHS is singular: rank(lhs)=$(rank(lhs)) < $(minimum(size(lhs)))"
         @info "Using Moore-Penrose pseudoinverse"
@@ -445,16 +449,13 @@ function inverse(tgstruct_input,refstruct,Y;gravity=false,recheck=true,scale=tru
     else
         x = lhs\rhs
     end
-    # W = I-transpose(c*Aq)*inv(c*Aq*transpose(c*Aq))*c*Aq
-    # new_lhs = W*Q̃*K̂*Y
-
-    λ = x[1:actstruct.nconstraint].*c
-    a = x[actstruct.nconstraint+1:end]
-    actuation_check(actstruct,Y,a)
-    refq,_ = get_q(refstruct)
-    actuate!(actstruct,a)
-    check_static_equilibrium(actstruct,refq,λ;gravity)
-    u0 = [s.original_restlen for s in actstruct.strings]
+    λ = x[1:acttg.nconstraint].*c
+    a = x[acttg.nconstraint+1:end]
+    actuation_check(acttr,Y,a)
+    refq,_ = get_q(reftr.tg)
+    actuate!(acttr,a)
+    check_static_equilibrium(acttg,refq,λ;gravity)
+    u0 = get_original_restlen(acttr)
     rl = u0 + Y*a
     λ,rl,a
 end

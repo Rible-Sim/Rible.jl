@@ -6,7 +6,7 @@ const TR = TensegrityRobot
 
 mass = 1.0
 inertia = SMatrix{3,3}(1.0I)
-CoM = zeros(3)
+r̄g = zeros(3)
 r = [0.0,0.0,-1.0]
 R = Matrix(1.0I,3,3)
 ṙ = [0.0,0.0,0.0]
@@ -28,7 +28,7 @@ ap4 = SVector{3}([0.0, 0.0, -h] + offset)
 
 prop = TR.RigidBody3DProperty(1,movable,mass,
             SMatrix{3,3}(inertia),
-            SVector(CoM...),
+            SVector(r̄g...),
             [ap1,ap2,ap3,ap4])
  
 state = TR.RigidBody3DState(prop,r,R,ṙ,ω,Val(:NC))
@@ -39,6 +39,6 @@ end
 mass = 1.0 #kg
 #inertia = Matrix(Diagonal([45.174,45.174,25.787]))*1e-8 # N/m^2
 inertia = Matrix(Diagonal([45.174,45.174,25.787]))*1e-1
-CoM = [0.0, 0.0, 17.56] .* 1e-4 # m
-rb1 = RigidBody(:rb1,mass = mass, inertia = inertia, CoM = CoM,
+r̄g = [0.0, 0.0, 17.56] .* 1e-4 # m
+rb1 = RigidBody(:rb1,mass = mass, inertia = inertia, r̄g = r̄g,
                      r = [0.0,0.0, -1.0], movable = false)

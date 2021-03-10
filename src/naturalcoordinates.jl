@@ -266,9 +266,27 @@ function NC2P2V(ri::AbstractVector{T},rj::AbstractVector{T},
     r̄j = invR*(rj-ro)
     u = rj-ri
     ū = invR*u
-    v̄,w̄ = HouseholderOrthogonalization(ū)
+    v̄,w̄ = HouseholderOrthogonalization(ū./norm(ū)).*norm(ū)
     v = R*v̄
     w = R*w̄
+    X̄ = hcat(ū,v̄,w̄)
+    lncs = LocalNaturalCoordinates2P2V(SVector{3}(r̄i),SVector{3}(r̄j),SVector{3}(v̄),
+                                        SVector{3}(w̄),SMatrix{3,3}(X̄),SMatrix{3,3}(inv(X̄)))
+    q = vcat(ri,rj,v,w)
+    lncs,q
+end
+
+function NC2P2V(ri::AbstractVector{T},rj::AbstractVector{T},
+                v::AbstractVector{T},w::AbstractVector{T},
+                       ro=zeros(T,3),R=Matrix(one(T)*I,3,3)
+                       ) where T
+    invR = transpose(R) # because this is a rotation matrix
+    r̄i = invR*(ri-ro)
+    r̄j = invR*(rj-ro)
+    u = rj-ri
+    ū = invR*u
+    v̄ = invR*v
+    w̄ = invR*w
     X̄ = hcat(ū,v̄,w̄)
     lncs = LocalNaturalCoordinates2P2V(SVector{3}(r̄i),SVector{3}(r̄j),SVector{3}(v̄),
                                         SVector{3}(w̄),SMatrix{3,3}(X̄),SMatrix{3,3}(inv(X̄)))
@@ -282,6 +300,16 @@ function NC2P2V(ri,rj,ro,R,ṙo,ω)
     ṙj = ṙo + ω×(rj-ro)
     v̇ = ω×q[7:9]
     ẇ = ω×q[10:12]
+    q̇ = vcat(ṙi,ṙj,v̇,ẇ)
+    lncs,SVector{12}(q),SVector{12}(q̇)
+end
+
+function NC2P2V(ri,rj,v,w,ro,R,ṙo,ω)
+    lncs,q = NC2P2V(ri,rj,v,w,ro,R)
+    ṙi = ṙo + ω×(ri-ro)
+    ṙj = ṙo + ω×(rj-ro)
+    v̇ = ω×v
+    ẇ = ω×w
     q̇ = vcat(ṙi,ṙj,v̇,ẇ)
     lncs,SVector{12}(q),SVector{12}(q̇)
 end

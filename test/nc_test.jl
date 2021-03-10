@@ -2,11 +2,11 @@ rb1 = tail.rigidbodies[1]
 rb2 = tail.rigidbodies[2]
 L = 0.02
 function make_cache(prop,L)
-    @unpack mass,inertia,CoM = prop
-    bps = TR.NaturalCoordinates.LocalNaturalCoordinates2P(L)
-    cf = TR.NaturalCoordinates.CoordinateFunctions(bps)
-    @unpack mass,inertia,CoM = prop
-    M = TR.NaturalCoordinates.make_M(cf,mass,inertia,CoM)
+    @unpack mass,inertia,r̄g = prop
+    lncs = TR.NaturalCoordinates.LocalNaturalCoordinates2P(L)
+    cf = TR.NaturalCoordinates.CoordinateFunctions(lncs)
+    @unpack mass,inertia,r̄g = prop
+    M = TR.NaturalCoordinates.make_M(cf,mass,inertia,r̄g)
     cf,M
 end
 

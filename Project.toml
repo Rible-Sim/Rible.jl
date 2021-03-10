@@ -23,6 +23,7 @@ ProgressMeter = "92933f4c-e287-5a05-a399-4b506db050ca"
 Rotations = "6038ab10-8711-5258-84ad-4b1120ba62dc"
 SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
+TypeSortedCollections = "94a5cd58-49a0-5741-bd07-fa4f4be8babf"
 
 [compat]
 julia = "1.4"

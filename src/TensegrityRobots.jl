@@ -12,6 +12,7 @@ using ForwardDiff
 using FiniteDiff
 using HomotopyContinuation
 using DynamicPolynomials
+using TypeSortedCollections
 using EzXML
 using Cubature
 using GaussQuadrature
@@ -34,10 +35,7 @@ include("forward_statics.jl")
 
 include("control.jl")
 
-struct TGRobot2D{ST,CT}
-    tgstruct::ST
-    hub::CT
-end
+
 # Write your package code here.
 include("plotting.jl")
 include("contact.jl")

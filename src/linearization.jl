@@ -38,6 +38,12 @@ function GECP(A_input)
     col_index
 end
 
+function find_full_constrained_index(lncs,q)
+    cf = NaturalCoordinates.CoordinateFunctions(lncs)
+    Aq = cf.Φq(q)
+    col_index = GECP(Aq)
+    col_index[size(Aq,1)+1:end]
+end
 
 function ∂Aᵀλ∂q(tgstruct,λ)
     body2q = tgstruct.connectivity.body2q

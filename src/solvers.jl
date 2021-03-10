@@ -52,19 +52,33 @@ function DyProblem(funcs,q0,q̇0,λ0,tspan)
     DyProblem(funcs,tspan,q0,q̇0,λ0,nx,nq,nλ)
 end
 
+function DyProblem(funcs,tr::TensegrityRobot,tspan)
+    @unpack qs,q̇s,λs = tr.traj
+    DyProblem(funcs,qs[end],q̇s[end],λs[end],tspan)
+end
+
 function solve(prob::DyProblem,solver;karg...)
     @unpack tspan,q0,q̇0,λ0,funcs = prob
     M,Φ,A,F!,Jacs = funcs
     ts = [tspan[1]]
     qs = [copy(q0)]
     q̇s = [copy(q̇0)]
-    ps = [M*copy(q̇0)]
+    ps = [Array(M)*copy(q̇0)]
     λs = [copy(λ0)]
     sol = Solution(ts,qs,q̇s,ps,λs)
     intor = Integrator(prob,tspan[1],copy(q0),copy(q̇0),sol,
                             tspan[1],copy(q0),copy(q̇0))
     cache = generate_cache(solver,intor)
     solve(intor,cache;karg...)
+end
+
+function solve!(tr::TensegrityRobot,prob::DyProblem,solver;karg...)
+    sol = solve(prob,solver;karg...)
+    append!(tr.traj.ts,sol.ts[2:end])
+    append!(tr.traj.qs,sol.qs[2:end])
+    append!(tr.traj.q̇s,sol.q̇s[2:end])
+    append!(tr.traj.λs,sol.λs[2:end])
+    tr
 end
 
 include("solvers/Wendlandt.jl")

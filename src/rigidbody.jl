@@ -10,7 +10,7 @@ struct RigidBodyProperty{N,T,L} <: AbstractRigidBodyProperty{N,T}
     type::Symbol
     mass::T
     inertia::Union{T,SArray{Tuple{N,N},T,2,L}}
-    CoM::SArray{Tuple{N},T,1,N}
+    r̄g::SArray{Tuple{N},T,1,N}
     naps::Int
     aps::Vector{SArray{Tuple{N},T,1,N}}
 end
@@ -23,11 +23,14 @@ struct RigidBodyCoordinates{N,T}
 end
 
 struct RigidBodyState{N,T,L,C,cacheType} <: AbstractRigidBodyState{N,T,C}
-    r::MArray{Tuple{N},T,1,N}
+    ro::MArray{Tuple{N},T,1,N}
     R::MArray{Tuple{N,N},T,2,L}
-    ṙ::MArray{Tuple{N},T,1,N}
+    ṙo::MArray{Tuple{N},T,1,N}
     ω::Union{T,MArray{Tuple{N},T,1,N}}
-    p::Vector{MArray{Tuple{N},T,1,N}} # Anchor Points in global frame
+    rg::MArray{Tuple{N},T,1,N}
+    ṙg::MArray{Tuple{N},T,1,N}
+    rps::Vector{MArray{Tuple{N},T,1,N}} # Anchor Points in global frame
+    ṙps::Vector{MArray{Tuple{N},T,1,N}} # Anchor Points in global frame
     F::MArray{Tuple{N},T,1,N}
     τ::Union{T,MArray{Tuple{N},T,1,N}}
     Faps::Vector{MArray{Tuple{N},T,1,N}}
@@ -49,7 +52,8 @@ struct ConstrainedFunctions{ΦT,ΦqT,∂Aᵀλ∂qT}
 end
 
 struct NaturalCoordinatesCache{ArrayT,MT,fT,cfT}
-    CG::ArrayT
+    Cg::ArrayT
+    Co::ArrayT
     Cp::Vector{ArrayT}
     M::MT
     funcs::fT
@@ -85,7 +89,7 @@ end
 # 2D and 3D
 function RigidBodyProperty(i::Integer,movable::Bool,
                             mass::Real,inertia_input,
-                            CoM::AbstractVector,aps;constrained=false)
+                            r̄g::AbstractVector,aps;constrained=false)
     name = Symbol("rb"*string(i))
     type = :generic
     naps = length(aps)
@@ -93,25 +97,26 @@ function RigidBodyProperty(i::Integer,movable::Bool,
         constrained = true
     end
     if typeof(inertia_input)<:Real
-        return RigidBodyProperty{2,eltype(CoM),4}(movable,constrained,name,type,mass,
-                                inertia_input,SVector{2}(CoM),naps,SVector{2}.(aps))
+        return RigidBodyProperty{2,eltype(r̄g),4}(movable,constrained,name,type,mass,
+                                inertia_input,SVector{2}(r̄g),naps,SVector{2}.(aps))
     else
         mtype = similar_type(inertia_input)
         vtype = SVector{size(inertia_input)[1]}
         return RigidBodyProperty(movable,constrained,name,type,mass,
-                                mtype(inertia_input),vtype(CoM),naps,vtype.(aps))
+                                mtype(inertia_input),vtype(r̄g),naps,vtype.(aps))
     end
 end
 
 function NaturalCoordinatesCache(prop::RigidBodyProperty{N,T,iT},
-                                 bps::NaturalCoordinates.LocalNaturalCoordinates,
+                                 lncs::NaturalCoordinates.LocalNaturalCoordinates,
                                  q,constrained_index=Vector{Int}()) where {N,T,iT}
-    cf = NaturalCoordinates.CoordinateFunctions(bps)
-    @unpack mass,inertia,CoM,naps,aps = prop
-    M = NaturalCoordinates.make_M(cf,mass,inertia,CoM)
+    cf = NaturalCoordinates.CoordinateFunctions(lncs)
+    @unpack mass,inertia,r̄g,naps,aps = prop
+    M = NaturalCoordinates.make_M(cf,mass,inertia,r̄g)
     @unpack C,c = cf
-    CG = C(c(CoM))
-    Cp = [typeof(CG)(C(c(aps[i]))) for i in 1:naps]
+    Cg = C(c(r̄g))
+    Co = C(c(zeros(T,N)))
+    Cp = [typeof(Cg)(C(c(aps[i]))) for i in 1:naps]
     if prop.movable
         if prop.constrained && constrained_index == Vector{Int}()
             @error "Rigid body constrained, but no index specified."
@@ -120,20 +125,20 @@ function NaturalCoordinatesCache(prop::RigidBodyProperty{N,T,iT},
         end
     end
     nc = length(constrained_index)
-    nq = size(CG)[2]
+    nq = size(Cg)[2]
     q0 = copy(q)
     cfuns = ConstrainedFunctions(
                 make_index_Φ(constrained_index,q0),
                 make_index_A(constrained_index,nq),
                 NaturalCoordinates.∂Φqᵀ∂q_forwarddiff(cf))
-    NaturalCoordinatesCache(CG,Cp,M,cf,nc,constrained_index,cfuns)
+    NaturalCoordinatesCache(Cg,Co,Cp,M,cf,nc,constrained_index,cfuns)
 end
 
 # 2D
 function NaturalCoordinatesCache(prop::RigidBodyProperty,
                                  L::Real,q,constrained_index)
-    bps = NaturalCoordinates.LocalNaturalCoordinates2P(L)
-    NaturalCoordinatesCache(prop,bps,q,constrained_index)
+    lncs = NaturalCoordinates.LocalNaturalCoordinates2P(L)
+    NaturalCoordinatesCache(prop,lncs,q,constrained_index)
 end
 
 function RigidBodyState(prop,ri::AbstractVector{T},
@@ -152,13 +157,13 @@ function RigidBodyState(prop,ri::AbstractVector{T},
     F = MVector(0.0,0.0)
     τ = 0.0
     τaps = MVector(0.0,0.0)
-    bps = NaturalCoordinates.LocalNaturalCoordinates1P1V{T}()
-    cache = NaturalCoordinatesCache(prop,bps,q,constrained_index)
+    lncs = NaturalCoordinates.LocalNaturalCoordinates1P1V{T}()
+    cache = NaturalCoordinatesCache(prop,lncs,q,constrained_index)
     naps = prop.naps
-    p = [MVector{2}(cache.Cp[i]*q) for i in 1:naps]
+    rps = [MVector{2}(cache.Cp[i]*q) for i in 1:naps]
     Faps = [zeros(MVector{2}) for i in 1:naps]
     τaps = [zeros(MVector{2}) for i in 1:naps]
-    RigidBodyState(r,R,ṙ,ω,p,F,τ,Faps,τaps,coords,cache)
+    RigidBodyState(r,R,ṙ,ω,rps,F,τ,Faps,τaps,coords,cache)
 end
 
 RigidBodyState(prop,ri,rj,constrained_index) = RigidBodyState(prop,ri,rj,zero(ri),zero(rj),constrained_index)
@@ -171,25 +176,29 @@ function RigidBodyState(prop,ri::AbstractVector{T},rj::AbstractVector{T},
     q̈ = zero(q)
     Q = zero(q)
     coords = RigidBodyCoordinates(q,q̇,q̈,Q)
-    r = MVector{2}(ri)
-    ṙ = zero(r)
+    ro = MVector{2}(ri)
+    ṙo = zero(ro)
     u = rj-ri
     θ = atan(u[2],u[1])
     R = MMatrix{2,2}(cos(θ), -sin(θ), sin(θ), cos(θ))
     ω = 0.0
+    @unpack r̄g = prop
+    rg = ro + R*r̄g
+    ṙg = ṙo + ω×rg
     F = MVector(0.0,0.0)
     τ = 0.0
     τaps = MVector(0.0,0.0)
     cache = NaturalCoordinatesCache(prop,norm(u),q,constrained_index)
     naps = prop.naps
-    p = [MVector{2}(cache.Cp[i]*q) for i in 1:naps]
+    rps = [MVector{2}(cache.Cp[i]*q) for i in 1:naps]
+    ṙps = [MVector{2}(cache.Cp[i]*q̇) for i in 1:naps]
     Faps = [zeros(MVector{2}) for i in 1:naps]
     τaps = [zeros(MVector{2}) for i in 1:naps]
-    RigidBodyState(r,R,ṙ,ω,p,F,τ,Faps,τaps,coords,cache)
+    RigidBodyState(ro,R,ṙo,ω,rg,ṙg,rps,ṙps,F,τ,Faps,τaps,coords,cache)
 end
 
 function RigidBodyState(prop::RigidBodyProperty{2,T},
-                        bps::NaturalCoordinates.LocalNaturalCoordinates2D6C,
+                        lncs::NaturalCoordinates.LocalNaturalCoordinates2D6C,
                         r_input,θ_input,ṙ_input,ω_input,
                         q_input,q̇_input=zero(q_input),
                         constrained_index=Vector{Int}()) where {T}
@@ -198,37 +207,37 @@ function RigidBodyState(prop::RigidBodyProperty{2,T},
     q̈ = zero(q)
     Q = zero(q)
     coords = RigidBodyCoordinates(q,q̇,q̈,Q)
-    cache = NaturalCoordinatesCache(prop,bps,q,constrained_index)
+    cache = NaturalCoordinatesCache(prop,lncs,q,constrained_index)
 
-    @unpack CoM,naps,aps = prop
+    @unpack r̄g,naps,aps = prop
     @unpack C,c = cache.funcs
 
     R = MMatrix{2,2,T,4}(rotation_matrix(θ_input))
-    rg = MVector{2}(r_input+R*CoM)
+    rg = MVector{2}(r_input+R*r̄g)
     ω = ω_input ###
     ṙg = MVector{2}(ṙ_input+ω×(rg-r_input))
 
-    CG = C(c(CoM))
+    Cg = C(c(r̄g))
     Cp = [C(c(ap)) for ap in aps]
     p = [Cp[i]*q for i in 1:naps]
     nap = prop.naps
-    p = [MVector{2}(cache.Cp[i]*q) for i in 1:nap]
+    rps = [MVector{2}(cache.Cp[i]*q) for i in 1:nap]
     F = @MVector zeros(T,2)
     τ = zero(ω_input) ###
     Faps = [@MVector zeros(T,2) for i in 1:nap]
     τaps = [zero(ω_input) for i in 1:nap]
 
-    RigidBodyState(rg,R,ṙg,ω,p,F,τ,Faps,τaps,coords,cache)
+    RigidBodyState(rg,R,ṙg,ω,rps,F,τ,Faps,τaps,coords,cache)
 end
 
 # 3D
 # function NaturalCoordinatesCache(prop::RigidBodyProperty{3,T,iT},r::AbstractVector{T}...) where {T,iT}
-#     bps = NaturalCoordinates.LocalNaturalCoordinates3D(r...)
-#     NaturalCoordinatesCache(prop,bps)
+#     lncs = NaturalCoordinates.LocalNaturalCoordinates3D(r...)
+#     NaturalCoordinatesCache(prop,lncs)
 # end
 
 function RigidBodyState(prop::RigidBodyProperty{3,T,iT},
-                        bps::NaturalCoordinates.LocalNaturalCoordinates3D,
+                        lncs::NaturalCoordinates.LocalNaturalCoordinates3D,
                         r_input,R_input,ṙ_input,ω_input,
                         q_input,q̇_input=zero(q_input),
                         constrained_index=Vector{Int}()) where {T,iT}
@@ -237,23 +246,26 @@ function RigidBodyState(prop::RigidBodyProperty{3,T,iT},
     q̈ = zero(q)
     Q = zero(q)
     coords = RigidBodyCoordinates(q,q̇,q̈,Q)
-    cache = NaturalCoordinatesCache(prop,bps,q,constrained_index)
-    @unpack CoM,naps,aps = prop
+    cache = NaturalCoordinatesCache(prop,lncs,q,constrained_index)
+    @unpack r̄g,naps,aps = prop
     @unpack C,c = cache.funcs
-    CG = C(c(CoM))
+    Cg = C(c(r̄g))
     Cp = [C(c(ap)) for ap in aps]
     p = [Cp[i]*q for i in 1:naps]
     nap = prop.naps
-    p = [MVector{3}(cache.Cp[i]*q) for i in 1:nap]
+    rps = [MVector{3}(cache.Cp[i]*q) for i in 1:nap]
+    ṙps = [MVector{3}(cache.Cp[i]*q̇) for i in 1:nap]
     F = @MVector zeros(T,3)
     τ = @MVector zeros(T,3) ###
     Faps = [@MVector zeros(T,3) for i in 1:nap]
     τaps = [@MVector zeros(T,3) for i in 1:nap]
     R = MMatrix{3,3,T,9}(R_input)
-    r = MVector{3}(r_input+R*CoM)
+    ro = MVector{3}(r_input)
     ω = MVector{3,T}(ω_input) ###
-    ṙ = MVector{3}(ṙ_input+ω×(r-r_input))
-    RigidBodyState(r,R,ṙ,ω,p,F,τ,Faps,τaps,coords,cache)
+    ṙo = MVector{3}(ṙ_input)
+    rg = MVector{3}(ro+R*r̄g)
+    ṙg = MVector{3}(ṙo+ω×(rg-ro))
+    RigidBodyState(ro,R,ṙo,ω,rg,ṙg,rps,ṙps,F,τ,Faps,τaps,coords,cache)
 end
 
 # operations on rigid body
