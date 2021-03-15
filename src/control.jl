@@ -1,7 +1,7 @@
-include("PIDController.jl")
-
-using .PIDController
-import .PIDController: reset!
+# include("PIDController.jl")
+#
+# using .PIDController
+# import .PIDController: reset!
 
 struct ControlTrajectory{tType,eType,uType}
     ts::Vector{tType}
@@ -53,12 +53,12 @@ abstract type ControlScheme end
 
 struct EmptyScheme <: ControlScheme end
 
-function record!(traj::ControlTrajectory,pid::PID)
-    @unpack ts,es,us = traj
-    push!(ts,pid.lastTime)
-    push!(es,pid.lastErr)
-    push!(us,pid.lastOutput)
-end
+# function record!(traj::ControlTrajectory,pid::PID)
+#     @unpack ts,es,us = traj
+#     push!(ts,pid.lastTime)
+#     push!(es,pid.lastErr)
+#     push!(us,pid.lastOutput)
+# end
 
 abstract type AbstractActuator{T} end
 

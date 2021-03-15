@@ -134,6 +134,13 @@ function build_L̂(tgstruct)
     L̂
 end
 
+function build_Γ(tg)
+    reset_forces!(tg)
+    update_strings_apply_forces!(tg)
+    forces = [s.state.tension.*s.state.direction for s in tg.strings]
+    reduce(vcat,forces)
+end
+
 function build_ℓ(tgstruct)
     reset_forces!(tgstruct)
     update_strings_apply_forces!(tgstruct)
@@ -226,8 +233,8 @@ function build_S(tgstruct,a,q)
     ret = zeros(eltype(a),nstrings)
     for i = 1:nstrings
         Ji = build_Ji(tgstruct,i)
-        Wi = Array(transpose(Ji)*Ji)
-        ret[i] = transpose(q)*Wi*q*a[i]^2 - 1
+        Ui = Array(transpose(Ji)*Ji)
+        ret[i] = transpose(q)*Ui*q*a[i]^2 - 1
     end
     ret
 end
