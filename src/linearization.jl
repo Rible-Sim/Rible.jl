@@ -64,6 +64,26 @@ function ∂Aᵀλ∂q(tgstruct,λ)
     ret
 end
 
+function ∂Aq̇∂q(tgstruct,q̇)
+    body2q = tgstruct.connectivity.body2q
+    @unpack ncoords, nconstraint = tgstruct
+    nbodyc = get_nbodyconstraint(tgstruct)
+    ret = zeros(get_numbertype(tgstruct),nconstraint,ncoords)
+    is = 0
+    for rbid in tgstruct.mvbodyindex
+        pindex = body2q[rbid]
+        rb = tgstruct.rigidbodies[rbid]
+        q̇_rb = q̇[pindex]
+        nc = rb.state.cache.nc
+        if nc > 0
+            is += nc
+        end
+        ret[is+1:is+nbodyc,pindex] .+= rb.state.cache.cfuncs.∂Aq̇∂q(q̇_rb)
+        is += nbodyc
+    end
+    ret
+end
+
 function test_fvector(tgstruct,q0)
     function L(q)
         reset_forces!(tgstruct)

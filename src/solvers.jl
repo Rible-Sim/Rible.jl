@@ -30,6 +30,7 @@ mutable struct Integrator{ProbType,T,qT,solType}
     tprev::T
     qprev::qT
     q̇prev::qT
+    convergence::Bool
 end
 const FALSE_CALLBACK_CONDITION = (intor) -> false
 const TRUE_CALLBACK_CONDITION  = (intor) -> true
@@ -66,19 +67,20 @@ function solve(prob::DyProblem,solver;karg...)
     ps = [Array(M)*copy(q̇0)]
     λs = [copy(λ0)]
     sol = Solution(ts,qs,q̇s,ps,λs)
+    convergence = true
     intor = Integrator(prob,tspan[1],copy(q0),copy(q̇0),sol,
-                            tspan[1],copy(q0),copy(q̇0))
+                            tspan[1],copy(q0),copy(q̇0),convergence)
     cache = generate_cache(solver,intor)
-    solve(intor,cache;karg...)
+    solve!(intor,cache;karg...)
 end
 
 function solve!(tr::TensegrityRobot,prob::DyProblem,solver;karg...)
-    sol = solve(prob,solver;karg...)
-    append!(tr.traj.ts,sol.ts[2:end])
-    append!(tr.traj.qs,sol.qs[2:end])
-    append!(tr.traj.q̇s,sol.q̇s[2:end])
-    append!(tr.traj.λs,sol.λs[2:end])
-    tr
+    intor = solve(prob,solver;karg...)
+    append!(tr.traj.ts,intor.sol.ts[2:end])
+    append!(tr.traj.qs,intor.sol.qs[2:end])
+    append!(tr.traj.q̇s,intor.sol.q̇s[2:end])
+    append!(tr.traj.λs,intor.sol.λs[2:end])
+    intor
 end
 
 include("solvers/Wendlandt.jl")

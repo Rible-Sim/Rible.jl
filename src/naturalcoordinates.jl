@@ -12,9 +12,14 @@ abstract type LocalNaturalCoordinates2D6C{T} <: LocalNaturalCoordinates2D{T} end
 abstract type LocalNaturalCoordinates3D12C{T} <: LocalNaturalCoordinates3D{T} end
 
 make_I(T,N) = SMatrix{N,N}(one(T)*I)
-get_ncoords(::LocalNaturalCoordinates2D4C) = 4
-get_ncoords(::LocalNaturalCoordinates2D6C) = 6
-get_ncoords(::LocalNaturalCoordinates3D12C) = 12
+get_ncoords(lncs) = get_ncoords(typeof(lncs))
+get_nconstraint(lncs) = get_nconstraint(typeof(lncs))
+get_ncoords(::Type{<:LocalNaturalCoordinates2D4C}) = 4
+get_ncoords(::Type{<:LocalNaturalCoordinates2D6C}) = 6
+get_ncoords(::Type{<:LocalNaturalCoordinates3D12C}) = 12
+get_nconstraint(::Type{<:LocalNaturalCoordinates2D4C}) = 1
+get_nconstraint(::Type{<:LocalNaturalCoordinates2D6C}) = 3
+get_nconstraint(::Type{<:LocalNaturalCoordinates3D12C}) = 6
 
 function LinearAlgebra.cross(a::Number,b::AbstractVector)
     ret = similar(b)
@@ -900,12 +905,28 @@ function CoordinateFunctions(lncs)
 end
 
 
-function ∂Φqᵀ∂q_forwarddiff(cf::CoordinateFunctions{<:LocalNaturalCoordinates})
+function ∂Aᵀλ∂q_forwarddiff(cf::CoordinateFunctions{<:LocalNaturalCoordinates})
     function ∂Aᵀλ∂q(λ)
         function ATλ(q)
             transpose(cf.Φq(q))*λ
         end
-        ForwardDiff.jacobian(ATλ,ones(eltype(λ),get_ncoords(cf.lncs)))
+        nq = get_ncoords(cf.lncs)
+        λT = eltype(λ)
+        out = zeros(λT,nq,nq)
+        ForwardDiff.jacobian!(out,ATλ,ones(λT,nq))
+    end
+end
+
+function ∂Aq̇∂q_forwarddiff(cf::CoordinateFunctions{<:LocalNaturalCoordinates})
+    function ∂Aq̇∂q(q̇)
+        function Aq̇(q)
+            cf.Φq(q)*q̇
+        end
+        nq = get_ncoords(cf.lncs)
+        nλ = get_nconstraint(cf.lncs)
+        q̇T = eltype(q̇)
+        out = zeros(q̇T,nλ,nq)
+        ForwardDiff.jacobian!(out,Aq̇,ones(q̇T,nq))
     end
 end
 

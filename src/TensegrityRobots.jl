@@ -43,5 +43,5 @@ include("linearization.jl")
 include("tangent.jl")
 include("miscellaneous.jl")
 include("solvers.jl")
-
+include("planning.jl")
 end

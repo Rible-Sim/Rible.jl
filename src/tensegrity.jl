@@ -216,9 +216,9 @@ function assemble_forces(tgstruct;factor=1.0)
     F
 end
 
-function apply_gravity!(tgstruct)
+function apply_gravity!(tgstruct;factor=1)
     rbs = tgstruct.rigidbodies
-    gravity_acceleration = get_gravity(tgstruct)
+    gravity_acceleration = factor*get_gravity(tgstruct)
     for (rbid,rb) in enumerate(rbs)
         @unpack prop, state = rb
         rb.state.F .+= gravity_acceleration*prop.mass
@@ -532,10 +532,7 @@ get_nbodyconstraint(rb::AbstractRigidBody) = get_nbodyconstraint(typeof(rb))
 get_nbodyconstraint(::Type{<:RigidBody{N,T,L,C,
                 <:NaturalCoordinatesCache{ArrayT,MT,
                 <:NaturalCoordinates.CoordinateFunctions{lncsType},
-                cfT}}}) where {N,T,L,C,ArrayT,MT,lncsType,cfT} = get_nbodyconstraint(lncsType)
-get_nbodyconstraint(::Type{<:NaturalCoordinates.LocalNaturalCoordinates2D4C}) = 1
-get_nbodyconstraint(::Type{<:NaturalCoordinates.LocalNaturalCoordinates2D6C}) = 3
-get_nbodyconstraint(::Type{<:NaturalCoordinates.LocalNaturalCoordinates3D12C}) = 6
+                cfT}}}) where {N,T,L,C,ArrayT,MT,lncsType,cfT} = NaturalCoordinates.get_nconstraint(lncsType)
 
 get_nbodycoords(tr::TensegrityRobot) = get_nbodycoords(tr.tg)
 get_nbodycoords(tg::TensegrityStructure) = get_nbodycoords(tg.rigidbodies)
@@ -544,10 +541,7 @@ get_nbodycoords(rb::AbstractRigidBody) = get_nbodycoords(typeof(rb))
 get_nbodycoords(::Type{<:RigidBody{N,T,L,C,
                 <:NaturalCoordinatesCache{ArrayT,MT,
                 <:NaturalCoordinates.CoordinateFunctions{lncsType},
-                cfT}}}) where {N,T,L,C,ArrayT,MT,lncsType,cfT} = get_nbodycoords(lncsType)
-get_nbodycoords(::Type{<:NaturalCoordinates.LocalNaturalCoordinates2D4C}) = 4
-get_nbodycoords(::Type{<:NaturalCoordinates.LocalNaturalCoordinates2D6C}) = 6
-get_nbodycoords(::Type{<:NaturalCoordinates.LocalNaturalCoordinates3D12C}) = 12
+                cfT}}}) where {N,T,L,C,ArrayT,MT,lncsType,cfT} = NaturalCoordinates.get_ncoords(lncsType)
 
 get_nbodydof(tr::TensegrityRobot) = get_nbodydof(tr.tg)
 get_nbodydof(tg::TensegrityStructure) = get_nbodydof(tg.rigidbodies)
