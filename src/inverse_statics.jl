@@ -134,6 +134,19 @@ function build_L̂(tgstruct)
     L̂
 end
 
+function build_L(tgstruct)
+    @unpack nstrings, ndim, strings = tgstruct
+    reset_forces!(tgstruct)
+    update_strings_apply_forces!(tgstruct)
+    T = get_numbertype(tgstruct)
+    L = spzeros(T, nstrings*ndim, nstrings)
+    for (i,ss) in enumerate(strings)
+        is = (i-1)*ndim
+        L[is+1:is+ndim,i] = ss.state.direction*ss.state.length
+    end
+    L
+end
+
 function build_Γ(tg)
     reset_forces!(tg)
     update_strings_apply_forces!(tg)

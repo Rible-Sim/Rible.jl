@@ -172,13 +172,13 @@ function distribute_q_to_rbs!(tgstruct,globalq,globalq̇)
         q̇ .= globalq̇[pindex]
         @unpack cache,rps,ṙps,ro,ṙo,rg,ṙg = rbs[rbid].state
         @unpack Co,Cg,Cp = cache
-        ro .= Co*q
-        ṙo .= Co*q̇
-        rg .= Cg*q
-        ṙg .= Cg*q̇
+        mul!(ro, Co, q)
+        mul!(ṙo, Co, q̇)
+        mul!(rg, Cg, q)
+        mul!(ṙg, Cg, q̇)
         for (i,(rp,ṙp)) in enumerate(zip(rps,ṙps))
-            rp .= Cp[i]*q
-            ṙp .= Cp[i]*q̇
+            mul!(rp, Cp[i], q)
+            mul!(ṙp, Cp[i], q̇)
         end
     end
 end
@@ -557,7 +557,10 @@ get_gravity(rb::AbstractRigidBody) = get_gravity(typeof(rb))
 get_gravity(::Type{<:AbstractRigidBody{2,T,C}}) where {T,C} = [zero(T),-9.81*one(T)]
 get_gravity(::Type{<:AbstractRigidBody{3,T,C}}) where {T,C} = [zero(T),zero(T),-9.81*one(T)]
 
-get_strings_len(tr::TensegrityRobot) = get_strings_len(tr.tg)
+get_strings_len(bot::TensegrityRobot) = get_strings_len(bot.tg)
+get_strings_deform(bot::TensegrityRobot) = get_strings_deform(bot.tg)
+get_strings_restlen(bot::TensegrityRobot) = get_strings_restlen(bot.tg)
+get_strings_len_dot(bot::TensegrityRobot) = get_strings_len_dot(bot.tg)
 
 function get_strings_len!(tg::TensegrityStructure,q)
     distribute_q_to_rbs!(tg,q,zero(q))
@@ -569,6 +572,14 @@ function get_strings_len(tg::TensegrityStructure)
     [s.state.length for s in tg.strings]
 end
 
+function get_strings_len_dot(tg::TensegrityStructure)
+    [s.state.lengthdot for s in tg.strings]
+end
+
+function get_strings_deform(tg::TensegrityStructure)
+    [s.state.length - s.state.restlen for s in tg.strings]
+end
+
 function get_strings_restlen(tg::TensegrityStructure)
     [s.state.restlen for s in tg.strings]
 end
@@ -578,6 +589,18 @@ function get_original_restlen(tr_input::TensegrityRobot)
     T = get_numbertype(tr)
     actuate!(tr,zeros(T,length(tr.hub.actuators)))
     u0 = get_strings_restlen(tr.tg)
+end
+
+function force_densities_to_restlen(tg::TensegrityStructure,γs)
+    [
+    begin
+        l = s.state.length
+        l̇ = s.state.lengthdot
+        k = s.k
+        c = s.c
+        u = l-(γ*l-c*l̇)/k
+    end
+        for (γ,s) in zip(γs,tg.strings)]
 end
 
 function find_remaining_index(body2q,rbs)

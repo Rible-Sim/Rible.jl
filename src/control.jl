@@ -17,34 +17,34 @@ function reset!(traj::ControlTrajectory)
 end
 
 abstract type AbstractController end
-abstract type Heating <: AbstractController end
+abstract type Heater <: AbstractController end
 abstract type GroupedController <: AbstractController end
-abstract type GroupedActuation <: GroupedController end
-abstract type GroupedHeating <: GroupedController end
+abstract type GroupedActuator <: GroupedController end
+abstract type GroupedHeater <: GroupedController end
 
-struct ManualActuation{CT,TT} <:AbstractController
-    act::CT
+struct ManualActuator{CT,TT} <:AbstractController
+    reg::CT
     traj::TT
 end
 
-struct ManualGangedActuation{CT,TT} <:GroupedActuation
-    acts::CT
+struct ManualGangedActuators{CT,TT} <:GroupedActuator
+    regs::CT
     traj::TT
 end
 
-struct ManualSerialActuation{CT,TT} <:GroupedActuation
-    acts::CT
+struct ManualSerialActuators{CT,TT} <:GroupedActuator
+    regs::CT
     traj::TT
 end
 
-struct ManualHeating{CT,HT,TT} <:Heating
-    act::CT
+struct ManualHeater{CT,HT,TT} <:Heater
+    reg::CT
     heating_law::HT
     traj::TT
 end
 
-struct ManualSerialHeating{CT,HT,TT} <:GroupedHeating
-    acts::CT
+struct ManualSerialHeater{CT,HT,TT} <:GroupedHeater
+    regs::CT
     heating_laws::HT
     trajs::TT
 end
@@ -60,72 +60,72 @@ struct EmptyScheme <: ControlScheme end
 #     push!(us,pid.lastOutput)
 # end
 
-abstract type AbstractActuator{T} end
+abstract type AbstractRegistor{T} end
 
-struct SimpleActuator{T} <: AbstractActuator{T}
+struct SimpleRegistor{T} <: AbstractRegistor{T}
     id_string::Int
     original_value::T
 end
 
-struct SimpleActuators{T} <: AbstractActuator{T}
+struct SimpleRegistors{T} <: AbstractRegistor{T}
     id_strings::Vector{Int}
     original_values::Vector{T}
 end
 
-function ManualActuation(act::SimpleActuator{T}) where {T}
+function ManualActuator(reg::SimpleRegistor{T}) where {T}
     ts = Vector{T}()
     es = Vector{T}()
     us = Vector{T}()
     traj = ControlTrajectory(ts,es,us)
-    ManualActuation(act,traj)
+    ManualActuator(reg,traj)
 end
 
-function ManualGangedActuation(acts::SimpleActuators{T}) where {T}
+function ManualGangedActuators(regs::SimpleRegistors{T}) where {T}
     ts = Vector{T}()
     es = Vector{T}()
     us = Vector{T}()
     traj = ControlTrajectory(ts,es,us)
-    ManualGangedActuation(acts,traj)
+    ManualGangedActuators(regs,traj)
 end
 
-function ManualSerialActuation(acts::SimpleActuators{T}) where {T}
+function ManualSerialActuators(regs::SimpleRegistors{T}) where {T}
     ts = Vector{Vector{T}}()
     es = Vector{Vector{T}}()
     us = Vector{Vector{T}}()
     trajs = ControlTrajectory(ts,es,us)
-    ManualSerialActuation(acts,trajs)
+    ManualSerialActuators(regs,trajs)
 end
 
-function ManualHeating(act::SimpleActuator{T},heating_law) where {T}
+function ManualHeater(reg::SimpleRegistor{T},heating_law) where {T}
     ts = Vector{T}()
     es = Vector{T}()
     us = Vector{T}()
     traj = ControlTrajectory(ts,es,us)
-    ManualHeating(act,heating_law,traj)
+    ManualHeater(reg,heating_law,traj)
 end
 
-function ManualSerialHeating(acts::SimpleActuators{T},heating_laws) where {T}
+function ManualSerialHeater(regs::SimpleRegistors{T},heating_laws) where {T}
     ts = Vector{Vector{T}}()
     es = Vector{Vector{T}}()
     us = Vector{Vector{T}}()
     trajs = ControlTrajectory(ts,es,us)
-    ManualSerialHeating(acts,heating_laws,trajs)
+    ManualSerialHeater(regs,heating_laws,trajs)
 end
 
 select_by_id(xs,id) = xs[findfirst((x)->x.id==id, xs)]
 
-function reset!(ctrller::ManualActuation,tg)
-    @unpack act, traj = ctrller
-    @unpack id_string, original_value = act
+function reset!(ctrller::ManualActuator,tg)
+    @unpack reg, traj = ctrller
+    @unpack id_string, original_value = reg
     @unpack strings = tg
     s = select_by_id(strings,id_string)
     s.state.restlen = original_value
     reset!(traj)
 end
 
-function reset!(ctrller::GroupedActuation,tg)
-    @unpack acts, trajs = ctrller
-    @unpack id_strings, original_values = acts
+function reset!(ctrller::GroupedActuator,tg)
+    @unpack regs, trajs = ctrller
+    @unpack id_strings, original_values = regs
     @unpack strings = tg
     for (id,original_value) in zip(id_strings,original_values)
         s = select_by_id(strings,id)
@@ -152,7 +152,7 @@ end
 
 
 
-function actuate!(ctrller::ManualActuation,tg,u;inc=false)
+function actuate!(ctrller::ManualActuator,tg,u;inc=false)
     @unpack strings = tg
     @unpack act, traj = ctrller
     @unpack id_string, original_value = act
@@ -166,7 +166,7 @@ function actuate!(ctrller::ManualActuation,tg,u;inc=false)
     # push!(us,u)
 end
 
-function actuate!(ctrller::ManualGangedActuation,tg,u;inc=false)
+function actuate!(ctrller::ManualGangedActuators,tg,u;inc=false)
     @unpack strings = tg
     @unpack acts, traj = ctrller
     @unpack id_strings, original_values = acts
@@ -183,7 +183,7 @@ function actuate!(ctrller::ManualGangedActuation,tg,u;inc=false)
     # push!(us,u)
 end
 
-function actuate!(ctrller::ManualSerialActuation,tg,u;inc=false)
+function actuate!(ctrller::ManualSerialActuators,tg,u;inc=false)
     @unpack strings = tg
     @unpack acts, trajs = ctrller
     @unpack id_strings, original_values = acts
@@ -199,7 +199,7 @@ function actuate!(ctrller::ManualSerialActuation,tg,u;inc=false)
     # push!(us,u)
 end
 
-function heat!(ctrller::ManualHeating,tg,u;inc=false,abs=true)
+function heat!(ctrller::ManualHeater,tg,u;inc=false,abs=true)
     @unpack SMA_strings = tg.tensiles
     @unpack id_string, original_value, heating_law = ctrller.act
     s = select_by_id(SMA_strings,id_string)
@@ -215,11 +215,11 @@ function heat!(ctrller::ManualHeating,tg,u;inc=false,abs=true)
     heat!(s,heating_law)
 end
 
-@inline function heat!(ctrller::ManualSerialHeating,tg::TensegrityStructure,u;inc=false)
+@inline function heat!(ctrller::ManualSerialHeater,tg::TensegrityStructure,u;inc=false)
     heat!(ctrller,tg.tensiles.SMA_strings,u;inc)
 end
 
-function heat!(ctrller::ManualSerialHeating,
+function heat!(ctrller::ManualSerialHeater,
                 SMA_strings::AbstractVector{<:SMAString},u;inc=false,abs=true)
     @unpack acts, heating_laws = ctrller
     @unpack id_strings, original_values = acts
