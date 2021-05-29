@@ -220,36 +220,39 @@ function build_Ji(tgstruct,i)
     Ji = C2*T2-C1*T1
 end
 
-function build_U(tgstruct,a,u)
+function build_U(tgstruct)
     @unpack ncoords,nstrings,ndim,strings = tgstruct
-    ret = zeros(eltype(a),nstrings*ndim,ncoords)
-    for i = 1:nstrings
-        k = strings[i].k
-        Ji = Array(build_Ji(tgstruct,i))
-        ret[(i-1)*ndim+1:i*ndim,:] = k*Ji*(1-a[i]*u[i])
+    function inner_U(s,u)
+        ret = zeros(eltype(s),nstrings*ndim,ncoords)
+        for i = 1:nstrings
+            k = strings[i].k
+            Ji = Array(build_Ji(tgstruct,i))
+            ret[(i-1)*ndim+1:i*ndim,:] = k*Ji*(1-s[i]*u[i])
+        end
+        ret
     end
-    ret
+    function inner_U(s,u,k)
+        ret = zeros(eltype(s),nstrings*ndim,ncoords)
+        for i = 1:nstrings
+            Ji = Array(build_Ji(tgstruct,i))
+            ret[(i-1)*ndim+1:i*ndim,:] = k[i]*Ji*(1-s[i]*u[i])
+        end
+        ret
+    end
+    inner_U
 end
 
-function build_U(tgstruct,a,u,k)
-    @unpack ncoords,nstrings,ndim,strings = tgstruct
-    ret = zeros(eltype(a),nstrings*ndim,ncoords)
-    for i = 1:nstrings
-        Ji = Array(build_Ji(tgstruct,i))
-        ret[(i-1)*ndim+1:i*ndim,:] = k[i]*Ji*(1-a[i]*u[i])
-    end
-    ret
-end
-
-function build_S(tgstruct,a,q)
+function build_S(tgstruct)
     @unpack nstrings = tgstruct
-    ret = zeros(eltype(a),nstrings)
-    for i = 1:nstrings
-        Ji = build_Ji(tgstruct,i)
-        Ui = Array(transpose(Ji)*Ji)
-        ret[i] = transpose(q)*Ui*q*a[i]^2 - 1
+    function inner_S(q,s)
+        ret = zeros(eltype(s),nstrings)
+        for i = 1:nstrings
+            Ji = build_Ji(tgstruct,i)
+            Ui = Array(transpose(Ji)*Ji)
+            ret[i] = transpose(q)*Ui*q*s[i]^2 - 1
+        end
+        ret
     end
-    ret
 end
 
 function compensate_gravity_funcs(tgstruct)
@@ -513,7 +516,7 @@ function check_static_equilibrium(tgstruct_input,q,λ;gravity=false)
     static_equilibrium = constraint_forces ≈ generalized_forces
     @debug "Res. forces = $(generalized_forces-constraint_forces)"
     if !static_equilibrium
-        @error "System not in static equilibrium."
+        @error "System not in static equilibrium. Err = $(norm(generalized_forces-constraint_forces))"
     end
     static_equilibrium
 end

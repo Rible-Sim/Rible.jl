@@ -5,6 +5,7 @@ using SparseArrays
 using LinearAlgebra
 using Parameters
 using StaticArrays
+using StructArrays
 using NLsolve
 using BlockArrays
 using GeometryTypes
