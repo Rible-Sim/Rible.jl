@@ -8,6 +8,7 @@ using StaticArrays
 using StructArrays
 using NLsolve
 using BlockArrays
+using BlockDiagonals
 using GeometryTypes
 using ForwardDiff
 using FiniteDiff
@@ -45,4 +46,5 @@ include("tangent.jl")
 include("miscellaneous.jl")
 include("solvers.jl")
 include("planning.jl")
+
 end

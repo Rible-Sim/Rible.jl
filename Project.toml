@@ -5,6 +5,7 @@ version = "0.1.0"
 
 [deps]
 BlockArrays = "8e7c35d0-a365-5155-bbbb-fb81a777f24e"
+BlockDiagonals = "0a1fb500-61f7-11e9-3c65-f5ef3456f9f0"
 Cubature = "667455a9-e2ce-5579-9412-b964f529a492"
 DynamicPolynomials = "7c1d4256-1411-5781-91ec-d7bc3513ac07"
 EzXML = "8f5d6c58-4d21-5cfd-889c-e3ad7ee6a615"
