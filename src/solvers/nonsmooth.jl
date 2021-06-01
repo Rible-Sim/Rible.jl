@@ -66,7 +66,7 @@ function get_residuals(qₙ,vₙ,xe,t,h,active_sets,𝐞,𝐌,𝒈,𝒈𝒒,𝐟
     𝒜c_indice = sort(collect(𝒜c))
     𝐠𝐪ₙ₊₁𝒜 = @view 𝐠𝐪ₙ₊₁[𝒜_indice,:]
     𝐠ₙ₊₁𝒜 = @view 𝐠ₙ₊₁[𝒜_indice]
-    𝐫ᵖ = 1/h*vcat(
+    𝐫ᵖ = vcat(
         Mₙ₊₁*Uₙ₊₁ - transpose(𝐠𝐪ₙ₊₁𝒜)*𝛎ₙ₊₁[𝒜_indice],
         𝐠ₙ₊₁𝒜,
         𝛎ₙ₊₁[𝒜c_indice]
@@ -166,8 +166,8 @@ function compute_Sₜᵖ(n,c,ū,xe,t,p,h,active_sets,dyfuncs)
     Mₙ₊₁ = 𝐌(qₙ₊₁)
     𝐠𝐪ₙ₊₁ = 𝒈𝒒(qₙ₊₁)
     𝐠𝐪ₙ₊₁𝒜 = 𝐠𝐪ₙ₊₁[𝒜_indice,:]
-    𝛎ₙ₊₁𝒜 = pad_λ(c,𝒜_indice,𝛎ₙ₊₁[𝒜_indice])
-    Gᵖ = ∂𝐌𝐚∂𝐪(qₙ₊₁,Uₙ₊₁) - ∂𝒈𝒒T𝛌∂𝒒(qₙ₊₁,𝛎ₙ₊₁𝒜)
+
+    Gᵖ = ∂𝐌𝐚∂𝐪(qₙ₊₁,Uₙ₊₁) - ∂𝒈𝒒T𝛌∂𝒒(qₙ₊₁,𝛎ₙ₊₁)
     Sₜᵖ = Array(BlockDiagonal(
         [
             [
@@ -204,64 +204,83 @@ function compute_Sₜᵛ(n,c,ū,xe,t,p,h,active_sets,dyfuncs)
 
 end
 
-function initialize_St(n,c,ū,q0,v0,t,p,h,𝒞,𝒰c,𝐞,dyfuncs;tol=1e-14,imax=100)
+function initialize_St(n,c,ū,q0,v0,t,p,h,𝒞,𝒰c,𝐞,dyfuncs,tspan;tol=1e-14,imax=100)
     𝐌,𝒈,𝒈𝒒,𝐟,Jacobians = dyfuncs
     # ∂𝒈𝒒T𝛌∂𝒒,∂𝒈𝒒𝐯∂𝒒,∂𝐌𝐚∂𝐪,∂𝐟∂𝐪,∂𝐟∂𝐯 = Jacobians
     @unpack αm,αf,γ,β = p
     r = 1
-    qₙ = q0
-    vₙ = v0
-    Mₙ = 𝐌(qₙ)
-    fₙ = 𝐟(qₙ,vₙ,t)
-    ṽ̇ₙ = Mₙ\fₙ
-    aₙ = ṽ̇ₙ
+    M0 = 𝐌(q0)
+    f0 = 𝐟(q0,v0,t)
+    ṽ̇0 = M0\f0
+    a0 = ṽ̇0
     # @show ṽ̇0
-    qₙ₊₁ ,vₙ₊₁ ,aₙ₊₁ ,ṽₙ₊₁ ,ṽ̇ₙ₊₁ ,Uₙ₊₁ ,Wₙ₊₁ ,𝛌ₙ₊₁ ,𝛎ₙ₊₁ ,𝚲ₙ₊₁  = initial_guesses(c,ū,qₙ,vₙ,aₙ,ṽ̇ₙ,p,h)
-    xe = (qₙ₊₁, vₙ₊₁, ṽ̇ₙ₊₁, ṽₙ₊₁, 𝛌ₙ₊₁, Uₙ₊₁, 𝛎ₙ₊₁, Wₙ₊₁, 𝚲ₙ₊₁)
-    q̃ₙ₊₁ = copy(qₙ₊₁)
-    active_sets = initialize_active_sets(𝒞,𝒰c)
-    update_active_sets!(active_sets,qₙ,vₙ,q̃ₙ₊₁,xe,𝐞,𝒈,𝒈𝒒,r)
-    for i = 1:imax
+    tstart,tend = tspan
+    totaltime = tend - tstart
+    totalstep = Int(ceil(totaltime/h))
+    qs = [copy(q0) for i = 1:totalstep+1]
+    vs = [copy(v0) for i = 1:totalstep+1]
+    as = [copy(a0) for i = 1:totalstep+1]
+    ṽ̇s = [copy(ṽ̇0) for i = 1:totalstep+1]
+    for timestep = 1:totalstep
+        qₙ = qs[timestep]
+        vₙ = vs[timestep]
+        aₙ = as[timestep]
+        ṽ̇ₙ = ṽ̇s[timestep]
+        qₙ₊₁ ,vₙ₊₁ ,aₙ₊₁ ,ṽₙ₊₁ ,ṽ̇ₙ₊₁ ,Uₙ₊₁ ,Wₙ₊₁ ,𝛌ₙ₊₁ ,𝛎ₙ₊₁ ,𝚲ₙ₊₁  = initial_guesses(c,ū,qₙ,vₙ,aₙ,ṽ̇ₙ,p,h)
         xe = (qₙ₊₁, vₙ₊₁, ṽ̇ₙ₊₁, ṽₙ₊₁, 𝛌ₙ₊₁, Uₙ₊₁, 𝛎ₙ₊₁, Wₙ₊₁, 𝚲ₙ₊₁)
-        𝐫ˢ, 𝐫ᵖ, 𝐫ᵛ = get_residuals(qₙ,vₙ,xe,t,h,active_sets,𝐞,𝐌,𝒈,𝒈𝒒,𝐟)
-        if maximum(norm.([𝐫ˢ, 𝐫ᵖ, 𝐫ᵛ])) < tol
-            @show i
-            break
+        q̃ₙ₊₁ = copy(qₙ₊₁)
+        active_sets = initialize_active_sets(𝒞,𝒰c)
+        update_active_sets!(active_sets,qₙ,vₙ,q̃ₙ₊₁,xe,𝐞,𝒈,𝒈𝒒,r)
+        for i = 1:imax
+            xe = (qₙ₊₁, vₙ₊₁, ṽ̇ₙ₊₁, ṽₙ₊₁, 𝛌ₙ₊₁, Uₙ₊₁, 𝛎ₙ₊₁, Wₙ₊₁, 𝚲ₙ₊₁)
+            residuals = get_residuals(qₙ,vₙ,xe,t,h,active_sets,𝐞,𝐌,𝒈,𝒈𝒒,𝐟)
+            max_err,isub = findmax(norm.(residuals))
+            if  max_err < tol
+                # @show i
+                break
+            elseif i == imax
+                @error "Reach max iteration $i, err=$max_err for the $isub subproblem"
+                # @show residuals[isub]
+                @show abs.(residuals[isub]) .> tol
+            end
+            # Step 1
+            𝐫ˢ, _, _ = residuals
+            Sₜˢ = compute_Sₜˢ(n,c,ū,xe,t,p,h,active_sets,dyfuncs)
+            Δxˢ = -Sₜˢ\𝐫ˢ
+            Δṽ,Δ𝛌 = split_by_lengths(Δxˢ,[n,ū])
+            Δ𝛌 /= -h
+            ṽₙ₊₁ += Δṽ
+            ṽ̇ₙ₊₁ += (1-αm)/(1-αf)/(γ*h)*Δṽ
+            vₙ₊₁ = ṽₙ₊₁ + Wₙ₊₁
+            qₙ₊₁ += h*β/γ*Δṽ
+            𝛌ₙ₊₁ += Δ𝛌
+            # step 2
+            xe = (qₙ₊₁, vₙ₊₁, ṽ̇ₙ₊₁, ṽₙ₊₁, 𝛌ₙ₊₁, Uₙ₊₁, 𝛎ₙ₊₁, Wₙ₊₁, 𝚲ₙ₊₁)
+            _, 𝐫ᵖ, _ = get_residuals(qₙ,vₙ,xe,t,h,active_sets,𝐞,𝐌,𝒈,𝒈𝒒,𝐟)
+            Sₜᵖ = compute_Sₜᵖ(n,c,ū,xe,t,p,h,active_sets,dyfuncs)
+            Δxᵖ = -Sₜᵖ\𝐫ᵖ
+            ΔU,Δ𝛎 = split_by_lengths(Δxᵖ,[n,c])
+            # ΔU *=  h
+            Δ𝛎 *= -1
+            Uₙ₊₁ += ΔU
+            qₙ₊₁ += ΔU
+            𝛎ₙ₊₁ += Δ𝛎
+            # step 3
+            xe = (qₙ₊₁, vₙ₊₁, ṽ̇ₙ₊₁, ṽₙ₊₁, 𝛌ₙ₊₁, Uₙ₊₁, 𝛎ₙ₊₁, Wₙ₊₁, 𝚲ₙ₊₁)
+            _, _, 𝐫ᵛ = get_residuals(qₙ,vₙ,xe,t,h,active_sets,𝐞,𝐌,𝒈,𝒈𝒒,𝐟)
+            Sₜᵛ = compute_Sₜᵛ(n,c,ū,xe,t,p,h,active_sets,dyfuncs)
+            Δxᵛ = -Sₜᵛ\𝐫ᵛ
+            ΔW,Δ𝚲 = split_by_lengths(Δxᵛ,[n,c])
+            Δ𝚲 *= -1
+            Wₙ₊₁ += ΔW
+            vₙ₊₁ = ṽₙ₊₁ + Wₙ₊₁
+            𝚲ₙ₊₁ += Δ𝚲
         end
-        # Step 1
-        Sₜˢ = compute_Sₜˢ(n,c,ū,xe,t,p,h,active_sets,dyfuncs)
-        Δxˢ = -inv(Sₜˢ)*𝐫ˢ
-        Δṽ,Δ𝛌 = split_by_lengths(Δxˢ,[n,ū])
-        Δ𝛌 /= -h
-        ṽₙ₊₁ += Δṽ
-        ṽ̇ₙ₊₁ += (1-αm)/(1-αf)/(γ*h)*Δṽ
-        vₙ₊₁ = ṽₙ₊₁ + Wₙ₊₁
-        qₙ₊₁ += h*β/γ*Δṽ
-        𝛌ₙ₊₁ += Δ𝛌
-        # step 2
-        xe = (qₙ₊₁, vₙ₊₁, ṽ̇ₙ₊₁, ṽₙ₊₁, 𝛌ₙ₊₁, Uₙ₊₁, 𝛎ₙ₊₁, Wₙ₊₁, 𝚲ₙ₊₁)
-        _, 𝐫ᵖ, _ = get_residuals(qₙ,vₙ,xe,t,h,active_sets,𝐞,𝐌,𝒈,𝒈𝒒,𝐟)
-        Sₜᵖ = compute_Sₜᵖ(n,c,ū,xe,t,p,h,active_sets,dyfuncs)
-        Δxᵖ = -inv(Sₜᵖ)*𝐫ᵖ
-        ΔU,Δ𝛎 = split_by_lengths(Δxᵖ,[n,c])
-        ΔU *=  h
-        Δ𝛎 *= -h
-        Uₙ₊₁ += ΔU
-        qₙ₊₁ += ΔU
-        𝛎ₙ₊₁ += Δ𝛎
-        # step 3
-        xe = (qₙ₊₁, vₙ₊₁, ṽ̇ₙ₊₁, ṽₙ₊₁, 𝛌ₙ₊₁, Uₙ₊₁, 𝛎ₙ₊₁, Wₙ₊₁, 𝚲ₙ₊₁)
-        _, _, 𝐫ᵛ = get_residuals(qₙ,vₙ,xe,t,h,active_sets,𝐞,𝐌,𝒈,𝒈𝒒,𝐟)
-        Sₜᵛ = compute_Sₜᵛ(n,c,ū,xe,t,p,h,active_sets,dyfuncs)
-        Δxᵛ = -inv(Sₜᵛ)*𝐫ᵛ
-        ΔW,Δ𝚲 = split_by_lengths(Δxᵛ,[n,c])
-        Δ𝚲 *= -1
-        Wₙ₊₁ += ΔW
-        vₙ₊₁ = ṽₙ₊₁ + Wₙ₊₁
-        𝚲ₙ₊₁ += Δ𝚲
-        # if i == imax
-        #     @error "Max iteration"
-        # end
+        aₙ₊₁ += (1-αf)/(1-αm)*ṽ̇ₙ₊₁
+        qs[timestep+1] .= qₙ₊₁
+        vs[timestep+1] .= vₙ₊₁
+        as[timestep+1] .= aₙ₊₁
+        ṽ̇s[timestep+1] .= ṽ̇ₙ₊₁
     end
-    aₙ₊₁ += (1-αf)/(1-αm)*ṽ̇ₙ₊₁
+    qs
 end
