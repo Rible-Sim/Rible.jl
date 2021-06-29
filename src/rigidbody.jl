@@ -200,12 +200,13 @@ function RigidBodyState(prop,ri::AbstractVector{T},rj::AbstractVector{T},
 end
 
 function RigidBodyState(prop::RigidBodyProperty{2,T},
-                        lncs::NaturalCoordinates.LocalNaturalCoordinates2D6C,
+                        lncs::NaturalCoordinates.LocalNaturalCoordinates2D,
                         r_input,θ_input,ṙ_input,ω_input,
                         q_input,q̇_input=zero(q_input),
                         constrained_index=Vector{Int}()) where {T}
-    q = MVector{6}(q_input)
-    q̇ = MVector{6}(q̇_input)
+    ncoords = NaturalCoordinates.get_ncoords(lncs)
+    q = MVector{ncoords}(q_input)
+    q̇ = MVector{ncoords}(q̇_input)
     q̈ = zero(q)
     Q = zero(q)
     coords = RigidBodyCoordinates(q,q̇,q̈,Q)
@@ -214,22 +215,25 @@ function RigidBodyState(prop::RigidBodyProperty{2,T},
     @unpack r̄g,naps,aps = prop
     @unpack C,c = cache.funcs
 
+    ro = MVector{2}(r_input)
     R = MMatrix{2,2,T,4}(rotation_matrix(θ_input))
-    rg = MVector{2}(r_input+R*r̄g)
+    ṙo = MVector{2}(ṙ_input)
     ω = ω_input ###
-    ṙg = MVector{2}(ṙ_input+ω×(rg-r_input))
+    rg = MVector{2}(ro+R*r̄g)
+    ṙg = MVector{2}(ṙo+ω×(rg-ro))
 
     Cg = C(c(r̄g))
     Cp = [C(c(ap)) for ap in aps]
     p = [Cp[i]*q for i in 1:naps]
     nap = prop.naps
     rps = [MVector{2}(cache.Cp[i]*q) for i in 1:nap]
+    ṙps = [MVector{2}(cache.Cp[i]*q̇) for i in 1:nap]
     F = @MVector zeros(T,2)
     τ = zero(ω_input) ###
     Faps = [@MVector zeros(T,2) for i in 1:nap]
     τaps = [zero(ω_input) for i in 1:nap]
 
-    RigidBodyState(rg,R,ṙg,ω,rps,F,τ,Faps,τaps,coords,cache)
+    RigidBodyState(ro,R,ṙo,ω,rg,ṙg,rps,ṙps,F,τ,Faps,τaps,coords,cache)
 end
 
 # 3D

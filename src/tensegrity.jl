@@ -67,7 +67,7 @@ function TensegrityStructure(rbs::Vector{rbT},tensiles::TT,cnt::Connectivity) wh
     nconstraint = get_nconstraint(rbs,mvbodyindex,nmvbodies,nfixbodies)
     ndof = ncoords - nconstraint
     strings = tensiles.strings
-    TensegrityStructure(ndim,
+    tg = TensegrityStructure(ndim,
                     ncoords,nconstraint,ndof,
                     nbodies,
                     nmvbodies,mvbodyindex,
@@ -75,6 +75,8 @@ function TensegrityStructure(rbs::Vector{rbT},tensiles::TT,cnt::Connectivity) wh
                     nstrings,
                     npoints,nmvpoints,
                     rbs,strings,tensiles,cnt)
+    jac_singularity_check(tg)
+    tg
 end
 
 function lengthdir(v)
@@ -180,6 +182,20 @@ function distribute_q_to_rbs!(tgstruct,globalq,globalq̇)
             mul!(rp, Cp[i], q)
             mul!(ṙp, Cp[i], q̇)
         end
+    end
+end
+
+function update_rbs_states!(tg,q,q̇=zero(q))
+    distribute_q_to_rbs!(tg,q,q̇)
+    rbs = tg.rigidbodies
+    for rbid in tg.mvbodyindex
+        rb = rbs[rbid]
+        lncs = rb.state.cache.funcs.lncs
+        @unpack q, q̇ = rb.state.coords
+        R = NaturalCoordinates.find_R(lncs,q)
+        Ω = NaturalCoordinates.find_ω(lncs,q,q̇)
+        rb.state.R .= R
+        # @show Ω
     end
 end
 

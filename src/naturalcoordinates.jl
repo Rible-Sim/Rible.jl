@@ -35,7 +35,7 @@ rotation_matrix(θ) = @SMatrix [cos(θ) -sin(θ); sin(θ) cos(θ)]
     h1 = max(n[1]-n̄,n[1]+n̄)
     h2 = n[2]
     h3 = n[3]
-    h = [h1,h2,h3]
+    h = SVector(h1,h2,h3)
     H = I - 2h*transpose(h)/(transpose(h)*h)
     t = H[1:3,2]
     b = H[1:3,3]
@@ -150,6 +150,32 @@ function transform_to_1P1V(lncs::LocalNaturalCoordinates2P{T}) where T
         -1/Lij 1/Lij],
         I2
     )
+end
+
+function NC1P1V(ri::AbstractVector{T},
+               ro=SVector{2}(zeros(T,2)),R=SMatrix{2,2}(one(T)*I)
+               ) where T
+    o = zero(T)
+    i = one(T)
+    ū = SVector(i,o)
+    n̄ = SVector(-ū[2],ū[1])
+    invR = transpose(R) # because this is a rotation matrix
+    r̄i = invR*(ri-ro) #
+    u = R*ū
+    X̄ = hcat(ū,n̄)
+    lncs = LocalNaturalCoordinates1P1V(SVector{2}(r̄i),SVector{2}(ū),
+                                        SMatrix{2,2}(X̄),SMatrix{2,2}(inv(X̄)))
+    q = vcat(ri,u)
+    lncs,q
+end
+
+function NC1P1V(ri,ro,θ,ṙo,ω)
+    R = rotation_matrix(θ)
+    lncs,q = NC1P1V(ri,ro,R)
+    ṙi = ṙo + ω×(ri-ro)
+    u̇ = ω×q[3:4]
+    q̇ = vcat(ṙi,u̇)
+    lncs,SVector{4}(q),SVector{4}(q̇)
 end
 
 function NC1P2V(ri::AbstractVector{T},
@@ -1097,6 +1123,66 @@ function make_M(cf::CoordinateFunctions{LocalNaturalCoordinates4P{T}},
     M_raw[1,2:4] = M_raw[2:4,1]
     M_raw[2:4,2:4] .= z
     M = SMatrix{12,12}(kron(M_raw,I3))
+end
+
+make_X(q::AbstractVector,lncs::LocalNaturalCoordinates) = make_X(lncs,q)
+
+function make_X(lncs::LocalNaturalCoordinates1P3V,q::AbstractVector)
+    u = @view q[4:6]
+    v = @view q[7:9]
+    w = @view q[10:12]
+    SMatrix{3,3}(hcat(u,v,w))
+end
+
+function make_X(lncs::LocalNaturalCoordinates2P2V,q::AbstractVector)
+    ri = @view q[1:3]
+    rj = @view q[4:6]
+    u = rj - ri
+    v = @view q[7:9]
+    w = @view q[10:12]
+    SMatrix{3,3}(hcat(u,v,w))
+end
+
+function make_X(lncs::LocalNaturalCoordinates3P1V,q::AbstractVector)
+    ri = @view q[1:3]
+    rj = @view q[4:6]
+    rk = @view q[7:9]
+    u = rj - ri
+    v = rk - ri
+    w = @view q[10:12]
+    SMatrix{3,3}(hcat(u,v,w))
+end
+
+function make_X(lncs::LocalNaturalCoordinates4P,q::AbstractVector)
+    ri = @view q[1:3]
+    rj = @view q[4:6]
+    rk = @view q[7:9]
+    rl = @view q[10:12]
+    u = rj - ri
+    v = rk - ri
+    w = rl - ri
+    SMatrix{3,3}(hcat(u,v,w))
+end
+
+find_R(q::AbstractVector, lncs::LocalNaturalCoordinates) = find_R(lncs,q)
+
+function find_R(lncs::LocalNaturalCoordinates2D,q::AbstractVector)
+    X = make_X(lncs,q)
+    @unpack invX̄ = lncs
+    R = SVector{2,2}(X*invX̄)
+end
+
+function find_R(lncs::LocalNaturalCoordinates3D,q::AbstractVector)
+    X = make_X(lncs,q)
+    @unpack invX̄ = lncs
+    R = SMatrix{3,3}(X*invX̄)
+end
+
+find_ω(q::AbstractVector,q̇::AbstractVector,lncs::LocalNaturalCoordinates3D) = find_ω(lncs,q,q̇)
+function find_ω(lncs::LocalNaturalCoordinates3D,q::AbstractVector,q̇::AbstractVector)
+    Ẋ = make_X(lncs,q̇)
+    X = make_X(lncs,q)
+    Ω = SMatrix{3,3}(Ẋ*inv(X))
 end
 
 end

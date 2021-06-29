@@ -89,3 +89,4 @@ end
 include("solvers/Wendlandt.jl")
 include("solvers/Zhong06.jl")
 include("solvers/nonsmooth.jl")
+include("solvers/Zhong06NSNH.jl")

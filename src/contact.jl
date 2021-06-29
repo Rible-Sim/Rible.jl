@@ -1,16 +1,34 @@
 struct ContactFrame{T}
-    n::MArray{Tuple{3},T,1,3}
-    t1::MArray{Tuple{3},T,1,3}
-    t2::MArray{Tuple{3},T,1,3}
+    n::SArray{Tuple{3},T,1,3}
+    u::SArray{Tuple{3},T,1,3}
+    w::SArray{Tuple{3},T,1,3}
 end
 
-function ContactFrame{T}() where {T}
-    i = one(T)
-    o = zero(T)
-    n = MVector(o,o,i)
-    t1 = MVector(i,o,o)
-    t2 = MVector(o,i,o)
-    ContactFrame(n,t1,t2)
+function ContactFrame(n)
+    n /= norm(n)
+    u,w = NaturalCoordinates.HouseholderOrthogonalization(n)
+    ContactFrame(SVector{3}(n),SVector{3}(u),SVector{3}(w))
+end
+
+struct GeneralizedDirections{N,T}
+    Dn::SArray{Tuple{N},T,1,N}
+    Du::SArray{Tuple{N},T,1,N}
+    Dw::SArray{Tuple{N},T,1,N}
+end
+
+function GeneralizedDirections{N}(cf,C) where N
+    @unpack n,u,w = cf
+    Dn = SVector{N}(transpose(n)*C)
+    Du = SVector{N}(transpose(u)*C)
+    Dw = SVector{N}(transpose(w)*C)
+    GeneralizedDirections(Dn,Du,Dw)
+end
+
+struct FrictionCone{N,T}
+    μ::T
+    e::T
+    cf::ContactFrame{T}
+    gd::GeneralizedDirections{N,T}
 end
 
 mutable struct ApproxFrictionalImpulse{T}
