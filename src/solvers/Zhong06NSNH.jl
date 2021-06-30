@@ -9,52 +9,50 @@ function stepk_maker(nq,nλ,nμ,qᵏ⁻¹,q̇ᵏ⁻¹,pᵏ⁻¹,tᵏ⁻¹,dyfunc
     M,Φ,A,Ψ,B,F!,jacobians,contact_funcs = dyfuncs
     Jac_F!,Ψq,∂Aᵀλ∂q,∂Bᵀμ∂q = jacobians
     # E,𝐠,𝐠𝐪,∂𝐠𝐪ᵀΛ∂q,∂𝐠𝐪q̇∂q = contact_funcs
-    function stepk!(R,J,x)
-        q̃ᵏ = @view x[         1:nq]
-        qᵏ = @view x[      nq+1:nq+nq]
-        λᵏ = @view x[   nq+nq+1:nq+nq+nλ]
-        μᵏ = @view x[nq+nq+nλ+1:nq+nq+nλ+nμ]
+    function inner_R_stepk!(R,x)
+        qᵏ = @view x[      1:nq]
+        λᵏ = @view x[   nq+1:nq+nλ]
+        μᵏ = @view x[nq+nλ+1:nq+nλ+nμ]
         F⁺ = zeros(eltype(qᵏ),nq)
+        F!(F⁺,(qᵏ.+qᵏ⁻¹)./2,(qᵏ.-qᵏ⁻¹)./h,tᵏ⁻¹+h/2)
+        R[      1:nq]       .= M*(qᵏ.-qᵏ⁻¹) .-h.*pᵏ⁻¹ .-
+                                1/2 .*transpose(A(qᵏ⁻¹))*λᵏ .-
+                                1/2 .*transpose(B(qᵏ⁻¹))*μᵏ .-
+                                (h^2)/2 .*F⁺
+        R[   nq+1:nq+nλ]    .= Φ(qᵏ)
+        R[nq+nλ+1:nq+nλ+nμ] .= Ψ(qᵏ,invM*Momentum_k(qᵏ⁻¹,pᵏ⁻¹,qᵏ,λᵏ,μᵏ,M,A,B,h))
+    end
 
+    function inner_J_stepk!(J,x)
+        qᵏ = @view x[      1:nq]
+        λᵏ = @view x[   nq+1:nq+nλ]
+        μᵏ = @view x[nq+nλ+1:nq+nλ+nμ]
         q = (qᵏ.+qᵏ⁻¹)./2
         q̇ = (qᵏ.-qᵏ⁻¹)./h
         t = tᵏ⁻¹+h/2
+        Aᵏ⁻¹ = A(qᵏ⁻¹)
+        Bᵏ⁻¹ = B(qᵏ⁻¹)
+        Aᵏ = A(qᵏ)
+        Bᵏ = B(qᵏ)
+        ∂q̇∂λ = invM*transpose(Aᵏ-Aᵏ⁻¹)/(2h)
+        ∂q̇∂μ = invM*transpose(Bᵏ-Bᵏ⁻¹)/(2h)
+
         ∂F∂q = zeros(eltype(qᵏ),nq,nq)
         ∂F∂q̇ = zeros(eltype(qᵏ),nq,nq)
         Jac_F!(∂F∂q,∂F∂q̇,q,q̇,t)
         q̇ᵏ = invM*Momentum_k(qᵏ⁻¹,pᵏ⁻¹,qᵏ,λᵏ,μᵏ,M,A,B,h)
         ∂q̇ᵏ∂qᵏ = 2/h*I + 1/(2h).*invM*(∂Aᵀλ∂q(qᵏ,λᵏ) + ∂Bᵀμ∂q(qᵏ,μᵏ))
-        Aᵏ = A(qᵏ)
-        Bᵏ = B(qᵏ)
-        invMAᵀ_2h = invM*transpose(Aᵏ)/(2h)
-        invMBᵀ_2h = invM*transpose(Bᵏ)/(2h)
-
-        F!(F⁺,q,q̇,t)
-        R[         1:nq]          .= M*(q̃ᵏ.-qᵏ⁻¹) .-h.*pᵏ⁻¹ .-
-                                        1/2 .*transpose(A(qᵏ⁻¹))*λᵏ .-
-                                        1/2 .*transpose(B(qᵏ⁻¹))*μᵏ .-
-                                        (h^2)/2 .*F⁺
-        R[      nq+1:nq+nq]       .= (2/h)*M*(qᵏ.-q̃ᵏ)
-        R[   nq+nq+1:nq+nq+nλ]    .= Φ(qᵏ)
-        R[nq+nq+nλ+1:nq+nq+nλ+nμ] .= Ψ(qᵏ,invM*Momentum_k(qᵏ⁻¹,pᵏ⁻¹,qᵏ,λᵏ,μᵏ,M,A,B,h))
-
         J .= 0.0
-        J[         1:nq         ,         1:nq        ] .= M
-        J[         1:nq         ,      nq+1:nq+nq      ] .= -h^2/2 .*(1/2 .*∂F∂q .+ 1/h.*∂F∂q̇)
-        J[         1:nq         ,   nq+nq+1:nq+nq+nλ   ] .= -1/2 .*transpose(A(qᵏ⁻¹))
-        J[         1:nq         ,nq+nq+nλ+1:nq+nq+nλ+nμ] .= -1/2 .*transpose(B(qᵏ⁻¹))
-
-        J[      nq+1:nq+nq      ,         1:nq      ] .= -(2/h)*M
-        J[      nq+1:nq+nq      ,      nq+1:nq+nq   ] .=  (2/h)*M
-
-        J[   nq+nq+1:nq+nq+nλ   ,      nq+1:nq+nq   ] .=  Aᵏ
-
-        J[nq+nq+nλ+1:nq+nq+nλ+nμ,      nq+1:nq+nq      ] .=  Ψq(qᵏ,q̇ᵏ)+Bᵏ*∂q̇ᵏ∂qᵏ
-        J[nq+nq+nλ+1:nq+nq+nλ+nμ,   nq+nq+1:nq+nq+nλ   ] .=  Bᵏ*invMAᵀ_2h
-        J[nq+nq+nλ+1:nq+nq+nλ+nμ,nq+nq+nλ+1:nq+nq+nλ+nμ] .=  Bᵏ*invMBᵀ_2h
+        J[      1:nq      ,      1:nq      ] .=  M.-h^2/2 .*(1/2 .*∂F∂q .+ 1/h.*∂F∂q̇)
+        J[      1:nq      ,   nq+1:nq+nλ   ] .= -1/2 .*transpose(A(qᵏ⁻¹))
+        J[      1:nq      ,nq+nλ+1:nq+nλ+nμ] .= -1/2 .*transpose(B(qᵏ⁻¹))
+        J[   nq+1:nq+nλ   ,      1:nq      ] .=  A(qᵏ)
+        J[nq+nλ+1:nq+nλ+nμ,      1:nq      ] .=  Ψq(qᵏ,q̇ᵏ)+Bᵏ*∂q̇ᵏ∂qᵏ
+        J[nq+nλ+1:nq+nλ+nμ,   nq+1:nq+nλ   ] .=  Bᵏ*∂q̇∂λ
+        J[nq+nλ+1:nq+nλ+nμ,nq+nλ+1:nq+nλ+nμ] .=  Bᵏ*∂q̇∂μ
     end
 
-    stepk!
+    inner_R_stepk!, inner_J_stepk!
 end
 
 function ns_stepk_maker(nq,nλ,nμ,nu,qᵏ⁻¹,q̇ᵏ⁻¹,pᵏ⁻¹,tᵏ⁻¹,Aset,dyfuncs,invM,h)
@@ -227,7 +225,7 @@ function nhsolve(prob,nq,nλ,nμ,nu,q0,q̇0;dt=0.01,ftol=1e-14,verbose=false,ite
         Aset = 𝐠(qˣ) .< 0
         Āset = .!Aset
         ns_stepk! = ns_stepk_maker(nq,nλ,nμ,nu,qᵏ⁻¹,q̇ᵏ⁻¹,pᵏ⁻¹,tᵏ⁻¹,Aset,dyfuncs,invM,dt)
-        stepk! = stepk_maker(nq,nλ,nμ,qᵏ⁻¹,q̇ᵏ⁻¹,pᵏ⁻¹,tᵏ⁻¹,dyfuncs,invM,dt)
+        R_stepk!, J_stepk! = stepk_maker(nq,nλ,nμ,qᵏ⁻¹,q̇ᵏ⁻¹,pᵏ⁻¹,tᵏ⁻¹,dyfuncs,invM,dt)
         isconverged = false
         res = typemax(eltype(qᵏ))
         k_break = 0
@@ -273,26 +271,30 @@ function nhsolve(prob,nq,nλ,nμ,nu,q0,q̇0;dt=0.01,ftol=1e-14,verbose=false,ite
         # R_stepk_result = nlsolve(R_stepk!, J_stepk!, initial_x[nq+1:nq+nq+nλ+nμ];
         #                     ftol, iterations, method=:newton)
 
-        smooth_x = initial_x[1:nq+nq+nλ+nμ]
+        smooth_x = initial_x[nq+1:nq+nq+nλ+nμ]
         smooth_R = similar(smooth_x)
-        smooth_J = zeros(eltype(smooth_x),2nq+nλ+nμ,2nq+nλ+nμ)
+        smooth_J = zeros(eltype(smooth_x),nq+nλ+nμ,nq+nλ+nμ)
 
         for k = 1:iterations
 
-            stepk!(smooth_R,smooth_J,smooth_x)
+            R_stepk!(smooth_R,smooth_x)
+            J_stepk!(smooth_J,smooth_x)
+            ref_J = copy(smooth_J)
+            FiniteDiff.finite_difference_jacobian!(ref_J,R_stepk!,smooth_x,Val(:central))
+            display(ref_J-smooth_J)
             res = norm(smooth_R)
             if res < ftol
                 isconverged = true
                 k_break = k
                 break
             else
-                Δx = -smooth_J\smooth_R
+                Δx = -ref_J\smooth_R
                 smooth_x .+= Δx
                 # @show k, res
                 # @show initial_J[nq+1:nq+nq+nλ+nμ,nq+1:nq+nq+nλ+nμ]
             end
         end
-        initial_x[1:nq+nq+nλ+nμ] .= smooth_x
+        initial_x[nq+1:nq+nq+nλ+nμ] .= smooth_x
         # if converged(R_stepk_result)
         #     isconverged = true
         #     k_break = R_stepk_result.iterations
