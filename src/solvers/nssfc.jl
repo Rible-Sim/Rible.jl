@@ -8,6 +8,7 @@ using BlockDiagonals
 using Printf
 using ProgressMeter
 using OffsetArrays
+using FiniteDiff
 
 function initial_guesses(b,qₛ,vₛ,ṽ̇ₛ,aₛ,𝛌bₛ,p,h)
     @unpack αm,αf,γ,β = p
@@ -549,7 +550,7 @@ function ns_stepk_maker(nq,nλ,nμ,nu,qₛ₋₁,q̇ₛ₋₁,pₛ₋₁,tₛ₋
 
         𝐜ᵀinv𝐉 = 𝐜ᵀ*inv(𝐉)
         𝐍 .= 𝐜ᵀinv𝐉*𝐁
-        @show Dₛ*vₛ + 𝐛
+
         𝐫 .= (Dₛ*vₛ + 𝐛) - 𝐜ᵀinv𝐉*(𝐫𝐞𝐬 + 𝐁*𝚲ₛ)
     end
     ns_stepk!,𝐁,𝐜ᵀ,𝐍,𝐫
@@ -722,22 +723,26 @@ function ip_ns_stepk_maker(nq,nλ,nμ,nu,qₛ₋₁,q̇ₛ₋₁,pₛ₋₁,tₛ
             vₙⁱₛ = vⁱₛ[1]
             # @show vₜⁱₛ, vₙⁱₛ₋₁, vₙⁱₛ
             𝐛[is+1] = ηs[i]*vₜⁱₛ + es[i]*vₙⁱₛ₋₁
-            D̃i = @view Dₛ[is+1:is+3,:]
+            D̃i = copy(Dₛ[is+1:is+3,:])
             D̃i[1,:] += (vⁱₛ[2]*Dₛ[is+2,:]+vⁱₛ[3]*Dₛ[is+3,:])/vₜⁱₛ
             ∂𝐛∂𝐱[is+1:is+3,n1+1:n2] .= D̃i*∂vₛ∂qₛ
             ∂𝐛∂𝐱[is+1:is+3,n2+1:n3] .= D̃i*∂vₛ∂λₛ
             ∂𝐛∂𝐱[is+1:is+3,n3+1:n4] .= D̃i*∂vₛ∂μₛ
         end
         # @show "before",yₛ,Λₛ
-        y_split = TR.split_by_lengths(yₛ,3)
         Λ_split = TR.split_by_lengths(Λₛ,3)
-        W_blocks = NTScale.(y_split,Λ_split)
-        z_split = W_blocks.*y_split
+        y_split = TR.split_by_lengths(yₛ,3)
+        Λ_cone = [transpose(Λi)*J*Λi for Λi in Λ_split]
+        y_cone = [transpose(yi)*J*yi for yi in y_split]
+        # @show Λ_cone
+        # @show y_cone
+        W_blocks = NTScale.(Λ_split,y_split)
+        z_split = W_blocks.*Λ_split
         z = reduce(vcat,z_split)
         W = BlockDiagonal(W_blocks)
         WᵀW = transpose(W)*W
-        @show z_split
-        @show z_split⊙z_split
+        # @show z_split
+        # @show z_split⊙z_split
         𝐫𝐞𝐬[   1:n1] .= -h.*pₛ₋₁ .+ M*(q̃ₛ.-qₛ₋₁) .-
                         1/2 .*transpose(Aₛ₋₁)*λₛ .-
                         1/2 .*transpose(Bₛ₋₁)*μₛ .-
@@ -747,12 +752,9 @@ function ip_ns_stepk_maker(nq,nλ,nμ,nu,qₛ₋₁,q̇ₛ₋₁,pₛ₋₁,tₛ
         𝐫𝐞𝐬[n3+1:n4] .= Ψ(qₛ,vₛ)
         𝐫𝐞𝐬[n4+1:n5] .= Dₛ*vₛ + 𝐛 - yₛ
         𝐫𝐞𝐬[n5+1:n6] .= reduce(vcat,z_split⊙z_split)
+        
         # res = norm(𝐫𝐞𝐬)
-        @show (2/h).*M*(qₛ - q̃ₛ)
-        @show transpose(Dₛ)*H*Λₛ
-        @show Dₛ*vₛ + 𝐛
-        @show Λₛ
-        @show 𝐫𝐞𝐬
+        # @show 𝐫𝐞𝐬
         𝐉[   1:n1,   1:n1] .=  M
         𝐉[   1:n1,n1+1:n2] .= -h^2/2 .*(1/2 .*∂F∂q .+ 1/h.*∂F∂q̇)
         𝐉[   1:n1,n2+1:n3] .= -1/2 .*transpose(Aₛ₋₁)
@@ -773,45 +775,43 @@ function ip_ns_stepk_maker(nq,nλ,nμ,nu,qₛ₋₁,q̇ₛ₋₁,pₛ₋₁,tₛ
         𝐉[n5+1:n6,n4+1:n5] .= BlockDiagonal(mat.(z_split).*W_blocks)
         𝐉[n5+1:n6,n5+1:n6] .= BlockDiagonal(mat.(z_split).*inv.(W_blocks))
 
+        # @show Λₛ,yₛ
         η = 1.0
         Δxp = 𝐉\(-𝐫𝐞𝐬)
-        # @show 𝐉
-        # @show 𝐫𝐞𝐬
-        # @show Δxp
         ΔΛp = @view Δxp[n4+1:n5]
         Δyp = @view Δxp[n5+1:n6]
         ΔΛp_split = TR.split_by_lengths(ΔΛp,3)
         Δyp_split = TR.split_by_lengths(Δyp,3)
-        # @show ΔΛp_split, Δyp_split
-        αmax = find_cone_step_length(z_split,W_blocks,Δyp_split,ΔΛp_split,J)
-        α = 1#min(one(αmax),0.99αmax)
-        yp_split = y_split .+ α.*Δyp_split
-        Λp_split = Λ_split .+ α.*ΔΛp_split
-        # yp_cone = [transpose(yi)*J*yi for yi in yp_split]
-        # Λp_cone = [transpose(Λi)*J*Λi for Λi in Λp_split]
-        # @show yp_cone
+        # @show ΔΛp, Δyp
+        # @show z_split,W_blocks,Δyp_split,ΔΛp_split,J
+        αpmax = find_cone_step_length(z_split,W_blocks,Δyp_split,ΔΛp_split,J)
+        αp = min(one(αpmax),0.99αpmax)
+        Λp_split = Λ_split .+ αp.*ΔΛp_split
+        yp_split = y_split .+ αp.*Δyp_split
+        Λp_cone = [transpose(Λi)*J*Λi for Λi in Λp_split]
+        yp_cone = [transpose(yi)*J*yi for yi in yp_split]
         # @show Λp_cone
-        yp = reduce(vcat,yp_split)
-        Λp = reduce(vcat,Λp_split)
+        # @show yp_cone
+        Λp = Λₛ .+ αp.*ΔΛp
+        yp = yₛ .+ αp.*Δyp
         μp = transpose(yp)*Λp/nΛ
         σ = (μp/μ)^3
         τ = σ*μp
-        # @show αmax,α,τ,σ,μ,μp
-        @show α
-        @show Δxp
-        @show ΔΛp,Δyp
-        𝐫𝐞𝐬_c_split = W_blocks.*(z_split⊘(-σ.*μp.*𝐞_split.+((inv.(W_blocks).*Δyp_split)⊙(W_blocks.*ΔΛp_split))))
+        # @show "Prediction",αpmax,αp,τ,σ,μ,μp
+        # @show Δxp
+        # @show αp.*ΔΛp,αp.*Δyp
+        # @show Λp,yp
+        𝐫𝐞𝐬_c_split = -σ.*μp.*𝐞_split.+((inv.(W_blocks).*Δyp_split)⊙(W_blocks.*ΔΛp_split))
         𝐫𝐞𝐬_c = reduce(vcat,𝐫𝐞𝐬_c_split)
-        𝐫𝐞𝐬[n4+1:n5] .+= 𝐫𝐞𝐬_c
+        𝐫𝐞𝐬[n5+1:n6] .+= 𝐫𝐞𝐬_c
         Δxc = 𝐉\(-𝐫𝐞𝐬)
         # η = exp(-0.1μ) + 0.9
         ΔΛc = @view Δxc[n4+1:n5]
-        Δyc = -yₛ-𝐫𝐞𝐬_c-WᵀW*ΔΛp
+        Δyc = @view Δxc[n5+1:n6]
         ΔΛc_split = TR.split_by_lengths(ΔΛc,3)
         Δyc_split = TR.split_by_lengths(Δyc,3)
         αmax = find_cone_step_length(z_split,W_blocks,Δyc_split,ΔΛc_split,J)
         α = min(1,0.99αmax)
-        # @show α
         q̃ₛ .+= α.*Δxc[   1:n1]
         qₛ .+= α.*Δxc[n1+1:n2]
         λₛ .+= α.*Δxc[n2+1:n3]
@@ -819,15 +819,18 @@ function ip_ns_stepk_maker(nq,nλ,nμ,nu,qₛ₋₁,q̇ₛ₋₁,pₛ₋₁,tₛ
         Λ_split .+= α.*ΔΛc_split
         y_split .+= α.*Δyc_split
         # @show ΔΛc_split, Δyc_split
-        y_cone = [transpose(yi)*J*yi for yi in y_split]
         Λ_cone = [transpose(Λi)*J*Λi for Λi in Λ_split]
-        # @show y_cone
-        # @show Λ_cone
-        Λₛ .= reduce(vcat,Λ_split)
-        yₛ .= reduce(vcat,y_split)
+        y_cone = [transpose(yi)*J*yi for yi in y_split]
+        Λₛ .+= α.*ΔΛc
+        yₛ .+= α.*Δyc
         # @show "after",yₛ,Λₛ
         μ = transpose(yₛ)*Λₛ/nΛ
-        @show σ,μ,μp
+        # @show Λ_cone
+        # @show y_cone
+        @show "Correction",αmax,α,τ,σ,μ,μp
+        # @show Δxc
+        # @show α.*ΔΛc,α.*Δyc
+        # @show Λₛ,yₛ
         μ,Δxc
     end
     ip_ns_stepk!
@@ -940,6 +943,7 @@ function nhsolve(nq,nλ,nμ,q0,q̇0,dyfuncs,tspan;dt=0.01,ftol=1e-14,xtol=ftol,v
                 ns_stepk!(nonsmooth_R,nonsmooth_J,
                             𝐁,𝐜ᵀ,𝐍,𝐫,nonsmooth_x,𝚲ₛ,q̇ₛ,Dₛ,ηs,es,H)
                 res = norm(nonsmooth_R)
+                @show timestep, iteration, res
                 # if res < ftol
                 #     isconverged = true
                 #     iteration_break = iteration-1
@@ -974,10 +978,6 @@ function nhsolve(nq,nλ,nμ,q0,q̇0,dyfuncs,tspan;dt=0.01,ftol=1e-14,xtol=ftol,v
             # @show gₙ*9.81
             # @show 𝚲ₛ./dt
             q̃ₛ .= nonsmooth_x[      1:nq]
-            @show q̃ₛ
-            @show qₛ
-            @show q̇ₛ
-            @show 𝚲ₛ
         end
 
         if !isconverged
@@ -1097,12 +1097,12 @@ function ipsolve(nq,nλ,nμ,q0,q̇0,dyfuncs,tspan;dt=0.01,ftol=1e-14,xtol=ftol,v
             nonsmooth_x = zeros(eltype(q0),nonsmooth_nx)
             nonsmooth_R = zeros(eltype(q0),nonsmooth_nx)
             nonsmooth_J = zeros(eltype(q0),nonsmooth_nx,nonsmooth_nx)
-            nonsmooth_x[               1:nq]                .= [0.2781866379712523, 0.0, 0.07282980498953609]
-            nonsmooth_x[            nq+1:nq+nq]             .= [0.2774778420780419, 0.0, 0.07397747720342729]
-            nonsmooth_x[   nq+nq+nλ+nμ+1:nq+nq+nλ+nμ+nΛ]    .= [(1.000000001)*3.8760483232954943, 0.0, 3.8760483232954943]
-            nonsmooth_x[nq+nq+nλ+nμ+nΛ+1:nq+nq+nλ+nμ+nΛ+nΛ] .= [(1.000000001)*0.8591722059215059, 0.0, -0.8591721975917848]
+            nonsmooth_x[               1:nq]                .= qₛ
+            nonsmooth_x[            nq+1:nq+nq]             .= qₛ
+            nonsmooth_x[   nq+nq+nλ+nμ+1:nq+nq+nλ+nμ+nΛ]    .= repeat([1,0,0],nu)
+            nonsmooth_x[nq+nq+nλ+nμ+nΛ+1:nq+nq+nλ+nμ+nΛ+nΛ] .= repeat([1,0,0],nu)
             # y = copy(nonsmooth_x[nq+nq+nλ+nμ+1:nq+nq+nλ+nμ+nΛ])
-            q̇ₛ .= [0.5142598661572809, 0.0, 1.400342517987585]
+            # q̇ₛ .= [0.5142598661572809, 0.0, 1.400342517987585]
             isconverged = false
             # @show timestep, nu
             ip_ns_stepk! = ip_ns_stepk_maker(nq,nλ,nμ,nu,qₛ₋₁,q̇ₛ₋₁,pₛ₋₁,tₛ₋₁,dyfuncs,invM,dt)
