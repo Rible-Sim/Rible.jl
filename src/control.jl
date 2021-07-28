@@ -154,8 +154,8 @@ end
 
 function actuate!(ctrller::ManualActuator,tg,u;inc=false)
     @unpack strings = tg
-    @unpack act, traj = ctrller
-    @unpack id_string, original_value = act
+    @unpack reg, traj = ctrller
+    @unpack id_string, original_value = reg
     @unpack us = traj
     s = select_by_id(strings,id_string)
     if inc

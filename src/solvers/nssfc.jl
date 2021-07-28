@@ -9,6 +9,7 @@ using Printf
 using ProgressMeter
 using OffsetArrays
 using FiniteDiff
+using FiniteDifferences
 
 function initial_guesses(b,qₛ,vₛ,ṽ̇ₛ,aₛ,𝛌bₛ,p,h)
     @unpack αm,αf,γ,β = p
@@ -407,7 +408,7 @@ function stepk_maker(nq,nλ,nμ,qₛ₋₁,q̇ₛ₋₁,pₛ₋₁,tₛ₋₁,dy
     n1 =  nq
     n2 = nq+nλ
     n3 = nq+nλ+nμ
-    function stepk!(R,J,x,q̇ₛ)
+    function stepk!(R,J,x)
         qₛ = @view x[   1:n1]
         λₛ = @view x[n1+1:n2]
         μₛ = @view x[n2+1:n3]
@@ -422,7 +423,8 @@ function stepk_maker(nq,nλ,nμ,qₛ₋₁,q̇ₛ₋₁,pₛ₋₁,tₛ₋₁,dy
         ∂F∂q̇ = zeros(eltype(qₛ),nq,nq)
         Jac_F!(∂F∂q,∂F∂q̇,q,q̇,t)
 
-        # q̇ₛ = invM*Momentum_k(qₛ₋₁,pₛ₋₁,qₛ,λₛ,μₛ,M,A,B,h)
+        pₛ = Momentum_k(qₛ₋₁,pₛ₋₁,qₛ,λₛ,μₛ,M,A,B,h)
+        q̇ₛ = invM*pₛ
 
         Aₛ₋₁ = A(qₛ₋₁)
         Bₛ₋₁ = B(qₛ₋₁)
@@ -461,23 +463,21 @@ function ns_stepk_maker(nq,nλ,nμ,nu,qₛ₋₁,q̇ₛ₋₁,pₛ₋₁,tₛ₋
 
     stepk! = stepk_maker(nq,nλ,nμ,qₛ₋₁,q̇ₛ₋₁,pₛ₋₁,tₛ₋₁,dyfuncs,invM,h)
 
-    n1 =  nq
-    n2 = 2nq
-    n3 = 2nq+nλ
-    n4 = 2nq+nλ+nμ
+    n1 = nq
+    n2 = nq+nλ
+    n3 = nq+nλ+nμ
     nΛ = 3nu
-    nx = n4
+    nx = n3
     T = eltype(qₛ₋₁)
     𝐁 = zeros(T,nx,nΛ)
     𝐜ᵀ = zeros(T,nΛ,nx)
     # 𝐜ᵀinv𝐉 = zeros(T,nΛ,nx)
     𝐍 = zeros(T,nΛ,nΛ)
     𝐫 = zeros(T,nΛ)
-    function ns_stepk!(𝐫𝐞𝐬,𝐉,𝐁,𝐜ᵀ,𝐍,𝐫,x,𝚲ₛ,vₛ,Dₛ,ηs,es,H)
-        q̃ₛ = @view x[   1:n1]
-        qₛ = @view x[n1+1:n2]
-        λₛ = @view x[n2+1:n3]
-        μₛ = @view x[n3+1:n4]
+    function ns_stepk!(𝐫𝐞𝐬,𝐉,𝐁,𝐜ᵀ,𝐍,𝐫,x,𝚲ₛ,Dₛ,ηs,es,H)
+        qₛ = @view x[   1:n1]
+        λₛ = @view x[n1+1:n2]
+        μₛ = @view x[n2+1:n3]
         vₛ₋₁ = q̇ₛ₋₁
 
         q = (qₛ.+qₛ₋₁)./2
@@ -494,37 +494,37 @@ function ns_stepk_maker(nq,nλ,nμ,nu,qₛ₋₁,q̇ₛ₋₁,pₛ₋₁,tₛ₋
         Bₛ₋₁ = B(qₛ₋₁)
         Aₛ = A(qₛ)
         Bₛ = B(qₛ)
+
+        pₛ = Momentum_k(qₛ₋₁,pₛ₋₁,qₛ,λₛ,μₛ,M,A,B,h)
+        vₛ = invM*pₛ
+
         ∂vₛ∂qₛ = 2/h*I + 1/(2h).*invM*(∂Aᵀλ∂q(qₛ,λₛ) + ∂Bᵀμ∂q(qₛ,μₛ))
         ∂vₛ∂λₛ = invM*transpose(Aₛ-Aₛ₋₁)/(2h)
         ∂vₛ∂μₛ = invM*transpose(Bₛ-Bₛ₋₁)/(2h)
 
         ∂DₛᵀHΛₛ∂qₛ = zeros(eltype(x),nq,nq)
 
-        𝐫𝐞𝐬[   1:n1] .= -h.*pₛ₋₁ .+ M*(q̃ₛ.-qₛ₋₁) .-
+        𝐫𝐞𝐬[   1:n1] .= -h.*pₛ₋₁ .+ M*(qₛ.-qₛ₋₁) .-
+                        (2/h).*transpose(Dₛ)*H*𝚲ₛ .-
                         1/2 .*transpose(Aₛ₋₁)*λₛ .-
                         1/2 .*transpose(Bₛ₋₁)*μₛ .-
                         (h^2)/2 .*F⁺
-        𝐫𝐞𝐬[n1+1:n2] .= (2/h).*M*(qₛ - q̃ₛ) - transpose(Dₛ)*H*𝚲ₛ
-        𝐫𝐞𝐬[n2+1:n3] .= Φ(qₛ)
-        𝐫𝐞𝐬[n3+1:n4] .= Ψ(qₛ,vₛ)
+        𝐫𝐞𝐬[n1+1:n2] .= Φ(qₛ)
+        𝐫𝐞𝐬[n2+1:n3] .= Ψ(qₛ,vₛ)
 
         𝐉 .= 0.0
-        𝐉[   1:n1,   1:n1] .=  M
-        𝐉[   1:n1,n1+1:n2] .= -h^2/2 .*(1/2 .*∂F∂q .+ 1/h.*∂F∂q̇)
-        𝐉[   1:n1,n2+1:n3] .= -1/2 .*transpose(Aₛ₋₁)
-        𝐉[   1:n1,n3+1:n4] .= -1/2 .*transpose(Bₛ₋₁)
+        𝐉[   1:n1,   1:n1] .=  M .- (2/h).*∂DₛᵀHΛₛ∂qₛ .-h^2/2 .*(1/2 .*∂F∂q .+ 1/h.*∂F∂q̇)
+        𝐉[   1:n1,n1+1:n2] .= -1/2 .*transpose(Aₛ₋₁)
+        𝐉[   1:n1,n2+1:n3] .= -1/2 .*transpose(Bₛ₋₁)
 
-        𝐉[n1+1:n2,   1:n1] .= -(2/h).*M
-        𝐉[n1+1:n2,n1+1:n2] .=  (2/h).*M .- ∂DₛᵀHΛₛ∂qₛ
+        𝐉[n1+1:n2,   1:n1] .=  Aₛ
 
-        𝐉[n2+1:n3,n1+1:n2] .=  Aₛ
-
-        𝐉[n3+1:n4,n1+1:n2] .=  Ψq(qₛ,vₛ) .+ Bₛ*∂vₛ∂qₛ
-        𝐉[n3+1:n4,n2+1:n3] .=  Bₛ*∂vₛ∂λₛ
-        𝐉[n3+1:n4,n3+1:n4] .=  Bₛ*∂vₛ∂μₛ
+        𝐉[n2+1:n3,   1:n1] .=  Ψq(qₛ,vₛ) .+ Bₛ*∂vₛ∂qₛ
+        𝐉[n2+1:n3,n1+1:n2] .=  Bₛ*∂vₛ∂λₛ
+        𝐉[n2+1:n3,n2+1:n3] .=  Bₛ*∂vₛ∂μₛ
 
         𝐁 .= 0
-        𝐁[n1+1:n2,1:nΛ] .= transpose(Dₛ)*H
+        𝐁[   1:n1,1:nΛ] .= (2/h).*transpose(Dₛ)*H
 
         𝐛 = zeros(eltype(x),nΛ)
         v́ₛ₋₁ = Dₛ*vₛ₋₁
@@ -543,10 +543,9 @@ function ns_stepk_maker(nq,nλ,nμ,nu,qₛ₋₁,q̇ₛ₋₁,pₛ₋₁,tₛ₋
         ∂Dₛvₛ∂qₛ = zeros(eltype(x),nΛ,nq)
         ∂bₛ∂qₛ = zeros(eltype(x),nΛ,nq)
 
-        𝐜ᵀ[1:nΛ,   1:n1] .= 0
-        𝐜ᵀ[1:nΛ,n1+1:n2] .= ∂Dₛvₛ∂qₛ + ∂bₛ∂qₛ + Dₛ*∂vₛ∂qₛ
-        𝐜ᵀ[1:nΛ,n2+1:n3] .= Dₛ*∂vₛ∂λₛ
-        𝐜ᵀ[1:nΛ,n3+1:n4] .= Dₛ*∂vₛ∂μₛ
+        𝐜ᵀ[1:nΛ,   1:n1] .= ∂Dₛvₛ∂qₛ + ∂bₛ∂qₛ + Dₛ*∂vₛ∂qₛ
+        𝐜ᵀ[1:nΛ,n1+1:n2] .= Dₛ*∂vₛ∂λₛ
+        𝐜ᵀ[1:nΛ,n2+1:n3] .= Dₛ*∂vₛ∂μₛ
 
         𝐜ᵀinv𝐉 = 𝐜ᵀ*inv(𝐉)
         𝐍 .= 𝐜ᵀinv𝐉*𝐁
@@ -631,30 +630,58 @@ function NTScale(x::AbstractVector{T},y::AbstractVector{T}) where {T<:AbstractVe
      BlockDiagonal(NTScale.(x,y))
 end
 
+function find_cone_step_length(z,Δz,z̄,J)
+    ẑ = z./z̄
+    head = transpose(ẑ)*J*Δz
+    tail = Δz[begin+1:end] .- (head+Δz[begin])./(ẑ[begin] + 1).*ẑ[begin+1:end]
+    ρ = vcat(head,tail)/z̄
+    α = max(0,norm(ρ[begin+1:end])-ρ[begin])^(-1)
+end
+
+function find_cone_step_length(z_split,Δz_split,J)
+    z_split_norm = [sqrt(transpose(zi)*J*zi) for zi in z_split]
+    α = [
+        find_cone_step_length(zi,Δzi,zi_norm,J)
+        for (zi,Δzi,zi_norm) in zip(z_split,Δz_split,z_split_norm)
+    ]
+    αmin = minimum(α)
+end
+
 function find_cone_step_length(z_split,W_blocks,Δy_split,Δx_split,J)
     Δx̃_split = W_blocks.*Δx_split
     Δỹ_split = inv.(W_blocks).*Δy_split
     z_split_norm = [sqrt(transpose(zi)*J*zi) for zi in z_split]
-    z̄_split = z_split./z_split_norm
-    ρ = [
-        begin
-            head = transpose(z̄i)*J*Δỹi
-            tail = Δỹi[begin+1:end] .- (head+Δỹi[begin])./(z̄i[begin] + 1).*z̄i[begin+1:end]
-            vcat(head,tail)/zi_norm
-        end
-        for (z̄i,Δỹi,zi_norm) in zip(z̄_split,Δỹ_split,z_split_norm)
+    # z̄_split = z_split./z_split_norm
+    # ρ = [
+    #     begin
+    #         head = transpose(z̄i)*J*Δỹi
+    #         tail = Δỹi[begin+1:end] .- (head+Δỹi[begin])./(z̄i[begin] + 1).*z̄i[begin+1:end]
+    #         vcat(head,tail)/zi_norm
+    #     end
+    #     for (z̄i,Δỹi,zi_norm) in zip(z̄_split,Δỹ_split,z_split_norm)
+    # ]
+    #
+    # σ = [
+    #     begin
+    #         head = transpose(z̄i)*J*Δx̃i
+    #         tail = Δx̃i[begin+1:end] .- (head+Δx̃i[begin])./(z̄i[begin] + 1).*z̄i[begin+1:end]
+    #         vcat(head,tail)/zi_norm
+    #     end
+    #     for (z̄i,Δx̃i,zi_norm) in zip(z̄_split,Δx̃_split,z_split_norm)
+    # ]
+    α_y = [
+        find_cone_step_length(zi,Δỹi,zi_norm,J)
+        for (zi,Δỹi,zi_norm) in zip(z_split,Δỹ_split,z_split_norm)
     ]
-
-    σ = [
-        begin
-            head = transpose(z̄i)*J*Δx̃i
-            tail = Δx̃i[begin+1:end] .- (head+Δx̃i[begin])./(z̄i[begin] + 1).*z̄i[begin+1:end]
-            vcat(head,tail)/zi_norm
-        end
-        for (z̄i,Δx̃i,zi_norm) in zip(z̄_split,Δx̃_split,z_split_norm)
+    α_x = [
+        find_cone_step_length(zi,Δx̃i,zi_norm,J)
+        for (zi,Δx̃i,zi_norm) in zip(z_split,Δx̃_split,z_split_norm)
     ]
-
-    αmin = minimum(max(0,norm(ρi[begin+1:end])-ρi[begin],norm(σi[begin+1:end])-σi[begin])^(-1) for (ρi,σi) in zip(ρ,σ))
+    # @show [max(0,norm(ρi[begin+1:end])-ρi[begin])^(-1) for ρi in ρ]
+    # @show [max(0,norm(σi[begin+1:end])-σi[begin])^(-1) for σi in σ]
+    αmin = min(minimum(α_y),minimum(α_x))
+    # αmin = minimum(max(0,norm(ρi[begin+1:end])-ρi[begin],norm(σi[begin+1:end])-σi[begin])^(-1) for (ρi,σi) in zip(ρ,σ))
+    # @show αmin
 end
 
 
@@ -677,103 +704,121 @@ function ip_ns_stepk_maker(nq,nλ,nμ,nu,qₛ₋₁,q̇ₛ₋₁,pₛ₋₁,tₛ
     e = [one(T),zero(T),zero(T)]
     J = Diagonal([one(T),-one(T),-one(T)])
     𝐞_split = [e for i = 1:nu]
-    function ip_ns_stepk!(𝐫𝐞𝐬,𝐉,x,vₛ,Dₛ,ηs,es,H,μ)
-        q̃ₛ = @view x[   1:n1]
-        qₛ = @view x[n1+1:n2]
-        λₛ = @view x[n2+1:n3]
-        μₛ = @view x[n3+1:n4]
-        Λₛ = @view x[n4+1:n5]
-        yₛ = @view x[n5+1:n6]
+    function ip_ns_stepk!(𝐫𝐞𝐬,𝐉,x,Dₛ,ηs,es,H,μ)
+        # function inner_res(x)
+            q̃ₛ = @view x[   1:n1]
+            qₛ = @view x[n1+1:n2]
+            λₛ = @view x[n2+1:n3]
+            μₛ = @view x[n3+1:n4]
+            Λₛ = @view x[n4+1:n5]
+            yₛ = @view x[n5+1:n6]
 
-        𝐉 .= 0.0
-        vₛ₋₁ = q̇ₛ₋₁
+            𝐉 .= 0.0
+            vₛ₋₁ = q̇ₛ₋₁
 
-        q = (qₛ.+qₛ₋₁)./2
-        q̇ = (qₛ.-qₛ₋₁)./h
-        t = tₛ₋₁+h/2
+            q = (qₛ.+qₛ₋₁)./2
+            q̇ = (qₛ.-qₛ₋₁)./h
+            t = tₛ₋₁+h/2
 
-        F⁺ = zeros(eltype(qₛ),nq)
-        F!(F⁺,q,q̇,t)
-        ∂F∂q = zeros(eltype(qₛ),nq,nq)
-        ∂F∂q̇ = zeros(eltype(qₛ),nq,nq)
-        Jac_F!(∂F∂q,∂F∂q̇,q,q̇,t)
+            F⁺ = zeros(eltype(qₛ),nq)
+            F!(F⁺,q,q̇,t)
+            ∂F∂q = zeros(eltype(qₛ),nq,nq)
+            ∂F∂q̇ = zeros(eltype(qₛ),nq,nq)
+            Jac_F!(∂F∂q,∂F∂q̇,q,q̇,t)
 
-        Aₛ₋₁ = A(qₛ₋₁)
-        Bₛ₋₁ = B(qₛ₋₁)
-        Aₛ = A(qₛ)
-        Bₛ = B(qₛ)
-        ∂vₛ∂qₛ = 2/h*I + 1/(2h).*invM*(∂Aᵀλ∂q(qₛ,λₛ) + ∂Bᵀμ∂q(qₛ,μₛ))
-        ∂vₛ∂λₛ = invM*transpose(Aₛ-Aₛ₋₁)/(2h)
-        ∂vₛ∂μₛ = invM*transpose(Bₛ-Bₛ₋₁)/(2h)
+            Aₛ₋₁ = A(qₛ₋₁)
+            Bₛ₋₁ = B(qₛ₋₁)
+            Aₛ = A(qₛ)
+            Bₛ = B(qₛ)
 
-        ∂Dₛvₛ∂qₛ = zeros(eltype(x),nΛ,nq)
-        ∂bₛ∂qₛ = zeros(eltype(x),nΛ,nq)
-        ∂DₛᵀHΛₛ∂qₛ = zeros(eltype(x),nq,nq)
+            pₛ = Momentum_k(qₛ₋₁,pₛ₋₁,qₛ,λₛ,μₛ,M,A,B,h)
+            vₛ = invM*pₛ
 
-        𝐛 = zeros(eltype(x),nΛ)
-        ∂𝐛∂𝐱 = @view 𝐉[n4+1:n5,1:nx]
-        v́ₛ₋₁ = Dₛ*vₛ₋₁
-        v́ₛ = Dₛ*vₛ
-        for i = 1:nu
-            is = 3(i-1)
-            vⁱₛ₋₁ = v́ₛ₋₁[is+1:is+3]
-            vⁱₛ   = v́ₛ[is+1:is+3]
-            vₜⁱₛ = norm(vⁱₛ[2:3])
-            vₙⁱₛ₋₁ = vⁱₛ₋₁[1]
-            vₙⁱₛ = vⁱₛ[1]
-            # @show vₜⁱₛ, vₙⁱₛ₋₁, vₙⁱₛ
-            𝐛[is+1] = ηs[i]*vₜⁱₛ + es[i]*vₙⁱₛ₋₁
-            D̃i = copy(Dₛ[is+1:is+3,:])
-            D̃i[1,:] += (vⁱₛ[2]*Dₛ[is+2,:]+vⁱₛ[3]*Dₛ[is+3,:])/vₜⁱₛ
-            ∂𝐛∂𝐱[is+1:is+3,n1+1:n2] .= D̃i*∂vₛ∂qₛ
-            ∂𝐛∂𝐱[is+1:is+3,n2+1:n3] .= D̃i*∂vₛ∂λₛ
-            ∂𝐛∂𝐱[is+1:is+3,n3+1:n4] .= D̃i*∂vₛ∂μₛ
-        end
-        # @show "before",yₛ,Λₛ
-        Λ_split = TR.split_by_lengths(Λₛ,3)
-        y_split = TR.split_by_lengths(yₛ,3)
-        Λ_cone = [transpose(Λi)*J*Λi for Λi in Λ_split]
-        y_cone = [transpose(yi)*J*yi for yi in y_split]
-        # @show Λ_cone
-        # @show y_cone
-        W_blocks = NTScale.(Λ_split,y_split)
-        z_split = W_blocks.*Λ_split
-        z = reduce(vcat,z_split)
-        W = BlockDiagonal(W_blocks)
-        WᵀW = transpose(W)*W
-        # @show z_split
-        # @show z_split⊙z_split
-        𝐫𝐞𝐬[   1:n1] .= -h.*pₛ₋₁ .+ M*(q̃ₛ.-qₛ₋₁) .-
-                        1/2 .*transpose(Aₛ₋₁)*λₛ .-
-                        1/2 .*transpose(Bₛ₋₁)*μₛ .-
-                        (h^2)/2 .*F⁺
-        𝐫𝐞𝐬[n1+1:n2] .= (2/h).*M*(qₛ - q̃ₛ) - transpose(Dₛ)*H*Λₛ
-        𝐫𝐞𝐬[n2+1:n3] .= Φ(qₛ)
-        𝐫𝐞𝐬[n3+1:n4] .= Ψ(qₛ,vₛ)
-        𝐫𝐞𝐬[n4+1:n5] .= Dₛ*vₛ + 𝐛 - yₛ
-        𝐫𝐞𝐬[n5+1:n6] .= reduce(vcat,z_split⊙z_split)
-        
-        # res = norm(𝐫𝐞𝐬)
-        # @show 𝐫𝐞𝐬
-        𝐉[   1:n1,   1:n1] .=  M
-        𝐉[   1:n1,n1+1:n2] .= -h^2/2 .*(1/2 .*∂F∂q .+ 1/h.*∂F∂q̇)
-        𝐉[   1:n1,n2+1:n3] .= -1/2 .*transpose(Aₛ₋₁)
-        𝐉[   1:n1,n3+1:n4] .= -1/2 .*transpose(Bₛ₋₁)
+            ∂vₛ∂qₛ = 2/h*I + 1/(2h).*invM*(∂Aᵀλ∂q(qₛ,λₛ) + ∂Bᵀμ∂q(qₛ,μₛ))
+            ∂vₛ∂λₛ = invM*transpose(Aₛ-Aₛ₋₁)/(2h)
+            ∂vₛ∂μₛ = invM*transpose(Bₛ-Bₛ₋₁)/(2h)
 
-        𝐉[n1+1:n2,   1:n1] .= -(2/h).*M
-        𝐉[n1+1:n2,n1+1:n2] .=  (2/h).*M .- ∂DₛᵀHΛₛ∂qₛ
-        𝐉[n1+1:n2,n4+1:n5] .= -transpose(Dₛ)*H
+            ∂Dₛvₛ∂qₛ = zeros(eltype(x),nΛ,nq)
+            ∂bₛ∂qₛ = zeros(eltype(x),nΛ,nq)
+            ∂DₛᵀHΛₛ∂qₛ = zeros(eltype(x),nq,nq)
 
-        𝐉[n2+1:n3,n1+1:n2] .=  Aₛ
+            𝐛 = zeros(eltype(x),nΛ)
+            ∂𝐛∂𝐱 = @view 𝐉[n4+1:n5,1:nx]
+            v́ₛ₋₁ = Dₛ*vₛ₋₁
+            v́ₛ = Dₛ*vₛ
+            for i = 1:nu
+                is = 3(i-1)
+                vⁱₛ₋₁ = v́ₛ₋₁[is+1:is+3]
+                vⁱₛ   = v́ₛ[is+1:is+3]
+                vₜⁱₛ = sqrt(vⁱₛ[2]^2+vⁱₛ[3]^2+eps(eltype(x)))
+                vᵤⁱₛ = norm(vⁱₛ[2])
+                vᵥⁱₛ = norm(vⁱₛ[3])
+                vₙⁱₛ₋₁ = vⁱₛ₋₁[1]
+                vₙⁱₛ = vⁱₛ[1]
+                # @show vₜⁱₛ, vₙⁱₛ₋₁, vₙⁱₛ
+                𝐛[is+1] = ηs[i]*vₜⁱₛ + es[i]*vₙⁱₛ₋₁
+                D̃i = copy(Dₛ[is+1:is+3,:])
+                D̃i[1,:] .+= (vⁱₛ[2].*Dₛ[is+2,:].+vⁱₛ[3].*Dₛ[is+3,:])./vₜⁱₛ
+                ∂𝐛∂𝐱[is+1:is+3,n1+1:n2] .= D̃i*∂vₛ∂qₛ
+                ∂𝐛∂𝐱[is+1:is+3,n2+1:n3] .= D̃i*∂vₛ∂λₛ
+                ∂𝐛∂𝐱[is+1:is+3,n3+1:n4] .= D̃i*∂vₛ∂μₛ
+            end
+            # @show "before",yₛ,Λₛ
+            Λ_split = TR.split_by_lengths(Λₛ,3)
+            y_split = TR.split_by_lengths(yₛ,3)
+            Λ_cone = [transpose(Λi)*J*Λi for Λi in Λ_split]
+            y_cone = [transpose(yi)*J*yi for yi in y_split]
+            # @show Λ_cone
+            # @show y_cone
+            W_blocks = NTScale.(Λ_split,y_split)
+            z_split = W_blocks.*Λ_split
+            z = reduce(vcat,z_split)
+            W = BlockDiagonal(W_blocks)
+            WᵀW = transpose(W)*W
+            # @show z_split
+            # @show z_split⊙z_split
+            𝐫𝐞𝐬 = zeros(eltype(x),nx)
+            𝐫𝐞𝐬[   1:n1] .= -h.*pₛ₋₁ .+ M*(q̃ₛ.-qₛ₋₁) .-
+                            1/2 .*transpose(Aₛ₋₁)*λₛ .-
+                            1/2 .*transpose(Bₛ₋₁)*μₛ .-
+                            (h^2)/2 .*F⁺
+            𝐫𝐞𝐬[n1+1:n2] .= (2/h).*M*(qₛ - q̃ₛ) - transpose(Dₛ)*H*Λₛ
+            𝐫𝐞𝐬[n2+1:n3] .= Φ(qₛ)
+            𝐫𝐞𝐬[n3+1:n4] .= Ψ(qₛ,vₛ)
+            𝐫𝐞𝐬[n4+1:n5] .= Dₛ*vₛ + 𝐛 - yₛ
+            𝐫𝐞𝐬[n5+1:n6] .= reduce(vcat,Λ_split⊙y_split)
 
-        𝐉[n3+1:n4,n1+1:n2] .=  Ψq(qₛ,vₛ) .+ Bₛ*∂vₛ∂qₛ
-        𝐉[n3+1:n4,n2+1:n3] .=  Bₛ*∂vₛ∂λₛ
-        𝐉[n3+1:n4,n3+1:n4] .=  Bₛ*∂vₛ∂μₛ
+            # res = norm(𝐫𝐞𝐬)
+            # @show 𝐫𝐞𝐬
+            𝐉[   1:n1,   1:n1] .=  M
+            𝐉[   1:n1,n1+1:n2] .= -h^2/2 .*(1/2 .*∂F∂q .+ 1/h.*∂F∂q̇)
+            𝐉[   1:n1,n2+1:n3] .= -1/2 .*transpose(Aₛ₋₁)
+            𝐉[   1:n1,n3+1:n4] .= -1/2 .*transpose(Bₛ₋₁)
 
-        𝐉[n4+1:n5,n5+1:n6] .= -Matrix(1I,nΛ,nΛ)
+            𝐉[n1+1:n2,   1:n1] .= -(2/h).*M
+            𝐉[n1+1:n2,n1+1:n2] .=  (2/h).*M .- ∂DₛᵀHΛₛ∂qₛ
+            𝐉[n1+1:n2,n4+1:n5] .= -transpose(Dₛ)*H
 
-        𝐉[n5+1:n6,n4+1:n5] .= BlockDiagonal(mat.(z_split).*W_blocks)
-        𝐉[n5+1:n6,n5+1:n6] .= BlockDiagonal(mat.(z_split).*inv.(W_blocks))
+            𝐉[n2+1:n3,n1+1:n2] .=  Aₛ
+
+            𝐉[n3+1:n4,n1+1:n2] .=  Ψq(qₛ,vₛ) .+ Bₛ*∂vₛ∂qₛ
+            𝐉[n3+1:n4,n2+1:n3] .=  Bₛ*∂vₛ∂λₛ
+            𝐉[n3+1:n4,n3+1:n4] .=  Bₛ*∂vₛ∂μₛ
+
+            𝐉[n4+1:n5,n5+1:n6] .= -Matrix(1I,nΛ,nΛ)
+
+            𝐉[n5+1:n6,n4+1:n5] .= BlockDiagonal(mat.(y_split))
+            𝐉[n5+1:n6,n5+1:n6] .= BlockDiagonal(mat.(Λ_split))
+            # @show 𝐉
+            # 𝐫𝐞𝐬
+        # end
+
+        # res = inner_res(x)
+        # J_finite = FiniteDiff.finite_difference_jacobian(inner_res,x,Val{:central})
+        # # J_finite = FiniteDifferences.jacobian(central_fdm(4, 1), inner_res, x)[1]
+        # display(𝐉[n4+1:n5,n1+1:n2])
+        # display(J_finite[n4+1:n5,n1+1:n2])
+        # display(𝐉[n4+1:n5,n1+1:n2] - J_finite[n4+1:n5,n1+1:n2])
 
         # @show Λₛ,yₛ
         η = 1.0
@@ -784,7 +829,10 @@ function ip_ns_stepk_maker(nq,nλ,nμ,nu,qₛ₋₁,q̇ₛ₋₁,pₛ₋₁,tₛ
         Δyp_split = TR.split_by_lengths(Δyp,3)
         # @show ΔΛp, Δyp
         # @show z_split,W_blocks,Δyp_split,ΔΛp_split,J
-        αpmax = find_cone_step_length(z_split,W_blocks,Δyp_split,ΔΛp_split,J)
+        αp_Λ = find_cone_step_length(Λ_split,ΔΛp_split,J)
+        αp_y = find_cone_step_length(y_split,Δyp_split,J)
+        αpmax = min(αp_Λ,αp_y)
+        # αpmax = find_cone_step_length(z_split,W_blocks,Δyp_split,ΔΛp_split,J)
         αp = min(one(αpmax),0.99αpmax)
         Λp_split = Λ_split .+ αp.*ΔΛp_split
         yp_split = y_split .+ αp.*Δyp_split
@@ -801,7 +849,7 @@ function ip_ns_stepk_maker(nq,nλ,nμ,nu,qₛ₋₁,q̇ₛ₋₁,pₛ₋₁,tₛ
         # @show Δxp
         # @show αp.*ΔΛp,αp.*Δyp
         # @show Λp,yp
-        𝐫𝐞𝐬_c_split = -σ.*μp.*𝐞_split.+((inv.(W_blocks).*Δyp_split)⊙(W_blocks.*ΔΛp_split))
+        𝐫𝐞𝐬_c_split = -σ.*μp.*𝐞_split.+((Δyp_split)⊙(ΔΛp_split))
         𝐫𝐞𝐬_c = reduce(vcat,𝐫𝐞𝐬_c_split)
         𝐫𝐞𝐬[n5+1:n6] .+= 𝐫𝐞𝐬_c
         Δxc = 𝐉\(-𝐫𝐞𝐬)
@@ -810,7 +858,11 @@ function ip_ns_stepk_maker(nq,nλ,nμ,nu,qₛ₋₁,q̇ₛ₋₁,pₛ₋₁,tₛ
         Δyc = @view Δxc[n5+1:n6]
         ΔΛc_split = TR.split_by_lengths(ΔΛc,3)
         Δyc_split = TR.split_by_lengths(Δyc,3)
-        αmax = find_cone_step_length(z_split,W_blocks,Δyc_split,ΔΛc_split,J)
+        # αmax = find_cone_step_length(z_split,W_blocks,Δyc_split,ΔΛc_split,J)
+        α_Λ = find_cone_step_length(Λ_split,ΔΛc_split,J)
+        # @show Λ_split,ΔΛc_split
+        α_y = find_cone_step_length(y_split,Δyc_split,J)
+        αmax = min(α_Λ,α_y)
         α = min(1,0.99αmax)
         q̃ₛ .+= α.*Δxc[   1:n1]
         qₛ .+= α.*Δxc[n1+1:n2]
@@ -827,7 +879,8 @@ function ip_ns_stepk_maker(nq,nλ,nμ,nu,qₛ₋₁,q̇ₛ₋₁,pₛ₋₁,tₛ
         μ = transpose(yₛ)*Λₛ/nΛ
         # @show Λ_cone
         # @show y_cone
-        @show "Correction",αmax,α,τ,σ,μ,μp
+        # @show "Correction",αmax,α,τ,σ,μ,μp
+        @show μ
         # @show Δxc
         # @show α.*ΔΛc,α.*Δyc
         # @show Λₛ,yₛ
@@ -856,16 +909,11 @@ function nhsolve(nq,nλ,nμ,q0,q̇0,dyfuncs,tspan;dt=0.01,ftol=1e-14,xtol=ftol,v
     invM = inv(M)
     # F⁺ = zero(q0)
     step = 0
-    smooth_nx = nq + nλ + nμ
-    nonsmooth_nx = nq + nq + nλ + nμ
-    smooth_Δx = zeros(eltype(q0),smooth_nx)
-    nonsmooth_Δx = zeros(eltype(q0),nonsmooth_nx)
-    smooth_x = zero(smooth_Δx)
-    smooth_R = zero(smooth_Δx)
-    smooth_J = zeros(eltype(smooth_x),smooth_nx,smooth_nx)
-    nonsmooth_x = zero(nonsmooth_Δx)
-    nonsmooth_R = zero(nonsmooth_Δx)
-    nonsmooth_J = zeros(eltype(nonsmooth_x),nonsmooth_nx,nonsmooth_nx)
+    nx = nq + nλ + nμ
+    Δx = zeros(eltype(q0),nx)
+    x = zero(Δx)
+    R = zero(Δx)
+    J = zeros(eltype(x),nx,nx)
     mr = norm(M,Inf)
     scaling = 1
 
@@ -889,7 +937,7 @@ function nhsolve(nq,nλ,nμ,q0,q̇0,dyfuncs,tspan;dt=0.01,ftol=1e-14,xtol=ftol,v
         λₛ   = λs[timestep]
         μₛ   = μs[timestep]
         qˣ = qₛ₋₁ .+ dt./2 .*q̇ₛ₋₁
-        qₛ .= qˣ
+        qₛ .= qₛ₋₁ .+ dt .*q̇ₛ₋₁
         q̇ₛ .= q̇ₛ₋₁
         nu,active_indices,g = get_indices(qˣ)
         gₙ = g[active_indices]
@@ -900,34 +948,24 @@ function nhsolve(nq,nλ,nμ,q0,q̇0,dyfuncs,tspan;dt=0.01,ftol=1e-14,xtol=ftol,v
         res = typemax(eltype(qₛ))
         iteration_break = 0
         APGD_res = typemax(eltype(qₛ))
+        x[      1:nq]          .= qₛ
+        x[   nq+1:nq+nλ]       .= 0.0
+        x[nq+nλ+1:nq+nλ+nμ]    .= 0.0
         if nu == 0
-            smooth_x[      1:nq]          .= qₛ
-            smooth_x[   nq+1:nq+nλ]       .= 0.0
-            smooth_x[nq+nλ+1:nq+nλ+nμ]    .= 0.0
             stepk! = stepk_maker(nq,nλ,nμ,qₛ₋₁,q̇ₛ₋₁,pₛ₋₁,tₛ₋₁,dyfuncs,invM,dt)
 
             for iteration = 1:imax
-                    stepk!(smooth_R,smooth_J,smooth_x,q̇ₛ)
-                    res = norm(smooth_R)
+                    stepk!(R,J,x)
+                    res = norm(R)
                     if res < ftol
                         isconverged = true
                         iteration_break = iteration-1
                         break
                     end
-                    smooth_Δx .= -smooth_J\smooth_R
-                    smooth_x .+= smooth_Δx
-                    qₛ .= smooth_x[      1:nq]
-                    λₛ .= smooth_x[   nq+1:nq+nλ]
-                    μₛ .= smooth_x[nq+nλ+1:nq+nλ+nμ]
-                    pₛ .= Momentum_k(qₛ₋₁,pₛ₋₁,qₛ,λₛ,μₛ,M,A,B,dt)
-                    q̇ₛ .= invM*pₛ
+                    Δx .= -J\R
+                    x .+= Δx
             end
-            q̃ₛ .= smooth_x[      1:nq]
         else # u!=0
-            nonsmooth_x[         1:nq]          .= qₛ
-            nonsmooth_x[      nq+1:nq+nq]       .= qₛ
-            nonsmooth_x[   nq+nq+1:nq+nq+nλ]    .= 0.0
-            nonsmooth_x[nq+nq+nλ+1:nq+nq+nλ+nμ] .= 0.0
             isconverged = false
             𝚲ₛ = zeros(eltype(qₛ₋₁),3nu)
             𝚲ʳₛ = copy(𝚲ₛ)
@@ -940,9 +978,9 @@ function nhsolve(nq,nλ,nμ,q0,q̇0,dyfuncs,tspan;dt=0.01,ftol=1e-14,xtol=ftol,v
                 _,_,g = get_indices(qₛ)
                 gₙ = g[active_indices]
                 # @show iteration,Dₛ,ηs,es,gₙ
-                ns_stepk!(nonsmooth_R,nonsmooth_J,
-                            𝐁,𝐜ᵀ,𝐍,𝐫,nonsmooth_x,𝚲ₛ,q̇ₛ,Dₛ,ηs,es,H)
-                res = norm(nonsmooth_R)
+                ns_stepk!(R,J,
+                            𝐁,𝐜ᵀ,𝐍,𝐫,x,𝚲ₛ,Dₛ,ηs,es,H)
+                res = norm(R)
                 @show timestep, iteration, res
                 # if res < ftol
                 #     isconverged = true
@@ -957,16 +995,11 @@ function nhsolve(nq,nλ,nμ,q0,q̇0,dyfuncs,tspan;dt=0.01,ftol=1e-14,xtol=ftol,v
                 APGD_res = APGD!(𝚲ₛ,r4,ηs,𝐍,𝐫;τ=1e-10,Nmax=100)
                 # @show APGD_res
                 Δ𝚲ₛ .= 𝚲ₛ - 𝚲ʳₛ
-                # @show 𝚲ₛ, 𝚲ʳₛ
-                nonsmooth_Δx .= nonsmooth_J\(-nonsmooth_R + 𝐁*(Δ𝚲ₛ))
+                @show 𝚲ₛ#, 𝚲ʳₛ
+                Δx .= J\(-R + 𝐁*(Δ𝚲ₛ))
                 𝚲ʳₛ .= 𝚲ₛ
-                nonsmooth_x .+= nonsmooth_Δx
-                qₛ .= nonsmooth_x[         nq+1:nq+nq]
-                λₛ .= nonsmooth_x[      nq+nq+1:nq+nq+nλ]
-                μₛ .= nonsmooth_x[   nq+nq+nλ+1:nq+nq+nλ+nμ]
-                pₛ .= Momentum_k(qₛ₋₁,pₛ₋₁,qₛ,λₛ,μₛ,M,A,B,dt)
-                q̇ₛ .= invM*pₛ
-                normΔx = norm(nonsmooth_Δx)
+                x .+= Δx
+                normΔx = norm(Δx)
                 res = normΔx
                 # @show normΔx, norm(Δ𝚲ₛ)
                 iteration_break = iteration
@@ -977,8 +1010,12 @@ function nhsolve(nq,nλ,nμ,q0,q̇0,dyfuncs,tspan;dt=0.01,ftol=1e-14,xtol=ftol,v
             end
             # @show gₙ*9.81
             # @show 𝚲ₛ./dt
-            q̃ₛ .= nonsmooth_x[      1:nq]
         end
+        qₛ .= x[      1:nq]
+        λₛ .= x[   nq+1:nq+nλ]
+        μₛ .= x[nq+nλ+1:nq+nλ+nμ]
+        pₛ .= Momentum_k(qₛ₋₁,pₛ₋₁,qₛ,λₛ,μₛ,M,A,B,dt)
+        q̇ₛ .= invM*pₛ
 
         if !isconverged
             @warn "NLsolve max iterations $iteration_break, at timestep=$timestep, Res=$(res)"
@@ -1058,8 +1095,8 @@ function ipsolve(nq,nλ,nμ,q0,q̇0,dyfuncs,tspan;dt=0.01,ftol=1e-14,xtol=ftol,v
         λₛ   = λs[timestep]
         μₛ   = μs[timestep]
         qˣ = qₛ₋₁ .+ dt./2 .*q̇ₛ₋₁
-        qₛ .= qˣ
-        q̇ₛ .= q̇ₛ₋₁
+        qₛ .= qₛ₋₁ .+ dt.*q̇ₛ₋₁
+        # q̇ₛ .= q̇ₛ₋₁
         nu,active_indices,g = get_indices(qˣ)
         gₙ = g[active_indices]
         cs[timestep] = nu
@@ -1075,7 +1112,7 @@ function ipsolve(nq,nλ,nμ,q0,q̇0,dyfuncs,tspan;dt=0.01,ftol=1e-14,xtol=ftol,v
             stepk! = stepk_maker(nq,nλ,nμ,qₛ₋₁,q̇ₛ₋₁,pₛ₋₁,tₛ₋₁,dyfuncs,invM,dt)
 
             for iteration = 1:imax
-                    stepk!(smooth_R,smooth_J,smooth_x,q̇ₛ)
+                    stepk!(smooth_R,smooth_J,smooth_x)
                     res = norm(smooth_R)
                     if res < ftol
                         isconverged = true
@@ -1084,13 +1121,13 @@ function ipsolve(nq,nλ,nμ,q0,q̇0,dyfuncs,tspan;dt=0.01,ftol=1e-14,xtol=ftol,v
                     end
                     smooth_Δx .= -smooth_J\smooth_R
                     smooth_x .+= smooth_Δx
-                    qₛ .= smooth_x[      1:nq]
-                    λₛ .= smooth_x[   nq+1:nq+nλ]
-                    μₛ .= smooth_x[nq+nλ+1:nq+nλ+nμ]
-                    pₛ .= Momentum_k(qₛ₋₁,pₛ₋₁,qₛ,λₛ,μₛ,M,A,B,dt)
-                    q̇ₛ .= invM*pₛ
             end
             q̃ₛ .= smooth_x[      1:nq]
+            qₛ .= smooth_x[      1:nq]
+            λₛ .= smooth_x[   nq+1:nq+nλ]
+            μₛ .= smooth_x[nq+nλ+1:nq+nλ+nμ]
+            pₛ .= Momentum_k(qₛ₋₁,pₛ₋₁,qₛ,λₛ,μₛ,M,A,B,dt)
+            q̇ₛ .= invM*pₛ
         else # u!=0
             nΛ = 3nu
             nonsmooth_nx = nq + nq + nλ + nμ + nΛ + nΛ
@@ -1114,23 +1151,23 @@ function ipsolve(nq,nλ,nμ,q0,q̇0,dyfuncs,tspan;dt=0.01,ftol=1e-14,xtol=ftol,v
                 gₙ = g[active_indices]
                 # @show iteration,Dₛ,ηs,es,gₙ
                 μ,Δxc = ip_ns_stepk!(nonsmooth_R,nonsmooth_J,
-                            nonsmooth_x,q̇ₛ,Dₛ,ηs,es,H,μ)
+                            nonsmooth_x,Dₛ,ηs,es,H,μ)
                 res = norm(Δxc)
-                @show iteration, res
+                @show timestep, iteration, res
                 iteration_break = iteration
                 if  res < ftol
                     isconverged = true
                     break
                 end
-                qₛ .= nonsmooth_x[         nq+1:nq+nq]
-                λₛ .= nonsmooth_x[      nq+nq+1:nq+nq+nλ]
-                μₛ .= nonsmooth_x[   nq+nq+nλ+1:nq+nq+nλ+nμ]
-                pₛ .= Momentum_k(qₛ₋₁,pₛ₋₁,qₛ,λₛ,μₛ,M,A,B,dt)
-                q̇ₛ .= invM*pₛ
             end
+            q̃ₛ .= nonsmooth_x[            1:nq]
+            qₛ .= nonsmooth_x[         nq+1:nq+nq]
+            λₛ .= nonsmooth_x[      nq+nq+1:nq+nq+nλ]
+            μₛ .= nonsmooth_x[   nq+nq+nλ+1:nq+nq+nλ+nμ]
+            pₛ .= Momentum_k(qₛ₋₁,pₛ₋₁,qₛ,λₛ,μₛ,M,A,B,dt)
+            q̇ₛ .= invM*pₛ
             # @show gₙ*9.81
             # @show 𝚲ₛ./dt
-            q̃ₛ .= nonsmooth_x[      1:nq]
         end
 
         if !isconverged
