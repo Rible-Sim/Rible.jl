@@ -168,8 +168,8 @@ end
 
 function actuate!(ctrller::ManualGangedActuators,tg,u;inc=false)
     @unpack strings = tg
-    @unpack acts, traj = ctrller
-    @unpack id_strings, original_values = acts
+    @unpack regs, traj = ctrller
+    @unpack id_strings, original_values = regs
     @unpack us = traj
     s1 = select_by_id(strings,id_strings[1])
     s2 = select_by_id(strings,id_strings[2])

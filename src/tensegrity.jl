@@ -577,6 +577,7 @@ get_strings_len(bot::TensegrityRobot) = get_strings_len(bot.tg)
 get_strings_deform(bot::TensegrityRobot) = get_strings_deform(bot.tg)
 get_strings_restlen(bot::TensegrityRobot) = get_strings_restlen(bot.tg)
 get_strings_len_dot(bot::TensegrityRobot) = get_strings_len_dot(bot.tg)
+get_strings_tension(bot::TensegrityRobot) = get_strings_tension(bot.tg)
 
 function get_strings_len!(tg::TensegrityStructure,q)
     distribute_q_to_rbs!(tg,q,zero(q))
@@ -598,6 +599,10 @@ end
 
 function get_strings_restlen(tg::TensegrityStructure)
     [s.state.restlen for s in tg.strings]
+end
+
+function get_strings_tension(tg::TensegrityStructure)
+    [s.state.tension for s in tg.strings]
 end
 
 function get_original_restlen(tr_input::TensegrityRobot)
