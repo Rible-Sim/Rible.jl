@@ -437,6 +437,14 @@ function build_A(tgstruct)
     end
 end
 
+function build_F(tg,rbid,pid,f)
+    rbs = tg.rigidbodies
+    Ti = build_Ti(tg,rbid)
+    C = rbs[rbid].state.cache.Cp[pid]
+    F = transpose(C*Ti)*f
+    reshape(F,:,1)
+end
+
 function get_q(tg)
     rbs = tg.rigidbodies
     @unpack body2q = tg.connectivity
@@ -578,11 +586,16 @@ get_strings_deform(bot::TensegrityRobot) = get_strings_deform(bot.tg)
 get_strings_restlen(bot::TensegrityRobot) = get_strings_restlen(bot.tg)
 get_strings_len_dot(bot::TensegrityRobot) = get_strings_len_dot(bot.tg)
 get_strings_tension(bot::TensegrityRobot) = get_strings_tension(bot.tg)
+get_strings_stiffness(bot::TensegrityRobot) = get_strings_stiffness(bot.tg)
 
 function get_strings_len!(tg::TensegrityStructure,q)
     distribute_q_to_rbs!(tg,q,zero(q))
     update_strings_apply_forces!(tg)
     get_strings_len(tg)
+end
+
+function get_string_stiffness(tg::TensegrityStructure)
+    [s.k for s in tg.strings]
 end
 
 function get_strings_len(tg::TensegrityStructure)
@@ -603,6 +616,10 @@ end
 
 function get_strings_tension(tg::TensegrityStructure)
     [s.state.tension for s in tg.strings]
+end
+
+function get_strings_stiffness(tg::TensegrityStructure)
+    [s.k for s in tg.strings]
 end
 
 function get_original_restlen(tr_input::TensegrityRobot)
@@ -661,6 +678,26 @@ function filter_body2q(body2q,rbs)
     filtered_body2q
 end
 
+function build_Y(bot)
+	@unpack tg, hub = bot
+	@unpack actuators = hub
+    @unpack nstrings,strings = tg
+    nact = length(actuators)
+    ret = spzeros(Int,nstrings,nact)
+    for (i,iact) in enumerate(actuators)
+		if typeof(iact)<:ManualActuator
+			is1 = iact.reg.id_string
+	        ret[is1,i] = 1
+		elseif typeof(iact)<:ManualActuators
+	        is1, is2 = iact.regs.id_strings
+	        ret[is1,i] = 1
+	        ret[is2,i] = -1
+		else
+			error("Unknown actuator type")
+		end
+    end
+    ret
+end
 
 function new_trajectory(tg::TensegrityStructure)
     t0 = zero(get_numbertype(tg))
