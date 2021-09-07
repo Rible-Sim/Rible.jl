@@ -87,6 +87,39 @@ function TensegrityStructure(rbs::Vector{rbT},tensiles::TT,cnt::Connectivity) wh
     tg
 end
 
+
+function TensegrityStructure_Cluster(rbs::Vector{rbT},tensiles::TT,cnt::Cluster_Connectivity) where {TT,rbT<:AbstractRigidBody{N,T}} where {N,T}
+    ndim = N
+    nbodies = length(rbs)
+    mvbodyindex = [i for i in eachindex(rbs) if rbs[i].prop.movable]
+    nmvbodies = length(mvbodyindex)
+    fixbodyindex = [i for i in eachindex(rbs) if !rbs[i].prop.movable]
+    nfixbodies = length(fixbodyindex)
+    nstrings = sum(map(length,tensiles))
+    npoints = 0
+    for (rbid,rb) in enumerate(rbs)
+        npoints += rb.prop.naps
+    end
+    nmvpoints = 0
+    for rbid in mvbodyindex
+        nmvpoints += rbs[rbid].prop.naps
+    end
+    ncoords = maximum(maximum.(cnt.body2q))
+    nconstraint = get_nconstraint(rbs,mvbodyindex,nmvbodies,nfixbodies)
+    ndof = ncoords - nconstraint
+    strings = tensiles.strings
+    tg = TensegrityStructure(ndim,
+                    ncoords,nconstraint,ndof,
+                    nbodies,
+                    nmvbodies,mvbodyindex,
+                    nfixbodies,fixbodyindex,
+                    nstrings,
+                    npoints,nmvpoints,
+                    rbs,strings,tensiles,cnt)
+    jac_singularity_check(tg)
+    tg
+end
+
 function lengthdir(v)
     l = norm(v)
     τ = v/l
