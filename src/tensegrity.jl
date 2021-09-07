@@ -25,8 +25,16 @@ struct Connectivity{bType,sType,cType}
     contacts::cType
 end
 
+struct Cluster_Connectivity{bType,sType,cType}
+    body2q::bType
+    string2ap::sType
+    clusterstring2ap::Vector{sType}
+    contacts::cType
+end
+
 Connectivity(b) = Connectivity(b,nothing,nothing)
 Connectivity(b,s) = Connectivity(b,s,nothing)
+Cluster_Connectivity(b,c,s) = Cluster_Connectivity(b, c, s, nothing)
 
 struct TensegrityStructure{BodyType,ST,TT,ConnectType}
     ndim::Int
