@@ -206,44 +206,11 @@ end
 
 function update_clusterstrings_apply_forces!(tgstruct, s)
     rbs = tgstruct.rigidbodies
-    ss = tgstruct.strings
     clusters = tgstruct.tensiles.clusterstrings
     cnt = tgstruct.connectivity
-    for sstring in ss
-        @unpack id,k,c = sstring
-        sstate = sstring.state
-        a,b = cnt.string2ap[id]
-        state1 = rbs[a.rbid].state
-        p1 = state1.rps[a.apid]
-        ṗ1 = state1.ṙps[a.apid]
-        f1 = state1.Faps[a.apid]
-        state2 = rbs[b.rbid].state
-        p2 = state2.rps[b.apid]
-        ṗ2 = state2.ṙps[b.apid]
-        f2 = state2.Faps[b.apid]
-        Δr = p2 - p1
-        Δṙ = ṗ2 - ṗ1
-        l,τ = lengthdir(p2-p1)
-        sstate.length = l
-        sstate.direction = τ
-        sstate.lengthdot = (transpose(Δr)*Δṙ)/l
-        Δl = sstate.length - sstate.restlen
-        f = k*Δl + c*sstate.lengthdot
-        if Δl < 0
-            sstate.tension = 0.0
-        elseif f < 0
-            sstate.tension = 0.0
-        else
-            sstate.tension = f
-        end
-        𝐟 = τ*sstate.tension
-        f1 .+=  𝐟
-        f2 .+= -𝐟
-    end
     
     for i in clusters    
         for cs in i.section
-            EA = .24
             @unpack ID = cs
             csstate = cs.state
             a,b = cnt.clusterstring2ap[i.ID][ID]
@@ -263,6 +230,8 @@ function update_clusterstrings_apply_forces!(tgstruct, s)
             csstate.lengthdot = (transpose(Δr)*Δṙ)/l
             Δl = csstate.length - csstate.restlen          
 
+            k = 10
+            EA = k * csstate.restlen
             if ID == 1
                 f = EA*(Δl - s[ID])/(csstate.restlen + s[ID])
             elseif ID == i.section[end].ID
@@ -278,7 +247,6 @@ function update_clusterstrings_apply_forces!(tgstruct, s)
             else
                 csstate.tension = f
             end
-
             𝐟 = τ*csstate.tension
             f1 .+=  𝐟
             f2 .+= -𝐟
