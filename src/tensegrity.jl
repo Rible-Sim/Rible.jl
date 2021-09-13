@@ -210,8 +210,8 @@ function update_clusterstrings_apply_forces!(tgstruct, s)
     cnt = tgstruct.connectivity
     
     for i in clusters    
-        for cs in i.section
-            @unpack ID = cs
+        for (ID, cs) in enumerate(i.section)
+            #@unpack ID = cs
             csstate = cs.state
             a,b = cnt.clusterstring2ap[i.ID][ID]
             state1 = rbs[a.rbid].state
@@ -241,10 +241,13 @@ function update_clusterstrings_apply_forces!(tgstruct, s)
             end
 
             if Δl < 0
+                #@show 1
                 csstate.tension = 0.0
             elseif f < 0
+                #@show 2
                 csstate.tension = 0.0
             else
+                #@show f
                 csstate.tension = f
             end
             𝐟 = τ*csstate.tension
