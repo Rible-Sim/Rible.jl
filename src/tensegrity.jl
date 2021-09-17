@@ -231,7 +231,8 @@ function update_clusterstrings_apply_forces!(tgstruct, s)
             Δl = csstate.length - csstate.restlen          
 
             k = 10
-            EA = k * csstate.restlen
+            #EA = k * csstate.restlen
+            EA = 10 * 0.024
             if ID == 1
                 f = EA*(Δl - s[ID])/(csstate.restlen + s[ID])
             elseif ID == i.section[end].ID
