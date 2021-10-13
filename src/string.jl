@@ -21,6 +21,14 @@ function SStringState(restlen,direction)
     SStringState(restlen,restlen,zero(restlen),zero(restlen),direction)
 end
 
+function SHStringState(restlen, direction)
+    SStringState(restlen,restlen,zero(restlen),1000*one(restlen),direction)
+end
+
+function SRStringState(restlen, direction)
+    SStringState(restlen,restlen,zero(restlen),1628.58*one(restlen),direction)
+end
+
 mutable struct SMAStringState{N,T}
     temp::T
     restlen::T
@@ -38,6 +46,7 @@ struct SString{N,T}
     id::Int
     k::T
     c::T
+    prestress::T
     state::SStringState{N,T}
 end
 
@@ -52,6 +61,29 @@ function SString3D(id,origin_restlen::T,k::T,c=zero(k)) where T
     state = SStringState(origin_restlen,direction)
     SString(id,k,c,state)
 end
+
+function SHString3D(id,origin_restlen::T,k::T,c=zero(k)) where T
+    direction = MVector{3}(one(T),zero(T),zero(T))
+    state = SHStringState(origin_restlen,direction)
+    SString(id,k,c,state)
+end
+
+function SRString3D(id,origin_restlen::T,k::T,c=zero(k)) where T
+    direction = MVector{3}(one(T),zero(T),zero(T))
+    state = SRStringState(origin_restlen,direction)
+    SString(id,k,c,state)
+end
+
+function SHRString3D(id,i,origin_restlen::T,k::T,prestress::T,c::T) where T
+    direction = MVector{3}(one(T),zero(T),zero(T))
+    if i%8 <= 4
+        state = SHStringState(origin_restlen,direction)
+    else
+        state = SRStringState(origin_restlen,direction)
+    end
+    SString(id,k,c,prestress,state)
+end
+
 
 struct SMAString{N,T,F}
     id::Int
