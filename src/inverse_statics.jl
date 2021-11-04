@@ -410,10 +410,10 @@ end
 
 
 
-function actuation_check(tr,Y,a)
-    @unpack tg = tr
+function actuation_check(bot,Y,a)
+    @unpack tg = bot
     Δu = Y*a
-    original_restlens = get_original_restlen(tr)
+    original_restlens = get_original_restlen(bot)
     restlens = original_restlens + Δu
     if any((x)->x<0,restlens)
         @warn "Negative rest lengths"
@@ -493,11 +493,11 @@ function get_inverse_func(tgstruct_input,refstruct,Y;gravity=false,recheck=true,
         x = xp + nb*ξ
         λ = x[1:actstruct.nconstraint].*c
         a = x[actstruct.nconstraint+1:end]
-        actuation_check(actstruct,Y,a)
-        refq,_ = get_q(refstruct)
-        actuate!(actstruct,a)
-        check_static_equilibrium(actstruct,refq,λ;gravity)
-        u0 = [s.original_restlen for s in actstruct.strings]
+        # actuation_check(actstruct,Y,a)
+        # refq,_ = get_q(refstruct)
+        # actuate!(actstruct,a)
+        # check_static_equilibrium(actstruct,refq,λ;gravity)
+        u0 = get_strings_restlen(tgstruct_input)
         rl = u0 + Y*a
         λ,rl,a
     end

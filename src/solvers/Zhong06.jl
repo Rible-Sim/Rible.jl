@@ -113,7 +113,7 @@ function solve!(intor::Integrator,cache::Zhong06Cache;
             if exception
                 error("Not Converged!")
             else
-                intor.convergence = false
+                # intor.convergence = false
                 break
             end
         end

@@ -2,6 +2,7 @@ abstract type AbstractRigidBody{N,T,C} end
 abstract type AbstractRigidBodyProperty{N,T} end
 abstract type AbstractRigidBodyState{N,T,C} end
 abstract type AbstractTensegrityStructure{N,T} end
+abstract type ExternalConstraints{T} end
 
 struct RigidBodyProperty{N,T,L} <: AbstractRigidBodyProperty{N,T}
     movable::Bool
@@ -63,6 +64,122 @@ struct NaturalCoordinatesCache{ArrayT,MT,fT,cfT}
     cfuncs::cfT
 end
 
+
+struct EmptyConstraint{T} <: ExternalConstraints{T}
+	nconstraints::Int64
+    indices::Vector{Int64}
+	values::T
+end
+
+struct FixedBodyConstraint{T} <: ExternalConstraints{T}
+	nconstraints::Int64
+    indices::Vector{Int64}
+	values::T
+end
+
+struct PinJointConstraint{T,pT,CT} <: ExternalConstraints{T}
+	nconstraints::Int64
+    indices::Vector{Int64}
+	values::T
+	njointed::Int64
+	ndim::Int64
+	pindex_jointed::pT
+	Cs::CT
+end
+
+get_numbertype(cst::ExternalConstraints{T}) where T = T
+
+function EmptyConstraint(values=Vector{Float64}())
+	EmptyConstraint(0,Vector{Int64}(),values)
+end
+
+function make_Φ(::EmptyConstraint)
+	inner_Φ(q) = Vector{eltype(q)}()
+end
+
+function make_A(::EmptyConstraint)
+	inner_A(q) = Array{eltype(q)}(undef,0,length(q))
+end
+
+function FixedBodyConstraint(rbs,body2q,rbid)
+	rb = rbs[rbid]
+	lncs = rb.state.cache.funcs.lncs
+	q_rb = rb.state.coords.q
+	constrained_index = find_full_constrained_index(lncs,q_rb)
+	indices = body2q[rbid][constrained_index]
+	values = q_rb[constrained_index]
+	FixedBodyConstraint(length(indices),indices,values)
+end
+
+function make_Φ(cst::FixedBodyConstraint)
+	@unpack indices, values = cst
+	@inline @inbounds inner_Φ(q)   = q[indices]-values
+	@inline @inbounds inner_Φ(q,d) = q[indices]-d
+	inner_Φ
+end
+
+function make_A(cst::FixedBodyConstraint)
+	nΦ = cst.nconstraints
+	indices = cst.indices
+	@inline @inbounds function inner_A(q)
+		nq = length(q)
+		ret = zeros(eltype(q),nΦ,nq)
+		for (iΦ,i) in enumerate(indices)
+			ret[iΦ,i] = 1
+		end
+		ret
+	end
+end
+
+function PinJointConstraint(rbs,body2q,rbids,pids)
+    njointed = length(rbids)
+    ndim = get_ndim(rbs)
+    nΦ = (njointed-1)*ndim
+    indices = reduce(vcat,body2q[rbids])
+	values = zeros(get_numbertype(rbs),nΦ)
+	pindex_jointed = body2q[rbids]
+	Cs = [rbs[i].state.cache.Cp[j] for (i,j) in zip(rbids,pids)]
+	PinJointConstraint(nΦ,indices,values,njointed,ndim,pindex_jointed,Cs)
+end
+
+function make_Φ(cst::PinJointConstraint)
+	nΦ = cst.nconstraints
+	@unpack values,njointed,ndim,pindex_jointed,Cs = cst
+	function _inner_Φ(q,d)
+		ret = zeros(eltype(q),nΦ)
+		q1 = @view q[pindex_jointed[1]]
+		for i = 2:njointed
+			qi = @view q[pindex_jointed[i]]
+			ret[ndim*(i-2)+1:ndim*(i-1)] = Cs[1]*q1-Cs[i]*qi-d[ndim*(i-2)+1:ndim*(i-1)]
+		end
+		ret
+	end
+	inner_Φ(q)   = _inner_Φ(q,values)
+	inner_Φ(q,d) = _inner_Φ(q,d)
+	inner_Φ
+end
+
+function make_A(cst::PinJointConstraint)
+	nΦ = cst.nconstraints
+	@unpack njointed,ndim,pindex_jointed,Cs = cst
+	function inner_A(q)
+		nq = length(q)
+        ret = zeros(eltype(q),nΦ,nq)
+		q1 = @view q[pindex_jointed[1]]
+        for i = 2:njointed
+			qi = @view q[pindex_jointed[i]]
+            ret[ndim*(i-2)+1:ndim*(i-1),pindex_jointed[1]] =  Cs[1]
+            ret[ndim*(i-2)+1:ndim*(i-1),pindex_jointed[i]] = -Cs[i]
+        end
+        ret
+    end
+end
+
+# function empty_cst(values=Vector{Float64}())
+# 	inner_Φ(q) = Vector{eltype(q)}()
+# 	GenericConstraint(:empty,0,Vector{Int64}(),values,inner_Φ,inner_A)
+# end
+
 function get_index_Φ_q0(rb)
     q0 = rb.state.coords.q
     index = rb.state.cache.constrained_index
@@ -70,11 +187,73 @@ function get_index_Φ_q0(rb)
 end
 
 function make_index_Φ(index,q0)
-    nΦ = length(index)
     @inline @inbounds inner_Φ(q)   = q[index]-q0[index]
     @inline @inbounds inner_Φ(q,d) = q[index]-d
     inner_Φ
 end
+
+
+# function fixed_body_cst(rbs,body2q,rbid)
+# 	rb = rbs[rbid]
+# 	lncs = rb.state.cache.funcs.lncs
+# 	q_rb = rb.state.coords.q
+# 	constrained_index = find_full_constrained_index(lncs,q_rb)
+# 	indices = body2q[rbid][constrained_index]
+# 	values = q_rb[constrained_index]
+#     @inline @inbounds inner_Φ(q)   = q[indices]-values
+#     @inline @inbounds inner_Φ(q,d) = q[indices]-d
+#     nΦ = get_nbodydof(rb)
+#     @inline @inbounds function inner_A(q)
+#         nq = length(q)
+#         ret = zeros(eltype(q),nΦ,nq)
+#         for (iΦ,i) in enumerate(indices)
+#             ret[iΦ,i] = 1
+#         end
+#         ret
+#     end
+#     GenericConstraint(:fixed_body,nΦ,indices,values,inner_Φ,inner_A)
+# end
+
+# function pin_joint_cst(rbs,body2q,rbids,pids)
+#     jrbs = rbs[rbids]
+#     njrbs = length(jrbs)
+#     ndim = get_ndim(rbs)
+#     nbodycoords = get_nbodycoords(rbs)
+#     nΦ = (njrbs-1)*ndim
+#     indices = reduce(vcat,body2q[rbids])
+#     function _inner_Φ(q,d)
+#         ret = zeros(eltype(q),nΦ)
+# 		pindex1 = body2q[rbids[1]]
+# 		q1 = q[pindex1]
+#         C1 = jrbs[1].state.cache.Cp[pids[1]]
+#         for i = 2:njrbs
+# 			pindexi = body2q[rbids[i]]
+#             qi = q[pindexi]
+#             Ci = jrbs[i].state.cache.Cp[pids[i]]
+#             ret[ndim*(i-2)+1:ndim*(i-1)] = C1*q1-Ci*qi-d[ndim*(i-2)+1:ndim*(i-1)]
+#         end
+#         ret
+#     end
+# 	values = zeros(get_numbertype(rbs),nΦ)
+# 	inner_Φ(q)   = _inner_Φ(q,values)
+#     inner_Φ(q,d) = _inner_Φ(q,d)
+#     function inner_A(q)
+# 		nq = length(q)
+#         ret = zeros(eltype(q),nΦ,nq)
+# 		pindex1 = body2q[rbids[1]]
+# 		q1 = q[pindex1]
+#         C1 = jrbs[1].state.cache.Cp[pids[1]]
+#         for i = 2:njrbs
+# 			pindexi = body2q[rbids[i]]
+#             qi = q[pindexi]
+#             Ci = jrbs[i].state.cache.Cp[pids[i]]
+#             ret[           1:ndim      ,pindex1] = C1
+#             ret[ndim*(i-2)+1:ndim*(i-1),pindexi] = Ci
+#         end
+#         ret
+#     end
+#     GenericConstraint(:pin_joint,nΦ,indices,values,inner_Φ,inner_A)
+# end
 
 function make_index_A(index,nq)
     nΦ = length(index)

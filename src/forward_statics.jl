@@ -1,5 +1,6 @@
 abstract type ForwardMode end
 struct PrimalMode <: ForwardMode end
+struct StiffMode <: ForwardMode end
 struct DeformMode <: ForwardMode end
 struct AllMode <: ForwardMode end
 
@@ -39,14 +40,14 @@ function check_and_retrieve(result,lens::AbstractVector{<:Int})
     nstep = steps(path_result1)
     sol = real(solution(path_result1))
     q,s,λ = split_by_lengths(sol,lens)
-    (q=q,s=s,λ=λ)
+    (q=q,s=s,λ=λ,nstep=nstep)
 end
 
 function check_and_retrieve(result,Psys::HomotopyContinuation.System)
     check_and_retrieve(result,length.(Psys.variable_groups))
 end
 
-function forward_system(tg,F,mode=PrimalMode())
+function forward_system(tg,mode=PrimalMode();F=reshape(build_G!(tg),:,1))
     @var q[1:tg.ncoords]
     @var s[1:tg.nstrings]
     @var λ[1:tg.nconstraint]
@@ -75,6 +76,11 @@ function forward_system(tg,F,mode=PrimalMode())
             S(polyq,polys);
             Φ(polyq)]
         Psys = System(P; variable_groups=vg, parameters = [u;g])
+    elseif typeof(mode)<:StiffMode
+        P = [transpose(A(polyq))*polyλ - Q̃*U(polys,polyu,polyk)*polyq - F*g;
+            S(polyq,polys);
+            Φ(polyq)]
+        Psys = System(P; variable_groups=vg, parameters = [k;u;g])
     elseif typeof(mode)<:DeformMode
         P = [transpose(A(polyq))*polyλ - Q̃*U(polys,polyu)*polyq - F*g;
             S(polyq,polys);
@@ -84,7 +90,7 @@ function forward_system(tg,F,mode=PrimalMode())
         P = [transpose(A(polyq))*polyλ - Q̃*U(polys,polyu,polyk)*polyq - F*g;
             S(polyq,polys);
             Φ(polyq,polyd)]
-        Psys = System(P; variable_groups=vg, parameters = [d;u;k;g])
+        Psys = System(P; variable_groups=vg, parameters = [d;k;u;g])
     else
         error("Invalid mode")
     end
@@ -92,6 +98,7 @@ function forward_system(tg,F,mode=PrimalMode())
     vars = (q=q,s=s,λ=λ,d=d,u=u,k=k,g=g)
     Psys,vars
 end
+
 function forward_once(Psys::HomotopyContinuation.System,
                         startsols,start_parameters,target_parameters)
 
@@ -103,7 +110,7 @@ end
 function forward_once(tg::TensegrityStructure,startsols_input,
                         start_parameters_input,
                         target_parameters_input,
-                        F = reshape(build_G!(tg),:,1),mode=PrimalMode())
+                        mode=PrimalMode();F=reshape(build_G!(tg),:,1))
 
     # @show maximum(abs.(to_number.(subs(P, q=>q0, s=>s0, λ=>λ0, u=>u0, g=>g0))))
     # reset_forces!(tg)
@@ -112,7 +119,7 @@ function forward_once(tg::TensegrityStructure,startsols_input,
     # u1 = u0
     # g0 = 1.0
     # g1 = 0.0
-    Psys,_ = forward_system(tg,F,mode)
+    Psys,_ = forward_system(tg,mode;F)
     q0,s0,λ0 = startsols_input
     startsols = [[q0; s0; λ0]]
     start_parameters = reduce(vcat,start_parameters_input)
@@ -124,7 +131,7 @@ end
 function forward_sequence(Psys::HomotopyContinuation.System,
                         startsols_input,
                         start_parameters_input,
-                        target_parameters_input;n=100)
+                        target_parameters_input;n=10)
 
     start_parameters = reduce(vcat,start_parameters_input)
     target_parameters = reduce(vcat,target_parameters_input)
@@ -132,7 +139,7 @@ function forward_sequence(Psys::HomotopyContinuation.System,
 
     q0,s0,λ0 = startsols_input
     plens = [length(p) for p in start_parameters_input]
-    start_point = merge((q=q0,s=s0,λ=λ0),start_parameters_input)
+    start_point = merge((q=q0,s=s0,λ=λ0,nstep=0),start_parameters_input)
     # solseq = initialize_sequence(start_point)
     solseq = StructArray([start_point])
 
@@ -148,11 +155,17 @@ function forward_sequence(Psys::HomotopyContinuation.System,
     solseq
 end
 
-function forward_multi_sequence(tg,startsols_input,
-                        parameter_points,
-                        F = reshape(build_G!(tg),:,1),mode=PrimalMode();n=100)
+function forward_sequence(tg::TensegrityStructure,startsols,
+                        start_parameters,
+                        target_parameters,
+                        mode=PrimalMode();F=reshape(build_G!(tg),:,1))
+    Psys,_ = forward_system(tg,mode;F)
+    forward_sequence(Psys,startsols,start_parameters,target_parameters)
+end
 
-    Psys,_ = forward_system(tg,F,mode)
+function forward_multi_sequence(Psys,startsols_input,
+                        parameter_points,mode=PrimalMode();n=10)
+
     parameter_point1 = parameter_points[1]
     startsols_inputs = [startsols_input]
     [begin
@@ -165,4 +178,35 @@ function forward_multi_sequence(tg,startsols_input,
     end
     for (i,parameter_point) in enumerate(parameter_points[begin:end-1])
     ]
+end
+
+function get_start_sol(bot,Y)
+    @unpack tg = bot
+    q,_ = get_q(tg)
+    λ,u,_ = inverse(bot,deepcopy(bot),Y)
+    ℓ = get_strings_len(bot)
+    s = inv.(ℓ)
+    (q=q,s=s,λ=λ),u
+end
+
+function get_start_system(bot,Y,mode=PrimalMode())
+    @unpack tg = bot
+    start_sol,u = get_start_sol(bot,Y)
+    g = [zero(get_numbertype(bot))]
+    if typeof(mode)<:PrimalMode
+        start_parameters = (u=u,g=g)
+    elseif typeof(mode)<:StiffMode
+        k = get_strings_stiffness(tg)
+        start_parameters = (k=k,u=u,g=g)
+    elseif typeof(mode)<:DeformMode
+        d = get_d(tg)
+        start_parameters = (d=d,u=u,g=g)
+    elseif typeof(mode)<:AllMode
+        d = get_d(tg)
+        k = get_strings_stiffness(tg)
+        start_parameters = (d=d,k=k,u=u,g=g)
+    else
+        error("Invalid mode")
+    end
+    start_sol, start_parameters
 end

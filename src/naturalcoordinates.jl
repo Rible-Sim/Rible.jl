@@ -446,31 +446,65 @@ function make_Φ(lncs::LocalNaturalCoordinates2P)
     end
 end
 
-@inline @inbounds function get_deform(lncs::LocalNaturalCoordinates1P2V)
-    @unpack ū,v̄ = lncs
+@inline @inbounds function get_deform(ū,v̄)
     u_square = ū⋅ū
     v_square = v̄⋅v̄
     uv_dotprod = ū⋅v̄
     u_square,v_square,uv_dotprod
 end
 
+@inline @inbounds function get_deform(lncs::LocalNaturalCoordinates1P2V)
+    @unpack ū,v̄ = lncs
+    get_deform(ū,v̄)
+end
+
 @inline @inbounds function get_deform(lncs::LocalNaturalCoordinates2P1V)
     @unpack r̄i,r̄j,v̄ = lncs
     ū = r̄j-r̄i
-    u_square = ū⋅ū
-    v_square = v̄⋅v̄
-    uv_dotprod = ū⋅v̄
-    u_square,v_square,uv_dotprod
+    get_deform(ū,v̄)
 end
 
 @inline @inbounds function get_deform(lncs::LocalNaturalCoordinates3P)
     @unpack r̄i,r̄j,r̄k = lncs
     ū = r̄j-r̄i
     v̄ = r̄k-r̄i
+    get_deform(ū,v̄)
+end
+
+@inline @inbounds function get_deform(ū,v̄,w̄)
     u_square = ū⋅ū
     v_square = v̄⋅v̄
+    W_square = w̄⋅w̄
     uv_dotprod = ū⋅v̄
-    u_square,v_square,uv_dotprod
+    uw_dotprod = ū⋅w̄
+    vw_dotprod = v̄⋅w̄
+    u_square,v_square,W_square,uv_dotprod,uw_dotprod,vw_dotprod
+end
+
+@inline @inbounds function get_deform(lncs::LocalNaturalCoordinates1P3V)
+    @unpack ū,v̄,w̄ = lncs
+    get_deform(ū,v̄,w̄)
+end
+
+@inline @inbounds function get_deform(lncs::LocalNaturalCoordinates2P2V)
+    @unpack r̄i,r̄j,v̄,w̄ = lncs
+    ū = r̄j-r̄i
+    get_deform(ū,v̄,w̄)
+end
+
+@inline @inbounds function get_deform(lncs::LocalNaturalCoordinates3P1V)
+    @unpack r̄i,r̄j,r̄k,w̄ = lncs
+    ū = r̄j-r̄i
+    v̄ = r̄k-r̄i
+    get_deform(ū,v̄,w̄)
+end
+
+@inline @inbounds function get_deform(lncs::LocalNaturalCoordinates4P)
+    @unpack r̄i,r̄j,r̄k,r̄l = lncs
+    ū = r̄j-r̄i
+    v̄ = r̄k-r̄i
+    w̄ = r̄l-r̄i
+    get_deform(ū,v̄,w̄)
 end
 
 function make_Φ(lncs::LocalNaturalCoordinates2D6C)
@@ -478,156 +512,86 @@ function make_Φ(lncs::LocalNaturalCoordinates2D6C)
     make_Φ(lncs,deforms)
 end
 
+function make_Φ(lncs::LocalNaturalCoordinates3D12C)
+    deforms = get_deform(lncs)
+    make_Φ(lncs,deforms)
+end
+
 function make_inner_Φ(func,deforms)
     @inline @inbounds function ret_func(q)
-        u_square,v_square,uv_dotprod = deforms
-        func(q,u_square,v_square,uv_dotprod)
+        func(q,deforms)
     end
-    @inline @inbounds function ret_func(q,u)
-        u_square,v_square,uv_dotprod = u
-        func(q,u_square,v_square,uv_dotprod)
+    @inline @inbounds function ret_func(q,d)
+        func(q,d)
     end
     ret_func
 end
 
 function make_Φ(lncs::LocalNaturalCoordinates1P2V,deforms)
-    @inline @inbounds function _inner_Φ(q,u_square,v_square,uv_dotprod)
+    @inline @inbounds function _inner_Φ(q,d)
         u = @view q[3:4]
         v = @view q[5:6]
-        [u⋅u - u_square, v⋅v - v_square, u⋅v - uv_dotprod]
+        [u⋅u - d[1], v⋅v - d[2], u⋅v - d[3]]
     end
     make_inner_Φ(_inner_Φ,deforms)
 end
 
 function make_Φ(lncs::LocalNaturalCoordinates2P1V,deforms)
-    @inline @inbounds function _inner_Φ(q,u_square,v_square,uv_dotprod)
+    @inline @inbounds function _inner_Φ(q,d)
         ri = @view q[1:2]
         rj = @view q[3:4]
         u = rj-ri
         v = @view q[5:6]
-        [u⋅u - u_square, v⋅v - v_square, u⋅v - uv_dotprod]
+        [u⋅u - d[1], v⋅v - d[2], u⋅v - d[3]]
     end
     make_inner_Φ(_inner_Φ,deforms)
 end
 
-function make_Φ(lncs::LocalNaturalCoordinates3P,deforms)
-    @inline @inbounds function _inner_Φ(q,u_square,v_square,uv_dotprod)
-        ri = @view q[1:2]
-        rj = @view q[3:4]
-        rk = @view q[5:6]
-        u = rj-ri
-        v = rk-ri
-        [u⋅u - u_square, v⋅v - v_square, u⋅v - uv_dotprod]
+function make_Φ(lncs::LocalNaturalCoordinates1P3V,deforms)
+    @inline @inbounds function _inner_Φ(q,d)
+        u = @view q[4:6]
+        v = @view q[7:9]
+        w = @view q[10:12]
+        [u⋅u - d[1], v⋅v - d[2], w⋅w - d[3], u⋅v - d[4], u⋅w - d[5], v⋅w - d[6]]
     end
     make_inner_Φ(_inner_Φ,deforms)
 end
 
-function make_Φ(lncs::LocalNaturalCoordinates1P3V)
-    @unpack r̄i,ū,v̄,w̄ = lncs
-    u_square = ū⋅ū
-    v_square = v̄⋅v̄
-    w_square = w̄⋅w̄
-    uv_dotprod = ū⋅v̄
-    uw_dotprod = ū⋅w̄
-    vw_dotprod = v̄⋅w̄
-    @inline @inbounds function inner_Φ(q)
-        ri = @view q[1:3]
-        u  = @view q[4:6]
-        v  = @view q[7:9]
-        w  = @view q[10:12]
-        [
-        u⋅u - u_square,
-        v⋅v - v_square,
-        w⋅w - w_square,
-        u⋅v - uv_dotprod,
-        u⋅w - uw_dotprod,
-        v⋅w - vw_dotprod
-        ]
-    end
-end
-
-function make_Φ(lncs::LocalNaturalCoordinates2P2V)
-    @unpack r̄i,r̄j,v̄,w̄ = lncs
-    ū = r̄j-r̄i
-    u_square = ū⋅ū
-    v_square = v̄⋅v̄
-    w_square = w̄⋅w̄
-    uv_dotprod = ū⋅v̄
-    uw_dotprod = ū⋅w̄
-    vw_dotprod = v̄⋅w̄
-    @inline @inbounds function inner_Φ(q)
+function make_Φ(lncs::LocalNaturalCoordinates2P2V,deforms)
+    @inline @inbounds function _inner_Φ(q,d)
         ri = @view q[1:3]
         rj = @view q[4:6]
-        v  = @view q[7:9]
-        w  = @view q[10:12]
         u = rj-ri
-        [
-        u⋅u - u_square,
-        v⋅v - v_square,
-        w⋅w - w_square,
-        u⋅v - uv_dotprod,
-        u⋅w - uw_dotprod,
-        v⋅w - vw_dotprod
-        ]
+        v = @view q[7:9]
+        [u⋅u - d[1], v⋅v - d[2], w⋅w - d[3], u⋅v - d[4], u⋅w - d[5], v⋅w - d[6]]
     end
+    make_inner_Φ(_inner_Φ,deforms)
 end
 
-function make_Φ(lncs::LocalNaturalCoordinates3P1V)
-    @unpack r̄i,r̄j,r̄k,w̄ = lncs
-    ū = r̄j-r̄i
-    v̄ = r̄k-r̄i
-    u_square = ū⋅ū
-    v_square = v̄⋅v̄
-    w_square = w̄⋅w̄
-    uv_dotprod = ū⋅v̄
-    uw_dotprod = ū⋅w̄
-    vw_dotprod = v̄⋅w̄
-    @inline @inbounds function inner_Φ(q)
+function make_Φ(lncs::LocalNaturalCoordinates3P1V,deforms)
+    @inline @inbounds function _inner_Φ(q,d)
         ri = @view q[1:3]
         rj = @view q[4:6]
         rk = @view q[7:9]
-        w  = @view q[10:12]
         u = rj-ri
         v = rk-ri
-        [
-        u⋅u - u_square,
-        v⋅v - v_square,
-        w⋅w - w_square,
-        u⋅v - uv_dotprod,
-        u⋅w - uw_dotprod,
-        v⋅w - vw_dotprod
-        ]
+        [u⋅u - d[1], v⋅v - d[2], w⋅w - d[3], u⋅v - d[4], u⋅w - d[5], v⋅w - d[6]]
     end
+    make_inner_Φ(_inner_Φ,deforms)
 end
 
-function make_Φ(lncs::LocalNaturalCoordinates4P)
-    @unpack r̄i,r̄j,r̄k,r̄l = lncs
-    ū = r̄j-r̄i
-    v̄ = r̄k-r̄i
-    w̄ = r̄l-r̄i
-    u_square = ū⋅ū
-    v_square = v̄⋅v̄
-    w_square = w̄⋅w̄
-    uv_dotprod = ū⋅v̄
-    uw_dotprod = ū⋅w̄
-    vw_dotprod = v̄⋅w̄
-    @inline @inbounds function inner_Φ(q)
+function make_Φ(lncs::LocalNaturalCoordinates4P,deforms)
+    @inline @inbounds function _inner_Φ(q,d)
         ri = @view q[1:3]
         rj = @view q[4:6]
-        rk  = @view q[7:9]
-        rl  = @view q[10:12]
+        rk = @view q[7:9]
+        rl = @view q[10:12]
         u = rj-ri
         v = rk-ri
         w = rl-ri
-        [
-        u⋅u - u_square,
-        v⋅v - v_square,
-        w⋅w - w_square,
-        u⋅v - uv_dotprod,
-        u⋅w - uw_dotprod,
-        v⋅w - vw_dotprod
-        ]
+        [u⋅u - d[1], v⋅v - d[2], w⋅w - d[3], u⋅v - d[4], u⋅w - d[5], v⋅w - d[6]]
     end
+    make_inner_Φ(_inner_Φ,deforms)
 end
 
 function make_Φq(lncs::LocalNaturalCoordinates1P1V)
