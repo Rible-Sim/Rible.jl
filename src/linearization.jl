@@ -102,12 +102,12 @@ function build_K(tgstruct)
     K = -Q̃*∂L∂q
 end
 
-function linearize!(tgstruct,q,λ)
-    M = build_massmatrix(tgstruct)
-    A = build_A(tgstruct)
-    Q̃ = build_Q̃(tgstruct)
-    ∂L∂q,∂L∂q̇ = build_tangent!(tgstruct,q,zero(q))
-    @unpack ncoords,nconstraint = tgstruct
+function linearize(tg,q,λ)
+    M = build_massmatrix(tg)
+    A = build_A(tg)
+    Q̃ = build_Q̃(tg)
+    ∂L∂q,∂L∂q̇ = build_tangent(tg,q,zero(q))
+    @unpack ncoords,nconstraint = tg
     nz = ncoords + nconstraint
     M̂ = zeros(eltype(q),nz,nz)
     Ĉ  = zeros(eltype(q),nz,nz)
@@ -116,7 +116,7 @@ function linearize!(tgstruct,q,λ)
     Ĉ[1:ncoords,1:ncoords] .= -Q̃*∂L∂q̇
 
     # fjac = test_fvector(tgstruct,q)
-    K̂[1:ncoords,1:ncoords] .= -Q̃*∂L∂q .+ ∂Aᵀλ∂q(tgstruct,λ)
+    K̂[1:ncoords,1:ncoords] .= -Q̃*∂L∂q .+ ∂Aᵀλ∂q(tg,λ)
     Aq = A(q)
     c = maximum(abs.(K̂[1:ncoords,1:ncoords]))
     K̂[1:ncoords,ncoords+1:nz] .= c.*transpose(Aq)
@@ -167,20 +167,22 @@ function normalize_wrt_mass!(Z,M)
     end
     Z
 end
-function undamped_eigen!(tgstruct,q0,λ0)
-    @assert check_static_equilibrium(tgstruct,q0,λ0;gravity=false)
-    M̂,Ĉ,K̂ = linearize!(tgstruct,q0,λ0)
+function undamped_eigen(tg,q0,λ0)
+    if !check_static_equilibrium(tg,q0,λ0;gravity=false)
+        @warn "Statics check failed, but proceed anyway."
+    end
+    M̂,Ĉ,K̂ = linearize(tg,q0,λ0)
     α = 10
     M̄,K̄ = frequencyshift(M̂,K̂,α)
     # @show size(K̄),rank(K̄),cond(K̄),rank(M̄)
     d,aug_Z = eigen(K̄,M̄)
     aug_ω2 = d .- α
-    @unpack ncoords, ndof = tgstruct
+    @unpack ncoords, ndof = tg
     # @show aug_ω2
     ω2,Z = find_finite(aug_ω2,aug_Z,ndof)
     ω = sqrt.(ω2)
     Zq = Z[1:ncoords,:]
-    M = build_massmatrix(tgstruct)
+    M = build_massmatrix(tg)
     normalize_wrt_mass!(Zq,M)
     ω, Zq#, Z
 end

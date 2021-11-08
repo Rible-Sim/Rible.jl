@@ -242,8 +242,8 @@ function heat!(s::SMAString,heating_law)
     s.law.F0, s.law.k = heating_law(s.state.temp)
 end
 
-function set_restlen!(tgstruct,u)
-    for (i,s) in enumerate(tgstruct.strings)
+function set_restlen!(tg,u)
+    for (i,s) in enumerate(tg.strings)
         s.state.restlen = u[i]
     end
 end

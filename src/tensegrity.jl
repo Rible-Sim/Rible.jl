@@ -557,19 +557,19 @@ function get_d(tg)
     d
 end
 
-get_ndim(tr::TensegrityRobot) = get_ndim(tr.tg)
+get_ndim(bot::TensegrityRobot) = get_ndim(bot.tg)
 get_ndim(tg::TensegrityStructure) = get_ndim(tg.rigidbodies)
 get_ndim(rbs::AbstractVector{<:AbstractRigidBody}) = get_ndim(eltype(rbs))
 get_ndim(rb::AbstractRigidBody) = get_ndim(typeof(rb))
 get_ndim(::Type{<:AbstractRigidBody{N,T,C}}) where {N,T,C} = N
 
-get_numbertype(tr::TensegrityRobot) = get_numbertype(tr.tg)
+get_numbertype(bot::TensegrityRobot) = get_numbertype(bot.tg)
 get_numbertype(tg::TensegrityStructure) = get_numbertype(tg.rigidbodies)
 get_numbertype(rbs::AbstractVector{<:AbstractRigidBody}) = get_numbertype(eltype(rbs))
 get_numbertype(rb::AbstractRigidBody) = get_numbertype(typeof(rb))
 get_numbertype(::Type{<:AbstractRigidBody{N,T,C}}) where {N,T,C} = T
 
-get_nbodyconstraint(tr::TensegrityRobot) = get_nbodyconstraint(tr.tg)
+get_nbodyconstraint(bot::TensegrityRobot) = get_nbodyconstraint(bot.tg)
 get_nbodyconstraint(tg::TensegrityStructure) = get_nbodyconstraint(tg.rigidbodies)
 get_nbodyconstraint(rbs::AbstractVector{<:AbstractRigidBody}) = get_nbodyconstraint(eltype(rbs))
 get_nbodyconstraint(rb::AbstractRigidBody) = get_nbodyconstraint(typeof(rb))
@@ -578,7 +578,7 @@ get_nbodyconstraint(::Type{<:RigidBody{N,T,L,C,
                 <:NaturalCoordinates.CoordinateFunctions{lncsType},
                 cfT}}}) where {N,T,L,C,ArrayT,MT,lncsType,cfT} = NaturalCoordinates.get_nconstraint(lncsType)
 
-get_nbodycoords(tr::TensegrityRobot) = get_nbodycoords(tr.tg)
+get_nbodycoords(bot::TensegrityRobot) = get_nbodycoords(bot.tg)
 get_nbodycoords(tg::TensegrityStructure) = get_nbodycoords(tg.rigidbodies)
 get_nbodycoords(rbs::AbstractVector{<:AbstractRigidBody}) = get_nbodycoords(eltype(rbs))
 get_nbodycoords(rb::AbstractRigidBody) = get_nbodycoords(typeof(rb))
@@ -587,14 +587,14 @@ get_nbodycoords(::Type{<:RigidBody{N,T,L,C,
                 <:NaturalCoordinates.CoordinateFunctions{lncsType},
                 cfT}}}) where {N,T,L,C,ArrayT,MT,lncsType,cfT} = NaturalCoordinates.get_ncoords(lncsType)
 
-get_nbodydof(tr::TensegrityRobot) = get_nbodydof(tr.tg)
+get_nbodydof(bot::TensegrityRobot) = get_nbodydof(bot.tg)
 get_nbodydof(tg::TensegrityStructure) = get_nbodydof(tg.rigidbodies)
 get_nbodydof(rbs::AbstractVector{<:AbstractRigidBody}) = get_nbodydof(eltype(rbs))
 get_nbodydof(rb::AbstractRigidBody) = get_nbodydof(typeof(rb))
 get_nbodydof(::Type{<:AbstractRigidBody{2,T,C}}) where {T,C} = 3
 get_nbodydof(::Type{<:AbstractRigidBody{3,T,C}}) where {T,C} = 6
 
-get_gravity(tr::TensegrityRobot) = get_gravity(tr.tg)
+get_gravity(bot::TensegrityRobot) = get_gravity(bot.tg)
 get_gravity(tg::TensegrityStructure) = get_gravity(tg.rigidbodies)
 get_gravity(rbs::AbstractVector{<:AbstractRigidBody}) = get_gravity(eltype(rbs))
 get_gravity(rb::AbstractRigidBody) = get_gravity(typeof(rb))
@@ -614,7 +614,7 @@ function get_strings_len!(tg::TensegrityStructure,q)
     get_strings_len(tg)
 end
 
-function get_string_stiffness(tg::TensegrityStructure)
+function get_strings_stiffness(tg::TensegrityStructure)
     [s.k for s in tg.strings]
 end
 
@@ -638,15 +638,11 @@ function get_strings_tension(tg::TensegrityStructure)
     [s.state.tension for s in tg.strings]
 end
 
-function get_strings_stiffness(tg::TensegrityStructure)
-    [s.k for s in tg.strings]
-end
-
-function get_original_restlen(tr_input::TensegrityRobot)
-    tr = deepcopy(tr_input)
-    T = get_numbertype(tr)
-    actuate!(tr,zeros(T,length(tr.hub.actuators)))
-    u0 = get_strings_restlen(tr.tg)
+function get_original_restlen(botinput::TensegrityRobot)
+    bot = deepcopy(botinput)
+    T = get_numbertype(bot)
+    actuate!(bot,zeros(T,length(bot.hub.actuators)))
+    u0 = get_strings_restlen(bot.tg)
 end
 
 function force_densities_to_restlen(tg::TensegrityStructure,γs)

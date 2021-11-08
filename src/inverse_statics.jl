@@ -1,7 +1,7 @@
-function build_Ti(tgstruct::TensegrityStructure,i::Int)
-    nbodycoords = get_nbodycoords(tgstruct)
-    body2q = tgstruct.connectivity.body2q
-    ncoords = tgstruct.ncoords
+function build_Ti(tg::TensegrityStructure,i::Integer)
+    nbodycoords = get_nbodycoords(tg)
+    body2q = tg.connectivity.body2q
+    ncoords = tg.ncoords
     build_Ti(nbodycoords,ncoords,body2q[i])
 end
 
@@ -13,13 +13,12 @@ function build_Ti(nbodycoords,nq,q_index)
     Ti
 end
 
-function build_T(tgstruct)
-    nbodycoords = get_nbodycoords(tgstruct)
-    body2q = tgstruct.connectivity.body2q
-    nmvbodies = tgstruct.nmvbodies
-    ncoords = tgstruct.ncoords
-    T = spzeros(Int,ncoords,nbodycoords*tgstruct.nmvbodies)
-    for (mvrbid,rbid) in enumerate(tgstruct.mvbodyindex)
+function build_T(tg)
+    nbodycoords = get_nbodycoords(tg)
+    @unpack nmvbodies, ncoords, connectivity = tg
+    body2q = connectivity.body2q
+    T = spzeros(Int,ncoords,nbodycoords*tg.nmvbodies)
+    for (mvrbid,rbid) in enumerate(tg.mvbodyindex)
         q_index = body2q[rbid]
         Ti = build_Ti(nbodycoords,ncoords,q_index)
         T[:,(mvrbid-1)*nbodycoords+1:mvrbid*nbodycoords] = transpose(Ti)
@@ -31,10 +30,9 @@ end
 # @code_warntype build_T(manipulator)
 
 function build_Ci(rb)
-    Ci = hcat([
-        transpose(Cpi)
-        for Cpi in rb.state.cache.Cp
-    ]...)
+    Ci = reduce(hcat,[
+        transpose(Cpi) for Cpi in rb.state.cache.Cp
+    ])
 end
 
 function build_C(tgstruct)
@@ -84,8 +82,8 @@ function build_D(tgstruct)
     D .= kron(D_raw,Matrix(1I,ndim,ndim))
 end
 
-function build_Q̃(tgstruct)
-    Q̃=build_T(tgstruct)*build_C(tgstruct)*build_D(tgstruct)
+function build_Q̃(tg)
+    Q̃=build_T(tg)*build_C(tg)*build_D(tg)
 end
 
 function fvector(tgstruct)
@@ -121,11 +119,9 @@ end
 # Array(Q̃)
 
 
-function build_L̂(tgstruct)
-    @unpack nstrings, ndim, strings = tgstruct
-    reset_forces!(tgstruct)
-    update_strings_apply_forces!(tgstruct)
-    T = get_numbertype(tgstruct)
+function build_L̂(tg)
+    @unpack nstrings, ndim, strings = tg
+    T = get_numbertype(tg)
     L̂ = spzeros(T, nstrings*ndim, nstrings)
     for (i,ss) in enumerate(strings)
         is = (i-1)*ndim
@@ -134,11 +130,9 @@ function build_L̂(tgstruct)
     L̂
 end
 
-function build_L(tgstruct)
-    @unpack nstrings, ndim, strings = tgstruct
-    reset_forces!(tgstruct)
-    update_strings_apply_forces!(tgstruct)
-    T = get_numbertype(tgstruct)
+function build_L(tg)
+    @unpack nstrings, ndim, strings = tg
+    T = get_numbertype(tg)
     L = spzeros(T, nstrings*ndim, nstrings)
     for (i,ss) in enumerate(strings)
         is = (i-1)*ndim
@@ -154,15 +148,9 @@ function build_Γ(tg)
     reduce(vcat,forces)
 end
 
-function build_ℓ(tgstruct)
-    reset_forces!(tgstruct)
-    update_strings_apply_forces!(tgstruct)
-    ℓ = [s.state.length for s in tgstruct.strings]
-end
-
-function build_K̂(tgstruct)
-     ks = [s.k for s in tgstruct.strings]
-     K̂ = build_L̂(tgstruct)*Diagonal(ks)
+function build_K̂(tg)
+     k = get_strings_stiffness(tg)
+     K̂ = build_L̂(tg)*Diagonal(k)
 end
 
 function build_W(tgstruct)
@@ -172,41 +160,28 @@ function build_W(tgstruct)
     W = transpose(Aq)*inv(Aq*transpose(Aq))*Aq
 end
 
-# function build_K(tgstruct)
-#     q,_ = get_q(tgstruct)
-#     A = build_A(tgstruct)
-#     Q̃ = build_Q̃(tgstruct)
-#     K̂ = build_K̂(tgstruct)
-#     # ℓ = build_ℓ(tgstruct)
-#     K = hcat(
-#         transpose(A(q)),
-#         Q̃*K̂
-#         )
+# function build_G(tginput;factor=1.0)
+#     tg = deepcopy(tginput)
+#     reset_forces!(tg)
+#     apply_gravity!(tg)
+#     G = assemble_forces(tg;factor=factor)
+#     @show G
+#     G
 # end
 
-function build_G!(tgstruct;factor=1.0)
-    reset_forces!(tgstruct)
-    apply_gravity!(tgstruct)
-    G = assemble_forces(tgstruct;factor=factor)
+function build_G(tg)
+    ret = zeros(get_numbertype(tg),tg.ncoords)
+    for (rbid,rb) in enumerate(tg.rigidbodies)
+        @unpack prop, state = rb
+        @unpack Cg = state.cache
+        Tiᵀ = transpose(build_Ti(tg,rbid))
+        Cgᵀ = transpose(Cg)
+        f = prop.mass*get_gravity(rb)
+        ret .+= Tiᵀ*Cgᵀ*f
+    end
+    ret
 end
 
-function build_Q̂(tgstruct)
-    q,_ = get_q(tgstruct)
-    A = build_A(tgstruct)
-    Q̃ = build_Q̃(tgstruct)
-    L̂ = build_L̂(tgstruct)
-    Q̂ = hcat(
-        transpose(A(q)),
-        -Q̃*L̂
-    )
-end
-function build_RHS(tgstruct)
-    Q̃ = build_Q̃(tgstruct)
-    K̂ = build_K̂(tgstruct)
-    ℓ = build_ℓ(tgstruct)
-    G = build_G!(tgstruct)
-    RHS = Q̃*K̂*ℓ + G
-end
 # Not ready
 function build_Ji(tgstruct,i)
     rbs = tgstruct.rigidbodies
@@ -274,49 +249,56 @@ function compensate_gravity_funcs(tgstruct)
     A,F!
 end
 
-function statics_equation_for_tension(tg_input,reftg;gravity=false,scale=true)
-    tg = deepcopy(tg_input)
-    refq0,_ = get_q(reftg)
-    reset_forces!(tg)
-    distribute_q_to_rbs!(tg,refq0)
-    update_strings_apply_forces!(tg)
-
-    L̂ = build_L̂(tg)
-    Q̃ = build_Q̃(tg)
-    A = build_A(tg)
-    Aq = A(refq0)
-
-    # Left hand side
-    Q̃L̂ = Q̃*L̂
-    if scale
-        c = maximum(abs.(Q̃L̂))
-    else
-        c = one(eltype(Q̃L̂))
+function check_inverse_sanity(B)
+    n1,n2 = size(B)
+    ret = false
+    if n1>n2
+        @warn "$n1(Eqns)>$n2(Unks). Inverse statics is generally unfeasible."
+    elseif n1==n2
+        rankB = rank(B)
+        if rankB<n2
+            @warn "$n1(Eqns)=$n2(Unks). But rank deficiency $(n2-rankB)."
+        else #rankB==n2
+            @info "$n1(Eqns)=$n2(Unks). Inverse statics is determinate."
+            ret = true
+        end
+    else # n1<n2
+        @info "$n1(Eqns)<$n2(Unks). Inverse statics is generally indeterminate by $(n2-n1)."
     end
-    B = hcat(c*transpose(Aq),-Q̃L̂)
-
-    # Right hand side
-    F̃ = zero(refq0)
-    if gravity
-        G = build_G!(tg)
-        F̃ .+= G
-    end
-
-    tg,B,F̃,c
+    ret
 end
 
-function statics_equation_for_density(tg_input,reftg;gravity=false,scale=true)
-    tg = deepcopy(tg_input)
-    refq0,_ = get_q(reftg)
+function build_inverse_statics_core(tginput,tgref::TensegrityStructure,Fˣ=nothing;gravity=false)
+    q,_ = get_q(tgref)
+    tg = deepcopy(tginput)
     reset_forces!(tg)
-    distribute_q_to_rbs!(tg,refq0)
+    distribute_q_to_rbs!(tg,q)
     update_strings_apply_forces!(tg)
+    if gravity
+        G = build_G(tg)
+    else
+        G = zero(q)
+    end
 
-    L = build_L(tg)
-    Q̃ = build_Q̃(tg)
+    if !(typeof(Fˣ)<:Nothing)
+        F = Fˣ + G
+    else
+        F = G
+    end
+
+    build_inverse_statics_core(tg,q,F)
+end
+
+function build_inverse_statics_core(tg,q::AbstractVector,F)
     A = build_A(tg)
-    Aq = A(refq0)
+    Aᵀ = transpose(A(q))
+    Q̃ = build_Q̃(tg)
+    tg,Aᵀ,Q̃,F
+end
 
+function build_inverse_statics_for_density(tginput,tgref,Fˣ=nothing;gravity=false,scale=true)
+    tg,Aᵀ,Q̃,F = build_inverse_statics_core(tginput,tgref,Fˣ;gravity)
+    L = build_L(tg)
     # Left hand side
     Q̃L = Q̃*L
     if scale
@@ -324,31 +306,40 @@ function statics_equation_for_density(tg_input,reftg;gravity=false,scale=true)
     else
         c = one(eltype(Q̃L))
     end
-    B = hcat(c*transpose(Aq),-Q̃L)
+    B = hcat(c*Aᵀ,-Q̃L)
 
     # Right hand side
-    F̃ = zero(refq0)
-    if gravity
-        G = build_G!(tg)
-        F̃ .+= G
-    end
+    F̃ = F
 
     tg,B,F̃,c
 end
 
-function statics_equation_for_restlength(tg_input,reftg;gravity=false,scale=true)
-    tg = deepcopy(tg_input)
-    refq0,_ = get_q(reftg)
-    reset_forces!(tg)
-    distribute_q_to_rbs!(tg,refq0)
-    update_strings_apply_forces!(tg)
+function build_inverse_statics_for_stiffness(tginput,tgref,Fˣ=nothing;gravity=false,scale=true)
+    tg,Aᵀ,Q̃,F = build_inverse_statics_core(tginput,tgref,Fˣ;gravity)
 
+    L̂ = build_L̂(tg)
+    ℓ = get_strings_len(tg)
+    u = get_strings_restlen(tg)
+
+    # Left hand side
+    Q̃L̄ = Q̃*L̂*Diagonal(ℓ-u)
+    if scale
+        c = maximum(abs.(Q̃L̄))
+    else
+        c = one(eltype(Q̃L̄))
+    end
+    B = hcat(c*Aᵀ,-Q̃L̄)
+
+    # Right hand side
+    F̃ = F
+
+    tg,B,F̃,c
+end
+
+function build_inverse_statics_for_restlength(tginput,tgref,Fˣ=nothing;gravity=false,scale=true)
+    tg,Aᵀ,Q̃,F = build_inverse_statics_core(tginput,tgref,Fˣ;gravity)
+    ℓ = get_strings_len(tg)
     K̂ = build_K̂(tg)
-    ℓ = build_ℓ(tg)
-    Q̃ = build_Q̃(tg)
-    A = build_A(tg)
-    Aq = A(refq0)
-
     # Left hand side
     Q̃K̂ = Q̃*K̂
     if scale
@@ -356,46 +347,37 @@ function statics_equation_for_restlength(tg_input,reftg;gravity=false,scale=true
     else
         c = one(eltype(Q̃K̂))
     end
-    B = hcat(c*transpose(Aq),Q̃K̂)
+    B = hcat(c*Aᵀ,Q̃K̂)
 
     # Right hand side
-    F̃ = zero(refq0)
-    F̃ .+= Q̃K̂*ℓ
-    if gravity
-        G = build_G!(tg)
-        F̃ .+= G
-    end
+    F̃ = Q̃K̂*ℓ + F
 
     tg,B,F̃,c
 end
 
-function statics_equation_for_stiffness(tg_input,reftg;gravity=false,scale=true)
-    tg = deepcopy(tg_input)
-    refq0,_ = get_q(reftg)
-    reset_forces!(tg)
-    distribute_q_to_rbs!(tg,refq0)
-    update_strings_apply_forces!(tg)
+function build_inverse_statics_for_actuation(botinput,botref::TensegrityRobot,
+                                        Fˣ=nothing;Y=build_Y(botinput),gravity=false,scale=true)
+    build_inverse_statics_for_actuation(botinput,botref.tg,Fˣ;Y,gravity,scale)
+end
 
-    L̄ = build_L̄(tg)
-    Q̃ = build_Q̃(tg)
-    A = build_A(tg)
-    Aq = A(refq0)
-
+function build_inverse_statics_for_actuation(botinput,tgref::TensegrityStructure,
+                                        Fˣ=nothing;Y=build_Y(botinput),gravity=false,scale=true)
+    tg,Aᵀ,Q̃,F = build_inverse_statics_core(botinput.tg,tgref,Fˣ;gravity)
+    ℓ = get_strings_len(tg)
+    K̂ = build_K̂(tg)
+    u0 = get_original_restlen(botinput)
     # Left hand side
-    Q̃L̄ = Q̃*L̄
+    Q̃K̂ = Q̃*K̂
+    Q̃K̂Y = Q̃K̂*Y
     if scale
-        c = maximum(abs.(Q̃L̄))
+        c = maximum(abs.(Q̃K̂Y))
     else
-        c = one(eltype(Q̃L̄))
+        c = one(eltype(Q̃K̂Y))
     end
-    B = hcat(c*transpose(Aq),-Q̃L̄)
+    B = hcat(c*Aᵀ,Q̃K̂Y)
 
     # Right hand side
-    F̃ = zero(refq0)
-    if gravity
-        G = build_G!(tg)
-        F̃ .+= G
-    end
+    F̃ = Q̃K̂*(ℓ-u0) + F
 
     tg,B,F̃,c
 end
@@ -408,79 +390,19 @@ function get_solution_set(B,F̃)
     return x,nb
 end
 
-
-
 function actuation_check(bot,Y,a)
     @unpack tg = bot
     Δu = Y*a
-    original_restlens = get_original_restlen(bot)
-    restlens = original_restlens + Δu
-    if any((x)->x<0,restlens)
+    u0 = get_original_restlen(bot)
+    u = u0 + Δu
+    if any((x)->x<0,u)
         @warn "Negative rest lengths"
     end
-    lengths = get_strings_len(tg)
-    if any((x)->x<=0,lengths-restlens)
+    ℓ = get_strings_len(tg)
+    if any((x)->x<=0,ℓ-u)
         @warn "Nonpositive tension"
     end
-end
-
-function statics_equation_for_actuation(tg,reftg,Y;gravity=false,scale=true)
-    acttg,B_old,F̃_old,c = statics_equation_for_restlength(tg,reftg;gravity,scale)
-    nλ = get_nconstraint(acttg)
-    nY1,nY2 = size(Y)
-    IY = zeros(eltype(c),nλ+nY1,nλ+nY2)
-    IY[1:nλ,1:nλ] .= Matrix(one(c)*I,nλ,nλ)
-    IY[nλ+1:nλ+nY1,nλ+1:nλ+nY2] = Y
-    B = B_old*IY
-    u0 = [s.state.restlen for s in acttg.strings]
-    F̃ = F̃_old - B_old*vcat(zeros(eltype(c),nλ),u0)
-    acttg,B,F̃,c
-end
-
-function inverse_for_actuation(tg,reftg,Y;gravity=false,recheck=true,scale=true)
-    # We only use the $q$ of the reference structure.
-    acttg,B,F̃,c = statics_equation_for_actuation(tg,reftg,Y;gravity,scale)
-    if rank(B) < minimum(size(B))
-        @warn "LHS is singular: rank(B)=$(rank(B)) < $(minimum(size(B)))"
-        @info "Using Moore-Penrose pseudoinverse"
-        y0 = pinv(B)*F̃
-    else
-        y0 = B\F̃
-    end
-    nλ = get_nconstraint(acttg)
-    _,na = size(Y)
-    λ = y0[1:nλ].*c
-    a = y0[nλ+1:nλ+na]
-    actuation_check(acttg,Y,a)
-    refq,_ = get_q(reftg)
-    actuate!(acttg,a)
-    check_static_equilibrium(acttg,refq,λ;gravity)
-    u0 = [s.state.restlen for s in tg.strings]
-    rl = u0 + Y*a
-    λ,rl,a
-end
-
-function inverse(tr,reftr,Y;gravity=false,recheck=true,scale=true)
-    # We only use the $q$ of the reference structure.
-    acttg,lhs,rhs,c = statics_equation_for_actuation(tr.tg,reftr.tg,Y;gravity,scale)
-    acttr = TensegrityRobot(acttg,deepcopy(tr.hub))
-    if rank(lhs) < minimum(size(lhs))
-        @warn "LHS is singular: rank(lhs)=$(rank(lhs)) < $(minimum(size(lhs)))"
-        @info "Using Moore-Penrose pseudoinverse"
-        x = pinv(lhs)*rhs
-        @debug "Inv. Res. $(lhs*x-rhs)"
-    else
-        x = lhs\rhs
-    end
-    λ = x[1:acttg.nconstraint].*c
-    a = x[acttg.nconstraint+1:end]
-    actuation_check(acttr,Y,a)
-    refq,_ = get_q(reftr.tg)
-    actuate!(acttr,a)
-    check_static_equilibrium(acttg,refq,λ;gravity)
-    u0 = get_original_restlen(acttr)
-    rl = u0 + Y*a
-    λ,rl,a
+    u
 end
 
 function get_inverse_func(tgstruct_input,refstruct,Y;gravity=false,recheck=true,scale=true)
@@ -503,20 +425,90 @@ function get_inverse_func(tgstruct_input,refstruct,Y;gravity=false,recheck=true,
     end
 end
 
-function check_static_equilibrium(tgstruct_input,q,λ;gravity=false)
-    tgstruct = deepcopy(tgstruct_input)
-    reset_forces!(tgstruct)
-    distribute_q_to_rbs!(tgstruct,q)
-    update_strings_apply_forces!(tgstruct)
+function check_static_equilibrium(tg_input,q,λ;gravity=false)
+    tg = deepcopy(tg_input)
+    reset_forces!(tg)
+    distribute_q_to_rbs!(tg,q)
+    update_strings_apply_forces!(tg)
     if gravity
-        apply_gravity!(tgstruct)
+        apply_gravity!(tg)
     end
-    generalized_forces = assemble_forces(tgstruct)
-    constraint_forces = transpose(build_A(tgstruct)(q))*λ
+    generalized_forces = assemble_forces(tg)
+    constraint_forces = transpose(build_A(tg)(q))*λ
     static_equilibrium = constraint_forces ≈ generalized_forces
     @debug "Res. forces = $(generalized_forces-constraint_forces)"
     if !static_equilibrium
         @error "System not in static equilibrium. Err = $(norm(generalized_forces-constraint_forces))"
+        @info "This error could be harmless, if nonpositive tension occurs."
     end
     static_equilibrium
+end
+
+function inverse_for_restlength(botinput,botref::TensegrityRobot,Fˣ=nothing;gravity=false,scale=true,recheck=true)
+    inverse_for_restlength(botinput.tg,botref.tg,Fˣ;gravity,scale,recheck)
+end
+
+function inverse_for_restlength(tginput,tgref::TensegrityStructure,Fˣ=nothing;gravity=false,scale=true,recheck=true)
+    tg,B,F̃,c = build_inverse_statics_for_restlength(tginput,tgref,Fˣ;gravity,scale)
+    nλ = get_nconstraint(tg)
+    nu = tg.nstrings
+    ny = nλ+nu
+    if check_inverse_sanity(B)
+        y0 = B\F̃
+    else
+        @info "Using Quadratic Programming."
+        model = JuMP.Model(COSMO.Optimizer)
+        JuMP.set_optimizer_attribute(model, "verbose", false)
+        JuMP.set_optimizer_attribute(model, "eps_abs", 1e-15)
+        JuMP.set_optimizer_attribute(model, "eps_rel", 1e-11)
+        JuMP.@variable(model, y[1:ny])
+        JuMP.@objective(model, Max, sum(y[nλ+1:nλ+nu].^2))
+        JuMP.@constraint(model, static, B*y .== F̃)
+        # JuMP.@constraint(model, ng, y[nλ+1:nλ+nu] .>= 0.14148)
+        JuMP.@constraint(model, ng, y[nλ+1:nλ+nu].+1e-10 .<= get_strings_len(tg))
+        # JuMP.print(model)
+        JuMP.optimize!(model)
+        if JuMP.termination_status(model) != JuMP.MathOptInterface.OPTIMAL
+            error("Inverse statics optimization failed.")
+        end
+        # @show JuMP.primal_status(model)
+        # @show JuMP.dual_status(model)
+        # @show JuMP.objective_value(model)
+        y0 = JuMP.value.(y)
+        # @show abs.(B*y0 .- F̃)
+        # y0 = pinv(B)*F̃
+    end
+    λ = y0[1:nλ].*c
+    u = y0[nλ+1:nλ+nu]
+    if recheck
+        tgcheck = deepcopy(tginput)
+        q,_ = get_q(tgref)
+        set_restlen!(tgcheck,u)
+        check_static_equilibrium(tgcheck,q,λ;gravity)
+    end
+    λ,u
+end
+
+function inverse_for_actuation(botinput,botref,Fˣ=nothing;Y=build_Y(botinput),
+                    gravity=false,scale=true,recheck=true)
+    tgref = botref.tg
+    tg,B,F̃,c = build_inverse_statics_for_actuation(botinput,tgref,Fˣ;Y,gravity,scale)
+    if check_inverse_sanity(B)
+        y0 = B\F̃
+    else
+        @info "Using Moore-Penrose pseudoinverse"
+        y0 = pinv(B)*F̃
+    end
+    nλ = get_nconstraint(tg)
+    na = size(Y,2)
+    λ = y0[1:nλ].*c
+    a = y0[nλ+1:nλ+na]
+    u = actuation_check(botinput,Y,a)
+    if recheck
+        botcheck = deepcopy(botinput)
+        q,_ = get_q(tgref)
+        actuate!(botcheck,a)
+        check_static_equilibrium(botcheck.tg,q,λ;gravity)
+    end
+    λ,u,a
 end

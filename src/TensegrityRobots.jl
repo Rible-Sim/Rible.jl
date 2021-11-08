@@ -7,6 +7,8 @@ using Parameters
 using StaticArrays
 using StructArrays
 using NLsolve
+import JuMP
+import COSMO
 using BlockArrays
 using BlockDiagonals
 using GeometryTypes

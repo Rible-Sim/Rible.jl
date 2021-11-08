@@ -30,13 +30,16 @@ function split_by_lengths(x::AbstractVector, len::Int)
 end
 
 function check_and_retrieve(result,lens::AbstractVector{<:Int})
-    real_path_results = results(result; only_real=true,
-                                only_nonsingular=true,
-                                only_finite=true)
-    @assert length(real_path_results) == 1
-    path_result1 = real_path_results[1]
-    @assert is_success(path_result1)
-    return_code = path_result1.return_code
+    # real_path_results = results(result; only_real=true,
+    #                             only_nonsingular=true,
+    #                             only_finite=true)
+    # @assert length(real_path_results) == 1
+    path_results = results(result)
+    if length(path_results) != 1
+        @show failed(result)
+        error("Tracking failed.")
+    end
+    path_result1 = path_results[1]
     nstep = steps(path_result1)
     sol = real(solution(path_result1))
     q,s,λ = split_by_lengths(sol,lens)
@@ -47,7 +50,7 @@ function check_and_retrieve(result,Psys::HomotopyContinuation.System)
     check_and_retrieve(result,length.(Psys.variable_groups))
 end
 
-function forward_system(tg,mode=PrimalMode();F=reshape(build_G!(tg),:,1))
+function forward_system(tg,mode=PrimalMode();F=reshape(build_G(tg),:,1))
     @var q[1:tg.ncoords]
     @var s[1:tg.nstrings]
     @var λ[1:tg.nconstraint]
@@ -96,7 +99,7 @@ function forward_system(tg,mode=PrimalMode();F=reshape(build_G!(tg),:,1))
     end
     # PPP = [subs(f, u=>l,g=>0.0) for f in P]
     vars = (q=q,s=s,λ=λ,d=d,u=u,k=k,g=g)
-    Psys,vars
+    Psys,P,vars
 end
 
 function forward_once(Psys::HomotopyContinuation.System,
@@ -110,7 +113,7 @@ end
 function forward_once(tg::TensegrityStructure,startsols_input,
                         start_parameters_input,
                         target_parameters_input,
-                        mode=PrimalMode();F=reshape(build_G!(tg),:,1))
+                        mode=PrimalMode();F=reshape(build_G(tg),:,1))
 
     # @show maximum(abs.(to_number.(subs(P, q=>q0, s=>s0, λ=>λ0, u=>u0, g=>g0))))
     # reset_forces!(tg)
@@ -119,12 +122,14 @@ function forward_once(tg::TensegrityStructure,startsols_input,
     # u1 = u0
     # g0 = 1.0
     # g1 = 0.0
-    Psys,_ = forward_system(tg,mode;F)
+    Psys,P,vars = forward_system(tg,mode;F)
     q0,s0,λ0 = startsols_input
     startsols = [[q0; s0; λ0]]
     start_parameters = reduce(vcat,start_parameters_input)
     target_parameters = reduce(vcat,target_parameters_input)
-
+    # q,s,λ,d,u,k,g = vars
+    # k0,u0,g0 = start_parameters_input
+    # @show maximum(abs.(evaluate(P, vcat(q,s,λ,k,u,g)=>vcat(q0,s0,λ0,k0,u0,g0))))
     forward_once(Psys,startsols,start_parameters,target_parameters)
 end
 
@@ -158,7 +163,7 @@ end
 function forward_sequence(tg::TensegrityStructure,startsols,
                         start_parameters,
                         target_parameters,
-                        mode=PrimalMode();F=reshape(build_G!(tg),:,1))
+                        mode=PrimalMode();F=reshape(build_G(tg),:,1))
     Psys,_ = forward_system(tg,mode;F)
     forward_sequence(Psys,startsols,start_parameters,target_parameters)
 end
@@ -180,19 +185,19 @@ function forward_multi_sequence(Psys,startsols_input,
     ]
 end
 
-function get_start_sol(bot,Y)
+function get_start_sol(bot)
     @unpack tg = bot
     q,_ = get_q(tg)
-    λ,u,_ = inverse(bot,deepcopy(bot),Y)
+    λ,u = inverse_for_restlength(bot,bot)
     ℓ = get_strings_len(bot)
     s = inv.(ℓ)
     (q=q,s=s,λ=λ),u
 end
 
-function get_start_system(bot,Y,mode=PrimalMode())
+function get_start_system(bot,mode=PrimalMode();F=reshape(build_G(bot.tg),:,1))
     @unpack tg = bot
-    start_sol,u = get_start_sol(bot,Y)
-    g = [zero(get_numbertype(bot))]
+    start_sol,u = get_start_sol(bot)
+    g = zeros(get_numbertype(bot),size(F,2))
     if typeof(mode)<:PrimalMode
         start_parameters = (u=u,g=g)
     elseif typeof(mode)<:StiffMode
