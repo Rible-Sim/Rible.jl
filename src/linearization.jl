@@ -45,19 +45,19 @@ function find_full_constrained_index(lncs,q)
     col_index[size(Aq,1)+1:end]
 end
 
-function ∂Aᵀλ∂q(tgstruct,λ)
-    body2q = tgstruct.connectivity.body2q
-    ncoords = tgstruct.ncoords
-    nbodyc = get_nbodyconstraint(tgstruct)
+function ∂Aᵀλ∂q(tg,λ)
+    body2q = tg.connectivity.body2q
+    ncoords = tg.ncoords
+    nbodyc = get_nbodyconstraint(tg)
     ret = zeros(eltype(λ),ncoords,ncoords)
     is = 0
-    for rbid in tgstruct.mvbodyindex
+    for rbid in tg.mvbodyindex
         pindex = body2q[rbid]
-        rb = tgstruct.rigidbodies[rbid]
-        nc = rb.state.cache.nc
-        if nc > 0
-            is += nc
-        end
+        rb = tg.rigidbodies[rbid]
+        # nc = rb.state.cache.nc
+        # if nc > 0
+        #     is += nc
+        # end
         ret[pindex,pindex] .+= rb.state.cache.cfuncs.∂Aᵀλ∂q(λ[is+1:is+nbodyc])
         is += nbodyc
     end
@@ -95,18 +95,23 @@ function test_fvector(tgstruct,q0)
     FiniteDiff.finite_difference_jacobian(L,q0)
 end
 
-function build_K(tgstruct)
-    Q̃ = build_Q̃(tgstruct)
-    q,_ = get_q(tgstruct)
-    ∂L∂q,_ = build_tangent!(tgstruct,q)
-    K = -Q̃*∂L∂q
+function build_K(tg,λ)
+    Q̃ = build_Q̃(tg)
+    q,_ = get_q(tg)
+    ∂L∂q,_ = build_tangent(tg)
+    K = -Q̃*∂L∂q .+ ∂Aᵀλ∂q(tg,λ)
 end
 
-function linearize(tg,q,λ)
+function linearize(tginput,λ,u,q,q̇=zero(q))
+    tg = deepcopy(tginput)
+    set_restlen!(tg,u)
+    reset_forces!(tg)
+    distribute_q_to_rbs!(tg,q,q̇)
+    update_strings_apply_forces!(tg)
     M = build_massmatrix(tg)
     A = build_A(tg)
     Q̃ = build_Q̃(tg)
-    ∂L∂q,∂L∂q̇ = build_tangent(tg,q,zero(q))
+    ∂L∂q,∂L∂q̇ = build_tangent(tg)
     @unpack ncoords,nconstraint = tg
     nz = ncoords + nconstraint
     M̂ = zeros(eltype(q),nz,nz)
@@ -216,11 +221,55 @@ function undamped_modal_solve!(tgstruct,q0,q̇0,λ0,tf,dt)
     q = z[1:length(q0),:]
 end
 
-function stability(tg)
-    K = build_K(tg)
+function find_nullspace(c)
+    Nc,Nu = size(c)
+    P = VectorOfArray([ begin
+                            p = zeros(eltype(c),Nu)
+                            p[i] = 1
+                            p
+                        end for i = 1:Nu])
+    for i = 1:Nc
+        # @show i
+        cPⁱ⁻¹ = c*P
+        rowi = cPⁱ⁻¹[i,:]
+        _ℓⁱ = findall((x)->!iszero(x),rowi)
+        ℓⁱ = _ℓⁱ[sortperm(rowi[_ℓⁱ],order=Base.Order.Reverse)]
+        if isempty(ℓⁱ)
+            continue
+        end
+        # display(cPⁱ⁻¹)
+        # @show ℓⁱ
+        # for k = 1:(length(ℓ)-1)
+        for k = 1:(length(ℓⁱ)-1)
+            αⁱₖ = -cPⁱ⁻¹[i,ℓⁱ[k]]./cPⁱ⁻¹[i,ℓⁱ[k+1]]
+            P[:,ℓⁱ[k]] .= P[:,ℓⁱ[k]] + αⁱₖ*P[:,ℓⁱ[k+1]]
+        end
+        deleteat!(P.u,ℓⁱ[end])
+    end
+    Array(P)
+end
+
+function check_stability(tg;verbose=false)
+    λ = inverse_for_multipliers(tg,tg)
+    check_stability(tg,λ;verbose)
+end
+
+function check_stability(tg,λ;verbose=false)
+    K = build_K(tg,λ)
     A = build_A(tg)
     q,_ = get_q(tg)
     N = nullspace(A(q))
+    # N = find_nullspace(A(q))
     Ǩ = transpose(N)*K*N
-    eigen(Ǩ)
+    eigen_result = eigen(Ǩ)
+    eigen_min = eigen_result.values[1]
+    if verbose
+        @show eigen_min
+    end
+    if eigen_min<0
+        @warn "Instability detected!"
+        return false
+    else
+        return true
+    end
 end

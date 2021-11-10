@@ -279,11 +279,10 @@ function build_inverse_statics_core(tginput,tgref::TensegrityStructure,Fˣ=nothi
     else
         G = zero(q)
     end
-
-    if !(typeof(Fˣ)<:Nothing)
-        F = Fˣ + G
-    else
+    if isnothing(Fˣ)
         F = G
+    else
+        F = Fˣ + G
     end
 
     build_inverse_statics_core(tg,q,F)
@@ -355,6 +354,25 @@ function build_inverse_statics_for_restlength(tginput,tgref,Fˣ=nothing;gravity=
     tg,B,F̃,c
 end
 
+function build_inverse_statics_for_multipliers(tginput,tgref,Fˣ=nothing;gravity=false,scale=true)
+    tg,Aᵀ,Q̃,F = build_inverse_statics_core(tginput,tgref,Fˣ;gravity)
+    ℓ = get_strings_len(tg)
+    u = get_strings_restlen(tg)
+    K̂ = build_K̂(tg)
+    # Right hand side
+    F̃ = Q̃*K̂*(ℓ-u) + F
+
+    # Left hand side
+    if scale
+        c = maximum(abs.(F̃))
+    else
+        c = one(eltype(F̃))
+    end
+    B = c*Aᵀ
+
+    tg,B,F̃,c
+end
+
 function build_inverse_statics_for_actuation(botinput,botref::TensegrityRobot,
                                         Fˣ=nothing;Y=build_Y(botinput),gravity=false,scale=true)
     build_inverse_statics_for_actuation(botinput,botref.tg,Fˣ;Y,gravity,scale)
@@ -390,18 +408,22 @@ function get_solution_set(B,F̃)
     return x,nb
 end
 
-function actuation_check(bot,Y,a)
+function check_restlen(tg,u)
+    ℓ = get_strings_len(tg)
+    if any((x)->x<0,u)
+        @warn "Negative rest lengths"
+    end
+    if any((x)->x<=0,ℓ-u)
+        @warn "Nonpositive tension"
+    end
+end
+
+function check_actuation(bot,Y,a)
     @unpack tg = bot
     Δu = Y*a
     u0 = get_original_restlen(bot)
     u = u0 + Δu
-    if any((x)->x<0,u)
-        @warn "Negative rest lengths"
-    end
-    ℓ = get_strings_len(tg)
-    if any((x)->x<=0,ℓ-u)
-        @warn "Nonpositive tension"
-    end
+    check_restlen(bot.tg,u)
     u
 end
 
@@ -415,7 +437,7 @@ function get_inverse_func(tgstruct_input,refstruct,Y;gravity=false,recheck=true,
         x = xp + nb*ξ
         λ = x[1:actstruct.nconstraint].*c
         a = x[actstruct.nconstraint+1:end]
-        # actuation_check(actstruct,Y,a)
+        # check_actuation(actstruct,Y,a)
         # refq,_ = get_q(refstruct)
         # actuate!(actstruct,a)
         # check_static_equilibrium(actstruct,refq,λ;gravity)
@@ -425,21 +447,25 @@ function get_inverse_func(tgstruct_input,refstruct,Y;gravity=false,recheck=true,
     end
 end
 
-function check_static_equilibrium(tg_input,q,λ;gravity=false)
+function check_static_equilibrium(tg_input,q,λ,F=nothing;gravity=false)
     tg = deepcopy(tg_input)
     reset_forces!(tg)
     distribute_q_to_rbs!(tg,q)
     update_strings_apply_forces!(tg)
+    check_restlen(tg,get_strings_restlen(tg))
     if gravity
         apply_gravity!(tg)
     end
     generalized_forces = assemble_forces(tg)
+    if !isnothing(F)
+        generalized_forces .+= F[:]
+    end
     constraint_forces = transpose(build_A(tg)(q))*λ
     static_equilibrium = constraint_forces ≈ generalized_forces
     @debug "Res. forces = $(generalized_forces-constraint_forces)"
     if !static_equilibrium
         @error "System not in static equilibrium. Err = $(norm(generalized_forces-constraint_forces))"
-        @info "This error could be harmless, if nonpositive tension occurs."
+        @info "This error could be harmless, if the error is sufficiently small, or nonpositive tension occurs."
     end
     static_equilibrium
 end
@@ -464,8 +490,9 @@ function inverse_for_restlength(tginput,tgref::TensegrityStructure,Fˣ=nothing;g
         JuMP.@variable(model, y[1:ny])
         JuMP.@objective(model, Max, sum(y[nλ+1:nλ+nu].^2))
         JuMP.@constraint(model, static, B*y .== F̃)
-        # JuMP.@constraint(model, ng, y[nλ+1:nλ+nu] .>= 0.14148)
-        JuMP.@constraint(model, ng, y[nλ+1:nλ+nu].+1e-10 .<= get_strings_len(tg))
+        ϵ = 1e-10
+        JuMP.@constraint(model, positive_u, y[nλ+1:nλ+nu].+ ϵ .>= 0)
+        JuMP.@constraint(model, positive_f, y[nλ+1:nλ+nu].+ ϵ .<= get_strings_len(tg))
         # JuMP.print(model)
         JuMP.optimize!(model)
         if JuMP.termination_status(model) != JuMP.MathOptInterface.OPTIMAL
@@ -489,6 +516,24 @@ function inverse_for_restlength(tginput,tgref::TensegrityStructure,Fˣ=nothing;g
     λ,u
 end
 
+function inverse_for_multipliers(botinput::TensegrityRobot,botref::TensegrityRobot=botinput,F=nothing;gravity=false,scale=true,recheck=true)
+    inverse_for_multipliers(botinput.tg,botref.tg,F;gravity,scale,recheck)
+end
+
+function inverse_for_multipliers(tginput::TensegrityStructure,tgref::TensegrityStructure=tginput,F=nothing;gravity=false,scale=true,recheck=true)
+    tg,B,F̃,c = build_inverse_statics_for_multipliers(tginput,tgref,F;gravity,scale)
+    nλ = get_nconstraint(tg)
+    y0 = B\F̃
+    @debug "Res. : $(norm(B*y0 - F̃))"
+    λ = y0.*c
+    if recheck
+        tgcheck = deepcopy(tginput)
+        q,_ = get_q(tgref)
+        check_static_equilibrium(tgcheck,q,λ,F;gravity)
+    end
+    λ
+end
+
 function inverse_for_actuation(botinput,botref,Fˣ=nothing;Y=build_Y(botinput),
                     gravity=false,scale=true,recheck=true)
     tgref = botref.tg
@@ -503,7 +548,7 @@ function inverse_for_actuation(botinput,botref,Fˣ=nothing;Y=build_Y(botinput),
     na = size(Y,2)
     λ = y0[1:nλ].*c
     a = y0[nλ+1:nλ+na]
-    u = actuation_check(botinput,Y,a)
+    u = check_actuation(botinput,Y,a)
     if recheck
         botcheck = deepcopy(botinput)
         q,_ = get_q(tgref)

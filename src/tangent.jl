@@ -11,11 +11,8 @@ struct TensionTangent{T}
     ∂l̂∂q::Vector{Array{T,2}}
 end
 
-function build_tangent(tginput,q,q̇=zero(q))
-    tg = deepcopy(tginput)
-    reset_forces!(tg)
-    distribute_q_to_rbs!(tg,q,q̇)
-    update_strings_apply_forces!(tg)
+function build_tangent(tg)
+    q, q̇ = get_q(tg)
     J = [build_Ji(tg,i) for i = 1:tg.nstrings]
     U = [transpose(Ji)*Ji for Ji in J]
     l = [sqrt(transpose(q)*Ui*q) for Ui in U]

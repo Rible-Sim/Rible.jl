@@ -77,7 +77,7 @@ function TensegrityStructure(rbs::Vector{rbT},tensiles::TT,cnt::Connectivity,
                     nstrings,
                     npoints,nmvpoints,
                     rbs,strings,tensiles,cnt,constraints)
-    jac_singularity_check(tg)
+    check_jacobian_singularity(tg)
     tg
 end
 
@@ -215,22 +215,22 @@ function generate_forces!(rbs)
     end
 end
 
-function assemble_forces!(F,tgstruct;factor=1.0)
-    rbs = tgstruct.rigidbodies
-    @unpack body2q = tgstruct.connectivity
+function assemble_forces!(F,tg;factor=1.0)
+    rbs = tg.rigidbodies
+    @unpack body2q = tg.connectivity
     generate_forces!(rbs)
     F .= 0.0
-    for rbid in tgstruct.mvbodyindex
+    for rbid in tg.mvbodyindex
         pindex = body2q[rbid]
         F[pindex] .+= factor*rbs[rbid].state.coords.Q
     end
 end
 
-function assemble_forces(tgstruct;factor=1.0)
-    T = get_numbertype(tgstruct)
-    @unpack body2q = tgstruct.connectivity
-    F = zeros(T,tgstruct.ncoords)
-    assemble_forces!(F,tgstruct,factor=factor)
+function assemble_forces(tg;factor=1.0)
+    T = get_numbertype(tg)
+    @unpack body2q = tg.connectivity
+    F = zeros(T,tg.ncoords)
+    assemble_forces!(F,tg,factor=factor)
     F
 end
 
@@ -509,7 +509,7 @@ function lucompletepiv!(A)
     return (rowpiv, colpiv)
 end
 
-function jac_singularity_check(tg)
+function check_jacobian_singularity(tg)
     q,_ = get_q(tg)
     A = build_A(tg)
     Aq = A(q)
@@ -722,7 +722,13 @@ function new_trajectory(tg::TensegrityStructure)
     NaturalCoordinatesTrajectory([t0], [q0], [q̇0], [λ0])
 end
 
-TensegrityRobot(tg,hub) = TensegrityRobot(tg,hub,new_trajectory(tg))
+function TensegrityRobot(tg,hub)
+	reset_forces!(tg)
+    update_strings_apply_forces!(tg)
+	check_jacobian_singularity(tg)
+	check_stability(tg)
+    TensegrityRobot(tg,hub,new_trajectory(tg))
+end
 
 function reset!(bot::TensegrityRobot)
     @unpack tg, traj = bot
