@@ -190,6 +190,7 @@ function update_strings_pre_forces!(tgstruct)
         sstate.lengthdot = (transpose(Δr)*Δṙ)/l
         Δl = sstate.length - sstate.restlen
         f = k*Δl + c*sstate.lengthdot + prestress
+        #f = k*Δl 
         # if Δl < 0
         #     sstate.tension = 0.0
         # elseif f < 0
@@ -271,10 +272,10 @@ function update_clusterstrings_apply_forces!(tgstruct, s)
             csstate.lengthdot = (transpose(Δr)*Δṙ)/l
 
             Δl = csstate.length - csstate.restlen          
-
             #EA = k * csstate.restlen
-            
-            EA = 110e9*pi/4*(1e-3)^2
+            #EA = 110e9*pi/4*(1e-3)^2
+            #@show s
+            EA = 86400
             if ID == 1
                 f = EA*(Δl - s[ID])/(csstate.restlen + s[ID])
             elseif ID == i.section[end].ID
@@ -282,7 +283,70 @@ function update_clusterstrings_apply_forces!(tgstruct, s)
             else
                 f = EA*(Δl + s[ID-1] - s[ID])/(csstate.restlen + s[ID] - s[ID-1])
             end
+            #@show f
+            # if Δl < 0
+            #     #@show 1
+            #     csstate.tension = 0.0
+            # elseif f < 0
+            #     #@show 2
+            #     csstate.tension = 0.0
+            # else
+            #     #@show f
+            #     csstate.tension = f
+            # end
+            #prestress = 1000
+            #if f+prestress < 0
+            #    csstate.tension = 0.0
+            #else
+            #    csstate.tension = f+prestress
+            #end
+            #@show f
+            csstate.tension = f
+            𝐟 = τ*csstate.tension
+            f1 .+=  𝐟
+            f2 .+= -𝐟
+        end
+    end
+end
 
+function update_clusterstrings_apply_preforces!(tgstruct, s)
+    rbs = tgstruct.rigidbodies
+    clusters = tgstruct.tensiles.clusterstrings
+    cnt = tgstruct.connectivity
+    
+    for i in clusters    
+        for (ID, cs) in enumerate(i.section)
+            #@unpack ID = cs
+            csstate = cs.state
+            a,b = cnt.clusterstring2ap[i.ID][ID]
+            state1 = rbs[a.rbid].state
+            p1 = state1.rps[a.apid]
+            ṗ1 = state1.ṙps[a.apid]
+            f1 = state1.Faps[a.apid]
+            state2 = rbs[b.rbid].state
+            p2 = state2.rps[b.apid]
+            ṗ2 = state2.ṙps[b.apid]
+            f2 = state2.Faps[b.apid]
+            Δr = p2 - p1
+            Δṙ = ṗ2 - ṗ1
+            l,τ = lengthdir(p2-p1)
+            csstate.length = l
+            csstate.direction = τ
+            csstate.lengthdot = (transpose(Δr)*Δṙ)/l
+
+            Δl = csstate.length - csstate.restlen          
+            #EA = k * csstate.restlen
+            EA = 110e9*pi/4*(1e-3)^2
+            #@show s
+            #EA = 86400
+            if ID == 1
+                f = EA*(Δl - s[ID])/(csstate.restlen + s[ID])
+            elseif ID == i.section[end].ID
+                f = EA*(Δl + s[ID-1])/(csstate.restlen - s[ID-1])
+            else
+                f = EA*(Δl + s[ID-1] - s[ID])/(csstate.restlen + s[ID] - s[ID-1])
+            end
+            #@show f
             # if Δl < 0
             #     #@show 1
             #     csstate.tension = 0.0
@@ -299,7 +363,8 @@ function update_clusterstrings_apply_forces!(tgstruct, s)
             else
                 csstate.tension = f+prestress
             end
-
+            #@show f
+            #csstate.tension = f
             𝐟 = τ*csstate.tension
             f1 .+=  𝐟
             f2 .+= -𝐟

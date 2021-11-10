@@ -21,12 +21,20 @@ function SStringState(restlen,direction)
     SStringState(restlen,restlen,zero(restlen),zero(restlen),direction)
 end
 
+function SHStringState(restlen, direction, k)
+    SStringState(restlen-1000/k,restlen,zero(restlen),1000*one(restlen),direction)
+end
+
+function SRStringState(restlen, direction, k)
+    SStringState(restlen-1628.58/k,restlen,zero(restlen),1628.58*one(restlen),direction)
+end
+
 function SHStringState(restlen, direction)
-    SStringState(restlen,restlen,zero(restlen),1000*one(restlen),direction)
+    SStringState(restlen, restlen,zero(restlen),1000*one(restlen),direction)
 end
 
 function SRStringState(restlen, direction)
-    SStringState(restlen,restlen,zero(restlen),1628.58*one(restlen),direction)
+    SStringState(restlen, restlen,zero(restlen),1628.58*one(restlen),direction)
 end
 
 mutable struct SMAStringState{N,T}
@@ -42,11 +50,18 @@ function SMAStringState(temp,restlen,direction)
     SMAStringState(temp,restlen,restlen,zero(restlen),zero(restlen),direction)
 end
 
-struct SString{N,T}
+struct SHRString{N,T}
     id::Int
     k::T
     c::T
     prestress::T
+    state::SStringState{N,T}
+end
+
+struct SString{N,T}
+    id::Int
+    k::T
+    c::T
     state::SStringState{N,T}
 end
 
@@ -81,7 +96,7 @@ function SHRString3D(id,i,origin_restlen::T,k::T,prestress::T,c::T) where T
     else
         state = SRStringState(origin_restlen,direction)
     end
-    SString(id,k,c,prestress,state)
+    SHRString(id,k,c,prestress,state)
 end
 
 
@@ -124,7 +139,8 @@ end
 
 function ClusterSectionCables3D(id, restlen::T) where T
     direction = MVector{3}(one(T),zero(T),zero(T))
-    section_state = ClusterSectionCablesState(restlen, restlen, 
+    section_state = ClusterSectionCablesState((restlen*86400)/(86400+1000), restlen, 
+    #section_state = ClusterSectionCablesState(restlen, restlen, 
         zero(restlen), zero(restlen), direction)
     return ClusterSectionCables(id, section_state)
 end
