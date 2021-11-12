@@ -1,6 +1,12 @@
-
 struct Wendlandt end
 struct Zhong06 end
+struct Newmark{T}
+    δ::T
+    α::T
+end
+function Newmark()
+    Newmark(0.25, 0.5)
+end
 
 struct SimProblem{BotType,FuncsType,ControlType,T}
     bot::BotType
@@ -88,5 +94,6 @@ end
 
 include("solvers/Wendlandt.jl")
 include("solvers/Zhong06.jl")
+include("solvers/Newmark.jl")
 include("solvers/nonsmooth.jl")
 include("solvers/Zhong06NSNH.jl")
