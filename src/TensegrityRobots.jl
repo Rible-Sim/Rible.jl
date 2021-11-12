@@ -21,7 +21,7 @@ using GaussQuadrature
 using ProgressMeter, Printf
 
 rotation_matrix(θ) = @SMatrix [cos(θ) -sin(θ); sin(θ) cos(θ)]
-
+include("nonsmooth.jl")
 include("naturalcoordinates.jl")
 using .NaturalCoordinates
 include("string.jl")
