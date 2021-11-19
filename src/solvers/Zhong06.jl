@@ -1,4 +1,4 @@
-struct Zhong06Cache{MT,T,qT,λT}
+struct Zhong06Cache{T,qT,λT,MT}
     totalstep::Int
     totaltime::T
     ts::Vector{T}
@@ -12,8 +12,9 @@ end
 function generate_cache(::Zhong06,intor;dt,kargs...)
     @unpack prob,state,nx,nq,nλ = intor
     @unpack bot,tspan,dyfuncs,restart = prob
-    @unpack t,q,q̇,tprev,qprev,q̇prev = state
-    M,Φ,A,F!,Jac_F! = dyfuncs
+    @unpack current,lasttime = state
+    @unpack q,q̇ = current
+    @unpack M = dyfuncs
     totaltime = tspan[end] - tspan[begin]
     totalstep = ceil(Int,totaltime/dt)
     ts = [tspan[begin]+(i-1)*dt for i in 1:totalstep+1]
@@ -30,9 +31,9 @@ function solve!(intor::Integrator,cache::Zhong06Cache;
                 progress=true,exception=true)
     @unpack prob,state,nx,nq,nλ = intor
     @unpack bot,tspan,dyfuncs,control!,restart = prob
-    # @unpack t,q,q̇,tprev,qprev,q̇prev = state
+    @unpack current,lasttime = state
     @unpack totaltime,totalstep,ts,qs,q̇s,ps,λs,invM = cache
-    M,Φ,A,F!,Jac_F! = dyfuncs
+    @unpack M,Φ,A,F!,Jac_F! = dyfuncs
     q0 = qs[begin]
     F⁺ = zero(q0)
     F⁻ = zero(q0)
@@ -130,12 +131,12 @@ function solve!(intor::Integrator,cache::Zhong06Cache;
 
         #---------Step k finisher-----------
         step += 1
-        state.tprev = state.t
-        state.qprev .= state.q
-        state.q̇prev .= state.q̇
-        state.t = ts[timestep+1]
-        state.q .= qᵏ
-        state.q̇ .= q̇ᵏ
+        lasttime.t .= current.t
+        lasttime.q .= current.q
+        lasttime.q̇ .= current.q̇
+        current.t .= ts[timestep+1]
+        current.q .= qᵏ
+        current.q̇ .= q̇ᵏ
         #---------Step k finisher-----------
         if verbose
             @printf("Progress: %5.1f%%, step: %s, time: %s, iterations: %s \n", (

@@ -563,6 +563,7 @@ function make_Φ(lncs::LocalNaturalCoordinates2P2V,deforms)
         rj = @view q[4:6]
         u = rj-ri
         v = @view q[7:9]
+        w = @view q[10:12]
         [u⋅u - d[1], v⋅v - d[2], w⋅w - d[3], u⋅v - d[4], u⋅w - d[5], v⋅w - d[6]]
     end
     make_inner_Φ(_inner_Φ,deforms)
@@ -573,6 +574,7 @@ function make_Φ(lncs::LocalNaturalCoordinates3P1V,deforms)
         ri = @view q[1:3]
         rj = @view q[4:6]
         rk = @view q[7:9]
+        w = @view q[10:12]
         u = rj-ri
         v = rk-ri
         [u⋅u - d[1], v⋅v - d[2], w⋅w - d[3], u⋅v - d[4], u⋅w - d[5], v⋅w - d[6]]

@@ -107,7 +107,7 @@ function linearize(tginput,λ,u,q,q̇=zero(q))
     set_restlen!(tg,u)
     reset_forces!(tg)
     distribute_q_to_rbs!(tg,q,q̇)
-    update_strings_apply_forces!(tg)
+    update_strings!(tg)
     M = build_massmatrix(tg)
     A = build_A(tg)
     Q̃ = build_Q̃(tg)
@@ -176,7 +176,8 @@ function undamped_eigen(tg,q0,λ0)
     if !check_static_equilibrium(tg,q0,λ0;gravity=false)
         @warn "Statics check failed, but proceed anyway."
     end
-    M̂,Ĉ,K̂ = linearize(tg,q0,λ0)
+    u0 = get_strings_restlen(tg)
+    M̂,Ĉ,K̂ = linearize(tg,λ0,u0,q0)
     α = 10
     M̄,K̄ = frequencyshift(M̂,K̂,α)
     # @show size(K̄),rank(K̄),cond(K̄),rank(M̄)

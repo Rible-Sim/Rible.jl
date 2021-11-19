@@ -212,6 +212,12 @@ git-tree-sha1 = "a0fcc1bb3c9ceaf07e1d0529c9806ce94be6adf9"
 uuid = "fdbdab4c-e67f-52f5-8c3f-e7b388dad3d4"
 version = "1.2.9"
 
+[[EponymTuples]]
+deps = ["Test"]
+git-tree-sha1 = "beb267f768b829fedf7562da883354066977c809"
+uuid = "97e2ac4a-e175-5f49-beb1-4d6866a6cdc3"
+version = "0.2.2"
+
 [[EzXML]]
 deps = ["Printf", "XML2_jll"]
 git-tree-sha1 = "0fa3b52a04a4e210aeb1626def9c90df3ae65268"

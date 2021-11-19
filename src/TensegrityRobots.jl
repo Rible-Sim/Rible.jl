@@ -21,6 +21,7 @@ using EzXML
 using Cubature
 using GaussQuadrature
 using ProgressMeter, Printf
+using EponymTuples
 
 rotation_matrix(θ) = @SMatrix [cos(θ) -sin(θ); sin(θ) cos(θ)]
 include("nonsmooth.jl")
@@ -32,6 +33,8 @@ include("rigidbody.jl")
 #include("rigidbody3d.jl")
 
 include("tensegrity.jl")
+include("clustertensegrity.jl")
+
 
 include("inverse_statics.jl")
 

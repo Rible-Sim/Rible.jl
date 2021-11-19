@@ -3,14 +3,22 @@ struct TensegrityRobot{tgT,hubT,trajT}
     hub::hubT
     traj::trajT
 end
-
+abstract type AbstractTensegrity end
 abstract type TensegrityRobotTrajectory{T} end
 
-struct NaturalCoordinatesTrajectory{T} <: TensegrityRobotTrajectory{T}
+struct ConstrainedCoordinatesTrajectory{T} <: TensegrityRobotTrajectory{T}
     ts::Vector{T}
     qs::Vector{Vector{T}}
     q̇s::Vector{Vector{T}}
     λs::Vector{Vector{T}}
+end
+
+struct SlidingConstrainedCoordinatesTrajectory{T} <: TensegrityRobotTrajectory{T}
+    ts::Vector{T}
+    qs::Vector{Vector{T}}
+    q̇s::Vector{Vector{T}}
+    λs::Vector{Vector{T}}
+    s̄s::Vector{Vector{T}}
 end
 
 struct ID
@@ -18,24 +26,24 @@ struct ID
     apid::Int
 end
 
-struct Connectivity{bType,sType,cType}
-    body2q::bType
-    string2ap::sType
-    contacts::cType
-end
+# struct Connectivity{bType,sType,cType}
+#     body2q::bType
+#     string2ap::sType
+#     contacts::cType
+# end
+#
+# struct Cluster_Connectivity{bType,sType,cType}
+#     body2q::bType
+#     string2ap::sType
+#     clusterstring2ap::Vector{sType}
+#     contacts::cType
+# end
 
-struct Cluster_Connectivity{bType,sType,cType}
-    body2q::bType
-    string2ap::sType
-    clusterstring2ap::Vector{sType}
-    contacts::cType
-end
+Connectivity(b) = (body2q=b,)
+Connectivity(b,s) = (body2q=b,string2ap=s)
+Connectivity(b,s,c) = (body2q=b,string2ap=s,clusterstring2ap=c)
 
-Connectivity(b) = Connectivity(b,nothing,nothing)
-Connectivity(b,s) = Connectivity(b,s,nothing)
-Cluster_Connectivity(b,c,s) = Cluster_Connectivity(b, c, s, nothing)
-
-struct TensegrityStructure{BodyType,StrType,TenType,CntType,CstType}
+struct TensegrityStructure{BodyType,StrType,TenType,CntType,CstType} <: AbstractTensegrity
     ndim::Int
     ncoords::Int
     nconstraint::Int
@@ -45,9 +53,9 @@ struct TensegrityStructure{BodyType,StrType,TenType,CntType,CstType}
     mvbodyindex::Vector{Int}
     nfixbodies::Int
     fixbodyindex::Vector{Int}
-    nstrings::Int
     npoints::Int
     nmvpoints::Int
+    nstrings::Int
     rigidbodies::Vector{BodyType}
     strings::StrType
     tensiles::TenType
@@ -55,7 +63,7 @@ struct TensegrityStructure{BodyType,StrType,TenType,CntType,CstType}
     constraints::CstType
 end
 
-function TensegrityStructure(rbs::Vector{rbT},tensiles::TT,cnt::Connectivity,
+function TensegrityStructure(rbs::Vector{rbT},tensiles::TT,cnt,
                             constraints = [EmptyConstraint()]) where {TT,rbT<:AbstractRigidBody{N,T}} where {N,T}
     ndim = N
     nbodies = length(rbs)
@@ -63,7 +71,62 @@ function TensegrityStructure(rbs::Vector{rbT},tensiles::TT,cnt::Connectivity,
     nmvbodies = length(mvbodyindex)
     fixbodyindex = [i for i in eachindex(rbs) if !rbs[i].prop.movable]
     nfixbodies = length(fixbodyindex)
-    nstrings = sum(map(length,tensiles))
+    npoints = 0
+    for (rbid,rb) in enumerate(rbs)
+        npoints += rb.prop.naps
+    end
+    nmvpoints = 0
+    for rbid in mvbodyindex
+        nmvpoints += rbs[rbid].prop.naps
+    end
+    ncoords = maximum(maximum.(cnt.body2q))
+    strings = tensiles.strings
+    nstrings = length(strings)
+    nconstraint = get_nconstraint(rbs,mvbodyindex,nmvbodies,constraints)
+    ndof = ncoords - nconstraint
+    tg = TensegrityStructure(
+                    ndim,
+                    ncoords,nconstraint,ndof,
+                    nbodies,nmvbodies,mvbodyindex,nfixbodies,fixbodyindex,
+                    npoints,nmvpoints,
+                    nstrings,
+                    rbs,strings,tensiles,
+                    cnt,constraints)
+    check_jacobian_singularity(tg)
+    tg
+end
+
+struct ClusterTensegrityStructure{BodyType,StrType,CStrType,TenType,CntType,CstType} <: AbstractTensegrity
+    ndim::Int
+    ncoords::Int
+    nconstraint::Int
+    ndof::Int
+    nbodies::Int
+    nmvbodies::Int
+    mvbodyindex::Vector{Int}
+    nfixbodies::Int
+    fixbodyindex::Vector{Int}
+    npoints::Int
+    nmvpoints::Int
+    nstrings::Int
+    nclusterstrings::Int
+    nslidings::Int
+    rigidbodies::Vector{BodyType}
+    strings::StrType
+    clusterstrings::CStrType
+    tensiles::TenType
+    connectivity::CntType
+    constraints::CstType
+end
+
+function ClusterTensegrityStructure(rbs::Vector{rbT},tensiles::TT,cnt,
+                            constraints = [EmptyConstraint()]) where {TT,rbT<:AbstractRigidBody{N,T}} where {N,T}
+    ndim = N
+    nbodies = length(rbs)
+    mvbodyindex = [i for i in eachindex(rbs) if rbs[i].prop.movable]
+    nmvbodies = length(mvbodyindex)
+    fixbodyindex = [i for i in eachindex(rbs) if !rbs[i].prop.movable]
+    nfixbodies = length(fixbodyindex)
     npoints = 0
     for (rbid,rb) in enumerate(rbs)
         npoints += rb.prop.naps
@@ -76,48 +139,19 @@ function TensegrityStructure(rbs::Vector{rbT},tensiles::TT,cnt::Connectivity,
     nconstraint = get_nconstraint(rbs,mvbodyindex,nmvbodies,constraints)
     ndof = ncoords - nconstraint
     strings = tensiles.strings
-    tg = TensegrityStructure(ndim,
+    nstrings = length(strings)
+    clusterstrings = tensiles.clusterstrings
+    nclusterstrings = length(clusterstrings)
+    nslidings = sum(length(cs.sps.s) for cs in clusterstrings)
+    tg = ClusterTensegrityStructure(
+                    ndim,
                     ncoords,nconstraint,ndof,
-                    nbodies,
-                    nmvbodies,mvbodyindex,
-                    nfixbodies,fixbodyindex,
-                    nstrings,
+                    nbodies,nmvbodies,mvbodyindex,nfixbodies,fixbodyindex,
                     npoints,nmvpoints,
-                    rbs,strings,tensiles,cnt,constraints)
+                    nstrings,nclusterstrings,nslidings,
+                    rbs,strings,clusterstrings,tensiles,
+                    cnt,constraints)
     check_jacobian_singularity(tg)
-    tg
-end
-
-
-function TensegrityStructure_Cluster(rbs::Vector{rbT},tensiles::TT,cnt::Cluster_Connectivity) where {TT,rbT<:AbstractRigidBody{N,T}} where {N,T}
-    ndim = N
-    nbodies = length(rbs)
-    mvbodyindex = [i for i in eachindex(rbs) if rbs[i].prop.movable]
-    nmvbodies = length(mvbodyindex)
-    fixbodyindex = [i for i in eachindex(rbs) if !rbs[i].prop.movable]
-    nfixbodies = length(fixbodyindex)
-    nstrings = sum(map(length,tensiles))
-    npoints = 0
-    for (rbid,rb) in enumerate(rbs)
-        npoints += rb.prop.naps
-    end
-    nmvpoints = 0
-    for rbid in mvbodyindex
-        nmvpoints += rbs[rbid].prop.naps
-    end
-    ncoords = maximum(maximum.(cnt.body2q))
-    nconstraint = get_nconstraint(rbs,mvbodyindex,nmvbodies,nfixbodies)
-    ndof = ncoords - nconstraint
-    strings = tensiles.strings
-    tg = TensegrityStructure(ndim,
-                    ncoords,nconstraint,ndof,
-                    nbodies,
-                    nmvbodies,mvbodyindex,
-                    nfixbodies,fixbodyindex,
-                    nstrings,
-                    npoints,nmvpoints,
-                    rbs,strings,tensiles,cnt)
-    jac_singularity_check(tg)
     tg
 end
 
@@ -127,15 +161,18 @@ function lengthdir(v)
     l,τ
 end
 
-function reset_forces!(tgst::TensegrityStructure)
-    reset_forces!.(tgst.rigidbodies)
+function reset_forces!(tg::AbstractTensegrity)
+    reset_forces!.(tg.rigidbodies)
 end
 
-function update_strings_apply_forces!(tgstruct)
-    rbs = tgstruct.rigidbodies
-    ss = tgstruct.strings
-    cnt = tgstruct.connectivity
-    for sstring in ss
+function update_strings!(tg)
+    update_strings!(tg, tg.tensiles)
+end
+
+function update_strings!(tg, @eponymargs(strings,))
+    rbs = tg.rigidbodies
+    cnt = tg.connectivity
+    for sstring in strings
         @unpack id,k,c = sstring
         sstate = sstring.state
         a,b = cnt.string2ap[id]
@@ -168,53 +205,9 @@ function update_strings_apply_forces!(tgstruct)
     end
 end
 
-function update_strings_pre_forces!(tgstruct)
-    rbs = tgstruct.rigidbodies
-    ss = tgstruct.strings
-    cnt = tgstruct.connectivity
-    for sstring in ss
-        @unpack id,k,c,prestress = sstring
-        sstate = sstring.state
-        a,b = cnt.string2ap[id]
-        state1 = rbs[a.rbid].state
-        p1 = state1.rps[a.apid]
-        ṗ1 = state1.ṙps[a.apid]
-        f1 = state1.Faps[a.apid]
-        state2 = rbs[b.rbid].state
-        p2 = state2.rps[b.apid]
-        ṗ2 = state2.ṙps[b.apid]
-        f2 = state2.Faps[b.apid]
-        Δr = p2 - p1
-        Δṙ = ṗ2 - ṗ1
-        l,τ = lengthdir(p2-p1)
-        sstate.length = l
-        sstate.direction = τ
-        sstate.lengthdot = (transpose(Δr)*Δṙ)/l
-        Δl = sstate.length - sstate.restlen
-        f = k*Δl + c*sstate.lengthdot + prestress
-        #f = k*Δl 
-        # if Δl < 0
-        #     sstate.tension = 0.0
-        # elseif f < 0
-        #     sstate.tension = 0.0
-        # else
-        #     sstate.tension = f
-        # end
-        if f < 0
-            sstate.tension = 0.0
-        else
-            sstate.tension = f
-        end
-        𝐟 = τ*sstate.tension
-        f1 .+=  𝐟
-        f2 .+= -𝐟
-    end
-end
-
-function update_SMA_strings_apply_forces!(tgstruct)
-    rbs = tgstruct.rigidbodies
-    SMA_strings = tgstruct.tensiles.SMA_strings
-    cnt = tgstruct.connectivity
+function update_strings!(tg,@eponymargs(SMA_strings,))
+    rbs = tg.rigidbodies
+    cnt = tg.connectivity
     for SMA_string in SMA_strings
         @unpack id,law = SMA_string
         sstate = SMA_string.state
@@ -248,16 +241,17 @@ function update_SMA_strings_apply_forces!(tgstruct)
     end
 end
 
-function update_clusterstrings_apply_forces!(tgstruct, s)
-    rbs = tgstruct.rigidbodies
-    clusters = tgstruct.tensiles.clusterstrings
-    cnt = tgstruct.connectivity
-    
-    for i in clusters    
-        for (ID, cs) in enumerate(i.section)
-            #@unpack ID = cs
-            csstate = cs.state
-            a,b = cnt.clusterstring2ap[i.ID][ID]
+function update_strings!(tg, @eponymargs(clusterstrings,))
+    rbs = tg.rigidbodies
+    cnt = tg.connectivity
+
+    for clusterstring in clusterstrings
+        s = clusterstring.sps.s
+        for (segid, seg) in enumerate(clusterstring.segs)
+            @unpack k,c,prestress,original_restlen = seg
+            u0 = original_restlen
+            segstate = seg.state
+            a,b = cnt.clusterstring2ap[clusterstring.ID][segid]
             state1 = rbs[a.rbid].state
             p1 = state1.rps[a.apid]
             ṗ1 = state1.ṙps[a.apid]
@@ -268,118 +262,36 @@ function update_clusterstrings_apply_forces!(tgstruct, s)
             f2 = state2.Faps[b.apid]
             Δr = p2 - p1
             Δṙ = ṗ2 - ṗ1
-            l,τ = lengthdir(p2-p1)
-            csstate.length = l
-            csstate.direction = τ
-            csstate.lengthdot = (transpose(Δr)*Δṙ)/l
-
-            Δl = csstate.length - csstate.restlen          
-            #EA = k * csstate.restlen
-            #EA = 110e9*pi/4*(1e-3)^2
-            #@show s
-            EA = 86400
-            if ID == 1
-                f = EA*(Δl - s[ID])/(csstate.restlen + s[ID])
-            elseif ID == i.section[end].ID
-                f = EA*(Δl + s[ID-1])/(csstate.restlen - s[ID-1])
+            segstate.length,segstate.direction = lengthdir(p2-p1)
+            l = segstate.length
+            τ = segstate.direction
+            segstate.lengthdot = (transpose(Δr)*Δṙ)/l
+            if segid == 1
+                u = u0 + s[segid]
+            elseif segid == length(clusterstring.segs)
+                u = u0 - s[segid-1]
             else
-                f = EA*(Δl + s[ID-1] - s[ID])/(csstate.restlen + s[ID] - s[ID-1])
+                u = u0 + s[segid] - s[segid-1]
             end
-            #@show f
-            # if Δl < 0
-            #     #@show 1
-            #     csstate.tension = 0.0
-            # elseif f < 0
-            #     #@show 2
-            #     csstate.tension = 0.0
-            # else
-            #     #@show f
-            #     csstate.tension = f
-            # end
-            #prestress = 1000
-            #if f+prestress < 0
-            #    csstate.tension = 0.0
-            #else
-            #    csstate.tension = f+prestress
-            #end
-            #@show f
-            csstate.tension = f
-            𝐟 = τ*csstate.tension
+            segstate.tension = k*u0/u*(l-u)
+            𝐟 = τ*segstate.tension
             f1 .+=  𝐟
             f2 .+= -𝐟
         end
     end
 end
 
-function update_clusterstrings_apply_preforces!(tgstruct, s)
-    rbs = tgstruct.rigidbodies
-    clusters = tgstruct.tensiles.clusterstrings
-    cnt = tgstruct.connectivity
-    
-    for i in clusters    
-        for (ID, cs) in enumerate(i.section)
-            #@unpack ID = cs
-            csstate = cs.state
-            a,b = cnt.clusterstring2ap[i.ID][ID]
-            state1 = rbs[a.rbid].state
-            p1 = state1.rps[a.apid]
-            ṗ1 = state1.ṙps[a.apid]
-            f1 = state1.Faps[a.apid]
-            state2 = rbs[b.rbid].state
-            p2 = state2.rps[b.apid]
-            ṗ2 = state2.ṙps[b.apid]
-            f2 = state2.Faps[b.apid]
-            Δr = p2 - p1
-            Δṙ = ṗ2 - ṗ1
-            l,τ = lengthdir(p2-p1)
-            csstate.length = l
-            csstate.direction = τ
-            csstate.lengthdot = (transpose(Δr)*Δṙ)/l
-
-            Δl = csstate.length - csstate.restlen          
-            #EA = k * csstate.restlen
-            EA = 110e9*pi/4*(1e-3)^2
-            #@show s
-            #EA = 86400
-            if ID == 1
-                f = EA*(Δl - s[ID])/(csstate.restlen + s[ID])
-            elseif ID == i.section[end].ID
-                f = EA*(Δl + s[ID-1])/(csstate.restlen - s[ID-1])
-            else
-                f = EA*(Δl + s[ID-1] - s[ID])/(csstate.restlen + s[ID] - s[ID-1])
-            end
-            #@show f
-            # if Δl < 0
-            #     #@show 1
-            #     csstate.tension = 0.0
-            # elseif f < 0
-            #     #@show 2
-            #     csstate.tension = 0.0
-            # else
-            #     #@show f
-            #     csstate.tension = f
-            # end
-            prestress = 1000
-            if f+prestress < 0
-                csstate.tension = 0.0
-            else
-                csstate.tension = f+prestress
-            end
-            #@show f
-            #csstate.tension = f
-            𝐟 = τ*csstate.tension
-            f1 .+=  𝐟
-            f2 .+= -𝐟
-        end
-    end
+function update_strings!(tg, @eponymargs(strings,clusterstrings))
+    update_strings!(tg,@eponymtuple(strings))
+    update_strings!(tg,@eponymtuple(clusterstrings))
 end
 
 
-distribute_q_to_rbs!(tgstruct,globalq) = distribute_q_to_rbs!(tgstruct,globalq,zero(globalq))
-function distribute_q_to_rbs!(tgstruct,globalq,globalq̇)
-    rbs = tgstruct.rigidbodies
-    cnt = tgstruct.connectivity
-    for rbid in tgstruct.mvbodyindex
+distribute_q_to_rbs!(tg,globalq) = distribute_q_to_rbs!(tg,globalq,zero(globalq))
+function distribute_q_to_rbs!(tg,globalq,globalq̇)
+    rbs = tg.rigidbodies
+    cnt = tg.connectivity
+    for rbid in tg.mvbodyindex
         pindex = cnt.body2q[rbid]
         @unpack q, q̇ = rbs[rbid].state.coords
         q .= globalq[pindex]
@@ -444,9 +356,9 @@ function assemble_forces(tg;factor=1.0)
     F
 end
 
-function apply_gravity!(tgstruct;factor=1)
-    rbs = tgstruct.rigidbodies
-    gravity_acceleration = factor*get_gravity(tgstruct)
+function apply_gravity!(tg;factor=1)
+    rbs = tg.rigidbodies
+    gravity_acceleration = factor*get_gravity(tg)
     for (rbid,rb) in enumerate(rbs)
         @unpack prop, state = rb
         rb.state.F .+= gravity_acceleration*prop.mass
@@ -492,39 +404,39 @@ end
 
 potential_energy(rb::AbstractRigidBody) = gravity_potential_energy(rb)
 
-function kinetic_energy_coords(tgstruct::TensegrityStructure,q,q̇)
-    distribute_q_to_rbs!(tgstruct,q,q̇)
-    ke = sum(kinetic_energy_coords.(tgstruct.rigidbodies))
+function kinetic_energy_coords(tg::AbstractTensegrity,q,q̇)
+    distribute_q_to_rbs!(tg,q,q̇)
+    ke = sum(kinetic_energy_coords.(tg.rigidbodies))
 end
 
-function gravity_potential_energy(tgstruct::TensegrityStructure,q)
-    distribute_q_to_rbs!(tgstruct,q)
-    sum(gravity_potential_energy.(tgstruct.rigidbodies))
+function gravity_potential_energy(tg::AbstractTensegrity,q)
+    distribute_q_to_rbs!(tg,q)
+    sum(gravity_potential_energy.(tg.rigidbodies))
 end
 
-function elastic_potential_energy(tgstruct::TensegrityStructure)
-    reset_forces!(tgstruct)
-    update_strings_apply_forces!(tgstruct)
-    pe = sum(potential_energy.(tgstruct.strings))
+function elastic_potential_energy(tg::TensegrityStructure)
+    reset_forces!(tg)
+    update_strings_apply_forces!(tg)
+    pe = sum(potential_energy.(tg.strings))
 end
 
-function elastic_potential_energy(tgstruct::TensegrityStructure,q)
-    distribute_q_to_rbs!(tgstruct,q)
-    elastic_potential_energy(tgstruct)
+function elastic_potential_energy(tg::TensegrityStructure,q)
+    distribute_q_to_rbs!(tg,q)
+    elastic_potential_energy(tg)
 end
 
-function elastic_potential_energy(tr::TensegrityRobot,q,a)
-    actuate!(tr,a)
-    elastic_potential_energy(tr.tg,q)
+function elastic_potential_energy(bot::TensegrityRobot,q,a)
+    actuate!(bot,a)
+    elastic_potential_energy(bot.tg,q)
 end
 
-function energy(tgstruct,q,q̇;gravity=false)
-    distribute_q_to_rbs!(tgstruct,q,q̇)
-    ke = sum(kinetic_energy_coords.(tgstruct.rigidbodies))
-    update_strings_apply_forces!(tgstruct)
-    epe = sum(potential_energy.(tgstruct.strings))
+function energy(tg,q,q̇;gravity=false)
+    distribute_q_to_rbs!(tg,q,q̇)
+    ke = sum(kinetic_energy_coords.(tg.rigidbodies))
+    update_strings_apply_forces!(tg)
+    epe = sum(potential_energy.(tg.strings))
     if gravity
-        gpe = gravity_potential_energy(tgstruct,q)
+        gpe = gravity_potential_energy(tg,q)
     else
         gpe = 0
     end
@@ -563,13 +475,14 @@ function build_body2q(rbs::Vector{rbType}) where rbType<:AbstractRigidBody{N,T,C
     body2q
 end
 
-function build_massmatrix(tgstruct::TensegrityStructure)
-    body2q = tgstruct.connectivity.body2q
-    ncoords = tgstruct.ncoords
-    mass_matrix = zeros(ncoords,ncoords)
-    for rbid in tgstruct.mvbodyindex
+function build_massmatrix(tg::AbstractTensegrity)
+    body2q = tg.connectivity.body2q
+    ncoords = tg.ncoords
+    T = get_numbertype(tg)
+    mass_matrix = zeros(T,ncoords,ncoords)
+    for rbid in tg.mvbodyindex
         pindex = body2q[rbid]
-        mass_matrix[pindex,pindex] .+= tgstruct.rigidbodies[rbid].state.cache.M
+        mass_matrix[pindex,pindex] .+= tg.rigidbodies[rbid].state.cache.M
     end
     mass_matrix
 end
@@ -777,19 +690,19 @@ function get_d(tg)
 end
 
 get_ndim(bot::TensegrityRobot) = get_ndim(bot.tg)
-get_ndim(tg::TensegrityStructure) = get_ndim(tg.rigidbodies)
+get_ndim(tg::AbstractTensegrity) = get_ndim(tg.rigidbodies)
 get_ndim(rbs::AbstractVector{<:AbstractRigidBody}) = get_ndim(eltype(rbs))
 get_ndim(rb::AbstractRigidBody) = get_ndim(typeof(rb))
 get_ndim(::Type{<:AbstractRigidBody{N,T,C}}) where {N,T,C} = N
 
 get_numbertype(bot::TensegrityRobot) = get_numbertype(bot.tg)
-get_numbertype(tg::TensegrityStructure) = get_numbertype(tg.rigidbodies)
+get_numbertype(tg::AbstractTensegrity) = get_numbertype(tg.rigidbodies)
 get_numbertype(rbs::AbstractVector{<:AbstractRigidBody}) = get_numbertype(eltype(rbs))
 get_numbertype(rb::AbstractRigidBody) = get_numbertype(typeof(rb))
 get_numbertype(::Type{<:AbstractRigidBody{N,T,C}}) where {N,T,C} = T
 
 get_nbodyconstraint(bot::TensegrityRobot) = get_nbodyconstraint(bot.tg)
-get_nbodyconstraint(tg::TensegrityStructure) = get_nbodyconstraint(tg.rigidbodies)
+get_nbodyconstraint(tg::AbstractTensegrity) = get_nbodyconstraint(tg.rigidbodies)
 get_nbodyconstraint(rbs::AbstractVector{<:AbstractRigidBody}) = get_nbodyconstraint(eltype(rbs))
 get_nbodyconstraint(rb::AbstractRigidBody) = get_nbodyconstraint(typeof(rb))
 get_nbodyconstraint(::Type{<:RigidBody{N,T,L,C,
@@ -798,7 +711,7 @@ get_nbodyconstraint(::Type{<:RigidBody{N,T,L,C,
                 cfT}}}) where {N,T,L,C,ArrayT,MT,lncsType,cfT} = NaturalCoordinates.get_nconstraint(lncsType)
 
 get_nbodycoords(bot::TensegrityRobot) = get_nbodycoords(bot.tg)
-get_nbodycoords(tg::TensegrityStructure) = get_nbodycoords(tg.rigidbodies)
+get_nbodycoords(tg::AbstractTensegrity) = get_nbodycoords(tg.rigidbodies)
 get_nbodycoords(rbs::AbstractVector{<:AbstractRigidBody}) = get_nbodycoords(eltype(rbs))
 get_nbodycoords(rb::AbstractRigidBody) = get_nbodycoords(typeof(rb))
 get_nbodycoords(::Type{<:RigidBody{N,T,L,C,
@@ -807,14 +720,14 @@ get_nbodycoords(::Type{<:RigidBody{N,T,L,C,
                 cfT}}}) where {N,T,L,C,ArrayT,MT,lncsType,cfT} = NaturalCoordinates.get_ncoords(lncsType)
 
 get_nbodydof(bot::TensegrityRobot) = get_nbodydof(bot.tg)
-get_nbodydof(tg::TensegrityStructure) = get_nbodydof(tg.rigidbodies)
+get_nbodydof(tg::AbstractTensegrity) = get_nbodydof(tg.rigidbodies)
 get_nbodydof(rbs::AbstractVector{<:AbstractRigidBody}) = get_nbodydof(eltype(rbs))
 get_nbodydof(rb::AbstractRigidBody) = get_nbodydof(typeof(rb))
 get_nbodydof(::Type{<:AbstractRigidBody{2,T,C}}) where {T,C} = 3
 get_nbodydof(::Type{<:AbstractRigidBody{3,T,C}}) where {T,C} = 6
 
 get_gravity(bot::TensegrityRobot) = get_gravity(bot.tg)
-get_gravity(tg::TensegrityStructure) = get_gravity(tg.rigidbodies)
+get_gravity(tg::AbstractTensegrity) = get_gravity(tg.rigidbodies)
 get_gravity(rbs::AbstractVector{<:AbstractRigidBody}) = get_gravity(eltype(rbs))
 get_gravity(rb::AbstractRigidBody) = get_gravity(typeof(rb))
 get_gravity(::Type{<:AbstractRigidBody{2,T,C}}) where {T,C} = [zero(T),-9.81*one(T)]
@@ -822,7 +735,7 @@ get_gravity(::Type{<:AbstractRigidBody{3,T,C}}) where {T,C} = [zero(T),zero(T),-
 
 
 get_gravity_y(tr::TensegrityRobot) = get_gravity_y(tr.tg)
-get_gravity_y(tg::TensegrityStructure) = get_gravity_y(tg.rigidbodies)
+get_gravity_y(tg::AbstractTensegrity) = get_gravity_y(tg.rigidbodies)
 get_gravity_y(rbs::AbstractVector{<:AbstractRigidBody}) = get_gravity_y(eltype(rbs))
 get_gravity_y(rb::AbstractRigidBody) = get_gravity_y(typeof(rb))
 get_gravity_y(::Type{<:AbstractRigidBody{2,T,C}}) where {T,C} = [zero(T),9.81*one(T)]
@@ -835,33 +748,33 @@ get_strings_len_dot(bot::TensegrityRobot) = get_strings_len_dot(bot.tg)
 get_strings_tension(bot::TensegrityRobot) = get_strings_tension(bot.tg)
 get_strings_stiffness(bot::TensegrityRobot) = get_strings_stiffness(bot.tg)
 
-function get_strings_len!(tg::TensegrityStructure,q)
+function get_strings_len!(tg::AbstractTensegrity,q)
     distribute_q_to_rbs!(tg,q,zero(q))
     update_strings_apply_forces!(tg)
     get_strings_len(tg)
 end
 
-function get_strings_stiffness(tg::TensegrityStructure)
+function get_strings_stiffness(tg::AbstractTensegrity)
     [s.k for s in tg.strings]
 end
 
-function get_strings_len(tg::TensegrityStructure)
+function get_strings_len(tg::AbstractTensegrity)
     [s.state.length for s in tg.strings]
 end
 
-function get_strings_len_dot(tg::TensegrityStructure)
+function get_strings_len_dot(tg::AbstractTensegrity)
     [s.state.lengthdot for s in tg.strings]
 end
 
-function get_strings_deform(tg::TensegrityStructure)
+function get_strings_deform(tg::AbstractTensegrity)
     [s.state.length - s.state.restlen for s in tg.strings]
 end
 
-function get_strings_restlen(tg::TensegrityStructure)
+function get_strings_restlen(tg::AbstractTensegrity)
     [s.state.restlen for s in tg.strings]
 end
 
-function get_strings_tension(tg::TensegrityStructure)
+function get_strings_tension(tg::AbstractTensegrity)
     [s.state.tension for s in tg.strings]
 end
 
@@ -872,7 +785,7 @@ function get_original_restlen(botinput::TensegrityRobot)
     u0 = get_strings_restlen(bot.tg)
 end
 
-function force_densities_to_restlen(tg::TensegrityStructure,γs)
+function force_densities_to_restlen(tg::AbstractTensegrity,γs)
     [
     begin
         l = s.state.length
@@ -946,32 +859,61 @@ function new_trajectory(tg::TensegrityStructure)
     t0 = zero(get_numbertype(tg))
     q0, q̇0  = get_initial(tg)
     λ0 = get_λ(tg)
-    NaturalCoordinatesTrajectory([t0], [q0], [q̇0], [λ0])
+    ConstrainedCoordinatesTrajectory([t0], [q0], [q̇0], [λ0])
+end
+
+function new_trajectory(tg::ClusterTensegrityStructure)
+    t0 = zero(get_numbertype(tg))
+    q0, q̇0  = get_initial(tg)
+    λ0 = get_λ(tg)
+    s̄0 = get_s̄(tg)
+    SlidingConstrainedCoordinatesTrajectory([t0], [q0], [q̇0], [λ0], [s̄0])
 end
 
 function TensegrityRobot(tg,hub)
 	reset_forces!(tg)
-    update_strings_apply_forces!(tg)
-	check_jacobian_singularity(tg)
-	check_stability(tg)
+    # update_strings_apply_forces!(tg)
+	# check_jacobian_singularity(tg)
+	# check_stability(tg)
     TensegrityRobot(tg,hub,new_trajectory(tg))
 end
 
 function reset!(bot::TensegrityRobot)
     @unpack tg, traj = bot
-    @unpack qs, q̇s = traj
-    reset_forces!(tg)
-    distribute_q_to_rbs!(tg,qs[begin],q̇s[begin])
-    update_strings_apply_forces!(tg)
+    reset!(tg,traj)
     reset!(traj)
 end
 
-function reset!(traj::TensegrityRobotTrajectory)
+function reset!(tg::TensegrityStructure,traj)
+    @unpack qs,q̇s = traj
+    reset_forces!(tg)
+    distribute_q_to_rbs!(tg,qs[begin],q̇s[begin])
+    update_strings!(tg)
+end
+
+function reset!(tg::ClusterTensegrityStructure,traj)
+    @unpack qs,q̇s,s̄s = traj
+    reset_forces!(tg)
+    distribute_q_to_rbs!(tg,qs[begin],q̇s[begin])
+    distribute_s̄!(tg,s̄s[begin])
+    update_strings!(tg)
+end
+
+function reset!(traj::ConstrainedCoordinatesTrajectory)
     @unpack ts, qs, q̇s, λs = traj
     resize!(ts,1)
     resize!(qs,1)
     resize!(q̇s,1)
     resize!(λs,1)
+end
+
+function reset!(traj::SlidingConstrainedCoordinatesTrajectory)
+    @unpack ts,qs,q̇s,λs,s̄s= traj
+    resize!(ts,1)
+    resize!(qs,1)
+    resize!(q̇s,1)
+    resize!(λs,1)
+    resize!(s̄s,1)
 end
 
 function set_new_initial!(bot::TensegrityRobot,q,q̇=zero(q))

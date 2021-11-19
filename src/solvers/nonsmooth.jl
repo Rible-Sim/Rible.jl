@@ -16,12 +16,12 @@ function generalized_α(ρ∞,h)
     (αm=αm,αf=αf,γ=γ,β=β,γₜ=γₜ,βₜ=βₜ)
 end
 
-function Newmark(ρ∞)
-    αf = αm = 0.0
-    γ = 1/2
-    β = 1/4
-    (αm=αm,αf=αf,γ=γ,β=β)
-end
+# function Newmark(ρ∞)
+#     αf = αm = 0.0
+#     γ = 1/2
+#     β = 1/4
+#     (αm=αm,αf=αf,γ=γ,β=β)
+# end
 
 mutable struct ActiveSets{T}
     𝒞::T
