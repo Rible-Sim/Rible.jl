@@ -96,7 +96,7 @@ function solve!(prob::SimProblem,solver::ConstrainedSolver;karg...)
 end
 
 function solve!(prob::SimProblem,solver::SlidingConstrainedSolver;karg...)
-    @unpack bot = prob
+    #@unpack bot = prob
     @unpack bot,tspan,dyfuncs,restart = prob
     @unpack tg,traj = bot
     @unpack A = dyfuncs

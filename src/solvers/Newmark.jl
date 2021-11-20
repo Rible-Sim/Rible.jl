@@ -153,7 +153,7 @@ function generate_cache(solver::SlidingNewmark,intor;dt,kargs...)
     q̈s = [zero(q̇) for i in 1:totalstep+1]
     s̄s = [copy(s̄) for i in 1:totalstep+1]
     F0 = copy(q)
-    F!(F0,qs[1],q̇s[1],0.0)
+    F!(F0,qs[1],q̇s[1],s̄s[1],0.0)
     q̈s[1] .= M\F0
     λs = [zeros(eltype(q),nλ) for i in 1:totalstep+1]
     SlidingNewmarkCache(totalstep,totaltime,ts,qs,q̇s,q̈s,λs,s̄s,solver)
@@ -165,9 +165,9 @@ function solve!(intor::Integrator,cache::SlidingNewmarkCache;
     @unpack prob,state,nx,nq,nλ = intor
     @unpack bot,tspan,dyfuncs,control!,restart = prob
     @unpack current,lasttime = state
-    @unpack totaltime,totalstep,ts,qs,q̇s,q̈s,λs,solver = cache
+    @unpack totaltime,totalstep,ts,qs,q̇s,q̈s,s̄s,λs,solver = cache
     @unpack γ,β = solver.newmark
-    @unpack M,Φ,A,F!,Jac_F! = dyfuncs
+    @unpack M,Φ,A,F!,Ψ,Jac_F! = dyfuncs
     q0 = qs[begin]
     F⁺ = zero(q0)
     F⁻ = zero(q0)
@@ -180,17 +180,20 @@ function solve!(intor::Integrator,cache::SlidingNewmarkCache;
     d1 = 1/dt
     d2 = 1/dt^2
     b1 = 1/β
-    function R_stepk_maker(qᵏ⁻¹,q̇ᵏ⁻¹,q̈ᵏ⁻¹,q̇ᵏ,q̈ᵏ,M,Φ,A,F!,nq,nλ,tᵏ⁻¹,dt)
+    function R_stepk_maker(qᵏ⁻¹,q̇ᵏ⁻¹,q̈ᵏ⁻¹,q̇ᵏ,q̈ᵏ,M,Φ,A,F!,Ψ,nq,nλ,tᵏ⁻¹,dt)
 
         # @inline @inbounds
         function inner_R_stepk!(R,x)
             qᵏ = @view x[   1:nq]
             λᵏ = @view x[nq+1:nq+nλ]
+            sᵏ = @view x[nq+nλ+1:nx]
             @. q̈ᵏ = ((qᵏ-qᵏ⁻¹)*d2 - q̇ᵏ⁻¹*d1)*b1 + (1-0.5*b1)*q̈ᵏ⁻¹
             @. q̇ᵏ = q̇ᵏ⁻¹ + ((1-γ)*q̈ᵏ⁻¹ + γ*q̈ᵏ)*dt
-            F!(F⁺,qᵏ,q̇ᵏ,tᵏ⁻¹+dt)
+            F!(F⁺,qᵏ,q̇ᵏ,sᵏ,tᵏ⁻¹+dt)
             R[   1:nq]    .= dt2.*M*q̈ᵏ .+ transpose(A(qᵏ))*λᵏ .- dt2.*F⁺
+            #R[   1:nq]    .= transpose(A(qᵏ))*λᵏ .- dt2.*F⁺
             R[nq+1:nq+nλ] .= scaling.*Φ(qᵏ)
+            R[nq+nλ+1:nx] .= Ψ(sᵏ)
         end
     end
 
@@ -205,23 +208,27 @@ function solve!(intor::Integrator,cache::SlidingNewmarkCache;
         q̈ᵏ⁻¹ = q̈s[timestep]
         λᵏ⁻¹ = λs[timestep]
         tᵏ⁻¹ = ts[timestep]
+        sᵏ⁻¹ = s̄s[timestep]
         qᵏ = qs[timestep+1]
         q̇ᵏ = q̇s[timestep+1]
         q̈ᵏ = q̈s[timestep+1]
         λᵏ = λs[timestep+1]
+        sᵏ = s̄s[timestep+1]
         initial_x[   1:nq]    .= qᵏ⁻¹
         initial_x[nq+1:nq+nλ] .= λᵏ⁻¹
+        initial_x[nq+nλ+1:nx] .= sᵏ⁻¹
         # initial_R = similar(initial_x)
         #R_stepk!(initial_R,initial_x)
-        @show qᵏ⁻¹
+        #@show qᵏ⁻¹
         #@code_warntype R_stepk!(initial_R,initial_x)
-        R_stepk! = R_stepk_maker(qᵏ⁻¹,q̇ᵏ⁻¹,q̈ᵏ⁻¹,q̇ᵏ,q̈ᵏ,M,Φ,A,F!,nq,nλ,tᵏ⁻¹,dt)
+        R_stepk! = R_stepk_maker(qᵏ⁻¹,q̇ᵏ⁻¹,q̈ᵏ⁻¹,q̇ᵏ,q̈ᵏ,M,Φ,A,F!,Ψ,nq,nλ,tᵏ⁻¹,dt)
         if typeof(Jac_F!) == Nothing
             dfk = OnceDifferentiable(R_stepk!,initial_x,initial_F)
         else
             error("Jacobian not implemented yet.")
         end
         R_stepk_result = nlsolve(dfk, initial_x; ftol, iterations, method=:newton)
+                
         if converged(R_stepk_result) == false
             # @show R_stepk_result
             if exception
@@ -236,15 +243,18 @@ function solve!(intor::Integrator,cache::SlidingNewmarkCache;
         xᵏ = R_stepk_result.zero
         qᵏ .= xᵏ[   1:nq]
         λᵏ .= xᵏ[nq+1:nq+nλ]
+        sᵏ .= xᵏ[nq+nλ+1:nx]
 
         #---------Step k finisher-----------
         step += 1
         lasttime.t .= current.t
         lasttime.q .= current.q
         lasttime.q̇ .= current.q̇
+        lasttime.s̄ .= current.s̄
         current.t .= ts[timestep+1]
         current.q .= qᵏ
         current.q̇ .= q̇ᵏ
+        current.s̄ .= sᵏ
         #---------Step k finisher-----------
         if verbose
             # dtwidth = ceil(Int,-log10(dt))

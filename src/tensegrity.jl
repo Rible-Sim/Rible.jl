@@ -173,7 +173,7 @@ function update_strings!(tg, @eponymargs(strings,))
     rbs = tg.rigidbodies
     cnt = tg.connectivity
     for sstring in strings
-        @unpack id,k,c = sstring
+        @unpack id,k,c,prestress = sstring
         sstate = sstring.state
         a,b = cnt.string2ap[id]
         state1 = rbs[a.rbid].state
@@ -191,10 +191,15 @@ function update_strings!(tg, @eponymargs(strings,))
         sstate.direction = τ
         sstate.lengthdot = (transpose(Δr)*Δṙ)/l
         Δl = sstate.length - sstate.restlen
-        f = k*Δl + c*sstate.lengthdot
-        if Δl < 0
-            sstate.tension = 0.0
-        elseif f < 0
+        f = k*Δl + c*sstate.lengthdot + prestress
+        #if Δl < 0
+        #    sstate.tension = 0.0
+        #elseif f < 0
+        #    sstate.tension = 0.0
+        #else
+        #    sstate.tension = f
+        #end
+        if f < 0
             sstate.tension = 0.0
         else
             sstate.tension = f
@@ -249,7 +254,9 @@ function update_strings!(tg, @eponymargs(clusterstrings,))
         s = clusterstring.sps.s
         for (segid, seg) in enumerate(clusterstring.segs)
             @unpack k,c,prestress,original_restlen = seg
-            u0 = original_restlen
+            @unpack restlen = seg.state
+            #u0 = original_restlen
+            u0 = restlen
             segstate = seg.state
             a,b = cnt.clusterstring2ap[clusterstring.ID][segid]
             state1 = rbs[a.rbid].state
@@ -274,6 +281,7 @@ function update_strings!(tg, @eponymargs(clusterstrings,))
                 u = u0 + s[segid] - s[segid-1]
             end
             segstate.tension = k*u0/u*(l-u)
+            #segstate.tension = k*(l-u)
             𝐟 = τ*segstate.tension
             f1 .+=  𝐟
             f2 .+= -𝐟

@@ -7,6 +7,7 @@ function distribute_s̄!(tg::ClusterTensegrityStructure,s̄)
         nsi = length(cs.sps)
         cs.sps.s⁺ .= s⁺[is+1:is+nsi]
         cs.sps.s⁻ .= s⁻[is+1:is+nsi]
+        cs.sps.s  .= s⁺[is+1:is+nsi] - s⁻[is+1:is+nsi]
         is += nsi
     end
 end

@@ -114,8 +114,8 @@ function calculate_α(μ,θ)
     exp(-μ*θ)
 end
 
-function SlidingPoint(μ=0.0)
-    θ = zero(μ)
+function SlidingPoint(μ=0.02)
+    θ = one(μ) * 2pi
     α = calculate_α(μ,θ)
     s = zero(μ)
     s⁺,s⁻ = s2s̄(s)
