@@ -152,9 +152,12 @@ function generate_cache(solver::SlidingNewmark,intor;dt,kargs...)
     q̇s = [copy(q̇) for i in 1:totalstep+1]
     q̈s = [zero(q̇) for i in 1:totalstep+1]
     s̄s = [copy(s̄) for i in 1:totalstep+1]
+    #@show length(s̄s[1])
+    #s̄s[1][1] = -6e-4
     F0 = copy(q)
     F!(F0,qs[1],q̇s[1],s̄s[1],0.0)
     q̈s[1] .= M\F0
+    #q̈s[1] .= 0
     λs = [zeros(eltype(q),nλ) for i in 1:totalstep+1]
     SlidingNewmarkCache(totalstep,totaltime,ts,qs,q̇s,q̈s,λs,s̄s,solver)
 end
@@ -228,7 +231,6 @@ function solve!(intor::Integrator,cache::SlidingNewmarkCache;
             error("Jacobian not implemented yet.")
         end
         R_stepk_result = nlsolve(dfk, initial_x; ftol, iterations, method=:newton)
-                
         if converged(R_stepk_result) == false
             # @show R_stepk_result
             if exception
@@ -243,7 +245,7 @@ function solve!(intor::Integrator,cache::SlidingNewmarkCache;
         xᵏ = R_stepk_result.zero
         qᵏ .= xᵏ[   1:nq]
         λᵏ .= xᵏ[nq+1:nq+nλ]
-        sᵏ .= xᵏ[nq+nλ+1:nx]
+        @show sᵏ .= xᵏ[nq+nλ+1:nx]
 
         #---------Step k finisher-----------
         step += 1

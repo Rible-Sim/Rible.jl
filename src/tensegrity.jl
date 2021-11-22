@@ -172,7 +172,38 @@ end
 function update_strings!(tg, @eponymargs(strings,))
     rbs = tg.rigidbodies
     cnt = tg.connectivity
-    for sstring in strings
+    function inner_update!(rbs, cnt, sstring::TensegrityRobots.SString)
+        @unpack id,k,c= sstring
+        sstate = sstring.state
+        a,b = cnt.string2ap[id]
+        state1 = rbs[a.rbid].state
+        p1 = state1.rps[a.apid]
+        ṗ1 = state1.ṙps[a.apid]
+        f1 = state1.Faps[a.apid]
+        state2 = rbs[b.rbid].state
+        p2 = state2.rps[b.apid]
+        ṗ2 = state2.ṙps[b.apid]
+        f2 = state2.Faps[b.apid]
+        Δr = p2 - p1
+        Δṙ = ṗ2 - ṗ1
+        l,τ = lengthdir(p2-p1)
+        sstate.length = l
+        sstate.direction = τ
+        sstate.lengthdot = (transpose(Δr)*Δṙ)/l
+        Δl = sstate.length - sstate.restlen
+        f = k*Δl + c*sstate.lengthdot
+        if Δl < 0
+            sstate.tension = 0.0
+        elseif f < 0
+            sstate.tension = 0.0
+        else
+            sstate.tension = f
+        end
+        𝐟 = τ*sstate.tension
+        f1 .+=  𝐟
+        f2 .+= -𝐟
+    end
+    function inner_update!(rbs, cnt, sstring::TensegrityRobots.PrestressString)
         @unpack id,k,c,prestress = sstring
         sstate = sstring.state
         a,b = cnt.string2ap[id]
@@ -207,6 +238,9 @@ function update_strings!(tg, @eponymargs(strings,))
         𝐟 = τ*sstate.tension
         f1 .+=  𝐟
         f2 .+= -𝐟
+    end
+    for sstring in strings
+        inner_update!(rbs,cnt,sstring)
     end
 end
 
@@ -255,8 +289,8 @@ function update_strings!(tg, @eponymargs(clusterstrings,))
         for (segid, seg) in enumerate(clusterstring.segs)
             @unpack k,c,prestress,original_restlen = seg
             @unpack restlen = seg.state
-            #u0 = original_restlen
-            u0 = restlen
+            u0 = original_restlen
+            #u0 = restlen
             segstate = seg.state
             a,b = cnt.clusterstring2ap[clusterstring.ID][segid]
             state1 = rbs[a.rbid].state
