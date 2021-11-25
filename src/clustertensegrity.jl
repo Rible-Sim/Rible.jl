@@ -12,6 +12,20 @@ function distribute_s̄!(tg::ClusterTensegrityStructure,s̄)
     end
 end
 
+function old_distribute_s̄!(tg::ClusterTensegrityStructure,s̄)
+    css = tg.clusterstrings
+    s⁺ = @view s̄[begin:2:end]
+    s⁻ = @view s̄[begin+1:2:end]
+    is = 0
+    for cs in tg.clusterstrings
+        nsi = length(cs.sps)
+        cs.sps.s⁺ .= s⁺[is+1:is+nsi]
+        cs.sps.s⁻ .= s⁻[is+1:is+nsi]
+        cs.sps.s  .= s⁺[is+1:is+nsi] - s⁻[is+1:is+nsi]
+        is += nsi
+    end
+end
+
 function get_s̄(tg::ClusterTensegrityStructure)
     ns = tg.nslidings
     s̄ = zeros(get_numbertype(tg),2ns)
@@ -29,7 +43,7 @@ end
 
 function build_Ψ(tg::ClusterTensegrityStructure)
     @unpack clusterstrings = tg
-    FB = FischerBurmeister()
+    FB = FischerBurmeister(1e-14,10.,10.)
     function _inner_Ψ(s̄)
         ψ = Vector{eltype(s̄)}(undef,2tg.nslidings)
         ψ⁺ = @view ψ[begin:2:end]
@@ -43,6 +57,7 @@ function build_Ψ(tg::ClusterTensegrityStructure)
             for (i,sp) in enumerate(sps)
                 ζ⁺ = segs[i+1].state.tension/sp.α - segs[i].state.tension
                 ζ⁻ = segs[i].state.tension - sp.α*segs[i+1].state.tension
+                #@show ζ⁺,s⁺[is+i]
                 ψ⁺[is+i] = FB(ζ⁺,s⁺[is+i])
                 ψ⁻[is+i] = FB(ζ⁻,s⁻[is+i])
             end

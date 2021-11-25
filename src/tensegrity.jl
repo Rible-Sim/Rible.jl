@@ -283,14 +283,12 @@ end
 function update_strings!(tg, @eponymargs(clusterstrings,))
     rbs = tg.rigidbodies
     cnt = tg.connectivity
-
     for clusterstring in clusterstrings
         s = clusterstring.sps.s
         for (segid, seg) in enumerate(clusterstring.segs)
             @unpack k,c,prestress,original_restlen = seg
             @unpack restlen = seg.state
-            u0 = original_restlen
-            #u0 = restlen
+            u0 = restlen
             segstate = seg.state
             a,b = cnt.clusterstring2ap[clusterstring.ID][segid]
             state1 = rbs[a.rbid].state
@@ -314,8 +312,16 @@ function update_strings!(tg, @eponymargs(clusterstrings,))
             else
                 u = u0 + s[segid] - s[segid-1]
             end
-            segstate.tension = k*u0/u*(l-u)
-            #segstate.tension = k*(l-u)
+            #segstate.tension = k*abs(u0)/u*(l-u)
+            segstate.tension = k*(l-u)
+            #if u0 < 0
+            #    wait()
+            #end
+
+            if segstate.tension < 0
+                #@show 1
+                segstate.tension = 0
+            end
             𝐟 = τ*segstate.tension
             f1 .+=  𝐟
             f2 .+= -𝐟
@@ -326,6 +332,15 @@ end
 function update_strings!(tg, @eponymargs(strings,clusterstrings))
     update_strings!(tg,@eponymtuple(strings))
     update_strings!(tg,@eponymtuple(clusterstrings))
+end
+
+function apply_actuation(tg, css_id::Union{Int64,Vector{Int64}}, cs_id::Union{Int64,Vector{Int64}}, apply_fun)
+    @unpack clusterstrings = tg
+    for css in css_id
+        for cs in cs_id
+            clusterstrings[css].segs[cs].state.restlen += apply_fun
+        end
+    end
 end
 
 
@@ -651,6 +666,70 @@ function get_q(tg)
         q̇[pindex] .= rbs[rbid].state.coords.q̇
     end
     return q,q̇
+end
+
+function get_q(bot::TensegrityRobots.TensegrityRobot)
+    get_q(bot.tg)
+end
+
+function get_force(bot::TensegrityRobots.TensegrityRobot)
+    get_force(bot, bot.tg.tensiles)
+end
+
+function get_force(bot::TensegrityRobots.TensegrityRobot,@eponymargs(strings,clusterstrings))
+    @unpack tensiles = bot.tg
+    f_list = Vector{Vector{Float64}}()
+    push!(f_list, [ss.state.tension for ss in tensiles.strings])
+    for clusterstring in tensiles.clusterstrings
+        push!(f_list, [cs.state.tension for cs in clusterstring.segs])
+    end
+    return f_list
+end
+
+function get_force(bot::TensegrityRobots.TensegrityRobot,@eponymargs(strings))
+    @unpack tensiles = bot.tg
+    f_list = Vector{Vector{Float64}}()
+    push!(f_list, [ss.state.tension for ss in tensiles.strings])
+    return f_list
+end
+
+
+function get_state(bot::TensegrityRobots.TensegrityRobot, dataname)
+    get_state(bot, bot.tg.tensiles, dataname)
+end
+
+function get_state(bot::TensegrityRobots.TensegrityRobot,@eponymargs(strings,clusterstrings), dataname)
+    @unpack tensiles = bot.tg
+    f_list = Vector{Vector{Float64}}()
+    push!(f_list, [getproperty(ss.state,dataname) for ss in tensiles.strings])
+    for clusterstring in tensiles.clusterstrings
+        push!(f_list, [getproperty(cs.state,dataname) for cs in clusterstring.segs])
+    end
+    return f_list
+end
+
+function get_state(bot::TensegrityRobots.TensegrityRobot,@eponymargs(strings), dataname)
+    @unpack tensiles = bot.tg
+    f_list = Vector{Vector{Float64}}()
+    push!(f_list, [getproperty(ss.state,dataname) for ss in tensiles.strings])
+    return f_list
+end
+
+function get_sp(bot::TensegrityRobots.TensegrityRobot, dataname)
+    @unpack clusterstrings = bot.tg
+    f_list = Vector{Vector{Any}}()
+    for css in clusterstrings
+        push!(f_list, getproperty(css.sps,dataname))
+    end
+    return f_list
+end
+
+function csf(bot::TensegrityRobots.TensegrityRobot)
+    return bot.tg.clusterstrings
+end
+
+function ssf(bot::TensegrityRobots.TensegrityRobot)
+    return bot.tg.strings
 end
 
 get_λ(tg) = zeros(get_numbertype(tg),tg.nconstraint)
