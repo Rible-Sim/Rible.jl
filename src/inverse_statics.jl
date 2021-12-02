@@ -5,6 +5,12 @@ function build_Ti(tg::TensegrityStructure,i::Integer)
     build_Ti(nbodycoords,ncoords,body2q[i])
 end
 
+function build_Ti(tg::ClusterTensegrityStructure,i::Integer)
+    nbodycoords = get_nbodycoords(tg)
+    body2q = tg.connectivity.body2q
+    ncoords = tg.ncoords
+    build_Ti(nbodycoords,ncoords,body2q[i])
+end
 function build_Ti(nbodycoords,nq,q_index)
     Ti = spzeros(Int,nbodycoords,nq)
     for (body_q_id,q_id) in enumerate(q_index)
@@ -188,6 +194,18 @@ function build_Ji(tgstruct,i)
     cnt = tgstruct.connectivity
     @unpack string2ap = cnt
     ap = string2ap[i]
+    C1 = rbs[ap[1].rbid].state.cache.Cp[ap[1].apid]
+    C2 = rbs[ap[2].rbid].state.cache.Cp[ap[2].apid]
+    T1 = build_Ti(tgstruct,ap[1].rbid)
+    T2 = build_Ti(tgstruct,ap[2].rbid)
+    Ji = C2*T2-C1*T1
+end
+
+function build_Ji(tgstruct,nc,nss)
+    rbs = tgstruct.rigidbodies
+    cnt = tgstruct.connectivity
+    @unpack clusterstring2ap = cnt
+    ap = clusterstring2ap[nc][nss]
     C1 = rbs[ap[1].rbid].state.cache.Cp[ap[1].apid]
     C2 = rbs[ap[2].rbid].state.cache.Cp[ap[2].apid]
     T1 = build_Ti(tgstruct,ap[1].rbid)

@@ -10,6 +10,7 @@ end
 Newmark(γ=0.5,β=0.25) = Newmark(γ,β)
 
 struct SlidingZhong06 <: SlidingConstrainedSolver end
+struct Seminewton <: SlidingConstrainedSolver end
 struct SlidingNewmark{T} <: SlidingConstrainedSolver
     newmark::Newmark{T}
 end
@@ -138,3 +139,4 @@ include("solvers/Zhong06.jl")
 include("solvers/Newmark.jl")
 include("solvers/nonsmooth.jl")
 include("solvers/Zhong06NSNH.jl")
+include("solvers/seminewton.jl")

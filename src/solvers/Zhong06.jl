@@ -237,50 +237,6 @@ function solve!(intor::Integrator,cache::SlidingZhong06Cache;
         end
     end
 
-    function apply_s̄!(bot)
-        @unpack clusterstrings = bot.tg
-        for cs in clusterstrings
-            @unpack s,s⁺,s⁻ = cs.sps
-            l = length(cs.segs)
-            for scs in cs.segs
-                if scs.id == 1
-                    scs.state.restlen += s[1]
-                elseif scs.id == l
-                    scs.state.restlen += -s[end]
-                else
-                    scs.state.restlen += s[scs.id] - s[scs.id-1]
-                end
-            end                 
-            s .= 0
-            s⁺ .= 0
-            s⁻ .= 0
-        end
-    end
-
-    function apply_s̄!(bot,s̄s)
-        @unpack clusterstrings = bot.tg
-        s⁺ = @view s̄s[1:2:end]
-        s⁻ = @view s̄s[2:2:end]
-        s = s⁺ - s⁻
-        is = 0
-        for cs in clusterstrings
-            l = length(cs.segs)
-            for scs in cs.segs
-                if scs.id == 1
-                    scs.state.restlen += s[is+1]
-                elseif scs.id == l
-                    scs.state.restlen += -s[is+l-1]
-                else
-                    scs.state.restlen += s[is+scs.id] - s[is+scs.id-1]
-                end
-            end                 
-            s .= 0
-            s⁺ .= 0
-            s⁻ .= 0
-            is += l - 1
-        end
-    end
-
     iteration = 0
     prog = Progress(totalstep; dt=1.0, enabled=progress)
     for timestep = 1:totalstep
