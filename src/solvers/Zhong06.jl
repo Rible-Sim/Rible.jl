@@ -201,9 +201,6 @@ function solve!(intor::Integrator,cache::SlidingZhong06Cache;
             1/h.*scaling.*(transpose(A(qᵏ))-transpose(A(qᵏ⁻¹)))*λᵏ
     end
     function R_stepk_maker(qᵏ⁻¹,pᵏ⁻¹,M,Φ,A,F!,nq,nλ,tᵏ⁻¹,dt)
-        # F!(F⁻,(qᵏ⁻¹.+qᵏ)./2,(qᵏ.-qᵏ⁻¹)./dt,tᵏ-dt/2)
-        # kr = norm(F⁻,Inf)
-        # scaling = mr + kr*dt^2
         @inline @inbounds function inner_R_stepk!(R,x)
             h = dt
             qᵏ = @view x[   1:nq]
@@ -225,17 +222,34 @@ function solve!(intor::Integrator,cache::SlidingZhong06Cache;
         @inline @inbounds function inner_J_stepk!(J,x)
             h = dt
             qᵏ = @view x[   1:nq]
-            λᵏ = @view x[nq+1:end]
+            λᵏ = @view x[nq+1:nq+nλ]
+            s̄ = @view x[nq+nλ+1:end]
             q = (qᵏ.+qᵏ⁻¹)./2
             q̇ = (qᵏ.-qᵏ⁻¹)./h
+
             t = tᵏ⁻¹+h/2
-            Jac_F!(∂F∂q,∂F∂q̇,q,q̇,t)
-            J[   1:nq ,   1:nq]  .=  M.-h^2/2 .*(1/2 .*∂F∂q.+1/h.*∂F∂q̇)
-            J[   1:nq ,nq+1:end] .= -scaling.*transpose(A(qᵏ⁻¹))
-            J[nq+1:end,   1:nq ] .=  scaling.*A(qᵏ)
-            J[nq+1:end,nq+1:end] .=  0.0
+            ∂F∂q,∂F∂q̇,∂F∂s̄ = Jac_F!(q,q̇,s̄,t)
+            ζ = build_ζ(bot.tg)
+            n = length(ζ)
+            ∂ζ∂q = build_∂ζ∂q(bot.tg)(q)
+            ∂ζ∂s̄ = build_∂ζ∂s̄(bot.tg)
+            ∂s̄∂s̄ = I(n)
+            coes = diagm([((ζ[i]/1000)^2 + (1000*s̄[i])^2)^(-1/2) for i in 1:n])
+            coζ = coes*diagm([ζ[i]/1000^2 for i in 1:n]) - diagm([1/1000 for i in 1:n])
+            cos̄ = coes*diagm([1000^2*s̄[i] for i in 1:n]) - diagm([1000 for i in 1:n])
+            J[   1:nq ,      1:nq    ] .=  M.-h^2/2 .*(1/2 .*∂F∂q.+1/h.*∂F∂q̇)
+            J[   1:nq ,   nq+1:nq+nλ ] .= -scaling.*transpose(A(qᵏ⁻¹))
+            J[   1:nq ,nq+nλ+1:end   ] .= 1/2 * dt^2 .* ∂F∂s̄
+            J[nq+1:nq+nλ,   1:nq ] .=  scaling.*A(qᵏ)
+            J[nq+1:nq+nλ,nq+1:nq+nλ] .=  0.0
+            J[nq+1:nq+nλ,nq+nλ+1:end] .=  0.0
+            #@show size(∂ζ∂q),size(zeros(Float64,length(a),nq))
+            J[nq+nλ+1:end,1:nq] .= coζ*∂ζ∂q
+            J[nq+nλ+1:end,nq+1:nq+nλ+1] .= 0.0
+            J[nq+nλ+1:end,nq+nλ+1:end] .= coζ *∂ζ∂s̄ + cos̄*∂s̄∂s̄
         end
     end
+
 
     iteration = 0
     prog = Progress(totalstep; dt=1.0, enabled=progress)
@@ -256,21 +270,23 @@ function solve!(intor::Integrator,cache::SlidingZhong06Cache;
         initial_x[   1:nq]    = qᵏ⁻¹
         initial_x[nq+1:nq+nλ] = λᵏ⁻¹
         initial_x[nq+nλ+1:nx] = sᵏ⁻¹
-        #bot.tg.clusterstrings[1].segs[1].state.restlen += apply_fun(tᵏ⁻¹,1e-3)
-        apply_acu!(bot.tg, tᵏ⁻¹)
-        # initial_R = similar(initial_x)
-        #R_stepk!(initial_R,initial_x)
-        # @show initial_R
-        #@code_warntype R_stepk!(initial_R,initial_x)
+       
+        if apply_acu! != nothing
+            apply_acu!(bot.tg, tᵏ⁻¹;dt)
+        end
         R_stepk! = R_stepk_maker(qᵏ⁻¹,pᵏ⁻¹,M,Φ,A,F!,nq,nλ,tᵏ⁻¹,dt)
-        #if typeof(Jac_F!) == Nothing
-        #    dfk = OnceDifferentiable(R_stepk!,initial_x,initial_F)
-        #else
-        #    J_stepk! = J_stepk_maker(qᵏ⁻¹,M,A,Jac_F!,nq,nλ,tᵏ⁻¹,dt)
-        #    dfk = OnceDifferentiable(R_stepk!,J_stepk!,initial_x,initial_F)
-        #end
-        dfk = OnceDifferentiable(R_stepk!,initial_x,initial_F)
+        #dfk = OnceDifferentiable(R_stepk!,initial_x,initial_F)
+
+        if typeof(Jac_F!) == Nothing
+            dfk = OnceDifferentiable(R_stepk!,initial_x,initial_F)
+        else
+            J_stepk! = J_stepk_maker(qᵏ⁻¹,M,A,Jac_F!,nq,nλ,tᵏ⁻¹,dt)
+            dfk = OnceDifferentiable(R_stepk!,J_stepk!,initial_x,initial_F)
+        end
+
+        #show_data(qᵏ⁻¹,sᵏ,M,A,Jac_F!,nq,nλ,tᵏ⁻¹,dt,initial_x,R_stepk!,J_stepk!)
         R_stepk_result = nlsolve(dfk, initial_x; ftol, iterations, method=:newton)
+        #record_data(bot, R_stepk_result.iterations)
 
         if converged(R_stepk_result) == false
             if exception
@@ -303,6 +319,7 @@ function solve!(intor::Integrator,cache::SlidingZhong06Cache;
         current.q .= qᵏ
         current.q̇ .= q̇ᵏ
         current.s̄ .= sᵏ
+        push!(bot.traj.OtherData,bot.tg.clusterstrings[1].segs[1].state.tension)
 
         #apply_s̄!(bot,sᵏ)
         #apply_s̄!(bot)

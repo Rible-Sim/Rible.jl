@@ -64,7 +64,7 @@ function rbid2mvrbid(mvbodyindex)
 
 end
 
-function build_D(tgstruct)
+function build_D(tgstruct::TensegrityStructure)
     @unpack nstrings,nmvpoints,ndim,mvbodyindex = tgstruct
     @unpack body2q,string2ap = tgstruct.connectivity
     D = spzeros(Int,nmvpoints*ndim,nstrings*ndim)
@@ -86,6 +86,46 @@ function build_D(tgstruct)
         end
     end
     D .= kron(D_raw,Matrix(1I,ndim,ndim))
+end
+
+
+function build_D(tgstruct::ClusterTensegrityStructure)
+    @unpack nstrings,nclusterstrings,nslidings,nmvpoints,ndim,mvbodyindex = tgstruct
+    @unpack body2q,string2ap,clusterstring2ap = tgstruct.connectivity
+    D = spzeros(Int,nmvpoints*ndim,(nstrings+nclusterstrings+nslidings)*ndim)
+    D_raw = spzeros(Int,nmvpoints,nstrings)
+    D_clu = spzeros(Int,nmvpoints,nclusterstrings+nslidings)
+    iss = [0]
+    for rbid in tgstruct.mvbodyindex
+        rb = tgstruct.rigidbodies[rbid]
+        push!(iss,iss[end]+rb.prop.naps)
+    end
+
+    for (sid,ap) in enumerate(string2ap)
+        mvrbid1 = findfirst((x)->x==ap[1].rbid, mvbodyindex)
+        if mvrbid1 != nothing
+            D_raw[iss[mvrbid1]+ap[1].apid,sid] = 1
+        end
+        mvrbid2 = findfirst((x)->x==ap[2].rbid, mvbodyindex)
+        if mvrbid2 != nothing
+            D_raw[iss[mvrbid2]+ap[2].apid,sid] = -1
+        end
+    end
+    cadd = 0
+    for c2ap in clusterstring2ap
+        for (cid,ap) in enumerate(c2ap)
+            mvrbid1 = findfirst((x)->x==ap[1].rbid, mvbodyindex)
+            if mvrbid1 != nothing
+                D_clu[iss[mvrbid1]+ap[1].apid,cid+cadd] = 1
+            end
+            mvrbid2 = findfirst((x)->x==ap[2].rbid, mvbodyindex)
+            if mvrbid2 != nothing
+                D_clu[iss[mvrbid2]+ap[2].apid,cid+cadd] = -1
+            end
+        end
+        cadd += length(c2ap)
+    end
+    D .= kron(hcat(D_raw, D_clu),Matrix(1I,ndim,ndim))
 end
 
 function build_Q̃(tg)

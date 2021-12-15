@@ -134,6 +134,17 @@ function solve!(prob::SimProblem,solver::SlidingConstrainedSolver;karg...)
     bot
 end
 
+function record_data(bot, it, data)
+    @unpack traj = bot
+    push!(traj.iterations, it)
+    push!(traj.OtherData, data)
+end
+
+function record_data(bot, it)
+    @unpack traj = bot
+    push!(traj.iterations, it)
+end
+
 include("solvers/Wendlandt.jl")
 include("solvers/Zhong06.jl")
 include("solvers/Newmark.jl")

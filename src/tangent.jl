@@ -43,7 +43,7 @@ function build_tangent(tg)
     ∂Γ∂q,∂Γ∂q̇
 end
 
-function build_Jac_Γ(tg::TensegrityRobots.TensegrityStructure)
+function build_Jac_Γ(tg::TensegrityStructure)
     ns = tg.nstrings
     @unpack ncoords,ndim = tg
     J = [build_Ji(tg,i) for i = 1:ns]
@@ -74,36 +74,42 @@ function build_Jac_Γ(tg::TensegrityRobots.TensegrityStructure)
     end
 end
 
-function build_Jac_Γ(tg::TensegrityRobots.ClusterTensegrityStructure,strings_index::Vector{Int64},cluster_index::Vector{Int64})
-    ns = tg.nstrings
-    ncs = tg.nclusterstrings
-    nsss = Int64((tg.nclusterstrings + tg.nslidings)/ncs)
-    nsnc  = maximum(vcat(strings_index,cluster_index))
-    @unpack ncoords,ndim = tg
-    J = [build_Ji(tg,i) for i = 1:ns]
+function build_Jac_Γ(tg::ClusterTensegrityStructure)
+    @unpack nstrings, nclusterstrings, nslidings = tg
+    @unpack ncoords,ndim,clusterstrings = tg
+    nclustersegs = nclusterstrings + nslidings
+    J = [build_Ji(tg,i) for i = 1:nstrings]
     k = [s.k for s in tg.strings]
     c = [s.c for s in tg.strings]
 
-    Jc = [build_Ji(tg,i,j) for i in 1:ncs for j in 1:nsss]
-    kc = [tg.clusterstrings[i].segs[j].k for i in 1:ncs for j in 1:nsss]
-    cc = [tg.clusterstrings[i].segs[j].c for i in 1:ncs for j in 1:nsss]
+    Jc = Vector{SparseMatrixCSC}()
+    kc = Vector{Float64}()
+    cc = Vector{Float64}()
+    for (cid,clusterstring) in enumerate(clusterstrings)
+        @unpack segs = clusterstring
+        for (sid, seg) in enumerate(segs)
+            push!(Jc, build_Ji(tg, cid, sid))
+            push!(kc, seg.k)
+            push!(cc, seg.c)
+        end
+    end
 
     U = [transpose(Ji)*Ji for Ji in J]
     Uc = [transpose(Jci)*Jci for Jci in Jc]
-    
+
     function inner_Jac_Γ(q,q̇,s̄)
-        #reset_forces!(tg)
-        #distribute_q_to_rbs!(tg,q,q̇)
-        #distribute_s̄!(tg,s̄)
-        #update_strings!(tg)
-        @unpack clusterstrings = tg
+        reset_forces!(tg)
+        distribute_q_to_rbs!(tg,q,q̇)
+        distribute_s̄!(tg,s̄)
+        update_strings!(tg)
+        #@unpack clusterstrings = tg
         f = [s.state.tension for s in tg.strings]
         l = [s.state.length for s in tg.strings]
         u = [s.state.restlen for s in tg.strings]
 
-        fc = [tg.clusterstrings[i].segs[j].state.tension for i in 1:ncs for j in 1:nsss]
-        lc = [tg.clusterstrings[i].segs[j].state.length for i in 1:ncs for j in 1:nsss]
         uc = Vector{Float64}()
+        fc = Vector{Float64}()
+        lc = Vector{Float64}()
         for clusterstring in clusterstrings
             @unpack s = clusterstring.sps
             @unpack state = clusterstring.segs
@@ -112,132 +118,169 @@ function build_Jac_Γ(tg::TensegrityRobots.ClusterTensegrityStructure,strings_in
             res[1:n-1] += s
             res[2:n] -= s
             append!(uc,res)
+            @unpack segs = clusterstring
+            for seg in segs
+                push!(fc, seg.state.tension)
+                push!(lc, seg.state.length)
+            end
         end
-        qᵀU = [transpose(q)*U[i] for i = 1:ns]
-        l̇ = [(qᵀU[i]*q̇)/l[i] for i = 1:ns]
-        l̂ = [J[i]*q/l[i] for i = 1:ns]
+        qᵀU = [transpose(q)*U[i] for i = 1:nstrings]
+        l̇ = [(qᵀU[i]*q̇)/l[i] for i = 1:nstrings]
+        l̂ = [J[i]*q/l[i] for i = 1:nstrings]
 
-        qᵀUc = [transpose(q)*Uc[i] for i = 1:nsss*ncs]
-        l̇c = [(qᵀUc[i]*q̇)/lc[i] for i = 1:nsss*ncs]
-        l̂c = [Jc[i]*q/lc[i] for i = 1:nsss*ncs]
+        qᵀUc = [transpose(q)*Uc[i] for i = 1:nclustersegs]
+        l̇c = [(qᵀUc[i]*q̇)/lc[i] for i = 1:nclustersegs]
+        l̂c = [Jc[i]*q/lc[i] for i = 1:nclustersegs]
 
-        ∂Γ∂q = zeros(eltype(q),ndim*nsnc,ncoords)
-        ∂Γ∂q̇ = zeros(eltype(q),ndim*nsnc,ncoords)
-        for (i,j) in enumerate(strings_index)
+        ∂Γ∂qs = zeros(eltype(q),ndim*nstrings,ncoords)
+        ∂Γ∂q̇s = zeros(eltype(q),ndim*nstrings,ncoords)
+        ∂Γ∂qc = zeros(eltype(q),ndim*nclustersegs,ncoords)
+        ∂Γ∂q̇c = zeros(eltype(q),ndim*nclustersegs,ncoords)
+        for i in 1:nstrings
             l̂qᵀUi = l̂[i]*qᵀU[i]
-            ∂Γ∂q[(j-1)*ndim+1:j*ndim,:] .= (k[i]*u[i]-c[i]*l̇[i])/l[i]^2 .*l̂qᵀUi .+ c[i]/l[i].*(l̂[i]*transpose(q̇)*U[i]) .+ f[i]/l[i] .*J[i]
-            ∂Γ∂q̇[(j-1)*ndim+1:j*ndim,:] .= c[i]/l[i].*l̂qᵀUi
+            ∂Γ∂qs[(i-1)*ndim+1:i*ndim,:] .= (k[i]*u[i]-c[i]*l̇[i])/l[i]^2 .*l̂qᵀUi .+ c[i]/l[i].*(l̂[i]*transpose(q̇)*U[i]) .+ f[i]/l[i] .*J[i]
+            ∂Γ∂q̇s[(i-1)*ndim+1:i*ndim,:] .= c[i]/l[i].*l̂qᵀUi
         end
-        for (i,j) in enumerate(cluster_index)
+        for i in 1:nclustersegs
             l̂qᵀUic = l̂c[i]*qᵀUc[i]
-            ∂Γ∂q[(j-1)*ndim+1:j*ndim,:] .+= (kc[i]*uc[i]-cc[i]*l̇c[i])/lc[i]^2 .*l̂qᵀUic .+ cc[i]/lc[i].*(l̂c[i]*transpose(q̇)*Uc[i]) .+ fc[i]/lc[i] .*Jc[i]
-            ∂Γ∂q̇[(j-1)*ndim+1:j*ndim,:] .+= cc[i]/lc[i].*l̂qᵀUic
+            ∂Γ∂qc[(i-1)*ndim+1:i*ndim,:] .+= (kc[i]*uc[i]-cc[i]*l̇c[i])/lc[i]^2 .*l̂qᵀUic .+ cc[i]/lc[i].*(l̂c[i]*transpose(q̇)*Uc[i]) .+ fc[i]/lc[i] .*Jc[i]
+            ∂Γ∂q̇c[(i-1)*ndim+1:i*ndim,:] .+= cc[i]/lc[i].*l̂qᵀUic
         end
-        ∂Γ∂q,∂Γ∂q̇
+        vcat(∂Γ∂qs,∂Γ∂qc), vcat(∂Γ∂q̇s,∂Γ∂q̇c)
     end
 end
 
-function build_∂Γ∂s̄(tg::ClusterTensegrityStructure,strings_index::Vector{Int64},cluster_index::Vector{Int64})
-    nsnc = maximum(vcat(strings_index, cluster_index))
-    nsnc = tg.nstrings
-    nss = tg.nslidings
-    ncs = tg.nclusterstrings
-    nsss = Int64((tg.nclusterstrings + tg.nslidings)/ncs)
-    @unpack ncoords,ndim = tg
-    Jc = [build_Ji(tg,i,j) for i in 1:ncs for j in 1:nsss]
-    kc = [1/tg.clusterstrings[i].segs[j].k for i in 1:ncs for j in 1:nsss]
-    nk = Int64(length(kc)/2)
-    N = zeros(Float64, nk, nss)
-    N0 = zeros(Float64, nk, nss)
-    N[1,1] = 1; N[1,2] = -1; N[nk,nss] = 1; N[nk,nss-1] = -1
-    for i in 2:nk-1
-        N[i,2i-3:2i] = [-1 1 1 -1]
+function build_∂Γ∂s̄(tg::ClusterTensegrityStructure)
+    @unpack nstrings, nslidings, nclusterstrings = tg
+    @unpack clusterstrings,ncoords,ndim = tg
+    nclustersegs = nclusterstrings + nslidings
+    Jc = Vector{SparseMatrixCSC}()
+    kc = Vector{Float64}()
+    N_list = Vector{SparseMatrixCSC}()
+    for (cid,clusterstring) in enumerate(clusterstrings)
+        @unpack segs = clusterstring
+        nsegs = length(segs)
+        for (sid, seg) in enumerate(segs)
+            push!(Jc, build_Ji(tg, cid, sid))
+            push!(kc, seg.k)
+        end
+        N = sparse(zeros(Float64, nsegs, 2nsegs-2))
+        N[1,1:2]=[1 -1]; N[end,end-1:end]=[-1 1]
+        for i in 2:nsegs-1
+            N[i, 2i-3:2i] = [-1 1 1 -1]
+        end
+        push!(N_list, N)
     end
-    N = repeat([N N0;N0 N],inner=(ndim,1))
+    #N = repeat(reduce(blockdiag,N_list),inner=(ndim,1))
+    N = reduce(blockdiag,N_list)
+    function _inner_∂Γ∂s̄_(q)
+        lc = Vector{Float64}()
+        for clusterstring in clusterstrings
+            @unpack segs = clusterstring
+            for seg in segs
+                push!(lc, seg.state.length)
+            end
+        end
 
-    function inner_∂Γ∂s̄(q, q̇, s̄)
+        l̂c = [Jc[i]*q/lc[i] for i = 1:nslidings+nclusterstrings]
+        ∂Γ∂s̄s = zeros(eltype(q),ndim*nstrings,2nslidings)
+        ∂Γ∂s̄c = zeros(eltype(q),ndim*(nclustersegs),2nslidings)
+        for i in 1:nclustersegs
+            #∂Γ∂s̄c[(i-1)*ndim+1,:] .= kc[i].*l̂c[i][1].*N[ndim*(i-1)+1,:]
+            #∂Γ∂s̄c[i*ndim,:] .= kc[i].*l̂c[i][2].*N[ndim*i,:]
+            #@show kc[i],l̂c[i],N[(i-1)*ndim+1:i*ndim,:]
+            for j in 1:ndim
+                ∂Γ∂s̄c[(i-1)*ndim+j,:] .= kc[i]*l̂c[i][j]*N[i,:]
+            end
+            #@show size(∂Γ∂s̄c[(i-1)*ndim+1:i*ndim,:])
+        end
+        return vcat(∂Γ∂s̄s, ∂Γ∂s̄c)
+    end
+
+    function inner_∂Γ∂s̄(q,q̇,s̄)
         reset_forces!(tg)
         distribute_q_to_rbs!(tg,q,q̇)
         distribute_s̄!(tg, s̄)
         update_strings!(tg)
-        lc = [tg.clusterstrings[i].segs[j].state.length for i in 1:ncs for j in 1:nsss]
-        
-        l̂c = [Jc[i]*q/lc[i] for i = 1:nsss*ncs]
-
-        ∂Γ∂s̄ = zeros(eltype(q),ndim*nsnc,nss*2)
-        
-        for (i,j) in enumerate(cluster_index)
-            #∂Γ∂s̄[(j-1)*ndim+1:j*ndim,:] .= -kc[i].*l̂c[i]'*N[ndim*(i-1)+1:ndim*i,:]
-            ∂Γ∂s̄[(j-1)*ndim+1,:] .= 1/2*kc[i].*l̂c[i][1].*N[ndim*(i-1)+1,:]
-            ∂Γ∂s̄[j*ndim,:] .= 1/2*kc[i].*l̂c[i][2].*N[ndim*i,:]
-            #∂Γ∂s̄[(j-1)*ndim+1,:] .= KN[i,:].*l̂c[i][1]
-            #∂Γ∂s̄[j*ndim,:] .= KN[i,:].*l̂c[i][2]
-        end
-        return ∂Γ∂s̄
+        _inner_∂Γ∂s̄_(q)
     end
-    
+
+    function inner_∂Γ∂s̄(q)
+        _inner_∂Γ∂s̄_(q)
+    end
+    return inner_∂Γ∂s̄
 end
 
-function build_∂ζ∂q(tg)    
-    ncs = tg.nclusterstrings
-    nsss = Int64((tg.nclusterstrings + tg.nslidings)/ncs)
-    @unpack ncoords,ndim = tg
+function build_∂ζ∂q(tg)
+    @unpack nslidings, nclusterstrings = tg
+    @unpack clusterstrings,ncoords,ndim = tg
+    nclustersegs = nslidings+nclusterstrings
 
-    Jc = [build_Ji(tg,i,j) for i in 1:ncs for j in 1:nsss]
-    kc = [tg.clusterstrings[i].segs[j].k for i in 1:ncs for j in 1:nsss]
-    αc = [tg.clusterstrings[i].sps[j].α for i in 1:ncs for j in 1:nsss-1]
-    Uc = [transpose(Jci)*Jci for Jci in Jc]
-    nk = Int64(length(kc)/2)
-
-    b0 = zeros(Float64, nk-1,nk)
-    b1⁺ = zeros(Float64, nk-1, nk)
-    b1⁻ = deepcopy(b1⁺)
-    b2⁺ = deepcopy(b1⁺)
-    b2⁻ = deepcopy(b1⁺)
-
-    for i in 1:nk-1
-        b1⁺[i,i:i+1] = [-kc[i] kc[i+1]/αc[i]]
-        b1⁻[i,i:i+1] = [kc[i] -αc[i]*kc[i+1]]
-        b2⁺[i,i:i+1] = [-kc[i+nk] kc[i+1+nk]/αc[i+nk-1]]
-        b2⁻[i,i:i+1] = [kc[i+nk] -αc[i+nk-1]*kc[i+1+nk]]
-    end
-    b = [b1⁺ b0;b1⁻ b0;b0 b2⁺;b0 b2⁻]
-
-    T0 = zeros(Float64, 2*(nsss-1), 2*(nsss-1))
-    T = get_TransMatrix(2*(nsss-1))    
-    T = [T T0;T0 T]
-
-    function inner_∂W∂q(q)
-        lc = [tg.clusterstrings[i].segs[j].state.length for i in 1:ncs for j in 1:nsss]
-        qᵀUc = [transpose(q)*Uc[i] for i = 1:nsss*ncs]
-        dldq = [(qᵀUc[i])/lc[i] for i = 1:nsss*ncs] 
-        a = zeros(Float64,length(dldq),length(dldq[1]))
-        for i in 1:length(dldq)
-            a[i,:] = dldq[i]
+    Jc = Vector{SparseMatrixCSC}()
+    kc = Vector{Float64}()
+    αc = Vector{Float64}()
+    b_list = Vector{SparseMatrixCSC}()
+    T_list = Vector{SparseMatrixCSC}()
+    for (cid,clusterstring) in enumerate(clusterstrings)
+        @unpack segs,sps = clusterstring
+        nsegs = length(segs)
+        for (sid, seg) in enumerate(segs)
+            push!(Jc, build_Ji(tg, cid, sid))
+            push!(kc, seg.k)
         end
-        ∂W∂q = 1/2*T*b*a
-        return ∂W∂q
+        for sp in sps
+            append!(αc,sp.α)
+        end
+        b⁺ = sparse(zeros(Float64, nsegs-1, nsegs))
+        b⁻ = sparse(zeros(Float64, nsegs-1, nsegs))
+        for i in 1:nsegs-1
+            b⁺[i,i:i+1] = [-kc[i] kc[i+1]/αc[i]]
+            b⁻[i,i:i+1] = [kc[i] -αc[i]*kc[i+1]]
+        end
+        push!(b_list, vcat(b⁺,b⁻))
+        push!(T_list, get_TransMatrix(nsegs-1))
+    end
+    Uc = [transpose(Jci)*Jci for Jci in Jc]
+    b = reduce(blockdiag, b_list)
+    T = reduce(blockdiag, T_list)
+
+    function inner_∂ζ∂q(q)
+        lc = Vector{Float64}()
+        for clusterstring in clusterstrings
+            for seg in clusterstring.segs
+                push!(lc, seg.state.length)
+            end
+        end
+        qᵀUc = [transpose(q)*Uc[i] for i = 1:nclustersegs]
+        dldq = [(qᵀUc[i])/lc[i] for i = 1:nclustersegs]
+        #∂ζ∂q = 1/2*T*b*reduce(vcat,dldq)
+        ∂ζ∂q = 1/2*T*b*reduce(vcat,dldq)
+        return ∂ζ∂q
     end
 end
 
 function get_TransMatrix(n)
-    T = zeros(Float64, n, n)
-    for (j,i) in enumerate(1:2:n)
+    T = zeros(Float64, 2n, 2n)
+    for (j,i) in enumerate(1:2:2n)
         T[i,j] = 1
     end
-    for (j,i) in enumerate(2:2:n)
-        T[i,j+Int64(n/2)] = 1
+    for (j,i) in enumerate(2:2:2n)
+        T[i,j+n] = 1
     end
-    return T
+    return sparse(T)
 end
 
 function build_∂ζ∂s̄(tg)
-    ns = tg.nslidings
-    A = get_clusterA(tg)
-    A0 = zeros(Float64, ns, ns)
-    T = get_TransMatrix(ns)
-    AA = [T*A[1]*T' A0; A0 T*A[2]*T']
-    return AA
+    @unpack clusterstrings = tg
+    A_list = Vector{SparseMatrixCSC}()
+    clusterA = get_clusterA(tg)
+    for (cid,clusterstring) in enumerate(clusterstrings)
+        nseg = length(clusterstring.segs)
+        T = get_TransMatrix(nseg-1)
+        A = sparse(T*clusterA[cid]*T')
+        push!(A_list,A)
+    end
+    return reduce(blockdiag,A_list)
 end
 
 function make_testtangent(tgstruct)

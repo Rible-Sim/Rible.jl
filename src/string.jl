@@ -78,12 +78,12 @@ function SString3D(id,original_restlen::T,k::T,c=zero(k)) where T
     SString(id,k,c,state)
 end
 
-function CableSegment2D(id,original_restlen::T,k::T,c=zero(k),prestress=zero(k)) where T
+function CableSegment2D(id,original_restlen::T,k::T;c=zero(k),prestress=zero(k)) where T
     state = SString2DState(original_restlen)
     CableSegment(id,k,c,prestress,original_restlen,state)
 end
 
-function CableSegment3D(id,original_restlen::T,k::T,c=zero(k),prestress=zero(k)) where T
+function CableSegment3D(id,original_restlen::T,k::T;c=zero(k),prestress=zero(k)) where T
     state = SString3DState(original_restlen)
     CableSegment(id,k,c,prestress,original_restlen,state)
 end
@@ -114,7 +114,7 @@ function calculate_α(μ,θ)
     exp(-μ*θ)
 end
 
-function SlidingPoint(μ=0.02)
+function SlidingPoint(μ)
     θ = one(μ) * 2pi
     #θ = zero(μ)
     α = calculate_α(μ,θ)
@@ -129,8 +129,8 @@ struct ClusterCables{spsType,segsType}
     segs::segsType
 end
 
-function ClusterCables3D(id, nsp, segs)
-    sps = StructArray([SlidingPoint() for i = 1:nsp])
+function ClusterCables3D(id, nsp, segs;μ=0.0)
+    sps = StructArray([SlidingPoint(μ) for i = 1:nsp])
     ClusterCables(id, sps, segs)
 end
 

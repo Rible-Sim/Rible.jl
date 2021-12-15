@@ -83,7 +83,7 @@ function solve!(intor::Integrator,cache::NewmarkCache;
         initial_x[nq+1:nq+nλ] .= λᵏ⁻¹
         # initial_R = similar(initial_x)
         #R_stepk!(initial_R,initial_x)
-        @show qᵏ⁻¹
+        # @show qᵏ⁻¹
         #@code_warntype R_stepk!(initial_R,initial_x)
         R_stepk! = R_stepk_maker(qᵏ⁻¹,q̇ᵏ⁻¹,q̈ᵏ⁻¹,q̇ᵏ,q̈ᵏ,M,Φ,A,F!,nq,nλ,tᵏ⁻¹,dt)
         if typeof(Jac_F!) == Nothing
@@ -93,7 +93,6 @@ function solve!(intor::Integrator,cache::NewmarkCache;
         end
         R_stepk_result = nlsolve(dfk, initial_x; ftol, iterations, method=:newton)
         if converged(R_stepk_result) == false
-            # @show R_stepk_result
             if exception
                 error("Not Converged!")
             else
@@ -174,7 +173,7 @@ function solve!(intor::Integrator,cache::SlidingNewmarkCache;
     @unpack current,lasttime = state
     @unpack totaltime,totalstep,ts,qs,q̇s,q̈s,s̄s,λs,solver = cache
     @unpack γ,β = solver.newmark
-    @unpack M,Φ,A,F!,Ψ,Jac_F! = dyfuncs
+    @unpack M,Φ,A,F!,Ψ,apply_acu!,Jac_F! = dyfuncs
     q0 = qs[begin]
     F⁺ = zero(q0)
     F⁻ = zero(q0)
@@ -197,11 +196,75 @@ function solve!(intor::Integrator,cache::SlidingNewmarkCache;
             @. q̈ᵏ = ((qᵏ-qᵏ⁻¹)*d2 - q̇ᵏ⁻¹*d1)*b1 + (1-0.5*b1)*q̈ᵏ⁻¹
             @. q̇ᵏ = q̇ᵏ⁻¹ + ((1-γ)*q̈ᵏ⁻¹ + γ*q̈ᵏ)*dt
             F!(F⁺,qᵏ,q̇ᵏ,sᵏ,tᵏ⁻¹+dt)
-            R[   1:nq]    .= dt2.*M*q̈ᵏ .+ transpose(A(qᵏ))*λᵏ .- dt2.*F⁺
-            #R[   1:nq]    .= transpose(A(qᵏ))*λᵏ .- dt2.*F⁺
-            R[nq+1:nq+nλ] .= scaling.*Φ(qᵏ)
+            R[   1:nq]    .= M*q̈ᵏ .+ transpose(A(qᵏ))*λᵏ .- F⁺
+            R[nq+1:nq+nλ] .= Φ(qᵏ)
+            #R[nq+1:nq+nλ] .= Φ(qᵏ)
             R[nq+nλ+1:nx] .= Ψ(sᵏ)
         end
+    end
+
+    function J_stepk_maker(qᵏ⁻¹,M,A,Jac_F!,nq,nλ,tᵏ⁻¹,dt)
+        @inline @inbounds function inner_J_stepk!(J,x)
+            h = dt
+            qᵏ = @view x[   1:nq]
+            λᵏ = @view x[nq+1:nq+nλ]
+            s̄ = @view x[nq+nλ+1:end]
+            q = qᵏ
+            q̇ = (qᵏ.-qᵏ⁻¹)./h
+
+            t = tᵏ⁻¹+h
+            ∂F∂q,∂F∂q̇,∂F∂s̄ = Jac_F!(q,q̇,s̄,t)
+            ζ = build_ζ(bot.tg)
+            n = length(ζ)
+            ∂ζ∂q = build_∂ζ∂q(bot.tg)(q)
+            ∂ζ∂s̄ = build_∂ζ∂s̄(bot.tg)
+            ∂s̄∂s̄ = I(n)
+            coes = diagm([((ζ[i]/1000)^2 + (1000*s̄[i])^2)^(-1/2) for i in 1:n])
+            coζ = coes*diagm([ζ[i]/1000^2 for i in 1:n]) - diagm([1/1000 for i in 1:n])
+            cos̄ = coes*diagm([1000^2*s̄[i] for i in 1:n]) - diagm([1000 for i in 1:n])
+            #@show size(b1*d2*M ), size(diagm(λᵏ)*A(qᵏ)), size(∂F∂q), size(γ*b1*d1*∂F∂q̇)
+            J[   1:nq ,      1:nq    ] .=  b1*d2*M  - ∂F∂q - γ*b1*d1*∂F∂q̇
+            J[   1:nq ,   nq+1:nq+nλ ] .= transpose(A(qᵏ))
+            J[   1:nq ,nq+nλ+1:end   ] .= ∂F∂s̄
+            J[nq+1:nq+nλ,   1:nq ] .=  A(qᵏ)
+            J[nq+1:nq+nλ,nq+1:nq+nλ] .=  0.0
+            J[nq+1:nq+nλ,nq+nλ+1:end] .=  0.0
+            #@show size(∂ζ∂q),size(zeros(Float64,length(a),nq))
+            J[nq+nλ+1:end,1:nq] .= coζ*∂ζ∂q
+            J[nq+nλ+1:end,nq+1:nq+nλ+1] .= 0.0
+            J[nq+nλ+1:end,nq+nλ+1:end] .= coζ*∂ζ∂s̄ + cos̄*∂s̄∂s̄
+        end
+    end
+
+
+    function show_data(qᵏ⁻¹,sᵏ,M,A,Jac_F!,nq,nλ,tᵏ⁻¹,dt,initial_x,R_stepk!,J_stepk!)
+        nx = length(initial_x)
+        output = zeros(nx,nx)
+        FiniteDiff.finite_difference_jacobian!(output,R_stepk!,initial_x)
+        J = zeros(Float64, nx, nx)
+        J_stepk!(J, initial_x)
+        #wait()
+        cha = J - output
+        @show max = findmax(cha)
+        max = 0
+        if max > .02
+            write_data(initial_x,output,J,cha) 
+            wait()
+        end
+    end
+    
+    function write_data(initial_x,output,J,cha) 
+        XLSX.openxlsx("t1.xlsx", mode="rw") do xf
+            s1 = xf["1"]
+            s2 = xf["2"]
+            s3 = xf["3"]
+            for i in 1:length(initial_x)
+                s1[i,1:length(initial_x)] = output[i,:]
+                s2[i,1:length(initial_x)] = J[i,:]
+                s3[i,1:length(initial_x)] = cha[i,:]
+            end
+        end 
+        @show 1
     end
 
     iteration = 0
@@ -232,8 +295,15 @@ function solve!(intor::Integrator,cache::SlidingNewmarkCache;
         if typeof(Jac_F!) == Nothing
             dfk = OnceDifferentiable(R_stepk!,initial_x,initial_F)
         else
-            error("Jacobian not implemented yet.")
+            J_stepk! = J_stepk_maker(qᵏ⁻¹,M,A,Jac_F!,nq,nλ,tᵏ⁻¹,dt)
+            dfk = OnceDifferentiable(R_stepk!,J_stepk!,initial_x,initial_F)
         end
+
+        if apply_acu! != nothing
+            apply_acu!(bot.tg, tᵏ⁻¹;dt)
+        end
+        #show_data(qᵏ⁻¹,sᵏ,M,A,Jac_F!,nq,nλ,tᵏ⁻¹,dt,initial_x,R_stepk!,J_stepk!)
+
         R_stepk_result = nlsolve(dfk, initial_x; ftol, iterations, method=:newton)
         if converged(R_stepk_result) == false
             # @show R_stepk_result

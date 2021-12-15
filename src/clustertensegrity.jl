@@ -29,7 +29,7 @@ end
 
 function build_Ψ(tg::ClusterTensegrityStructure)
     @unpack clusterstrings = tg
-    FB = FischerBurmeister(1e-14,10.,10.)
+    FB = FischerBurmeister(1e-14,1000.,1000.)
     function _inner_Ψ(s̄)
         ψ = Vector{eltype(s̄)}(undef,2tg.nslidings)
         ψ⁺ = @view ψ[begin:2:end]
@@ -123,7 +123,7 @@ function get_clusterB(tg)
         len = [state[i].length for i in 1:n+1]
         B⁺ = [-k[i]*(len[i]-restlen[i])+k[i+1]*(len[i+1]-restlen[i+1])/α[i] for i in 1:n]
         B⁻ = [k[i]*(len[i]-restlen[i])-α[i]*k[i+1]*(len[i+1]-restlen[i+1]) for i in 1:n]
-        B = [B⁺;B⁻] 
+        B = [B⁺;B⁻]
         B_list[csid] = B
     end
     return B_list
@@ -171,6 +171,3 @@ function semi_newton(AA,f,y0,λ0)
     end
     return y,λ
 end
-
-
-

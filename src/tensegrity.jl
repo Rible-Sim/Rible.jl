@@ -21,6 +21,16 @@ struct SlidingConstrainedCoordinatesTrajectory{T} <: TensegrityRobotTrajectory{T
     s̄s::Vector{Vector{T}}
 end
 
+struct SlidingConstrainedCoordinatesTrajectoryRecordData{T,R,M} <: TensegrityRobotTrajectory{T}
+    ts::Vector{T}
+    qs::Vector{Vector{T}}
+    q̇s::Vector{Vector{T}}
+    λs::Vector{Vector{T}}
+    s̄s::Vector{Vector{T}}
+    iterations::Vector{R}
+    OtherData::Vector{M}
+end
+
 struct ID
     rbid::Int
     apid::Int
@@ -312,8 +322,9 @@ function update_strings!(tg, @eponymargs(clusterstrings,))
             else
                 u = u0 + s[segid] - s[segid-1]
             end
+            #u = u0
             #segstate.tension = k*abs(u0)/u*(l-u)
-            segstate.tension = k*(l-u)
+            segstate.tension = k*(l-u) 
             #if u0 < 0
             #    wait()
             #end
@@ -991,6 +1002,14 @@ function new_trajectory(tg::ClusterTensegrityStructure)
     SlidingConstrainedCoordinatesTrajectory([t0], [q0], [q̇0], [λ0], [s̄0])
 end
 
+function record_trajectory(tg::ClusterTensegrityStructure)
+    t0 = zero(get_numbertype(tg))
+    q0, q̇0  = get_initial(tg)
+    λ0 = get_λ(tg)
+    s̄0 = get_s̄(tg)
+    SlidingConstrainedCoordinatesTrajectoryRecordData([t0], [q0], [q̇0], [λ0], [s̄0], Vector{Float64}(), [])
+end
+
 function TensegrityRobot(tg,hub)
 	reset_forces!(tg)
     # update_strings_apply_forces!(tg)
@@ -999,11 +1018,25 @@ function TensegrityRobot(tg,hub)
     TensegrityRobot(tg,hub,new_trajectory(tg))
 end
 
+function TensegrityRobotRecord(tg,hub)
+	reset_forces!(tg)
+    # update_strings_apply_forces!(tg)
+	# check_jacobian_singularity(tg)
+	# check_stability(tg)
+    TensegrityRobot(tg,hub,record_trajectory(tg))
+end
+
 function reset!(bot::TensegrityRobot)
     @unpack tg, traj = bot
     reset!(tg,traj)
     reset!(traj)
 end
+
+#function reset!(bot::TensegrityRobotRecord)
+#    @unpack tg, traj = bot
+#    reset!(tg,traj)
+#    reset!(traj)
+#end
 
 function reset!(tg::TensegrityStructure,traj)
     @unpack qs,q̇s = traj
@@ -1015,6 +1048,7 @@ end
 function reset!(tg::ClusterTensegrityStructure,traj)
     @unpack qs,q̇s,s̄s = traj
     reset_forces!(tg)
+    reset_restlen!(tg)
     distribute_q_to_rbs!(tg,qs[begin],q̇s[begin])
     distribute_s̄!(tg,s̄s[begin])
     update_strings!(tg)
@@ -1035,6 +1069,26 @@ function reset!(traj::SlidingConstrainedCoordinatesTrajectory)
     resize!(q̇s,1)
     resize!(λs,1)
     resize!(s̄s,1)
+end
+
+function reset!(traj::SlidingConstrainedCoordinatesTrajectoryRecordData)
+    @unpack ts,qs,q̇s,λs,s̄s,iterations,OtherData= traj
+    resize!(ts,1)
+    resize!(qs,1)
+    resize!(q̇s,1)
+    resize!(λs,1)
+    resize!(s̄s,1)
+    resize!(iterations,0)
+    resize!(OtherData,0)
+end
+
+function reset_restlen!(tg::ClusterTensegrityStructure)
+    @unpack clusterstrings = tg
+    for clusterstring in clusterstrings
+        for seg in clusterstring.segs
+            seg.state.restlen = seg.original_restlen
+        end
+    end
 end
 
 function set_new_initial!(bot::TensegrityRobot,q,q̇=zero(q))

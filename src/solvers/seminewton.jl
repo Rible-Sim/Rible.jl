@@ -1,3 +1,4 @@
+#using XLSX
 struct SeminewtonCache{T,qT,λT,sT,MT}
     totalstep::Int
     totaltime::T
@@ -78,7 +79,7 @@ function solve!(intor::Integrator,cache::SeminewtonCache;
 
     ∂F∂q = zeros(eltype(q0),nq,nq)
     ∂F∂q̇ = zeros(eltype(q0),nq,nq)
-    
+
     function J_stepk_maker(qᵏ⁻¹,M,A,Jac_F!,nq,nλ,tᵏ⁻¹,dt)
         @inline @inbounds function inner_J_stepk!(J,x)
             h = dt
@@ -87,7 +88,7 @@ function solve!(intor::Integrator,cache::SeminewtonCache;
             s̄ = @view x[nq+nλ+1:end]
             q = (qᵏ.+qᵏ⁻¹)./2
             q̇ = (qᵏ.-qᵏ⁻¹)./h
-            
+
             t = tᵏ⁻¹+h/2
             ∂F∂q,∂F∂q̇,∂F∂s̄ = Jac_F!(q,q̇,s̄,t)
             ζ = build_ζ(bot.tg)
@@ -100,7 +101,7 @@ function solve!(intor::Integrator,cache::SeminewtonCache;
             ∂s̄∂s̄ = I(length(s̄))[a,:]
             J[   1:nq ,      1:nq    ] .=  M.-h^2/2 .*(1/2 .*∂F∂q.+1/h.*∂F∂q̇)
             J[   1:nq ,   nq+1:nq+nλ ] .= -scaling.*transpose(A(qᵏ⁻¹))
-            J[   1:nq ,nq+nλ+1:end   ] .= ∂F∂s̄
+            J[   1:nq ,nq+nλ+1:end   ] .= 1/2 * dt^2 .* ∂F∂s̄
             J[nq+1:nq+nλ,   1:nq ] .=  scaling.*A(qᵏ)
             J[nq+1:nq+nλ,nq+1:nq+nλ] .=  0.0
             J[nq+1:nq+nλ,nq+nλ+1:end] .=  0.0
@@ -108,73 +109,33 @@ function solve!(intor::Integrator,cache::SeminewtonCache;
             J[nq+nλ+1:end,1:nq] .= vcat(∂ζ∂q,zeros(Float64,length(a),nq))
             J[nq+nλ+1:end,nq+1:nq+nλ+1] .= 0.0
             J[nq+nλ+1:end,nq+nλ+1:end] .= vcat(∂ζ∂s̄,∂s̄∂s̄)
-            @show cond(J)
+            #@show cond(J)
         end
     end
 
-    function J_get(qᵏ⁻¹,M,A,Jac_F!,nq,nλ,tᵏ⁻¹,dt)
-        @inline @inbounds function inner_J_stepk!(x)
-            J = zeros(Float64, length(x),length(x))
-            h = dt
-            qᵏ = @view x[   1:nq]
-            λᵏ = @view x[nq+1:nq+nλ]
-            s̄ = @view x[nq+nλ+1:end]
-            q = (qᵏ.+qᵏ⁻¹)./2
-            q̇ = (qᵏ.-qᵏ⁻¹)./h
-            t = tᵏ⁻¹+h/2
-            ∂F∂q,∂F∂q̇,∂F∂s̄ = Jac_F!(q,q̇,s̄,t)
-            ζ = build_ζ(bot.tg)
-            c = 1
-            n = length(ζ)
-            i = findall(x->x<=0, ζ-c.*s̄)
-            a = setdiff(1:n,i)
-            ∂ζ∂q = build_∂ζ∂q(bot.tg)(q)[i,:]
-            ∂ζ∂s̄ = build_∂ζ∂s̄(bot.tg)[i,:]
-            ∂s̄∂s̄ = I(length(s̄))[a,:]
-            J[   1:nq ,      1:nq    ] .=  M.-h^2/2 .*(1/2 .*∂F∂q.+1/h.*∂F∂q̇)
-            J[   1:nq ,   nq+1:nq+nλ ] .= -scaling.*transpose(A(qᵏ⁻¹))
-            J[   1:nq ,nq+nλ+1:end   ] .= ∂F∂s̄
-            J[nq+1:nq+nλ,   1:nq ] .=  scaling.*A(qᵏ)
-            J[nq+1:nq+nλ,nq+1:nq+nλ] .=  0.0
-            J[nq+1:nq+nλ,nq+nλ+1:end] .=  0.0
-            #@show size(∂ζ∂q),size(zeros(Float64,length(a),nq))
-            J[nq+nλ+1:end,1:nq] .= vcat(∂ζ∂q,zeros(Float64,length(a),nq))
-            J[nq+nλ+1:end,nq+1:nq+nλ+1] .= 0.0
-            J[nq+nλ+1:end,nq+nλ+1:end] .= vcat(∂ζ∂s̄,∂s̄∂s̄)
-            @show cond(J)
-            return J
-        end
-    end
-
-    function show_data(qᵏ⁻¹,sᵏ,M,A,Jac_F!,nq,nλ,tᵏ⁻¹,dt,initial_x,R_stepk!)
+    function newton(f!,j!,initial_x;iter=50, ftol=1e-7,)
         nx = length(initial_x)
-        output = zeros(nx,nx)
-        FiniteDiff.finite_difference_jacobian!(output,R_stepk!,initial_x)
-        
-        J = J_get(qᵏ⁻¹,M,A,Jac_F!,nq,nλ,tᵏ⁻¹,dt)(initial_x)
-        wait()
-        cha = J - output
-        @show max = maximum(cha)
-        max = 100
-        if max > .02
-            write_data(initial_x,output,J,cha) 
-            wait()
+        F = zeros(Float64, nx, 1)
+        J = zeros(Float64, nx, nx)
+        xᵏ⁻¹ = initial_x
+        for i in 1:iter
+            j!(J,xᵏ⁻¹)
+            f!(F,xᵏ⁻¹)
+            tempf = deepcopy(F)
+            xᵏ = xᵏ⁻¹ - J\F
+            f!(F,xᵏ)
+            if norm(tempf-F) < ftol
+                xᵏ⁻¹ = xᵏ
+                break
+            end
+            if i == iter
+                @warn "not converged"
+            end
+            xᵏ⁻¹ = xᵏ
         end
+        return xᵏ⁻¹
     end
     
-    function write_data(initial_x,output,J,cha) 
-        XLSX.openxlsx("t1.xlsx", mode="rw") do xf
-            s1 = xf["1"]
-            s2 = xf["2"]
-            s3 = xf["3"]
-            for i in 1:length(initial_x)
-                s1[i,1:length(initial_x)] = output[i,:]
-                s2[i,1:length(initial_x)] = J[i,:]
-                s3[i,1:length(initial_x)] = cha[i,:]
-            end
-        end 
-        @show 1
-    end
     iteration = 0
     prog = Progress(totalstep; dt=1.0, enabled=progress)
     for timestep = 1:totalstep
@@ -186,23 +147,22 @@ function solve!(intor::Integrator,cache::SeminewtonCache;
         λᵏ⁻¹ = λs[timestep]
         tᵏ⁻¹ = ts[timestep]
         sᵏ⁻¹ = s̄s[timestep]
+        q̇ᵏ⁻¹ = q̇s[timestep]
         qᵏ = qs[timestep+1]
         q̇ᵏ = q̇s[timestep+1]
         pᵏ = ps[timestep+1]
         λᵏ = λs[timestep+1]
         sᵏ = s̄s[timestep+1]
-        initial_x[   1:nq]    = qᵏ⁻¹
+        initial_x[   1:nq]    = qᵏ⁻¹ 
         initial_x[nq+1:nq+nλ] = λᵏ⁻¹
         initial_x[nq+nλ+1:nx] = sᵏ⁻¹
         #bot.tg.clusterstrings[1].segs[1].state.restlen += apply_fun(tᵏ⁻¹,1e-3)
-        apply_acu!(bot.tg, tᵏ⁻¹)
+        apply_acu!(bot.tg, tᵏ⁻¹;dt=dt)
         # initial_R = similar(initial_x)
         #R_stepk!(initial_R,initial_x)
         # @show initial_R
         #@code_warntype R_stepk!(initial_R,initial_x)
         R_stepk! = R_stepk_maker(qᵏ⁻¹,pᵏ⁻¹,M,Φ,A,F!,nq,nλ,tᵏ⁻¹,dt)
-        
-        #show_data(qᵏ⁻¹,sᵏ,M,A,Jac_F!,nq,nλ,tᵏ⁻¹,dt,initial_x,R_stepk!)
 
         if typeof(Jac_F!) == Nothing
             dfk = OnceDifferentiable(R_stepk!,initial_x,initial_F)
@@ -210,14 +170,11 @@ function solve!(intor::Integrator,cache::SeminewtonCache;
             J_stepk! = J_stepk_maker(qᵏ⁻¹,M,A,Jac_F!,nq,nλ,tᵏ⁻¹,dt)
             dfk = OnceDifferentiable(R_stepk!,J_stepk!,initial_x,initial_F)
         end
-        # dfk = OnceDifferentiable(R_stepk!,initial_x,initial_F)
-        function build_J!(output,initial_x)
-            FiniteDiff.finite_difference_jacobian!(output,R_stepk!,initial_x)
-            # @show cond(output)
-        end
-        dfk = OnceDifferentiable(R_stepk!,build_J!,initial_x,initial_F)
+
         R_stepk_result = nlsolve(dfk, initial_x; ftol, iterations, method=:newton)
-        
+
+        #xᵏ = newton(R_stepk!,J_stepk!,initial_x)
+        #@show bot.tg.clusterstrings[1].segs[1].state.tension
         if converged(R_stepk_result) == false
             if exception
                 error("Not Converged!")
@@ -227,7 +184,7 @@ function solve!(intor::Integrator,cache::SeminewtonCache;
                 #break
             end
         end
-        iteration += R_stepk_result.iterations
+        #iteration += R_stepk_result.iterations
         xᵏ = R_stepk_result.zero
         qᵏ .= xᵏ[   1:nq]
         λᵏ .= xᵏ[nq+1:nq+nλ]
