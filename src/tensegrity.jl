@@ -656,6 +656,28 @@ function build_A(tg)
     end
 end
 
+function build_Aq(tg)
+    rbs = tg.rigidbodies
+    csts = tg.constraints
+    @unpack body2q = tg.connectivity
+    nfixbodies = tg.nfixbodies
+    nconstraint = tg.nconstraint
+    nbodyc = get_nbodyconstraint(tg)
+    nbodydof = get_nbodydof(tg)
+    ncoords = tg.ncoords
+    @inline @inbounds function inner_Aq(λ)
+        ret = zeros(Float64,ncoords,ncoords)
+        is = Ref(0)
+        for rbid in tg.mvbodyindex
+            pindex = body2q[rbid]
+            rb = rbs[rbid]
+            ret[is[]+1:is[]+nbodyc,pindex] .= 2*[1 1 -1 -1;-1 -1 1 1]*diagm(λ[pindex])
+            is[] += nbodyc
+        end
+        ret
+    end
+end
+
 function build_F(tg,rbid,pid,f)
     rbs = tg.rigidbodies
     Ti = build_Ti(tg,rbid)

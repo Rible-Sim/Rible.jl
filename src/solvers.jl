@@ -9,13 +9,17 @@ end
 
 Newmark(γ=0.5,β=0.25) = Newmark(γ,β)
 
-struct SlidingZhong06 <: SlidingConstrainedSolver end
-struct Seminewton <: SlidingConstrainedSolver end
-struct SlidingNewmark{T} <: SlidingConstrainedSolver
+struct FBZhong06 <: SlidingConstrainedSolver end
+struct SNZhong06 <: SlidingConstrainedSolver end
+struct FBNewmark{T} <: SlidingConstrainedSolver
+    newmark::Newmark{T}
+end
+struct SNNewmark{T} <: SlidingConstrainedSolver
     newmark::Newmark{T}
 end
 
-SlidingNewmark() = SlidingNewmark(Newmark())
+FBNewmark() = FBNewmark(Newmark())
+SNNewmark() = SNNewmark(Newmark())
 
 struct SimProblem{BotType,FuncsType,ControlType,T}
     bot::BotType
@@ -150,4 +154,4 @@ include("solvers/Zhong06.jl")
 include("solvers/Newmark.jl")
 include("solvers/nonsmooth.jl")
 include("solvers/Zhong06NSNH.jl")
-include("solvers/seminewton.jl")
+#include("solvers/seminewton.jl")
