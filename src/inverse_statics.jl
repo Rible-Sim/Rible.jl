@@ -142,10 +142,13 @@ function build_L(tg)
 end
 
 function build_Γ(tg)
-    reset_forces!(tg)
-    update_strings_apply_forces!(tg)
-    forces = [s.state.tension.*s.state.direction for s in tg.strings]
-    reduce(vcat,forces)
+    function inner_Γ(q)
+        reset_forces!(tg)
+        distribute_q_to_rbs!(tg,q)
+        update_strings_apply_forces!(tg)
+        forces = [s.state.tension.*s.state.direction for s in tg.strings]
+        reduce(vcat,forces)
+    end
 end
 
 function build_K̂(tg)
@@ -486,16 +489,20 @@ function inverse_for_restlength(tginput,tgref::TensegrityStructure,Fˣ=nothing;g
         model = JuMP.Model(COSMO.Optimizer)
         JuMP.set_optimizer_attribute(model, "verbose", false)
         JuMP.set_optimizer_attribute(model, "eps_abs", 1e-15)
-        JuMP.set_optimizer_attribute(model, "eps_rel", 1e-11)
+        JuMP.set_optimizer_attribute(model, "eps_rel", 1e-10)
         JuMP.@variable(model, y[1:ny])
         JuMP.@objective(model, Max, sum(y[nλ+1:nλ+nu].^2))
+        # JuMP.@objective(model, Max, 0.0)
         JuMP.@constraint(model, static, B*y .== F̃)
-        ϵ = 1e-10
+        ϵ = 1e-7
         JuMP.@constraint(model, positive_u, y[nλ+1:nλ+nu].+ ϵ .>= 0)
         JuMP.@constraint(model, positive_f, y[nλ+1:nλ+nu].+ ϵ .<= get_strings_len(tg))
         # JuMP.print(model)
         JuMP.optimize!(model)
-        if JuMP.termination_status(model) != JuMP.MathOptInterface.OPTIMAL
+        if JuMP.termination_status(model) == JuMP.MathOptInterface.OPTIMAL
+            @info "Optimal Solution found."
+        else
+            @show JuMP.termination_status(model)
             error("Inverse statics optimization failed.")
         end
         # @show JuMP.primal_status(model)

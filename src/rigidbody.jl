@@ -95,6 +95,8 @@ end
 
 function make_Φ(::EmptyConstraint)
 	inner_Φ(q) = Vector{eltype(q)}()
+	inner_Φ(q,d) = Vector{eltype(q)}()
+	inner_Φ
 end
 
 function make_A(::EmptyConstraint)

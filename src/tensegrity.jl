@@ -726,7 +726,7 @@ function TensegrityRobot(tg,hub)
 	reset_forces!(tg)
     update_strings_apply_forces!(tg)
 	check_jacobian_singularity(tg)
-	check_stability(tg)
+	# check_stability(tg)
     TensegrityRobot(tg,hub,new_trajectory(tg))
 end
 

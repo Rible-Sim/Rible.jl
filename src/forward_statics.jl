@@ -41,13 +41,24 @@ function check_and_retrieve(result,lens::AbstractVector{<:Int})
     end
     path_result1 = path_results[1]
     nstep = steps(path_result1)
+    res = residual(path_result1)
     sol = real(solution(path_result1))
     q,s,λ = split_by_lengths(sol,lens)
-    (q=q,s=s,λ=λ,nstep=nstep)
+    (q=q,s=s,λ=λ,nstep=nstep,res=res)
 end
 
 function check_and_retrieve(result,Psys::HomotopyContinuation.System)
     check_and_retrieve(result,length.(Psys.variable_groups))
+end
+
+function check_slackness(𝐥,𝐮)
+    @assert length(𝐥) == length(𝐮)
+    for (i,(l,u)) in enumerate(zip(𝐥,𝐮))
+        Δl = l - u
+        if Δl < 0
+            @warn "The $(i)th string is slack, Δl = $(Δl)"
+        end
+    end
 end
 
 function forward_system(tg,mode=PrimalMode();F=reshape(build_G(tg),:,1))
@@ -72,40 +83,45 @@ function forward_system(tg,mode=PrimalMode();F=reshape(build_G(tg),:,1))
     U = build_U(tg)
     S = build_S(tg)
 
-    vg = [q,s,λ]
+    variable_groups = [q,s,λ]
 
-    if typeof(mode)<:PrimalMode
+    scaling = 1
+    if mode isa PrimalMode
         P = [transpose(A(polyq))*polyλ - Q̃*U(polys,polyu)*polyq - F*g;
             S(polyq,polys);
             Φ(polyq)]
-        Psys = System(P; variable_groups=vg, parameters = [u;g])
-    elseif typeof(mode)<:StiffMode
+        parameters = [u;g]
+        Psys = System(P; variable_groups, parameters)
+    elseif mode isa StiffMode
         P = [transpose(A(polyq))*polyλ - Q̃*U(polys,polyu,polyk)*polyq - F*g;
             S(polyq,polys);
             Φ(polyq)]
-        Psys = System(P; variable_groups=vg, parameters = [k;u;g])
-    elseif typeof(mode)<:DeformMode
+        parameters = [k;u;g]
+        Psys = System(P; variable_groups, parameters)
+    elseif mode isa DeformMode
         P = [transpose(A(polyq))*polyλ - Q̃*U(polys,polyu)*polyq - F*g;
             S(polyq,polys);
             Φ(polyq,polyd)]
-        Psys = System(P; variable_groups=vg, parameters = [d;u;g])
-    elseif typeof(mode)<:AllMode
+        parameters = [d;u;g]
+        Psys = System(P; variable_groups, parameters)
+    elseif mode isa AllMode
         P = [transpose(A(polyq))*polyλ - Q̃*U(polys,polyu,polyk)*polyq - F*g;
             S(polyq,polys);
             Φ(polyq,polyd)]
-        Psys = System(P; variable_groups=vg, parameters = [d;k;u;g])
+        parameters= [d;k;u;g]
+        Psys = System(P; variable_groups, parameters)
     else
         error("Invalid mode")
     end
     # PPP = [subs(f, u=>l,g=>0.0) for f in P]
-    vars = (q=q,s=s,λ=λ,d=d,u=u,k=k,g=g)
-    Psys,P,vars
+    # vars = (q=q,s=s,λ=λ,d=d,u=u,k=k,g=g)
+    P,variable_groups,parameters
 end
 
 function forward_once(Psys::HomotopyContinuation.System,
                         startsols,start_parameters,target_parameters)
-
-    result = HomotopyContinuation.solve(Psys, startsols; start_parameters, target_parameters, threading = false)
+    tracker_options = TrackerOptions(;extended_precision=true,parameters=:default)
+    result = HomotopyContinuation.solve(Psys, startsols; start_parameters, target_parameters, tracker_options, threading = false)
     # result = HomotopyContinuation.solve(Fsys, startsols)
     check_and_retrieve(result,Psys)
 end
@@ -115,28 +131,40 @@ function forward_once(tg::TensegrityStructure,startsols_input,
                         target_parameters_input,
                         mode=PrimalMode();F=reshape(build_G(tg),:,1))
 
-    # @show maximum(abs.(to_number.(subs(P, q=>q0, s=>s0, λ=>λ0, u=>u0, g=>g0))))
-    # reset_forces!(tg)
-    # update_strings_apply_forces!(tg)
-    # l = [s.state.length for s = tg.strings]
-    # u1 = u0
-    # g0 = 1.0
-    # g1 = 0.0
-    Psys,P,vars = forward_system(tg,mode;F)
+    P_all,variable_groups,parameters = forward_system(tg,mode;F)
+    # Psys = System(P;variable_groups,parameters)
     q0,s0,λ0 = startsols_input
     startsols = [[q0; s0; λ0]]
     start_parameters = reduce(vcat,start_parameters_input)
     target_parameters = reduce(vcat,target_parameters_input)
-    # q,s,λ,d,u,k,g = vars
-    # k0,u0,g0 = start_parameters_input
-    # @show maximum(abs.(evaluate(P, vcat(q,s,λ,k,u,g)=>vcat(q0,s0,λ0,k0,u0,g0))))
-    forward_once(Psys,startsols,start_parameters,target_parameters)
+    identicals = start_parameters .== target_parameters
+    differents = .!(identicals)
+    # @show subs(P_all,reduce(vcat,variable_groups)=>startsols[1],parameters=>start_parameters)
+    diff_parameters = parameters[differents]
+    if isempty(diff_parameters)
+        @warn("Identical start and target parameters.")
+        P = P_all
+        diff_start_parameters = start_parameters
+        diff_target_parameters = target_parameters
+        Psys = System(P;variable_groups,parameters=parameters)
+    else
+        P = subs(P_all,parameters[identicals]=>start_parameters[identicals])
+        diff_start_parameters = start_parameters[differents]
+        diff_target_parameters = target_parameters[differents]
+        Psys = System(P;variable_groups,parameters=diff_parameters)
+    end
+
+
+    # forward_once(Psys,startsols,start_parameters,target_parameters)
+    target_sol = forward_once(Psys,startsols,diff_start_parameters,diff_target_parameters)
+    check_slackness(inv.(target_sol.s),target_parameters_input.u)
+    target_sol
 end
 
 function forward_sequence(Psys::HomotopyContinuation.System,
                         startsols_input,
                         start_parameters_input,
-                        target_parameters_input;n=10)
+                        target_parameters_input;n=1)
 
     start_parameters = reduce(vcat,start_parameters_input)
     target_parameters = reduce(vcat,target_parameters_input)
@@ -144,7 +172,7 @@ function forward_sequence(Psys::HomotopyContinuation.System,
 
     q0,s0,λ0 = startsols_input
     plens = [length(p) for p in start_parameters_input]
-    start_point = merge((q=q0,s=s0,λ=λ0,nstep=0),start_parameters_input)
+    start_point = merge((q=q0,s=s0,λ=λ0,nstep=0,res=zero(eltype(q0))),start_parameters_input)
     # solseq = initialize_sequence(start_point)
     solseq = StructArray([start_point])
 
@@ -155,6 +183,7 @@ function forward_sequence(Psys::HomotopyContinuation.System,
         sol = forward_once(Psys,xᵏ⁻¹,pᵏ⁻¹,pᵏ)
         parameters = deepcopy(start_parameters_input)
         foreach((x,y)-> x[:] = y, parameters, split_by_lengths(pᵏ,plens))
+        check_slackness(inv.(sol.s),parameters.u)
         StructArrays.append!!(solseq,[merge(sol,parameters)])
     end
     solseq
@@ -164,16 +193,18 @@ function forward_sequence(tg::TensegrityStructure,startsols,
                         start_parameters,
                         target_parameters,
                         mode=PrimalMode();F=reshape(build_G(tg),:,1))
-    Psys,_ = forward_system(tg,mode;F)
+    P,variable_groups,parameters = forward_system(tg,mode;F)
+    Psys = System(P;variable_groups,parameters)
     forward_sequence(Psys,startsols,start_parameters,target_parameters)
 end
 
-function forward_multi_sequence(Psys,startsols_input,
-                        parameter_points,mode=PrimalMode();n=10)
+function forward_multi_sequence(Psys::HomotopyContinuation.System,startsols_input,
+                        parameter_points,mode=PrimalMode();n=1)
 
     parameter_point1 = parameter_points[1]
     startsols_inputs = [startsols_input]
     [begin
+        @info "Forwarding the $(i)th sequence."
         seq = forward_sequence(Psys,
                             startsols_inputs[i],
                             parameter_points[i],
@@ -185,10 +216,19 @@ function forward_multi_sequence(Psys,startsols_input,
     ]
 end
 
+function forward_multi_sequence(tg::TensegrityStructure,startsols,
+                        parameter_points,mode=PrimalMode();
+                        F=reshape(build_G(tg),:,1),n=1)
+    P,variable_groups,parameters = forward_system(tg,mode;F)
+    Psys = System(P;variable_groups,parameters)
+    forward_multi_sequence(Psys,startsols,parameter_points,mode;n)
+end
+
 function get_start_sol(bot)
     @unpack tg = bot
     q,_ = get_q(tg)
     λ,u = inverse_for_restlength(bot,bot)
+    # λ = inverse_for_multipliers(bot,bot); u = get_strings_restlen(bot)
     ℓ = get_strings_len(bot)
     s = inv.(ℓ)
     (q=q,s=s,λ=λ),u
