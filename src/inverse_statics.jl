@@ -1,8 +1,8 @@
 function build_Ti(tg::TensegrityStructure,i::Integer)
     nbodycoords = get_nbodycoords(tg)
-    body2q = tg.connectivity.body2q
-    ncoords = tg.ncoords
-    build_Ti(nbodycoords,ncoords,body2q[i])
+    body2fullq = tg.connectivity.body2fullq
+    nfullcoords = maximum.(body2fullq) |> maximum
+    build_Ti(nbodycoords,nfullcoords,body2fullq[i])
 end
 
 function build_Ti(nbodycoords,nq,q_index)
@@ -186,25 +186,25 @@ function build_G(tg)
 end
 
 # Not ready
-function build_Ji(tgstruct,i)
-    rbs = tgstruct.rigidbodies
-    cnt = tgstruct.connectivity
+function build_Ji(tg,i)
+    rbs = tg.rigidbodies
+    cnt = tg.connectivity
     @unpack string2ap = cnt
     ap = string2ap[i]
     C1 = rbs[ap[1].rbid].state.cache.Cp[ap[1].apid]
     C2 = rbs[ap[2].rbid].state.cache.Cp[ap[2].apid]
-    T1 = build_Ti(tgstruct,ap[1].rbid)
-    T2 = build_Ti(tgstruct,ap[2].rbid)
+    T1 = build_Ti(tg,ap[1].rbid)
+    T2 = build_Ti(tg,ap[2].rbid)
     Ji = C2*T2-C1*T1
 end
 
-function build_U(tgstruct)
-    @unpack ncoords,nstrings,ndim,strings = tgstruct
+function build_U(tg)
+    @unpack ncoords,nstrings,ndim,strings = tg
     function inner_U(s,u)
         ret = zeros(eltype(s),nstrings*ndim,ncoords)
         for i = 1:nstrings
             k = strings[i].k
-            Ji = Array(build_Ji(tgstruct,i))
+            Ji = Array(build_Ji(tg,i))
             ret[(i-1)*ndim+1:i*ndim,:] = k*Ji*(1-s[i]*u[i])
         end
         ret
@@ -212,7 +212,7 @@ function build_U(tgstruct)
     function inner_U(s,u,k)
         ret = zeros(eltype(s),nstrings*ndim,ncoords)
         for i = 1:nstrings
-            Ji = Array(build_Ji(tgstruct,i))
+            Ji = Array(build_Ji(tg,i))
             ret[(i-1)*ndim+1:i*ndim,:] = k[i]*Ji*(1-s[i]*u[i])
         end
         ret
@@ -220,14 +220,122 @@ function build_U(tgstruct)
     inner_U
 end
 
-function build_S(tgstruct)
-    @unpack nstrings = tgstruct
-    function inner_S(q,s)
+function build_Q(tg)
+    @unpack nfullcoords,nstrings,ndim,strings = tg
+    cnt = tg.connectivity
+    @unpack string2ap,apnb = cnt
+    function inner_Q(q,s,u,k,c)
+        ret = zeros(eltype(s),nfullcoords)
+        foreach(string2ap) do scnt
+            j = scnt.id
+            rb1 = scnt.end1.rbsig
+            rb2 = scnt.end2.rbsig
+            rb1id = rb1.prop.id
+            rb2id = rb2.prop.id
+            ap1id = scnt.end1.pid
+            ap2id = scnt.end2.pid
+            is1 = (apnb[rb1id][ap1id]-1)*ndim
+            is2 = (apnb[rb2id][ap2id]-1)*ndim
+            c1 = c[is1+1:is1+ndim]
+            c2 = c[is2+1:is2+ndim]
+            C1 = rb1.state.cache.funcs.C(c1)
+            C2 = rb2.state.cache.funcs.C(c2)
+            T1 = build_Ti(tg,rb1id)
+            T2 = build_Ti(tg,rb2id)
+            Jj = C2*T2-C1*T1
+            Uj = transpose(Jj)*Jj
+            ret .+= k[j]*(u[j]*s[j]-1)*Uj*q
+        end
+        ret
+    end
+end
+
+function build_KE(tg)
+    @unpack nfullcoords,nstrings,ndim,strings = tg
+    cnt = tg.connectivity
+    @unpack string2ap,apnb = cnt
+    function inner_KE(q,s,k,c)
+        ret = zeros(eltype(s),nfullcoords,nfullcoords)
+        foreach(string2ap) do scnt
+            j = scnt.id
+            rb1 = scnt.end1.rbsig
+            rb2 = scnt.end2.rbsig
+            rb1id = rb1.prop.id
+            rb2id = rb2.prop.id
+            ap1id = scnt.end1.pid
+            ap2id = scnt.end2.pid
+            is1 = (apnb[rb1id][ap1id]-1)*ndim
+            is2 = (apnb[rb2id][ap2id]-1)*ndim
+            c1 = c[is1+1:is1+ndim]
+            c2 = c[is2+1:is2+ndim]
+            C1 = rb1.state.cache.funcs.C(c1)
+            C2 = rb2.state.cache.funcs.C(c2)
+            T1 = build_Ti(tg,rb1id)
+            T2 = build_Ti(tg,rb2id)
+            Jj = C2*T2-C1*T1
+            Uj = transpose(Jj)*Jj
+            Ujq = Uj*q
+            ret .+= k[j]*s[j]^2*(Ujq*transpose(Ujq))
+        end
+        ret
+    end
+end
+
+function build_KG(tg)
+    @unpack nfullcoords,nstrings,ndim,strings = tg
+    cnt = tg.connectivity
+    @unpack string2ap,apnb = cnt
+    function inner_KG(q,s,μ,k,c)
+        ret = zeros(eltype(s),nfullcoords,nfullcoords)
+        foreach(string2ap) do scnt
+            j = scnt.id
+            rb1 = scnt.end1.rbsig
+            rb2 = scnt.end2.rbsig
+            rb1id = rb1.prop.id
+            rb2id = rb2.prop.id
+            ap1id = scnt.end1.pid
+            ap2id = scnt.end2.pid
+            is1 = (apnb[rb1id][ap1id]-1)*ndim
+            is2 = (apnb[rb2id][ap2id]-1)*ndim
+            c1 = c[is1+1:is1+ndim]
+            c2 = c[is2+1:is2+ndim]
+            C1 = rb1.state.cache.funcs.C(c1)
+            C2 = rb2.state.cache.funcs.C(c2)
+            T1 = build_Ti(tg,rb1id)
+            T2 = build_Ti(tg,rb2id)
+            Jj = C2*T2-C1*T1
+            Uj = transpose(Jj)*Jj
+            Ujq = Uj*q
+            ret .+= k[j]*(1-μ[j]*s[j])*(Uj-s[j]^2*Ujq*transpose(Ujq))
+        end
+        ret
+    end
+end
+
+function build_S(tg)
+    (;ndim,nstrings) = tg
+    (;string2ap,apnb) = tg.connectivity
+    function inner_S(q,s,c)
         ret = zeros(eltype(s),nstrings)
-        for i = 1:nstrings
-            Ji = build_Ji(tgstruct,i)
-            Ui = Array(transpose(Ji)*Ji)
-            ret[i] = transpose(q)*Ui*q*s[i]^2 - 1
+        foreach(string2ap) do scnt
+            j = scnt.id
+            rb1 = scnt.end1.rbsig
+            rb2 = scnt.end2.rbsig
+            rb1id = rb1.prop.id
+            rb2id = rb2.prop.id
+            ap1id = scnt.end1.pid
+            ap2id = scnt.end2.pid
+            is1 = (apnb[rb1id][ap1id]-1)*ndim
+            is2 = (apnb[rb2id][ap2id]-1)*ndim
+            c1 = c[is1+1:is1+ndim]
+            c2 = c[is2+1:is2+ndim]
+            C1 = rb1.state.cache.funcs.C(c1)
+            C2 = rb2.state.cache.funcs.C(c2)
+            T1 = build_Ti(tg,rb1id)
+            T2 = build_Ti(tg,rb2id)
+            Jj = C2*T2-C1*T1
+            Uj = transpose(Jj)*Jj
+            ret[j] = transpose(q)*Uj*q*s[j]^2 - 1
         end
         ret
     end

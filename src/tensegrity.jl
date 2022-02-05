@@ -14,23 +14,29 @@ struct NaturalCoordinatesTrajectory{T} <: TensegrityRobotTrajectory{T}
     λs::Vector{Vector{T}}
 end
 
-struct ID
-    rbid::Int
-    apid::Int
+struct ID{RBType,APType}
+    rbsig::RBType
+    pid::APType
 end
 
-struct Connectivity{bType,sType,cType}
+struct Connectivity{bType,iType,sType,aType,cType}
+    body2fullq::bType
     body2q::bType
+    mvindices::iType
+    fixindices::iType
     string2ap::sType
+    apnb::aType
     contacts::cType
 end
 
-Connectivity(b) = Connectivity(b,nothing,nothing)
-Connectivity(b,s) = Connectivity(b,s,nothing)
+Connectivity(bf,b,mi,fi) = Connectivity(bf,b,mi,fi,nothing,nothing,nothing)
+Connectivity(bf,b,mi,fi,s) = Connectivity(bf,b,mi,fi,s,nothing,nothing)
+Connectivity(bf,b,mi,fi,s,a) = Connectivity(bf,b,mi,fi,s,a,nothing)
 
 struct TensegrityStructure{BodyType,StrType,TenType,CntType,CstType}
     ndim::Int
     ncoords::Int
+    nfullcoords::Int
     nconstraint::Int
     ndof::Int
     nbodies::Int
@@ -41,36 +47,46 @@ struct TensegrityStructure{BodyType,StrType,TenType,CntType,CstType}
     nstrings::Int
     npoints::Int
     nmvpoints::Int
-    rigidbodies::Vector{BodyType}
+    rigidbodies::BodyType
     strings::StrType
     tensiles::TenType
     connectivity::CntType
     constraints::CstType
 end
 
-function TensegrityStructure(rbs::Vector{rbT},tensiles::TT,cnt::Connectivity,
-                            constraints = [EmptyConstraint()]) where {TT,rbT<:AbstractRigidBody{N,T}} where {N,T}
+function TensegrityStructure{N,T}(rbs,tensiles,cnt::Connectivity,
+                            constraints = [EmptyConstraint()]) where {N,T}
     ndim = N
     nbodies = length(rbs)
-    mvbodyindex = [i for i in eachindex(rbs) if rbs[i].prop.movable]
+    mvbodyindex = Vector{Int}()
+    fixbodyindex = Vector{Int}()
+    foreach(rbs) do rb
+        if rb.prop.movable
+            push!(mvbodyindex,rb.prop.id)
+        else
+            push!(fixbodyindex,rb.prop.id)
+        end
+    end
     nmvbodies = length(mvbodyindex)
-    fixbodyindex = [i for i in eachindex(rbs) if !rbs[i].prop.movable]
     nfixbodies = length(fixbodyindex)
     nstrings = sum(map(length,tensiles))
     npoints = 0
-    for (rbid,rb) in enumerate(rbs)
+    foreach(rbs) do rb
         npoints += rb.prop.naps
     end
     nmvpoints = 0
-    for rbid in mvbodyindex
-        nmvpoints += rbs[rbid].prop.naps
+    foreach(rbs) do rb
+        if rb.prop.id in mvbodyindex
+            nmvpoints += rb.prop.naps
+        end
     end
-    ncoords = maximum(maximum.(cnt.body2q))
-    nconstraint = get_nconstraint(rbs,mvbodyindex,nmvbodies,constraints)
+    ncoords = maximum(maximum.(cnt.body2q[mvbodyindex]))
+    nfullcoords = maximum(maximum.(cnt.body2fullq))
+    nconstraint = get_nconstraint(rbs,mvbodyindex,nmvbodies,nbodies,constraints)
     ndof = ncoords - nconstraint
     strings = tensiles.strings
     tg = TensegrityStructure(ndim,
-                    ncoords,nconstraint,ndof,
+                    ncoords,nfullcoords,nconstraint,ndof,
                     nbodies,
                     nmvbodies,mvbodyindex,
                     nfixbodies,fixbodyindex,
@@ -88,25 +104,32 @@ function lengthdir(v)
 end
 
 function reset_forces!(tgst::TensegrityStructure)
-    reset_forces!.(tgst.rigidbodies)
+    reset_forces!(tgst.rigidbodies)
+end
+
+function reset_forces!(rigidbodies::TypeSortedCollection)
+    foreach(reset_forces!,rigidbodies)
 end
 
 function update_strings_apply_forces!(tgstruct)
     rbs = tgstruct.rigidbodies
     ss = tgstruct.strings
     cnt = tgstruct.connectivity
-    for sstring in ss
+    (;string2ap) = cnt
+    foreach(string2ap) do scnt
+        sstring = ss[scnt.id]
         @unpack id,k,c = sstring
         sstate = sstring.state
-        a,b = cnt.string2ap[id]
-        state1 = rbs[a.rbid].state
-        p1 = state1.rps[a.apid]
-        ṗ1 = state1.ṙps[a.apid]
-        f1 = state1.Faps[a.apid]
-        state2 = rbs[b.rbid].state
-        p2 = state2.rps[b.apid]
-        ṗ2 = state2.ṙps[b.apid]
-        f2 = state2.Faps[b.apid]
+        state1 = scnt.end1.rbsig.state
+        state2 = scnt.end2.rbsig.state
+        apid1 = scnt.end1.pid
+        apid2 = scnt.end2.pid
+        p1 = state1.rps[apid1]
+        ṗ1 = state1.ṙps[apid1]
+        f1 = state1.Faps[apid1]
+        p2 = state2.rps[apid2]
+        ṗ2 = state2.ṙps[apid2]
+        f2 = state2.Faps[apid2]
         Δr = p2 - p1
         Δṙ = ṗ2 - ṗ1
         l,τ = lengthdir(p2-p1)
@@ -165,24 +188,28 @@ function update_SMA_strings_apply_forces!(tgstruct)
     end
 end
 
-distribute_q_to_rbs!(tgstruct,globalq) = distribute_q_to_rbs!(tgstruct,globalq,zero(globalq))
-function distribute_q_to_rbs!(tgstruct,globalq,globalq̇)
-    rbs = tgstruct.rigidbodies
-    cnt = tgstruct.connectivity
-    for rbid in tgstruct.mvbodyindex
-        pindex = cnt.body2q[rbid]
-        @unpack q, q̇ = rbs[rbid].state.coords
-        q .= globalq[pindex]
-        q̇ .= globalq̇[pindex]
-        @unpack cache,rps,ṙps,ro,ṙo,rg,ṙg = rbs[rbid].state
-        @unpack Co,Cg,Cp = cache
-        mul!(ro, Co, q)
-        mul!(ṙo, Co, q̇)
-        mul!(rg, Cg, q)
-        mul!(ṙg, Cg, q̇)
-        for (i,(rp,ṙp)) in enumerate(zip(rps,ṙps))
-            mul!(rp, Cp[i], q)
-            mul!(ṙp, Cp[i], q̇)
+distribute_q_to_rbs!(tg,globalq) = distribute_q_to_rbs!(tg,globalq,zero(globalq))
+function distribute_q_to_rbs!(tg,globalq,globalq̇)
+    rbs = tg.rigidbodies
+    cnt = tg.connectivity
+    foreach(tg.rigidbodies) do rb
+        rbid = rb.prop.id
+        if rbid in tg.mvbodyindex
+            pindex = cnt.body2q[rbid]
+            uci = rb.state.cache.unconstrained_index
+            @unpack q, q̇ = rb.state.coords
+            q[uci] .= globalq[pindex]
+            q̇[uci] .= globalq̇[pindex]
+            @unpack cache,rps,ṙps,ro,ṙo,rg,ṙg = rb.state
+            @unpack Co,Cg,Cp = cache
+            mul!(ro, Co, q)
+            mul!(ṙo, Co, q̇)
+            mul!(rg, Cg, q)
+            mul!(ṙg, Cg, q̇)
+            for (i,(rp,ṙp)) in enumerate(zip(rps,ṙps))
+                mul!(rp, Cp[i], q)
+                mul!(ṙp, Cp[i], q̇)
+            end
         end
     end
 end
@@ -234,9 +261,9 @@ function assemble_forces(tg;factor=1.0)
     F
 end
 
-function apply_gravity!(tgstruct;factor=1)
-    rbs = tgstruct.rigidbodies
-    gravity_acceleration = factor*get_gravity(tgstruct)
+function apply_gravity!(tg;factor=1)
+    rbs = tg.rigidbodies
+    gravity_acceleration = factor*get_gravity(tg)
     for (rbid,rb) in enumerate(rbs)
         @unpack prop, state = rb
         rb.state.F .+= gravity_acceleration*prop.mass
@@ -344,6 +371,89 @@ function build_body2q(rbs::Vector{rbType}) where rbType<:AbstractRigidBody{N,T,C
     body2q
 end
 
+function renumbering!(body2q_raw,sync=false,rbs=nothing)
+    imax = 0
+    mvindices = Vector{Int}()
+    fixindices = Vector{Int}()
+    for (rbid,pindex) in enumerate(body2q_raw)
+        if !(rbs isa Nothing)
+            if !rbs[rbid].prop.movable
+                foreach(pindex) do index
+                    if !(index in fixindices)
+                        push!(fixindices,index)
+                    end
+                end
+                resize!(pindex,0)
+                continue
+            else
+                ci = Vector(rbs[rbid].state.cache.constrained_index)
+                foreach(pindex[ci]) do index
+                    if !(index in fixindices)
+                        push!(fixindices,index)
+                    end
+                end
+                deleteat!(pindex,ci)
+            end
+        end
+        for (pid,index) in enumerate(pindex)
+            # @show pindex
+            if !(index in mvindices)
+                push!(mvindices,index)
+            end
+            indexdiff = index - imax
+            if  indexdiff == 1
+                imax += 1
+            elseif indexdiff ≥ 1
+                imax += 1
+                pindex[pid] = imax
+                if sync
+                    for restpindex in body2q_raw[rbid+1:end]
+                        ifind = findfirst((x)->x==index,restpindex)
+                        if !(ifind isa Nothing)
+                            restpindex[ifind]=imax
+                        end
+                    end
+                end
+            end
+        end
+    end
+    mvindices,fixindices
+end
+
+function make_body2q(rbs,shared_index;move_only=true)
+    nbodycoords = get_nbodycoords(rbs[1])
+    nb = length(rbs)
+    body2q_raw = collect.([(i-1)*nbodycoords+1:i*nbodycoords for i = 1:nb])
+    # @show body2q_raw
+    for ishare in shared_index
+        rbid1 = ishare.end1.rbsig
+        rbid2 = ishare.end2.rbsig
+        pid1 = ishare.end1.pid
+        pid2 = ishare.end2.pid
+        body2q_raw[rbid2][pid2] = body2q_raw[rbid1][pid1]
+        # @show body2q_raw
+        renumbering!(body2q_raw)
+    end
+    # @show body2q_raw
+    # if move_only
+    body2fullq = deepcopy(body2q_raw)
+    mvindices,fixindices = renumbering!(deepcopy(body2q_raw),false,rbs)
+    renumbering!(body2q_raw,true,rbs)
+    # end
+    # @show body2q_raw
+    body2fullq, body2q_raw, mvindices, fixindices
+end
+
+function make_apnb(rigidbodies)
+	ret = Vector{Vector{Int}}()
+	is = 0
+	foreach(rigidbodies) do rb
+		push!(ret,collect(is+1:is+rb.prop.naps))
+		is += rb.prop.naps
+	end
+	ret
+end
+
 function build_massmatrix(tgstruct::TensegrityStructure)
     body2q = tgstruct.connectivity.body2q
     ncoords = tgstruct.ncoords
@@ -355,7 +465,7 @@ function build_massmatrix(tgstruct::TensegrityStructure)
     mass_matrix
 end
 
-function get_nconstraint(rbs,mvbodyindex,nmvbodies,constraints)
+function get_nconstraint(rbs,mvbodyindex,nmvbodies,nbodies,constraints)
     nbodyconstraint = get_nbodyconstraint(rbs)
     nbodydof = get_nbodydof(rbs)
     ninconstraint = nbodyconstraint*nmvbodies
@@ -381,16 +491,19 @@ function build_Φ(tg)
         ret = Vector{eltype(q)}(undef,nconstraint)
         is = Ref(0)
         #is[] += nbodydof*nfixbodies
-        for rbid in tg.mvbodyindex
-            pindex = body2q[rbid]
-            rb = rbs[rbid]
-            # nc = rb.state.cache.nc
-            # if nc > 0
-            #     ret[is[]+1:is[]+nc] = rb.state.cache.cfuncs.Φ(q[pindex])
-            #     is[] += nc
-            # end
-            ret[is[]+1:is[]+nbodyc] .= rb.state.cache.funcs.Φ(q[pindex])
-            is[] += nbodyc
+        foreach(rbs) do rb
+            rbid = rb.prop.id
+            mvrbid = findfirst((x)->x==rbid,tg.mvbodyindex)
+            if !(mvrbid isa Nothing)
+                pindex = body2q[rbid]
+                # nc = rb.state.cache.nc
+                # if nc > 0
+                #     ret[is[]+1:is[]+nc] = rb.state.cache.cfuncs.Φ(q[pindex])
+                #     is[] += nc
+                # end
+                ret[nbodyc*(mvrbid-1)+1:nbodyc*mvrbid] .= rb.state.cache.funcs.Φ(q[pindex])
+                is[] += nbodyc
+            end
         end
         foreach(csts) do cst
             nc = cst.nconstraints
@@ -436,16 +549,19 @@ function build_A(tg)
     @inline @inbounds function inner_A(q)
         ret = zeros(eltype(q),nconstraint,ncoords)
         is = Ref(0)
-        for rbid in tg.mvbodyindex
-            pindex = body2q[rbid]
-            rb = rbs[rbid]
-            nc = rb.state.cache.nc
-            # if nc > 0
-            #     ret[is[]+1:is[]+nc,pindex] = rb.state.cache.cfuncs.Φq(q[pindex])
-            #     is[] += nc
-            # end
-            ret[is[]+1:is[]+nbodyc,pindex] .= rb.state.cache.funcs.Φq(q[pindex])
-            is[] += nbodyc
+        foreach(rbs) do rb
+            rbid = rb.prop.id
+            mvrbid = findfirst((x)->x==rbid,tg.mvbodyindex)
+            if !(mvrbid isa Nothing)
+                pindex = body2q[rbid]
+                # nc = rb.state.cache.nc
+                # if nc > 0
+                #     ret[is[]+1:is[]+nc,pindex] = rb.state.cache.cfuncs.Φq(q[pindex])
+                #     is[] += nc
+                # end
+                ret[nbodyc*(mvrbid-1)+1:nbodyc*mvrbid,pindex] .= rb.state.cache.funcs.Φq(q[pindex])
+                is[] += nbodyc
+            end
         end
         foreach(csts) do cst
             nc = cst.nconstraints
@@ -464,6 +580,21 @@ function build_F(tg,rbid,pid,f)
     reshape(F,:,1)
 end
 
+function get_fullq(tg)
+    rbs = tg.rigidbodies
+    @unpack body2fullq = tg.connectivity
+    nfullcoords = maximum.(body2fullq) |> maximum
+    T = get_numbertype(tg)
+    q = zeros(T,nfullcoords)
+    q̇ = zeros(T,nfullcoords)
+    foreach(rbs) do rb
+        pindex = body2fullq[rb.prop.id]
+        q[pindex] .= rb.state.coords.q
+        q̇[pindex] .= rb.state.coords.q̇
+    end
+    return q,q̇
+end
+
 function get_q(tg)
     rbs = tg.rigidbodies
     @unpack body2q = tg.connectivity
@@ -471,10 +602,13 @@ function get_q(tg)
     T = get_numbertype(tg)
     q = zeros(T,ncoords)
     q̇ = zeros(T,ncoords)
-    for rbid in tg.mvbodyindex
-        pindex = body2q[rbid]
-        q[pindex] .= rbs[rbid].state.coords.q
-        q̇[pindex] .= rbs[rbid].state.coords.q̇
+    foreach(rbs) do rb
+        if rb.prop.id in tg.mvbodyindex
+            pindex = body2q[rb.prop.id]
+            uci = rb.state.cache.unconstrained_index
+            q[pindex] .= rb.state.coords.q[uci]
+            q̇[pindex] .= rb.state.coords.q̇[uci]
+        end
     end
     return q,q̇
 end
@@ -517,11 +651,12 @@ function check_jacobian_singularity(tg)
     if sys_rank < minimum(size(Aq))
         @warn "System's Jacobian is singular: rank(A(q))=$(sys_rank)<$(minimum(size(Aq)))"
     end
-    for (rbid,rb) in enumerate(tg.rigidbodies)
+    foreach(tg.rigidbodies) do rb
+        rbid = rb.prop.id
         if rb.prop.movable && rb.prop.constrained
-            q_rb = rb.state.coords.q
-            Aq_rb = vcat(rb.state.cache.cfuncs.Φq(q_rb),
-                         rb.state.cache.funcs.Φq(q_rb))
+            uci = rb.state.cache.unconstrained_index
+            q_rb = rb.state.coords.q[uci]
+            Aq_rb = rb.state.cache.funcs.Φq(q_rb)
             rb_rank = rank(Aq_rb)
             intrinsic_Aq = rb.state.cache.funcs.Φq(q_rb)
             # @show rbid,lucompletepiv!(copy(intrinsic_Aq))
@@ -535,6 +670,28 @@ function check_jacobian_singularity(tg)
     end
 end
 
+get_s(bot::TensegrityRobot) = get_s(bot.tg)
+
+function get_s(tg::TensegrityStructure)
+    1 ./get_strings_len(tg)
+end
+
+get_c(bot::TensegrityRobot) = get_c(bot.tg)
+function get_c(tg)
+    (;ndim,npoints) = tg
+    cnt = tg.connectivity
+    (;apnb) = cnt
+    T = get_numbertype(tg)
+    ret = Vector{T}(undef,npoints*ndim)
+    foreach(tg.rigidbodies) do rb
+        rbid = rb.prop.id
+        for i in 1:rb.prop.naps
+            ip = apnb[rbid][i]
+            ret[(ip-1)*ndim+1:ip*ndim] = rb.state.cache.funcs.c(rb.prop.aps[i])
+        end
+    end
+    ret
+end
 
 function get_d(tg)
     @unpack nconstraint = tg
@@ -560,18 +717,21 @@ end
 get_ndim(bot::TensegrityRobot) = get_ndim(bot.tg)
 get_ndim(tg::TensegrityStructure) = get_ndim(tg.rigidbodies)
 get_ndim(rbs::AbstractVector{<:AbstractRigidBody}) = get_ndim(eltype(rbs))
+get_ndim(rbs::TypeSortedCollection) = get_ndim(eltype(rbs.data[1]))
 get_ndim(rb::AbstractRigidBody) = get_ndim(typeof(rb))
 get_ndim(::Type{<:AbstractRigidBody{N,T,C}}) where {N,T,C} = N
 
 get_numbertype(bot::TensegrityRobot) = get_numbertype(bot.tg)
 get_numbertype(tg::TensegrityStructure) = get_numbertype(tg.rigidbodies)
 get_numbertype(rbs::AbstractVector{<:AbstractRigidBody}) = get_numbertype(eltype(rbs))
+get_numbertype(rbs::TypeSortedCollection) = get_numbertype(eltype(rbs.data[1]))
 get_numbertype(rb::AbstractRigidBody) = get_numbertype(typeof(rb))
 get_numbertype(::Type{<:AbstractRigidBody{N,T,C}}) where {N,T,C} = T
 
 get_nbodyconstraint(bot::TensegrityRobot) = get_nbodyconstraint(bot.tg)
 get_nbodyconstraint(tg::TensegrityStructure) = get_nbodyconstraint(tg.rigidbodies)
 get_nbodyconstraint(rbs::AbstractVector{<:AbstractRigidBody}) = get_nbodyconstraint(eltype(rbs))
+get_nbodyconstraint(rbs::TypeSortedCollection) = get_nbodyconstraint(eltype(rbs.data[1]))
 get_nbodyconstraint(rb::AbstractRigidBody) = get_nbodyconstraint(typeof(rb))
 get_nbodyconstraint(::Type{<:RigidBody{N,T,L,C,
                 <:NaturalCoordinatesCache{ArrayT,MT,
@@ -581,6 +741,7 @@ get_nbodyconstraint(::Type{<:RigidBody{N,T,L,C,
 get_nbodycoords(bot::TensegrityRobot) = get_nbodycoords(bot.tg)
 get_nbodycoords(tg::TensegrityStructure) = get_nbodycoords(tg.rigidbodies)
 get_nbodycoords(rbs::AbstractVector{<:AbstractRigidBody}) = get_nbodycoords(eltype(rbs))
+get_nbodycoords(rbs::TypeSortedCollection) = get_nbodycoords(eltype(rbs.data[1]))
 get_nbodycoords(rb::AbstractRigidBody) = get_nbodycoords(typeof(rb))
 get_nbodycoords(::Type{<:RigidBody{N,T,L,C,
                 <:NaturalCoordinatesCache{ArrayT,MT,
@@ -590,6 +751,7 @@ get_nbodycoords(::Type{<:RigidBody{N,T,L,C,
 get_nbodydof(bot::TensegrityRobot) = get_nbodydof(bot.tg)
 get_nbodydof(tg::TensegrityStructure) = get_nbodydof(tg.rigidbodies)
 get_nbodydof(rbs::AbstractVector{<:AbstractRigidBody}) = get_nbodydof(eltype(rbs))
+get_nbodydof(rbs::TypeSortedCollection) = get_nbodydof(eltype(rbs.data[1]))
 get_nbodydof(rb::AbstractRigidBody) = get_nbodydof(typeof(rb))
 get_nbodydof(::Type{<:AbstractRigidBody{2,T,C}}) where {T,C} = 3
 get_nbodydof(::Type{<:AbstractRigidBody{3,T,C}}) where {T,C} = 6
@@ -669,6 +831,20 @@ function find_remaining_index(body2q,rbs)
         end
     end
     remaining_index = findall((x)->x!=0,switch_index)
+end
+
+function get_indices(tg)
+    (;ncoords) = tg
+    (;body2q) = tg.connectivity
+    mvindices_bool = ones(Bool,ncoords)
+    foreach(tg.rigidbodies) do rb
+        rbid = rb.prop.id
+        if rbid in tg.fixbodyindex
+            mvindices_bool[body2q[rbid]] .= false
+        end
+    end
+    # @show mvindices_bool
+    findall(mvindices_bool),findall(.!mvindices_bool)
 end
 
 function filter_body2q(rbs)

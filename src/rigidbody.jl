@@ -7,7 +7,7 @@ abstract type ExternalConstraints{T} end
 struct RigidBodyProperty{N,T,L} <: AbstractRigidBodyProperty{N,T}
     movable::Bool
     constrained::Bool
-    name::Symbol
+    id::Int
     type::Symbol
     mass::T
     inertia::Union{T,SArray{Tuple{N,N},T,2,L}}
@@ -53,19 +53,26 @@ struct ConstrainedFunctions{ΦT,ΦqT,∂Aᵀλ∂qT,∂Aq̇∂qT}
     ∂Aq̇∂q::∂Aq̇∂qT
 end
 
-struct NaturalCoordinatesCache{ArrayT,MT,fT,cfT}
+struct NaturalCoordinatesCache{ArrayT,MT,fT,cfT,CN,UCN}
     Cg::ArrayT
     Co::ArrayT
     Cp::Vector{ArrayT}
     M::MT
     funcs::fT
     nc::Int
-    constrained_index::Vector{Int}
+    constrained_index::SVector{CN,Int}
+    unconstrained_index::SVector{UCN,Int}
     cfuncs::cfT
 end
 
 
 struct EmptyConstraint{T} <: ExternalConstraints{T}
+	nconstraints::Int64
+    indices::Vector{Int64}
+	values::T
+end
+
+struct FixedIndicesConstraint{T} <: ExternalConstraints{T}
 	nconstraints::Int64
     indices::Vector{Int64}
 	values::T
@@ -101,6 +108,30 @@ end
 
 function make_A(::EmptyConstraint)
 	inner_A(q) = Array{eltype(q)}(undef,0,length(q))
+end
+
+function FixedIndicesConstraint(indices,values)
+	FixedIndicesConstraint(length(indices),indices,values)
+end
+
+function make_Φ(cst::FixedIndicesConstraint)
+	@unpack indices, values = cst
+	@inline @inbounds inner_Φ(q)   = q[indices]-values
+	@inline @inbounds inner_Φ(q,d) = q[indices]-d
+	inner_Φ
+end
+
+function make_A(cst::FixedIndicesConstraint)
+	nΦ = cst.nconstraints
+	indices = cst.indices
+	@inline @inbounds function inner_A(q)
+		nq = length(q)
+		ret = zeros(eltype(q),nΦ,nq)
+		for (iΦ,i) in enumerate(indices)
+			ret[iΦ,i] = 1
+		end
+		ret
+	end
 end
 
 function FixedBodyConstraint(rbs,body2q,rbid)
@@ -269,30 +300,30 @@ function make_index_A(index,nq)
 end
 
 # 2D and 3D
-function RigidBodyProperty(i::Integer,movable::Bool,
+function RigidBodyProperty(id::Integer,movable::Bool,
                             mass::Real,inertia_input,
                             r̄g::AbstractVector,aps;constrained=false)
-    name = Symbol("rb"*string(i))
     type = :generic
     naps = length(aps)
     if !movable
         constrained = true
     end
     if typeof(inertia_input)<:Real
-        return RigidBodyProperty{2,eltype(r̄g),4}(movable,constrained,name,type,mass,
+        return RigidBodyProperty{2,eltype(r̄g),4}(movable,constrained,id,type,mass,
                                 inertia_input,SVector{2}(r̄g),naps,SVector{2}.(aps))
     else
         mtype = similar_type(inertia_input)
         vtype = SVector{size(inertia_input)[1]}
-        return RigidBodyProperty(movable,constrained,name,type,mass,
+        return RigidBodyProperty(movable,constrained,id,type,mass,
                                 mtype(inertia_input),vtype(r̄g),naps,vtype.(aps))
     end
 end
 
 function NaturalCoordinatesCache(prop::RigidBodyProperty{N,T,iT},
                                  lncs::NaturalCoordinates.LocalNaturalCoordinates,
-                                 q,constrained_index=Vector{Int}()) where {N,T,iT}
-    cf = NaturalCoordinates.CoordinateFunctions(lncs)
+                                 q,constrained_index=SVector{0,Int}()) where {N,T,iT}
+ 	unconstrained_index = NaturalCoordinates.get_unconstrained_indices(lncs,constrained_index)
+    cf = NaturalCoordinates.CoordinateFunctions(lncs,q,constrained_index,unconstrained_index)
     @unpack mass,inertia,r̄g,naps,aps = prop
     M = NaturalCoordinates.make_M(cf,mass,inertia,r̄g)
     @unpack C,c = cf
@@ -314,7 +345,7 @@ function NaturalCoordinatesCache(prop::RigidBodyProperty{N,T,iT},
                 make_index_A(constrained_index,nq),
                 NaturalCoordinates.∂Aᵀλ∂q_forwarddiff(cf),
                 NaturalCoordinates.∂Aq̇∂q_forwarddiff(cf))
-    NaturalCoordinatesCache(Cg,Co,Cp,M,cf,nc,constrained_index,cfuns)
+    NaturalCoordinatesCache(Cg,Co,Cp,M,cf,nc,constrained_index,unconstrained_index,cfuns)
 end
 
 # 2D
@@ -384,14 +415,18 @@ function RigidBodyState(prop::RigidBodyProperty{2,T},
                         lncs::NaturalCoordinates.LocalNaturalCoordinates2D,
                         r_input,θ_input,ṙ_input,ω_input,
                         q_input,q̇_input=zero(q_input),
-                        constrained_index=Vector{Int}()) where {T}
+                        constrained_index=SVector{0,Int}()) where {T}
     ncoords = NaturalCoordinates.get_ncoords(lncs)
     q = MVector{ncoords}(q_input)
     q̇ = MVector{ncoords}(q̇_input)
     q̈ = zero(q)
     Q = zero(q)
     coords = RigidBodyCoordinates(q,q̇,q̈,Q)
-    cache = NaturalCoordinatesCache(prop,lncs,q,constrained_index)
+	if prop.movable
+		cache = NaturalCoordinatesCache(prop,lncs,q,constrained_index)
+	else
+		cache = NaturalCoordinatesCache(prop,lncs,q,SVector{ncoords}(collect(1:ncoords)))
+	end
 
     @unpack r̄g,naps,aps = prop
     @unpack C,c = cache.funcs

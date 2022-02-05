@@ -50,16 +50,18 @@ function ∂Aᵀλ∂q(tg,λ)
     ncoords = tg.ncoords
     nbodyc = get_nbodyconstraint(tg)
     ret = zeros(eltype(λ),ncoords,ncoords)
-    is = 0
-    for rbid in tg.mvbodyindex
-        pindex = body2q[rbid]
-        rb = tg.rigidbodies[rbid]
-        # nc = rb.state.cache.nc
-        # if nc > 0
-        #     is += nc
-        # end
-        ret[pindex,pindex] .+= rb.state.cache.cfuncs.∂Aᵀλ∂q(λ[is+1:is+nbodyc])
-        is += nbodyc
+    is = Ref(0)
+    foreach(tg.rigidbodies) do rb
+        rbid = rb.prop.id
+        if rbid in tg.mvbodyindex
+            pindex = body2q[rbid]
+            # nc = rb.state.cache.nc
+            # if nc > 0
+            #     is += nc
+            # end
+            ret[pindex,pindex] .+= rb.state.cache.cfuncs.∂Aᵀλ∂q(λ[is[]+1:is[]+nbodyc])
+            is[] += nbodyc
+        end
     end
     ret
 end

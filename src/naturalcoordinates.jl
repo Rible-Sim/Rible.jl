@@ -447,10 +447,7 @@ function make_Φ(lncs::LocalNaturalCoordinates2P)
 end
 
 @inline @inbounds function get_deform(ū,v̄)
-    u_square = ū⋅ū
-    v_square = v̄⋅v̄
-    uv_dotprod = ū⋅v̄
-    u_square,v_square,uv_dotprod
+    sqrt(ū⋅ū),sqrt(v̄⋅v̄),sqrt(ū⋅v̄)
 end
 
 @inline @inbounds function get_deform(lncs::LocalNaturalCoordinates1P2V)
@@ -507,9 +504,9 @@ end
     get_deform(ū,v̄,w̄)
 end
 
-function make_Φ(lncs::LocalNaturalCoordinates2D6C)
+function make_Φ(lncs::LocalNaturalCoordinates2D6C,q0,ci,uci)
     deforms = get_deform(lncs)
-    make_Φ(lncs,deforms)
+    make_Φ(lncs,q0,ci,uci,deforms)
 end
 
 function make_Φ(lncs::LocalNaturalCoordinates3D12C)
@@ -527,22 +524,28 @@ function make_inner_Φ(func,deforms)
     ret_func
 end
 
-function make_Φ(lncs::LocalNaturalCoordinates1P2V,deforms)
-    @inline @inbounds function _inner_Φ(q,d)
+function make_Φ(lncs::LocalNaturalCoordinates1P2V,q0,ci,uci,deforms)
+    @inline @inbounds function _inner_Φ(quc,d)
+        q = zeros(eltype(quc),6)
+        q[ci] = q0[ci]
+        q[uci] = quc
         u = @view q[3:4]
         v = @view q[5:6]
-        [u⋅u - d[1], v⋅v - d[2], u⋅v - d[3]]
+        [(u⋅u - d[1]^2)/2, (v⋅v - d[2]^2)/2, √2/2*(u⋅v - d[3]^2)]
     end
     make_inner_Φ(_inner_Φ,deforms)
 end
 
-function make_Φ(lncs::LocalNaturalCoordinates2P1V,deforms)
-    @inline @inbounds function _inner_Φ(q,d)
+function make_Φ(lncs::LocalNaturalCoordinates2P1V,q0,ci,uci,deforms)
+    @inline @inbounds function _inner_Φ(quc,d)
+        q = zeros(eltype(quc),6)
+        q[ci] = q0[ci]
+        q[uci] = quc
         ri = @view q[1:2]
         rj = @view q[3:4]
         u = rj-ri
         v = @view q[5:6]
-        [u⋅u - d[1], v⋅v - d[2], u⋅v - d[3]]
+        [√2/4/d[1]*(u⋅u - d[1]^2), √2/4/d[2]*(v⋅v - d[2]^2), sqrt(1/(2d[1]+d[2]))*(u⋅v - d[3]^2)]
     end
     make_inner_Φ(_inner_Φ,deforms)
 end
@@ -615,33 +618,46 @@ function make_Φq(lncs::LocalNaturalCoordinates2P)
     end
 end
 
-function make_Φq(lncs::LocalNaturalCoordinates1P2V)
-    @inline @inbounds function inner_Φq(q)
+function make_Φq(lncs::LocalNaturalCoordinates1P2V,q0,ci,uci)
+    @inline @inbounds function inner_Φq(quc)
+        q = zeros(eltype(quc),6)
+        q[ci] = q0[ci]
+        q[uci] = quc
         u = @view q[3:4]
         v = @view q[5:6]
         ret = zeros(eltype(q),3,6)
-        ret[1,3:4] = 2u
-        ret[2,5:6] = 2v
-        ret[3,3:4] = v
-        ret[3,5:6] = u
-        ret
+        ret[1,3:4] = u
+        ret[2,5:6] = v
+        ret[3,3:4] = √2/2*v
+        ret[3,5:6] = √2/2*u
+        ret[:,uci]
     end
 end
 
-function make_Φq(lncs::LocalNaturalCoordinates2P1V)
-    @inline @inbounds function inner_Φq(q)
+function make_Φq(lncs::LocalNaturalCoordinates2P1V,q0,ci,uci)
+    d = get_deform(lncs)
+    a = sqrt(1/(2d[2]^2+d[1]^2))
+    weights = zeros(eltype(q0),3,6)
+    weights[1,1:4] .= 1//4
+    weights[2,3:4] .= 1//2
+    weights[3,1:6] .= 1//6
+    wsum = sqrt.(inv.(sum(weights[:,uci],dims=2)))
+    @inline @inbounds function inner_Φq(quc)
+        q = zeros(eltype(quc),6)
+        q[ci] = q0[ci]
+        q[uci] = quc
         ri = @view q[1:2]
         rj = @view q[3:4]
         u = rj-ri
         v = @view q[5:6]
         ret = zeros(eltype(q),3,6)
-        ret[1,1:2] = -2u
-        ret[1,3:4] = 2u
-        ret[2,5:6] = 2v
-        ret[3,1:2] = -v
-        ret[3,3:4] = v
-        ret[3,5:6] = u
-        ret
+        ret[1,1:2] = wsum[1]*(-√2/2*u/d[1])
+        ret[1,3:4] = wsum[1]*( √2/2*u/d[1])
+        ret[2,5:6] = wsum[2]*(      v/d[2])
+        ret[3,1:2] = wsum[3]*(-a*v)
+        ret[3,3:4] = wsum[3]*( a*v)
+        ret[3,5:6] = wsum[3]*( a*u)
+        ret[:,uci]
     end
 end
 
@@ -886,11 +902,15 @@ struct CoordinateFunctions{lncsType,cT,CT,ΦT,ΦqT}
     Φq::ΦqT
 end
 
-function CoordinateFunctions(lncs)
+function get_unconstrained_indices(lncs::LocalNaturalCoordinates2D6C,constrained_index)
+    SVector{6-length(constrained_index)}(deleteat!(collect(1:6),Vector(constrained_index)))
+end
+
+function CoordinateFunctions(lncs,q0,ci,uci)
     c = make_c(lncs)
     C = make_C(lncs)
-    Φ = make_Φ(lncs)
-    Φq = make_Φq(lncs)
+    Φ = make_Φ(lncs,q0,ci,uci)
+    Φq = make_Φq(lncs,q0,ci,uci)
     CoordinateFunctions(lncs,c,C,Φ,Φq)
 end
 
