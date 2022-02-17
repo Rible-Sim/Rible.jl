@@ -58,25 +58,28 @@ function rbid2mvrbid(mvbodyindex)
 
 end
 
-function build_D(tgstruct)
-    @unpack nstrings,nmvpoints,ndim,mvbodyindex = tgstruct
-    @unpack body2q,string2ap = tgstruct.connectivity
+function build_D(tg)
+    @unpack nstrings,nmvpoints,ndim,mvbodyindex = tg
+    @unpack body2q,string2ap = tg.connectivity
     D = spzeros(Int,nmvpoints*ndim,nstrings*ndim)
     D_raw = spzeros(Int,nmvpoints,nstrings)
     iss = [0]
-    for rbid in tgstruct.mvbodyindex
-        rb = tgstruct.rigidbodies[rbid]
-        push!(iss,iss[end]+rb.prop.naps)
+
+    foreach(tg.rigidbodies) do rb
+        if rb.prop.id in tg.mvbodyindex
+            push!(iss,iss[end]+rb.prop.naps)
+        end
     end
 
-    for (sid,ap) in enumerate(string2ap)
-        mvrbid1 = findfirst((x)->x==ap[1].rbid, mvbodyindex)
+    foreach(string2ap) do scnt
+        id = scnt.id
+        mvrbid1 = findfirst((x)->x==scnt.end1.rbsig.prop.id, mvbodyindex)
         if mvrbid1 != nothing
-            D_raw[iss[mvrbid1]+ap[1].apid,sid] = 1
+            D_raw[iss[mvrbid1]+scnt.end1.pid,id] = 1
         end
-        mvrbid2 = findfirst((x)->x==ap[2].rbid, mvbodyindex)
+        mvrbid2 = findfirst((x)->x==scnt.end2.rbsig.prop.id, mvbodyindex)
         if mvrbid2 != nothing
-            D_raw[iss[mvrbid2]+ap[2].apid,sid] = -1
+            D_raw[iss[mvrbid2]+scnt.end2.pid,id] = -1
         end
     end
     D .= kron(D_raw,Matrix(1I,ndim,ndim))
@@ -225,7 +228,7 @@ function build_Q(tg)
     cnt = tg.connectivity
     @unpack string2ap,apnb = cnt
     function inner_Q(q,s,u,k,c)
-        ret = zeros(eltype(s),nfullcoords)
+        ret = zeros(eltype(u),nfullcoords)
         foreach(string2ap) do scnt
             j = scnt.id
             rb1 = scnt.end1.rbsig
@@ -248,6 +251,31 @@ function build_Q(tg)
         end
         ret
     end
+    function inner_Q(q,γ,c)
+        ret = zeros(eltype(γ),nfullcoords)
+        foreach(string2ap) do scnt
+            j = scnt.id
+            rb1 = scnt.end1.rbsig
+            rb2 = scnt.end2.rbsig
+            rb1id = rb1.prop.id
+            rb2id = rb2.prop.id
+            ap1id = scnt.end1.pid
+            ap2id = scnt.end2.pid
+            is1 = (apnb[rb1id][ap1id]-1)*ndim
+            is2 = (apnb[rb2id][ap2id]-1)*ndim
+            c1 = c[is1+1:is1+ndim]
+            c2 = c[is2+1:is2+ndim]
+            C1 = rb1.state.cache.funcs.C(c1)
+            C2 = rb2.state.cache.funcs.C(c2)
+            T1 = build_Ti(tg,rb1id)
+            T2 = build_Ti(tg,rb2id)
+            Jj = C2*T2-C1*T1
+            Uj = transpose(Jj)*Jj
+            ret .+= γ[j]*Uj*q
+        end
+        ret
+    end
+    inner_Q
 end
 
 function build_KE(tg)

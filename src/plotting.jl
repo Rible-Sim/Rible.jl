@@ -1,7 +1,19 @@
-function get_strings(tgstruct)
-    string2ap = tgstruct.connectivity.string2ap
-    rbs = tgstruct.rigidbodies
-    [Point(rbs[s[1].rbid].state.rps[s[1].apid]) =>
-     Point(rbs[s[2].rbid].state.rps[s[2].apid])
-     for s in string2ap]
+function get_strings(tg::TensegrityStructure{T,N}) where {T,N}
+    string2ap = tg.connectivity.string2ap
+    ret = Vector{Pair{Point2{Float64},Point2{Float64}}}(undef,tg.nstrings)
+    map!(ret,string2ap) do scnt
+        Point(scnt.end1.rbsig.state.rps[scnt.end1.pid]) =>
+        Point(scnt.end2.rbsig.state.rps[scnt.end2.pid])
+    end
+    ret
+end
+
+function make_apcnt(rigidbodies)
+	ret = Vector{Vector{Int}}()
+	is = Ref(0)
+	foreach(rigidbodies) do rb
+		push!(ret,collect(is[]+1:is[]+rb.prop.naps))
+		is[] += rb.prop.naps
+	end
+	ret
 end

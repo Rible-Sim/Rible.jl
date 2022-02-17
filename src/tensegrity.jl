@@ -103,18 +103,22 @@ function lengthdir(v)
     l,τ
 end
 
-function reset_forces!(tgst::TensegrityStructure)
-    reset_forces!(tgst.rigidbodies)
+function reset_forces!(tg::TensegrityStructure)
+    reset_forces!(tg.rigidbodies)
+end
+
+function reset_forces!(rigidbodies::AbstractVector)
+    foreach(reset_forces!,rigidbodies)
 end
 
 function reset_forces!(rigidbodies::TypeSortedCollection)
     foreach(reset_forces!,rigidbodies)
 end
 
-function update_strings_apply_forces!(tgstruct)
-    rbs = tgstruct.rigidbodies
-    ss = tgstruct.strings
-    cnt = tgstruct.connectivity
+function update_strings_apply_forces!(tg)
+    rbs = tg.rigidbodies
+    ss = tg.strings
+    cnt = tg.connectivity
     (;string2ap) = cnt
     foreach(string2ap) do scnt
         sstring = ss[scnt.id]
@@ -769,6 +773,7 @@ get_strings_restlen(bot::TensegrityRobot) = get_strings_restlen(bot.tg)
 get_strings_len_dot(bot::TensegrityRobot) = get_strings_len_dot(bot.tg)
 get_strings_tension(bot::TensegrityRobot) = get_strings_tension(bot.tg)
 get_strings_stiffness(bot::TensegrityRobot) = get_strings_stiffness(bot.tg)
+get_strings_force_density(bot::TensegrityRobot) = get_strings_force_density(bot.tg)
 
 function get_strings_len!(tg::TensegrityStructure,q)
     distribute_q_to_rbs!(tg,q,zero(q))
@@ -798,6 +803,10 @@ end
 
 function get_strings_tension(tg::TensegrityStructure)
     [s.state.tension for s in tg.strings]
+end
+
+function get_strings_force_density(tg::TensegrityStructure)
+    [s.state.tension/s.state.length for s in tg.strings]
 end
 
 function get_original_restlen(botinput::TensegrityRobot)
@@ -901,7 +910,7 @@ end
 function TensegrityRobot(tg,hub)
 	reset_forces!(tg)
     update_strings_apply_forces!(tg)
-	check_jacobian_singularity(tg)
+	# check_jacobian_singularity(tg)
 	# check_stability(tg)
     TensegrityRobot(tg,hub,new_trajectory(tg))
 end

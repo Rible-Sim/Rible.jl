@@ -903,7 +903,7 @@ struct CoordinateFunctions{lncsType,cT,CT,ΦT,ΦqT}
 end
 
 function get_unconstrained_indices(lncs::LocalNaturalCoordinates2D6C,constrained_index)
-    SVector{6-length(constrained_index)}(deleteat!(collect(1:6),Vector(constrained_index)))
+    deleteat!(collect(1:6),constrained_index)
 end
 
 function CoordinateFunctions(lncs,q0,ci,uci)

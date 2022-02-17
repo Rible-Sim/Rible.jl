@@ -53,15 +53,15 @@ struct ConstrainedFunctions{ΦT,ΦqT,∂Aᵀλ∂qT,∂Aq̇∂qT}
     ∂Aq̇∂q::∂Aq̇∂qT
 end
 
-struct NaturalCoordinatesCache{ArrayT,MT,fT,cfT,CN,UCN}
+struct NaturalCoordinatesCache{ArrayT,MT,fT,cfT}
     Cg::ArrayT
     Co::ArrayT
     Cp::Vector{ArrayT}
     M::MT
     funcs::fT
     nc::Int
-    constrained_index::SVector{CN,Int}
-    unconstrained_index::SVector{UCN,Int}
+    constrained_index::Vector{Int}
+    unconstrained_index::Vector{Int}
     cfuncs::cfT
 end
 
@@ -321,7 +321,7 @@ end
 
 function NaturalCoordinatesCache(prop::RigidBodyProperty{N,T,iT},
                                  lncs::NaturalCoordinates.LocalNaturalCoordinates,
-                                 q,constrained_index=SVector{0,Int}()) where {N,T,iT}
+                                 q,constrained_index=Vector{Int}()) where {N,T,iT}
  	unconstrained_index = NaturalCoordinates.get_unconstrained_indices(lncs,constrained_index)
     cf = NaturalCoordinates.CoordinateFunctions(lncs,q,constrained_index,unconstrained_index)
     @unpack mass,inertia,r̄g,naps,aps = prop
@@ -415,7 +415,7 @@ function RigidBodyState(prop::RigidBodyProperty{2,T},
                         lncs::NaturalCoordinates.LocalNaturalCoordinates2D,
                         r_input,θ_input,ṙ_input,ω_input,
                         q_input,q̇_input=zero(q_input),
-                        constrained_index=SVector{0,Int}()) where {T}
+                        constrained_index=Vector{Int}()) where {T}
     ncoords = NaturalCoordinates.get_ncoords(lncs)
     q = MVector{ncoords}(q_input)
     q̇ = MVector{ncoords}(q̇_input)
@@ -425,7 +425,7 @@ function RigidBodyState(prop::RigidBodyProperty{2,T},
 	if prop.movable
 		cache = NaturalCoordinatesCache(prop,lncs,q,constrained_index)
 	else
-		cache = NaturalCoordinatesCache(prop,lncs,q,SVector{ncoords}(collect(1:ncoords)))
+		cache = NaturalCoordinatesCache(prop,lncs,q,collect(1:ncoords))
 	end
 
     @unpack r̄g,naps,aps = prop
