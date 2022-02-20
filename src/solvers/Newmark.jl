@@ -210,13 +210,14 @@ function solve!(intor::Integrator,cache::FBNewmarkCache;
             ∂ζ∂q = build_∂ζ∂q(bot.tg)(q)
             ∂ζ∂s̄ = build_∂ζ∂s̄(bot.tg)
             ∂s̄∂s̄ = I(n)
-            coes = diagm([((ζ[i]/1000)^2 + (1000*s̄[i])^2)^(-1/2) for i in 1:n])
-            coζ = coes*diagm([ζ[i]/1000^2 for i in 1:n]) - diagm([1/1000 for i in 1:n])
-            cos̄ = coes*diagm([1000^2*s̄[i] for i in 1:n]) - diagm([1000 for i in 1:n])
+            κ₁ = 1000; κ₂ = 1000
+            coes = diagm([((ζ[i]/κ₁)^2 + (κ₂*s̄[i])^2)^(-1/2) for i in 1:n])
+            coζ = coes*diagm([ζ[i]/κ₁^2 for i in 1:n]) - diagm([1/κ₁ for i in 1:n])
+            cos̄ = coes*diagm([κ₂^2*s̄[i] for i in 1:n]) - diagm([κ₂ for i in 1:n])
             #@show size(b1*d2*M ), size(diagm(λᵏ)*A(qᵏ)), size(∂F∂q), size(γ*b1*d1*∂F∂q̇)
             J[   1:nq ,      1:nq    ] .=  b1*d2*M  + ∂Aᵀλ∂q1 - ∂F∂q - γ*b1*d1*∂F∂q̇
             J[   1:nq ,   nq+1:nq+nλ ] .= transpose(A(qᵏ))
-            J[   1:nq ,nq+nλ+1:end   ] .= ∂F∂s̄
+            J[   1:nq ,nq+nλ+1:end   ] .= -∂F∂s̄
             J[nq+1:nq+nλ,   1:nq ] .=  A(qᵏ)
             J[nq+1:nq+nλ,nq+1:nq+nλ] .=  0.0
             J[nq+1:nq+nλ,nq+nλ+1:end] .=  0.0
@@ -364,7 +365,7 @@ function generate_cache(solver::SNNewmark,intor;dt,kargs...)
     λs = [zeros(eltype(q),nλ) for i in 1:totalstep+1]
     SNNewmarkCache(totalstep,totaltime,ts,qs,q̇s,q̈s,λs,s̄s,solver)
 end
-using XLSX
+# using XLSX
 function solve!(intor::Integrator,cache::SNNewmarkCache;
                 dt=0.01,ftol=1e-14,verbose=false,iterations=50,
                 progress=true,exception=true)
@@ -435,12 +436,12 @@ function solve!(intor::Integrator,cache::SNNewmarkCache;
             #@show size(b1*d2*M ), size(diagm(λᵏ)*A(qᵏ)), size(∂F∂q), size(γ*b1*d1*∂F∂q̇)
             J[   1:nq ,      1:nq    ] .=  b1*d2*M  + ∂Aᵀλ∂q1 - ∂F∂q - γ*b1*d1*∂F∂q̇
             J[   1:nq ,   nq+1:nq+nλ ] .= transpose(A(qᵏ))
-            J[   1:nq ,nq+nλ+1:end   ] .= ∂F∂s̄
+            J[   1:nq ,nq+nλ+1:end   ] .= -∂F∂s̄
             J[nq+1:nq+nλ,   1:nq ] .=  A(qᵏ)
             J[nq+1:nq+nλ,nq+1:nq+nλ] .=  0.0
             J[nq+1:nq+nλ,nq+nλ+1:end] .=  0.0
             #@show size(∂ζ∂q),size(zeros(Float64,length(a),nq))
-            J[nq+nλ+1:end,1:nq] .= 2*vcat(∂ζ∂q,zeros(Float64,length(a),nq))
+            J[nq+nλ+1:end,1:nq] .= vcat(∂ζ∂q,zeros(Float64,length(a),nq))
             J[nq+nλ+1:end,nq+1:nq+nλ+1] .= 0.0
             J[nq+nλ+1:end,nq+nλ+1:end] .= vcat(∂ζ∂s̄,∂s̄∂s̄)
         end
@@ -543,7 +544,7 @@ function solve!(intor::Integrator,cache::SNNewmarkCache;
         #---------Step k finisher-----------
         if verbose
             # dtwidth = ceil(Int,-log10(dt))
-            @printf("Progress: %5.1f%%, step: %s, time: %.7f, iterations: %s \n", (
+            @printf("Progress: %5.1f%%, step: %.0f, time: %.3f, iterations: %.0f \n", (
             ts[timestep+1]/totaltime*100), timestep+1, ts[timestep+1], R_stepk_result.iterations)
         end
         next!(prog)

@@ -234,17 +234,18 @@ function solve!(intor::Integrator,cache::FBZhong06Cache;
             ∂ζ∂q = build_∂ζ∂q(bot.tg)(q)
             ∂ζ∂s̄ = build_∂ζ∂s̄(bot.tg)
             ∂s̄∂s̄ = I(n)
-            coes = diagm([((ζ[i]/1000)^2 + (1000*s̄[i])^2)^(-1/2) for i in 1:n])
-            coζ = coes*diagm([ζ[i]/1000^2 for i in 1:n]) - diagm([1/1000 for i in 1:n])
-            cos̄ = coes*diagm([1000^2*s̄[i] for i in 1:n]) - diagm([1000 for i in 1:n])
+            κ₁ = 1000; κ₂ = 1000
+            coes = diagm([((ζ[i]/κ₁)^2 + (κ₂*s̄[i])^2)^(-1/2) for i in 1:n])
+            coζ = coes*diagm([ζ[i]/κ₁^2 for i in 1:n]) - diagm([1/κ₁ for i in 1:n])
+            cos̄ = coes*diagm([κ₂^2*s̄[i] for i in 1:n]) - diagm([κ₂ for i in 1:n])
             J[   1:nq ,      1:nq    ] .=  M.-h^2/2 .*(1/2 .*∂F∂q.+1/h.*∂F∂q̇)
             J[   1:nq ,   nq+1:nq+nλ ] .= -scaling.*transpose(A(qᵏ⁻¹))
-            J[   1:nq ,nq+nλ+1:end   ] .= 1/2 * dt^2 .* ∂F∂s̄
+            J[   1:nq ,nq+nλ+1:end   ] .= -1/2 * dt^2 .* ∂F∂s̄
             J[nq+1:nq+nλ,   1:nq ] .=  scaling.*A(qᵏ)
             J[nq+1:nq+nλ,nq+1:nq+nλ] .=  0.0
             J[nq+1:nq+nλ,nq+nλ+1:end] .=  0.0
             #@show size(∂ζ∂q),size(zeros(Float64,length(a),nq))
-            J[nq+nλ+1:end,1:nq] .= coζ*∂ζ∂q
+            J[nq+nλ+1:end,1:nq] .= 1/2*coζ*∂ζ∂q
             J[nq+nλ+1:end,nq+1:nq+nλ+1] .= 0.0
             J[nq+nλ+1:end,nq+nλ+1:end] .= coζ *∂ζ∂s̄ + cos̄*∂s̄∂s̄
         end
@@ -326,7 +327,7 @@ function solve!(intor::Integrator,cache::FBZhong06Cache;
         #apply_s̄!(bot)
         #---------Step k finisher-----------
         if verbose
-            @printf("Progress: %5.1f%%, step: %s, time: %s, iterations: %s \n", (
+            @printf("Progress: %5.2f%%, step: %.0f, time: %.4f, iterations: %.0f \n", (
             ts[timestep+1]/totaltime*100), timestep+1, ts[timestep+1], R_stepk_result.iterations)
         end
         next!(prog)
@@ -405,7 +406,7 @@ function solve!(intor::Integrator,cache::SNZhong06Cache;
 
             ζ = build_ζ(bot.tg)
             add = nq+nλ
-            c = 1
+            c = 1e8
             n = length(ζ)
             i = findall(x->x<=0, ζ-c.*sᵏ)
             a = setdiff(1:n,i)
@@ -430,48 +431,26 @@ function solve!(intor::Integrator,cache::SNZhong06Cache;
             t = tᵏ⁻¹+h/2
             ∂F∂q,∂F∂q̇,∂F∂s̄ = Jac_F!(q,q̇,s̄,t)
             ζ = build_ζ(bot.tg)
-            c = 1
+            c = 1e8
             n = length(ζ)
             i = findall(x->x<=0, ζ-c.*s̄)
+            # @show ζ, s̄
             a = setdiff(1:n,i)
             ∂ζ∂q = build_∂ζ∂q(bot.tg)(q)[i,:]
             ∂ζ∂s̄ = build_∂ζ∂s̄(bot.tg)[i,:]
             ∂s̄∂s̄ = I(length(s̄))[a,:]
             J[   1:nq ,      1:nq    ] .=  M.-h^2/2 .*(1/2 .*∂F∂q.+1/h.*∂F∂q̇)
             J[   1:nq ,   nq+1:nq+nλ ] .= -scaling.*transpose(A(qᵏ⁻¹))
-            J[   1:nq ,nq+nλ+1:end   ] .= 1/2 * dt^2 .* ∂F∂s̄
+            J[   1:nq ,nq+nλ+1:end   ] .= -1/2 * dt^2 .* ∂F∂s̄
             J[nq+1:nq+nλ,   1:nq ] .=  scaling.*A(qᵏ)
             J[nq+1:nq+nλ,nq+1:nq+nλ] .=  0.0
             J[nq+1:nq+nλ,nq+nλ+1:end] .=  0.0
             #@show size(∂ζ∂q),size(zeros(Float64,length(a),nq))
-            J[nq+nλ+1:end,1:nq] .= vcat(∂ζ∂q,zeros(Float64,length(a),nq))
+            J[nq+nλ+1:end,1:nq] .= 1/2*vcat(∂ζ∂q,zeros(Float64,length(a),nq))
             J[nq+nλ+1:end,nq+1:nq+nλ+1] .= 0.0
             J[nq+nλ+1:end,nq+nλ+1:end] .= vcat(∂ζ∂s̄,∂s̄∂s̄)
             #@show cond(J)
         end
-    end
-
-    function newton(f!,j!,initial_x;iter=50, ftol=1e-7,)
-        nx = length(initial_x)
-        F = zeros(Float64, nx, 1)
-        J = zeros(Float64, nx, nx)
-        xᵏ⁻¹ = initial_x
-        for i in 1:iter
-            j!(J,xᵏ⁻¹)
-            f!(F,xᵏ⁻¹)
-            tempf = deepcopy(F)
-            xᵏ = xᵏ⁻¹ - J\F
-            f!(F,xᵏ)
-            if norm(tempf-F) < ftol
-                xᵏ⁻¹ = xᵏ
-                break
-            end
-            if i == iter
-                @warn "not converged"
-            end
-            xᵏ⁻¹ = xᵏ
-        end
-        return xᵏ⁻¹
     end
     
     iteration = 0
@@ -494,8 +473,9 @@ function solve!(intor::Integrator,cache::SNZhong06Cache;
         initial_x[   1:nq]    = qᵏ⁻¹ 
         initial_x[nq+1:nq+nλ] = λᵏ⁻¹
         initial_x[nq+nλ+1:nx] = sᵏ⁻¹
-        #bot.tg.clusterstrings[1].segs[1].state.restlen += apply_fun(tᵏ⁻¹,1e-3)
-        apply_acu!(bot.tg, tᵏ⁻¹;dt=dt)
+        if apply_acu! != nothing
+            apply_acu!(bot.tg, tᵏ⁻¹;dt)
+        end
         # initial_R = similar(initial_x)
         #R_stepk!(initial_R,initial_x)
         # @show initial_R
@@ -547,7 +527,7 @@ function solve!(intor::Integrator,cache::SNZhong06Cache;
 
         #---------Step k finisher-----------
         if verbose
-            @printf("Progress: %5.1f%%, step: %s, time: %s, iterations: %s \n", (
+            @printf("Progress: %5.1f%%, step: %.0f, time: %.3f, iterations: %.0f \n", (
             ts[timestep+1]/totaltime*100), timestep+1, ts[timestep+1], R_stepk_result.iterations)
         end
         #

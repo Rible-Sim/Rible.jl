@@ -324,7 +324,7 @@ function update_strings!(tg, @eponymargs(clusterstrings,))
             end
             #u = u0
             #segstate.tension = k*abs(u0)/u*(l-u)
-            segstate.tension = k*(l-u) 
+            segstate.tension = k*(l-u) + prestress
             #if u0 < 0
             #    wait()
             #end
@@ -726,7 +726,7 @@ function get_force(bot::TensegrityRobots.TensegrityRobot,@eponymargs(strings))
     return f_list
 end
 
-
+"get restlen length lengthdot tension"
 function get_state(bot::TensegrityRobots.TensegrityRobot, dataname)
     get_state(bot, bot.tg.tensiles, dataname)
 end
@@ -748,6 +748,7 @@ function get_state(bot::TensegrityRobots.TensegrityRobot,@eponymargs(strings), d
     return f_list
 end
 
+"get μ θ α s s⁺ s⁻"
 function get_sp(bot::TensegrityRobots.TensegrityRobot, dataname)
     @unpack clusterstrings = bot.tg
     f_list = Vector{Vector{Any}}()

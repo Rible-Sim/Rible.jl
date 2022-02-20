@@ -152,22 +152,3 @@ function get_clusterζ(tg::ClusterTensegrityStructure)
     end
     return ζ_list
 end
-
-function semi_newton(AA,f,y0,λ0)
-    bool = true
-    n = length(f)
-    λ = λ0
-    y = y0
-    c = 1
-    while bool
-        @show I = findall(x->x<=0,(λ+c.*y))
-        A = setdiff(1:n,I)
-        λ[I] .= 0
-        y[A] .= 0
-        @show AA[I,I]
-        y[I] .= AA[I,I]\f[I]
-        λ[A] .= f[A] - (AA*y)[A]
-        @show bool = norm(AA*y+λ - f) >= 1e-7
-    end
-    return y,λ
-end

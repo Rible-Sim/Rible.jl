@@ -190,7 +190,7 @@ function build_∂Γ∂s̄(tg::ClusterTensegrityStructure)
             #∂Γ∂s̄c[i*ndim,:] .= kc[i].*l̂c[i][2].*N[ndim*i,:]
             #@show kc[i],l̂c[i],N[(i-1)*ndim+1:i*ndim,:]
             for j in 1:ndim
-                ∂Γ∂s̄c[(i-1)*ndim+j,:] .= kc[i]*l̂c[i][j]*N[i,:]
+                ∂Γ∂s̄c[(i-1)*ndim+j,:] .= -kc[i]*l̂c[i][j]*N[i,:]
             end
             #@show size(∂Γ∂s̄c[(i-1)*ndim+1:i*ndim,:])
         end
@@ -254,7 +254,7 @@ function build_∂ζ∂q(tg)
         qᵀUc = [transpose(q)*Uc[i] for i = 1:nclustersegs]
         dldq = [(qᵀUc[i])/lc[i] for i = 1:nclustersegs]
         #∂ζ∂q = 1/2*T*b*reduce(vcat,dldq)
-        ∂ζ∂q = 1/2*T*b*reduce(vcat,dldq)
+        ∂ζ∂q = T*b*reduce(vcat,dldq)
         return ∂ζ∂q
     end
 end
