@@ -271,7 +271,7 @@ function solve!(intor::Integrator,cache::FBZhong06Cache;
         initial_x[   1:nq]    = qᵏ⁻¹
         initial_x[nq+1:nq+nλ] = λᵏ⁻¹
         initial_x[nq+nλ+1:nx] = sᵏ⁻¹
-       
+
         if apply_acu! != nothing
             apply_acu!(bot.tg, tᵏ⁻¹;dt)
         end
@@ -320,9 +320,15 @@ function solve!(intor::Integrator,cache::FBZhong06Cache;
         current.q .= qᵏ
         current.q̇ .= q̇ᵏ
         current.s̄ .= sᵏ
-        if typeof(bot)==TensegrityRobotRecord
-            push!(bot.traj.OtherData,bot.tg.clusterstrings[1].segs[1].state.tension)
+        tension_lists = Vector{Vector{Float64}}()
+        for clusterstring in bot.tg.clusterstrings
+            tension_list = Vector{Float64}()
+            for seg in clusterstring.segs
+                push!(tension_list, seg.state.tension)
+            end
+            push!(tension_lists, tension_list)
         end
+        push!(bot.traj.OtherData, tension_lists)
         #apply_s̄!(bot,sᵏ)
         #apply_s̄!(bot)
         #---------Step k finisher-----------
@@ -452,7 +458,7 @@ function solve!(intor::Integrator,cache::SNZhong06Cache;
             #@show cond(J)
         end
     end
-    
+
     iteration = 0
     prog = Progress(totalstep; dt=1.0, enabled=progress)
     for timestep = 1:totalstep
@@ -470,7 +476,7 @@ function solve!(intor::Integrator,cache::SNZhong06Cache;
         pᵏ = ps[timestep+1]
         λᵏ = λs[timestep+1]
         sᵏ = s̄s[timestep+1]
-        initial_x[   1:nq]    = qᵏ⁻¹ 
+        initial_x[   1:nq]    = qᵏ⁻¹
         initial_x[nq+1:nq+nλ] = λᵏ⁻¹
         initial_x[nq+nλ+1:nx] = sᵏ⁻¹
         if apply_acu! != nothing
