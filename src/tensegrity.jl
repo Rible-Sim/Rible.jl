@@ -115,6 +115,13 @@ function reset_forces!(rigidbodies::TypeSortedCollection)
     foreach(reset_forces!,rigidbodies)
 end
 
+function update!(tg::TensegrityStructure)
+    q,_ = get_q(tg)
+    reset_forces!(tg)
+    distribute_q_to_rbs!(tg,q)
+    update_strings_apply_forces!(tg)
+end
+
 function update_strings_apply_forces!(tg)
     rbs = tg.rigidbodies
     ss = tg.strings
@@ -198,22 +205,22 @@ function distribute_q_to_rbs!(tg,globalq,globalq̇)
     cnt = tg.connectivity
     foreach(tg.rigidbodies) do rb
         rbid = rb.prop.id
+        @unpack q, q̇ = rb.state.coords
         if rbid in tg.mvbodyindex
             pindex = cnt.body2q[rbid]
             uci = rb.state.cache.unconstrained_index
-            @unpack q, q̇ = rb.state.coords
             q[uci] .= globalq[pindex]
             q̇[uci] .= globalq̇[pindex]
-            @unpack cache,rps,ṙps,ro,ṙo,rg,ṙg = rb.state
-            @unpack Co,Cg,Cp = cache
-            mul!(ro, Co, q)
-            mul!(ṙo, Co, q̇)
-            mul!(rg, Cg, q)
-            mul!(ṙg, Cg, q̇)
-            for (i,(rp,ṙp)) in enumerate(zip(rps,ṙps))
-                mul!(rp, Cp[i], q)
-                mul!(ṙp, Cp[i], q̇)
-            end
+        end
+        @unpack cache,rps,ṙps,ro,ṙo,rg,ṙg = rb.state
+        @unpack Co,Cg,Cp = cache
+        mul!(ro, Co, q)
+        mul!(ṙo, Co, q̇)
+        mul!(rg, Cg, q)
+        mul!(ṙg, Cg, q̇)
+        for (i,(rp,ṙp)) in enumerate(zip(rps,ṙps))
+            mul!(rp, Cp[i], q)
+            mul!(ṙp, Cp[i], q̇)
         end
     end
 end
@@ -695,6 +702,28 @@ function get_c(tg)
         end
     end
     ret
+end
+
+
+function set_C!(tg,c)
+    (;ndim,npoints) = tg
+    cnt = tg.connectivity
+    (;apnb) = cnt
+    T = get_numbertype(tg)
+    foreach(tg.rigidbodies) do rb
+        rbid = rb.prop.id
+        for i in 1:rb.prop.naps
+            ip = apnb[rbid][i]
+            ci = c[(ip-1)*ndim+1:ip*ndim]
+            (;r̄i,X̄) = rb.state.cache.funcs.lncs
+            # @set rb.prop.aps[i] = r̄i + X̄*ci
+            # @show i
+            # @show r̄i + X̄*ci
+            # @show rb.prop.aps[i]
+            rb.state.cache.Cp[i] = rb.state.cache.funcs.C(ci)
+            # rb.state.cache.funcs.c(rb.prop.aps[i])
+        end
+    end
 end
 
 function get_d(tg)

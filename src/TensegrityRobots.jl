@@ -21,7 +21,7 @@ using EzXML
 using Cubature
 using GaussQuadrature
 using ProgressMeter, Printf
-
+using Setfield
 rotation_matrix(θ) = @SMatrix [cos(θ) -sin(θ); sin(θ) cos(θ)]
 
 include("naturalcoordinates.jl")
