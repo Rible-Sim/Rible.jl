@@ -509,6 +509,11 @@ function make_Φ(lncs::LocalNaturalCoordinates2D6C,q0,ci,uci)
     make_Φ(lncs,q0,ci,uci,deforms)
 end
 
+function make_Φ(lncs::LocalNaturalCoordinates3D12C,q0,ci,uci)
+    deforms = get_deform(lncs)
+    make_Φ(lncs,q0,ci,uci,deforms)
+end
+
 function make_Φ(lncs::LocalNaturalCoordinates3D12C)
     deforms = get_deform(lncs)
     make_Φ(lncs,deforms)
@@ -550,8 +555,11 @@ function make_Φ(lncs::LocalNaturalCoordinates2P1V,q0,ci,uci,deforms)
     make_inner_Φ(_inner_Φ,deforms)
 end
 
-function make_Φ(lncs::LocalNaturalCoordinates1P3V,deforms)
-    @inline @inbounds function _inner_Φ(q,d)
+function make_Φ(lncs::LocalNaturalCoordinates1P3V,q0,ci,uci,deforms)
+    @inline @inbounds function _inner_Φ(quc,d)
+        q = zeros(eltype(quc),12)
+        q[ci] = q0[ci]
+        q[uci] = quc
         u = @view q[4:6]
         v = @view q[7:9]
         w = @view q[10:12]
@@ -680,27 +688,33 @@ function make_Φq(lncs::LocalNaturalCoordinates3P)
     end
 end
 
-function make_Φq(lncs::LocalNaturalCoordinates1P3V)
-    @inline @inbounds function inner_Φq(q)
+function make_Φq(lncs::LocalNaturalCoordinates1P3V,q0,ci,uci)
+    @inline @inbounds function inner_Φq(quc)
+        q = zeros(eltype(quc),12)
+        q[ci] = q0[ci]
+        q[uci] = quc
         ri = @view q[1:3]
         u  = @view q[4:6]
         v  = @view q[7:9]
         w  = @view q[10:12]
         ret = zeros(eltype(q), 6, 12)
-        ret[1,4:6] =  2u
-        ret[2,7:9]   = 2v
-        ret[3,10:12] = 2w
+        ret[1,4:6]   = u
+        ret[2,7:9]   = v
+        ret[3,10:12] = w
 
-        ret[4,4:6] =  v
-        ret[4,7:9] =  u
+        ret[4,7:9]   = √2/2*w
+        ret[4,10:12] = √2/2*v
 
-        ret[5,4:6] =  w
-        ret[5,10:12] = u
 
-        ret[6,7:9]   = w
-        ret[6,10:12] = v
 
-        ret
+        ret[5,4:6] =  √2/2*w
+        ret[5,10:12] = √2/2*u
+
+        ret[6,4:6] =  √2/2*v
+        ret[6,7:9] =  √2/2*u
+
+
+        ret[:,uci]
     end
 end
 
@@ -904,6 +918,10 @@ end
 
 function get_unconstrained_indices(lncs::LocalNaturalCoordinates2D6C,constrained_index)
     deleteat!(collect(1:6),constrained_index)
+end
+
+function get_unconstrained_indices(lncs::LocalNaturalCoordinates3D12C,constrained_index)
+    deleteat!(collect(1:12),constrained_index)
 end
 
 function CoordinateFunctions(lncs,q0,ci,uci)

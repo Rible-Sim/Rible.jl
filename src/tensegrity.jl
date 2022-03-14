@@ -431,7 +431,7 @@ function renumbering!(body2q_raw,sync=false,rbs=nothing)
     mvindices,fixindices
 end
 
-function make_body2q(rbs,shared_index;move_only=true)
+function make_body2q(rbs,shared_index=Vector{Int}();move_only=true)
     nbodycoords = get_nbodycoords(rbs[1])
     nb = length(rbs)
     body2q_raw = collect.([(i-1)*nbodycoords+1:i*nbodycoords for i = 1:nb])

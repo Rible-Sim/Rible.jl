@@ -638,16 +638,17 @@ function inverse_for_restlength(tginput,tgref::TensegrityStructure,Fˣ=nothing;g
         y0 = B\F̃
     else
         @info "Using Quadratic Programming."
+        # COSMO.Settings(verbose = false, eps_abs = 1e-7, eps_rel = 1e-16)
         model = JuMP.Model(COSMO.Optimizer)
         JuMP.set_optimizer_attribute(model, "verbose", false)
-        JuMP.set_optimizer_attribute(model, "eps_abs", 1e-15)
-        JuMP.set_optimizer_attribute(model, "eps_rel", 1e-10)
+        JuMP.set_optimizer_attribute(model, "eps_abs", 1e-7)
+        JuMP.set_optimizer_attribute(model, "eps_rel", 1e-16)
         JuMP.@variable(model, y[1:nu])
-        JuMP.@objective(model, Max, sum(y[1:nu].^2))
+        JuMP.@objective(model, Min, sum(y[1:nu].^2))
         # JuMP.@objective(model, Max, 0.0)
         JuMP.@constraint(model, static, B*y .== F̃)
         ϵ = 1e-2
-        JuMP.@constraint(model, positive_u, y[1:nu].+ ϵ .>= 0)
+        JuMP.@constraint(model, positive_u, y[1:nu].- ϵ .>= 0)
         JuMP.@constraint(model, positive_f, y[1:nu].+ ϵ .<= get_strings_len(tg))
         # JuMP.print(model)
         JuMP.optimize!(model)
