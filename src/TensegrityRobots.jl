@@ -1,8 +1,9 @@
 module TensegrityRobots
 
 using Logging
-using SparseArrays
 using LinearAlgebra
+using SparseArrays
+using SparseMatricesCSR
 using Parameters
 using StaticArrays
 using StructArrays
@@ -21,15 +22,15 @@ using EzXML
 using Cubature
 using GaussQuadrature
 using ProgressMeter, Printf
-using Setfield
+using EponymTuples
 rotation_matrix(θ) = @SMatrix [cos(θ) -sin(θ); sin(θ) cos(θ)]
 
 include("naturalcoordinates.jl")
 using .NaturalCoordinates
-include("string.jl")
 
 include("rigidbody.jl")
-#include("rigidbody3d.jl")
+
+include("cable.jl")
 
 include("tensegrity.jl")
 

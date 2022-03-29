@@ -1,145 +1,142 @@
-struct Zhong06Cache{MT,T,qT,λT}
-    totalstep::Int
-    totaltime::T
-    ts::Vector{T}
-    qs::qT
-    q̇s::qT
-    ps::qT
-    λs::λT
-    invM::MT
+struct Zhong06Cache{MMT,AT,ΦT}
+    mass_matrices::MMT
+    A::AT
+    Φ::ΦT
 end
 
 function generate_cache(::Zhong06,intor;dt,kargs...)
-    @unpack prob,state,nx,nq,nλ = intor
-    @unpack bot,tspan,dyfuncs,restart = prob
-    @unpack t,q,q̇,tprev,qprev,q̇prev = state
-    M,Φ,A,F!,Jac_F! = dyfuncs
-    totaltime = tspan[end] - tspan[begin]
-    totalstep = ceil(Int,totaltime/dt)
-    ts = [tspan[begin]+(i-1)*dt for i in 1:totalstep+1]
-    qs = [copy(q) for i in 1:totalstep+1]
-    q̇s = [copy(q̇) for i in 1:totalstep+1]
-    ps = [M*copy(q̇) for i in 1:totalstep+1]
-    λs = [zeros(eltype(q),nλ) for i in 1:totalstep+1]
-    invM = inv(M)
-    Zhong06Cache(totalstep,totaltime,ts,qs,q̇s,ps,λs,invM)
+    (;prob,state) = intor
+    (;bot,dynfuncs) = prob
+    (;q,q̇) = state.now
+    # F!,_ = dynfuncs
+    mm = build_MassMatrices(bot)
+    # (;M) = mm
+    A = build_A(bot)
+    Φ = build_Φ(bot)
+    Zhong06Cache(mm,A,Φ)
+end
+
+function retrieve!(intor,solvercache)
+
 end
 
 function solve!(intor::Integrator,cache::Zhong06Cache;
-                dt=0.01,ftol=1e-14,verbose=false,iterations=50,
+                dt,ftol=1e-14,verbose=false,iterations=50,
                 progress=true,exception=true)
-    @unpack prob,state,nx,nq,nλ = intor
-    @unpack bot,tspan,dyfuncs,control!,restart = prob
+    (;prob,state,control!,tspan,restart,totalstep) = intor
+    (;bot,dynfuncs) = prob
+    (;traj) = bot
     # @unpack t,q,q̇,tprev,qprev,q̇prev = state
-    @unpack totaltime,totalstep,ts,qs,q̇s,ps,λs,invM = cache
-    M,Φ,A,F!,Jac_F! = dyfuncs
-    q0 = qs[begin]
-    F⁺ = zero(q0)
-    F⁻ = zero(q0)
+    (;F!) = dynfuncs
+    (;mass_matrices,A,Φ) = cache
+    (;Ḿ,M̄,invM̌) = mass_matrices
+    q̌0 = traj.q̌[begin]
+    λ0 = traj.λ[begin]
+    q̇0 = traj.q̇[begin]
+    T = eltype(q̌0)
+    nq̌ = length(q̌0)
+    nλ = length(λ0)
+    ∂F∂q = zeros(T,nq̌,nq̌)
+    ∂F∂q̇ = zeros(T,nq̌,nq̌)
+    p̌ᵏ⁻¹ = Ḿ*q̇0
+    p̌ᵏ   = zero(p̌ᵏ⁻¹)
     step = 0
-    initial_x = zeros(nx)
-    initial_F = similar(initial_x)
-    mr = norm(M,Inf)
+    initial_x = vcat(q̌0,λ0)
+    initial_Res = zero(initial_x)
+    mr = norm(Ḿ,Inf)
     scaling = mr
 
-    @inline @inbounds function Momentum_k!(pᵏ,qᵏ⁻¹,pᵏ⁻¹,qᵏ,λᵏ,M,A,h)
-        pᵏ .= -pᵏ⁻¹.+2/h.*M*(qᵏ.-qᵏ⁻¹) .+
-            1/h.*scaling.*(transpose(A(qᵏ))-transpose(A(qᵏ⁻¹)))*λᵏ
-    end
-    function R_stepk_maker(qᵏ⁻¹,pᵏ⁻¹,M,Φ,A,F!,nq,nλ,tᵏ⁻¹,dt)
-        # F!(F⁻,(qᵏ⁻¹.+qᵏ)./2,(qᵏ.-qᵏ⁻¹)./dt,tᵏ-dt/2)
-        # kr = norm(F⁻,Inf)
-        # scaling = mr + kr*dt^2
-        @inline @inbounds function inner_R_stepk!(R,x)
+    function Res_stepk_maker(p̌ᵏ⁻¹,qᵏ,q̌ᵏ,λᵏ,qᵏ⁻¹,F̌,Ḿ,Φ,Aᵀ,F!,nq̌,nλ,tᵏ⁻¹,dt)
+        @inline @inbounds function inner_Res_stepk!(Res,x)
             h = dt
-            qᵏ = @view x[   1:nq]
-            λᵏ = @view x[nq+1:nq+nλ]
-            R[   1:nq]    .= M*(qᵏ.-qᵏ⁻¹) .-h.*pᵏ⁻¹.-scaling.*transpose(A(qᵏ⁻¹))*λᵏ
-            F!(F⁺,(qᵏ.+qᵏ⁻¹)./2,(qᵏ.-qᵏ⁻¹)./h,tᵏ⁻¹+h/2)
-            R[   1:nq]   .-= (h^2)/2 .*F⁺
-            R[nq+1:nq+nλ] .= scaling.*Φ(qᵏ)
+            q̌ᵏ .= @view x[   1:nq̌   ]
+            λᵏ .= @view x[nq̌+1:nq̌+nλ]
+            F!(F̌,(qᵏ.+qᵏ⁻¹)./2,(qᵏ.-qᵏ⁻¹)./h,tᵏ⁻¹+h/2)
+            Res[   1:nq̌   ] .= Ḿ*(qᵏ.-qᵏ⁻¹) .-
+                               h.*p̌ᵏ⁻¹ .-
+                               (h^2)/2 .*F̌ .-
+                               scaling.*Aᵀ*λᵏ
+            Res[nq̌+1:nq̌+nλ] .= scaling.*Φ(qᵏ)
         end
     end
 
-    ∂F∂q = zeros(eltype(q0),nq,nq)
-    ∂F∂q̇ = zeros(eltype(q0),nq,nq)
-
-    function J_stepk_maker(qᵏ⁻¹,M,A,Jac_F!,nq,nλ,tᵏ⁻¹,dt)
-        @inline @inbounds function inner_J_stepk!(J,x)
+    function Jac_stepk_maker(qᵏ⁻¹,M,A,Jac_F!,nq̌,nλ,tᵏ⁻¹,dt)
+        @inline @inbounds function inner_Jac_stepk!(J,x)
             h = dt
-            qᵏ = @view x[   1:nq]
-            λᵏ = @view x[nq+1:end]
+            qᵏ = @view x[      1:nq̌]
+            λᵏ = @view x[nq̌+1:end  ]
             q = (qᵏ.+qᵏ⁻¹)./2
             q̇ = (qᵏ.-qᵏ⁻¹)./h
             t = tᵏ⁻¹+h/2
             Jac_F!(∂F∂q,∂F∂q̇,q,q̇,t)
-            J[   1:nq ,   1:nq]  .=  M.-h^2/2 .*(1/2 .*∂F∂q.+1/h.*∂F∂q̇)
-            J[   1:nq ,nq+1:end] .= -scaling.*transpose(A(qᵏ⁻¹))
-            J[nq+1:end,   1:nq ] .=  scaling.*A(qᵏ)
-            J[nq+1:end,nq+1:end] .=  0.0
+            J[      1:nq̌,      1:nq̌] .=  M.-h^2/2 .*(1/2 .*∂F∂q.+1/h.*∂F∂q̇)
+            J[      1:nq̌,nq̌+1:end  ] .= -scaling.*transpose(A(qᵏ⁻¹))
+            J[nq̌+1:end  ,      1:nq̌] .=  scaling.*A(qᵏ)
+            J[nq̌+1:end  ,nq̌+1:end  ] .=  0.0
         end
+    end
+
+    @inline @inbounds function Momentum_k!(p̌ᵏ,p̌ᵏ⁻¹,qᵏ,qᵏ⁻¹,λᵏ,M,A,Aᵀ,h)
+        p̌ᵏ .= -p̌ᵏ⁻¹.+2/h.*Ḿ*(qᵏ.-qᵏ⁻¹) .+
+            1/h.*scaling.*(transpose(A(qᵏ))-Aᵀ)*λᵏ
     end
 
     iteration = 0
     prog = Progress(totalstep; dt=1.0, enabled=progress)
     for timestep = 1:totalstep
         #---------Step k Control-----------
-        control!(intor,cache)
+        # control!(intor,cache)
         #---------Step k Control-----------
-        qᵏ⁻¹ = qs[timestep]
-        pᵏ⁻¹ = ps[timestep]
-        λᵏ⁻¹ = λs[timestep]
-        tᵏ⁻¹ = ts[timestep]
-        qᵏ = qs[timestep+1]
-        q̇ᵏ = q̇s[timestep+1]
-        pᵏ = ps[timestep+1]
-        λᵏ = λs[timestep+1]
-        initial_x[   1:nq]    = qᵏ⁻¹
-        initial_x[nq+1:nq+nλ] = λᵏ⁻¹
-        # initial_R = similar(initial_x)
-        #R_stepk!(initial_R,initial_x)
-        # @show initial_R
-        #@code_warntype R_stepk!(initial_R,initial_x)
-        R_stepk! = R_stepk_maker(qᵏ⁻¹,pᵏ⁻¹,M,Φ,A,F!,nq,nλ,tᵏ⁻¹,dt)
-        if typeof(Jac_F!) == Nothing
-            dfk = OnceDifferentiable(R_stepk!,initial_x,initial_F)
-        else
-            J_stepk! = J_stepk_maker(qᵏ⁻¹,M,A,Jac_F!,nq,nλ,tᵏ⁻¹,dt)
-            dfk = OnceDifferentiable(R_stepk!,J_stepk!,initial_x,initial_F)
-        end
-        R_stepk_result = nlsolve(dfk, initial_x; ftol, iterations, method=:newton)
+        tᵏ⁻¹ = traj.t[timestep]
+        tᵏ = traj.t[timestep+1]
+        qᵏ⁻¹ = traj.q[timestep]
+        qᵏ = traj.q[timestep+1]
+        q̌ᵏ = traj.q̌[timestep+1]
+        q̌̇ᵏ = traj.q̌̇[timestep+1]
+        q̃̇ᵏ = traj.q̃̇[timestep+1]
+        λᵏ = traj.λ[timestep+1]
+        F̌ = traj.F̌[timestep+1]
+        initial_x[   1:nq̌]    .= traj.q̌[timestep]
+        initial_x[nq̌+1:nq̌+nλ] .= traj.λ[timestep]
+        Aᵀ = transpose(A(qᵏ⁻¹))
+        Res_stepk! = Res_stepk_maker(p̌ᵏ⁻¹,qᵏ,q̌ᵏ,λᵏ,qᵏ⁻¹,F̌,Ḿ,Φ,Aᵀ,F!,nq̌,nλ,tᵏ⁻¹,dt)
+        # if typeof(Jac_F!) == Nothing
+            dfk = OnceDifferentiable(Res_stepk!,initial_x,initial_Res)
+        # else
+        #     Jac_stepk! = Jac_stepk_maker(qᵏ⁻¹,Ḿ,A,Jac_F!,nq̌,nλ,tᵏ⁻¹,dt)
+        #     dfk = OnceDifferentiable(Res_stepk!,Jac_stepk!,initial_x,initial_Res)
+        # end
+        Res_stepk_result = nlsolve(dfk, initial_x; ftol, iterations, method=:newton)
 
-        if converged(R_stepk_result) == false
+        if converged(Res_stepk_result) == false
             if exception
-                error("Not Converged!")
+                error("Not Converged! Step=$timestep")
             else
                 # intor.convergence = false
                 break
             end
         end
-        iteration += R_stepk_result.iterations
-        xᵏ = R_stepk_result.zero
-        qᵏ .= xᵏ[   1:nq]
-        λᵏ .= xᵏ[nq+1:nq+nλ]
-        Momentum_k!(pᵏ,qᵏ⁻¹,pᵏ⁻¹,qᵏ,λᵏ,M,A,dt)
-
-        # Aq = A(qᵏ)
-        # invM = inv(M+transpose(Aq)*Aq)
-        q̇ᵏ .= invM*pᵏ
-
-
+        iteration += Res_stepk_result.iterations
+        xᵏ = Res_stepk_result.zero
+        q̌ᵏ .= xᵏ[   1:nq̌   ]
+        λᵏ .= xᵏ[nq̌+1:nq̌+nλ]
+        Momentum_k!(p̌ᵏ,p̌ᵏ⁻¹,qᵏ,qᵏ⁻¹,λᵏ,Ḿ,A,Aᵀ,dt)
+        q̌̇ᵏ .= invM̌*(p̌ᵏ.-M̄*q̃̇ᵏ )
         #---------Step k finisher-----------
         step += 1
-        state.tprev = state.t
-        state.qprev .= state.q
-        state.q̇prev .= state.q̇
-        state.t = ts[timestep+1]
-        state.q .= qᵏ
-        state.q̇ .= q̇ᵏ
+        p̌ᵏ,p̌ᵏ⁻¹ = p̌ᵏ⁻¹,p̌ᵏ
+        state.prv = traj[timestep]
+        state.now = traj[timestep+1]
         #---------Step k finisher-----------
         if verbose
-            @printf("Progress: %5.1f%%, step: %s, time: %s, iterations: %s \n", (
-            ts[timestep+1]/totaltime*100), timestep+1, ts[timestep+1], R_stepk_result.iterations)
+            dg_step = ceil(Int,log10(totalstep))+1
+            dg_dt = max(1,-floor(Int,log10(dt)))
+            wd_t = ceil(Int,log10(traj.t[end]))+dg_dt+1+1
+            progfmt = Printf.Format("Progress: %5.1f%%, step: %$(dg_step)u, time: %$(wd_t).$(dg_dt)f, iterations: %s \n")
+            progstr = Printf.format(progfmt,
+                floor(timestep/totalstep*100;digits=1), timestep+1, tᵏ, Res_stepk_result.iterations
+            )
+            print(progstr)
         end
         next!(prog)
     end

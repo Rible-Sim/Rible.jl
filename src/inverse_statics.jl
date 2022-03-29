@@ -279,12 +279,12 @@ function build_Q(tg)
 end
 
 function build_KE(tg)
-    @unpack nfullcoords,nstrings,ndim,strings = tg
-    cnt = tg.connectivity
-    @unpack string2ap,apnb = cnt
+    (;ncables,ndim,cables,connectivity) = tg
+    (;numbered,indexed,connected) = connectivity
+    (;nfull,mem2sysfull) = indexed
     function inner_KE(q,s,k,c)
-        ret = zeros(eltype(s),nfullcoords,nfullcoords)
-        foreach(string2ap) do scnt
+        ret = zeros(eltype(s),nfull,nfull)
+        foreach(connected) do scnt
             j = scnt.id
             rb1 = scnt.end1.rbsig
             rb2 = scnt.end2.rbsig
@@ -534,7 +534,7 @@ function check_restlen(tg)
 end
 
 function check_restlen(tg,u)
-    ℓ = get_strings_len(tg)
+    ℓ = get_cables_len(tg)
     if any((x)->x<0,u)
         @warn "Negative rest lengths"
     end
@@ -595,26 +595,27 @@ function check_static_equilibrium(tg_input,q,λ,F=nothing;gravity=false)
     static_equilibrium
 end
 
-function check_static_equilibrium_output_multipliers(tg_input)
+function check_static_equilibrium_output_multipliers(tg_input;F=nothing,gravity=false)
     q,_ = get_q(tg_input)
-    check_static_equilibrium_output_multipliers(tg_input,q)
+    check_static_equilibrium_output_multipliers(tg_input,q,F;gravity)
 end
 
 function check_static_equilibrium_output_multipliers(tg_input,q,F=nothing;gravity=false)
     tg = deepcopy(tg_input)
-    reset_forces!(tg)
-    distribute_q_to_rbs!(tg,q)
-    update_strings_apply_forces!(tg)
-    check_restlen(tg,get_strings_restlen(tg))
+    clear_forces!(tg)
+    update_rigids!(tg)
+    update_cables_apply_forces!(tg)
+    check_restlen(tg,get_cables_restlen(tg))
     if gravity
         apply_gravity!(tg)
     end
-    generalized_forces = assemble_forces(tg)
+    generate_forces!(tg)
+    generalized_forces = get_force(tg)
     if !isnothing(F)
         generalized_forces .+= F[:]
     end
     A = build_A(tg)(q)
-    N = nullspace(A)
+    # N = nullspace(A)
     λ = inv(A*transpose(A))*A*(generalized_forces)
     constraint_forces = transpose(A)*λ
     static_equilibrium = constraint_forces ≈ generalized_forces

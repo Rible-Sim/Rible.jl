@@ -220,7 +220,7 @@ end
 end
 
 function heat!(ctrller::ManualSerialHeater,
-                SMA_strings::AbstractVector{<:SMAString},u;inc=false,abs=true)
+                SMA_strings::AbstractVector{<:SMACable},u;inc=false,abs=true)
     @unpack acts, heating_laws = ctrller
     @unpack id_strings, original_values = acts
     for (id, original_value, heating_law) in zip(id_strings,original_values,heating_laws)
@@ -238,7 +238,7 @@ function heat!(ctrller::ManualSerialHeater,
     end
 end
 
-function heat!(s::SMAString,heating_law)
+function heat!(s::SMACable,heating_law)
     s.law.F0, s.law.k = heating_law(s.state.temp)
 end
 

@@ -45,36 +45,32 @@ function find_full_constrained_index(lncs,q)
     col_index[size(Aq,1)+1:end]
 end
 
-function ∂Aᵀλ∂q(tg,λ)
-    body2q = tg.connectivity.body2q
-    ncoords = tg.ncoords
-    nbodyc = get_nbodyconstraint(tg)
-    ret = zeros(eltype(λ),ncoords,ncoords)
-    is = Ref(0)
-    foreach(tg.rigidbodies) do rb
+function ∂Aᵀλ∂q̌(tg,λ)
+    (;rigidbodies,nconstraints) = tg
+    (;indexed,jointed) = tg.connectivity
+    (;nfree,ninconstraints,mem2sysfree,mem2sysincst) = indexed
+    ret = zeros(eltype(λ),nfree,nfree)
+    foreach(rigidbodies) do rb
         rbid = rb.prop.id
-        if rbid in tg.mvbodyindex
-            pindex = body2q[rbid]
-            # nc = rb.state.cache.nc
-            # if nc > 0
-            #     is += nc
-            # end
-            ret[pindex,pindex] .+= rb.state.cache.cfuncs.∂Aᵀλ∂q(λ[is[]+1:is[]+nbodyc])
-            is[] += nbodyc
+        memfree = mem2sysfree[rbid]
+        memincst = mem2sysincst[rbid]
+        uci = rb.state.cache.unconstrained_index
+        if !isempty(memincst)
+            ret[memfree,memfree] .= rb.state.cache.funcs.∂Aᵀλ∂q(λ[memincst])[:,uci]
         end
     end
     ret
 end
 
-function ∂Aq̇∂q(tgstruct,q̇)
-    body2q = tgstruct.connectivity.body2q
-    @unpack ncoords, nconstraint = tgstruct
-    nbodyc = get_nbodyconstraint(tgstruct)
-    ret = zeros(get_numbertype(tgstruct),nconstraint,ncoords)
+function ∂Aq̇∂q(tg,q̇)
+    body2q = tg.connectivity.body2q
+    @unpack ncoords, nconstraint = tg
+    nbodyc = get_nbodyconstraint(tg)
+    ret = zeros(get_numbertype(tg),nconstraint,ncoords)
     is = 0
-    for rbid in tgstruct.mvbodyindex
+    for rbid in tg.mvbodyindex
         pindex = body2q[rbid]
-        rb = tgstruct.rigidbodies[rbid]
+        rb = tg.rigidbodies[rbid]
         q̇_rb = q̇[pindex]
         nc = rb.state.cache.nc
         if nc > 0
@@ -86,22 +82,15 @@ function ∂Aq̇∂q(tgstruct,q̇)
     ret
 end
 
-function test_fvector(tgstruct,q0)
+function test_fvector(tg,q0)
     function L(q)
-        reset_forces!(tgstruct)
-        distribute_q_to_rbs!(tgstruct,q,zero(q))
-        update_strings_apply_forces!(tgstruct)
-        fvector(tgstruct)
-        [tgstruct.strings[i].state.length for i = 1:2]
+        reset_forces!(tg)
+        distribute_q_to_rbs!(tg,q,zero(q))
+        update_strings_apply_forces!(tg)
+        fvector(tg)
+        [tg.strings[i].state.length for i = 1:2]
     end
     FiniteDiff.finite_difference_jacobian(L,q0)
-end
-
-function build_K(tg,λ)
-    Q̃ = build_Q̃(tg)
-    q,_ = get_q(tg)
-    ∂L∂q,_ = build_tangent(tg)
-    K = -Q̃*∂L∂q .+ ∂Aᵀλ∂q(tg,λ)
 end
 
 function linearize(tginput,λ,u,q,q̇=zero(q))
@@ -122,7 +111,7 @@ function linearize(tginput,λ,u,q,q̇=zero(q))
     M̂[1:ncoords,1:ncoords] .= M
     Ĉ[1:ncoords,1:ncoords] .= -Q̃*∂L∂q̇
 
-    # fjac = test_fvector(tgstruct,q)
+    # fjac = test_fvector(tg,q)
     K̂[1:ncoords,1:ncoords] .= -Q̃*∂L∂q .+ ∂Aᵀλ∂q(tg,λ)
     Aq = A(q)
     c = maximum(abs.(K̂[1:ncoords,1:ncoords]))
@@ -174,10 +163,53 @@ function normalize_wrt_mass!(Z,M)
     end
     Z
 end
-function undamped_eigen(tg,q0,λ0)
-    if !check_static_equilibrium(tg,q0,λ0;gravity=false)
-        @warn "Statics check failed, but proceed anyway."
+
+function undamped_eigen(tg)
+    _,λ0 = check_static_equilibrium_output_multipliers(tg)
+    M̌ = build_M(tg)
+    build_K(tg)
+end
+
+function build_Ǩ(tg)
+    _,λ = check_static_equilibrium_output_multipliers(tg)
+    build_Ǩ(tg,λ)
+end
+
+function build_Ǩ(tg,λ)
+    (;cables,connectivity) = tg
+    (;connected,indexed) = connectivity
+    (;nfull,nfree,sysfree,mem2sysfull) = indexed
+    T = get_numbertype(tg)
+    ndim = get_ndim(tg)
+    K = spzeros(T,nfull,nfull)
+    D = zeros(T,ndim,ndim)
+    foreach(connected) do cc
+        cable = cables[cc.id]
+        (;end1,end2) = cc
+        rb1 = end1.rbsig
+        rb2 = end2.rbsig
+        C1 = rb1.state.cache.Cps[end1.pid]
+        C2 = rb2.state.cache.Cps[end2.pid]
+        m2sf1 = mem2sysfull[rb1.prop.id]
+        m2sf2 = mem2sysfull[rb2.prop.id]
+        (;k,c,state) = cable
+        (;direction,force,tension,length,restlen) = state
+        D .= direction*transpose(direction)
+        density = tension/length
+        D .= density*I + (k-density).*D
+        K[m2sf2,m2sf2] .+= transpose(C2)*D*C2
+        K[m2sf1,m2sf2] .-= transpose(C1)*D*C2
+        K[m2sf2,m2sf1] .-= transpose(C2)*D*C1
+        K[m2sf1,m2sf1] .+= transpose(C1)*D*C1
     end
+    # K
+    Kc = ∂Aᵀλ∂q̌(tg,λ)
+    # K[sysfree,sysfree] .+= Kc
+    # K[sysfree,sysfree]
+end
+
+function old_undamped_eigen(tg)
+    λ0 = check_static_equilibrium_output_multipliers(tg)
     M̂,Ĉ,K̂ = linearize(tg,q0,λ0)
     α = 10
     M̄,K̄ = frequencyshift(M̂,K̂,α)
@@ -194,8 +226,8 @@ function undamped_eigen(tg,q0,λ0)
     ω, Zq#, Z
 end
 
-function undamped_modal_solve!(tgstruct,q0,q̇0,λ0,tf,dt)
-    M̂,Ĉ,K̂ = linearize(tgstruct,q0,λ0)
+function undamped_modal_solve!(tg,q0,q̇0,λ0,tf,dt)
+    M̂,Ĉ,K̂ = linearize(tg,q0,λ0)
     # show(stdout,"text/plain",K̂)
     # showtable(K̂)
     # M̄,C̄,K̄ = TR.frequencyshift(M̂,Ĉ,K̂,0.1)

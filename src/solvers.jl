@@ -1,89 +1,74 @@
-
 struct Wendlandt end
 struct Zhong06 end
 
-struct SimProblem{BotType,FuncsType,ControlType,T}
+struct SimProblem{BotType,FuncsType}
     bot::BotType
-    dyfuncs::FuncsType
-    control!::ControlType
-    tspan::Tuple{T,T}
-    restart::Bool
+    dynfuncs::FuncsType
+    function SimProblem(bot,make_dynfuncs)
+        dynfuncs = make_dynfuncs(bot)
+        new{typeof(bot),typeof(dynfuncs)}(bot,dynfuncs)
+    end
 end
 
-mutable struct IntegratorState{T,qT}
-    t::T
-    q::qT
-    q̇::qT
-    tprev::T
-    qprev::qT
-    q̇prev::qT
-end
-
-struct Integrator{ProbType,StateType}
-    prob::ProbType
-    state::StateType
-    convergence::Bool
-    nx::Int
-    nq::Int
-    nλ::Int
-end
-
-const FALSE_CALLBACK_CONDITION = (intor) -> false
-const TRUE_CALLBACK_CONDITION  = (intor) -> true
 struct DiscreteCallback{condType,aType}
     condition::condType
     affect!::aType
 end
+
+const FALSE_CALLBACK_CONDITION = (intor) -> false
+const TRUE_CALLBACK_CONDITION  = (intor) -> true
 const DEFAULT_CALLBACK = DiscreteCallback(
                         FALSE_CALLBACK_CONDITION,
                         (integrator)->nothing)
-
 const NO_CONTROL = (intor,cache) -> nothing
 
-function SimProblem(bot,make_dyfuncs,tspan::Tuple{T,T};restart=true) where T
-    SimProblem(bot,make_dyfuncs(bot),NO_CONTROL,tspan,restart)
+mutable struct IntegratorState{StateT}
+    now::StateT
+    prv::StateT
+    convergence::Bool
 end
 
-function SimProblem(bot,make_dyfuncs,control!,tspan::Tuple{T,T};restart=true) where T
-    SimProblem(bot,make_dyfuncs(bot),control!,tspan,restart)
+struct Integrator{ProbType,StateType,CtrlType,T}
+    prob::ProbType
+    state::StateType
+    control!::CtrlType
+    tspan::Tuple{T,T}
+    restart::Bool
+    totalstep::Int
 end
 
-function solve(prob::SimProblem,solver;karg...)
-    @unpack bot,tspan,dyfuncs,restart = prob
-    @unpack tg,traj = bot
-    M,Φ,A,F!,Jacs = dyfuncs
+function solve!(prob::SimProblem,solver,
+                control! = nothing;
+                tspan=(0.0,1.0),restart=true,dt,karg...)
+    (;bot,dynfuncs) = prob
+    (;tg,traj) = bot
     if restart
-        reset!(traj)
-        q0 = traj.qs[begin]
-        q̇0 = traj.q̇s[begin]
-        λ0 = traj.λs[begin]
-    else
-        q0 = traj.qs[end]
-        q̇0 = traj.q̇s[end]
-        λ0 = traj.λs[end]
+        resize!(traj,1)
     end
-    ts = [tspan[1]]
-    Asize = size(A(q0))
-    nq = Asize[2]
-    @assert nq == length(q0)
-    nλ = Asize[1]
-    @assert nλ == length(λ0)
-    nx = nq + nλ
-    state = IntegratorState(ts[end],copy(q0),copy(q̇0),ts[end],copy(q0),copy(q̇0))
-    convergence = true
-    intor = Integrator(prob,state,convergence,nx,nq,nλ)
-    cache = generate_cache(solver,intor;karg...)
-    solve!(intor,cache;karg...)
+    tstart,tend = tspan
+    totaltime = tend - tstart
+    totalstep = ceil(Int,totaltime/dt)
+    for istep = 1:totalstep
+        push!(traj,deepcopy(traj[end]))
+        traj.t[end] = tstart + dt*istep
+        if !isa(control!, Nothing)
+            control!(traj[end],tg)
+        end
+    end
+    now = deepcopy(traj[end])
+    prv = deepcopy(traj[end])
+    convergence = false
+    state = IntegratorState(now,prv,convergence)
+    intor = Integrator(prob,state,control!,tspan,restart,totalstep)
+    solve!(intor,solver;dt,karg...)
 end
 
-function solve!(prob::SimProblem,solver;karg...)
-    @unpack bot = prob
-    intor,cache = solve(prob,solver;karg...)
-    append!(bot.traj.ts,cache.ts[2:end])
-    append!(bot.traj.qs,cache.qs[2:end])
-    append!(bot.traj.q̇s,cache.q̇s[2:end])
-    append!(bot.traj.λs,cache.λs[2:end])
-    bot
+function solve!(intor,solver;karg...)
+    solvercache = generate_cache(solver,intor;karg...)
+    solve!(intor,solvercache;karg...)
+    # retrieve!(intor,solvercache)
+    # intor,solvercache
+    intor.prob.bot
 end
 
 include("solvers/Wendlandt.jl")
