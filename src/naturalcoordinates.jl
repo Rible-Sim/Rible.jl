@@ -26,8 +26,8 @@ I3_Int = make_I(Int,3)
 get_ndim(::LocalNaturalCoordinates2D) = 2
 get_ndim(::LocalNaturalCoordinates3D) = 3
 get_nlocaldim(::LocalNaturalCoordinates2D4C) = 1
-get_nlocaldim(::LocalNaturalCoordinates3D6C) = 1
 get_nlocaldim(::LocalNaturalCoordinates2D6C) = 2
+get_nlocaldim(::LocalNaturalCoordinates3D6C) = 1
 get_nlocaldim(::LocalNaturalCoordinates3D12C) = 3
 get_ncoords(::LocalNaturalCoordinates2D4C) = 4
 get_ncoords(::LocalNaturalCoordinates2D6C) = 6
@@ -37,6 +37,7 @@ get_nconstraints(::LocalNaturalCoordinates2D4C) = 1
 get_nconstraints(::LocalNaturalCoordinates2D6C) = 3
 get_nconstraints(::LocalNaturalCoordinates3D6C) = 1
 get_nconstraints(::LocalNaturalCoordinates3D12C) = 6
+get_ndof(lncs::LocalNaturalCoordinates) =  get_ncoords(lncs) - get_nconstraints(lncs)
 
 @inline @inbounds function LinearAlgebra.cross(a::Number,b::AbstractVector)
     ret = similar(b)
@@ -683,7 +684,7 @@ function make_Φq(lncs::Union{LocalNaturalCoordinates2D2P,LocalNaturalCoordinate
         ret = zeros(eltype(q),1,2ndim)
         ret[1,     1: ndim] = -2 .*(rj.-ri)
         ret[1,ndim+1:2ndim] = -ret[1,1:ndim]
-        ret[Φi,uci]
+        @view ret[Φi,uci]
     end
 end
 
@@ -697,7 +698,7 @@ function make_Φq(lncs::LocalNaturalCoordinates1P2V,uci,Φi)
         ret[2,5:6] = v
         ret[3,3:4] = √2/2*v
         ret[3,5:6] = √2/2*u
-        ret[Φi,uci]
+        @view ret[Φi,uci]
     end
 end
 
@@ -721,7 +722,7 @@ function make_Φq(lncs::LocalNaturalCoordinates2P1V,uci,Φi)
         ret[3,1:2] = wsum[3]*(-a*v)
         ret[3,3:4] = wsum[3]*( a*v)
         ret[3,5:6] = wsum[3]*( a*u)
-        ret[Φi,uci]
+        @view ret[Φi,uci]
     end
 end
 
@@ -765,7 +766,7 @@ function make_Φq(lncs::LocalNaturalCoordinates1P3V,uci,Φi)
         ret[6,4:6] =  √2/2*v
         ret[6,7:9] =  √2/2*u
 
-        ret[Φi,uci]
+        @view ret[Φi,uci]
     end
 end
 

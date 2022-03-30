@@ -46,17 +46,18 @@ function find_full_constrained_index(lncs,q)
 end
 
 function ∂Aᵀλ∂q̌(tg,λ)
+    (;nfree) = tg.connectivity.indexed
+    ret = zeros(eltype(λ),nfree,nfree)
     (;rigidbodies,nconstraints) = tg
     (;indexed,jointed) = tg.connectivity
-    (;nfree,ninconstraints,mem2sysfree,mem2sysincst) = indexed
-    ret = zeros(eltype(λ),nfree,nfree)
+    (;ninconstraints,mem2sysfree,mem2sysincst) = indexed
     foreach(rigidbodies) do rb
         rbid = rb.prop.id
         memfree = mem2sysfree[rbid]
         memincst = mem2sysincst[rbid]
         uci = rb.state.cache.unconstrained_index
         if !isempty(memincst)
-            ret[memfree,memfree] .= rb.state.cache.funcs.∂Aᵀλ∂q(λ[memincst])[:,uci]
+            ret[memfree,memfree] .+= rb.state.cache.funcs.∂Aᵀλ∂q(λ[memincst])[:,uci]
         end
     end
     ret
@@ -86,9 +87,9 @@ function test_fvector(tg,q0)
     function L(q)
         reset_forces!(tg)
         distribute_q_to_rbs!(tg,q,zero(q))
-        update_strings_apply_forces!(tg)
+        update_cables_apply_forces!(tg)
         fvector(tg)
-        [tg.strings[i].state.length for i = 1:2]
+        [tg.cables[i].state.length for i = 1:2]
     end
     FiniteDiff.finite_difference_jacobian(L,q0)
 end
@@ -98,7 +99,7 @@ function linearize(tginput,λ,u,q,q̇=zero(q))
     set_restlen!(tg,u)
     reset_forces!(tg)
     distribute_q_to_rbs!(tg,q,q̇)
-    update_strings_apply_forces!(tg)
+    update_cables_apply_forces!(tg)
     M = build_massmatrix(tg)
     A = build_A(tg)
     Q̃ = build_Q̃(tg)
@@ -155,34 +156,21 @@ function find_finite(ω2,Z,ndof)
     finite_ω2,finite_Z
 end
 
-function normalize_wrt_mass!(Z,M)
-    n = size(Z)[2]
-    for i = 1:n
-        zmz = transpose(Z[:,i])*M*Z[:,i]
-        Z[:,i] ./= sqrt(zmz)
-    end
-    Z
-end
-
-function undamped_eigen(tg)
-    _,λ0 = check_static_equilibrium_output_multipliers(tg)
-    M̌ = build_M(tg)
-    build_K(tg)
-end
-
 function build_Ǩ(tg)
     _,λ = check_static_equilibrium_output_multipliers(tg)
     build_Ǩ(tg,λ)
 end
 
-function build_Ǩ(tg,λ)
+function build_∂Q̌∂q̌!(∂Q̌∂q̌,tg)
     (;cables,connectivity) = tg
     (;connected,indexed) = connectivity
-    (;nfull,nfree,sysfree,mem2sysfull) = indexed
+    (;nfull,nfree,sysfree,mem2sysfree,mem2sysfull) = indexed
     T = get_numbertype(tg)
     ndim = get_ndim(tg)
-    K = spzeros(T,nfull,nfull)
-    D = zeros(T,ndim,ndim)
+    # ∂Q̌∂q̌ = zeros(T,nfree,nfree)
+    D = @MMatrix zeros(T,ndim,ndim)
+    Im = Symmetric(SMatrix{ndim,ndim}(one(T)*I))
+    J̌ = zeros(T,ndim,nfree)
     foreach(connected) do cc
         cable = cables[cc.id]
         (;end1,end2) = cc
@@ -190,22 +178,75 @@ function build_Ǩ(tg,λ)
         rb2 = end2.rbsig
         C1 = rb1.state.cache.Cps[end1.pid]
         C2 = rb2.state.cache.Cps[end2.pid]
-        m2sf1 = mem2sysfull[rb1.prop.id]
-        m2sf2 = mem2sysfull[rb2.prop.id]
+        uci1 = rb1.state.cache.unconstrained_index
+        uci2 = rb2.state.cache.unconstrained_index
+        mfree1 = mem2sysfree[rb1.prop.id]
+        mfree2 = mem2sysfree[rb2.prop.id]
         (;k,c,state) = cable
         (;direction,force,tension,length,restlen) = state
         D .= direction*transpose(direction)
         density = tension/length
-        D .= density*I + (k-density).*D
-        K[m2sf2,m2sf2] .+= transpose(C2)*D*C2
-        K[m2sf1,m2sf2] .-= transpose(C1)*D*C2
-        K[m2sf2,m2sf1] .-= transpose(C2)*D*C1
-        K[m2sf1,m2sf1] .+= transpose(C1)*D*C1
+        D .*= k-density
+        D .+= density.*Im
+        J̌ .= 0
+        J̌[:,mfree2] .+= C2[:,uci2]
+        J̌[:,mfree1] .-= C1[:,uci1]
+        ∂Q̌∂q̌ .-= transpose(J̌)*D*J̌
+        # ∂Q̌∂q̌_full[mfree2,mfree2] .+= transpose(C2)*D*C2
+        # ∂Q̌∂q̌_full[mfree1,mfree2] .-= transpose(C1)*D*C2
+        # ∂Q̌∂q̌_full[mfree2,mfree1] .-= transpose(C2)*D*C1
+        # ∂Q̌∂q̌_full[mfree1,mfree1] .+= transpose(C1)*D*C1
     end
-    # K
-    Kc = ∂Aᵀλ∂q̌(tg,λ)
-    # K[sysfree,sysfree] .+= Kc
-    # K[sysfree,sysfree]
+end
+
+function build_Ǩ(tg,λ)
+    (;nfree) = tg.connectivity.indexed
+    T = get_numbertype(tg)
+    Ǩ = zeros(T,nfree,nfree)
+    build_∂Q̌∂q̌!(Ǩ,tg)
+    Ǩ .= ∂Aᵀλ∂q̌(tg,λ) .- Ǩ
+    Ǩ
+end
+
+function norm_wrt!(Z,M)
+    n = size(Z)[2]
+    for i = 1:n
+        z = @view Z[:,i]
+        zmz = transpose(z)*M*z
+        z ./= sqrt(zmz)
+    end
+    Z
+end
+
+function undamped_eigen(tg)
+    _,λ = check_static_equilibrium_output_multipliers(tg)
+    q = get_q(tg)
+    M̌ = build_M̌(tg)
+    Ǩ = build_Ǩ(tg,λ)
+    Ǎ = make_A(tg)(q)
+    Ň = nullspace(Ǎ)
+    ℳ = transpose(Ň)*M̌*Ň
+    𝒦 = transpose(Ň)*Ǩ*Ň
+    ω,ξ = eigen(𝒦,ℳ)
+    δq̌ = Ň*ξ
+    norm_wrt!(δq̌,M̌)
+    ω,δq̌
+end
+
+function undamped_eigen!(bot::TensegrityRobot)
+    (;tg,traj) = bot
+    q̌ = get_q̌(tg)
+    ω,δq̌ = undamped_eigen(tg)
+    resize!(traj,1)
+    nω = length(ω)
+    for i = 1:nω
+        push!(traj,deepcopy(traj[end]))
+        traj.t[end] = ω[i]
+        δq̌i = @view δq̌[:,i]
+        ratio = 1#norm(δq̌i)/norm(q̌)
+        traj.q̌[end] .= q̌ .+ 0.1δq̌i/ratio
+    end
+    bot
 end
 
 function old_undamped_eigen(tg)

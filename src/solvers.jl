@@ -5,7 +5,14 @@ struct SimProblem{BotType,FuncsType}
     bot::BotType
     dynfuncs::FuncsType
     function SimProblem(bot,make_dynfuncs)
-        dynfuncs = make_dynfuncs(bot)
+        dynfuncs_raw = make_dynfuncs(bot)
+        if dynfuncs_raw isa NamedTuple{(:F!,)}
+            dynfuncs = (F! = dynfuncs_raw.F!, Jac_F! = nothing)
+        elseif dynfuncs_raw isa NamedTuple{(:F!,:Jac_F!)}
+            dynfuncs = dynfuncs_raw
+        else
+            error("dynfuncs not recognized.")
+        end
         new{typeof(bot),typeof(dynfuncs)}(bot,dynfuncs)
     end
 end

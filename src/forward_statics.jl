@@ -63,11 +63,11 @@ end
 
 function forward_system(tg,mode=PrimalMode();F=reshape(build_G(tg),:,1))
     @var q[1:tg.ncoords]
-    @var s[1:tg.nstrings]
+    @var s[1:tg.ncables]
     @var λ[1:tg.nconstraint]
     @var d[1:tg.nconstraint]
-    @var k[1:tg.nstrings]
-    @var u[1:tg.nstrings]
+    @var k[1:tg.ncables]
+    @var u[1:tg.ncables]
     @var g[1:size(F,2)]
     polyq = 1.0q
     polys = 1.0s
@@ -228,8 +228,8 @@ function get_start_sol(bot)
     @unpack tg = bot
     q,_ = get_q(tg)
     λ,u = inverse_for_restlength(bot,bot)
-    # λ = inverse_for_multipliers(bot,bot); u = get_strings_restlen(bot)
-    ℓ = get_strings_len(bot)
+    # λ = inverse_for_multipliers(bot,bot); u = get_cables_restlen(bot)
+    ℓ = get_cables_len(bot)
     s = inv.(ℓ)
     (q=q,s=s,λ=λ),u
 end
@@ -241,14 +241,14 @@ function get_start_system(bot,mode=PrimalMode();F=reshape(build_G(bot.tg),:,1))
     if typeof(mode)<:PrimalMode
         start_parameters = (u=u,g=g)
     elseif typeof(mode)<:StiffMode
-        k = get_strings_stiffness(tg)
+        k = get_cables_stiffness(tg)
         start_parameters = (k=k,u=u,g=g)
     elseif typeof(mode)<:DeformMode
         d = get_d(tg)
         start_parameters = (d=d,u=u,g=g)
     elseif typeof(mode)<:AllMode
         d = get_d(tg)
-        k = get_strings_stiffness(tg)
+        k = get_cables_stiffness(tg)
         start_parameters = (d=d,k=k,u=u,g=g)
     else
         error("Invalid mode")

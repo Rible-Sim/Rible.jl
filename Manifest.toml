@@ -814,6 +814,12 @@ git-tree-sha1 = "8d0d7a3fe2f30d6a7f833a5f19f7c7a5b396eae6"
 uuid = "a2a6695c-b41b-5b7d-aed9-dbfdeacea5d7"
 version = "0.3.0"
 
+[[deps.Tullio]]
+deps = ["ChainRulesCore", "DiffRules", "LinearAlgebra", "Requires"]
+git-tree-sha1 = "7830c974acc69437a3fee35dd7b510a74cbc862d"
+uuid = "bc48ee85-29a4-5162-ae0b-a64e1601d4bc"
+version = "0.3.3"
+
 [[deps.TypeSortedCollections]]
 git-tree-sha1 = "d539b357e7695d80c75f5b066cec5d8c45886ab2"
 uuid = "94a5cd58-49a0-5741-bd07-fa4f4be8babf"

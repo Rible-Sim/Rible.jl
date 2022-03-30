@@ -12,7 +12,8 @@ import JuMP
 import COSMO
 using BlockArrays
 using BlockDiagonals
-using GeometryTypes
+using Tullio
+# using GeometryTypes
 using ForwardDiff
 using FiniteDiff
 using HomotopyContinuation

@@ -68,7 +68,7 @@ struct SimpleRegistor{T} <: AbstractRegistor{T}
 end
 
 struct SimpleRegistors{T} <: AbstractRegistor{T}
-    id_strings::Vector{Int}
+    id_cables::Vector{Int}
     original_values::Vector{T}
 end
 
@@ -117,18 +117,18 @@ select_by_id(xs,id) = xs[findfirst((x)->x.id==id, xs)]
 function reset!(ctrller::ManualActuator,tg)
     @unpack reg, traj = ctrller
     @unpack id_string, original_value = reg
-    @unpack strings = tg
-    s = select_by_id(strings,id_string)
+    @unpack cables = tg
+    s = select_by_id(cables,id_string)
     s.state.restlen = original_value
     reset!(traj)
 end
 
 function reset!(ctrller::GroupedActuator,tg)
     @unpack regs, trajs = ctrller
-    @unpack id_strings, original_values = regs
-    @unpack strings = tg
-    for (id,original_value) in zip(id_strings,original_values)
-        s = select_by_id(strings,id)
+    @unpack id_cables, original_values = regs
+    @unpack cables = tg
+    for (id,original_value) in zip(id_cables,original_values)
+        s = select_by_id(cables,id)
         s.state.restlen = original_value
     end
     reset!(traj)
@@ -153,11 +153,11 @@ end
 
 
 function actuate!(ctrller::ManualActuator,tg,u;inc=false)
-    @unpack strings = tg
+    @unpack cables = tg
     @unpack reg, traj = ctrller
     @unpack id_string, original_value = reg
     @unpack us = traj
-    s = select_by_id(strings,id_string)
+    s = select_by_id(cables,id_string)
     if inc
         s.state.restlen += u
     else
@@ -167,12 +167,12 @@ function actuate!(ctrller::ManualActuator,tg,u;inc=false)
 end
 
 function actuate!(ctrller::ManualGangedActuators,tg,u;inc=false)
-    @unpack strings = tg
+    @unpack cables = tg
     @unpack regs, traj = ctrller
-    @unpack id_strings, original_values = regs
+    @unpack id_cables, original_values = regs
     @unpack us = traj
-    s1 = select_by_id(strings,id_strings[1])
-    s2 = select_by_id(strings,id_strings[2])
+    s1 = select_by_id(cables,id_cables[1])
+    s2 = select_by_id(cables,id_cables[2])
     if inc
         s1.state.restlen += u
         s2.state.restlen -= u
@@ -184,12 +184,12 @@ function actuate!(ctrller::ManualGangedActuators,tg,u;inc=false)
 end
 
 function actuate!(ctrller::ManualSerialActuators,tg,u;inc=false)
-    @unpack strings = tg
+    @unpack cables = tg
     @unpack acts, trajs = ctrller
-    @unpack id_strings, original_values = acts
+    @unpack id_cables, original_values = acts
     @unpack us = trajs
-    for (id, original_value) in zip(id_strings,original_values)
-        s = select_by_id(strings,id)
+    for (id, original_value) in zip(id_cables,original_values)
+        s = select_by_id(cables,id)
         if inc
             s.state.restlen += u
         else
@@ -200,9 +200,9 @@ function actuate!(ctrller::ManualSerialActuators,tg,u;inc=false)
 end
 
 function heat!(ctrller::ManualHeater,tg,u;inc=false,abs=true)
-    @unpack SMA_strings = tg.tensiles
+    @unpack SMA_cables = tg.tensiles
     @unpack id_string, original_value, heating_law = ctrller.act
-    s = select_by_id(SMA_strings,id_string)
+    s = select_by_id(SMA_cables,id_string)
     if abs
         s.state.temp = u
     else
@@ -216,15 +216,15 @@ function heat!(ctrller::ManualHeater,tg,u;inc=false,abs=true)
 end
 
 @inline function heat!(ctrller::ManualSerialHeater,tg::TensegrityStructure,u;inc=false)
-    heat!(ctrller,tg.tensiles.SMA_strings,u;inc)
+    heat!(ctrller,tg.tensiles.SMA_cables,u;inc)
 end
 
 function heat!(ctrller::ManualSerialHeater,
-                SMA_strings::AbstractVector{<:SMACable},u;inc=false,abs=true)
+                SMA_cables::AbstractVector{<:SMACable},u;inc=false,abs=true)
     @unpack acts, heating_laws = ctrller
-    @unpack id_strings, original_values = acts
-    for (id, original_value, heating_law) in zip(id_strings,original_values,heating_laws)
-        s = select_by_id(SMA_strings,id)
+    @unpack id_cables, original_values = acts
+    for (id, original_value, heating_law) in zip(id_cables,original_values,heating_laws)
+        s = select_by_id(SMA_cables,id)
         if abs
             s.state.temp = u
         else
@@ -243,7 +243,7 @@ function heat!(s::SMACable,heating_law)
 end
 
 function set_restlen!(tg,u)
-    for (i,s) in enumerate(tg.strings)
+    for (i,s) in enumerate(tg.cables)
         s.state.restlen = u[i]
     end
 end
