@@ -358,14 +358,14 @@ function update_cables_apply_forces!(tg)
         scable = cables[scnt.id]
         state1 = scnt.end1.rbsig.state
         state2 = scnt.end2.rbsig.state
-        apid1 = scnt.end1.pid
-        apid2 = scnt.end2.pid
-        p1 = state1.rps[apid1]
-        ṗ1 = state1.ṙps[apid1]
-        f1 = state1.fps[apid1]
-        p2 = state2.rps[apid2]
-        ṗ2 = state2.ṙps[apid2]
-        f2 = state2.fps[apid2]
+        pid1 = scnt.end1.pid
+        pid2 = scnt.end2.pid
+        p1 = state1.rps[pid1]
+        ṗ1 = state1.ṙps[pid1]
+        f1 = state1.fps[pid1]
+        p2 = state2.rps[pid2]
+        ṗ2 = state2.ṙps[pid2]
+        f2 = state2.fps[pid2]
 		update!(scable,p1,p2,ṗ1,ṗ2)
 		f1 .+=  scable.state.force
 		f2 .-=  scable.state.force
