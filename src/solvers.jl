@@ -1,5 +1,4 @@
 struct Wendlandt end
-struct Zhong06 end
 
 struct SimProblem{BotType,FuncsType}
     bot::BotType
@@ -80,5 +79,6 @@ end
 
 include("solvers/Wendlandt.jl")
 include("solvers/Zhong06.jl")
+include("solvers/Alpha.jl")
 include("solvers/nonsmooth.jl")
 include("solvers/Zhong06NSNH.jl")

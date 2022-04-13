@@ -20,24 +20,32 @@ const LNC2D6C = LocalNaturalCoordinates2D6C
 const LNC3D6C = LocalNaturalCoordinates3D6C
 const LNC3D12C = LocalNaturalCoordinates3D12C
 
+struct LNCMP{M,L,T,N} <: LocalNaturalCoordinates{T}
+    r̄ps::SArray{Tuple{M,L},T,2,N}
+end
+
 make_I(T,N) = SMatrix{N,N}(one(T)*I)
 I2_Int = make_I(Int,2)
 I3_Int = make_I(Int,3)
-get_ndim(::LocalNaturalCoordinates2D) = 2
-get_ndim(::LocalNaturalCoordinates3D) = 3
-get_nlocaldim(::LocalNaturalCoordinates2D4C) = 1
-get_nlocaldim(::LocalNaturalCoordinates2D6C) = 2
-get_nlocaldim(::LocalNaturalCoordinates3D6C) = 1
-get_nlocaldim(::LocalNaturalCoordinates3D12C) = 3
-get_ncoords(::LocalNaturalCoordinates2D4C) = 4
-get_ncoords(::LocalNaturalCoordinates2D6C) = 6
-get_ncoords(::LocalNaturalCoordinates3D6C) = 6
-get_ncoords(::LocalNaturalCoordinates3D12C) = 12
-get_nconstraints(::LocalNaturalCoordinates2D4C) = 1
-get_nconstraints(::LocalNaturalCoordinates2D6C) = 3
-get_nconstraints(::LocalNaturalCoordinates3D6C) = 1
-get_nconstraints(::LocalNaturalCoordinates3D12C) = 6
-get_ndof(lncs::LocalNaturalCoordinates) =  get_ncoords(lncs) - get_nconstraints(lncs)
+get_ndim(::LNC2D) = 2
+get_ndim(::LNC3D) = 3
+get_ndim(::LNCMP{M}) where M = M
+get_nlocaldim(::LNC2D4C) = 1
+get_nlocaldim(::LNC2D6C) = 2
+get_nlocaldim(::LNC3D6C) = 1
+get_nlocaldim(::LNC3D12C) = 3
+get_nlocaldim(::LNCMP{M,L}) where {M,L} = L
+get_ncoords(::LNC2D4C) = 4
+get_ncoords(::LNC2D6C) = 6
+get_ncoords(::LNC3D6C) = 6
+get_ncoords(::LNC3D12C) = 12
+get_ncoords(::LNCMP{M,L}) where {M,L}  = L*M
+get_nconstraints(::LNC2D4C) = 1
+get_nconstraints(::LNC2D6C) = 3
+get_nconstraints(::LNC3D6C) = 1
+get_nconstraints(::LNC3D12C) = 6
+get_nconstraints(::LNCMP{M,L}) where {M,L}  = L*M
+get_ndof(lncs::LNC) =  get_ncoords(lncs) - get_nconstraints(lncs)
 
 @inline @inbounds function LinearAlgebra.cross(a::Number,b::AbstractVector)
     ret = similar(b)
@@ -75,21 +83,21 @@ function skew(w)
              -w2 w1 o]
 end
 
-struct LocalNaturalCoordinates2D2P{T} <: LocalNaturalCoordinates2D4C{T}
+struct LNC2D2P{T} <: LNC2D4C{T}
     r̄i::SArray{Tuple{2},T,1,2}
     r̄j::SArray{Tuple{2},T,1,2}
     X̄::SArray{Tuple{2,1},T,2,2}
     invX̄::SArray{Tuple{1,2},T,2,2}
 end
 
-struct LocalNaturalCoordinates3D2P{T} <: LocalNaturalCoordinates3D6C{T}
+struct LNC3D2P{T} <: LNC3D6C{T}
     r̄i::SArray{Tuple{3},T,1,3}
     r̄j::SArray{Tuple{3},T,1,3}
     X̄::SArray{Tuple{3,1},T,2,3}
     invX̄::SArray{Tuple{1,3},T,2,3}
 end
 
-struct LocalNaturalCoordinates1P2V{T} <: LocalNaturalCoordinates2D6C{T}
+struct LNC1P2V{T} <: LNC2D6C{T}
     r̄i::SArray{Tuple{2},T,1,2}
     ū::SArray{Tuple{2},T,1,2}
     v̄::SArray{Tuple{2},T,1,2}
@@ -97,7 +105,7 @@ struct LocalNaturalCoordinates1P2V{T} <: LocalNaturalCoordinates2D6C{T}
     invX̄::SArray{Tuple{2,2},T,2,4}
 end
 
-struct LocalNaturalCoordinates2P1V{T} <: LocalNaturalCoordinates2D6C{T}
+struct LNC2P1V{T} <: LNC2D6C{T}
     r̄i::SArray{Tuple{2},T,1,2}
     r̄j::SArray{Tuple{2},T,1,2}
     v̄::SArray{Tuple{2},T,1,2}
@@ -105,7 +113,7 @@ struct LocalNaturalCoordinates2P1V{T} <: LocalNaturalCoordinates2D6C{T}
     invX̄::SArray{Tuple{2,2},T,2,4}
 end
 
-struct LocalNaturalCoordinates3P{T} <: LocalNaturalCoordinates2D6C{T}
+struct LNC3P{T} <: LNC2D6C{T}
     r̄i::SArray{Tuple{2},T,1,2}
     r̄j::SArray{Tuple{2},T,1,2}
     r̄k::SArray{Tuple{2},T,1,2}
@@ -113,7 +121,7 @@ struct LocalNaturalCoordinates3P{T} <: LocalNaturalCoordinates2D6C{T}
     invX̄::SArray{Tuple{2,2},T,2,4}
 end
 
-struct LocalNaturalCoordinates1P3V{T} <: LocalNaturalCoordinates3D12C{T}
+struct LNC1P3V{T} <: LNC3D12C{T}
     r̄i::SArray{Tuple{3},T,1,3}
     ū::SArray{Tuple{3},T,1,3}
     v̄::SArray{Tuple{3},T,1,3}
@@ -122,7 +130,7 @@ struct LocalNaturalCoordinates1P3V{T} <: LocalNaturalCoordinates3D12C{T}
     invX̄::SArray{Tuple{3,3},T,2,9}
 end
 
-struct LocalNaturalCoordinates2P2V{T} <: LocalNaturalCoordinates3D12C{T}
+struct LNC2P2V{T} <: LNC3D12C{T}
     r̄i::SArray{Tuple{3},T,1,3}
     r̄j::SArray{Tuple{3},T,1,3}
     v̄::SArray{Tuple{3},T,1,3}
@@ -131,7 +139,7 @@ struct LocalNaturalCoordinates2P2V{T} <: LocalNaturalCoordinates3D12C{T}
     invX̄::SArray{Tuple{3,3},T,2,9}
 end
 
-struct LocalNaturalCoordinates3P1V{T} <: LocalNaturalCoordinates3D12C{T}
+struct LNC3P1V{T} <: LNC3D12C{T}
     r̄i::SArray{Tuple{3},T,1,3}
     r̄j::SArray{Tuple{3},T,1,3}
     r̄k::SArray{Tuple{3},T,1,3}
@@ -140,7 +148,7 @@ struct LocalNaturalCoordinates3P1V{T} <: LocalNaturalCoordinates3D12C{T}
     invX̄::SArray{Tuple{3,3},T,2,9}
 end
 
-struct LocalNaturalCoordinates4P{T} <: LocalNaturalCoordinates3D12C{T}
+struct LNC4P{T} <: LNC3D12C{T}
     r̄i::SArray{Tuple{3},T,1,3}
     r̄j::SArray{Tuple{3},T,1,3}
     r̄k::SArray{Tuple{3},T,1,3}
@@ -150,11 +158,11 @@ struct LocalNaturalCoordinates4P{T} <: LocalNaturalCoordinates3D12C{T}
 end
 
 # Conversions
-# get_conversion(lncs::LocalNaturalCoordinates1P1V) = I
-get_conversion(lncs::LocalNaturalCoordinates1P2V) = I
-get_conversion(lncs::LocalNaturalCoordinates1P3V) = I
+get_conversion(lncs::LNCMP) = I
+get_conversion(lncs::LNC1P2V) = I
+get_conversion(lncs::LNC1P3V) = I
 
-function get_conversion(lncs::Union{LocalNaturalCoordinates2D2P,LocalNaturalCoordinates3D2P})
+function get_conversion(lncs::Union{LNC2D2P,LNC3D2P})
     ndim = get_ndim(lncs)
     kron(
         [ 1 0;
@@ -163,21 +171,21 @@ function get_conversion(lncs::Union{LocalNaturalCoordinates2D2P,LocalNaturalCoor
     )
 end
 
-get_conversion(lncs::LocalNaturalCoordinates2P1V) = kron(
+get_conversion(lncs::LNC2P1V) = kron(
     [ 1 0 0;
      -1 1 0;
       0 0 1],
     I2_Int
 )
 
-get_conversion(lncs::LocalNaturalCoordinates3P) = kron(
+get_conversion(lncs::LNC3P) = kron(
     [ 1 0 0;
      -1 1 0;
      -1 0 1],
     I2_Int
 )
 
-get_conversion(lncs::LocalNaturalCoordinates2P2V) = kron(
+get_conversion(lncs::LNC2P2V) = kron(
     [ 1 0 0 0;
      -1 1 0 0;
       0 0 1 0;
@@ -185,7 +193,7 @@ get_conversion(lncs::LocalNaturalCoordinates2P2V) = kron(
     I3_Int
 )
 
-get_conversion(lncs::LocalNaturalCoordinates3P1V) = kron(
+get_conversion(lncs::LNC3P1V) = kron(
     [ 1 0 0 0;
      -1 1 0 0;
      -1 0 1 0;
@@ -193,7 +201,7 @@ get_conversion(lncs::LocalNaturalCoordinates3P1V) = kron(
     I3_Int
 )
 
-get_conversion(lncs::LocalNaturalCoordinates4P) = kron(
+get_conversion(lncs::LNC4P) = kron(
     [ 1 0 0 0;
      -1 1 0 0;
      -1 0 1 0;
@@ -201,6 +209,14 @@ get_conversion(lncs::LocalNaturalCoordinates4P) = kron(
     I3_Int
 )
 
+function rigidstate2naturalcoords(lncs::LNCMP,ro,R,ṙo,ω)
+    (;r̄ps) = lncs
+    rps = Ref(ro) .+ Ref(R) .* eachcol(r̄ps)
+    ṙps = Ref(ṙo) .+ Ref(ω) .× (rps .- Ref(ro))
+    q = reduce(vcat,rps)
+    q̇ = reduce(vcat,ṙps)
+    q,q̇
+end
 
 function rigidstate2naturalcoords(lncs,ro,R,ṙo,ω)
     (;r̄i,X̄) = lncs
@@ -216,6 +232,19 @@ function rigidstate2naturalcoords(lncs,ro,R,ṙo,ω)
     q,q̇
 end
 
+## Many points
+function NCMP(rps::AbstractVector{<:AbstractVector})
+    T = eltype(eltype(rps))
+    M = size(eltype(rps))[1]
+    L = length(rps)
+    ro = SVector{M}(zeros(T,M))
+    R = SMatrix{M,M}(one(T)*I)
+    invR = transpose(R)
+    r̄ps = SMatrix{M,L}(reduce(hcat,Ref(invR).*(rps.-Ref(ro))))
+    q = reduce(vcat,rps)
+    LNCMP(r̄ps),q
+end
+
 ## Rigid Bar
 
 function NC2D2P(ri::AbstractVector{T},rj::AbstractVector{T},
@@ -227,7 +256,7 @@ function NC2D2P(ri::AbstractVector{T},rj::AbstractVector{T},
     ū = r̄j-r̄i
     X̄ = ū
     invX̄ = pinv(X̄)
-    lncs = LocalNaturalCoordinates2D2P(SVector{2}(r̄i),SVector{2}(r̄j),
+    lncs = LNC2D2P(SVector{2}(r̄i),SVector{2}(r̄j),
                                         SMatrix{2,1}(X̄),SMatrix{1,2}(invX̄))
     q = vcat(ri,rj)
     lncs,q
@@ -251,7 +280,7 @@ function NC3D2P(ri::AbstractVector{T},rj::AbstractVector{T},
     ū = r̄j-r̄i
     X̄ = ū
     invX̄ = pinv(X̄)
-    lncs = LocalNaturalCoordinates3D2P(SVector{3}(r̄i),SVector{3}(r̄j),
+    lncs = LNC3D2P(SVector{3}(r̄i),SVector{3}(r̄j),
                                         SMatrix{3,1}(X̄),SMatrix{1,3}(invX̄))
     q = vcat(ri,rj)
     lncs,q
@@ -279,7 +308,7 @@ function NC1P2V(ri::AbstractVector{T},
     u = R*ū
     v = R*v̄
     X̄ = hcat(ū,v̄)
-    lncs = LocalNaturalCoordinates1P2V(SVector{2}(r̄i),SVector{2}(ū),SVector{2}(v̄),
+    lncs = LNC1P2V(SVector{2}(r̄i),SVector{2}(ū),SVector{2}(v̄),
                                         SMatrix{2,2}(X̄),SMatrix{2,2}(inv(X̄)))
     q = vcat(ri,u,v)
     lncs,q
@@ -305,7 +334,7 @@ function NC2P1V(ri::AbstractVector{T},rj::AbstractVector{T},
     v̄ = rotation_matrix(π/2)*ū
     v = R*v̄
     X̄ = hcat(ū,v̄)
-    lncs = LocalNaturalCoordinates2P1V(SVector{2}(r̄i),SVector{2}(r̄j),SVector{2}(v̄),
+    lncs = LNC2P1V(SVector{2}(r̄i),SVector{2}(r̄j),SVector{2}(v̄),
                                         SMatrix{2,2}(X̄),SMatrix{2,2}(inv(X̄)))
     q = vcat(ri,rj,v)
     lncs,q
@@ -330,7 +359,7 @@ function NC3P(ri::AbstractVector{T},rj::AbstractVector{T},rk::AbstractVector{T},
     ū = r̄j - r̄i
     v̄ = r̄k - r̄i
     X̄ = hcat(ū,v̄)
-    lncs = LocalNaturalCoordinates3P(SVector{2}(r̄i),SVector{2}(r̄j),SVector{2}(r̄k),
+    lncs = LNC3P(SVector{2}(r̄i),SVector{2}(r̄j),SVector{2}(r̄k),
                                         SMatrix{2,2}(X̄),SMatrix{2,2}(inv(X̄)))
     q = vcat(ri,rj,rk)
     lncs,q
@@ -362,7 +391,7 @@ function NC1P3V(ri::AbstractVector{T},
     v = R*v̄
     w = R*w̄
     X̄ = hcat(ū,v̄,w̄)
-    lncs = LocalNaturalCoordinates1P3V(SVector{3}(r̄i),SVector{3}(ū),SVector{3}(v̄),
+    lncs = LNC1P3V(SVector{3}(r̄i),SVector{3}(ū),SVector{3}(v̄),
                                         SVector{3}(w̄),SMatrix{3,3}(X̄),SMatrix{3,3}(inv(X̄)))
     q = vcat(ri,u,v,w)
     lncs,q
@@ -390,7 +419,7 @@ function NC2P2V(ri::AbstractVector{T},rj::AbstractVector{T},
     v = R*v̄
     w = R*w̄
     X̄ = hcat(ū,v̄,w̄)
-    lncs = LocalNaturalCoordinates2P2V(SVector{3}(r̄i),SVector{3}(r̄j),SVector{3}(v̄),
+    lncs = LNC2P2V(SVector{3}(r̄i),SVector{3}(r̄j),SVector{3}(v̄),
                                         SVector{3}(w̄),SMatrix{3,3}(X̄),SMatrix{3,3}(inv(X̄)))
     q = vcat(ri,rj,v,w)
     lncs,q
@@ -408,7 +437,7 @@ function NC2P2V(ri::AbstractVector{T},rj::AbstractVector{T},
     v̄ = invR*v
     w̄ = invR*w
     X̄ = hcat(ū,v̄,w̄)
-    lncs = LocalNaturalCoordinates2P2V(SVector{3}(r̄i),SVector{3}(r̄j),SVector{3}(v̄),
+    lncs = LNC2P2V(SVector{3}(r̄i),SVector{3}(r̄j),SVector{3}(v̄),
                                         SVector{3}(w̄),SMatrix{3,3}(X̄),SMatrix{3,3}(inv(X̄)))
     q = vcat(ri,rj,v,w)
     lncs,q
@@ -451,7 +480,7 @@ function NC3P1V(ri::AbstractVector{T},rj::AbstractVector{T},
     v̄ = r̄k-r̄i
     w̄ = invR*w
     X̄ = hcat(ū,v̄,w̄)
-    lncs = LocalNaturalCoordinates3P1V(SVector{3}(r̄i),SVector{3}(r̄j),SVector{3}(r̄k),
+    lncs = LNC3P1V(SVector{3}(r̄i),SVector{3}(r̄j),SVector{3}(r̄k),
                                         SVector{3}(w̄),SMatrix{3,3}(X̄),SMatrix{3,3}(inv(X̄)))
     q = vcat(ri,rj,rk,w)
     lncs,q
@@ -480,7 +509,7 @@ function NC4P(ri::AbstractVector{T},rj::AbstractVector{T},
     v̄ = r̄k - r̄i
     w̄ = r̄l - r̄i
     X̄ = hcat(ū,v̄,w̄)
-    lncs = LocalNaturalCoordinates4P(SVector{3}(r̄i),SVector{3}(r̄j),SVector{3}(r̄k),
+    lncs = LNC4P(SVector{3}(r̄i),SVector{3}(r̄j),SVector{3}(r̄k),
                                         SVector{3}(r̄l),SMatrix{3,3}(X̄),SMatrix{3,3}(inv(X̄)))
     q = vcat(ri,rj,rk,rl)
     lncs,q
@@ -497,10 +526,15 @@ function NC4P(ri,rj,rk,rl,ro,R,ṙo,ω)
 end
 
 # Deformations
+## Deformations: Many points
+function get_deform(lncs::LNCMP)
+    lncs.r̄ps
+end
+
 ## Deformations: Rigid bar
 @inline @inbounds get_deform(ū) = sqrt(ū⋅ū)
 
-@inline @inbounds function get_deform(lncs::Union{LocalNaturalCoordinates2D2P,LocalNaturalCoordinates3D2P})
+@inline @inbounds function get_deform(lncs::Union{LNC2D2P,LNC3D2P})
     @unpack r̄i,r̄j = lncs
     ū = r̄j-r̄i
     get_deform(ū)
@@ -511,18 +545,18 @@ end
     sqrt(ū⋅ū),sqrt(v̄⋅v̄),sqrt(ū⋅v̄)
 end
 
-@inline @inbounds function get_deform(lncs::LocalNaturalCoordinates1P2V)
+@inline @inbounds function get_deform(lncs::LNC1P2V)
     @unpack ū,v̄ = lncs
     get_deform(ū,v̄)
 end
 
-@inline @inbounds function get_deform(lncs::LocalNaturalCoordinates2P1V)
+@inline @inbounds function get_deform(lncs::LNC2P1V)
     @unpack r̄i,r̄j,v̄ = lncs
     ū = r̄j-r̄i
     get_deform(ū,v̄)
 end
 
-@inline @inbounds function get_deform(lncs::LocalNaturalCoordinates3P)
+@inline @inbounds function get_deform(lncs::LNC3P)
     @unpack r̄i,r̄j,r̄k = lncs
     ū = r̄j-r̄i
     v̄ = r̄k-r̄i
@@ -540,25 +574,25 @@ end
     u_sqrt,v_sqrt,w_sqrt,uv_sqrt,uw_sqrt,vw_sqrt
 end
 
-@inline @inbounds function get_deform(lncs::LocalNaturalCoordinates1P3V)
+@inline @inbounds function get_deform(lncs::LNC1P3V)
     @unpack ū,v̄,w̄ = lncs
     get_deform(ū,v̄,w̄)
 end
 
-@inline @inbounds function get_deform(lncs::LocalNaturalCoordinates2P2V)
+@inline @inbounds function get_deform(lncs::LNC2P2V)
     @unpack r̄i,r̄j,v̄,w̄ = lncs
     ū = r̄j-r̄i
     get_deform(ū,v̄,w̄)
 end
 
-@inline @inbounds function get_deform(lncs::LocalNaturalCoordinates3P1V)
+@inline @inbounds function get_deform(lncs::LNC3P1V)
     @unpack r̄i,r̄j,r̄k,w̄ = lncs
     ū = r̄j-r̄i
     v̄ = r̄k-r̄i
     get_deform(ū,v̄,w̄)
 end
 
-@inline @inbounds function get_deform(lncs::LocalNaturalCoordinates4P)
+@inline @inbounds function get_deform(lncs::LNC4P)
     @unpack r̄i,r̄j,r̄k,r̄l = lncs
     ū = r̄j-r̄i
     v̄ = r̄k-r̄i
@@ -568,8 +602,8 @@ end
 
 # Intrinsic Constraints
 ## Intrinsic Constraints: Dispatch
-function make_Φ(lncs::LocalNaturalCoordinates,Φi)
-    deforms = get_deform(lncs)
+function make_Φ(lncs::LNC,Φi)
+    deforms = get_deform(lncs::LNC)
     make_Φ(lncs,Φi,deforms)
 end
 
@@ -583,8 +617,16 @@ function make_inner_Φ(func,deforms)
     ret_func
 end
 
+## Intrinsic Constraints: Many points
+function make_Φ(lncs::LNCMP,Φi,deforms)
+    @inline @inbounds function _inner_Φ(q,d)
+        all = q - d
+        all[Φi]
+    end
+    make_inner_Φ(_inner_Φ,deforms)
+end
 ## Intrinsic Constraints: Rigid bar
-function make_Φ(lncs::LocalNaturalCoordinates2D2P,Φi,deforms)
+function make_Φ(lncs::LNC2D2P,Φi,deforms)
     @inline @inbounds function _inner_Φ(q,d)
         xi,yi,xj,yj = q
         all = [(xj-xi)^2 + (yj-yi)^2 - d^2]
@@ -593,7 +635,7 @@ function make_Φ(lncs::LocalNaturalCoordinates2D2P,Φi,deforms)
     make_inner_Φ(_inner_Φ,deforms)
 end
 
-function make_Φ(lncs::LocalNaturalCoordinates3D2P,Φi,deforms)
+function make_Φ(lncs::LNC3D2P,Φi,deforms)
     @inline @inbounds function _inner_Φ(q,d)
         xi,yi,zi,xj,yj,zj = q
         all = [(xj-xi)^2 + (yj-yi)^2 + (zj-zi)^2- d^2]
@@ -603,7 +645,7 @@ function make_Φ(lncs::LocalNaturalCoordinates3D2P,Φi,deforms)
 end
 
 ## Intrinsic Constraints: 2D rigid body
-function make_Φ(lncs::LocalNaturalCoordinates1P2V,Φi,deforms)
+function make_Φ(lncs::LNC1P2V,Φi,deforms)
     @inline @inbounds function _inner_Φ(q,d)
         u = @view q[3:4]
         v = @view q[5:6]
@@ -613,7 +655,7 @@ function make_Φ(lncs::LocalNaturalCoordinates1P2V,Φi,deforms)
     make_inner_Φ(_inner_Φ,deforms)
 end
 
-function make_Φ(lncs::LocalNaturalCoordinates2P1V,Φi,deforms)
+function make_Φ(lncs::LNC2P1V,Φi,deforms)
     @inline @inbounds function _inner_Φ(q,d)
         ri = @view q[1:2]
         rj = @view q[3:4]
@@ -625,8 +667,21 @@ function make_Φ(lncs::LocalNaturalCoordinates2P1V,Φi,deforms)
     make_inner_Φ(_inner_Φ,deforms)
 end
 
+function make_Φ(lncs::LNC3P,Φi,deforms)
+    @inline @inbounds function _inner_Φ(q,d)
+        ri = @view q[1:2]
+        rj = @view q[3:4]
+        rk = @view q[5:6]
+        u = rj-ri
+        v = rk-ri
+        all = [(u⋅u - d[1]^2), (v⋅v - d[2]^2), (u⋅v - d[3]^2)]
+        all[Φi]
+    end
+    make_inner_Φ(_inner_Φ,deforms)
+end
+
 ## Intrinsic Constraints: 3D rigid body
-function make_Φ(lncs::LocalNaturalCoordinates1P3V,Φi,deforms)
+function make_Φ(lncs::LNC1P3V,Φi,deforms)
     @inline @inbounds function _inner_Φ(q,d)
         u = @view q[4:6]
         v = @view q[7:9]
@@ -637,7 +692,7 @@ function make_Φ(lncs::LocalNaturalCoordinates1P3V,Φi,deforms)
     make_inner_Φ(_inner_Φ,deforms)
 end
 
-function make_Φ(lncs::LocalNaturalCoordinates2P2V,deforms)
+function make_Φ(lncs::LNC2P2V,deforms)
     @inline @inbounds function _inner_Φ(q,d)
         ri = @view q[1:3]
         rj = @view q[4:6]
@@ -648,7 +703,7 @@ function make_Φ(lncs::LocalNaturalCoordinates2P2V,deforms)
     make_inner_Φ(_inner_Φ,deforms)
 end
 
-function make_Φ(lncs::LocalNaturalCoordinates3P1V,deforms)
+function make_Φ(lncs::LNC3P1V,deforms)
     @inline @inbounds function _inner_Φ(q,d)
         ri = @view q[1:3]
         rj = @view q[4:6]
@@ -660,7 +715,7 @@ function make_Φ(lncs::LocalNaturalCoordinates3P1V,deforms)
     make_inner_Φ(_inner_Φ,deforms)
 end
 
-function make_Φ(lncs::LocalNaturalCoordinates4P,deforms)
+function make_Φ(lncs::LNC4P,deforms)
     @inline @inbounds function _inner_Φ(q,d)
         ri = @view q[1:3]
         rj = @view q[4:6]
@@ -674,9 +729,19 @@ function make_Φ(lncs::LocalNaturalCoordinates4P,deforms)
     make_inner_Φ(_inner_Φ,deforms)
 end
 
-# Jacobians
+## Jacobians
+
+## Jacobians: Many points
+function make_Φq(lncs::LNCMP,uci,Φi)
+    ncoords = get_ncoords(lncs)
+    @inline @inbounds function inner_Φq(q)
+        ret = Matrix(one(eltypeq)*I,ncoords,ncoords)
+        @view ret[Φi,uci]
+    end
+end
+
 ## Jacobians: Rigid bar
-function make_Φq(lncs::Union{LocalNaturalCoordinates2D2P,LocalNaturalCoordinates3D2P},uci,Φi)
+function make_Φq(lncs::Union{LNC2D2P,LNC3D2P},uci,Φi)
     ndim = get_ndim(lncs)
     @inline @inbounds function inner_Φq(q)
         ri = @view q[1:ndim]
@@ -689,7 +754,7 @@ function make_Φq(lncs::Union{LocalNaturalCoordinates2D2P,LocalNaturalCoordinate
 end
 
 ## Jacobians: 2D rigid body
-function make_Φq(lncs::LocalNaturalCoordinates1P2V,uci,Φi)
+function make_Φq(lncs::LNC1P2V,uci,Φi)
     @inline @inbounds function inner_Φq(q)
         u = @view q[3:4]
         v = @view q[5:6]
@@ -702,7 +767,7 @@ function make_Φq(lncs::LocalNaturalCoordinates1P2V,uci,Φi)
     end
 end
 
-function make_Φq(lncs::LocalNaturalCoordinates2P1V,uci,Φi)
+function make_Φq(lncs::LNC2P1V,uci,Φi)
     d = get_deform(lncs)
     a = sqrt(1/(2d[2]^2+d[1]^2))
     weights = zeros(Rational{Int64},3,6)
@@ -726,12 +791,12 @@ function make_Φq(lncs::LocalNaturalCoordinates2P1V,uci,Φi)
     end
 end
 
-function make_Φq(lncs::LocalNaturalCoordinates3P)
+function make_Φq(lncs::LNC3P,uci,Φi)
     @inline @inbounds function inner_Φq(q)
         ri = @view q[1:2]
         rj = @view q[3:4]
-        u = rj-ri
         rk = @view q[5:6]
+        u = rj-ri
         v = rk-ri
         ret = zeros(eltype(q),3,6)
         ret[1,1:2] = -2u
@@ -741,12 +806,12 @@ function make_Φq(lncs::LocalNaturalCoordinates3P)
         ret[3,1:2] = -v-u
         ret[3,3:4] = v
         ret[3,5:6] = u
-        ret
+        @view ret[Φi,uci]
     end
 end
 
 ## Jacobians: 3D rigid body
-function make_Φq(lncs::LocalNaturalCoordinates1P3V,uci,Φi)
+function make_Φq(lncs::LNC1P3V,uci,Φi)
     @inline @inbounds function inner_Φq(q)
         ri = @view q[1:3]
         u  = @view q[4:6]
@@ -770,7 +835,7 @@ function make_Φq(lncs::LocalNaturalCoordinates1P3V,uci,Φi)
     end
 end
 
-function make_Φq(lncs::LocalNaturalCoordinates2P2V)
+function make_Φq(lncs::LNC2P2V)
     @inline @inbounds function inner_Φq(q)
         ri = @view q[1:3]
         rj = @view q[4:6]
@@ -799,7 +864,7 @@ function make_Φq(lncs::LocalNaturalCoordinates2P2V)
     end
 end
 
-function make_Φq(lncs::LocalNaturalCoordinates3P1V)
+function make_Φq(lncs::LNC3P1V)
     @inline @inbounds function inner_Φq(q)
         ri = @view q[1:3]
         rj = @view q[4:6]
@@ -832,7 +897,7 @@ function make_Φq(lncs::LocalNaturalCoordinates3P1V)
     end
 end
 
-function make_Φq(lncs::LocalNaturalCoordinates4P)
+function make_Φq(lncs::LNC4P)
     @inline @inbounds function inner_Φq(q)
         ri = @view q[1:3]
         rj = @view q[4:6]
@@ -869,18 +934,39 @@ end
 
 # Transformations
 function make_c(lncs)
-    @unpack r̄i,invX̄ = lncs
+    (;r̄i,invX̄) = lncs
     function c(r̄)
         invX̄*(r̄-r̄i)
     end
 end
 
-function make_C(lncs::LocalNaturalCoordinates)
+function make_C(lncs::LNC)
     function C(c)
         ndim = get_ndim(lncs)
         ncoords = get_ncoords(lncs)
         conversion = get_conversion(lncs)
         C_raw = hcat(1,transpose(c))
+        SMatrix{ndim,ncoords}(kron(C_raw,make_I(Int,ndim))*conversion)
+    end
+end
+
+## Transformations: Many points
+function make_c(lncs::LNCMP)
+    (;r̄ps) = lncs
+    function c(r̄)
+        dts = [norm(r̄-r̄p) for r̄p in eachcol(r̄ps)]
+        c = zeros(eltype(r̄),size(r̄ps,2))
+        c[argmin(dts)] = 1
+        c
+     end
+end
+
+function make_C(lncs::LNCMP)
+    function C(c)
+        ndim = get_ndim(lncs)
+        ncoords = get_ncoords(lncs)
+        conversion = get_conversion(lncs)
+        C_raw = transpose(c)
         SMatrix{ndim,ncoords}(kron(C_raw,make_I(Int,ndim))*conversion)
     end
 end
@@ -921,7 +1007,7 @@ function make_∂Aq̇∂q_forwarddiff(Φq,nq,nλ)
     end
 end
 
-function get_unconstrained_indices(lncs::LocalNaturalCoordinates,constrained_index)
+function get_unconstrained_indices(lncs::LNC,constrained_index)
     deleteat!(collect(1:get_ncoords(lncs)),constrained_index)
 end
 
@@ -940,10 +1026,10 @@ end
 
 
 # Mass matrices
-Ī2J̄(::LocalNaturalCoordinates2D2P,Ī)  = Ī
-Ī2J̄(::LocalNaturalCoordinates3D2P,Ī)  = Ī
-Ī2J̄(::LocalNaturalCoordinates2D6C,Ī)  =     tr(Ī)*I-Ī
-Ī2J̄(::LocalNaturalCoordinates3D12C,Ī) = 1/2*tr(Ī)*I-Ī
+Ī2J̄(::LNC2D2P,Ī)  = Ī
+Ī2J̄(::LNC3D2P,Ī)  = Ī
+Ī2J̄(::LNC2D6C,Ī)  =     tr(Ī)*I-Ī
+Ī2J̄(::LNC3D12C,Ī) = 1/2*tr(Ī)*I-Ī
 
 function Īg2az(lncs,m,Īg,r̄g)
     (;r̄i,invX̄) = lncs
@@ -973,27 +1059,32 @@ function make_M(cf::CoordinateFunctions,m::T,Īg,r̄g) where {T} # ami (area mo
     M = SMatrix{ncoords,ncoords}(transpose(Y_nonstd)*M_std*Y_nonstd)
 end
 
-make_X(q::AbstractVector,lncs::LocalNaturalCoordinates) = make_X(lncs,q)
+function make_M(cf::CoordinateFunctions{<:LNCMP},m::T,Īg,r̄g) where {T} # ami (area moment of inertia tensor)
+    ncoords = get_ncoords(cf.lncs)
+    M = SMatrix{ncoords,ncoords}(zeros(T,ncoords,ncoords))
+end
 
-function make_X(lncs::LocalNaturalCoordinates,q::AbstractVector)
+make_X(q::AbstractVector,lncs::LNC) = make_X(lncs,q)
+
+function make_X(lncs::LNC,q::AbstractVector)
     Y = get_conversion(lncs)
     qstd = Y*q
     ndim = get_ndim(lncs)
     reshape(q[ndim+1:end],ndim,:)
 end
 
-find_R(q::AbstractVector, lncs::LocalNaturalCoordinates) = find_R(lncs,q)
+find_R(q::AbstractVector, lncs::LNC) = find_R(lncs,q)
 
-function find_R(lncs::LocalNaturalCoordinates,q::AbstractVector)
+function find_R(lncs::LNC,q::AbstractVector)
     X = make_X(lncs,q)
     (;invX̄) = lncs
     ndim = get_ndim(lncs)
     R = SVector{ndim,ndim}(X*invX̄)
 end
 
-find_ω(q::AbstractVector,q̇::AbstractVector,lncs::LocalNaturalCoordinates3D) = find_ω(lncs,q,q̇)
+find_ω(q::AbstractVector,q̇::AbstractVector,lncs::LNC3D) = find_ω(lncs,q,q̇)
 
-function find_ω(lncs::LocalNaturalCoordinates,q::AbstractVector,q̇::AbstractVector)
+function find_ω(lncs::LNC,q::AbstractVector,q̇::AbstractVector)
     Ẋ = make_X(lncs,q̇)
     X = make_X(lncs,q)
     ndim = get_ndim(lncs)

@@ -1,3 +1,5 @@
+struct Zhong06 end
+
 struct Zhong06Cache{MMT,AT,ΦT}
     mass_matrices::MMT
     A::AT
@@ -16,7 +18,7 @@ function generate_cache(::Zhong06,intor;dt,kargs...)
     Zhong06Cache(mm,A,Φ)
 end
 
-function retrieve!(intor,solvercache)
+function retrieve!(intor,cache::Zhong06Cache)
 
 end
 
