@@ -48,7 +48,7 @@ function solve!(intor::Integrator,cache::Zhong06Cache;
     mr = norm(Ḿ,Inf)
     scaling = mr
 
-    function make_Res_stepk(p̌ᵏ⁻¹,qᵏ,q̌ᵏ,λᵏ,qᵏ⁻¹,F̌,Ḿ,Φ,Aᵀ,F!,nq̌,nλ,tᵏ⁻¹,dt)
+    function make_Res_stepk(qᵏ,q̌ᵏ,λᵏ,qᵏ⁻¹,p̌ᵏ⁻¹,F̌,Aᵀ,tᵏ⁻¹)
         @inline @inbounds function inner_Res_stepk!(Res,x)
             h = dt
             q̌ᵏ .= x[   1:nq̌   ]
@@ -62,12 +62,12 @@ function solve!(intor::Integrator,cache::Zhong06Cache;
         end
     end
 
-    function make_Jac_stepk(qᵏ⁻¹,qᵏ,q̌ᵏ,M,A,Aᵀ,Jac_F!,nq̌,nλ,tᵏ⁻¹,dt)
+    function make_Jac_stepk(qᵏ,q̌ᵏ,qᵏ⁻¹,∂F∂q̌,∂F∂q̌̇,Aᵀ,tᵏ⁻¹)
         @inline @inbounds function inner_Jac_stepk!(Jac,x)
             h = dt
             q̌ᵏ .= x[1:nq̌]
             Jac_F!(∂F∂q̌,∂F∂q̌̇,(qᵏ.+qᵏ⁻¹)./2,(qᵏ.-qᵏ⁻¹)./h,tᵏ⁻¹+h/2)
-            Jac[   1:nq̌ ,   1:nq̌ ] .=  M̌.-h^2/2 .*(1/2 .*∂F∂q̌.+1/h.*∂F∂q̌̇)
+            Jac[   1:nq̌ ,   1:nq̌ ] .=  M̌.-(h^2)/2 .*(1/2 .*∂F∂q̌.+1/h.*∂F∂q̌̇)
             Jac[   1:nq̌ ,nq̌+1:end] .= -scaling.*Aᵀ
             Jac[nq̌+1:end,   1:nq̌ ] .=  scaling.*A(qᵏ)
             Jac[nq̌+1:end,nq̌+1:end] .=  0.0
@@ -97,11 +97,21 @@ function solve!(intor::Integrator,cache::Zhong06Cache;
         initial_x[   1:nq̌]    .= traj.q̌[timestep]
         initial_x[nq̌+1:nq̌+nλ] .= traj.λ[timestep]
         Aᵀ = transpose(A(qᵏ⁻¹))
-        Res_stepk! = make_Res_stepk(p̌ᵏ⁻¹,qᵏ,q̌ᵏ,λᵏ,qᵏ⁻¹,F̌,Ḿ,Φ,Aᵀ,F!,nq̌,nλ,tᵏ⁻¹,dt)
+        Res_stepk! = make_Res_stepk(qᵏ,q̌ᵏ,λᵏ,qᵏ⁻¹,p̌ᵏ⁻¹,F̌,Aᵀ,tᵏ⁻¹)
         if Jac_F! isa Nothing
             dfk = OnceDifferentiable(Res_stepk!,initial_x,initial_Res)
         else
-            Jac_stepk! = make_Jac_stepk(qᵏ⁻¹,qᵏ,q̌ᵏ,M̌,A,Aᵀ,Jac_F!,nq̌,nλ,tᵏ⁻¹,dt)
+
+            Jac_stepk! = make_Jac_stepk(qᵏ,q̌ᵏ,qᵏ⁻¹,∂F∂q̌,∂F∂q̌̇,Aᵀ,tᵏ⁻¹)
+            # Jac_ref = zeros(nq̌+nλ,nq̌+nλ)
+            # FiniteDiff.finite_difference_jacobian!(Jac_ref,Res_stepk!,initial_x)
+            # Jac_my = zeros(nq̌+nλ,nq̌+nλ)
+            # Jac_stepk!(Jac_my,initial_x)
+            # diff_Jac = Jac_my .- Jac_ref
+            # diff_Jac[abs.(diff_Jac).<1e-5] .= 0.0
+            # display(diff_Jac)
+            # @show maximum(abs.(diff_Jac))
+        # end
             dfk = OnceDifferentiable(Res_stepk!,Jac_stepk!,initial_x,initial_Res)
         end
         Res_stepk_result = nlsolve(dfk, initial_x; ftol, iterations, method=:newton)

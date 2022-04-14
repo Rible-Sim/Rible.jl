@@ -163,7 +163,7 @@ end
 function build_Γ(tg)
     function inner_Γ(q)
         clear_forces!(tg)
-        distribute_q_to_rbs!(tg,q)
+        update_rigids!(tg,q)
         update_cables_apply_forces!(tg)
         forces = [s.state.tension.*s.state.direction for s in tg.cables]
         reduce(vcat,forces)
@@ -569,21 +569,21 @@ function check_actuation(bot,Y,a)
     u
 end
 
-function get_inverse_func(tgstruct_input,refstruct,Y;gravity=false,recheck=true,scale=true)
-    # We only use the $q$ of the reference structure.
-    actstruct,lhs,rhs,c = statics_equation_for_actuation(tgstruct_input,refstruct,Y;gravity,scale)
+function get_inverse_func(tg_input,reftg,Y;gravity=false,recheck=true,scale=true)
+    # We only use the $q$ of the reference tgure.
+    acttg,lhs,rhs,c = statics_equation_for_actuation(tg_input,reftg,Y;gravity,scale)
     ncoeffs = maximum(size(lhs))- rank(lhs)
     xp,nb = get_solution_set(lhs,rhs)
     @info "Number of coefficients = $ncoeffs"
     function inner_inverse_func(ξ)
         x = xp + nb*ξ
-        λ = x[1:actstruct.nconstraint].*c
-        a = x[actstruct.nconstraint+1:end]
-        # check_actuation(actstruct,Y,a)
-        # refq = get_q(refstruct)
-        # actuate!(actstruct,a)
-        # check_static_equilibrium(actstruct,refq,λ;gravity)
-        u0 = get_cables_restlen(tgstruct_input)
+        λ = x[1:acttg.nconstraint].*c
+        a = x[acttg.nconstraint+1:end]
+        # check_actuation(acttg,Y,a)
+        # refq = get_q(reftg)
+        # actuate!(acttg,a)
+        # check_static_equilibrium(acttg,refq,λ;gravity)
+        u0 = get_cables_restlen(tg_input)
         rl = u0 + Y*a
         λ,rl,a
     end

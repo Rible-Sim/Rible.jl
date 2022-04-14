@@ -316,7 +316,7 @@ function TensegrityStructure(rbs,tensiles,cnt::Connectivity)
 	        rbs,cables,tensiles,
 	        cnt,state
 	)
-    # check_jacobian_singularity(tg)
+    check_jacobian_singularity(tg)
     tg
 end
 
@@ -372,8 +372,7 @@ function update_cables_apply_forces!(tg)
     end
 end
 
-update_rigids!(tg,q) = update_rigids!(tg,q,zero(q))
-function update_rigids!(tg,q,q̇)
+function update_rigids!(tg,q,q̇=zero(q))
 	tg.state.system.q .= q
 	tg.state.system.q̇ .= q̇
 	update_rigids!(tg)
@@ -604,28 +603,22 @@ function lucompletepiv!(A)
 end
 
 function check_jacobian_singularity(tg)
-    q,_ = get_q(tg)
-    A = build_A(tg)
+	(;rigidbodies,state) = tg
+    q = get_q(tg)
+    A = make_A(tg)
     Aq = A(q)
     sys_rank = rank(Aq)
     if sys_rank < minimum(size(Aq))
         @warn "System's Jacobian is singular: rank(A(q))=$(sys_rank)<$(minimum(size(Aq)))"
     end
-    foreach(tg.rigidbodies) do rb
+    foreach(rigidbodies) do rb
         rbid = rb.prop.id
-        if rb.prop.movable && rb.prop.constrained
-            uci = rb.state.cache.unconstrained_index
-            q_rb = rb.state.coords.q[uci]
-            Aq_rb = rb.state.cache.funcs.Φq(q_rb)
-            rb_rank = rank(Aq_rb)
-            intrinsic_Aq = rb.state.cache.funcs.Φq(q_rb)
-            # @show rbid,lucompletepiv!(copy(intrinsic_Aq))
-            # col_index = GECP(intrinsic_Aq)
-            # @show rbid,col_index
-            # @show rank(intrinsic_Aq[:,col_index[1:6]])
-            if rb_rank < minimum(size(Aq_rb))
-                @warn "The $(rbid)th rigid body's Jacobian is singular: rank(A(q))=$(rb_rank)<$(minimum(size(Aq_rb)))"
-            end
+        uci = rb.state.cache.unconstrained_index
+        q_rb = state.rigids[rbid].q
+        Aq_rb = rb.state.cache.funcs.Φq(q_rb)
+        rb_rank = rank(Aq_rb)
+        if rb_rank < minimum(size(Aq_rb))
+            @warn "The $(rbid)th rigid body's Jacobian is singular: rank(A(q))=$(rb_rank)<$(minimum(size(Aq_rb)))"
         end
     end
 end

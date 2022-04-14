@@ -45,7 +45,7 @@ function find_full_constrained_index(lncs,q)
     col_index[size(Aq,1)+1:end]
 end
 
-function ∂Aᵀλ∂q̌(tg,λ)
+function ∂Aᵀλ∂q̌(tg::TensegrityStructure,λ)
     (;nfree) = tg.connectivity.indexed
     ret = zeros(eltype(λ),nfree,nfree)
     (;rigidbodies,nconstraints) = tg

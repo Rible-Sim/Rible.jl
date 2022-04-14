@@ -661,7 +661,8 @@ function make_Φ(lncs::LNC2P1V,Φi,deforms)
         rj = @view q[3:4]
         u = rj-ri
         v = @view q[5:6]
-        all = [√2/4/d[1]*(u⋅u - d[1]^2), √2/4/d[2]*(v⋅v - d[2]^2), sqrt(1/(2d[1]+d[2]))*(u⋅v - d[3]^2)]
+        all = [(u⋅u - d[1]^2)/2, (v⋅v - d[2]^2)/2, √2/2*(u⋅v - d[3]^2)]
+        # all = [√2/4/d[1]*(u⋅u - d[1]^2), √2/4/d[2]*(v⋅v - d[2]^2), sqrt(1/(2d[1]+d[2]))*(u⋅v - d[3]^2)]
         all[Φi]
     end
     make_inner_Φ(_inner_Φ,deforms)
@@ -735,7 +736,7 @@ end
 function make_Φq(lncs::LNCMP,uci,Φi)
     ncoords = get_ncoords(lncs)
     @inline @inbounds function inner_Φq(q)
-        ret = Matrix(one(eltypeq)*I,ncoords,ncoords)
+        ret = Matrix(one(eltype(q))*I,ncoords,ncoords)
         @view ret[Φi,uci]
     end
 end
@@ -768,25 +769,25 @@ function make_Φq(lncs::LNC1P2V,uci,Φi)
 end
 
 function make_Φq(lncs::LNC2P1V,uci,Φi)
-    d = get_deform(lncs)
-    a = sqrt(1/(2d[2]^2+d[1]^2))
-    weights = zeros(Rational{Int64},3,6)
-    weights[1,1:4] .= 1//4
-    weights[2,3:4] .= 1//2
-    weights[3,1:6] .= 1//6
-    wsum = sqrt.(inv.(sum(weights[:,uci],dims=2)))
+    # d = get_deform(lncs)
+    # a = sqrt(1/(2d[2]^2+d[1]^2))
+    # weights = zeros(Rational{Int64},3,6)
+    # weights[1,1:4] .= 1//4
+    # weights[2,3:4] .= 1//2
+    # weights[3,1:6] .= 1//6
+    # wsum = sqrt.(inv.(sum(weights[:,uci],dims=2)))
     @inline @inbounds function inner_Φq(q)
         ri = @view q[1:2]
         rj = @view q[3:4]
         u = rj-ri
         v = @view q[5:6]
         ret = zeros(eltype(q),3,6)
-        ret[1,1:2] = wsum[1]*(-√2/2*u/d[1])
-        ret[1,3:4] = wsum[1]*( √2/2*u/d[1])
-        ret[2,5:6] = wsum[2]*(      v/d[2])
-        ret[3,1:2] = wsum[3]*(-a*v)
-        ret[3,3:4] = wsum[3]*( a*v)
-        ret[3,5:6] = wsum[3]*( a*u)
+        ret[1,1:2] =-u
+        ret[1,3:4] = u
+        ret[2,5:6] = v
+        ret[3,1:2] =-√2/2*v
+        ret[3,3:4] = √2/2*v
+        ret[3,5:6] = √2/2*u
         @view ret[Φi,uci]
     end
 end
@@ -800,12 +801,12 @@ function make_Φq(lncs::LNC3P,uci,Φi)
         v = rk-ri
         ret = zeros(eltype(q),3,6)
         ret[1,1:2] = -2u
-        ret[1,3:4] = 2u
+        ret[1,3:4] =  2u
         ret[2,1:2] = -2v
-        ret[2,5:6] = 2v
-        ret[3,1:2] = -v-u
-        ret[3,3:4] = v
-        ret[3,5:6] = u
+        ret[2,5:6] =  2v
+        ret[3,1:2] =  -v-u
+        ret[3,3:4] =   v
+        ret[3,5:6] =   u
         @view ret[Φi,uci]
     end
 end

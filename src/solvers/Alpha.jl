@@ -13,11 +13,10 @@ function Alpha(ρ∞)
     Alpha(αm,αf,γ,β)
 end
 
-struct AlphaCache{solverT,MMT,AT,ΦT,T}
+struct AlphaCache{solverT,MMT,funcsT,T}
     solver::solverT
     mass_matrices::MMT
-    A::AT
-    Φ::ΦT
+    funcs::funcsT
     β′::T
     γ′::T
 end
@@ -32,10 +31,12 @@ function generate_cache(solver::Alpha,intor;dt,kargs...)
     # (;M) = mm
     A = make_A(bot)
     Φ = make_Φ(bot)
+    ∂Ǎᵀλ∂q̌ = (q,λ)->∂Aᵀλ∂q̌(bot.tg,λ)
+    funcs = @eponymtuple(A,Φ,∂Ǎᵀλ∂q̌)
     h = dt
     β′ = (1-αm)/((h^2)*β*(1-αf))
     γ′ = γ/(h*β)
-    AlphaCache(solver,mm,A,Φ,β′,γ′)
+    AlphaCache(solver,mm,funcs,β′,γ′)
 end
 
 function retrieve!(intor,cache::AlphaCache)
@@ -50,7 +51,8 @@ function solve!(intor::Integrator,cache::AlphaCache;
     (;traj) = bot
     # @unpack t,q,q̇,tprev,qprev,q̇prev = state
     (;F!,Jac_F!) = dynfuncs
-    (;solver,mass_matrices,A,Φ,β′,γ′) = cache
+    (;solver,mass_matrices,funcs,β′,γ′) = cache
+    (;A,Φ,∂Ǎᵀλ∂q̌) = funcs
     (;αm,αf,γ,β) = solver
     (;Ḿ,M̌,M̄,invM̌) = mass_matrices
     q̌0 = traj.q̌[begin]
@@ -76,7 +78,7 @@ function solve!(intor::Integrator,cache::AlphaCache;
     mr = norm(Ḿ,Inf)
     scaling = (β*dt^2)/mr
 
-    function make_Res_stepk(qᵏ,q̇ᵏ,q̈ᵏ,aᵏ,q̌ᵏ,λᵏ,qᵏ⁻¹,q̇ᵏ⁻¹,q̈ᵏ⁻¹,aᵏ⁻¹,F̌,Ḿ,Φ,A,F!,nq̌,nλ,tᵏ,dt)
+    function make_Res_stepk(qᵏ,q̇ᵏ,q̈ᵏ,aᵏ,q̌ᵏ,λᵏ,qᵏ⁻¹,q̇ᵏ⁻¹,q̈ᵏ⁻¹,aᵏ⁻¹,F̌,tᵏ)
         @inline @inbounds function inner_Res_stepk!(Res,x)
             h = dt
             q̌ᵏ .= x[   1:nq̌   ]
@@ -86,28 +88,27 @@ function solve!(intor::Integrator,cache::AlphaCache;
             q̈ᵏ .= 1/(1-αf).*((1-αm).*aᵏ .+ αm.*aᵏ⁻¹ .- αf.*q̈ᵏ⁻¹)
             F!(F̌,qᵏ,q̇ᵏ,tᵏ)
             Res[   1:nq̌   ] .= scaling.*Ḿ*q̈ᵏ .-
-                               scaling.*F̌ .-
+                               scaling.*F̌ .+
                                transpose(A(qᵏ))*λᵏ
             Res[nq̌+1:nq̌+nλ] .= Φ(qᵏ)
         end
     end
 
-    # function make_Jac_stepk(qᵏ⁻¹,qᵏ,q̌ᵏ,M,A,Aᵀ,Jac_F!,nq̌,nλ,tᵏ⁻¹,dt)
-    #     @inline @inbounds function inner_Jac_stepk!(Jac,x)
-    #         h = dt
-    #         q̌ᵏ .= x[1:nq̌]
-    #         Jac_F!(∂F∂q̌,∂F∂q̌̇,(qᵏ.+qᵏ⁻¹)./2,(qᵏ.-qᵏ⁻¹)./h,tᵏ⁻¹+h/2)
-    #         Jac[   1:nq̌ ,   1:nq̌ ] .=  M̌.-h^2/2 .*(1/2 .*∂F∂q̌.+1/h.*∂F∂q̌̇)
-    #         Jac[   1:nq̌ ,nq̌+1:end] .= -scaling.*Aᵀ
-    #         Jac[nq̌+1:end,   1:nq̌ ] .=  scaling.*A(qᵏ)
-    #         Jac[nq̌+1:end,nq̌+1:end] .=  0.0
-    #     end
-    # end
-    #
-    # @inline @inbounds function Momentum_k!(p̌ᵏ,p̌ᵏ⁻¹,qᵏ,qᵏ⁻¹,λᵏ,M,A,Aᵀ,h)
-    #     p̌ᵏ .= -p̌ᵏ⁻¹.+2/h.*Ḿ*(qᵏ.-qᵏ⁻¹) .+
-    #         1/h.*scaling.*(transpose(A(qᵏ))-Aᵀ)*λᵏ
-    # end
+    function make_Jac_stepk(qᵏ,q̇ᵏ,q̈ᵏ,aᵏ,q̌ᵏ,λᵏ,qᵏ⁻¹,q̇ᵏ⁻¹,q̈ᵏ⁻¹,aᵏ⁻¹,F̌,tᵏ)
+        @inline @inbounds function inner_Jac_stepk!(Jac,x)
+            h = dt
+            q̌ᵏ .= x[1:nq̌]
+            λᵏ .= x[nq̌+1:nq̌+nλ]
+            aᵏ .= 1/(h^2)/β.*(qᵏ.-qᵏ⁻¹.-h.*q̇ᵏ⁻¹.-(h^2)*(0.5-β).*aᵏ⁻¹)
+            q̇ᵏ .= q̇ᵏ⁻¹ .+ h.*((1-γ).*aᵏ⁻¹ .+ γ.*aᵏ)
+            q̈ᵏ .= 1/(1-αf).*((1-αm).*aᵏ .+ αm.*aᵏ⁻¹ .- αf.*q̈ᵏ⁻¹)
+            Jac_F!(∂F∂q̌,∂F∂q̌̇,qᵏ,q̇ᵏ,tᵏ)
+            Jac[   1:nq̌ ,   1:nq̌ ] .= scaling.*(β′.*M̌ .- ∂F∂q̌) .+ ∂Ǎᵀλ∂q̌(qᵏ,λᵏ)
+            Jac[   1:nq̌ ,nq̌+1:end] .= transpose(A(qᵏ))
+            Jac[nq̌+1:end,   1:nq̌ ] .= transpose(Jac[   1:nq̌ ,nq̌+1:end])
+            Jac[nq̌+1:end,nq̌+1:end] .= 0.0
+        end
+    end
 
     total_iterations = 0
     prog = Progress(totalstep; dt=1.0, enabled=progress)
@@ -135,20 +136,28 @@ function solve!(intor::Integrator,cache::AlphaCache;
         # q̌̇ᵏ .= q̌̇ᵏ⁻¹ .+ dt.*(1-γ).*q̌̈ᵏ⁻¹
         initial_x[   1:nq̌]    .= q̌ᵏ
         initial_x[nq̌+1:nq̌+nλ] .= 0.0
-        Res_stepk! = make_Res_stepk(qᵏ,q̇ᵏ,q̈ᵏ,aᵏ,q̌ᵏ,λᵏ,qᵏ⁻¹,q̇ᵏ⁻¹,q̈ᵏ⁻¹,aᵏ⁻¹,F̌,Ḿ,Φ,A,F!,nq̌,nλ,tᵏ,dt)
-        # if Jac_F! isa Nothing
+        Res_stepk! = make_Res_stepk(qᵏ,q̇ᵏ,q̈ᵏ,aᵏ,q̌ᵏ,λᵏ,qᵏ⁻¹,q̇ᵏ⁻¹,q̈ᵏ⁻¹,aᵏ⁻¹,F̌,tᵏ)
+        if Jac_F! isa Nothing
             dfk = OnceDifferentiable(Res_stepk!,initial_x,initial_Res)
-        # else
-            # Jac_stepk! = make_Jac_stepk(qᵏ⁻¹,qᵏ,q̌ᵏ,M̌,A,Aᵀ,Jac_F!,nq̌,nλ,tᵏ⁻¹,dt)
-            # dfk = OnceDifferentiable(Res_stepk!,Jac_stepk!,initial_x,initial_Res)
-        # end
+        else
+            Jac_stepk! = make_Jac_stepk(qᵏ,q̇ᵏ,q̈ᵏ,aᵏ,q̌ᵏ,λᵏ,qᵏ⁻¹,q̇ᵏ⁻¹,q̈ᵏ⁻¹,aᵏ⁻¹,F̌,tᵏ)
+            dfk = OnceDifferentiable(Res_stepk!,Jac_stepk!,initial_x,initial_Res)
+            # Jac_ref = zeros(nq̌+nλ,nq̌+nλ)
+            # FiniteDiff.finite_difference_jacobian!(Jac_ref,Res_stepk!,initial_x)
+            # Jac_my = zeros(nq̌+nλ,nq̌+nλ)
+            # Jac_stepk!(Jac_my,initial_x)
+            # diff_Jac = Jac_my .- Jac_ref
+            # diff_Jac[abs.(diff_Jac).<1e-5] .= 0.0
+            # display(diff_Jac)
+            # @show maximum(abs.(diff_Jac))
+        end
         Res_stepk_result = nlsolve(dfk, initial_x; ftol, iterations, method=:newton)
 
         if converged(Res_stepk_result) == false
             if exception
                 error("Not Converged! Step=$timestep")
             else
-                # intor.convergence = false
+                @warn "Not Converged! Step=$timestep"
                 break
             end
         end

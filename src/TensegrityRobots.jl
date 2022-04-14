@@ -39,6 +39,8 @@ include("inverse_statics.jl")
 
 include("forward_statics.jl")
 
+include("dynamic_relax.jl")
+
 include("control.jl")
 
 
