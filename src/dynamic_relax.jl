@@ -20,17 +20,28 @@ end
 function initialize_GDR(tg,F::Nothing)
     Q̃ = build_Q̃(tg)
     Γ = build_Γ(tg)
-    𝛚(x) = -Q̃*Γ(x)
+    # 𝛚(x) =
+    function 𝛚(x)
+        Q = Q̃*Γ(x)
+        clear_forces!(tg)
+        update_rigids!(tg,x)
+        update_cables_apply_forces!(tg)
+        # apply_gravity!(tg)
+        F = generate_forces!(tg)
+        @show abs.(F-Q) |> maximum
+        F
+    end
     𝐛 = make_Φ(tg)
     𝐉 = make_A(tg)
-    x0 = get_q(tg)
-    x0,𝛚,𝐛,𝐉
+    x0 = tg.state.system.q
+    x̌0 = tg.state.system.q̌
+    x0,x̌0,𝛚,𝐛,𝐉
 end
 
 function initialize_GDR(tg,F)
-    x0,𝛚_,𝐛,𝐉 = initialize_GDR(tg,nothing)
-    𝛚(x) = 𝛚_(x) - F
-    x0,𝛚,𝐛,𝐉
+    x0,x̌0,𝛚_,𝐛,𝐉 = initialize_GDR(tg,nothing)
+    𝛚(x) = - 𝛚_(x) - F
+    x0,x̌0,𝛚,𝐛,𝐉
 end
 
 function get_pseudo_inverse(J)
@@ -51,11 +62,8 @@ function project_gradient!(r,ω,proj)
 end
 
 function parallel_transport!(q,proj)
-    # @show norm(q)
     projected_q = proj*q
-    # @show projected_q
     q .= norm(q)./norm(projected_q).*projected_q
-    # @show norm(q)
 end
 
 function compute_θ(ϕ,r)
@@ -80,17 +88,15 @@ end
 
 function GDR!(bot,F=nothing;β=1e-3,maxiters=1e4,ϵ=1e-7,N=10,ξ=1e-7)
     (;tg,traj) = bot
-    (;sysfree) = tg.connectivity.indexed
-    x,𝛚,𝐛,𝐉 = initialize_GDR(tg,F)
-    x̌ = @view x[sysfree]
+    x,x̌,𝛚,𝐛,𝐉 = initialize_GDR(tg,F)
     # 𝛄 = make_viscous_damper()
     𝛄 = make_kinetic_damper()
     # 𝛄 = make_drift_damper()
     t = zero(β)
     r = one.(x̌)
     q = β.*r
-    rs = Vector{eltype(r)}()
-    bs = Vector{eltype(r)}()
+    rs = Vector{eltype(r)}([Inf])
+    bs = Vector{eltype(r)}([Inf])
     ss = Vector{Int}()
     for itr = 1:maxiters
         J = 𝐉(x)
@@ -117,6 +123,9 @@ function GDR!(bot,F=nothing;β=1e-3,maxiters=1e4,ϵ=1e-7,N=10,ξ=1e-7)
             break
         elseif itr == maxiters
             @warn "Max iternation reached for GDR"
+        elseif rs[end] > rs[end-1]
+            # @error("Diverging")
+            # break
         end
     end
     rs,bs,ss,bot

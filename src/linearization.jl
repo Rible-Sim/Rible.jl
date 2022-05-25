@@ -204,12 +204,13 @@ function build_Ǩ(tg,λ)
     T = get_numbertype(tg)
     Ǩ = zeros(T,nfree,nfree)
     build_∂Q̌∂q̌!(Ǩ,tg)
-    Ǩ .= ∂Aᵀλ∂q̌(tg,λ) .- Ǩ
+    Ǩ .= ∂Aᵀλ∂q̌(tg,λ) .-Ǩ
+    # Ǩ .= Ǩ
     Ǩ
 end
 
 function norm_wrt!(Z,M)
-    n = size(Z)[2]
+    n = size(Z,2)
     for i = 1:n
         z = @view Z[:,i]
         zmz = transpose(z)*M*z
@@ -221,30 +222,53 @@ end
 function undamped_eigen(tg)
     _,λ = check_static_equilibrium_output_multipliers(tg)
     q = get_q(tg)
+    q̌ = get_q̌(tg)
     M̌ = build_M̌(tg)
     Ǩ = build_Ǩ(tg,λ)
     Ǎ = make_A(tg)(q)
     Ň = nullspace(Ǎ)
     ℳ = transpose(Ň)*M̌*Ň
     𝒦 = transpose(Ň)*Ǩ*Ň
-    ω,ξ = eigen(𝒦,ℳ)
-    δq̌ = Ň*ξ
-    norm_wrt!(δq̌,M̌)
-    ω,δq̌
+    # @show ℳ, 𝒦
+    ω²,ξ = eigen(𝒦,ℳ)
+    # @show transpose(ξ)*ℳ*ξ
+    Ňξ = Ň*ξ
+    # @show transpose(Ňξ)*M̌*Ňξ
+    norm_wrt!(Ňξ,M̌)
+    δq̌ = [v for v in eachcol(Ňξ)]
+    ω²,δq̌
+    # nq = length(q̌)
+    # nλ = length(λ)
+    # nx = nq + nλ
+    # M̂ = zeros(eltype(q),nx,nx)
+    # K̂ = zeros(eltype(q),nx,nx)
+    # M̂[1:nq,1:nq] .= M̌
+    # K̂[1:nq,1:nq] .= Ǩ
+    # c = maximum(abs.(K̂[1:nq,1:nq]))
+    # K̂[1:nq,nq+1:nx] .= c.*transpose(Ǎ)
+    # K̂[nq+1:nx,1:nq] .= c.*Ǎ
+    #
+    # eigen(K̂,M̂)
 end
 
-function undamped_eigen!(bot::TensegrityRobot)
+function undamped_eigen!(bot::TensegrityRobot;scaling=0.01)
     (;tg,traj) = bot
     q̌ = get_q̌(tg)
-    ω,δq̌ = undamped_eigen(tg)
+    ω²,δq̌ = undamped_eigen(tg)
+    neg_indices = ω².<=0
+    if !isempty(neg_indices)
+        @warn "Negative ω² occurs. zeroing."
+        ω²[neg_indices] .= 0
+    end
+    ω = sqrt.(ω²)
     resize!(traj,1)
     nω = length(ω)
     for i = 1:nω
         push!(traj,deepcopy(traj[end]))
         traj.t[end] = ω[i]
-        δq̌i = @view δq̌[:,i]
-        ratio = 1#norm(δq̌i)/norm(q̌)
-        traj.q̌[end] .= q̌ .+ 0.1δq̌i/ratio
+        δq̌i = δq̌[i]
+        ratio = norm(δq̌i)/norm(q̌)
+        traj.q̌[end] .= q̌ .+ scaling.*δq̌i/ratio
     end
     bot
 end

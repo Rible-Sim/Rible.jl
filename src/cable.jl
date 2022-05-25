@@ -33,15 +33,20 @@ end
 
 function update!(cab::Cable,p1,p2,ṗ1,ṗ2)
 	(;k,c,state) = cab
-	state.direction .= p2 .- p1 # Δr
-	state.length = norm(state.direction)
-	state.force .= ṗ2 - ṗ1 # Δṙ
-	state.lengthdot = (transpose(state.direction)*state.force)/state.length
-	state.direction ./= state.length
-	Δl = state.length - state.restlen
-	f = k*Δl + c*state.lengthdot
+	# state.direction .= p2 .- p1 # Δr
+	# state.length = norm(state.direction)
+	# state.force .= ṗ2 - ṗ1 # Δṙ
+	# state.lengthdot = (transpose(state.direction)*state.force)/state.length
+	# state.direction ./= state.length
+	l = p2 - p1
+	l̇ = ṗ2 - ṗ1
+	state.length = norm(l)
+	state.direction = l/state.length
+	state.lengthdot = (transpose(state.direction)*l̇)
+	deformation = state.length - state.restlen
+	f = k*deformation + c*state.lengthdot
 	if cab.slack
-		if Δl < 0
+		if deformation < 0
 			state.tension = 0.0
 		elseif f < 0
 			state.tension = 0.0
@@ -55,8 +60,10 @@ function update!(cab::Cable,p1,p2,ṗ1,ṗ2)
 end
 
 function potential_energy(cab::Cable)
-	(;k,state) = cab
-	1/2*k*(state.length - state.restlen)^2
+	(;k,state,slack) = cab
+	Δ⁺ = state.length - state.restlen
+	Δ = ifelse(slack,max(0,Δ⁺),Δ⁺)
+	pe = 1/2*k*Δ^2
 end
 
 mutable struct LinearLaw{T}

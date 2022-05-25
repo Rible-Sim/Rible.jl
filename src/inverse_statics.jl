@@ -25,9 +25,7 @@ function build_T(tg)
     end
     T
 end
-# T = build_T(manipulator)
-# Array(T)
-# @code_warntype build_T(manipulator)
+
 
 function build_Ci(rb)
     Ci = reduce(hcat,[
@@ -98,9 +96,8 @@ function build_Q̃(tg)
         uci2 = rb2.state.cache.unconstrained_index
         m2sf1 = mem2sysfree[rb1.prop.id]
         m2sf2 = mem2sysfree[rb2.prop.id]
-        J̌ᵀ = @view Q̃[:,(j-1)*ndim+1:j*ndim]
-        J̌ᵀ[m2sf2,:] .+= transpose(C2)[uci2,:]
-        J̌ᵀ[m2sf1,:] .-= transpose(C1)[uci1,:]
+        Q̃[m2sf2,(j-1)*ndim+1:j*ndim] .-= transpose(C2)[uci2,:]
+        Q̃[m2sf1,(j-1)*ndim+1:j*ndim] .+= transpose(C1)[uci1,:]
     end
     Q̃
 end
@@ -131,11 +128,7 @@ function iksolve(prob;ftol=1e-14)
     λ_result = ik_result.zero[nu+1:nu+nλ]
     u_result,λ_result
 end
-# D = build_D(manipulator)
-# Array(D)
 
-# Q̃=build_T(manipulator)*build_C(manipulator)*build_D(manipulator)
-# Array(Q̃)
 
 
 function build_L̂(tg)
@@ -182,26 +175,11 @@ function build_W(tgstruct)
     W = transpose(Aq)*inv(Aq*transpose(Aq))*Aq
 end
 
-# function build_G(tginput;factor=1.0)
-#     tg = deepcopy(tginput)
-#     clear_forces!(tg)
-#     apply_gravity!(tg)
-#     G = assemble_forces(tg;factor=factor)
-#     @show G
-#     G
-# end
-
-function build_G(tg)
-    ret = zeros(get_numbertype(tg),tg.ncoords)
-    for (rbid,rb) in enumerate(tg.rigidbodies)
-        @unpack prop, state = rb
-        @unpack Cg = state.cache
-        Tiᵀ = transpose(build_Ti(tg,rbid))
-        Cgᵀ = transpose(Cg)
-        f = prop.mass*get_gravity(rb)
-        ret .+= Tiᵀ*Cgᵀ*f
-    end
-    ret
+function build_Ǧ(tginput;factor=1.0)
+    tg = deepcopy(tginput)
+    clear_forces!(tg)
+    apply_gravity!(tg;factor)
+    Ǧ = generate_forces!(tg)
 end
 
 # Not ready
@@ -456,17 +434,13 @@ function build_inverse_statics_for_density(tginput,tgref,Fˣ=nothing;gravity=fal
     L = build_L(tg)
     # Left hand side
     Q̃L = Q̃*L
-    if scale
-        c = maximum(abs.(Q̃L))
-    else
-        c = one(eltype(Q̃L))
-    end
+
     B = -Nᵀ*Q̃L
 
     # Right hand side
     F̃ = Nᵀ*F
 
-    tg,B,F̃,c
+    B,F̃
 end
 
 function build_inverse_statics_for_stiffness(tginput,tgref,Fˣ=nothing;gravity=false,scale=true)
@@ -478,17 +452,13 @@ function build_inverse_statics_for_stiffness(tginput,tgref,Fˣ=nothing;gravity=f
 
     # Left hand side
     Q̃L̄ = Q̃*L̂*Diagonal(ℓ-u)
-    if scale
-        c = maximum(abs.(Q̃L̄))
-    else
-        c = one(eltype(Q̃L̄))
-    end
+
     B = -Nᵀ*Q̃L̄
 
     # Right hand side
     F̃ = Nᵀ*F
 
-    tg,B,F̃,c
+    B,F̃
 end
 
 function build_inverse_statics_for_restlength(tginput,tgref,Fˣ=nothing;gravity=false,scale=true)
@@ -497,17 +467,12 @@ function build_inverse_statics_for_restlength(tginput,tgref,Fˣ=nothing;gravity=
     K̂ = build_K̂(tg)
     # Left hand side
     Q̃K̂ = Q̃*K̂
-    if scale
-        c = maximum(abs.(Q̃K̂))
-    else
-        c = one(eltype(Q̃K̂))
-    end
+
     B = Nᵀ*Q̃K̂
 
     # Right hand side
     F̃ = Nᵀ*(Q̃K̂*ℓ + F)
-
-    tg,B,F̃,c
+    B,F̃
 end
 
 function build_inverse_statics_for_actuation(botinput,botref::TensegrityRobot,
@@ -524,17 +489,13 @@ function build_inverse_statics_for_actuation(botinput,tgref::TensegrityStructure
     # Left hand side
     Q̃K̂ = Q̃*K̂
     Q̃K̂Y = Q̃K̂*Y
-    if scale
-        c = maximum(abs.(Q̃K̂Y))
-    else
-        c = one(eltype(Q̃K̂Y))
-    end
+
     B = Nᵀ*Q̃K̂Y
 
     # Right hand side
     F̃ = Nᵀ*(Q̃K̂*(ℓ-u0) + F)
 
-    tg,B,F̃,c
+    B,F̃
 end
 
 function get_solution_set(B,F̃)
@@ -555,7 +516,7 @@ function check_restlen(tg,u)
     if any((x)->x<0,u)
         @warn "Negative rest lengths"
     end
-    if any((x)->x<=0,ℓ-u)
+    if any((x)->x<0,ℓ-u)
         @warn "Nonpositive tension"
     end
 end
@@ -626,13 +587,11 @@ function check_static_equilibrium_output_multipliers(tg_input,q,F=nothing;gravit
     if gravity
         apply_gravity!(tg)
     end
-    generate_forces!(tg)
-    generalized_forces = get_force(tg)
+    generalized_forces = generate_forces!(tg)
     if !isnothing(F)
         generalized_forces .+= F[:]
     end
     A = make_A(tg)(q)
-    # N = nullspace(A)
     λ = inv(A*transpose(A))*A*(generalized_forces)
     constraint_forces = transpose(A)*λ
     static_equilibrium = constraint_forces ≈ generalized_forces
@@ -649,7 +608,7 @@ function inverse_for_restlength(botinput,botref::TensegrityRobot,Fˣ=nothing;gra
 end
 
 function inverse_for_restlength(tginput,tgref::TensegrityStructure,Fˣ=nothing;gravity=false,scale=true,recheck=true)
-    tg,B,F̃,c = build_inverse_statics_for_restlength(tginput,tgref,Fˣ;gravity,scale)
+    B,F̃ = build_inverse_statics_for_restlength(tginput,tgref,Fˣ;gravity,scale)
     nu = tg.ncables
     if check_inverse_sanity(B)
         y0 = B\F̃
@@ -705,23 +664,20 @@ end
 function inverse_for_actuation(botinput,botref,Fˣ=nothing;Y=build_Y(botinput),
                     gravity=false,scale=true,recheck=true)
     tgref = botref.tg
-    tg,B,F̃,c = build_inverse_statics_for_actuation(botinput,tgref,Fˣ;Y,gravity,scale)
+    B,F̃ = build_inverse_statics_for_actuation(botinput,tgref,Fˣ;Y,gravity,scale)
     if check_inverse_sanity(B)
         y0 = B\F̃
     else
         @info "Using Moore-Penrose pseudoinverse"
         y0 = pinv(B)*F̃
     end
-    nλ = get_nconstraint(tg)
     na = size(Y,2)
-    # λ = y0[1:nλ].*c
     a = y0[1:na]
-    u = check_actuation(botinput,Y,a)
     if recheck
         botcheck = deepcopy(botinput)
         q = get_q(tgref)
         actuate!(botcheck,a)
         _,λ = check_static_equilibrium_output_multipliers(botcheck.tg,q;gravity)
     end
-    λ,u,a
+    λ,a
 end

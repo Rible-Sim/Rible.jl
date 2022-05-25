@@ -24,6 +24,7 @@ using Cubature
 using GaussQuadrature
 using ProgressMeter, Printf
 using EponymTuples
+using DocStringExtensions
 rotation_matrix(θ) = @SMatrix [cos(θ) -sin(θ); sin(θ) cos(θ)]
 
 include("naturalcoordinates.jl")

@@ -56,7 +56,7 @@ function solve!(intor::Integrator,cache::Zhong06Cache;
             F!(F̌,(qᵏ.+qᵏ⁻¹)./2,(qᵏ.-qᵏ⁻¹)./h,tᵏ⁻¹+h/2)
             Res[   1:nq̌   ] .= Ḿ*(qᵏ.-qᵏ⁻¹) .-
                                h.*p̌ᵏ⁻¹ .-
-                               (h^2)/2 .*F̌ .-
+                               (h^2)/2 .*F̌ .+
                                scaling.*Aᵀ*λᵏ
             Res[nq̌+1:nq̌+nλ] .= scaling.*Φ(qᵏ)
         end
@@ -68,14 +68,15 @@ function solve!(intor::Integrator,cache::Zhong06Cache;
             q̌ᵏ .= x[1:nq̌]
             Jac_F!(∂F∂q̌,∂F∂q̌̇,(qᵏ.+qᵏ⁻¹)./2,(qᵏ.-qᵏ⁻¹)./h,tᵏ⁻¹+h/2)
             Jac[   1:nq̌ ,   1:nq̌ ] .=  M̌.-(h^2)/2 .*(1/2 .*∂F∂q̌.+1/h.*∂F∂q̌̇)
-            Jac[   1:nq̌ ,nq̌+1:end] .= -scaling.*Aᵀ
+            Jac[   1:nq̌ ,nq̌+1:end] .=  scaling.*Aᵀ
+            # Jac[nq̌+1:end,   1:nq̌ ] .=  scaling.*transpose(Aᵀ)
             Jac[nq̌+1:end,   1:nq̌ ] .=  scaling.*A(qᵏ)
             Jac[nq̌+1:end,nq̌+1:end] .=  0.0
         end
     end
 
     @inline @inbounds function Momentum_k!(p̌ᵏ,p̌ᵏ⁻¹,qᵏ,qᵏ⁻¹,λᵏ,M,A,Aᵀ,h)
-        p̌ᵏ .= -p̌ᵏ⁻¹.+2/h.*Ḿ*(qᵏ.-qᵏ⁻¹) .+
+        p̌ᵏ .= -p̌ᵏ⁻¹.+2/h.*Ḿ*(qᵏ.-qᵏ⁻¹) .-
             1/h.*scaling.*(transpose(A(qᵏ))-Aᵀ)*λᵏ
     end
 

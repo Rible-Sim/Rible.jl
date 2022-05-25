@@ -3,59 +3,37 @@ abstract type AbstractRigidBodyProperty{N,T} end
 abstract type AbstractRigidBodyState{N,T} end
 abstract type ExternalConstraints{T} end
 
+"""
+刚体属性类
+$(TYPEDEF)
+---
+$(TYPEDFIELDS)
+"""
 struct RigidBodyProperty{N,T,L} <: AbstractRigidBodyProperty{N,T}
+	"是否可动（大概的确已经没用了）"
     movable::Bool
+	"是否受约束"
     constrained::Bool
+	"编号。必须在系统中唯一。"
     id::Int
+	"类型。暂时没有。"
     type::Symbol
+	"质量"
     mass::T
+	"转动惯量"
     inertia::Union{T,SArray{Tuple{N,N},T,2,L}}
+	"质心（在固连系中的）坐标"
     r̄g::SArray{Tuple{N},T,1,N}
+	"连接点个数"
     nr̄ps::Int
+	"连接点（在固连系中的）坐标"
     r̄ps::Vector{SArray{Tuple{N},T,1,N}}
 end
 
-mutable struct RigidBodyState{N,T,L,M,cacheType} <: AbstractRigidBodyState{N,T}
-    ro::MArray{Tuple{N},T,1,N}
-    R::MArray{Tuple{N,N},T,2,L}
-    ṙo::MArray{Tuple{N},T,1,N}
-    ω::MArray{Tuple{M},T,1,M}
-    rg::MArray{Tuple{N},T,1,N}
-    ṙg::MArray{Tuple{N},T,1,N}
-    rps::Vector{MArray{Tuple{N},T,1,N}} # Anchor Points in global frame
-    ṙps::Vector{MArray{Tuple{N},T,1,N}} # Anchor Points in global frame
-    f::MArray{Tuple{N},T,1,N}
-    τ::MArray{Tuple{M},T,1,M}
-    fps::Vector{MArray{Tuple{N},T,1,N}}
-    τps::Vector{MArray{Tuple{M},T,1,M}}
-    cache::cacheType
-end
-
-struct RigidBody{N,T,L,M,cacheType} <: AbstractRigidBody{N,T}
-    prop::RigidBodyProperty{N,T,L}
-    state::RigidBodyState{N,T,L,M,cacheType}
-end
-
-struct ConstrainedFunctions{ΦT,ΦqT,∂Aᵀλ∂qT,∂Aq̇∂qT}
-    Φ::ΦT
-    Φq::ΦqT
-    ∂Aᵀλ∂q::∂Aᵀλ∂qT
-    ∂Aq̇∂q::∂Aq̇∂qT
-end
-
-struct NaturalCoordinatesCache{ArrayT,MT,fT}
-    constrained_index::Vector{Int}
-    unconstrained_index::Vector{Int}
-	Φi::Vector{Int}
-    nΦ::Int
-    funcs::fT
-    M::MT
-    Co::ArrayT
-    Cg::ArrayT
-    Cps::Vector{ArrayT}
-end
-
-# 2D and 3D
+"""
+刚体属性构造子
+$(TYPEDSIGNATURES)
+"""
 function RigidBodyProperty(id::Integer,movable::Bool,
                             mass::Real,inertia_input,
                             r̄g::AbstractVector,r̄ps;constrained=false)
@@ -70,8 +48,20 @@ function RigidBodyProperty(id::Integer,movable::Bool,
 							mtype(inertia_input),vtype(r̄g),nr̄ps,vtype.(r̄ps))
 end
 
+struct NaturalCoordinatesCache{ArrayT,MT,fT}
+    constrained_index::Vector{Int}
+    unconstrained_index::Vector{Int}
+	Φi::Vector{Int}
+    nΦ::Int
+    funcs::fT
+    M::MT
+    Co::ArrayT
+    Cg::ArrayT
+    Cps::Vector{ArrayT}
+end
+
 function NaturalCoordinatesCache(prop::RigidBodyProperty{N,T,iT},
-                                 lncs::NaturalCoordinates.LocalNaturalCoordinates,
+                                 lncs::NaturalCoordinates.LNC,
 								 ci=Vector{Int}(),
 								 Φi=get_all_Φi(lncs)) where {N,T,iT}
     (;mass,inertia,r̄g,nr̄ps,r̄ps) = prop
@@ -93,8 +83,50 @@ function NaturalCoordinatesCache(prop::RigidBodyProperty{N,T,iT},
     NaturalCoordinatesCache(ci,uci,Φi,nΦ,cf,M,Co,Cg,Cps)
 end
 
+"""
+刚体状态mutable类。所有坐标在同一个惯性系中表达。
+$(TYPEDEF)
+---
+$(TYPEDFIELDS)
+"""
+mutable struct RigidBodyState{N,T,L,M,cacheType} <: AbstractRigidBodyState{N,T}
+	"固连系原点"
+    ro::MArray{Tuple{N},T,1,N}
+	"固连系旋转矩阵"
+    R::MArray{Tuple{N,N},T,2,L}
+	"固连系原点平移速度"
+    ṙo::MArray{Tuple{N},T,1,N}
+	"固连系角速度"
+    ω::MArray{Tuple{M},T,1,M}
+	"质心坐标"
+    rg::MArray{Tuple{N},T,1,N}
+	"质心速度"
+    ṙg::MArray{Tuple{N},T,1,N}
+	"各连接点坐标"
+    rps::Vector{MArray{Tuple{N},T,1,N}} # Anchor Points in global frame
+	"各连接点速度"
+    ṙps::Vector{MArray{Tuple{N},T,1,N}} # Anchor Points in global frame
+	"合力"
+    f::MArray{Tuple{N},T,1,N}
+	"合力矩"
+    τ::MArray{Tuple{M},T,1,M}
+	"各连接点所受作用力"
+    fps::Vector{MArray{Tuple{N},T,1,N}}
+	"各连接点所受力矩"
+    τps::Vector{MArray{Tuple{M},T,1,M}}
+	"其他重要信息"
+    cache::cacheType
+end
+
+"""
+刚体状态构造子
+$(TYPEDSIGNATURES)
+---
+`ci`为约束坐标的索引。
+`Φi`为约束方程的索引。
+"""
 function RigidBodyState(prop::RigidBodyProperty{N,T},
-                        lncs::NaturalCoordinates.LocalNaturalCoordinates,
+                        lncs::NaturalCoordinates.LNC,
                         r_input,rotation_input,ṙ_input,ω_input,
                         ci=Vector{Int}(),
 						Φi=get_all_Φi(lncs)) where {N,T}
@@ -125,6 +157,19 @@ function RigidBodyState(prop::RigidBodyProperty{N,T},
 	cache = NaturalCoordinatesCache(prop,lncs,ci,Φi)
 
     RigidBodyState(ro,R,ṙo,ω,rg,ṙg,rps,ṙps,f,τ,fps,τps,cache)
+end
+
+"""
+通用刚体类
+$(TYPEDEF)
+---
+$(TYPEDFIELDS)
+"""
+struct RigidBody{N,T,L,M,cacheType} <: AbstractRigidBody{N,T}
+	"刚体属性"
+    prop::RigidBodyProperty{N,T,L}
+	"刚体状态"
+    state::RigidBodyState{N,T,L,M,cacheType}
 end
 
 # kinematic joint constraints
@@ -284,7 +329,7 @@ function make_A(cst::PinJoint,mem2sysfree,nq)
     end
 end
 
-function get_all_Φi(lncs::NaturalCoordinates.LocalNaturalCoordinates)
+function get_all_Φi(lncs::NaturalCoordinates.LNC)
 	nΦ = NaturalCoordinates.get_nconstraints(lncs)
 	collect(1:nΦ)
 end

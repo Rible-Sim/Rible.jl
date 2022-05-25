@@ -3,48 +3,87 @@ using LinearAlgebra
 using StaticArrays
 using Parameters
 using ForwardDiff
+using DocStringExtensions
 
-abstract type LocalNaturalCoordinates{T} end
-abstract type LocalNaturalCoordinates2D{T} <: LocalNaturalCoordinates{T} end
-abstract type LocalNaturalCoordinates3D{T} <: LocalNaturalCoordinates{T} end
-abstract type LocalNaturalCoordinates2D4C{T} <: LocalNaturalCoordinates2D{T} end
-abstract type LocalNaturalCoordinates2D6C{T} <: LocalNaturalCoordinates2D{T} end
-abstract type LocalNaturalCoordinates3D6C{T} <: LocalNaturalCoordinates3D{T} end
-abstract type LocalNaturalCoordinates3D12C{T} <: LocalNaturalCoordinates3D{T} end
+"""
+所有局部自然坐标抽象超类。
+"""
+abstract type LNC{T} end
+"""
+所有二维局部自然坐标抽象超类。
+"""
+abstract type LNC2D{T} <: LNC{T} end
+"""
+所有三维局部自然坐标抽象超类。
+"""
+abstract type LNC3D{T} <: LNC{T} end
+"""
+所有坐标数目为4的二维局部自然坐标抽象超类，用于刚性直杆。
+"""
+abstract type LNC2D4C{T} <: LNC2D{T} end
+"""
+所有坐标数目为6的二维局部自然坐标抽象超类，用于任意形状刚体。
+"""
+abstract type LNC2D6C{T} <: LNC2D{T} end
+"""
+所有坐标数目为6的三维局部自然坐标抽象超类，用于刚性直杆。
+"""
+abstract type LNC3D6C{T} <: LNC3D{T} end
+"""
+所有坐标数目为12的三维局部自然坐标抽象超类，用于任意形状刚体。
+"""
+abstract type LNC3D12C{T} <: LNC3D{T} end
 
-const LNC = LocalNaturalCoordinates
-const LNC2D = LocalNaturalCoordinates2D
-const LNC3D = LocalNaturalCoordinates3D
-const LNC2D4C = LocalNaturalCoordinates2D4C
-const LNC2D6C = LocalNaturalCoordinates2D6C
-const LNC3D6C = LocalNaturalCoordinates3D6C
-const LNC3D12C = LocalNaturalCoordinates3D12C
-
-struct LNCMP{M,L,T,N} <: LocalNaturalCoordinates{T}
+"""
+二维或三维局部自然坐标类，用于任意一列点。
+$(TYPEDSIGNATURES)
+"""
+struct LNCMP{M,L,T,N} <: LNC{T}
     r̄ps::SArray{Tuple{M,L},T,2,N}
 end
 
 make_I(T,N) = SMatrix{N,N}(one(T)*I)
 I2_Int = make_I(Int,2)
 I3_Int = make_I(Int,3)
+
+"""
+返回空间维数。
+$(TYPEDSIGNATURES)
+"""
 get_ndim(::LNC2D) = 2
 get_ndim(::LNC3D) = 3
 get_ndim(::LNCMP{M}) where M = M
+"""
+返回自然坐标所构成的坐标系的维数。
+$(TYPEDSIGNATURES)
+"""
 get_nlocaldim(::LNC2D4C) = 1
 get_nlocaldim(::LNC2D6C) = 2
 get_nlocaldim(::LNC3D6C) = 1
 get_nlocaldim(::LNC3D12C) = 3
 get_nlocaldim(::LNCMP{M,L}) where {M,L} = L
+"""
+返回坐标个数。
+$(TYPEDSIGNATURES)
+"""
 get_ncoords(::LNC2D4C) = 4
 get_ncoords(::LNC2D6C) = 6
 get_ncoords(::LNC3D6C) = 6
 get_ncoords(::LNC3D12C) = 12
 get_ncoords(::LNCMP{M,L}) where {M,L}  = L*M
+"""
+返回约束方程个数。
+$(TYPEDSIGNATURES)
+"""
 get_nconstraints(::LNC2D4C) = 1
 get_nconstraints(::LNC2D6C) = 3
 get_nconstraints(::LNC3D6C) = 1
 get_nconstraints(::LNC3D12C) = 6
 get_nconstraints(::LNCMP{M,L}) where {M,L}  = L*M
+"""
+返回自由度数。
+$(TYPEDSIGNATURES)
+"""
 get_ndof(lncs::LNC) =  get_ncoords(lncs) - get_nconstraints(lncs)
 
 @inline @inbounds function LinearAlgebra.cross(a::Number,b::AbstractVector)
@@ -378,8 +417,8 @@ end
 ## 3D Rigid body
 
 function NC1P3V(ri::AbstractVector{T},
-               ro=zeros(T,3),R=Matrix(one(T)*I,3,3)
-               ) where T
+                ro=zeros(T,3),R=Matrix(one(T)*I,3,3)
+                ) where T
     o = zero(T)
     i = one(T)
     ū = SVector(i,o,o)
@@ -397,12 +436,39 @@ function NC1P3V(ri::AbstractVector{T},
     lncs,q
 end
 
+function NC1P3V(ri::AbstractVector{T},u::AbstractVector{T},v::AbstractVector{T},w::AbstractVector{T},
+                ro=zeros(T,3),R=Matrix(one(T)*I,3,3)
+                ) where T
+    o = zero(T)
+    i = one(T)
+    invR = transpose(R) # because this is a rotation matrix
+    r̄i = invR*(ri-ro) #
+    ū = invR*u
+    v̄ = invR*v
+    w̄ = invR*w
+    X̄ = hcat(ū,v̄,w̄)
+    lncs = LNC1P3V(SVector{3}(r̄i),SVector{3}(ū),SVector{3}(v̄),
+                                        SVector{3}(w̄),SMatrix{3,3}(X̄),SMatrix{3,3}(inv(X̄)))
+    q = vcat(ri,u,v,w)
+    lncs,q
+end
+
 function NC1P3V(ri,ro,R,ṙo,ω)
     lncs,q = NC1P3V(ri,ro,R)
     ṙi = ṙo + ω×(ri-ro)
     u̇ = ω×q[4:6]
     v̇ = ω×q[7:9]
     ẇ = ω×q[10:12]
+    q̇ = vcat(ṙi,u̇,v̇,ẇ)
+    lncs,SVector{12}(q),SVector{12}(q̇)
+end
+
+function NC1P3V(ri,u,v,w,ro,R,ṙo,ω)
+    lncs,q = NC1P3V(ri,u,v,w,ro,R)
+    ṙi = ṙo + ω×(ri-ro)
+    u̇ = ω×u
+    v̇ = ω×v
+    ẇ = ω×w
     q̇ = vcat(ṙi,u̇,v̇,ẇ)
     lncs,SVector{12}(q),SVector{12}(q̇)
 end
@@ -469,8 +535,6 @@ function NC3P1V(ri::AbstractVector{T},rj::AbstractVector{T},
                        ) where T
     u = rj-ri
     v = rk-ri
-    # w_raw = cross(u,v)
-    # w = w_raw/norm(w_raw)
     w = u×v
     invR = transpose(R) # because this is a rotation matrix
     r̄i = invR*(ri-ro)
@@ -542,7 +606,7 @@ end
 
 ## Deformations: 2D rigid body
 @inline @inbounds function get_deform(ū,v̄)
-    sqrt(ū⋅ū),sqrt(v̄⋅v̄),sqrt(ū⋅v̄)
+    sqrt(ū⋅ū),sqrt(v̄⋅v̄),ū⋅v̄
 end
 
 @inline @inbounds function get_deform(lncs::LNC1P2V)
@@ -568,10 +632,10 @@ end
     u_sqrt = sqrt(ū⋅ū)
     v_sqrt = sqrt(v̄⋅v̄)
     w_sqrt = sqrt(w̄⋅w̄)
-    uv_sqrt = sqrt(ū⋅v̄)
-    uw_sqrt = sqrt(ū⋅w̄)
-    vw_sqrt = sqrt(v̄⋅w̄)
-    u_sqrt,v_sqrt,w_sqrt,uv_sqrt,uw_sqrt,vw_sqrt
+    vw = v̄⋅w̄
+    uw = ū⋅w̄
+    uv = ū⋅v̄
+    u_sqrt,v_sqrt,w_sqrt,vw,uw,uv
 end
 
 @inline @inbounds function get_deform(lncs::LNC1P3V)
@@ -649,7 +713,7 @@ function make_Φ(lncs::LNC1P2V,Φi,deforms)
     @inline @inbounds function _inner_Φ(q,d)
         u = @view q[3:4]
         v = @view q[5:6]
-        all = [(u⋅u - d[1]^2)/2, (v⋅v - d[2]^2)/2, √2/2*(u⋅v - d[3]^2)]
+        all = [(u⋅u - d[1]^2)/2, (v⋅v - d[2]^2)/2, √2/2*(u⋅v - d[3])]
         all[Φi]
     end
     make_inner_Φ(_inner_Φ,deforms)
@@ -661,7 +725,7 @@ function make_Φ(lncs::LNC2P1V,Φi,deforms)
         rj = @view q[3:4]
         u = rj-ri
         v = @view q[5:6]
-        all = [(u⋅u - d[1]^2)/2, (v⋅v - d[2]^2)/2, √2/2*(u⋅v - d[3]^2)]
+        all = [(u⋅u - d[1]^2)/2, (v⋅v - d[2]^2)/2, √2/2*(u⋅v - d[3])]
         # all = [√2/4/d[1]*(u⋅u - d[1]^2), √2/4/d[2]*(v⋅v - d[2]^2), sqrt(1/(2d[1]+d[2]))*(u⋅v - d[3]^2)]
         all[Φi]
     end
@@ -675,7 +739,7 @@ function make_Φ(lncs::LNC3P,Φi,deforms)
         rk = @view q[5:6]
         u = rj-ri
         v = rk-ri
-        all = [(u⋅u - d[1]^2), (v⋅v - d[2]^2), (u⋅v - d[3]^2)]
+        all = [(u⋅u - d[1]^2), (v⋅v - d[2]^2), (u⋅v - d[3])]
         all[Φi]
     end
     make_inner_Φ(_inner_Φ,deforms)
@@ -687,36 +751,40 @@ function make_Φ(lncs::LNC1P3V,Φi,deforms)
         u = @view q[4:6]
         v = @view q[7:9]
         w = @view q[10:12]
-        all = [u⋅u - d[1]^2, v⋅v - d[2]^2, w⋅w - d[3]^2, u⋅v - d[4]^2, u⋅w - d[5]^2, v⋅w - d[6]^2]
-        all[Φi]
+        all = [u⋅u - d[1]^2, v⋅v - d[2]^2, w⋅w - d[3]^2, v⋅w - d[4], u⋅w - d[5], u⋅v - d[6]]
+        @view all[Φi]
     end
     make_inner_Φ(_inner_Φ,deforms)
 end
 
-function make_Φ(lncs::LNC2P2V,deforms)
+function make_Φ(lncs::LNC2P2V,Φi,deforms)
     @inline @inbounds function _inner_Φ(q,d)
         ri = @view q[1:3]
         rj = @view q[4:6]
         u = rj-ri
         v = @view q[7:9]
-        [u⋅u - d[1]^2, v⋅v - d[2]^2, w⋅w - d[3]^2, u⋅v - d[4]^2, u⋅w - d[5]^2, v⋅w - d[6]^2]
+        w = @view q[10:12]
+        all = [u⋅u - d[1]^2, v⋅v - d[2]^2, w⋅w - d[3]^2, v⋅w - d[4], u⋅w - d[5], u⋅v - d[6]]
+        @view all[Φi]
     end
     make_inner_Φ(_inner_Φ,deforms)
 end
 
-function make_Φ(lncs::LNC3P1V,deforms)
+function make_Φ(lncs::LNC3P1V,Φi,deforms)
     @inline @inbounds function _inner_Φ(q,d)
         ri = @view q[1:3]
         rj = @view q[4:6]
         rk = @view q[7:9]
         u = rj-ri
         v = rk-ri
-        [u⋅u - d[1]^2, v⋅v - d[2]^2, w⋅w - d[3]^2, u⋅v - d[4]^2, u⋅w - d[5]^2, v⋅w - d[6]^2]
+        w = @view q[10:12]
+        all = [u⋅u - d[1]^2, v⋅v - d[2]^2, w⋅w - d[3]^2, v⋅w - d[4], u⋅w - d[5], u⋅v - d[6]]
+        @view all[Φi]
     end
     make_inner_Φ(_inner_Φ,deforms)
 end
 
-function make_Φ(lncs::LNC4P,deforms)
+function make_Φ(lncs::LNC4P,Φi,deforms)
     @inline @inbounds function _inner_Φ(q,d)
         ri = @view q[1:3]
         rj = @view q[4:6]
@@ -725,7 +793,8 @@ function make_Φ(lncs::LNC4P,deforms)
         u = rj-ri
         v = rk-ri
         w = rl-ri
-        [u⋅u - d[1]^2, v⋅v - d[2]^2, w⋅w - d[3]^2, u⋅v - d[4]^2, u⋅w - d[5]^2, v⋅w - d[6]^2]
+        all = [u⋅u - d[1]^2, v⋅v - d[2]^2, w⋅w - d[3]^2, v⋅w - d[4], u⋅w - d[5], u⋅v - d[6]]
+        @view all[Φi]
     end
     make_inner_Φ(_inner_Φ,deforms)
 end
@@ -819,24 +888,24 @@ function make_Φq(lncs::LNC1P3V,uci,Φi)
         v  = @view q[7:9]
         w  = @view q[10:12]
         ret = zeros(eltype(q), 6, 12)
-        ret[1,4:6]   = u
-        ret[2,7:9]   = v
-        ret[3,10:12] = w
+        ret[1,4:6]   = 2u
+        ret[2,7:9]   = 2v
+        ret[3,10:12] = 2w
 
-        ret[4,7:9]   = √2/2*w
-        ret[4,10:12] = √2/2*v
+        ret[4,7:9]   = w
+        ret[4,10:12] = v
 
-        ret[5,4:6] =  √2/2*w
-        ret[5,10:12] = √2/2*u
+        ret[5,4:6] =  w
+        ret[5,10:12] = u
 
-        ret[6,4:6] =  √2/2*v
-        ret[6,7:9] =  √2/2*u
+        ret[6,4:6] =  v
+        ret[6,7:9] =  u
 
         @view ret[Φi,uci]
     end
 end
 
-function make_Φq(lncs::LNC2P2V)
+function make_Φq(lncs::LNC2P2V,uci,Φi)
     @inline @inbounds function inner_Φq(q)
         ri = @view q[1:3]
         rj = @view q[4:6]
@@ -850,27 +919,27 @@ function make_Φq(lncs::LNC2P2V)
         ret[2,7:9]   = 2v
         ret[3,10:12] = 2w
 
-        ret[4,1:3] = -v
-        ret[4,4:6] =  v
-        ret[4,7:9] =  u
+        ret[4,7:9]   = w
+        ret[4,10:12] = v
 
         ret[5,1:3] = -w
         ret[5,4:6] =  w
         ret[5,10:12] = u
 
-        ret[6,7:9]   = w
-        ret[6,10:12] = v
+        ret[6,1:3] = -v
+        ret[6,4:6] =  v
+        ret[6,7:9] =  u
 
-        ret
+        @view ret[Φi,uci]
     end
 end
 
-function make_Φq(lncs::LNC3P1V)
+function make_Φq(lncs::LNC3P1V,uci,Φi)
     @inline @inbounds function inner_Φq(q)
         ri = @view q[1:3]
         rj = @view q[4:6]
         u  = rj-ri
-        rk  = @view q[7:9]
+        rk = @view q[7:9]
         v  = rk-ri
         w  = @view q[10:12]
         ret = zeros(eltype(q), 6, 12)
@@ -882,23 +951,23 @@ function make_Φq(lncs::LNC3P1V)
 
         ret[3,10:12] = 2w
 
-        ret[4,1:3] = -v-u
-        ret[4,4:6] =  v
-        ret[4,7:9] =  u
+        ret[4,1:3]   =-w
+        ret[4,7:9]   = w
+        ret[4,10:12] = v
 
         ret[5,1:3] = -w
         ret[5,4:6] =  w
         ret[5,10:12] = u
 
-        ret[6,1:3]   =-w
-        ret[6,7:9]   = w
-        ret[6,10:12] = v
+        ret[6,1:3] = -v-u
+        ret[6,4:6] =  v
+        ret[6,7:9] =  u
 
-        ret
+        @view ret[Φi,uci]
     end
 end
 
-function make_Φq(lncs::LNC4P)
+function make_Φq(lncs::LNC4P,uci,Φi)
     @inline @inbounds function inner_Φq(q)
         ri = @view q[1:3]
         rj = @view q[4:6]
@@ -917,19 +986,19 @@ function make_Φq(lncs::LNC4P)
         ret[3,1:3]   = -2w
         ret[3,10:12] =  2w
 
-        ret[4,1:3] = -v-u
-        ret[4,4:6] =  v
-        ret[4,7:9] =  u
+        ret[4,1:3]   =-w-v
+        ret[4,7:9]   = w
+        ret[4,10:12] = v
 
         ret[5,1:3] = -w-u
         ret[5,4:6] =  w
         ret[5,10:12] = u
 
-        ret[6,1:3]   =-w-v
-        ret[6,7:9]   = w
-        ret[6,10:12] = v
+        ret[6,1:3] = -v-u
+        ret[6,4:6] =  v
+        ret[6,7:9] =  u
 
-        ret
+        @view ret[Φi,uci]
     end
 end
 
@@ -1029,7 +1098,7 @@ end
 # Mass matrices
 Ī2J̄(::LNC2D2P,Ī)  = Ī
 Ī2J̄(::LNC3D2P,Ī)  = Ī
-Ī2J̄(::LNC2D6C,Ī)  =     tr(Ī)*I-Ī
+Ī2J̄(::LNC2D6C,Ī)  = Ī
 Ī2J̄(::LNC3D12C,Ī) = 1/2*tr(Ī)*I-Ī
 
 function Īg2az(lncs,m,Īg,r̄g)
@@ -1080,7 +1149,7 @@ function find_R(lncs::LNC,q::AbstractVector)
     X = make_X(lncs,q)
     (;invX̄) = lncs
     ndim = get_ndim(lncs)
-    R = SVector{ndim,ndim}(X*invX̄)
+    R = SMatrix{ndim,ndim}(X*invX̄)
 end
 
 find_ω(q::AbstractVector,q̇::AbstractVector,lncs::LNC3D) = find_ω(lncs,q,q̇)
@@ -1089,7 +1158,14 @@ function find_ω(lncs::LNC,q::AbstractVector,q̇::AbstractVector)
     Ẋ = make_X(lncs,q̇)
     X = make_X(lncs,q)
     ndim = get_ndim(lncs)
-    ω = SMatrix{ndim,ndim}(Ẋ*inv(X))
+    # @show Ẋ,X
+    if ndim == 2
+        u = X[:,1]
+        u̇ = Ẋ[:,1]
+        ω = SVector{1}([-u[2],u[1]]\u̇)
+    else
+        ω = SVector{ndim}(Ẋ*inv(X))
+    end
 end
 
 end

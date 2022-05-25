@@ -74,8 +74,14 @@ function index_inconstraints(rbs)
 	ninconstraints,mem2sysincst
 end
 
-function index(rbs,sharing=Matrix{Float64}(undef,0,0))
+function index(rbs,sharing_input=Matrix{Float64}(undef,0,0))
     ids,nmem = check_rbid_sanity(rbs)
+	if size(sharing_input,2) > nmem
+		@warn "Cropping the sharing matrix."
+		sharing = sharing_input[:,1:nmem]
+	else
+		sharing = sharing_input[:,:]
+	end
     sysfull = Vector{Int}()
     syspres = Vector{Int}()
     sysfree = Vector{Int}()
@@ -112,7 +118,7 @@ function index(rbs,sharing=Matrix{Float64}(undef,0,0))
                 push!(shared_indices,myindex)
             end
         end
-        deleteat!(unshareds,shared_indices)
+		deleteat!(unshareds,shared_indices)
         nusi = length(unshareds)
         mem2sysfull[rbid][unshareds] = collect(length(sysfull)+1:length(sysfull)+nusi)
         append!(sysfull,mem2sysfull[rbid][unshareds])
@@ -170,13 +176,22 @@ function sort_rigidbodies(rbs::TypeSortedCollection)
     sort!(reduce(vcat,rbs.data))
 end
 
-function connect(rbs,cm)
+function connect(rbs,cm_input)
     _,nb = check_rbid_sanity(rbs)
+	if size(cm_input,2) > nb
+		@warn "Cropping the connecting matrix."
+		cm = cm_input[:,1:nb]
+	else
+		cm = cm_input[:,:]
+	end
     rbs_sorted = sort_rigidbodies(rbs)
     ret_raw = []
     is = 0
     for row in eachrow(cm)
         rbids = findall(!iszero,row)
+		if isempty(rbids)
+			continue
+		end
         @assert length(rbids) == 2
         @assert reduce(*,row[rbids]) < 0
         rbid1,rbid2 = ifelse(row[rbids[1]]>0,rbids,reverse(rbids))
@@ -441,11 +456,20 @@ function apply_gravity!(tg;factor=1)
     end
 end
 
-function update!(tg::TensegrityStructure)
+function update!(tg::TensegrityStructure;gravity=false)
     clear_forces!(tg)
     update_rigids!(tg)
     update_cables_apply_forces!(tg)
+	if gravity
+		apply_gravity!(tg)
+	end
 	generate_forces!(tg)
+end
+
+function update!(tg::TensegrityStructure,q,q̇=zero(q))
+    tg.state.system.q .= q
+    tg.state.system.q̇ .= q̇
+	update!(tg)
 end
 
 function build_M(tg::TensegrityStructure)
@@ -781,19 +805,19 @@ function force_densities_to_restlen(tg::TensegrityStructure,γs)
 end
 
 function build_Y(bot)
-	@unpack tg, hub = bot
-	@unpack actuators = hub
-    @unpack ncables,cables = tg
+	(;tg, hub) = bot
+	(;actuators) = hub
+    (;ncables,cables) = tg
     nact = length(actuators)
     ret = spzeros(Int,ncables,nact)
-    for (i,iact) in enumerate(actuators)
-		if typeof(iact)<:ManualActuator
-			is1 = iact.reg.id_cable
-	        ret[is1,i] = 1
-		elseif typeof(iact)<:ManualGangedActuators
-	        is1, is2 = iact.regs.id_cables
-	        ret[is1,i] = 1
-	        ret[is2,i] = -1
+    foreach(actuators) do act
+		(;id,coupler,reg) = act
+		if coupler isa Serial
+	        ret[act.reg.ids,id] .= 1
+		elseif coupler isa Ganged
+	        is1,is2 = act.reg.ids
+	        ret[is1,id] =  1
+	        ret[is2,id] = -1
 		else
 			error("Unknown actuator type")
 		end
@@ -825,6 +849,23 @@ function set_new_initial!(bot::TensegrityRobot,q,q̇=zero(q))
     reset!(bot)
 end
 
+function goto_step!(bot::TensegrityRobot,that_step)
+	(;tg, traj) = bot
+    tg.state.system.q .= traj.q[that_step]
+    tg.state.system.q̇ .= traj.q̇[that_step]
+	update!(tg)
+	bot
+end
+
+function analyse_slack(tg::TensegrityStructure,verbose=false)
+	(;cables) = tg
+	slackcases = [cable.id for cable in cables if cable.state.length <= cable.state.restlen]
+	if verbose && !isempty(slackcases)
+		@show slackcases
+	end
+	slackcases
+end
+
 function kinetic_energy(tg::TensegrityStructure)
 	M = build_M(tg)
 	(;q̇) = tg.state.system
@@ -839,13 +880,17 @@ function potential_energy_gravity(tg::TensegrityStructure)
 	V[]
 end
 
-function mechanical_energy(tg::TensegrityStructure)
+function mechanical_energy(tg::TensegrityStructure;gravity=false)
 	T = kinetic_energy(tg)
-	V = potential_energy_gravity(tg)
+	V = zero(T)
+	if gravity
+		V += potential_energy_gravity(tg)
+	end
 	if !isempty(tg.cables)
 		V += sum(potential_energy.(tg.cables))
 	end
-	T+V
+	E = T+V
+	@eponymtuple(T,V,E)
 end
 
 function mechanical_energy!(tg::TensegrityStructure)
@@ -853,15 +898,18 @@ function mechanical_energy!(tg::TensegrityStructure)
 	mechanical_energy(tg)
 end
 
-function mechanical_energy!(bot::TensegrityRobot)
+function mechanical_energy!(bot::TensegrityRobot;actuate=false,gravity=false)
 	(;tg,traj) = bot
-	[
+	StructArray([
 		begin
 			tg.state.system.q .= trajstate.q
 	        tg.state.system.q̇ .= trajstate.q̇
+			if actuate
+				actuate!(bot,[trajstate.t])
+			end
 	        update!(tg)
-			mechanical_energy(tg)
+			mechanical_energy(tg;gravity)
 		end
 		for trajstate in traj
-	]
+	])
 end
