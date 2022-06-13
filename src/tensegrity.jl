@@ -202,6 +202,10 @@ function connect(rbs,cm_input)
     ret = TypeSortedCollection(ret_raw)
 end
 
+"""
+刚体连接性类。
+$(TYPEDEF)
+"""
 struct Connectivity{numberType,indexType,connectType,jointType,cType}
     numbered::numberType
     indexed::indexType
@@ -210,6 +214,10 @@ struct Connectivity{numberType,indexType,connectType,jointType,cType}
     contacts::cType
 end
 
+"""
+连接性构造子。
+$(TYPEDSIGNATURES)
+"""
 function Connectivity(numbered,indexed,connected,jointed=unjoin())
 	Connectivity(numbered,indexed,connected,jointed,nothing)
 end
@@ -218,6 +226,10 @@ function get_nconstraints(rbs::TypeSortedCollection)
 	ninconstraints = mapreduce(get_ninconstraints,+,rbs,init=0)
 end
 
+"""
+刚体自然坐标状态类。
+$(TYPEDEF)
+"""
 mutable struct NaturalCoordinatesState{T,qT,qviewT}
 	t::T
 	q::qT
@@ -234,6 +246,10 @@ mutable struct NaturalCoordinatesState{T,qT,qviewT}
 	F̌::qviewT
 end
 
+"""
+自然坐标状态构造子。
+$(TYPEDSIGNATURES)
+"""
 function NaturalCoordinatesState(t,q,q̇,q̈,F,λ,freei,presi)
 	t = zero(eltype(q))
 	q̌ = @view q[freei]
@@ -246,11 +262,19 @@ function NaturalCoordinatesState(t,q,q̇,q̈,F,λ,freei,presi)
 	NaturalCoordinatesState(t,q,q̇,q̈,F,λ,q̌,q̌̇,q̌̈,q̃,q̃̇,q̃̈,F̌)
 end
 
+"""
+张拉整体状态类。
+$(TYPEDEF)
+"""
 struct TensegrityState{sysT<:NaturalCoordinatesState,msT}
 	system::sysT
 	rigids::msT
 end
 
+"""
+张拉整体状态构造子。
+$(TYPEDSIGNATURES)
+"""
 function TensegrityState(rbs,cnt::Connectivity)
 	(;indexed,jointed) = cnt
 	(;nfull,ninconstraints,sysfree,syspres) = indexed
@@ -294,6 +318,10 @@ function TensegrityState(rbs,cnt::Connectivity)
 	TensegrityState(system,rigids)
 end
 
+"""
+张拉整体结构类。
+$(TYPEDEF)
+"""
 struct TensegrityStructure{BodyType,StrType,TenType,CntType,StateType} <: AbstractTensegrityStructure
     ndim::Int
 	ndof::Int
@@ -309,6 +337,10 @@ struct TensegrityStructure{BodyType,StrType,TenType,CntType,StateType} <: Abstra
 	state::StateType
 end
 
+"""
+张拉整体结构构造子。
+$(TYPEDSIGNATURES)
+"""
 function TensegrityStructure(rbs,tensiles,cnt::Connectivity)
     ndim = get_ndim(rbs)
     nrigids = length(rbs)
@@ -335,25 +367,30 @@ function TensegrityStructure(rbs,tensiles,cnt::Connectivity)
     tg
 end
 
+"""
+张拉整体机器人类。
+$(TYPEDEF)
+"""
 struct TensegrityRobot{tgT,hubT,trajT}
     tg::tgT
     hub::hubT
     traj::trajT
 end
 
+"""
+清除刚体所受作用力和力矩。
+$(TYPEDSIGNATURES)
+"""
 function clear_forces!(tg::TensegrityStructure)
     tg.state.system.F .= 0
 	clear_forces!(tg.rigidbodies)
 end
-
 function clear_forces!(rigidbodies::AbstractVector)
     foreach(clear_forces!,rigidbodies)
 end
-
 function clear_forces!(rigidbodies::TypeSortedCollection)
     foreach(clear_forces!,rigidbodies)
 end
-
 function clear_forces!(rb::AbstractRigidBody)
 	(;state) = rb
 	state.f .= 0
@@ -366,6 +403,10 @@ function clear_forces!(rb::AbstractRigidBody)
 	end
 end
 
+"""
+更新绳索拉力
+$(TYPEDSIGNATURES)
+"""
 function update_cables_apply_forces!(tg)
     (;cables) = tg
     (;connected) = tg.connectivity
@@ -387,12 +428,15 @@ function update_cables_apply_forces!(tg)
     end
 end
 
+"""
+更新刚体状态。
+$(TYPEDSIGNATURES)
+"""
 function update_rigids!(tg,q,q̇=zero(q))
 	tg.state.system.q .= q
 	tg.state.system.q̇ .= q̇
 	update_rigids!(tg)
 end
-
 function update_rigids!(tg)
     (;rigidbodies,state) = tg
     foreach(rigidbodies) do rb
@@ -422,6 +466,10 @@ function update_orientations!(tg)
 	end
 end
 
+"""
+计算系统力的大小。
+$(TYPEDSIGNATURES)
+"""
 function generate_forces!(tg::TensegrityStructure)
 	(;rigidbodies,state) = tg
 	(;system,rigids) = tg.state
@@ -448,6 +496,10 @@ function get_force!(F,tg::TensegrityStructure)
 	F .= get_force(tg)
 end
 
+"""
+施加重力。
+$(TYPEDSIGNATURES)
+"""
 function apply_gravity!(tg;factor=1)
     (;rigidbodies) = tg
     gravity_acceleration = factor*get_gravity(tg)
@@ -491,6 +543,10 @@ function build_M̌(tg::TensegrityStructure)
 	M̌ = Symmetric(M[sysfree,sysfree])
 end
 
+"""
+返回系统质量矩阵。
+$(TYPEDSIGNATURES)
+"""
 function build_MassMatrices(bot::TensegrityRobot)
 	(;tg) = bot
 	(;nfree,npres,sysfree,syspres) = tg.connectivity.indexed
@@ -598,6 +654,10 @@ function get_λ(tg)
 	tg.state.system.λ
 end
 
+"""
+返回系统初始状态。
+$(TYPEDSIGNATURES)
+"""
 function get_initial(tg)
     q0,q̇0 = get_q(tg)
     λ0 = get_λ(tg)
@@ -626,6 +686,10 @@ function lucompletepiv!(A)
     return (rowpiv, colpiv)
 end
 
+"""
+检查雅可比矩阵奇异性
+$(TYPEDSIGNATURES)
+"""
 function check_jacobian_singularity(tg)
 	(;rigidbodies,state) = tg
     q = get_q(tg)
@@ -704,6 +768,10 @@ function get_d(tg)
     d
 end
 
+"""
+返回系统维度。
+$(TYPEDSIGNATURES)
+"""
 get_ndim(bot::TensegrityRobot) = get_ndim(bot.tg)
 get_ndim(tg::TensegrityStructure) = get_ndim(tg.rigidbodies)
 get_ndim(rbs::AbstractVector{<:AbstractRigidBody}) = get_ndim(eltype(rbs))
@@ -718,6 +786,10 @@ get_numbertype(rbs::TypeSortedCollection) = get_numbertype(eltype(rbs.data[1]))
 get_numbertype(rb::AbstractRigidBody) = get_numbertype(typeof(rb))
 get_numbertype(::Type{<:AbstractRigidBody{N,T}}) where {N,T} = T
 
+"""
+返回系统约束数量。
+$(TYPEDSIGNATURES)
+"""
 get_nconstraints(tg::TensegrityStructure) = tg.nconstraints
 
 get_ninconstraints(rb::AbstractRigidBody) = NaturalCoordinates.get_nconstraints(rb.state.cache.funcs.lncs)
@@ -725,6 +797,10 @@ get_nbodycoords(rb::AbstractRigidBody) = NaturalCoordinates.get_ncoords(rb.state
 get_ndof(rb::AbstractRigidBody) = NaturalCoordinates.get_nlocaldim(rb.state.cache.funcs.lncs)
 get_nlocaldim(rb::AbstractRigidBody) = NaturalCoordinates.get_nlocaldim(rb.state.cache.funcs.lncs)
 
+"""
+返回系统重力。
+$(TYPEDSIGNATURES)
+"""
 get_gravity(bot::TensegrityRobot) = get_gravity(bot.tg)
 get_gravity(tg::TensegrityStructure) = get_gravity(tg.rigidbodies)
 get_gravity(rbs::AbstractVector{<:AbstractRigidBody}) = get_gravity(eltype(rbs))
@@ -757,10 +833,18 @@ function get_cables_len!(tg::TensegrityStructure,q)
     get_cables_len(tg)
 end
 
+"""
+返回系统绳索刚度。
+$(TYPEDSIGNATURES)
+"""
 function get_cables_stiffness(tg::TensegrityStructure)
     [s.k for s in tg.cables]
 end
 
+"""
+返回系统绳索当前长度。
+$(TYPEDSIGNATURES)
+"""
 function get_cables_len(tg::TensegrityStructure)
     [s.state.length for s in tg.cables]
 end
@@ -769,22 +853,42 @@ function get_cables_len_dot(tg::TensegrityStructure)
     [s.state.lengthdot for s in tg.cables]
 end
 
+"""
+返回系统绳索变形量。
+$(TYPEDSIGNATURES)
+"""
 function get_cables_deform(tg::TensegrityStructure)
     [s.state.length - s.state.restlen for s in tg.cables]
 end
 
+"""
+返回系统绳索静止长度。
+$(TYPEDSIGNATURES)
+"""
 function get_cables_restlen(tg::TensegrityStructure)
     [s.state.restlen for s in tg.cables]
 end
 
+"""
+返回系统绳索拉力。
+$(TYPEDSIGNATURES)
+"""
 function get_cables_tension(tg::TensegrityStructure)
     [s.state.tension for s in tg.cables]
 end
 
+"""
+返回系统绳索力密度。
+$(TYPEDSIGNATURES)
+"""
 function get_cables_force_density(tg::TensegrityStructure)
     [s.state.tension/s.state.length for s in tg.cables]
 end
 
+"""
+返回系统绳索初始长度。
+$(TYPEDSIGNATURES)
+"""
 function get_original_restlen(botinput::TensegrityRobot)
     bot = deepcopy(botinput)
     T = get_numbertype(bot)
@@ -825,6 +929,10 @@ function build_Y(bot)
     ret
 end
 
+"""
+张拉整体机器人类构造子。
+$(TYPEDSIGNATURES)
+"""
 function TensegrityRobot(tg,hub)
 	update!(tg)
 	# check_jacobian_singularity(tg)
@@ -833,6 +941,10 @@ function TensegrityRobot(tg,hub)
     TensegrityRobot(tg,hub,traj)
 end
 
+"""
+重置系统状态。
+$(TYPEDSIGNATURES)
+"""
 function reset!(bot::TensegrityRobot)
     (;tg, traj) = bot
     (;q, q̇) = traj
@@ -842,6 +954,10 @@ function reset!(bot::TensegrityRobot)
     reset!(traj,1)
 end
 
+"""
+更改初始条件。
+$(TYPEDSIGNATURES)
+"""
 function set_new_initial!(bot::TensegrityRobot,q,q̇=zero(q))
     (;tg, traj) = bot
     traj.q[begin] .= q
@@ -849,6 +965,10 @@ function set_new_initial!(bot::TensegrityRobot,q,q̇=zero(q))
     reset!(bot)
 end
 
+"""
+更新系统到指定时间步状态。
+$(TYPEDSIGNATURES)
+"""
 function goto_step!(bot::TensegrityRobot,that_step)
 	(;tg, traj) = bot
     tg.state.system.q .= traj.q[that_step]
@@ -866,12 +986,20 @@ function analyse_slack(tg::TensegrityStructure,verbose=false)
 	slackcases
 end
 
+"""
+返回系统动能。
+$(TYPEDSIGNATURES)
+"""
 function kinetic_energy(tg::TensegrityStructure)
 	M = build_M(tg)
 	(;q̇) = tg.state.system
 	T = 1/2*transpose(q̇)*M*q̇
 end
 
+"""
+返回系统势能。
+$(TYPEDSIGNATURES)
+"""
 function potential_energy_gravity(tg::TensegrityStructure)
 	V = Ref(zero(get_numbertype(tg)))
 	foreach(tg.rigidbodies) do rb
@@ -880,6 +1008,10 @@ function potential_energy_gravity(tg::TensegrityStructure)
 	V[]
 end
 
+"""
+返回系统机械能。
+$(TYPEDSIGNATURES)
+"""
 function mechanical_energy(tg::TensegrityStructure;gravity=false)
 	T = kinetic_energy(tg)
 	V = zero(T)

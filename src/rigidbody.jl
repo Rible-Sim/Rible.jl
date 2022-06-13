@@ -180,17 +180,38 @@ function get_rbids(rbs)
 	ids,nb
 end
 
+"""
+刚体上任一点类
+$(TYPEDEF)
+---
+$(TYPEDFIELDS)
+"""
 struct ID{RBType,APType}
+	"指向点所在的刚体"
     rbsig::RBType
+	"点在刚体上的编号"
     pid::APType
 end
 
+"""
+点对点类。
+$(TYPEDEF)
+---
+$(TYPEDFIELDS)
+"""
 struct Point2Point{end1Type<:ID,end2Type<:ID}
+	"编号"
 	id::Int
+	"起始点"
 	end1::end1Type
+	"终止点"
 	end2::end2Type
 end
 
+"""
+空约束类。
+$(TYPEDEF)
+"""
 struct EmptyConstraint{T} <: ExternalConstraints{T}
 	nconstraints::Int64
     indices::Vector{Int64}
@@ -199,6 +220,10 @@ end
 
 get_numbertype(cst::ExternalConstraints{T}) where T = T
 
+"""
+空约束构造子。
+$(TYPEDEF)
+"""
 function EmptyConstraint(values=Vector{Float64}())
 	EmptyConstraint(0,Vector{Int64}(),values)
 end
@@ -213,12 +238,20 @@ function make_A(::EmptyConstraint)
 	inner_A(q) = Array{eltype(q)}(undef,0,length(q))
 end
 
+"""
+刚体坐标固定约束类，适用于单个坐标。
+$(TYPEDEF)
+"""
 struct FixedIndicesConstraint{T} <: ExternalConstraints{T}
 	nconstraints::Int64
     indices::Vector{Int64}
 	values::T
 end
 
+"""
+刚体坐标固定约束构造子。
+$(TYPEDSIGNATURES)
+"""
 function FixedIndicesConstraint(indices,values)
 	FixedIndicesConstraint(length(indices),indices,values)
 end
@@ -243,12 +276,20 @@ function make_A(cst::FixedIndicesConstraint)
 	end
 end
 
+"""
+刚体固定约束类。
+$(TYPEDEF)
+"""
 struct FixedBodyConstraint{T} <: ExternalConstraints{T}
 	nconstraints::Int64
     indices::Vector{Int64}
 	values::T
 end
 
+"""
+固定约束构造子。
+$(TYPEDSIGNATURES)
+"""
 function FixedBodyConstraint(rbs,body2q,rbid)
 	rb = rbs[rbid]
 	lncs = rb.state.cache.funcs.lncs
@@ -279,12 +320,20 @@ function make_A(cst::FixedBodyConstraint)
 	end
 end
 
+"""
+刚体铰接约束类。
+$(TYPEDEF)
+"""
 struct PinJoint{valueType,p2pType} <: ExternalConstraints{valueType}
 	nconstraints::Int
 	values::valueType
 	p2p::p2pType
 end
 
+"""
+铰接约束构造子。
+$(TYPEDSIGNATURES)
+"""
 function PinJoint(p2p)
 	rb1 = p2p.end1.rbsig
     nΦ = get_ndim(rb1)
@@ -329,6 +378,10 @@ function make_A(cst::PinJoint,mem2sysfree,nq)
     end
 end
 
+"""
+返回约束方程编号。
+$(TYPEDSIGNATURES)
+"""
 function get_all_Φi(lncs::NaturalCoordinates.LNC)
 	nΦ = NaturalCoordinates.get_nconstraints(lncs)
 	collect(1:nΦ)
@@ -336,18 +389,30 @@ end
 ##
 
 # operations on rigid body
+"""
+返回刚体平移动能。
+$(TYPEDSIGNATURES)
+"""
 function kinetic_energy_translation(rb::AbstractRigidBody)
     (;mass) = rb.prop
 	(;ṙg) = rb.state
     T = 1/2*transpose(ṙg)*mass*ṙg
 end
 
+"""
+返回刚体旋转动能。
+$(TYPEDSIGNATURES)
+"""
 function kinetic_energy_rotation(rb::AbstractRigidBody)
     (;inertia) = rb.prop
 	(;ω) = rb.state
 	T = 1/2*transpose(ω)*inertia*ω
 end
 
+"""
+返回刚体重力势能。
+$(TYPEDSIGNATURES)
+"""
 function potential_energy_gravity(rb::AbstractRigidBody)
 	(;mass) = rb.prop
     (;rg) = rb.state
