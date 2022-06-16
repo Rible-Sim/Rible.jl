@@ -40,7 +40,7 @@ function plot_tg!(tg::TR.TensegrityStructure)
     fig
 end
 
-function plot_traj!(bot::TR.TensegrityRobot;showlabels=true,textsize=10)
+function plot_traj!(bot::TR.TensegrityRobot;showlabels=true,textsize=10,actuate=false)
     (;tg,traj) = bot
     ndim = TR.get_ndim(tg)
     fig = Figure(resolution=(1280,720))
@@ -50,7 +50,11 @@ function plot_traj!(bot::TR.TensegrityRobot;showlabels=true,textsize=10)
         ax.aspect = DataAspect()
     else
         # ax = Axis3(fig[1,1],title=axtitle, aspect=:data)
-        ax = LScene(fig[1,1], scenekw = (clear=true,))
+        # ax = LScene(fig[1,1], show_axis=false, scenekw = (clear=true,))
+        ax = LScene(fig[1,1], ) #scenekw = (clear=true,)
+        # cam = Makie.camera(ax.scene)
+        # cam = cam3d!(ax.scene, projectiontype=Makie.Orthographic)
+        # update_cam!(ax.scene, cam)
     end
     grid1 = fig[2,1] = GridLayout()
     tg.state.system.q .= traj.q[begin]
@@ -63,10 +67,17 @@ function plot_traj!(bot::TR.TensegrityRobot;showlabels=true,textsize=10)
     on(ls_step.slider.value) do this_step
         tg.state.system.q .= traj.q[this_step]
         # tg.state.system.q̇ .= traj.q̇[this_step]
-        # TR.actuate!(bot,[traj.t[this_step]])
+        if actuate
+            TR.actuate!(bot,[traj.t[this_step]])
+        end
         TR.update!(tg)
         axtitle[] = string(traj.t[this_step])
         # @show TR.mechanical_energy(tg)
+        #
+        # camera = cameracontrols(ax.scene)
+        # lookat = camera.lookat[]
+        # eyepos = camera.eyeposition[]
+        # @show lookat, eyepos
         TR.analyse_slack(tg,true)
         tgob[] = tg
     end
@@ -83,6 +94,7 @@ function init_plot!(ax,tgob;isref=false,showlabels=true,textsize=10)
         rigidlabelcolor = :grey
     else
         cablecolor=:deepskyblue
+        # cablecolor=:red
         cablelabelcolor=:darkgreen
         rigidcolor=:black
         rigidlabelcolor=:darkblue
@@ -158,7 +170,7 @@ function init_plot!(ax,tgob;isref=false,showlabels=true,textsize=10)
             rbs = TR.get_rigidbodies($tgob)
             [rb.state.rg for rb in rbs]
         end
-        scatter!(ax,rg_by_rbs, color = rigidlabelcolor,markersize = 4)
+        scatter!(ax,rg_by_rbs, color = rigidlabelcolor, markersize = 4)
         # points on rigidbodies
         rps_by_rbs = [
             @lift begin

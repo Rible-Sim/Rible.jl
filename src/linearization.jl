@@ -182,16 +182,62 @@ function build_∂Q̌∂q̌!(∂Q̌∂q̌,tg)
         uci2 = rb2.state.cache.unconstrained_index
         mfree1 = mem2sysfree[rb1.prop.id]
         mfree2 = mem2sysfree[rb2.prop.id]
-        (;k,c,state) = cable
-        (;direction,force,tension,length,restlen) = state
-        D .= direction*transpose(direction)
-        density = tension/length
-        D .*= k-density
-        D .+= density.*Im
-        J̌ .= 0
-        J̌[:,mfree2] .+= C2[:,uci2]
-        J̌[:,mfree1] .-= C1[:,uci1]
-        ∂Q̌∂q̌ .-= transpose(J̌)*D*J̌
+        (;k,c,state,slack) = cable
+        (;direction,tension,length,lengthdot) = state
+        if slack && (tension==0)
+            ∂Q̌∂q̌ .-= 0
+        else
+            D .= direction*transpose(direction)
+            density = tension/length
+            β = c*lengthdot/length + density
+            D .*= k-β
+            D .+= β.*Im
+            J̌ .= 0
+            J̌[:,mfree2] .+= C2[:,uci2]
+            J̌[:,mfree1] .-= C1[:,uci1]
+            ∂Q̌∂q̌ .-= transpose(J̌)*D*J̌
+        end
+        # ∂Q̌∂q̌_full[mfree2,mfree2] .+= transpose(C2)*D*C2
+        # ∂Q̌∂q̌_full[mfree1,mfree2] .-= transpose(C1)*D*C2
+        # ∂Q̌∂q̌_full[mfree2,mfree1] .-= transpose(C2)*D*C1
+        # ∂Q̌∂q̌_full[mfree1,mfree1] .+= transpose(C1)*D*C1
+    end
+end
+
+function build_∂Q̌∂q̌̇!(∂Q̌∂q̌̇,tg)
+    (;cables,connectivity) = tg
+    (;connected,indexed) = connectivity
+    (;nfull,nfree,sysfree,mem2sysfree,mem2sysfull) = indexed
+    T = get_numbertype(tg)
+    ndim = get_ndim(tg)
+    # ∂Q̌∂q̌̇ = zeros(T,nfree,nfree)
+    D = @MMatrix zeros(T,ndim,ndim)
+    Im = Symmetric(SMatrix{ndim,ndim}(one(T)*I))
+    J̌ = zeros(T,ndim,nfree)
+    foreach(connected) do cc
+        cable = cables[cc.id]
+        (;end1,end2) = cc
+        rb1 = end1.rbsig
+        rb2 = end2.rbsig
+        C1 = rb1.state.cache.Cps[end1.pid]
+        C2 = rb2.state.cache.Cps[end2.pid]
+        uci1 = rb1.state.cache.unconstrained_index
+        uci2 = rb2.state.cache.unconstrained_index
+        mfree1 = mem2sysfree[rb1.prop.id]
+        mfree2 = mem2sysfree[rb2.prop.id]
+        (;k,c,state,slack) = cable
+        (;direction,tension) = state
+        if slack && (tension == 0)
+            ∂Q̌∂q̌̇ .-= 0
+        else
+            D .= direction*transpose(direction)
+            D .*= c
+            J̌ .= 0
+            J̌[:,mfree2] .+= C2[:,uci2]
+            J̌[:,mfree1] .-= C1[:,uci1]
+
+            ∂Q̌∂q̌̇ .-= transpose(J̌)*D*J̌
+        end
         # ∂Q̌∂q̌_full[mfree2,mfree2] .+= transpose(C2)*D*C2
         # ∂Q̌∂q̌_full[mfree1,mfree2] .-= transpose(C1)*D*C2
         # ∂Q̌∂q̌_full[mfree2,mfree1] .-= transpose(C2)*D*C1
@@ -219,8 +265,8 @@ function norm_wrt!(Z,M)
     Z
 end
 
-function undamped_eigen(tg)
-    _,λ = check_static_equilibrium_output_multipliers(tg)
+function undamped_eigen(tg;gravity=false)
+    _,λ = check_static_equilibrium_output_multipliers(tg;gravity)
     q = get_q(tg)
     q̌ = get_q̌(tg)
     M̌ = build_M̌(tg)
@@ -251,10 +297,10 @@ function undamped_eigen(tg)
     # eigen(K̂,M̂)
 end
 
-function undamped_eigen!(bot::TensegrityRobot;scaling=0.01)
+function undamped_eigen!(bot::TensegrityRobot;gravity=false,scaling=0.01)
     (;tg,traj) = bot
     q̌ = get_q̌(tg)
-    ω²,δq̌ = undamped_eigen(tg)
+    ω²,δq̌ = undamped_eigen(tg;gravity)
     neg_indices = ω².<=0
     if !isempty(neg_indices)
         @warn "Negative ω² occurs. zeroing."

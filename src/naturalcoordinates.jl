@@ -36,7 +36,7 @@ abstract type LNC3D12C{T} <: LNC3D{T} end
 
 """
 二维或三维局部自然坐标类，用于任意一列点。
-$(TYPEDSIGNATURES)
+$(TYPEDEF)
 """
 struct LNCMP{M,L,T,N} <: LNC{T}
     r̄ps::SArray{Tuple{M,L},T,2,N}

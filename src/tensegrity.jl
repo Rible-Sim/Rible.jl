@@ -849,10 +849,13 @@ function set_new_initial!(bot::TensegrityRobot,q,q̇=zero(q))
     reset!(bot)
 end
 
-function goto_step!(bot::TensegrityRobot,that_step)
+function goto_step!(bot::TensegrityRobot,that_step;actuate=false)
 	(;tg, traj) = bot
     tg.state.system.q .= traj.q[that_step]
     tg.state.system.q̇ .= traj.q̇[that_step]
+	if actuate
+		actuate!(bot,[traj.t[that_step]])
+	end
 	update!(tg)
 	bot
 end
