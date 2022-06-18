@@ -361,7 +361,9 @@ function RigidBodyState(prop,ri::AbstractVector{T},rj::AbstractVector{T},
     ṙo = zero(ro)
     u = rj-ri
     θ = atan(u[2],u[1])
-    R = MMatrix{2,2}(cos(θ), -sin(θ), sin(θ), cos(θ))
+    # @show θ
+    R = MMatrix{2,2}(cos(θ), sin(θ), -sin(θ), cos(θ))
+    # @show R
     ω = 0.0
     @unpack r̄g = prop
     rg = ro + R*r̄g

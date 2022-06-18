@@ -329,8 +329,7 @@ function solve!(intor::Integrator,cache::FBZhong06Cache;
             push!(tension_lists, tension_list)
         end
         push!(bot.traj.OtherData, tension_lists)
-        #apply_s̄!(bot,sᵏ)
-        #apply_s̄!(bot)
+
         #---------Step k finisher-----------
         if verbose
             @printf("Progress: %5.2f%%, step: %.0f, time: %.4f, iterations: %.0f \n", (

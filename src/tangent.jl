@@ -81,8 +81,7 @@ function build_Jac_Γ(tg::ClusterTensegrityStructure)
     J = [build_Ji(tg,i) for i = 1:nstrings]
     k = [s.k for s in tg.strings]
     c = [s.c for s in tg.strings]
-
-    Jc = Vector{SparseMatrixCSC}()
+    Jc = Vector{SparseMatrixCSC{Float64,Int64}}()
     kc = Vector{Float64}()
     cc = Vector{Float64}()
     for (cid,clusterstring) in enumerate(clusterstrings)
@@ -93,11 +92,10 @@ function build_Jac_Γ(tg::ClusterTensegrityStructure)
             push!(cc, seg.c)
         end
     end
-
     U = [transpose(Ji)*Ji for Ji in J]
     Uc = [transpose(Jci)*Jci for Jci in Jc]
 
-    function inner_Jac_Γ(q,q̇,s̄)
+    function _inner_Jac_Γ(q,q̇,s̄)
         reset_forces!(tg)
         distribute_q_to_rbs!(tg,q,q̇)
         distribute_s̄!(tg,s̄)
@@ -148,15 +146,21 @@ function build_Jac_Γ(tg::ClusterTensegrityStructure)
         end
         vcat(∂Γ∂qs,∂Γ∂qc), vcat(∂Γ∂q̇s,∂Γ∂q̇c)
     end
+    inner_Jac_Γ(q,q̇,s̄) = _inner_Jac_Γ(q,q̇,s̄)
+    function inner_Jac_Γ(q,q̇)
+        s̄ = get_s̄(tg)
+        _inner_Jac_Γ(q,q̇,s̄)
+    end
+    inner_Jac_Γ
 end
 
 function build_∂Γ∂s̄(tg::ClusterTensegrityStructure)
     @unpack nstrings, nslidings, nclusterstrings = tg
     @unpack clusterstrings,ncoords,ndim = tg
     nclustersegs = nclusterstrings + nslidings
-    Jc = Vector{SparseMatrixCSC}()
+    Jc = Vector{SparseMatrixCSC{Float64,Int64}}()
     kc = Vector{Float64}()
-    N_list = Vector{SparseMatrixCSC}()
+    N_list = Vector{SparseMatrixCSC{Float64,Int64}}()
     for (cid,clusterstring) in enumerate(clusterstrings)
         @unpack segs = clusterstring
         nsegs = length(segs)
@@ -216,11 +220,11 @@ function build_∂ζ∂q(tg)
     @unpack clusterstrings,ncoords,ndim = tg
     nclustersegs = nslidings+nclusterstrings
 
-    Jc = Vector{SparseMatrixCSC}()
+    Jc = Vector{SparseMatrixCSC{Float64,Int64}}()
     kc = Vector{Float64}()
     αc = Vector{Float64}()
-    b_list = Vector{SparseMatrixCSC}()
-    T_list = Vector{SparseMatrixCSC}()
+    b_list = Vector{SparseMatrixCSC{Float64,Int64}}()
+    T_list = Vector{SparseMatrixCSC{Float64,Int64}}()
     for (cid,clusterstring) in enumerate(clusterstrings)
         @unpack segs,sps = clusterstring
         nsegs = length(segs)
@@ -272,7 +276,7 @@ end
 
 function build_∂ζ∂s̄(tg)
     @unpack clusterstrings = tg
-    A_list = Vector{SparseMatrixCSC}()
+    A_list = Vector{SparseMatrixCSC{Float64,Int64}}()
     clusterA = get_clusterA(tg)
     for (cid,clusterstring) in enumerate(clusterstrings)
         nseg = length(clusterstring.segs)
