@@ -28,9 +28,9 @@ makedocs(
             "solvers.md"
         ],
         "setup.md",
-        "例子" => [
-            "tail.md"
-        ]
+        # "例子" => [
+        #     "tail.md"
+        # ]
     ]
 )
 

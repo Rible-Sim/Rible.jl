@@ -2,8 +2,13 @@
 #
 # using .PIDController
 # import .PIDController: reset!
-
+"""
+所有？？超类。
+"""
 abstract type AbstractCoupler end
+"""
+所有？？制动超类。
+"""
 abstract type AbstractActuator{CT} end
 struct Uncoupled <: AbstractCoupler end
 struct Ganged <: AbstractCoupler end

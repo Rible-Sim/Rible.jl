@@ -31,6 +31,10 @@ function build_tangent(tg)
     ∂Γ∂q,∂Γ∂q̇
 end
 
+"""
+返回∂Γ∂q,∂Γ∂q̇。
+$(TYPEDSIGNATURES)
+"""
 function build_Jac_Γ(tg)
     ns = tg.ncables
     @unpack ncoords,ndim = tg

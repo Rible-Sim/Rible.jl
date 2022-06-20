@@ -1,8 +1,16 @@
+"""
+交换列。
+$(TYPEDSIGNATURES)
+"""
 function swapcols!(X::AbstractMatrix, i::Integer, j::Integer)
     @inbounds for k = 1:size(X,1)
         X[k,i], X[k,j] = X[k,j], X[k,i]
     end
 end
+"""
+交换行。
+$(TYPEDSIGNATURES)
+"""
 function swaprows!(X::AbstractMatrix, i::Integer, j::Integer)
     @inbounds for k = 1:size(X,2)
         X[i,k], X[j,k] = X[j,k], X[i,k]
@@ -94,6 +102,10 @@ function test_fvector(tg,q0)
     FiniteDiff.finite_difference_jacobian(L,q0)
 end
 
+"""
+线性化。
+$(TYPEDSIGNATURES)
+"""
 function linearize(tginput,λ,u,q,q̇=zero(q))
     tg = deepcopy(tginput)
     set_restlen!(tg,u)
@@ -366,6 +378,10 @@ function undamped_modal_solve!(tg,q0,q̇0,λ0,tf,dt)
     q = z[1:length(q0),:]
 end
 
+"""
+返回零空间。
+$(TYPEDSIGNATURES)
+"""
 function find_nullspace(c)
     Nc,Nu = size(c)
     P = VectorOfArray([ begin
@@ -394,6 +410,10 @@ function find_nullspace(c)
     Array(P)
 end
 
+"""
+校核稳定性。
+$(TYPEDSIGNATURES)
+"""
 function check_stability(tg;verbose=false)
     λ = inverse_for_multipliers(tg,tg)
     check_stability(tg,λ;verbose)
