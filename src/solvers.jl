@@ -10,7 +10,8 @@ struct SimProblem{BotType,FuncsType}
         elseif dynfuncs_raw isa NamedTuple{(:F!,:Jac_F!)}
             dynfuncs = dynfuncs_raw
         else
-            error("dynfuncs not recognized.")
+            @warn "`dynfuncs` not recognized, but proceed anyway."
+            dynfuncs = dynfuncs_raw
         end
         new{typeof(bot),typeof(dynfuncs)}(bot,dynfuncs)
     end
@@ -43,11 +44,7 @@ struct Integrator{ProbType,StateType,CtrlType,T}
     totalstep::Int
 end
 
-function solve!(prob::SimProblem,solver,
-                control! = nothing;
-                tspan=(0.0,1.0),restart=true,dt,karg...)
-    (;bot,dynfuncs) = prob
-    (;tg,traj) = bot
+function prepare_traj!(traj;tspan,dt,restart=true)
     if restart
         resize!(traj,1)
     end
@@ -57,8 +54,18 @@ function solve!(prob::SimProblem,solver,
     for istep = 1:totalstep
         push!(traj,deepcopy(traj[end]))
         traj.t[end] = tstart + dt*istep
-        if !isa(control!, Nothing)
-            control!(traj[end],tg)
+    end
+end
+
+function solve!(prob::SimProblem,solver,
+                control! = nothing;
+                tspan,dt,restart=true,karg...)
+    (;bot,dynfuncs) = prob
+    (;tg,traj) = bot
+    prepare_traj!(traj;tspan,dt,restart)
+    if !isa(control!, Nothing)
+        for i in enumerate(traj)
+            control!(traj[i],tg)
         end
     end
     now = deepcopy(traj[end])
