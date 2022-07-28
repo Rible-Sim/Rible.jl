@@ -229,11 +229,19 @@ function build_G(tg)
 end
 
 # Not ready
+<<<<<<< Updated upstream
 function build_Ji(tgstruct,i)
     rbs = tgstruct.rigidbodies
     cnt = tgstruct.connectivity
     @unpack string2ap = cnt
     ap = string2ap[i]
+=======
+function build_Ji(tg::ClusterTensegrityStructure,i)
+    rbs = tg.rigidbodies
+    cnt = tg.connectivity
+    (;connected) = cnt.connectivity
+    ap = connected[1][i]
+>>>>>>> Stashed changes
     C1 = rbs[ap[1].rbid].state.cache.Cp[ap[1].apid]
     C2 = rbs[ap[2].rbid].state.cache.Cp[ap[2].apid]
     T1 = build_Ti(tgstruct,ap[1].rbid)
@@ -241,6 +249,7 @@ function build_Ji(tgstruct,i)
     Ji = C2*T2-C1*T1
 end
 
+<<<<<<< Updated upstream
 function build_Ji(tgstruct,nc,nss)
     rbs = tgstruct.rigidbodies
     cnt = tgstruct.connectivity
@@ -255,6 +264,17 @@ end
 
 function build_U(tgstruct)
     @unpack ncoords,nstrings,ndim,strings = tgstruct
+=======
+function build_Ji(tg, nc, nss)
+    rbs = tg.rigidbodies
+    cnt = tg.connectivity
+
+end
+
+
+function build_U(tg)
+    @unpack ncoords,ncables,ndim,cables = tg
+>>>>>>> Stashed changes
     function inner_U(s,u)
         ret = zeros(eltype(s),nstrings*ndim,ncoords)
         for i = 1:nstrings
@@ -521,10 +541,17 @@ end
 
 function check_static_equilibrium_output_multipliers(tg_input,q,F=nothing;gravity=false)
     tg = deepcopy(tg_input)
+<<<<<<< Updated upstream
     reset_forces!(tg)
     distribute_q_to_rbs!(tg,q)
     update_strings!(tg)
     check_restlen(tg,get_strings_restlen(tg))
+=======
+    clear_forces!(tg)
+    update_rigids!(tg)
+    update_cables!(tg)
+    # check_restlen(tg,get_cables_restlen(tg))
+>>>>>>> Stashed changes
     if gravity
         apply_gravity!(tg)
     end

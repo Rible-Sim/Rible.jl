@@ -23,10 +23,29 @@ SNNewmark() = SNNewmark(Newmark())
 
 struct SimProblem{BotType,FuncsType,ControlType,T}
     bot::BotType
+<<<<<<< Updated upstream
     dyfuncs::FuncsType
     control!::ControlType
     tspan::Tuple{T,T}
     restart::Bool
+=======
+    dynfuncs::FuncsType
+    function SimProblem(bot,make_dynfuncs)
+        dynfuncs_raw = make_dynfuncs(bot)
+        if dynfuncs_raw isa NamedTuple{(:F!,)}
+            dynfuncs = (F! = dynfuncs_raw.F!, Jac_F! = nothing)
+        elseif dynfuncs_raw isa NamedTuple{(:F!,:Jac_F!)}
+            dynfuncs = dynfuncs_raw
+        elseif dynfuncs_raw isa NamedTuple{(:F!, :apply_acu!)}
+            dynfuncs = (F! = dynfuncs_raw.F!, Jac_F! = nothing, apply_acu! = dynfuncs_raw.apply_acu!)
+        elseif dynfuncs_raw isa NamedTuple{(:F!, :Jac_F!, :apply_acu!)}
+            dynfuncs = dynfuncs_raw
+        else
+            error("dynfuncs not recognized.")
+        end
+        new{typeof(bot),typeof(dynfuncs)}(bot,dynfuncs)
+    end
+>>>>>>> Stashed changes
 end
 
 # mutable struct IntegratorState{T,qT}

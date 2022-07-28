@@ -1,3 +1,4 @@
+<<<<<<< Updated upstream
 struct TensionTangent{T}
     J::Vector{Array{T,2}}
     U::Vector{Array{T,2}}
@@ -11,6 +12,8 @@ struct TensionTangent{T}
     ∂l̂∂q::Vector{Array{T,2}}
 end
 
+=======
+>>>>>>> Stashed changes
 function build_tangent(tg)
     q, q̇ = get_q(tg)
     J = [build_Ji(tg,i) for i = 1:tg.nstrings]
@@ -43,8 +46,17 @@ function build_tangent(tg)
     ∂Γ∂q,∂Γ∂q̇
 end
 
+<<<<<<< Updated upstream
 function build_Jac_Γ(tg::TensegrityStructure)
     ns = tg.nstrings
+=======
+"""
+返回∂Γ∂q,∂Γ∂q̇。
+$(TYPEDSIGNATURES)
+"""
+function build_Jac_Γ(tg::TensegrityStructure)
+    ns = tg.ncables
+>>>>>>> Stashed changes
     @unpack ncoords,ndim = tg
     J = [build_Ji(tg,i) for i = 1:ns]
     U = [transpose(Ji)*Ji for Ji in J]
@@ -75,6 +87,7 @@ function build_Jac_Γ(tg::TensegrityStructure)
 end
 
 function build_Jac_Γ(tg::ClusterTensegrityStructure)
+<<<<<<< Updated upstream
     @unpack nstrings, nclusterstrings, nslidings = tg
     @unpack ncoords,ndim,clusterstrings = tg
     nclustersegs = nclusterstrings + nslidings
@@ -86,6 +99,21 @@ function build_Jac_Γ(tg::ClusterTensegrityStructure)
     cc = Vector{Float64}()
     for (cid,clusterstring) in enumerate(clusterstrings)
         @unpack segs = clusterstring
+=======
+    (;ntensiles, ncables, nclustercables, ndim, ndof) = tg
+    (;clustercables, cables) = tg
+    nclustersegs = length(reduce(vcat, [clustercables[i].segs for i in 1:length(clustercables)]))
+
+    J = [build_Ji(tg,i) for i = 1:ncables]
+    k = [s.k for s in cables]
+    c = [s.c for s in cables]
+    Jc = Vector{SparseMatrixCSC{Float64,Int64}}()
+    
+    kc = Vector{Float64}()
+    cc = Vector{Float64}()
+    for (cid,clustercable) in enumerate(clustercables)
+        (;segs) = clustercable
+>>>>>>> Stashed changes
         for (sid, seg) in enumerate(segs)
             push!(Jc, build_Ji(tg, cid, sid))
             push!(kc, seg.k)
@@ -93,6 +121,7 @@ function build_Jac_Γ(tg::ClusterTensegrityStructure)
         end
     end
     U = [transpose(Ji)*Ji for Ji in J]
+<<<<<<< Updated upstream
     Uc = [transpose(Jci)*Jci for Jci in Jc]
 
     function _inner_Jac_Γ(q,q̇,s̄)
@@ -286,6 +315,32 @@ function build_∂ζ∂s̄(tg)
     end
     return reduce(blockdiag,A_list)
 end
+=======
+    function inner_Jac_Γ(q,q̇)
+        reset_forces!(tg)
+        distribute_q_to_rbs!(tg,q,q̇)
+        update_cables_apply_forces!(tg)
+        f = [s.state.tension for s in tg.cables]
+        l = [s.state.length for s in tg.cables]
+        u = [s.state.restlen for s in tg.cables]
+        qᵀU = [transpose(q)*U[i] for i = 1:ns]
+        # l = [sqrt(qᵀU[i]*q) for i = 1:ns]
+        l̇ = [(qᵀU[i]*q̇)/l[i] for i = 1:ns]
+        l̂ = [J[i]*q/l[i] for i = 1:ns]
+        ∂Γ∂q = zeros(eltype(q),ndim*ns,ncoords)
+        ∂Γ∂q̇ = zeros(eltype(q),ndim*ns,ncoords)
+        for i in 1:ns
+            l̂qᵀUi = l̂[i]*qᵀU[i]
+            # ∂Γ∂q[(i-1)*ndim+1:i*ndim,:] .= l̂[i]*(k[i]./l[i].*qᵀU[i] .+ c[i]./l[i].*transpose(q̇).-c[i]*l̇[i]./l[i]^2 .*qᵀU[i])
+            # ∂Γ∂q[(i-1)*ndim+1:i*ndim,:] .+= f[i].*(J[i]./l[i].-l̂[i]*qᵀU[i]./l[i]^2)
+            ∂Γ∂q[(i-1)*ndim+1:i*ndim,:] .= (k[i]*u[i]-c[i]*l̇[i])/l[i]^2 .*l̂qᵀUi .+ c[i]/l[i].*(l̂[i]*transpose(q̇)*U[i]) .+ f[i]/l[i] .*J[i]
+            ∂Γ∂q̇[(i-1)*ndim+1:i*ndim,:] .= c[i]/l[i].*l̂qᵀUi
+        end
+        ∂Γ∂q,∂Γ∂q̇
+    end
+end
+
+>>>>>>> Stashed changes
 
 function make_testtangent(tgstruct)
     @unpack ncoords,nstrings = tgstruct

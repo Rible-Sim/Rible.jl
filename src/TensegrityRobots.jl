@@ -51,5 +51,6 @@ include("tangent.jl")
 include("miscellaneous.jl")
 include("solvers.jl")
 include("planning.jl")
+include("clustercables.jl")
 
 end
