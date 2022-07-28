@@ -2,248 +2,167 @@
 #
 # using .PIDController
 # import .PIDController: reset!
+"""
+所有？？超类。
+"""
+abstract type AbstractCoupler end
+"""
+所有？？制动超类。
+"""
+abstract type AbstractActuator{CT} end
+struct Uncoupled <: AbstractCoupler end
+struct Ganged <: AbstractCoupler end
+struct Serial <: AbstractCoupler end
 
-struct ControlTrajectory{tType,eType,uType}
-    ts::Vector{tType}
-    es::Vector{eType}
-    us::Vector{uType}
+struct ManualActuator{CT<:AbstractCoupler,RT} <: AbstractActuator{CT}
+    id::Int
+    coupler::CT
+    reg::RT
 end
 
-function reset!(traj::ControlTrajectory)
-    @unpack ts,es,us = traj
-    resize!(ts,0)
-    resize!(es,0)
-    resize!(us,0)
+function ManualActuator(actid,id::Int,value::Number)
+    ManualActuator(actid,Serial,(ids=[id],values=[value]))
 end
 
-abstract type AbstractController end
-abstract type Heater <: AbstractController end
-abstract type GroupedController <: AbstractController end
-abstract type GroupedActuator <: GroupedController end
-abstract type GroupedHeater <: GroupedController end
-
-struct ManualActuator{CT,TT} <:AbstractController
-    reg::CT
-    traj::TT
+function ManualActuator(actid,ids::AbstractVector,values::AbstractVector,coupler=Serial())
+    ManualActuator(actid,coupler,@eponymtuple(ids,values))
 end
 
-struct ManualGangedActuators{CT,TT} <:GroupedActuator
-    regs::CT
-    traj::TT
+function actuate!(tg,act::AbstractActuator{<:Uncoupled},μ::AbstractVector)
+    (;cables) = tg
+    (;reg) = act
+    (;ids, values) = reg
+    for (id, original_restlen) in zip(ids,values)
+        cable = select_by_id(cables,id)
+        cable.state.restlen = original_restlen + μ[id]
+    end
 end
 
-struct ManualSerialActuators{CT,TT} <:GroupedActuator
-    regs::CT
-    traj::TT
+function actuate!(tg,act::AbstractActuator{<:Serial},μ::Number)
+    (;cables) = tg
+    (;reg) = act
+    (;ids, values) = reg
+    for (id, original_restlen) in zip(ids,values)
+        cable = select_by_id(cables,id)
+        cable.state.restlen = original_restlen + μ
+    end
 end
 
-struct ManualHeater{CT,HT,TT} <:Heater
-    reg::CT
-    heating_law::HT
-    traj::TT
+function actuate!(tg,act::AbstractActuator{<:Ganged},μ::Number)
+    (;cables) = tg
+    (;reg) = act
+    (;ids, values) = reg
+    cable1 = select_by_id(cables,ids[1])
+    cable2 = select_by_id(cables,ids[2])
+    cable1.state.restlen = values[1] + μ
+    cable2.state.restlen = values[2] - μ
 end
 
-struct ManualSerialHeater{CT,HT,TT} <:GroupedHeater
-    regs::CT
-    heating_laws::HT
-    trajs::TT
+struct PrescribedActuator{MT,FT}
+    id::Int
+    manual::MT
+    pres::FT
 end
 
-abstract type ControlScheme end
-
-struct EmptyScheme <: ControlScheme end
-
-# function record!(traj::ControlTrajectory,pid::PID)
-#     @unpack ts,es,us = traj
-#     push!(ts,pid.lastTime)
-#     push!(es,pid.lastErr)
-#     push!(us,pid.lastOutput)
+function actuate!(tg,act::PrescribedActuator,t::Real)
+    actuate!(tg,act.manual,act.pres(t))
+end
+#
+# struct ManualHeater{CT,HT,TT} <:Heater
+#     reg::CT
+#     heating_law::HT
+#     traj::TT
 # end
-
-abstract type AbstractRegistor{T} end
-
-struct SimpleRegistor{T} <: AbstractRegistor{T}
-    id_string::Int
-    original_value::T
-end
-
-struct SimpleRegistors{T} <: AbstractRegistor{T}
-    id_strings::Vector{Int}
-    original_values::Vector{T}
-end
-
-function ManualActuator(reg::SimpleRegistor{T}) where {T}
-    ts = Vector{T}()
-    es = Vector{T}()
-    us = Vector{T}()
-    traj = ControlTrajectory(ts,es,us)
-    ManualActuator(reg,traj)
-end
-
-function ManualGangedActuators(regs::SimpleRegistors{T}) where {T}
-    ts = Vector{T}()
-    es = Vector{T}()
-    us = Vector{T}()
-    traj = ControlTrajectory(ts,es,us)
-    ManualGangedActuators(regs,traj)
-end
-
-function ManualSerialActuators(regs::SimpleRegistors{T}) where {T}
-    ts = Vector{Vector{T}}()
-    es = Vector{Vector{T}}()
-    us = Vector{Vector{T}}()
-    trajs = ControlTrajectory(ts,es,us)
-    ManualSerialActuators(regs,trajs)
-end
-
-function ManualHeater(reg::SimpleRegistor{T},heating_law) where {T}
-    ts = Vector{T}()
-    es = Vector{T}()
-    us = Vector{T}()
-    traj = ControlTrajectory(ts,es,us)
-    ManualHeater(reg,heating_law,traj)
-end
-
-function ManualSerialHeater(regs::SimpleRegistors{T},heating_laws) where {T}
-    ts = Vector{Vector{T}}()
-    es = Vector{Vector{T}}()
-    us = Vector{Vector{T}}()
-    trajs = ControlTrajectory(ts,es,us)
-    ManualSerialHeater(regs,heating_laws,trajs)
-end
+#
+# struct ManualSerialHeater{CT,HT,TT} <:GroupedHeater
+#     regs::CT
+#     heating_laws::HT
+#     trajs::TT
+# end
+#
+#
+# function ManualHeater(reg::SimpleRegistor{T},heating_law) where {T}
+#     ts = Vector{T}()
+#     es = Vector{T}()
+#     us = Vector{T}()
+#     traj = ControlTrajectory(ts,es,us)
+#     ManualHeater(reg,heating_law,traj)
+# end
+#
+# function ManualSerialHeater(regs::SimpleRegistors{T},heating_laws) where {T}
+#     ts = Vector{Vector{T}}()
+#     es = Vector{Vector{T}}()
+#     us = Vector{Vector{T}}()
+#     trajs = ControlTrajectory(ts,es,us)
+#     ManualSerialHeater(regs,heating_laws,trajs)
+# end
 
 select_by_id(xs,id) = xs[findfirst((x)->x.id==id, xs)]
 
-function reset!(ctrller::ManualActuator,tg)
-    @unpack reg, traj = ctrller
-    @unpack id_string, original_value = reg
-    @unpack strings = tg
-    s = select_by_id(strings,id_string)
-    s.state.restlen = original_value
-    reset!(traj)
-end
-
-function reset!(ctrller::GroupedActuator,tg)
-    @unpack regs, trajs = ctrller
-    @unpack id_strings, original_values = regs
-    @unpack strings = tg
-    for (id,original_value) in zip(id_strings,original_values)
-        s = select_by_id(strings,id)
-        s.state.restlen = original_value
-    end
-    reset!(traj)
-end
-
-function actuate!(tr::TensegrityRobot,us;inc=false)
-    @unpack tg, hub = tr
-    @unpack actuators = hub
-    for (actuator,u) in zip(actuators,us)
-        actuate!(actuator,tg,u;inc)
+function actuate!(bot::TensegrityRobot,μs)
+    (;tg, hub) = bot
+    (;actuators) = hub
+    foreach(actuators) do actuator
+        (;id) = actuator
+        actuate!(tg,actuator,μs[id])
     end
 end
-
-function heat!(tr::TensegrityRobot,us;inc=false)
-    @unpack tg, hub = tr
-    @unpack heaters = hub
-    for (heater,u) in zip(heaters,us)
-        heat!(heater,tg,u;inc)
-    end
-end
-
-
-
-function actuate!(ctrller::ManualActuator,tg,u;inc=false)
-    @unpack strings = tg
-    @unpack reg, traj = ctrller
-    @unpack id_string, original_value = reg
-    @unpack us = traj
-    s = select_by_id(strings,id_string)
-    if inc
-        s.state.restlen += u
-    else
-        s.state.restlen = original_value + u
-    end
-    # push!(us,u)
-end
-
-function actuate!(ctrller::ManualGangedActuators,tg,u;inc=false)
-    @unpack strings = tg
-    @unpack regs, traj = ctrller
-    @unpack id_strings, original_values = regs
-    @unpack us = traj
-    s1 = select_by_id(strings,id_strings[1])
-    s2 = select_by_id(strings,id_strings[2])
-    if inc
-        s1.state.restlen += u
-        s2.state.restlen -= u
-    else
-        s1.state.restlen = original_values[1] + u
-        s2.state.restlen = original_values[2] - u
-    end
-    # push!(us,u)
-end
-
-function actuate!(ctrller::ManualSerialActuators,tg,u;inc=false)
-    @unpack strings = tg
-    @unpack acts, trajs = ctrller
-    @unpack id_strings, original_values = acts
-    @unpack us = trajs
-    for (id, original_value) in zip(id_strings,original_values)
-        s = select_by_id(strings,id)
-        if inc
-            s.state.restlen += u
-        else
-            s.state.restlen = original_value + u
-        end
-    end
-    # push!(us,u)
-end
-
-function heat!(ctrller::ManualHeater,tg,u;inc=false,abs=true)
-    @unpack SMA_strings = tg.tensiles
-    @unpack id_string, original_value, heating_law = ctrller.act
-    s = select_by_id(SMA_strings,id_string)
-    if abs
-        s.state.temp = u
-    else
-        if inc
-            s.state.temp += u
-        else
-            s.state.temp = original_value + u
-        end
-    end
-    heat!(s,heating_law)
-end
-
-@inline function heat!(ctrller::ManualSerialHeater,tg::TensegrityStructure,u;inc=false)
-    heat!(ctrller,tg.tensiles.SMA_strings,u;inc)
-end
-
-function heat!(ctrller::ManualSerialHeater,
-                SMA_strings::AbstractVector{<:SMAString},u;inc=false,abs=true)
-    @unpack acts, heating_laws = ctrller
-    @unpack id_strings, original_values = acts
-    for (id, original_value, heating_law) in zip(id_strings,original_values,heating_laws)
-        s = select_by_id(SMA_strings,id)
-        if abs
-            s.state.temp = u
-        else
-            if inc
-                s.state.temp += u
-            else
-                s.state.temp = original_value + u
-            end
-        end
-        heat!(s, heating_law)
-    end
-end
-
-function heat!(s::SMAString,heating_law)
-    s.law.F0, s.law.k = heating_law(s.state.temp)
-end
+#
+# function heat!(tr::TensegrityRobot,us;inc=false)
+#     @unpack tg, hub = tr
+#     @unpack heaters = hub
+#     for (heater,u) in zip(heaters,us)
+#         heat!(heater,tg,u;inc)
+#     end
+# end
+#
+#
+#
+# function heat!(ctrller::ManualHeater,tg,u;inc=false,abs=true)
+#     @unpack SMA_cables = tg.tensiles
+#     @unpack id_string, original_value, heating_law = ctrller.act
+#     s = select_by_id(SMA_cables,id_string)
+#     if abs
+#         s.state.temp = u
+#     else
+#         if inc
+#             s.state.temp += u
+#         else
+#             s.state.temp = original_value + u
+#         end
+#     end
+#     heat!(s,heating_law)
+# end
+#
+# @inline function heat!(ctrller::ManualSerialHeater,tg::TensegrityStructure,u;inc=false)
+#     heat!(ctrller,tg.tensiles.SMA_cables,u;inc)
+# end
+#
+# function heat!(ctrller::ManualSerialHeater,
+#                 SMA_cables::AbstractVector{<:SMACable},u;inc=false,abs=true)
+#     @unpack acts, heating_laws = ctrller
+#     @unpack id_cables, original_values = acts
+#     for (id, original_value, heating_law) in zip(id_cables,original_values,heating_laws)
+#         s = select_by_id(SMA_cables,id)
+#         if abs
+#             s.state.temp = u
+#         else
+#             if inc
+#                 s.state.temp += u
+#             else
+#                 s.state.temp = original_value + u
+#             end
+#         end
+#         heat!(s, heating_law)
+#     end
+# end
+#
+# function heat!(s::SMACable,heating_law)
+#     s.law.F0, s.law.k = heating_law(s.state.temp)
+# end
 
 function set_restlen!(tg,u)
-    for (i,s) in enumerate(tg.strings)
+    for (i,s) in enumerate(tg.cables)
         s.state.restlen = u[i]
     end
 end

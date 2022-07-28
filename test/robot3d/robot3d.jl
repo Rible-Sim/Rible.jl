@@ -34,6 +34,7 @@ prop = TR.RigidBody3DProperty(1,movable,mass,
 state = TR.RigidBody3DState(prop,r,R,ṙ,ω,Val(:NC))
 
 TR.RigidBody(prop,state)
+end
 
 mass = 1.0 #kg
 #inertia = Matrix(Diagonal([45.174,45.174,25.787]))*1e-8 # N/m^2

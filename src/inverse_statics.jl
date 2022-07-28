@@ -1,16 +1,10 @@
 function build_Ti(tg::TensegrityStructure,i::Integer)
     nbodycoords = get_nbodycoords(tg)
-    body2q = tg.connectivity.body2q
-    ncoords = tg.ncoords
-    build_Ti(nbodycoords,ncoords,body2q[i])
+    body2fullq = tg.connectivity.body2fullq
+    nfullcoords = maximum.(body2fullq) |> maximum
+    build_Ti(nbodycoords,nfullcoords,body2fullq[i])
 end
 
-function build_Ti(tg::ClusterTensegrityStructure,i::Integer)
-    nbodycoords = get_nbodycoords(tg)
-    body2q = tg.connectivity.body2q
-    ncoords = tg.ncoords
-    build_Ti(nbodycoords,ncoords,body2q[i])
-end
 function build_Ti(nbodycoords,nq,q_index)
     Ti = spzeros(Int,nbodycoords,nq)
     for (body_q_id,q_id) in enumerate(q_index)
@@ -31,9 +25,7 @@ function build_T(tg)
     end
     T
 end
-# T = build_T(manipulator)
-# Array(T)
-# @code_warntype build_T(manipulator)
+
 
 function build_Ci(rb)
     Ci = reduce(hcat,[
@@ -56,86 +48,64 @@ function build_C(tgstruct)
     end
     C
 end
-# C = build_C(manipulator)
-# Array(C)
-# @code_warntype build_C(manipulator)
-# manipulator.connectivity.string2ap[1]
-function rbid2mvrbid(mvbodyindex)
 
-end
-
-function build_D(tgstruct::TensegrityStructure)
-    @unpack nstrings,nmvpoints,ndim,mvbodyindex = tgstruct
-    @unpack body2q,string2ap = tgstruct.connectivity
-    D = spzeros(Int,nmvpoints*ndim,nstrings*ndim)
-    D_raw = spzeros(Int,nmvpoints,nstrings)
+function build_D(tg)
+    @unpack ncables,nmvpoints,ndim,mvbodyindex = tg
+    @unpack body2q,string2ap = tg.connectivity
+    D = spzeros(Int,nmvpoints*ndim,ncables*ndim)
+    D_raw = spzeros(Int,nmvpoints,ncables)
     iss = [0]
-    for rbid in tgstruct.mvbodyindex
-        rb = tgstruct.rigidbodies[rbid]
-        push!(iss,iss[end]+rb.prop.naps)
+
+    foreach(tg.rigidbodies) do rb
+        if rb.prop.id in tg.mvbodyindex
+            push!(iss,iss[end]+rb.prop.naps)
+        end
     end
 
-    for (sid,ap) in enumerate(string2ap)
-        mvrbid1 = findfirst((x)->x==ap[1].rbid, mvbodyindex)
+    foreach(string2ap) do scnt
+        id = scnt.id
+        mvrbid1 = findfirst((x)->x==scnt.end1.rbsig.prop.id, mvbodyindex)
         if mvrbid1 != nothing
-            D_raw[iss[mvrbid1]+ap[1].apid,sid] = 1
+            D_raw[iss[mvrbid1]+scnt.end1.pid,id] = 1
         end
-        mvrbid2 = findfirst((x)->x==ap[2].rbid, mvbodyindex)
+        mvrbid2 = findfirst((x)->x==scnt.end2.rbsig.prop.id, mvbodyindex)
         if mvrbid2 != nothing
-            D_raw[iss[mvrbid2]+ap[2].apid,sid] = -1
+            D_raw[iss[mvrbid2]+scnt.end2.pid,id] = -1
         end
     end
     D .= kron(D_raw,Matrix(1I,ndim,ndim))
 end
 
-
-function build_D(tgstruct::ClusterTensegrityStructure)
-    @unpack nstrings,nclusterstrings,nslidings,nmvpoints,ndim,mvbodyindex = tgstruct
-    @unpack body2q,string2ap,clusterstring2ap = tgstruct.connectivity
-    D = spzeros(Int,nmvpoints*ndim,(nstrings+nclusterstrings+nslidings)*ndim)
-    D_raw = spzeros(Int,nmvpoints,nstrings)
-    D_clu = spzeros(Int,nmvpoints,nclusterstrings+nslidings)
-    iss = [0]
-    for rbid in tgstruct.mvbodyindex
-        rb = tgstruct.rigidbodies[rbid]
-        push!(iss,iss[end]+rb.prop.naps)
-    end
-
-    for (sid,ap) in enumerate(string2ap)
-        mvrbid1 = findfirst((x)->x==ap[1].rbid, mvbodyindex)
-        if mvrbid1 != nothing
-            D_raw[iss[mvrbid1]+ap[1].apid,sid] = 1
-        end
-        mvrbid2 = findfirst((x)->x==ap[2].rbid, mvbodyindex)
-        if mvrbid2 != nothing
-            D_raw[iss[mvrbid2]+ap[2].apid,sid] = -1
-        end
-    end
-    cadd = 0
-    for c2ap in clusterstring2ap
-        for (cid,ap) in enumerate(c2ap)
-            mvrbid1 = findfirst((x)->x==ap[1].rbid, mvbodyindex)
-            if mvrbid1 != nothing
-                D_clu[iss[mvrbid1]+ap[1].apid,cid+cadd] = 1
-            end
-            mvrbid2 = findfirst((x)->x==ap[2].rbid, mvbodyindex)
-            if mvrbid2 != nothing
-                D_clu[iss[mvrbid2]+ap[2].apid,cid+cadd] = -1
-            end
-        end
-        cadd += length(c2ap)
-    end
-    D .= kron(hcat(D_raw, D_clu),Matrix(1I,ndim,ndim))
-end
-
 function build_Q̃(tg)
-    Q̃=build_T(tg)*build_C(tg)*build_D(tg)
+    (;ncables,cables,connectivity) = tg
+    (;connected,indexed) = connectivity
+    (;nfull,nfree,sysfree,mem2sysfree,mem2sysfull) = indexed
+    T = get_numbertype(tg)
+    ndim = get_ndim(tg)
+    Q̃ = zeros(T,nfree,ndim*ncables)
+
+    foreach(connected) do cc
+        j = cc.id
+        cable = cables[j]
+        (;end1,end2) = cc
+        rb1 = end1.rbsig
+        rb2 = end2.rbsig
+        C1 = rb1.state.cache.Cps[end1.pid]
+        C2 = rb2.state.cache.Cps[end2.pid]
+        uci1 = rb1.state.cache.unconstrained_index
+        uci2 = rb2.state.cache.unconstrained_index
+        m2sf1 = mem2sysfree[rb1.prop.id]
+        m2sf2 = mem2sysfree[rb2.prop.id]
+        Q̃[m2sf2,(j-1)*ndim+1:j*ndim] .-= transpose(C2)[uci2,:]
+        Q̃[m2sf1,(j-1)*ndim+1:j*ndim] .+= transpose(C1)[uci1,:]
+    end
+    Q̃
 end
 
 function fvector(tgstruct)
-    @unpack ndim, nstrings, strings = tgstruct
-    ret = zeros(get_numbertype(tgstruct),ndim*nstrings)
-    for (i,stri) in enumerate(strings)
+    @unpack ndim, ncables, cables = tgstruct
+    ret = zeros(get_numbertype(tgstruct),ndim*ncables)
+    for (i,stri) in enumerate(cables)
         ret[(i-1)*ndim+1:i*ndim] = stri.state.tension*stri.state.direction
     end
     ret
@@ -158,18 +128,14 @@ function iksolve(prob;ftol=1e-14)
     λ_result = ik_result.zero[nu+1:nu+nλ]
     u_result,λ_result
 end
-# D = build_D(manipulator)
-# Array(D)
 
-# Q̃=build_T(manipulator)*build_C(manipulator)*build_D(manipulator)
-# Array(Q̃)
 
 
 function build_L̂(tg)
-    @unpack nstrings, ndim, strings = tg
+    (;ncables, ndim, cables) = tg
     T = get_numbertype(tg)
-    L̂ = spzeros(T, nstrings*ndim, nstrings)
-    for (i,ss) in enumerate(strings)
+    L̂ = spzeros(T, ncables*ndim, ncables)
+    for (i,ss) in enumerate(cables)
         is = (i-1)*ndim
         L̂[is+1:is+ndim,i] = ss.state.direction
     end
@@ -177,10 +143,10 @@ function build_L̂(tg)
 end
 
 function build_L(tg)
-    @unpack nstrings, ndim, strings = tg
+    (;ncables, ndim, cables) = tg
     T = get_numbertype(tg)
-    L = spzeros(T, nstrings*ndim, nstrings)
-    for (i,ss) in enumerate(strings)
+    L = spzeros(T, ncables*ndim, ncables)
+    for (i,ss) in enumerate(cables)
         is = (i-1)*ndim
         L[is+1:is+ndim,i] = ss.state.direction*ss.state.length
     end
@@ -188,106 +154,62 @@ function build_L(tg)
 end
 
 function build_Γ(tg)
-    reset_forces!(tg)
-    update_strings_apply_forces!(tg)
-    forces = [s.state.tension.*s.state.direction for s in tg.strings]
-    reduce(vcat,forces)
+    function inner_Γ(q)
+        clear_forces!(tg)
+        update_rigids!(tg,q)
+        update_cables_apply_forces!(tg)
+        forces = [s.state.tension.*s.state.direction for s in tg.cables]
+        reduce(vcat,forces)
+    end
 end
 
 function build_K̂(tg)
-     k = get_strings_stiffness(tg)
+     k = get_cables_stiffness(tg)
      K̂ = build_L̂(tg)*Diagonal(k)
 end
 
 function build_W(tgstruct)
-    q,_ = get_q(tgstruct)
-    A = build_A(tgstruct)
+    q = get_q(tgstruct)
+    A = make_A(tgstruct)
     Aq = A(q)
     W = transpose(Aq)*inv(Aq*transpose(Aq))*Aq
 end
 
-# function build_G(tginput;factor=1.0)
-#     tg = deepcopy(tginput)
-#     reset_forces!(tg)
-#     apply_gravity!(tg)
-#     G = assemble_forces(tg;factor=factor)
-#     @show G
-#     G
-# end
-
-function build_G(tg)
-    ret = zeros(get_numbertype(tg),tg.ncoords)
-    for (rbid,rb) in enumerate(tg.rigidbodies)
-        @unpack prop, state = rb
-        @unpack Cg = state.cache
-        Tiᵀ = transpose(build_Ti(tg,rbid))
-        Cgᵀ = transpose(Cg)
-        f = prop.mass*get_gravity(rb)
-        ret .+= Tiᵀ*Cgᵀ*f
-    end
-    ret
+function build_Ǧ(tginput;factor=1.0)
+    tg = deepcopy(tginput)
+    clear_forces!(tg)
+    apply_gravity!(tg;factor)
+    Ǧ = generate_forces!(tg)
 end
 
 # Not ready
-<<<<<<< Updated upstream
-function build_Ji(tgstruct,i)
-    rbs = tgstruct.rigidbodies
-    cnt = tgstruct.connectivity
-    @unpack string2ap = cnt
-    ap = string2ap[i]
-=======
 function build_Ji(tg::ClusterTensegrityStructure,i)
     rbs = tg.rigidbodies
     cnt = tg.connectivity
     (;connected) = cnt.connectivity
     ap = connected[1][i]
->>>>>>> Stashed changes
     C1 = rbs[ap[1].rbid].state.cache.Cp[ap[1].apid]
     C2 = rbs[ap[2].rbid].state.cache.Cp[ap[2].apid]
-    T1 = build_Ti(tgstruct,ap[1].rbid)
-    T2 = build_Ti(tgstruct,ap[2].rbid)
+    T1 = build_Ti(tg,ap[1].rbid)
+    T2 = build_Ti(tg,ap[2].rbid)
     Ji = C2*T2-C1*T1
 end
-
-<<<<<<< Updated upstream
-function build_Ji(tgstruct,nc,nss)
-    rbs = tgstruct.rigidbodies
-    cnt = tgstruct.connectivity
-    @unpack clusterstring2ap = cnt
-    ap = clusterstring2ap[nc][nss]
-    C1 = rbs[ap[1].rbid].state.cache.Cp[ap[1].apid]
-    C2 = rbs[ap[2].rbid].state.cache.Cp[ap[2].apid]
-    T1 = build_Ti(tgstruct,ap[1].rbid)
-    T2 = build_Ti(tgstruct,ap[2].rbid)
-    Ji = C2*T2-C1*T1
-end
-
-function build_U(tgstruct)
-    @unpack ncoords,nstrings,ndim,strings = tgstruct
-=======
-function build_Ji(tg, nc, nss)
-    rbs = tg.rigidbodies
-    cnt = tg.connectivity
-
-end
-
 
 function build_U(tg)
     @unpack ncoords,ncables,ndim,cables = tg
->>>>>>> Stashed changes
     function inner_U(s,u)
-        ret = zeros(eltype(s),nstrings*ndim,ncoords)
-        for i = 1:nstrings
-            k = strings[i].k
-            Ji = Array(build_Ji(tgstruct,i))
+        ret = zeros(eltype(s),ncables*ndim,ncoords)
+        for i = 1:ncables
+            k = cables[i].k
+            Ji = Array(build_Ji(tg,i))
             ret[(i-1)*ndim+1:i*ndim,:] = k*Ji*(1-s[i]*u[i])
         end
         ret
     end
     function inner_U(s,u,k)
-        ret = zeros(eltype(s),nstrings*ndim,ncoords)
-        for i = 1:nstrings
-            Ji = Array(build_Ji(tgstruct,i))
+        ret = zeros(eltype(s),ncables*ndim,ncoords)
+        for i = 1:ncables
+            Ji = Array(build_Ji(tg,i))
             ret[(i-1)*ndim+1:i*ndim,:] = k[i]*Ji*(1-s[i]*u[i])
         end
         ret
@@ -295,14 +217,147 @@ function build_U(tg)
     inner_U
 end
 
-function build_S(tgstruct)
-    @unpack nstrings = tgstruct
-    function inner_S(q,s)
-        ret = zeros(eltype(s),nstrings)
-        for i = 1:nstrings
-            Ji = build_Ji(tgstruct,i)
-            Ui = Array(transpose(Ji)*Ji)
-            ret[i] = transpose(q)*Ui*q*s[i]^2 - 1
+function build_Q(tg)
+    @unpack nfullcoords,ncables,ndim,cables = tg
+    cnt = tg.connectivity
+    @unpack string2ap,apnb = cnt
+    function inner_Q(q,s,u,k,c)
+        ret = zeros(eltype(u),nfullcoords)
+        foreach(string2ap) do scnt
+            j = scnt.id
+            rb1 = scnt.end1.rbsig
+            rb2 = scnt.end2.rbsig
+            rb1id = rb1.prop.id
+            rb2id = rb2.prop.id
+            ap1id = scnt.end1.pid
+            ap2id = scnt.end2.pid
+            is1 = (apnb[rb1id][ap1id]-1)*ndim
+            is2 = (apnb[rb2id][ap2id]-1)*ndim
+            c1 = c[is1+1:is1+ndim]
+            c2 = c[is2+1:is2+ndim]
+            C1 = rb1.state.cache.funcs.C(c1)
+            C2 = rb2.state.cache.funcs.C(c2)
+            T1 = build_Ti(tg,rb1id)
+            T2 = build_Ti(tg,rb2id)
+            Jj = C2*T2-C1*T1
+            Uj = transpose(Jj)*Jj
+            ret .+= k[j]*(u[j]*s[j]-1)*Uj*q
+        end
+        ret
+    end
+    function inner_Q(q,γ,c)
+        ret = zeros(eltype(γ),nfullcoords)
+        foreach(string2ap) do scnt
+            j = scnt.id
+            rb1 = scnt.end1.rbsig
+            rb2 = scnt.end2.rbsig
+            rb1id = rb1.prop.id
+            rb2id = rb2.prop.id
+            ap1id = scnt.end1.pid
+            ap2id = scnt.end2.pid
+            is1 = (apnb[rb1id][ap1id]-1)*ndim
+            is2 = (apnb[rb2id][ap2id]-1)*ndim
+            c1 = c[is1+1:is1+ndim]
+            c2 = c[is2+1:is2+ndim]
+            C1 = rb1.state.cache.funcs.C(c1)
+            C2 = rb2.state.cache.funcs.C(c2)
+            T1 = build_Ti(tg,rb1id)
+            T2 = build_Ti(tg,rb2id)
+            Jj = C2*T2-C1*T1
+            Uj = transpose(Jj)*Jj
+            ret .+= γ[j]*Uj*q
+        end
+        ret
+    end
+    inner_Q
+end
+
+function build_KE(tg)
+    (;ncables,ndim,cables,connectivity) = tg
+    (;numbered,indexed,connected) = connectivity
+    (;nfull,mem2sysfull) = indexed
+    function inner_KE(q,s,k,c)
+        ret = zeros(eltype(s),nfull,nfull)
+        foreach(connected) do scnt
+            j = scnt.id
+            rb1 = scnt.end1.rbsig
+            rb2 = scnt.end2.rbsig
+            rb1id = rb1.prop.id
+            rb2id = rb2.prop.id
+            ap1id = scnt.end1.pid
+            ap2id = scnt.end2.pid
+            is1 = (apnb[rb1id][ap1id]-1)*ndim
+            is2 = (apnb[rb2id][ap2id]-1)*ndim
+            c1 = c[is1+1:is1+ndim]
+            c2 = c[is2+1:is2+ndim]
+            C1 = rb1.state.cache.funcs.C(c1)
+            C2 = rb2.state.cache.funcs.C(c2)
+            T1 = build_Ti(tg,rb1id)
+            T2 = build_Ti(tg,rb2id)
+            Jj = C2*T2-C1*T1
+            Uj = transpose(Jj)*Jj
+            Ujq = Uj*q
+            ret .+= k[j]*s[j]^2*(Ujq*transpose(Ujq))
+        end
+        ret
+    end
+end
+
+function build_KG(tg)
+    @unpack nfullcoords,ncables,ndim,cables = tg
+    cnt = tg.connectivity
+    @unpack string2ap,apnb = cnt
+    function inner_KG(q,s,μ,k,c)
+        ret = zeros(eltype(s),nfullcoords,nfullcoords)
+        foreach(string2ap) do scnt
+            j = scnt.id
+            rb1 = scnt.end1.rbsig
+            rb2 = scnt.end2.rbsig
+            rb1id = rb1.prop.id
+            rb2id = rb2.prop.id
+            ap1id = scnt.end1.pid
+            ap2id = scnt.end2.pid
+            is1 = (apnb[rb1id][ap1id]-1)*ndim
+            is2 = (apnb[rb2id][ap2id]-1)*ndim
+            c1 = c[is1+1:is1+ndim]
+            c2 = c[is2+1:is2+ndim]
+            C1 = rb1.state.cache.funcs.C(c1)
+            C2 = rb2.state.cache.funcs.C(c2)
+            T1 = build_Ti(tg,rb1id)
+            T2 = build_Ti(tg,rb2id)
+            Jj = C2*T2-C1*T1
+            Uj = transpose(Jj)*Jj
+            Ujq = Uj*q
+            ret .+= k[j]*(1-μ[j]*s[j])*(Uj-s[j]^2*Ujq*transpose(Ujq))
+        end
+        ret
+    end
+end
+
+function build_S(tg)
+    (;ndim,ncables) = tg
+    (;string2ap,apnb) = tg.connectivity
+    function inner_S(q,s,c)
+        ret = zeros(eltype(s),ncables)
+        foreach(string2ap) do scnt
+            j = scnt.id
+            rb1 = scnt.end1.rbsig
+            rb2 = scnt.end2.rbsig
+            rb1id = rb1.prop.id
+            rb2id = rb2.prop.id
+            ap1id = scnt.end1.pid
+            ap2id = scnt.end2.pid
+            is1 = (apnb[rb1id][ap1id]-1)*ndim
+            is2 = (apnb[rb2id][ap2id]-1)*ndim
+            c1 = c[is1+1:is1+ndim]
+            c2 = c[is2+1:is2+ndim]
+            C1 = rb1.state.cache.funcs.C(c1)
+            C2 = rb2.state.cache.funcs.C(c2)
+            T1 = build_Ti(tg,rb1id)
+            T2 = build_Ti(tg,rb2id)
+            Jj = C2*T2-C1*T1
+            Uj = transpose(Jj)*Jj
+            ret[j] = transpose(q)*Uj*q*s[j]^2 - 1
         end
         ret
     end
@@ -310,14 +365,14 @@ end
 
 function compensate_gravity_funcs(tgstruct)
 
-    A = build_A(tgstruct)
+    A = make_A(tgstruct)
 
     Q̃=build_Q̃(tgstruct)
 
     function F!(F,u)
-        reset_forces!(tgstruct)
+        clear_forces!(tgstruct)
         actuate!(tgstruct,u)
-        update_strings_apply_forces!(tgstruct)
+        update_cables_apply_forces!(tgstruct)
         apply_gravity!(tgstruct)
         F .= 0
         #F .= Q̃*fvector(tgstruct)
@@ -347,27 +402,28 @@ function check_inverse_sanity(B)
 end
 
 function build_inverse_statics_core(tginput,tgref::TensegrityStructure,Fˣ=nothing;gravity=false)
-    q,_ = get_q(tgref)
+    q = get_q(tgref)
+    q̌ = get_q̌(tgref)
     tg = deepcopy(tginput)
-    reset_forces!(tg)
-    distribute_q_to_rbs!(tg,q)
-    update_strings!(tg)
+    clear_forces!(tg)
+    update_rigids!(tg,q)
+    update_cables_apply_forces!(tg)
     if gravity
-        G = build_G(tg)
+        Ǧ = build_Ǧ(tg)
     else
-        G = zero(q)
+        Ǧ = zero(q̌)
     end
     if isnothing(Fˣ)
-        F = G
+        F̌ = Ǧ
     else
-        F = Fˣ + G
+        F̌ = F̌ˣ + Ǧ
     end
 
-    build_inverse_statics_core(tg,q,F)
+    build_inverse_statics_core(tg,q,F̌)
 end
 
 function build_inverse_statics_core(tg,q::AbstractVector,F)
-    A = build_A(tg)
+    A = make_A(tg)
     Nᵀ = transpose(nullspace(A(q)))
     Q̃ = build_Q̃(tg)
     tg,Nᵀ,Q̃,F
@@ -378,58 +434,45 @@ function build_inverse_statics_for_density(tginput,tgref,Fˣ=nothing;gravity=fal
     L = build_L(tg)
     # Left hand side
     Q̃L = Q̃*L
-    if scale
-        c = maximum(abs.(Q̃L))
-    else
-        c = one(eltype(Q̃L))
-    end
+
     B = -Nᵀ*Q̃L
 
     # Right hand side
     F̃ = Nᵀ*F
 
-    tg,B,F̃,c
+    B,F̃
 end
 
 function build_inverse_statics_for_stiffness(tginput,tgref,Fˣ=nothing;gravity=false,scale=true)
     tg,Nᵀ,Q̃,F = build_inverse_statics_core(tginput,tgref,Fˣ;gravity)
 
     L̂ = build_L̂(tg)
-    ℓ = get_strings_len(tg)
-    u = get_strings_restlen(tg)
+    ℓ = get_cables_len(tg)
+    u = get_cables_restlen(tg)
 
     # Left hand side
     Q̃L̄ = Q̃*L̂*Diagonal(ℓ-u)
-    if scale
-        c = maximum(abs.(Q̃L̄))
-    else
-        c = one(eltype(Q̃L̄))
-    end
+
     B = -Nᵀ*Q̃L̄
 
     # Right hand side
     F̃ = Nᵀ*F
 
-    tg,B,F̃,c
+    B,F̃
 end
 
 function build_inverse_statics_for_restlength(tginput,tgref,Fˣ=nothing;gravity=false,scale=true)
     tg,Nᵀ,Q̃,F = build_inverse_statics_core(tginput,tgref,Fˣ;gravity)
-    ℓ = get_strings_len(tg)
+    ℓ = get_cables_len(tg)
     K̂ = build_K̂(tg)
     # Left hand side
     Q̃K̂ = Q̃*K̂
-    if scale
-        c = maximum(abs.(Q̃K̂))
-    else
-        c = one(eltype(Q̃K̂))
-    end
+
     B = Nᵀ*Q̃K̂
 
     # Right hand side
     F̃ = Nᵀ*(Q̃K̂*ℓ + F)
-
-    tg,B,F̃,c
+    B,F̃
 end
 
 function build_inverse_statics_for_actuation(botinput,botref::TensegrityRobot,
@@ -440,23 +483,19 @@ end
 function build_inverse_statics_for_actuation(botinput,tgref::TensegrityStructure,
                                         Fˣ=nothing;Y=build_Y(botinput),gravity=false,scale=true)
     tg,Nᵀ,Q̃,F = build_inverse_statics_core(botinput.tg,tgref,Fˣ;gravity)
-    ℓ = get_strings_len(tg)
+    ℓ = get_cables_len(tg)
     K̂ = build_K̂(tg)
     u0 = get_original_restlen(botinput)
     # Left hand side
     Q̃K̂ = Q̃*K̂
     Q̃K̂Y = Q̃K̂*Y
-    if scale
-        c = maximum(abs.(Q̃K̂Y))
-    else
-        c = one(eltype(Q̃K̂Y))
-    end
+
     B = Nᵀ*Q̃K̂Y
 
     # Right hand side
     F̃ = Nᵀ*(Q̃K̂*(ℓ-u0) + F)
 
-    tg,B,F̃,c
+    B,F̃
 end
 
 function get_solution_set(B,F̃)
@@ -468,16 +507,16 @@ function get_solution_set(B,F̃)
 end
 
 function check_restlen(tg)
-    u = get_strings_restlen(tg)
+    u = get_cables_restlen(tg)
     check_restlen(tg,u)
 end
 
 function check_restlen(tg,u)
-    ℓ = get_strings_len(tg)
+    ℓ = get_cables_len(tg)
     if any((x)->x<0,u)
         @warn "Negative rest lengths"
     end
-    if any((x)->x<=0,ℓ-u)
+    if any((x)->x<0,ℓ-u)
         @warn "Nonpositive tension"
     end
 end
@@ -491,21 +530,21 @@ function check_actuation(bot,Y,a)
     u
 end
 
-function get_inverse_func(tgstruct_input,refstruct,Y;gravity=false,recheck=true,scale=true)
-    # We only use the $q$ of the reference structure.
-    actstruct,lhs,rhs,c = statics_equation_for_actuation(tgstruct_input,refstruct,Y;gravity,scale)
+function get_inverse_func(tg_input,reftg,Y;gravity=false,recheck=true,scale=true)
+    # We only use the $q$ of the reference tgure.
+    acttg,lhs,rhs,c = statics_equation_for_actuation(tg_input,reftg,Y;gravity,scale)
     ncoeffs = maximum(size(lhs))- rank(lhs)
     xp,nb = get_solution_set(lhs,rhs)
     @info "Number of coefficients = $ncoeffs"
     function inner_inverse_func(ξ)
         x = xp + nb*ξ
-        λ = x[1:actstruct.nconstraint].*c
-        a = x[actstruct.nconstraint+1:end]
-        # check_actuation(actstruct,Y,a)
-        # refq,_ = get_q(refstruct)
-        # actuate!(actstruct,a)
-        # check_static_equilibrium(actstruct,refq,λ;gravity)
-        u0 = get_strings_restlen(tgstruct_input)
+        λ = x[1:acttg.nconstraint].*c
+        a = x[acttg.nconstraint+1:end]
+        # check_actuation(acttg,Y,a)
+        # refq = get_q(reftg)
+        # actuate!(acttg,a)
+        # check_static_equilibrium(acttg,refq,λ;gravity)
+        u0 = get_cables_restlen(tg_input)
         rl = u0 + Y*a
         λ,rl,a
     end
@@ -513,10 +552,10 @@ end
 
 function check_static_equilibrium(tg_input,q,λ,F=nothing;gravity=false)
     tg = deepcopy(tg_input)
-    reset_forces!(tg)
+    clear_forces!(tg)
     distribute_q_to_rbs!(tg,q)
-    update_strings!(tg)
-    check_restlen(tg,get_strings_restlen(tg))
+    update_cables_apply_forces!(tg)
+    check_restlen(tg,get_cables_restlen(tg))
     if gravity
         apply_gravity!(tg)
     end
@@ -524,7 +563,7 @@ function check_static_equilibrium(tg_input,q,λ,F=nothing;gravity=false)
     if !isnothing(F)
         generalized_forces .+= F[:]
     end
-    constraint_forces = transpose(build_A(tg)(q))*λ
+    constraint_forces = transpose(make_A(tg)(q))*λ
     static_equilibrium = constraint_forces ≈ generalized_forces
     @debug "Res. forces = $(generalized_forces-constraint_forces)"
     if !static_equilibrium
@@ -534,33 +573,25 @@ function check_static_equilibrium(tg_input,q,λ,F=nothing;gravity=false)
     static_equilibrium
 end
 
-function check_static_equilibrium_output_multipliers(tg_input)
-    q,_ = get_q(tg_input)
-    check_static_equilibrium_output_multipliers(tg_input,q)
+function check_static_equilibrium_output_multipliers(tg_input;F=nothing,gravity=false)
+    q = get_q(tg_input)
+    check_static_equilibrium_output_multipliers(tg_input,q,F;gravity)
 end
 
 function check_static_equilibrium_output_multipliers(tg_input,q,F=nothing;gravity=false)
     tg = deepcopy(tg_input)
-<<<<<<< Updated upstream
-    reset_forces!(tg)
-    distribute_q_to_rbs!(tg,q)
-    update_strings!(tg)
-    check_restlen(tg,get_strings_restlen(tg))
-=======
     clear_forces!(tg)
     update_rigids!(tg)
     update_cables!(tg)
     # check_restlen(tg,get_cables_restlen(tg))
->>>>>>> Stashed changes
     if gravity
         apply_gravity!(tg)
     end
-    generalized_forces = assemble_forces(tg)
+    generalized_forces = generate_forces!(tg)
     if !isnothing(F)
         generalized_forces .+= F[:]
     end
-    A = build_A(tg)(q)
-    N = nullspace(A)
+    A = make_A(tg)(q)
     λ = inv(A*transpose(A))*A*(generalized_forces)
     constraint_forces = transpose(A)*λ
     static_equilibrium = constraint_forces ≈ generalized_forces
@@ -577,24 +608,24 @@ function inverse_for_restlength(botinput,botref::TensegrityRobot,Fˣ=nothing;gra
 end
 
 function inverse_for_restlength(tginput,tgref::TensegrityStructure,Fˣ=nothing;gravity=false,scale=true,recheck=true)
-    tg,B,F̃,c = build_inverse_statics_for_restlength(tginput,tgref,Fˣ;gravity,scale)
-    nλ = get_nconstraint(tg)
-    nu = tg.nstrings
+    B,F̃ = build_inverse_statics_for_restlength(tginput,tgref,Fˣ;gravity,scale)
+    nu = tg.ncables
     if check_inverse_sanity(B)
         y0 = B\F̃
     else
         @info "Using Quadratic Programming."
+        # COSMO.Settings(verbose = false, eps_abs = 1e-7, eps_rel = 1e-16)
         model = JuMP.Model(COSMO.Optimizer)
         JuMP.set_optimizer_attribute(model, "verbose", false)
-        JuMP.set_optimizer_attribute(model, "eps_abs", 1e-15)
-        JuMP.set_optimizer_attribute(model, "eps_rel", 1e-10)
+        JuMP.set_optimizer_attribute(model, "eps_abs", 1e-7)
+        JuMP.set_optimizer_attribute(model, "eps_rel", 1e-16)
         JuMP.@variable(model, y[1:nu])
-        JuMP.@objective(model, Max, sum(y[1:nu].^2))
+        JuMP.@objective(model, Min, sum(y[1:nu].^2))
         # JuMP.@objective(model, Max, 0.0)
         JuMP.@constraint(model, static, B*y .== F̃)
         ϵ = 1e-2
-        JuMP.@constraint(model, positive_u, y[1:nu].+ ϵ .>= 0)
-        JuMP.@constraint(model, positive_f, y[1:nu].+ ϵ .<= get_strings_len(tg))
+        JuMP.@constraint(model, positive_u, y[1:nu].- ϵ .>= 0)
+        JuMP.@constraint(model, positive_f, y[1:nu].+ ϵ .<= get_cables_len(tg))
         # JuMP.print(model)
         JuMP.optimize!(model)
         if JuMP.termination_status(model) == JuMP.MathOptInterface.OPTIMAL
@@ -613,7 +644,7 @@ function inverse_for_restlength(tginput,tgref::TensegrityStructure,Fˣ=nothing;g
     u = y0[1:nu]
     if recheck
         tgcheck = deepcopy(tginput)
-        q,_ = get_q(tgref)
+        q = get_q(tgref)
         set_restlen!(tgcheck,u)
         _,λ = check_static_equilibrium_output_multipliers(tgcheck,q;gravity)
     end
@@ -624,8 +655,8 @@ function inverse_for_multipliers(botinput::TensegrityRobot,botref::TensegrityRob
     inverse_for_multipliers(botinput.tg,botref.tg,F;gravity,scale,recheck)
 end
 
-function inverse_for_multipliers(tginput::AbstractTensegrity,tgref::AbstractTensegrity=tginput,F=nothing;gravity=false,scale=true,recheck=true)
-    q,_ = get_q(tgref)
+function inverse_for_multipliers(tginput::TensegrityStructure,tgref::TensegrityStructure=tginput,F=nothing;gravity=false,scale=true,recheck=true)
+    q = get_q(tgref)
     _,λ = check_static_equilibrium_output_multipliers(tginput,q;gravity)
     λ
 end
@@ -633,23 +664,20 @@ end
 function inverse_for_actuation(botinput,botref,Fˣ=nothing;Y=build_Y(botinput),
                     gravity=false,scale=true,recheck=true)
     tgref = botref.tg
-    tg,B,F̃,c = build_inverse_statics_for_actuation(botinput,tgref,Fˣ;Y,gravity,scale)
+    B,F̃ = build_inverse_statics_for_actuation(botinput,tgref,Fˣ;Y,gravity,scale)
     if check_inverse_sanity(B)
         y0 = B\F̃
     else
         @info "Using Moore-Penrose pseudoinverse"
         y0 = pinv(B)*F̃
     end
-    nλ = get_nconstraint(tg)
     na = size(Y,2)
-    # λ = y0[1:nλ].*c
     a = y0[1:na]
-    u = check_actuation(botinput,Y,a)
     if recheck
         botcheck = deepcopy(botinput)
-        q,_ = get_q(tgref)
+        q = get_q(tgref)
         actuate!(botcheck,a)
         _,λ = check_static_equilibrium_output_multipliers(botcheck.tg,q;gravity)
     end
-    λ,u,a
+    λ,a
 end

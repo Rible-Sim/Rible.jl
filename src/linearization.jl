@@ -1,8 +1,16 @@
+"""
+交换列。
+$(TYPEDSIGNATURES)
+"""
 function swapcols!(X::AbstractMatrix, i::Integer, j::Integer)
     @inbounds for k = 1:size(X,1)
         X[k,i], X[k,j] = X[k,j], X[k,i]
     end
 end
+"""
+交换行。
+$(TYPEDSIGNATURES)
+"""
 function swaprows!(X::AbstractMatrix, i::Integer, j::Integer)
     @inbounds for k = 1:size(X,2)
         X[i,k], X[j,k] = X[j,k], X[i,k]
@@ -45,9 +53,6 @@ function find_full_constrained_index(lncs,q)
     col_index[size(Aq,1)+1:end]
 end
 
-<<<<<<< Updated upstream
-function ∂Aᵀλ∂q(tg,λ)
-=======
 function ∂Aᵀλ∂q̌(tg::AbstractTensegrityStructure,λ)
     (;nfree) = tg.connectivity.indexed
     ret = zeros(eltype(λ),nfree,nfree)
@@ -67,34 +72,14 @@ function ∂Aᵀλ∂q̌(tg::AbstractTensegrityStructure,λ)
 end
 
 function ∂Aq̇∂q(tg,q̇)
->>>>>>> Stashed changes
     body2q = tg.connectivity.body2q
-    ncoords = tg.ncoords
+    @unpack ncoords, nconstraint = tg
     nbodyc = get_nbodyconstraint(tg)
-    ret = zeros(eltype(λ),ncoords,ncoords)
+    ret = zeros(get_numbertype(tg),nconstraint,ncoords)
     is = 0
     for rbid in tg.mvbodyindex
         pindex = body2q[rbid]
         rb = tg.rigidbodies[rbid]
-        # nc = rb.state.cache.nc
-        # if nc > 0
-        #     is += nc
-        # end
-        ret[pindex,pindex] .+= rb.state.cache.cfuncs.∂Aᵀλ∂q(λ[is+1:is+nbodyc])
-        is += nbodyc
-    end
-    ret
-end
-
-function ∂Aq̇∂q(tgstruct,q̇)
-    body2q = tgstruct.connectivity.body2q
-    @unpack ncoords, nconstraint = tgstruct
-    nbodyc = get_nbodyconstraint(tgstruct)
-    ret = zeros(get_numbertype(tgstruct),nconstraint,ncoords)
-    is = 0
-    for rbid in tgstruct.mvbodyindex
-        pindex = body2q[rbid]
-        rb = tgstruct.rigidbodies[rbid]
         q̇_rb = q̇[pindex]
         nc = rb.state.cache.nc
         if nc > 0
@@ -106,35 +91,31 @@ function ∂Aq̇∂q(tgstruct,q̇)
     ret
 end
 
-function test_fvector(tgstruct,q0)
+function test_fvector(tg,q0)
     function L(q)
-        reset_forces!(tgstruct)
-        distribute_q_to_rbs!(tgstruct,q,zero(q))
-        update_strings_apply_forces!(tgstruct)
-        fvector(tgstruct)
-        [tgstruct.strings[i].state.length for i = 1:2]
+        reset_forces!(tg)
+        distribute_q_to_rbs!(tg,q,zero(q))
+        update_cables_apply_forces!(tg)
+        fvector(tg)
+        [tg.cables[i].state.length for i = 1:2]
     end
     FiniteDiff.finite_difference_jacobian(L,q0)
 end
 
-function build_K(tg,λ)
-    Q̃ = build_Q̃(tg)
-    q,_ = get_q(tg)
-    ∂L∂q,_ = build_tangent(tg)
-    K = -Q̃*∂L∂q .+ ∂Aᵀλ∂q(tg,λ)
-end
-
+"""
+线性化。
+$(TYPEDSIGNATURES)
+"""
 function linearize(tginput,λ,u,q,q̇=zero(q))
     tg = deepcopy(tginput)
     set_restlen!(tg,u)
     reset_forces!(tg)
     distribute_q_to_rbs!(tg,q,q̇)
-    update_strings!(tg)
+    update_cables_apply_forces!(tg)
     M = build_massmatrix(tg)
     A = build_A(tg)
     Q̃ = build_Q̃(tg)
-    Jac_Γ = build_Jac_Γ(tg)
-    ∂L∂q,∂L∂q̇ = Jac_Γ(q,q̇)
+    ∂L∂q,∂L∂q̇ = build_tangent(tg)
     @unpack ncoords,nconstraint = tg
     nz = ncoords + nconstraint
     M̂ = zeros(eltype(q),nz,nz)
@@ -143,7 +124,7 @@ function linearize(tginput,λ,u,q,q̇=zero(q))
     M̂[1:ncoords,1:ncoords] .= M
     Ĉ[1:ncoords,1:ncoords] .= -Q̃*∂L∂q̇
 
-    # fjac = test_fvector(tgstruct,q)
+    # fjac = test_fvector(tg,q)
     K̂[1:ncoords,1:ncoords] .= -Q̃*∂L∂q .+ ∂Aᵀλ∂q(tg,λ)
     Aq = A(q)
     c = maximum(abs.(K̂[1:ncoords,1:ncoords]))
@@ -187,10 +168,6 @@ function find_finite(ω2,Z,ndof)
     finite_ω2,finite_Z
 end
 
-<<<<<<< Updated upstream
-function normalize_wrt_mass!(Z,M)
-    n = size(Z)[2]
-=======
 function build_Ǩ(tg)
     _,λ = check_static_equilibrium_output_multipliers(tg)
     build_Ǩ(tg,λ)
@@ -547,19 +524,71 @@ end
 
 function norm_wrt!(Z,M)
     n = size(Z,2)
->>>>>>> Stashed changes
     for i = 1:n
-        zmz = transpose(Z[:,i])*M*Z[:,i]
-        Z[:,i] ./= sqrt(zmz)
+        z = @view Z[:,i]
+        zmz = transpose(z)*M*z
+        z ./= sqrt(zmz)
     end
     Z
 end
-function undamped_eigen(tg,q0,λ0)
-    if !check_static_equilibrium(tg,q0,λ0;gravity=false)
-        @warn "Statics check failed, but proceed anyway."
+
+function undamped_eigen(tg;gravity=false)
+    _,λ = check_static_equilibrium_output_multipliers(tg;gravity)
+    q = get_q(tg)
+    q̌ = get_q̌(tg)
+    M̌ = build_M̌(tg)
+    Ǩ = build_Ǩ(tg,λ)
+    Ǎ = make_A(tg)(q)
+    Ň = nullspace(Ǎ)
+    ℳ = transpose(Ň)*M̌*Ň
+    𝒦 = transpose(Ň)*Ǩ*Ň
+    # @show ℳ, 𝒦
+    ω²,ξ = eigen(𝒦,ℳ)
+    # @show transpose(ξ)*ℳ*ξ
+    Ňξ = Ň*ξ
+    # @show transpose(Ňξ)*M̌*Ňξ
+    norm_wrt!(Ňξ,M̌)
+    δq̌ = [v for v in eachcol(Ňξ)]
+    ω²,δq̌
+    # nq = length(q̌)
+    # nλ = length(λ)
+    # nx = nq + nλ
+    # M̂ = zeros(eltype(q),nx,nx)
+    # K̂ = zeros(eltype(q),nx,nx)
+    # M̂[1:nq,1:nq] .= M̌
+    # K̂[1:nq,1:nq] .= Ǩ
+    # c = maximum(abs.(K̂[1:nq,1:nq]))
+    # K̂[1:nq,nq+1:nx] .= c.*transpose(Ǎ)
+    # K̂[nq+1:nx,1:nq] .= c.*Ǎ
+    #
+    # eigen(K̂,M̂)
+end
+
+function undamped_eigen!(bot::TensegrityRobot;gravity=false,scaling=0.01)
+    (;tg,traj) = bot
+    q̌ = get_q̌(tg)
+    ω²,δq̌ = undamped_eigen(tg;gravity)
+    neg_indices = ω².<=0
+    if !isempty(neg_indices)
+        @warn "Negative ω² occurs. zeroing."
+        ω²[neg_indices] .= 0
     end
-    u0 = get_strings_restlen(tg)
-    M̂,Ĉ,K̂ = linearize(tg,λ0,u0,q0)
+    ω = sqrt.(ω²)
+    resize!(traj,1)
+    nω = length(ω)
+    for i = 1:nω
+        push!(traj,deepcopy(traj[end]))
+        traj.t[end] = ω[i]
+        δq̌i = δq̌[i]
+        ratio = norm(δq̌i)/norm(q̌)
+        traj.q̌[end] .= q̌ .+ scaling.*δq̌i/ratio
+    end
+    bot
+end
+
+function old_undamped_eigen(tg)
+    λ0 = check_static_equilibrium_output_multipliers(tg)
+    M̂,Ĉ,K̂ = linearize(tg,q0,λ0)
     α = 10
     M̄,K̄ = frequencyshift(M̂,K̂,α)
     # @show size(K̄),rank(K̄),cond(K̄),rank(M̄)
@@ -575,8 +604,8 @@ function undamped_eigen(tg,q0,λ0)
     ω, Zq#, Z
 end
 
-function undamped_modal_solve!(tgstruct,q0,q̇0,λ0,tf,dt)
-    M̂,Ĉ,K̂ = linearize(tgstruct,q0,λ0)
+function undamped_modal_solve!(tg,q0,q̇0,λ0,tf,dt)
+    M̂,Ĉ,K̂ = linearize(tg,q0,λ0)
     # show(stdout,"text/plain",K̂)
     # showtable(K̂)
     # M̄,C̄,K̄ = TR.frequencyshift(M̂,Ĉ,K̂,0.1)
@@ -604,6 +633,10 @@ function undamped_modal_solve!(tgstruct,q0,q̇0,λ0,tf,dt)
     q = z[1:length(q0),:]
 end
 
+"""
+返回零空间。
+$(TYPEDSIGNATURES)
+"""
 function find_nullspace(c)
     Nc,Nu = size(c)
     P = VectorOfArray([ begin
@@ -632,6 +665,10 @@ function find_nullspace(c)
     Array(P)
 end
 
+"""
+校核稳定性。
+$(TYPEDSIGNATURES)
+"""
 function check_stability(tg;verbose=false)
     λ = inverse_for_multipliers(tg,tg)
     check_stability(tg,λ;verbose)

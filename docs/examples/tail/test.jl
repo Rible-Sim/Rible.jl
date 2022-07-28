@@ -14,7 +14,7 @@ using TensegrityRobots; const TR = TensegrityRobots
 includet("tail_define.jl")
 includet("make_new_tail.jl")
 includet("plotting.jl")
-# includet("../analysis.jl")
+includet("../analysis.jl")
 
 n = 4
 tail = make_new_tail(n)
@@ -50,4 +50,4 @@ prob = TR.DyProblem(dynfuncs(tail),tail,(0.0,20.0))
 TR.solve!(tail,prob,TR.Zhong06(),dt=dt,ftol=1e-14,verbose=true)
 # sol = TR.solve(prob,TR.ConstSPARK(1),dt=dt,ftol=1e-12,verbose=true)
 #@code_warntype TR.solve(prob,TR.Zhong06(),dt=dt,ftol=1e-14,verbose=true)
-plot_traj!(tail)
+plotstructure(tail)
