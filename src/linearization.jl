@@ -72,21 +72,20 @@ function ∂Aᵀλ∂q̌(tg::TensegrityStructure,λ)
 end
 
 function ∂Aq̇∂q(tg,q̇)
-    body2q = tg.connectivity.body2q
-    @unpack ncoords, nconstraint = tg
-    nbodyc = get_nbodyconstraint(tg)
-    ret = zeros(get_numbertype(tg),nconstraint,ncoords)
-    is = 0
-    for rbid in tg.mvbodyindex
-        pindex = body2q[rbid]
-        rb = tg.rigidbodies[rbid]
-        q̇_rb = q̇[pindex]
-        nc = rb.state.cache.nc
-        if nc > 0
-            is += nc
+    (;nfree) = tg.connectivity.indexed
+    (;rigidbodies,nconstraints) = tg
+    (;indexed,jointed) = tg.connectivity
+    (;ninconstraints,mem2sysfree,mem2sysincst) = indexed
+    ret = zeros(eltype(q̇),nconstraints,nfree)
+    foreach(rigidbodies) do rb
+        rbid = rb.prop.id
+        memfree = mem2sysfree[rbid]
+        memincst = mem2sysincst[rbid]
+        uci = rb.state.cache.unconstrained_index
+        Φi = rb.state.cache.Φi
+        if !isempty(memincst)
+            ret[memincst,memfree] .+= rb.state.cache.funcs.∂Aq̇∂q(q̇[memfree])[Φi,uci]
         end
-        ret[is+1:is+nbodyc,pindex] .+= rb.state.cache.cfuncs.∂Aq̇∂q(q̇_rb)
-        is += nbodyc
     end
     ret
 end

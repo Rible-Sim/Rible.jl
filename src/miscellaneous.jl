@@ -43,10 +43,3 @@ end
 function ison(x::AbstractVector{T},p::Plane;tol=eps(T)) where T
     distance(x,p) < tol
 end
-
-function show_camera(scene)
-    camera = cameracontrols(scene)
-    lookat = camera.lookat[]
-    eyepos = camera.eyeposition[]
-    @show eyepos, lookat
-end

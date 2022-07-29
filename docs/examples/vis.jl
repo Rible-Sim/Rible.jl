@@ -1,6 +1,102 @@
-function plot_local_points(rb::TR.AbstractRigidBody)
+@unit pt "pt" Point (100//7227)*u"inch" false
+Unitful.register(@__MODULE__)
+@unit px "px" Pixel (3//4)*u"pt" false
+Unitful.register(@__MODULE__)
+to_resolution(dpi,len) = uconvert(Unitful.NoUnits,dpi*len)
+
+pt2px(x, ppi = 300*u"px"/1u"inch") = ustrip(u"px",x*u"pt"*ppi)
+
+fontsize = 8 |> pt2px
+markersize = 0.5fontsize
+linewidth = 0.5 |> pt2px
+# cablewidth = 0.75 |> pt2px
+# barwidth = 1.5 |> pt2px
+const cw = 455 |> pt2px
+const tw = 455 |> pt2px
+const th = 688.5 |> pt2px
+455.24411
+const mks_cyc = Iterators.cycle(["o","v","^","s","P","X","d","<",">","h"])
+const lss_cyc = Iterators.cycle(["-","--","-.",":"])
+const alphabet = join('a':'z')
+
+const tlabel = L"t~(\mathrm{s})"
+
+function hidex(ax)
+    ax.xticklabelsvisible = false
+    ax.xlabelvisible = false
+end
+
+function hidey(ax)
+    ax.yticklabelsvisible = false
+    ax.ylabelvisible = false
+end
+
+my_theme = Theme(;
+    font = "CMU Serif",
+    fontsize,
+    markersize,
+    linewidth,
+    figure_padding = (2fontsize,fontsize,fontsize,fontsize),
+    Axis3 = (
+        titlefont = "CMU Serif Bold",
+        titlesize = fontsize,
+        titlegap = 0
+    )
+)
+sg_theme = Theme(;
+    font = "CMU Serif",
+    fontsize,
+    markersize,
+    linewidth,
+    figure_padding = (fontsize,fontsize,fontsize,fontsize),
+    resolution=(0.5tw,0.4tw),
+    Label = (
+        textsize = fontsize,
+        font = "CMU Serif Bold",
+        halign = :left
+    )
+)
+
+mh_theme = Theme(;
+    font = "CMU Serif",
+    fontsize,
+    markersize,
+    linewidth,
+    figure_padding = (fontsize,fontsize,fontsize,fontsize),
+    resolution=(0.9tw,0.4tw),
+    Label = (
+        textsize = fontsize,
+        font = "CMU Serif Bold",
+        halign = :left
+    )
+)
+
+mv_theme = Theme(;
+    font = "CMU Serif",
+    fontsize,
+    markersize,
+    linewidth,
+    figure_padding = (fontsize,fontsize,fontsize,fontsize),
+    resolution=(0.9tw,0.8tw),
+    palette = (
+        vlinecolor = [:slategrey],
+    ),
+    Label = (
+        textsize = fontsize,
+        font = "CMU Serif Bold",
+        halign = :left,
+        padding = (0, 0, 0, 0),
+    ),
+    VLines = (
+        # linewidth = 4,
+        cycle = [:color => :vlinecolor],
+    )
+)
+
+function plot_rigid(rb::TR.AbstractRigidBody;showmesh=true)
     (;r̄g,r̄ps,nr̄ps) = rb.prop
-    fig = Figure(resolution=(1280,720))
+    (;mesh) = rb
+    fig = Figure(resolution=(1920,1080))
     ndim = TR.get_ndim(rb)
     if ndim == 2
         ax = Axis(fig[1,1])
@@ -24,6 +120,9 @@ function plot_local_points(rb::TR.AbstractRigidBody)
         align = (:left, :baseline),
         offset = (-5, 10)
     )
+    if !(mesh isa Nothing) && showmesh
+        mesh!(ax,mesh,color=:slategrey)
+    end
     fig
 end
 
@@ -40,64 +139,217 @@ function plot_tg!(tg::TR.TensegrityStructure)
     fig
 end
 
-function plot_traj!(bot::TR.TensegrityRobot;showlabels=true,textsize=10,actuate=false)
+function match_figsize(figsize)
+    @match figsize begin
+        :UHD => (3840,2160)
+        :FHD => (1920,1080)
+        :HD  => (1280,720)
+        fs::Tuple => fs
+    end
+end
+
+function time2step(at,t)
+    atstep = findfirst((x)->x>=at, t)
+    @assert !isa(atstep,Nothing)
+    atstep
+end
+
+function get_groundmesh(f::Function,rect)
+    GeometryBasics.Mesh(f, rect, NaiveSurfaceNets())
+end
+
+function get_groundmesh(plane::TR.Plane,rect)
+    GeometryBasics.Mesh(rect, NaiveSurfaceNets()) do v
+        TR.signed_distance(v,plane)
+    end
+end
+
+function get_groundmesh(::Nothing,rect)
+    plane_n = [0,0,1.0]
+    plane_r = zeros(3)
+    plane = TR.Plane(plane_n,plane_r)
+    get_groundmesh(plane,rect)
+end
+
+function plot_traj!(bot::TR.TensegrityRobot;
+            figsize=:FHD,
+            gridsize=(1,1),
+            attimes=nothing,
+            atsteps=nothing,
+            doslide=true,
+            showinit=false,
+            showlabels=true,
+            showpoints=true,
+            showmesh=true,
+            showwire=false,
+            showinfo=true,
+            xlims=(-1.0,1.0),
+            ylims=(-1.0,1.0),
+            zlims=(-1e-3,1.0),
+            showground=true,
+            ground=nothing,
+            fontsize=20,
+            actuate=false,
+            figname=nothing,
+            kargs...)
     (;tg,traj) = bot
     ndim = TR.get_ndim(tg)
-    fig = Figure(resolution=(1280,720))
-    axtitle = Observable("")
-    if ndim == 2
-        ax = Axis(fig[1,1],title=axtitle)
-        ax.aspect = DataAspect()
-    else
-        # ax = Axis3(fig[1,1],title=axtitle, aspect=:data)
-        # ax = LScene(fig[1,1], show_axis=false, scenekw = (clear=true,))
-        ax = LScene(fig[1,1], ) #scenekw = (clear=true,)
-        # cam = Makie.camera(ax.scene)
-        # cam = cam3d!(ax.scene, projectiontype=Makie.Orthographic)
-        # update_cam!(ax.scene, cam)
-    end
-    grid1 = fig[2,1] = GridLayout()
-    tg.state.system.q .= traj.q[begin]
-    TR.update!(tg)
-    tgob = Observable(deepcopy(tg))
-    init_plot!(ax,deepcopy(tgob);isref=true)
-    init_plot!(ax,tgob;showlabels,textsize)
-    ls_step = labelslider!(fig,"Step",1:length(traj))
-    grid1[1,1] = ls_step.layout
-    on(ls_step.slider.value) do this_step
-        tg.state.system.q .= traj.q[this_step]
-        # tg.state.system.q̇ .= traj.q̇[this_step]
-        if actuate
-            TR.actuate!(bot,[traj.t[this_step]])
+    fig = Figure(resolution=match_figsize(figsize))
+    xmin,xmax = xlims
+    ymin,ymax = ylims
+    zmin,zmax = zlims
+    xwid = xmax - xmin
+    ywid = ymax - ymin
+    zwid = zmax - zmin
+    grid1 = fig[1,1] = GridLayout()
+    subgrids = [
+        grid1[i,j] = GridLayout()
+        for i in 1:gridsize[1], j = 1:gridsize[2]
+    ] |> permutedims
+    parsed_steps = @match (attimes,atsteps) begin
+        (a::Nothing,b::Nothing) => [
+                1 for sgi in eachindex(subgrids)
+            ]
+    	(a,b::Nothing) => [
+                time2step(a[sgi],traj.t)
+                for sgi in eachindex(subgrids)
+            ]
+        (a::Nothing,b) => b
+        (a,b) => begin
+            @warn "Ignoring `attimes`"
+            b
         end
-        TR.update!(tg)
-        axtitle[] = string(traj.t[this_step])
-        # @show TR.mechanical_energy(tg)
-        #
-        # camera = cameracontrols(ax.scene)
-        # lookat = camera.lookat[]
-        # eyepos = camera.eyeposition[]
-        # @show lookat, eyepos
-        TR.analyse_slack(tg,true)
-        tgob[] = tg
     end
+
+    # @warn "Overwriting `atsteps`"
+    # @warn "Ignoring `attimes`"
+    rowgap!(grid1,2fontsize)
+	# colgap!(grid1,10fontsize)
+    for sgi in eachindex(subgrids)
+        sg = subgrids[sgi]
+        this_time = Observable(traj.t[parsed_steps[sgi]])
+        tg.state.system.q .= traj.q[parsed_steps[sgi]]
+
+        TR.update!(tg)
+        TR.update_orientations!(tg)
+
+        tgob = Observable(deepcopy(tg))
+        axtitle = lift(this_time) do tt
+            @sprintf "(%s) t = %.10G(s)" alphabet[sgi] tt
+        end
+        if ndim == 2
+            ax = Axis(sg[1,1],title=axtitle)
+            ax.aspect = DataAspect()
+        else
+            ax = Axis3(sg[1,1],
+                title=axtitle,
+                aspect=:data,
+            )
+            zlims!(ax,zmin,zmax)
+            # ax = LScene(fig[1,1], show_axis=false, scenekw = (clear=true,))
+            # ax = LScene(fig[1,1], ) #scenekw = (clear=true,)
+            # cam = Makie.camera(ax.scene)
+            # cam = cam3d!(ax.scene, projectiontype=Makie.Orthographic)
+            # update_cam!(ax.scene, cam)
+        end
+        xlims!(ax,xmin,xmax)
+        ylims!(ax,ymin,ymax)
+        if showground
+            rect = Rect3f((xmin,ymin,zmin),(xwid,ywid,zwid))
+            groundmesh = get_groundmesh(ground,rect)
+            mesh!(ax,groundmesh;color = :snow)
+        end
+        if showinit
+            init_plot!(ax,deepcopy(tgob);showmesh,showwire,isref=true,kargs...)
+        end
+        init_plot!(ax,tgob;showlabels,showmesh,showwire,fontsize,kargs...)
+
+        if doslide
+            if showinfo
+                grid2 = sg[:,2] = GridLayout(;tellheight=false)
+                grid_info = grid2[1,1] = GridLayout(;tellheight=false)
+                dict_info = [
+                    "azimuth" => lift(string,ax.azimuth),
+                    "elevation" => lift(string,ax.elevation)
+                ]
+
+                for (i,(infoname,infovalue)) in enumerate(dict_info)
+                    Label(grid_info[i,1],
+                        lift(infovalue) do iv
+                            "$infoname = $iv"
+                        end,
+                        justification = :left,
+                    )
+                end
+                grid_button = grid2[2,1] = GridLayout(;tellheight=false)
+                # camera = cameracontrols(ax.scene)
+                # lookat = camera.lookat
+                # eyepos = camera.eyeposition
+                botton_printinfo = Button(grid_button[1,1], label = "Print Infos")
+                on(botton_printinfo.clicks) do _
+                    for (infoname,infovalue) in dict_info
+                        println("$infoname = $(infovalue[])")
+                    end
+                end
+            end
+            grid3 = sg[2,:] = GridLayout()
+            slidergrid = SliderGrid(
+                grid3[1,1],
+                (label = "Step", range = 1:length(traj), startvalue = parsed_steps[sgi]),
+            )
+            on(slidergrid.sliders[1].value) do this_step
+                tg.state.system.q .= traj.q[this_step]
+                # tg.state.system.q̇ .= traj.q̇[this_step]
+                if actuate
+                    TR.actuate!(bot,[traj.t[this_step]])
+                end
+                TR.update!(tg)
+                TR.update_orientations!(tg)
+                # @show TR.mechanical_energy(tg)
+                #
+                this_time[] = traj.t[this_step]
+                TR.analyse_slack(tg,true)
+                tgob[] = tg
+            end
+        end
+    end
+    savefig(fig,figname)
     fig
 end
 
-function init_plot!(ax,tgob;isref=false,showlabels=true,textsize=10)
+function savefig(fig,figname=nothing)
+    if !isa(figname,Nothing)
+        if isdefined(Main,:figdir)
+            figpath = joinpath(figdir,figname)
+        else
+            figpath = figname
+        end
+        if Makie.current_backend[] isa CM.CairoBackend
+            CM.save(figpath*".pdf",fig)
+        else
+            GM.save(figpath*".png",fig)
+        end
+    end
+end
+function init_plot!(ax,tgob;isref=false,
+        showlabels=true,
+        showpoints=true,
+        showmesh=true,
+        showwire=false,
+        fontsize=10,
+        cablecolor=:deepskyblue,
+        cablelabelcolor=:darkgreen,
+        rigidcolor=:slategray4,
+        rigidlabelcolor=:darkblue,
+        kargs...)
     (;ncables,nrigids) = tgob[]
+    ndim = TR.get_ndim(tgob[])
     if isref
         showlabels = false
         cablecolor =
         cablelabelcolor =
         rigidcolor =
         rigidlabelcolor = :grey
-    else
-        cablecolor=:deepskyblue
-        # cablecolor=:red
-        cablelabelcolor=:darkgreen
-        rigidcolor=:black
-        rigidlabelcolor=:darkblue
     end
     # cables
     if ncables !== 0
@@ -138,7 +390,7 @@ function init_plot!(ax,tgob;isref=false,showlabels=true,textsize=10)
             text!(ax,
                 ["c$(i)" for (i,rc) in enumerate(rcs_by_cables[])] ,
                 position = rcs_by_cables,
-                textsize = textsize,
+                textsize = fontsize,
                 color = cablelabelcolor,
                 align = (:left, :top),
                 offset = (-5, -10)
@@ -146,124 +398,123 @@ function init_plot!(ax,tgob;isref=false,showlabels=true,textsize=10)
         end
     end
     # rigid bars
-    rigidbars = TR.get_rigidbars(tgob[])
-    if !isempty(rigidbars)
-        linesegs_bars = @lift begin
-            bars = TR.get_rigidbars($tgob)
-            ndim = TR.get_ndim($tgob)
-            T = TR.get_numbertype($tgob)
-            ret = Vector{Pair{Point{ndim,T},Point{ndim,T}}}()
-            mapreduce(
-                (bar)->
-                Point(bar.state.rps[1]) =>
-                Point(bar.state.rps[2]),
-                vcat,
-                bars
-                ;init=ret
+    # rigidbars = TR.get_rigidbars(tgob[])
+    # if !isempty(rigidbars)
+    #     if ndim == 2
+    #         linesegs_bars = @lift begin
+    #             bars = TR.get_rigidbars($tgob)
+    #             ndim = TR.get_ndim($tgob)
+    #             T = TR.get_numbertype($tgob)
+    #             ret = Vector{Pair{Point{ndim,T},Point{ndim,T}}}()
+    #             mapreduce(
+    #                 (bar)->
+    #                 Point(bar.state.rps[1]) =>
+    #                 Point(bar.state.rps[2]),
+    #                 vcat,
+    #                 bars
+    #                 ;init=ret
+    #             )
+    #         end
+    #         linesegments!(ax, linesegs_bars, color = rigidcolor, linewidth = 4)
+    #     else
+    #         cyl_bars_mesh = @lift begin
+    #         	bars = TR.get_rigidbars($tgob)
+    #         	mapreduce(
+    #         		bar2mesh,
+    #         		Meshes.merge,
+    #         		bars[2:end]
+    #         		;init = bar2mesh(bars[1])
+    #         	) |> simple2mesh
+    #         end
+    #         mesh!(ax, cyl_bars_mesh, color = :slategray4, shading = true, )
+    #     end
+    # end
+    rbsob = @lift begin
+        TR.get_rigidbodies($tgob)
+    end
+    nb = length(rbsob[])
+    if showmesh || showwire
+        for rbid = 1:nb
+            rigid_mesh = @lift begin
+                rb = ($rbsob)[rbid]
+                update_rigidmesh(rb)
+            end
+            if showwire
+                strokewidth = linewidth
+            else
+                strokewidth = 0
+            end
+            poly!(ax, rigid_mesh;
+                    color = rigidcolor,
+                    shading = true,
+                    strokewidth
             )
         end
-        linesegments!(ax, linesegs_bars, color = rigidcolor, linewidth = 4)
+    end
+    # mass centers
+    rg_by_rbs = @lift begin
+        [rb.state.rg for rb in $rbsob]
+    end
+    # points on rigidbodies
+    rps_by_rbs = [
+        @lift begin
+            rbs = TR.get_rigidbodies($tgob)
+            rbs[rbid].state.rps
+        end
+        for rbid = 1:nrigids
+    ]
+    if showpoints
+        scatter!(ax,rg_by_rbs; color = rigidlabelcolor, markersize)
+        for (rbid,rps) in enumerate(rps_by_rbs)
+            scatter!(ax,rps)
+        end
     end
     if showlabels
-        # mass centers
-        rg_by_rbs = @lift begin
-            rbs = TR.get_rigidbodies($tgob)
-            [rb.state.rg for rb in rbs]
-        end
-        scatter!(ax,rg_by_rbs, color = rigidlabelcolor, markersize = 4)
-        # points on rigidbodies
-        rps_by_rbs = [
-            @lift begin
-                rbs = TR.get_rigidbodies($tgob)
-                rbs[rbid].state.rps
-            end
-            for rbid = 1:nrigids
-        ]
         text!(ax,
             ["r$(i)g" for (i,rg) in enumerate(rg_by_rbs[])] ,
             position = rg_by_rbs,
-            textsize = textsize,
+            textsize = fontsize,
             color = rigidlabelcolor,
             align = (:left, :top),
             offset = (-5, -10)
         )
         for (rbid,rps) in enumerate(rps_by_rbs)
-            # if rbid in [8,9]
-                scatter!(ax,rps)
-                text!(ax,
-                    # ["r$(rbid)p$pid $(string(rp))" for (pid,rp) in enumerate(rps[])],
-                    ["r$(rbid)p$pid" for (pid,rp) in enumerate(rps[])],
-                    position = rps,
-                    textsize = textsize,
-                    color = :darkred,
-                    align = (:left, :top),
-                    offset = (20(rand()-0.5), 20(rand()-0.5))
-                )
-            # end
+            text!(ax,
+                # ["r$(rbid)p$pid $(string(rp))" for (pid,rp) in enumerate(rps[])],
+                ["r$(rbid)p$pid" for (pid,rp) in enumerate(rps[])],
+                position = rps,
+                textsize = fontsize,
+                color = :darkred,
+                align = (:left, :top),
+                offset = (20(rand()-0.5), 20(rand()-0.5))
+            )
         end
     end
 end
 
-function get_trajectory!(bot::TR.TensegrityRobot,rbid::Int,pid::Int,step_range=:)
-    (; tg, traj)= bot
-    rp = VectorOfArray(Vector{Vector{Float64}}())
-    rbs = TR.get_rigidbodies(tg)
-    rb = rbs[rbid]
-    for q in traj.q
-        TR.update_rigids!(tg,q)
-        if pid == 0
-            push!(rp,rb.state.rg)
-        else
-            push!(rp,rb.state.rps[pid])
-        end
-    end
-    rp
+function update_rigidmesh(rb)
+    (;state,mesh) = rb
+    @assert !(mesh isa Nothing)
+    trans = Translation(state.ro)
+    rot = LinearMap(state.R)
+    ct = trans ∘ rot
+    updated_pos = ct.(mesh.position)
+    fac = faces(mesh)
+    nls = normals(updated_pos,fac)
+    GeometryBasics.Mesh(meta(updated_pos,normals=nls),fac)
 end
 
-function get_velocity!(bot::TR.TensegrityRobot,rbid::Int,pid::Int,step_range=:)
-    (; tg, traj)= bot
-    ṙp = VectorOfArray(Vector{Vector{Float64}}())
-    rbs = TR.get_rigidbodies(tg)
-    rb = rbs[rbid]
-    for (q,q̇) in zip(traj.q, traj.q̇)
-        TR.update_rigids!(tg,q,q̇)
-        push!(ṙp,rb.state.ṙps[pid])
-    end
-    ṙp
+function bar2mesh(bar_state)
+	p1 = Meshes.Point(bar_state.rps[1])
+	p2 = Meshes.Point(bar_state.rps[2])
+	s = Meshes.Segment(p1,p2)
+	cyl_bar = Meshes.Cylinder(Meshes.length(s)/40,s)
+    # cylsurf_bar = Meshes.boundary(cyl_bar)
+    # Meshes.sample(cylsurf_bar,Meshes.RegularSampling(10,3))
+	cyl_bar_simple = Meshes.triangulate(cylsurf_bar)
+    cyl_bar_simple |> simple2mesh
 end
 
-function get_angular!(bot::TR.TensegrityRobot,rbid::Int,step_range=:)
-    (; tg, traj)= bot
-    ω = VectorOfArray(Vector{Vector{Float64}}())
-    rbs = TR.get_rigidbodies(tg)
-    rb = rbs[rbid]
-    for (q,q̇) in zip(traj.q, traj.q̇)
-        TR.update_rigids!(tg,q,q̇)
-        TR.update_orientations!(tg)
-        push!(ω,rb.state.ω)
-    end
-    ω
-end
-
-function get_time_mids(bot::TR.TensegrityRobot)
-    (;t) = bot.traj
-    (t[begin+1:end] .+ t[begin:end-1])./2
-end
-
-function get_tension!(bot::TR.TensegrityRobot,cid::Int,step_range=:)
-    (; tg, traj)= bot
-    (; cables) = tg
-    T = TR.get_numbertype(tg)
-    f = Vector{T}()
-    h = traj.t[2] - traj.t[1]
-    q_mids = [(traj.q[k] .+ traj.q[k+1])./2 for k = 1:length(traj)-1]
-    q̇_mids = [(traj.q[k] .- traj.q[k+1])./h for k = 1:length(traj)-1]
-    for (q,q̇) in zip(q_mids, q̇_mids)
-        TR.update!(tg,q)
-        push!(f,cables[cid].state.tension)
-    end
-    f
-end
 
 function parse_Adams_dynamic(url)
     adams_xml = readxml(url)
@@ -302,4 +553,33 @@ function parse_Adams_frequency(url)
     frequency_node = findfirst("//adams:ModalEnergyHeader[@type='undamped_natural_freqs']",adams_xml.root, ns)
     frequency_string = split(frequency_node.content,"\n")[2]
     frequency = parse.(Float64,split(frequency_string," "))
+end
+
+function simple2mesh(sp)
+	dim   = Meshes.embeddim(sp)
+	nvert = Meshes.nvertices(sp)
+	nelem = Meshes.nelements(sp)
+	verts = Meshes.vertices(sp)
+	topo  = Meshes.topology(sp)
+	elems = Meshes.elements(topo)
+
+	# coordinates of vertices
+	coords = Meshes.coordinates.(verts)
+	# fan triangulation (assume convexity)
+	tris4elem = map(elems) do elem
+	  I = Meshes.indices(elem)
+	  [[I[1], I[i], I[i+1]] for i in 2:length(I)-1]
+	end
+
+	# flatten vector of triangles
+	tris = [tri for tris in tris4elem for tri in tris]
+
+	points  = Point.(coords)
+	faces  = TriangleFace{UInt64}.(tris)
+	# tcolors  = colorant
+
+	# convert connectivities to matrix format
+	# tmatrix = reduce(hcat, tconnec) |> transpose |> Matrix
+    nls = normals(points,faces)
+    GeometryBasics.Mesh(meta(points,normals=nls),faces)
 end

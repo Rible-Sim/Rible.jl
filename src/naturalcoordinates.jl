@@ -327,12 +327,9 @@ end
 返回任意列点自然坐标类、自然坐标。
 $(TYPEDSIGNATURES)
 """
-function NCMP(rps::AbstractVector{<:AbstractVector})
-    T = eltype(eltype(rps))
+function NCMP(rps::AbstractVector{<:AbstractVector},ro,R,ṙo,ω)
     M = size(eltype(rps))[1]
     L = length(rps)
-    ro = SVector{M}(zeros(T,M))
-    R = SMatrix{M,M}(one(T)*I)
     invR = transpose(R)
     r̄ps = SMatrix{M,L}(reduce(hcat,Ref(invR).*(rps.-Ref(ro))))
     q = reduce(vcat,rps)
@@ -668,7 +665,7 @@ end
 $(TYPEDSIGNATURES)
 """
 function get_deform(lncs::LNCMP)
-    lncs.r̄ps
+    reduce(vcat,lncs.r̄ps)
 end
 
 # """
@@ -1248,7 +1245,7 @@ end
 
 function make_M(cf::CoordinateFunctions{<:LNCMP},m::T,Īg,r̄g) where {T} # ami (area moment of inertia tensor)
     ncoords = get_ncoords(cf.lncs)
-    M = SMatrix{ncoords,ncoords}(zeros(T,ncoords,ncoords))
+    M = SMatrix{ncoords,ncoords}(Matrix(m*I,ncoords,ncoords))
 end
 
 make_X(q::AbstractVector,lncs::LNC) = make_X(lncs,q)
@@ -1261,15 +1258,28 @@ function make_X(lncs::LNC,q::AbstractVector)
 end
 
 find_R(q::AbstractVector, lncs::LNC) = find_R(lncs,q)
-
+find_R(lncs::LNCMP,q::AbstractVector) = Matrix(one(eltype(q))*I,get_ndim(lncs),get_ndim(lncs))
 function find_R(lncs::LNC,q::AbstractVector)
     X = make_X(lncs,q)
     (;invX̄) = lncs
     ndim = get_ndim(lncs)
-    R = SMatrix{ndim,ndim}(X*invX̄)
+    if lncs isa LNC3D2P
+        (;r̄i,r̄j) = lncs
+        ū = r̄j - r̄i
+        v̄,w̄ = HouseholderOrthogonalization(ū)
+        ri = @view q[1:3]
+        rj = @view q[4:6]
+        u = rj -ri
+        v,w = HouseholderOrthogonalization(u)
+        R = SMatrix{ndim,ndim}([u;;v;;w]*inv([ū;;v̄;;w̄]))
+    else
+        R = SMatrix{ndim,ndim}(X*invX̄)
+    end
+    return R
 end
 
 find_ω(q::AbstractVector,q̇::AbstractVector,lncs::LNC3D) = find_ω(lncs,q,q̇)
+find_ω(lncs::LNCMP,q::AbstractVector,q̇::AbstractVector) = zeros(eltype(q),get_ndim(lncs))
 
 function find_ω(lncs::LNC,q::AbstractVector,q̇::AbstractVector)
     Ẋ = make_X(lncs,q̇)
@@ -1281,7 +1291,8 @@ function find_ω(lncs::LNC,q::AbstractVector,q̇::AbstractVector)
         u̇ = Ẋ[:,1]
         ω = SVector{1}([-u[2],u[1]]\u̇)
     else
-        ω = SVector{ndim}(Ẋ*inv(X))
+        Ω = Ẋ*pinv(X)
+        ω = SVector{3}(Ω[3,2],Ω[1,3],Ω[2,1])
     end
 end
 

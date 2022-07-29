@@ -206,20 +206,19 @@ end
 刚体连接性类。
 $(TYPEDEF)
 """
-struct Connectivity{numberType,indexType,connectType,jointType,cType}
+struct Connectivity{numberType,indexType,connectType,jointType}
     numbered::numberType
     indexed::indexType
     connected::connectType
     jointed::jointType
-    contacts::cType
 end
 
 """
 连接性构造子。
 $(TYPEDSIGNATURES)
 """
-function Connectivity(numbered,indexed,connected,jointed=unjoin())
-	Connectivity(numbered,indexed,connected,jointed,nothing)
+function Connectivity(numbered,indexed,connected)
+	Connectivity(numbered,indexed,connected,unjoin())
 end
 
 function get_nconstraints(rbs::TypeSortedCollection)
@@ -322,7 +321,7 @@ end
 张拉整体结构类。
 $(TYPEDEF)
 """
-struct TensegrityStructure{BodyType,StrType,TenType,CntType,StateType} <: AbstractTensegrityStructure
+struct TensegrityStructure{RigidType,CableType,TenType,CntType,StateType,ContactsType} <: AbstractTensegrityStructure
     ndim::Int
 	ndof::Int
 	nconstraints::Int
@@ -330,18 +329,19 @@ struct TensegrityStructure{BodyType,StrType,TenType,CntType,StateType} <: Abstra
     ncables::Int
     ntensiles::Int
     # nprespoints::Int
-    rigidbodies::BodyType
-    cables::StrType
+    rigidbodies::RigidType
+    cables::CableType
     tensiles::TenType
     connectivity::CntType
 	state::StateType
+	contacts::ContactsType
 end
 
 """
 张拉整体结构构造子。
 $(TYPEDSIGNATURES)
 """
-function TensegrityStructure(rbs,tensiles,cnt::Connectivity)
+function TensegrityStructure(rbs,tensiles,cnt::Connectivity,contacts=nothing)
     ndim = get_ndim(rbs)
     nrigids = length(rbs)
     ncables = length(tensiles.cables)
@@ -358,12 +358,14 @@ function TensegrityStructure(rbs,tensiles,cnt::Connectivity)
     cables = tensiles.cables
 	state = TensegrityState(rbs,cnt)
     tg = TensegrityStructure(
-			ndim,ndof,nconstraints,
-	        nrigids,ncables,ntensiles,
-	        rbs,cables,tensiles,
-	        cnt,state
+		ndim,ndof,nconstraints,
+        nrigids,ncables,ntensiles,
+        rbs,cables,tensiles,
+        cnt,state,
+		contacts
 	)
     check_jacobian_singularity(tg)
+	update!(tg)
     tg
 end
 
@@ -371,10 +373,11 @@ end
 张拉整体机器人类。
 $(TYPEDEF)
 """
-struct TensegrityRobot{tgT,hubT,trajT}
+struct TensegrityRobot{tgT,hubT,trajT,contacts_trajT}
     tg::tgT
     hub::hubT
     traj::trajT
+	contacts_traj::contacts_trajT
 end
 
 """
@@ -933,12 +936,10 @@ end
 张拉整体机器人类构造子。
 $(TYPEDSIGNATURES)
 """
-function TensegrityRobot(tg,hub)
-	update!(tg)
-	# check_jacobian_singularity(tg)
-	# check_stability(tg)
+function TensegrityRobot(tg,hub=nothing)
 	traj = StructArray([deepcopy(tg.state.system)])
-    TensegrityRobot(tg,hub,traj)
+	contacts_traj = [deepcopy(tg.contacts)]
+    TensegrityRobot(tg,hub,traj,contacts_traj)
 end
 
 """
@@ -1033,7 +1034,7 @@ function mechanical_energy!(tg::TensegrityStructure)
 	mechanical_energy(tg)
 end
 
-function mechanical_energy!(bot::TensegrityRobot;actuate=false,gravity=false)
+function mechanical_energy!(bot::TensegrityRobot;actuate=false,gravity=true)
 	(;tg,traj) = bot
 	StructArray([
 		begin

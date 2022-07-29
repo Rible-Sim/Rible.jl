@@ -165,12 +165,16 @@ $(TYPEDEF)
 ---
 $(TYPEDFIELDS)
 """
-struct RigidBody{N,T,L,M,cacheType} <: AbstractRigidBody{N,T}
+struct RigidBody{N,T,L,M,cacheType,meshType} <: AbstractRigidBody{N,T}
 	"刚体属性"
     prop::RigidBodyProperty{N,T,L}
 	"刚体状态"
     state::RigidBodyState{N,T,L,M,cacheType}
+	"可视化网格"
+	mesh::meshType
 end
+
+RigidBody(prop,state) = RigidBody(prop,state,nothing)
 
 # kinematic joint constraints
 

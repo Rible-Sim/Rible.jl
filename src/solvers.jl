@@ -55,14 +55,16 @@ function prepare_traj!(traj;tspan,dt,restart=true)
         push!(traj,deepcopy(traj[end]))
         traj.t[end] = tstart + dt*istep
     end
+    totalstep
 end
 
 function solve!(prob::SimProblem,solver,
                 control! = nothing;
                 tspan,dt,restart=true,karg...)
     (;bot,dynfuncs) = prob
-    (;tg,traj) = bot
-    prepare_traj!(traj;tspan,dt,restart)
+    (;tg,traj,contacts_traj) = bot
+    if restart; resize!(contacts_traj,1); end
+    totalstep = prepare_traj!(traj;tspan,dt,restart)
     if !isa(control!, Nothing)
         for i in enumerate(traj)
             control!(traj[i],tg)
@@ -81,11 +83,15 @@ function solve!(intor,solver;karg...)
     solve!(intor,solvercache;karg...)
     # retrieve!(intor,solvercache)
     # intor,solvercache
-    intor.prob.bot
+    # intor.prob.bot
 end
 
 include("solvers/Wendlandt.jl")
 include("solvers/Zhong06.jl")
 include("solvers/Alpha.jl")
-include("solvers/nonsmooth.jl")
-include("solvers/Zhong06NSNH.jl")
+include("solvers/CCP/CCPsolvers.jl")
+include("solvers/CCP/ZhongCCP.jl")
+include("solvers/CCP/AlphaCCP.jl")
+
+# include("solvers/nonsmooth.jl")
+# include("solvers/Zhong06NSNH.jl")

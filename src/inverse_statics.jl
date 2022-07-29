@@ -1,16 +1,13 @@
-function build_Ti(tg::TensegrityStructure,i::Integer)
-    nbodycoords = get_nbodycoords(tg)
-    body2fullq = tg.connectivity.body2fullq
-    nfullcoords = maximum.(body2fullq) |> maximum
-    build_Ti(nbodycoords,nfullcoords,body2fullq[i])
-end
-
-function build_Ti(nbodycoords,nq,q_index)
-    Ti = spzeros(Int,nbodycoords,nq)
-    for (body_q_id,q_id) in enumerate(q_index)
-        Ti[body_q_id,q_id] = 1
+function build_T(tg,i)
+    (;indexed) = tg.connectivity
+    (;nfull,mem2sysfull) = indexed
+    T = zeros(Int,length(mem2sysfull[i]),nfull)
+    # Ť = zeros(Int,length(mem2sysfull[i]),nfree)
+    # T̃ = zeros(Int,length(mem2sysfull[i]),npres)
+    for (i,j) in enumerate(mem2sysfull[i])
+        T[i,j] = 1
     end
-    Ti
+    T
 end
 
 function build_T(tg)
@@ -25,7 +22,6 @@ function build_T(tg)
     end
     T
 end
-
 
 function build_Ci(rb)
     Ci = reduce(hcat,[
