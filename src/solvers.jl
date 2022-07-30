@@ -1,125 +1,88 @@
-function build_tangent(tg)
-    q, q̇ = get_q(tg)
-    J = [build_Ji(tg,i) for i = 1:tg.ncables]
-    U = [transpose(Ji)*Ji for Ji in J]
-    l = [sqrt(transpose(q)*Ui*q) for Ui in U]
-    # display(l)
-    # display([s.state.length for s in tg.cables])
-    # @show l.-[s.state.length for s in tg.cables]
-    l̇ = [(transpose(q)*Ui*q̇)/li for (Ui,li) in zip(U,l)]
-    ∂l∂q = [(transpose(q)*Ui)./li for (Ui,li) in zip(U,l)]
-    ∂l̇∂q̇ = ∂l∂q
-    ∂l̇∂q = [(li*transpose(q̇)-l̇i*transpose(q))/li^2*Ui for (Ui,li,l̇i) in zip(U,l,l̇)]
-    k = [s.k for s in tg.cables]
-    c = [s.c for s in tg.cables]
-    ∂f∂q = [ki*∂li∂q+ci*∂l̇i∂q for (ki,ci,∂li∂q,∂l̇i∂q) in zip(k,c,∂l∂q,∂l̇∂q)]
-    ∂f∂q̇ = [ci*∂l̇i∂q̇ for (ci,∂l̇i∂q̇) in zip(c,∂l̇∂q̇)]
-    l̂ = [Ji*q/li for (Ji,li) in zip(J,l)]
-    ∂l̂∂q = [(Ji-l̂i*∂li∂q)/li for (li,l̂i,Ji,∂li∂q) in zip(l,l̂,J,∂l∂q)]
-    # @show l̂.-[s.state.direction for s in tg.cables]
-    f = [s.state.tension for s in tg.cables]
-    ∂𝐟∂q = [l̂i*∂fi∂q+fi*∂l̂i∂q for (l̂i,fi,∂fi∂q,∂l̂i∂q) in zip(l̂,f,∂f∂q,∂l̂∂q)]
-    ∂𝐟∂q̇ = [l̂i*∂fi∂q̇ for (l̂i,∂fi∂q̇) in zip(l̂,∂f∂q̇)]
-    @unpack ndim,ncoords,ncables = tg
-    ∂Γ∂q = zeros(eltype(q),ndim*ncables,ncoords)
-    ∂Γ∂q̇ = zeros(eltype(q),ndim*ncables,ncoords)
-    for i in 1:ncables
-        ∂Γ∂q[(i-1)*ndim+1:i*ndim,:] = ∂𝐟∂q[i]
-        ∂Γ∂q̇[(i-1)*ndim+1:i*ndim,:] = ∂𝐟∂q̇[i]
-    end
-    ∂Γ∂q,∂Γ∂q̇
-end
+struct Wendlandt end
 
-"""
-返回∂Γ∂q,∂Γ∂q̇。
-$(TYPEDSIGNATURES)
-"""
-function build_Jac_Γ(tg::TensegrityStructure)
-    ns = tg.ncables
-    @unpack ncoords,ndim = tg
-    J = [build_Ji(tg,i) for i = 1:ns]
-    U = [transpose(Ji)*Ji for Ji in J]
-    k = [s.k for s in tg.cables]
-    c = [s.c for s in tg.cables]
-    function inner_Jac_Γ(q,q̇)
-        reset_forces!(tg)
-        distribute_q_to_rbs!(tg,q,q̇)
-        update_cables_apply_forces!(tg)
-        f = [s.state.tension for s in tg.cables]
-        l = [s.state.length for s in tg.cables]
-        u = [s.state.restlen for s in tg.cables]
-        qᵀU = [transpose(q)*U[i] for i = 1:ns]
-        # l = [sqrt(qᵀU[i]*q) for i = 1:ns]
-        l̇ = [(qᵀU[i]*q̇)/l[i] for i = 1:ns]
-        l̂ = [J[i]*q/l[i] for i = 1:ns]
-        ∂Γ∂q = zeros(eltype(q),ndim*ns,ncoords)
-        ∂Γ∂q̇ = zeros(eltype(q),ndim*ns,ncoords)
-        for i in 1:ns
-            l̂qᵀUi = l̂[i]*qᵀU[i]
-            # ∂Γ∂q[(i-1)*ndim+1:i*ndim,:] .= l̂[i]*(k[i]./l[i].*qᵀU[i] .+ c[i]./l[i].*transpose(q̇).-c[i]*l̇[i]./l[i]^2 .*qᵀU[i])
-            # ∂Γ∂q[(i-1)*ndim+1:i*ndim,:] .+= f[i].*(J[i]./l[i].-l̂[i]*qᵀU[i]./l[i]^2)
-            ∂Γ∂q[(i-1)*ndim+1:i*ndim,:] .= (k[i]*u[i]-c[i]*l̇[i])/l[i]^2 .*l̂qᵀUi .+ c[i]/l[i].*(l̂[i]*transpose(q̇)*U[i]) .+ f[i]/l[i] .*J[i]
-            ∂Γ∂q̇[(i-1)*ndim+1:i*ndim,:] .= c[i]/l[i].*l̂qᵀUi
+struct SimProblem{BotType,FuncsType}
+    bot::BotType
+    dynfuncs::FuncsType
+    function SimProblem(bot,make_dynfuncs)
+        dynfuncs_raw = make_dynfuncs(bot)
+        if dynfuncs_raw isa NamedTuple{(:F!,)}
+            dynfuncs = (F! = dynfuncs_raw.F!, Jac_F! = nothing)
+        elseif dynfuncs_raw isa NamedTuple{(:F!,:Jac_F!)}
+            dynfuncs = dynfuncs_raw
+        elseif dynfuncs_raw isa NamedTuple{(:F!, :apply_acu!)}
+            dynfuncs = (F! = dynfuncs_raw.F!, Jac_F! = nothing, apply_acu! = dynfuncs_raw.apply_acu!)
+        elseif dynfuncs_raw isa NamedTuple{(:F!, :Jac_F!, :apply_acu!)}
+            dynfuncs = dynfuncs_raw
+        else
+            error("dynfuncs not recognized.")
         end
-        ∂Γ∂q,∂Γ∂q̇
+        new{typeof(bot),typeof(dynfuncs)}(bot,dynfuncs)
     end
 end
 
-function build_Jac_Γ(tg::ClusterTensegrityStructure)
-    (;ntensiles, ncables, nclustercables, ndim, ndof) = tg
-    (;clustercables, cables) = tg
-    nclustersegs = length(reduce(vcat, [clustercables[i].segs for i in 1:length(clustercables)]))
+struct DiscreteCallback{condType,aType}
+    condition::condType
+    affect!::aType
+end
 
-    J = [build_Ji(tg,i) for i = 1:ncables]
-    k = [s.k for s in cables]
-    c = [s.c for s in cables]
-    Jc = Vector{SparseMatrixCSC{Float64,Int64}}()
-    
-    kc = Vector{Float64}()
-    cc = Vector{Float64}()
-    for (cid,clustercable) in enumerate(clustercables)
-        (;segs) = clustercable
-        for (sid, seg) in enumerate(segs)
-            push!(Jc, build_Ji(tg, cid, sid))
-            push!(kc, seg.k)
-            push!(cc, seg.c)
+const FALSE_CALLBACK_CONDITION = (intor) -> false
+const TRUE_CALLBACK_CONDITION  = (intor) -> true
+const DEFAULT_CALLBACK = DiscreteCallback(
+                        FALSE_CALLBACK_CONDITION,
+                        (integrator)->nothing)
+const NO_CONTROL = (intor,cache) -> nothing
+
+mutable struct IntegratorState{StateT}
+    now::StateT
+    prv::StateT
+    convergence::Bool
+end
+
+struct Integrator{ProbType,StateType,CtrlType,T}
+    prob::ProbType
+    state::StateType
+    control!::CtrlType
+    tspan::Tuple{T,T}
+    restart::Bool
+    totalstep::Int
+end
+
+function solve!(prob::SimProblem,solver,
+                control! = nothing;
+                tspan=(0.0,1.0),restart=true,dt,karg...)
+    (;bot,dynfuncs) = prob
+    (;tg,traj) = bot
+    if restart
+        resize!(traj,1)
+    end
+    tstart,tend = tspan
+    totaltime = tend - tstart
+    totalstep = ceil(Int,totaltime/dt)
+    for istep = 1:totalstep
+        push!(traj,deepcopy(traj[end]))
+        traj.t[end] = tstart + dt*istep
+        if !isa(control!, Nothing)
+            control!(traj[end],tg)
         end
     end
-    U = [transpose(Ji)*Ji for Ji in J]
-    function inner_Jac_Γ(q,q̇)
-        reset_forces!(tg)
-        distribute_q_to_rbs!(tg,q,q̇)
-        update_cables_apply_forces!(tg)
-        f = [s.state.tension for s in tg.cables]
-        l = [s.state.length for s in tg.cables]
-        u = [s.state.restlen for s in tg.cables]
-        qᵀU = [transpose(q)*U[i] for i = 1:ns]
-        # l = [sqrt(qᵀU[i]*q) for i = 1:ns]
-        l̇ = [(qᵀU[i]*q̇)/l[i] for i = 1:ns]
-        l̂ = [J[i]*q/l[i] for i = 1:ns]
-        ∂Γ∂q = zeros(eltype(q),ndim*ns,ncoords)
-        ∂Γ∂q̇ = zeros(eltype(q),ndim*ns,ncoords)
-        for i in 1:ns
-            l̂qᵀUi = l̂[i]*qᵀU[i]
-            # ∂Γ∂q[(i-1)*ndim+1:i*ndim,:] .= l̂[i]*(k[i]./l[i].*qᵀU[i] .+ c[i]./l[i].*transpose(q̇).-c[i]*l̇[i]./l[i]^2 .*qᵀU[i])
-            # ∂Γ∂q[(i-1)*ndim+1:i*ndim,:] .+= f[i].*(J[i]./l[i].-l̂[i]*qᵀU[i]./l[i]^2)
-            ∂Γ∂q[(i-1)*ndim+1:i*ndim,:] .= (k[i]*u[i]-c[i]*l̇[i])/l[i]^2 .*l̂qᵀUi .+ c[i]/l[i].*(l̂[i]*transpose(q̇)*U[i]) .+ f[i]/l[i] .*J[i]
-            ∂Γ∂q̇[(i-1)*ndim+1:i*ndim,:] .= c[i]/l[i].*l̂qᵀUi
-        end
-        ∂Γ∂q,∂Γ∂q̇
-    end
+    now = deepcopy(traj[end])
+    prv = deepcopy(traj[end])
+    convergence = false
+    state = IntegratorState(now,prv,convergence)
+    intor = Integrator(prob,state,control!,tspan,restart,totalstep)
+    solve!(intor,solver;dt,karg...)
 end
 
-
-function make_testtangent(tgstruct)
-    @unpack ncoords,ncables = tgstruct
-    function build_𝐟(x)
-        q = x[1:ncoords]
-        q̇ = x[ncoords+1:2ncoords]
-        reset_forces!(tgstruct)
-        distribute_q_to_rbs!(tgstruct,q,q̇)
-        update_cables_apply_forces!(tgstruct)
-        vcat([tgstruct.cables[i].state.direction*tgstruct.cables[i].state.tension
-            for i = 1:ncables]...)
-    end
+function solve!(intor,solver;karg...)
+    solvercache = generate_cache(solver,intor;karg...)
+    solve!(intor,solvercache;karg...)
+    # retrieve!(intor,solvercache)
+    # intor,solvercache
+    intor.prob.bot
 end
+
+include("solvers/Wendlandt.jl")
+include("solvers/Zhong06.jl")
+include("solvers/Alpha.jl")
+include("solvers/nonsmooth.jl")
+include("solvers/Zhong06NSNH.jl")

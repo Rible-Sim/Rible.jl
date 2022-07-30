@@ -1,4 +1,3 @@
-using Match
 struct RigidData
     r̄g
     m
@@ -426,8 +425,8 @@ function BuildTail(type; β=1.0, μ=0.02)
             movable,
             m,
             SMatrix{2, 2}([
-                I 0
-                0 0
+                0.99I 0
+                0 0.01I
             ]),
             SVector{2}(r̄g),
             [SVector{2}(aps[i]) for i in 1:nrp],
