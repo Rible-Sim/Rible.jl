@@ -23,7 +23,7 @@ function retrieve!(intor,cache::Zhong06Cache)
 end
 
 function solve!(intor::Integrator,cache::Zhong06Cache;
-                dt,ftol=1e-14,verbose=false,iterations=50,
+                dt,ftol=1e-14,verbose=false,maxiters=50,
                 progress=true,exception=true)
     (;prob,state,control!,tspan,restart,totalstep) = intor
     (;bot,dynfuncs) = prob
@@ -115,7 +115,7 @@ function solve!(intor::Integrator,cache::Zhong06Cache;
         # end
             dfk = OnceDifferentiable(Res_stepk!,Jac_stepk!,initial_x,initial_Res)
         end
-        Res_stepk_result = nlsolve(dfk, initial_x; ftol, iterations, method=:newton)
+        Res_stepk_result = nlsolve(dfk, initial_x; ftol, iterations=maxiters, method=:newton)
 
         if converged(Res_stepk_result) == false
             if exception
@@ -150,5 +150,5 @@ function solve!(intor::Integrator,cache::Zhong06Cache;
         next!(prog)
     end
 
-    return intor,cache
+    bot
 end

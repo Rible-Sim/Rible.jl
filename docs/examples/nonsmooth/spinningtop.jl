@@ -11,12 +11,14 @@ using BenchmarkTools
 using TypeSortedCollections
 using CoordinateTransformations
 using Rotations
+using Interpolations
 using GeometryBasics
 using Peaks
 using OffsetArrays
 using Printf
 using Unitful
 using Match
+using EponymTuples
 using Revise
 import Meshes
 using Meshing
@@ -27,14 +29,21 @@ includet("../vis.jl")
 const figdir=raw"C:\Users\luo22\OneDrive\Papers\Ph.D.Thesis\ns"
 
 function make_top(ro = [0.0,0.0,0.0],
-       Ro = one(RotMatrix{3}),
+       R = one(RotMatrix{3}),
        ṙo = [0.0,0.0,0.0],
-       ωo = [0.0,0.0,5.0];
+       ωō = [0.0,0.0,5.0];
 	   μ = 0.5,
-	   e = 0.9
+	   e = 0.9,
+	   constrained=false
 	)
+	ω = R*ωō
     movable = true
-    constrained = false
+	if constrained
+		constrained_index = [1,2,3]
+	else
+		constrained_index = Vector{Int}()
+    end
+
     m = 1.0
     r̄g = @SVector zeros(3)
     Ī = SMatrix{3,3}(Matrix(1.0I,3,3))
@@ -54,10 +63,10 @@ function make_top(ro = [0.0,0.0,0.0],
 	])
 	nls = normals(pts,fcs)
 	top_mesh = GeometryBasics.Mesh(meta(pts,normals=nls),fcs)
-    prop = TR.RigidBodyProperty(1,movable,m,Ī,r̄g,r̄ps)
-    ri = ro
-    lncs, _ = TR.NaturalCoordinates.NC1P3V(ri,ro,Ro,ṙo,ωo)
-    state = TR.RigidBodyState(prop,lncs,ro,Ro,ṙo,ωo)
+    prop = TR.RigidBodyProperty(1,movable,m,Ī,r̄g,r̄ps;constrained)
+    ri = ro+R*r̄ps[5]
+    lncs, _ = TR.NaturalCoordinates.NC1P3V(ri,ro,R,ṙo,ω)
+    state = TR.RigidBodyState(prop,lncs,ro,R,ṙo,ω,constrained_index)
     rb1 = TR.RigidBody(prop,state,top_mesh)
 	rbs = TypeSortedCollection((rb1,))
 	numberedpoints = TR.number(rbs)
@@ -127,8 +136,7 @@ function top_contact_dynfuncs(bot)
 		H = Diagonal(inv_μ_vec)
         active_contacts, na, gaps, D, H, es
     end
-
-    F!,Jac_F!,prepare_contacts!
+    @eponymtuple(F!,Jac_F!,prepare_contacts!)
 end
 
 # Spinning
@@ -151,7 +159,6 @@ contacts_traj_voa = VectorOfArray(top.contacts_traj)
 for (i,c) in enumerate(contacts_traj_voa[1,1:end])
 	check_Coulomb(i,c)
 end
-
 
 function plotsave_energy(bot,figname=nothing)
 	(;traj) = bot
@@ -218,7 +225,7 @@ with_theme(my_theme;
 		fontsize=8 |> pt2px,
 		figsize=(0.9tw,0.7tw),
 		savefig=true,
-		# figname="spinningtop_traj"
+		figname="spinningtop_traj"
 	)
 end
 
@@ -364,8 +371,11 @@ function plotsave_friction_direction(bots,x,xs,figname=nothing)
 			mo = 8
 			scaling = 10.0^(-mo)
 			Label(fig[botid,1,Top()],latexstring("\\times 10^{-$(mo)}"))
-			scatter!(ax1,t[idx_per],δα_per./scaling)
-			scatter!(ax1,t[idx_imp],δα_imp./scaling)
+			markersize = fontsize
+			scatter!(ax1,t[idx_per],δα_per./scaling;
+						marker=:diamond, markersize)
+			scatter!(ax1,t[idx_imp],δα_imp./scaling;
+						marker=:xcross, markersize)
 			ylims!(ax1,-1.0,1.0)
 			xlims!(ax1,extrema(t)...)
 
@@ -378,8 +388,10 @@ function plotsave_friction_direction(bots,x,xs,figname=nothing)
 			mo = 8
 			scaling = 10.0^(-mo)
 			Label(fig[botid,2,Top()],latexstring("\\times 10^{-$(mo)}"))
-			scatter!(ax2,t[idx_per],(θ_per.-π/4)./scaling, label="Persistent")
-			scatter!(ax2,t[idx_imp],(θ_imp.-π/4)./scaling, label="Impact")
+			scatter!(ax2,t[idx_per],(θ_per.-π/4)./scaling, label="Persistent";
+						marker=:diamond, markersize)
+			scatter!(ax2,t[idx_imp],(θ_imp.-π/4)./scaling, label="Impact";
+						marker=:xcross, markersize)
 			xlims!(ax2,extrema(t)...)
 			ylims!(ax2,-1.0,1.0)
 			if botid !== length(bots)
@@ -434,27 +446,35 @@ function plotsave_point_traj_vel(bots,figname=nothing)
 			)
 			Label(fig[i,1,TopLeft()], "($(alphabet[2i-1]))")
 			Label(fig[i,2,TopLeft()], "($(alphabet[2i]))")
+			ax3 = Axis(fig[i,2],
+						xlabel=tlabel,
+						ylabel=L"v~(\mathrm{m/s})",
+						yticklabelcolor = :red,
+						yaxisposition = :right
+				)
+			hidespines!(ax3)
+			hidexdecorations!(ax3)
 
 			(;t) = bot.traj
 			rp5 = get_trajectory!(bot,1,5)
 			rpx = rp5[1,:]
 			rpy = rp5[2,:]
 			lines!(ax1,rpx,rpy)
-			xlims!(ax1,0,12.5)
-			ylims!(ax1,-0.25,0.25)
+			xlims!(ax1,0,13.0)
+			ylims!(ax1,-0.3,0.45)
 
 			ṙp5 = get_mid_velocity!(bot,1,5)
 			ṙpx = ṙp5[1,:]
 			ṙpy = ṙp5[2,:]
 			t_mids = get_time_mids(bot)
 			θ_mids = atan.(ṙpy,ṙpx)
-			idx_v = findall(ṙp5.u) do ṙ
-						norm(ṙ[2:3]) > 1e-4
-					end
-			lines!(ax2,t_mids[idx_v],θ_mids[idx_v])
-			# lines!(ax2,t_mids,ṙpx, label="ẋ")
-			# lines!(ax2,t_mids,ṙpy, label="ẏ")
-			xlims!(ax2,extrema(t_mids)...)
+			ṙpxy = map(ṙp5.u) do ṙ
+				norm(ṙ[1:2])
+			end
+			lines!(ax2,t_mids,θ_mids)
+			lines!(ax3,t_mids,ṙpxy,color=:red)
+			xlims!(ax2,extrema(bot.traj.t)...)
+			xlims!(ax3,extrema(bot.traj.t)...)
 			ylims!(ax2,-π,π)
 
 			if i !== nbot
@@ -477,7 +497,7 @@ CM.activate!(); plotsave_point_traj_vel(tops_e0,"contact_point_traj_vel")
 ωs = [5.0,10.0,20.0]
 tops_ω = [
 	begin
-		top = make_top([0,0,cos(π/24)*0.5-1e-14],Ro,[0,0,0.0],[0,0,ω]; μ=0.9, e = 0.0)
+		top = make_top([0,0,cos(π/24)*0.5-1e-6],Ro,[0,0,0.0],[0,0,ω]; μ=0.9, e = 0.0)
 		TR.solve!(TR.SimProblem(top,top_contact_dynfuncs),
 				TR.ZhongCCP();
 				tspan=(0.0,500.0),dt=1e-2,ftol=1e-14,maxiters=50,exception=false)
@@ -500,7 +520,7 @@ function plotsave_energy_conserving(bots,figname=nothing)
 			resolution = (0.7tw,0.5tw)
 		) do
 		fig = Figure()
-
+		mos = [4,5,6]
 		for (botid,bot) in enumerate(bots)
 			ax1 = Axis(
 				fig[botid,1],
@@ -512,14 +532,13 @@ function plotsave_energy_conserving(bots,figname=nothing)
 			if botid !== 3
 				hidex(ax1)
 			end
-			pre = 500
 			(;t) = bot.traj
-			mo = 3
+			mo = mos[botid]
 			scaling = 10.0^(-mo)
 			Label(fig[botid,1,Top()],latexstring("\\times 10^{-$mo}"))
 			me = TR.mechanical_energy!(bot)
-			lines!(ax1,t[pre:end],(me.E[pre:end].-me.E[pre])./me.E[pre]./scaling)
-			xlims!(ax1,t[pre],t[end])
+			lines!(ax1,t,(me.E.-me.E[begin])./me.E[begin]./scaling)
+			xlims!(ax1,extrema(t)...)
 			ylims!(ax1,-1,1)
 		end
 		savefig(fig,figname)
@@ -528,6 +547,132 @@ function plotsave_energy_conserving(bots,figname=nothing)
 end
 GM.activate!(); plotsave_energy_conserving(tops_ω)
 CM.activate!(); plotsave_energy_conserving(tops_ω,"energy_conserving")
+
+top_ω5 = make_top([0,0,cos(π/24)*0.5-1e-6],RotX(π/24),[0,0,0.0],[0,0,5.0]; μ=0.9, e = 0.0)
+TR.solve!(TR.SimProblem(top_ω5,top_contact_dynfuncs),
+		TR.ZhongCCP();
+		tspan=(0.0,50.0),dt=1e-2,ftol=1e-14,maxiters=50,exception=false)
+
+findall(isactive,VectorOfArray(top_ω5.contacts_traj)[1,:])
+
+plot_traj!(top_ω5;showinfo=false,rigidcolor=:white,showwire=true,figsize=(0.6tw,0.6tw),
+	xlims=(-1.0,2.0),
+	ylims=(-1.0,1.0),
+	zlims=(-1e-3,1.0),
+)
+
+# DAE
+top_fix = make_top([0,0,cos(π/24)*0.5],RotX(π/24),[0,0,0.0],[0,0,5.0]; μ=0.9, e = 0.0, constrained=true)
+TR.solve!(TR.SimProblem(top_fix,top_contact_dynfuncs),
+		TR.Zhong06();
+		tspan=(0.0,50.0),dt=1e-2,ftol=1e-14,maxiters=50,exception=false)
+
+plot_traj!(top_fix;showinfo=false,rigidcolor=:white,showwire=true,figsize=(0.6tw,0.6tw),
+	xlims=(-1.0,2.0),
+	ylims=(-1.0,1.0),
+	zlims=(-1e-3,1.0),
+)
+
+function plotsave_compare_traj(top1,top2,figname=nothing)
+	ro_top1 = get_trajectory!(top1,1,0)
+	ro_top2 = get_trajectory!(top2,1,0)
+	ylabels = ["x","y","z"]
+	with_theme(mv_theme;
+			resolution = (0.8tw,0.5tw),
+		) do
+		fig = Figure()
+		for i = 1:3
+			ax = Axis(fig[i,1]; xlabel = tlabel, ylabel = latexstring("$(ylabels[i])~(\\mathrm{m})"))
+			Label(fig[i,1,TopLeft()],"($(alphabet[i]))")
+			lines!(ax,top1.traj.t, ro_top1[i,:],label="NMSI")
+			scatter!(ax,top2.traj.t[begin:25:end], ro_top2[i,begin:25:end],label="MSI",
+						marker='⨉', strokewidth=0, color = :red, strokecolor=:red)
+			xlims!(ax,extrema(top2.traj.t)...)
+			if i !== 3
+				hidex(ax)
+			else
+				axislegend(ax;position=:rb,orientation=:horizontal)
+			end
+		end
+		savefig(fig,figname)
+		fig
+	end
+end
+GM.activate!(); plotsave_compare_traj(top_fix,top_ω5)
+CM.activate!(); plotsave_compare_traj(top_fix,top_ω5,"compare_traj")
+
+
+
+#dt
+dts = [1e-1,3e-2,1e-2,3e-3,1e-3,3e-4,1e-4,1e-5]
+
+tops_dt = [
+	begin
+		top = make_top([0,0,cos(π/24)*0.5-1e-6],Ro,[0,0,0.0],[0,0,5.0]; μ=0.9, e = 0.0)
+		TR.solve!(TR.SimProblem(top,top_contact_dynfuncs),
+				TR.ZhongCCP();
+				tspan=(0.0,2.0),dt,ftol=1e-14,maxiters=50,exception=false)
+	end
+	for dt in dts
+]
+
+#v
+tops_dt_v = [
+	begin
+		top = make_top([0,0,cos(π/24)*0.5-1e-4],Ro,[1.0,0,0.0],[0,0,5.0]; μ=0.01, e = 0.0)
+		TR.solve!(TR.SimProblem(top,top_contact_dynfuncs),
+				TR.ZhongCCP();
+				tspan=(0.0,2.0),dt,ftol=1e-14,maxiters=50,exception=false)
+	end
+	for dt in dts
+]
+
+function plotsave_error(mbots,figname=nothing)
+	with_theme(mv_theme;
+			resolution = (0.8tw,0.3tw),
+		) do
+		fig = Figure()
+		for j = 1:2
+			bots = mbots[:,j]
+			nbots = length(bots)
+			itp = interpolate(get_trajectory!(bots[nbots],1,0)[1,:], BSpline(Linear()))
+			ref_traj = scale(itp,0:dts[nbots]:2.0)
+			# ref_traj(0:0.1:2)
+			err_avg = [
+				get_trajectory!(bots[i],1,0)[1,begin:end-1].-ref_traj(bots[i].traj.t[begin:end-1]) .|> abs |> mean
+				for (i,dt) in enumerate(dts[1:nbots-1])
+			]
+
+			ax = Axis(fig[1,j];
+				xlabel = L"h",
+				ylabel = "Avg. Err.",
+				yscale = Makie.log10,yminorticksvisible = true, yminorgridvisible = true,yminorticks = IntervalsBetween(8),
+				xscale = Makie.log10,xminorticksvisible = true, xminorgridvisible = true,xminorticks = IntervalsBetween(8),
+				)
+			Label(fig[1,j,TopLeft()],"($(alphabet[j]))")
+			scatterlines!(ax,dts[1:nbots-1],err_avg;marker=:rect,color=:red,label="Error of NMSI")
+			lines!(ax,dts[1:nbots-1],err_avg[1].*100 .*dts[1:nbots-1].^2,label="2nd-Order")
+			lines!(ax,dts[1:nbots-1],err_avg[1].*10  .*dts[1:nbots-1],label="1st-Order")
+			ylims!(ax,1e-11,1e-2)
+			if j == 1
+				axislegend(ax;position=:rb)
+			else
+				hidey(ax)
+			end
+		end
+		savefig(fig,figname)
+		fig
+	end
+end
+
+GM.activate!(); plotsave_error(hcat(tops_dt,tops_dt_v))
+CM.activate!(); plotsave_error(hcat(tops_dt,tops_dt_v),"top_err")
+
+plot_traj!(tops_dt_v[1];showinfo=false,rigidcolor=:white,showwire=true,figsize=(0.6tw,0.6tw),
+	xlims=(-1.0,2.0),
+	ylims=(-1.0,1.0),
+	zlims=(-1e-3,1.0),
+)
 
 # friction_direction
 # Dare you try
@@ -539,28 +684,18 @@ function plotsave_contact_friction(bots,figname=nothing)
 		resolution = (0.9tw,0.5tw)
 	) do
 		fig = Figure()
-
-		axs = [
-			begin
-				k = 3(j-1)+i
-				ax = Axis(
-					fig[i,j],
-					xlabel=tlabel,
-					ylabel=L"\Lambda~(\mathrm{N}\cdot\mathrm{s})",
-					title=latexstring("\\mu=$(μs[k])")
-				)
-				if i !== 3
-					hidex(ax)
-				end
-				Label(fig[i,j,TopLeft()],"($(alphabet[k]))")
-				# ylims!(ax,16.5,18)
-				ax
-			end
-			for i = 1:3, j = 1:2
-		]
+		nbots = length(bots)
 
 		for (botid,bot) in enumerate(bots)
-			ax = axs[botid]
+			ax = Axis(
+				fig[botid,1],
+				xlabel=tlabel,
+				ylabel=L"\Lambda~(\mathrm{N}\cdot\mathrm{s})",
+			)
+			if botid !== nbots
+				hidex(ax)
+			end
+			Label(fig[botid,1,TopLeft()],"($(alphabet[botid]))")
 			(;t) = bot.traj
 			c1s = VectorOfArray(bot.contacts_traj)[1,:]
 			idx_per = findall(doespersist, c1s)
@@ -575,14 +710,14 @@ function plotsave_contact_friction(bots,figname=nothing)
 			# Λt2_mids = 0.5 .* (Λt2[active_pos_idx] .+ Λt2[active_pos_idx .+ 1])
 			# lines!(ax,t_mids,Λt1_mids,label=L"\Lambda_{t_1}")
 			# lines!(ax,t_mids,Λt2_mids,label=L"\Lambda_{t_2}")
-			xlims!(ax,t[556],t[end])
+			# xlims!(ax,t[556],t[end])
 		end
-		Legend(fig[:,3],axs[1])
+		# Legend(fig[:,3],axs[1])
 		savefig(fig,figname)
 		fig
 	end
 end
-GM.activate!(); plotsave_contact_friction(tops_e0)
+GM.activate!(); plotsave_contact_friction(tops_dt[8:8])
 CM.activate!(); plotsave_contact_friction(tops_e0,"contact_friction")
 
 

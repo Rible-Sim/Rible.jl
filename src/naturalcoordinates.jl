@@ -313,7 +313,7 @@ function rigidstate2naturalcoords(lncs,ro,R,ṙo,ω)
     ri = ro + R*r̄i
     ṙi = ṙo + ω×(ri-ro)
     X = R*X̄
-    Ẋ = reduce(hcat,Ref(ω) .× eachcol(X̄))
+    Ẋ = reduce(hcat,Ref(ω) .× eachcol(X))
     qstd = vcat(ri,vec(X))
     q̇std = vcat(ṙi,vec(Ẋ))
     Y = get_conversion(lncs)

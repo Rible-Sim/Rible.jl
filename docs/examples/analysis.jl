@@ -25,7 +25,11 @@ function get_velocity!(bot::TR.TensegrityRobot,rbid::Int,pid::Int,step_range=:)
     rb = rbs[rbid]
     for (q,q̇) in zip(traj.q, traj.q̇)
         TR.update_rigids!(tg,q,q̇)
-        push!(ṙp,rb.state.ṙps[pid])
+        if pid == 0
+            push!(ṙp,rb.state.ṙg)
+        else
+	        push!(ṙp,rb.state.ṙps[pid])
+		end
     end
     ṙp
 end
@@ -45,7 +49,21 @@ function get_mid_velocity!(bot::TR.TensegrityRobot,rbid::Int,pid::Int,step_range
     ṙp
 end
 
-function get_angular!(bot::TR.TensegrityRobot,rbid::Int,step_range=:)
+function get_orientation!(bot::TR.TensegrityRobot,rbid::Int,step_range=:)
+    (; tg, traj)= bot
+	T = TR.get_numbertype(bot)
+    R = VectorOfArray(Vector{Matrix{T}}())
+    rbs = TR.get_rigidbodies(tg)
+    rb = rbs[rbid]
+    for (q,q̇) in zip(traj.q, traj.q̇)
+        TR.update_rigids!(tg,q,q̇)
+        TR.update_orientations!(tg)
+        push!(R,rb.state.R)
+    end
+    R
+end
+
+function get_angular_velocity!(bot::TR.TensegrityRobot,rbid::Int,step_range=:)
     (; tg, traj)= bot
 	T = TR.get_numbertype(bot)
     ω = VectorOfArray(Vector{Vector{T}}())
@@ -170,6 +188,9 @@ function get_tangent(x)
 	mag, dir
 end
 
+function isactive(contact)
+	contact.state.active
+end
 function isimpact(contact;Λtol=1e-8) # rule out false active
 	cs = contact.state
 	cs.active && !cs.persistent && norm(cs.Λ) > Λtol

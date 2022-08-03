@@ -9,6 +9,8 @@ struct SimProblem{BotType,FuncsType}
             dynfuncs = (F! = dynfuncs_raw.F!, Jac_F! = nothing)
         elseif dynfuncs_raw isa NamedTuple{(:F!,:Jac_F!)}
             dynfuncs = dynfuncs_raw
+        elseif dynfuncs_raw isa NamedTuple{(:F!,:Jac_F!,:prepare_contacts!)}
+            dynfuncs = dynfuncs_raw
         else
             @warn "`dynfuncs` not recognized, but proceed anyway."
             dynfuncs = dynfuncs_raw

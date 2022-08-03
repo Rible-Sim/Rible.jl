@@ -200,6 +200,7 @@ function solve!(intor::Integrator,solvercache::ZhongCCPCache;
     nλ = length(λ0)
     ∂F∂q = zeros(T,nq,nq)
     ∂F∂q̇ = zeros(T,nq,nq)
+    prepare_contacts!(contacts_traj[end],q0)
     step = 0
     nx = nq + nλ
 

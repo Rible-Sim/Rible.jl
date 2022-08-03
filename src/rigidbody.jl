@@ -150,7 +150,7 @@ function RigidBodyState(prop::RigidBodyProperty{N,T},
     τ = zero(ω) ###
     nr̄ps = prop.nr̄ps
     rps = [MVector{N}(ro+R*r̄ps[i]) for i in 1:nr̄ps]
-    ṙps = [MVector{N}(ṙo+ω×(r̄ps[i]-ro)) for i in 1:nr̄ps]
+    ṙps = [MVector{N}(ṙo+ω×(rps[i]-ro)) for i in 1:nr̄ps]
     fps = [@MVector zeros(T,N) for i in 1:nr̄ps]
     τps = [zero(τ) for i in 1:nr̄ps]
 
