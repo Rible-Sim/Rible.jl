@@ -364,7 +364,7 @@ function init_plot!(ax,tgob;isref=false,
                 Point(scnt.end1.rbsig.state.rps[scnt.end1.pid]) =>
                 Point(scnt.end2.rbsig.state.rps[scnt.end2.pid]),
                 vcat,
-                connected
+                connected.cables
                 ;init=ret
             )
         end
@@ -381,7 +381,7 @@ function init_plot!(ax,tgob;isref=false,
                     scnt.end2.rbsig.state.rps[scnt.end2.pid]
                 )./2],
                 vcat,
-                connected
+                connected.cables
                 ;init=ret
             )
         end

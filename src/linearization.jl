@@ -53,7 +53,7 @@ function find_full_constrained_index(lncs,q)
     col_index[size(Aq,1)+1:end]
 end
 
-function ∂Aᵀλ∂q̌(tg::TensegrityStructure,λ)
+function ∂Aᵀλ∂q̌(tg::AbstractTensegrityStructure,λ)
     (;nfree) = tg.connectivity.indexed
     ret = zeros(eltype(λ),nfree,nfree)
     (;rigidbodies,nconstraints) = tg
@@ -182,7 +182,7 @@ function build_∂Q̌∂q̌!(∂Q̌∂q̌,tg)
     D = @MMatrix zeros(T,ndim,ndim)
     Im = Symmetric(SMatrix{ndim,ndim}(one(T)*I))
     J̌ = zeros(T,ndim,nfree)
-    foreach(connected) do cc
+    foreach(connected.cables) do cc
         cable = cables[cc.id]
         (;end1,end2) = cc
         rb1 = end1.rbsig
@@ -213,6 +213,105 @@ function build_∂Q̌∂q̌!(∂Q̌∂q̌,tg)
         # ∂Q̌∂q̌_full[mfree2,mfree1] .-= transpose(C2)*D*C1
         # ∂Q̌∂q̌_full[mfree1,mfree1] .+= transpose(C1)*D*C1
     end
+    return ∂Q̌∂q̌
+end
+
+function build_∂Q̌∂q̌(tg,@eponymargs(cables,))
+    (;cables,connectivity) = tg
+    (;connected,indexed) = connectivity
+    (;nfull,nfree,sysfree,mem2sysfree,mem2sysfull) = indexed
+    T = get_numbertype(tg)
+    ndim = get_ndim(tg)
+    ∂Q̌∂q̌ = zeros(T,nfree,nfree)
+    D = @MMatrix zeros(T,ndim,ndim)
+    Im = Symmetric(SMatrix{ndim,ndim}(one(T)*I))
+    J̌ = zeros(T,ndim,nfree)
+    foreach(connected.cables) do cc
+        cable = cables[cc.id]
+        (;end1,end2) = cc
+        rb1 = end1.rbsig
+        rb2 = end2.rbsig
+        C1 = rb1.state.cache.Cps[end1.pid]
+        C2 = rb2.state.cache.Cps[end2.pid]
+        uci1 = rb1.state.cache.unconstrained_index
+        uci2 = rb2.state.cache.unconstrained_index
+        mfree1 = mem2sysfree[rb1.prop.id]
+        mfree2 = mem2sysfree[rb2.prop.id]
+        (;k,c,state,slack) = cable
+        (;direction,tension,length,lengthdot) = state
+        if slack && (tension==0)
+            ∂Q̌∂q̌ .-= 0
+        else
+            D .= direction*transpose(direction)
+            density = tension/length
+            β = c*lengthdot/length + density
+            D .*= k-β
+            D .+= β.*Im
+            J̌ .= 0
+            J̌[:,mfree2] .+= C2[:,uci2]
+            J̌[:,mfree1] .-= C1[:,uci1]
+            ∂Q̌∂q̌ .-= transpose(J̌)*D*J̌
+        end
+        # ∂Q̌∂q̌_full[mfree2,mfree2] .+= transpose(C2)*D*C2
+        # ∂Q̌∂q̌_full[mfree1,mfree2] .-= transpose(C1)*D*C2
+        # ∂Q̌∂q̌_full[mfree2,mfree1] .-= transpose(C2)*D*C1
+        # ∂Q̌∂q̌_full[mfree1,mfree1] .+= transpose(C1)*D*C1
+    end
+    return ∂Q̌∂q̌
+end
+
+function build_∂Q̌∂q̌(tg,@eponymargs(clustercables))
+    (;clustercables,connectivity) = tg
+    (;connected,indexed) = connectivity
+    (;nfull,nfree,sysfree,mem2sysfree,mem2sysfull) = indexed
+    T = get_numbertype(tg)
+    ndim = get_ndim(tg)
+    ∂Q̌∂q̌ = zeros(T,nfree,nfree)
+    D = @MMatrix zeros(T,ndim,ndim)
+    Im = Symmetric(SMatrix{ndim,ndim}(one(T)*I))
+    J̌ = zeros(T,ndim,nfree)
+    i = 0
+    foreach(connected.clustercables) do clustercable
+        i += 1
+        foreach(clustercable) do cc
+            cable = tg.clustercables[i].segs[cc.id]
+            (;end1,end2) = cc
+            rb1 = end1.rbsig
+            rb2 = end2.rbsig
+            C1 = rb1.state.cache.Cps[end1.pid]
+            C2 = rb2.state.cache.Cps[end2.pid]
+            uci1 = rb1.state.cache.unconstrained_index
+            uci2 = rb2.state.cache.unconstrained_index
+            mfree1 = mem2sysfree[rb1.prop.id]
+            mfree2 = mem2sysfree[rb2.prop.id]
+            (;k,c,state) = cable
+            (;direction,tension,length,lengthdot) = state
+            if tension==0
+                ∂Q̌∂q̌ .-= 0
+            else
+                D .= direction*transpose(direction)
+                density = tension/length
+                β = c*lengthdot/length + density
+                D .*= k-β
+                D .+= β.*Im
+                J̌ .= 0
+                J̌[:,mfree2] .+= C2[:,uci2]
+                J̌[:,mfree1] .-= C1[:,uci1]
+                ∂Q̌∂q̌ .-= transpose(J̌)*D*J̌
+            end
+        end
+    end
+    return ∂Q̌∂q̌
+end
+
+function build_∂Q̌∂q̌(tg)
+    build_∂Q̌∂q̌(tg, tg.tensiles)
+end
+
+function build_∂Q̌∂q̌(tg, @eponymargs(cables, clustercables))
+    ∂Q̌∂q̌1 = build_∂Q̌∂q̌(tg, @eponymtuple(cables))
+    ∂Q̌∂q̌2 = build_∂Q̌∂q̌(tg, @eponymtuple(clustercables))
+    return ∂Q̌∂q̌1 + ∂Q̌∂q̌2
 end
 
 function build_∂Q̌∂q̌̇!(∂Q̌∂q̌̇,tg)
@@ -225,7 +324,7 @@ function build_∂Q̌∂q̌̇!(∂Q̌∂q̌̇,tg)
     D = @MMatrix zeros(T,ndim,ndim)
     Im = Symmetric(SMatrix{ndim,ndim}(one(T)*I))
     J̌ = zeros(T,ndim,nfree)
-    foreach(connected) do cc
+    foreach(connected.cables) do cc
         cable = cables[cc.id]
         (;end1,end2) = cc
         rb1 = end1.rbsig
@@ -256,11 +355,167 @@ function build_∂Q̌∂q̌̇!(∂Q̌∂q̌̇,tg)
     end
 end
 
+function build_∂Q̌∂q̌̇(tg, @eponymargs(cables, ))
+    (;cables,connectivity) = tg
+    (;connected,indexed) = connectivity
+    (;nfull,nfree,sysfree,mem2sysfree,mem2sysfull) = indexed
+    T = get_numbertype(tg)
+    ndim = get_ndim(tg)
+    ∂Q̌∂q̌̇ = zeros(T,nfree,nfree)
+    D = @MMatrix zeros(T,ndim,ndim)
+    Im = Symmetric(SMatrix{ndim,ndim}(one(T)*I))
+    J̌ = zeros(T,ndim,nfree)
+    foreach(connected.cables) do cc
+        cable = cables[cc.id]
+        (;end1,end2) = cc
+        rb1 = end1.rbsig
+        rb2 = end2.rbsig
+        C1 = rb1.state.cache.Cps[end1.pid]
+        C2 = rb2.state.cache.Cps[end2.pid]
+        uci1 = rb1.state.cache.unconstrained_index
+        uci2 = rb2.state.cache.unconstrained_index
+        mfree1 = mem2sysfree[rb1.prop.id]
+        mfree2 = mem2sysfree[rb2.prop.id]
+        (;k,c,state,slack) = cable
+        (;direction,tension) = state
+        if slack && (tension == 0)
+            ∂Q̌∂q̌̇ .-= 0
+        else
+            D .= direction*transpose(direction)
+            D .*= c
+            J̌ .= 0
+            J̌[:,mfree2] .+= C2[:,uci2]
+            J̌[:,mfree1] .-= C1[:,uci1]
+
+            ∂Q̌∂q̌̇ .-= transpose(J̌)*D*J̌
+        end
+        # ∂Q̌∂q̌_full[mfrjiexee2,mfree2] .+= transpose(C2)*D*C2
+        # ∂Q̌∂q̌_full[mfree1,mfree2] .-= transpose(C1)*D*C2
+        # ∂Q̌∂q̌_full[mfree2,mfree1] .-= transpose(C2)*D*C1
+        # ∂Q̌∂q̌_full[mfree1,mfree1] .+= transpose(C1)*D*C1
+    end
+    return ∂Q̌∂q̌̇
+end
+
+function build_∂Q̌∂q̌̇(tg, @eponymargs(clustercables, ))
+    (;cables,connectivity) = tg
+    (;connected,indexed) = connectivity
+    (;nfull,nfree,sysfree,mem2sysfree,mem2sysfull) = indexed
+    T = get_numbertype(tg)
+    ndim = get_ndim(tg)
+    ∂Q̌∂q̌̇ = zeros(T,nfree,nfree)
+    D = @MMatrix zeros(T,ndim,ndim)
+    Im = Symmetric(SMatrix{ndim,ndim}(one(T)*I))
+    J̌ = zeros(T,ndim,nfree)
+    i = 0
+    foreach(connected.clustercables) do clustercable
+        i += 1
+        foreach(clustercable) do cc
+            cable = clustercables[i].segs[cc.id]
+            (;end1,end2) = cc
+            rb1 = end1.rbsig
+            rb2 = end2.rbsig
+            C1 = rb1.state.cache.Cps[end1.pid]
+            C2 = rb2.state.cache.Cps[end2.pid]
+            uci1 = rb1.state.cache.unconstrained_index
+            uci2 = rb2.state.cache.unconstrained_index
+            mfree1 = mem2sysfree[rb1.prop.id]
+            mfree2 = mem2sysfree[rb2.prop.id]
+            (;k,c,state) = cable
+            (;direction,tension) = state
+            if tension == 0
+                ∂Q̌∂q̌̇ .-= 0
+            else
+                D .= direction*transpose(direction)
+                D .*= c
+                J̌ .= 0
+                J̌[:,mfree2] .+= C2[:,uci2]
+                J̌[:,mfree1] .-= C1[:,uci1]
+
+                ∂Q̌∂q̌̇ .-= transpose(J̌)*D*J̌
+            end
+        end
+    end
+    return ∂Q̌∂q̌̇
+end
+
+function build_∂Q̌∂q̌̇(tg)
+    return build_∂Q̌∂q̌̇(tg, tg.tensiles)
+end
+
+function build_∂Q̌∂q̌̇(tg, @eponymargs(cables, clustercables))
+    ∂Q̌∂q̌̇1 = build_∂Q̌∂q̌̇(tg, @eponymtuple(cables))
+    ∂Q̌∂q̌̇2 = build_∂Q̌∂q̌̇(tg, @eponymtuple(clustercables))
+    return ∂Q̌∂q̌̇1 + ∂Q̌∂q̌̇2
+end
+
+function build_∂Q̌∂s̄(tg)
+    (;cables,clustercables,connectivity, nclustercables) = tg
+    (;connected,indexed) = connectivity
+    (;nfull,nfree,sysfree,mem2sysfree,mem2sysfull) = indexed
+    ns = sum([length(clustercables[i].sps) for i in 1:nclustercables])
+    T = get_numbertype(tg)
+    ndim = get_ndim(tg)
+    ∂Q̌∂s̄ = zeros(T,2ns,nfree)
+    D = zeros(T, ndim)
+    lkn = zeros(T, 2ns, ndim)
+    # Im = Symmetric(SMatrix{ndim,ndim}(one(T)*I))
+    J̌ = zeros(T,ndim,nfree)
+
+    N_list = Vector{SparseMatrixCSC{Float64,Int64}}()
+    kc = Vector{Float64}()
+    for (cid,clustercable) in enumerate(clustercables)
+        @unpack segs = clustercable
+        nsegs = length(segs)
+        for (sid, seg) in enumerate(segs)
+            push!(kc, seg.k)
+        end
+        N = sparse(zeros(Float64, nsegs, 2nsegs-2))
+        N[1,1:2]=[1 -1]; N[end,end-1:end]=[-1 1]
+        for i in 2:nsegs-1
+            N[i, 2i-3:2i] = [-1 1 1 -1]
+        end
+        push!(N_list, N)
+    end
+    N = reduce(blockdiag,N_list)
+    i = 0; j = 0
+    foreach(connected.clustercables) do clustercable
+        i += 1
+        foreach(clustercable) do cc
+            j += 1
+            cable = clustercables[i].segs[cc.id]
+            (;end1,end2) = cc
+            rb1 = end1.rbsig
+            rb2 = end2.rbsig
+            C1 = rb1.state.cache.Cps[end1.pid]
+            C2 = rb2.state.cache.Cps[end2.pid]
+            uci1 = rb1.state.cache.unconstrained_index
+            uci2 = rb2.state.cache.unconstrained_index
+            mfree1 = mem2sysfree[rb1.prop.id]
+            mfree2 = mem2sysfree[rb2.prop.id]
+            (;k,c,state) = cable
+            (;direction,tension) = state
+            if tension == 0
+                ∂Q̌∂s̄ .-= 0
+            else
+                D .= direction
+                J̌ .= 0
+                J̌[:,mfree2] .+= C2[:,uci2]
+                J̌[:,mfree1] .-= C1[:,uci1]
+                kN = kc[j] .* N[j,:]
+                @tullio lkn[k, l] = D[l] * kN[k]
+                ∂Q̌∂s̄ .-= lkn * J̌
+            end
+        end
+    end
+    return ∂Q̌∂s̄'
+end
+
 function build_Ǩ(tg,λ)
     (;nfree) = tg.connectivity.indexed
     T = get_numbertype(tg)
-    Ǩ = zeros(T,nfree,nfree)
-    build_∂Q̌∂q̌!(Ǩ,tg)
+    # Ǩ = zeros(T,nfree,nfree)
+    Ǩ = build_∂Q̌∂q̌(tg)
     Ǩ .= ∂Aᵀλ∂q̌(tg,λ) .-Ǩ
     # Ǩ .= Ǩ
     Ǩ

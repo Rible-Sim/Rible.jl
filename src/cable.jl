@@ -134,3 +134,58 @@ function SMACable3D(id,restlen::T,law::LawT,c::T,original_temp::T=0.0) where {La
     state = SMACableState(original_temp,restlen,direction)
     SMACable(id,law,c,state)
 end
+
+mutable struct SlidingPoint{T}
+    μ::T
+    θ::T
+    α::T
+    s::T
+    s⁺::T
+    s⁻::T
+end
+
+struct CableSegment{N,T}
+    id::Int
+    k::T
+    c::T
+    prestress::T
+    original_restlen::T
+    state::CableState{N,T}
+end
+
+function CableSegment(id, original_restlen, k; c=zero(k), prestress=zero(k))
+    direction = MVector{2}(one(k), zero(k))
+    state = CableState(original_restlen, direction)
+    CableSegment(id, k, c, prestress, original_restlen, state)
+end
+
+function calculate_α(μ,θ)
+    exp(-μ*θ)
+end
+
+function SlidingPoint(μ)
+    θ = one(μ) * 2pi
+    #θ = zero(μ)
+    α = calculate_α(μ,θ)
+    s = zero(μ)
+    s⁺,s⁻ = s2s̄(s)
+    SlidingPoint(μ,θ,α,s,s⁺,s⁻)
+end
+
+struct ClusterCables{spsType,segsType}
+    ID::Int
+    sps::spsType
+    segs::segsType
+end
+
+function ClusterCables(id, nsp, segs;μ=0.0)
+    sps = StructArray([SlidingPoint(μ) for i = 1:nsp])
+    ClusterCables(id, sps, segs)
+end
+
+function s2s̄(s::Number)
+    abss = abs(s)
+    s⁺ = (abss + s)/2
+    s⁻ = (abss - s)/2
+    s⁺,s⁻
+end

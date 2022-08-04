@@ -179,11 +179,11 @@ function build_Ǧ(tginput;factor=1.0)
 end
 
 # Not ready
-function build_Ji(tg,i)
+function build_Ji(tg::ClusterTensegrityStructure,i)
     rbs = tg.rigidbodies
     cnt = tg.connectivity
-    @unpack string2ap = cnt
-    ap = string2ap[i]
+    (;connected) = cnt.connectivity
+    ap = connected[1][i]
     C1 = rbs[ap[1].rbid].state.cache.Cp[ap[1].apid]
     C2 = rbs[ap[2].rbid].state.cache.Cp[ap[2].apid]
     T1 = build_Ti(tg,ap[1].rbid)
@@ -578,8 +578,8 @@ function check_static_equilibrium_output_multipliers(tg_input,q,F=nothing;gravit
     tg = deepcopy(tg_input)
     clear_forces!(tg)
     update_rigids!(tg)
-    update_cables_apply_forces!(tg)
-    check_restlen(tg,get_cables_restlen(tg))
+    update_cables!(tg)
+    # check_restlen(tg,get_cables_restlen(tg))
     if gravity
         apply_gravity!(tg)
     end
