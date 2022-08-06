@@ -174,7 +174,7 @@ end
 
 function build_∂Q̌∂q̌!(∂Q̌∂q̌,tg)
     (;cables,connectivity) = tg
-    (;connected,indexed) = connectivity
+    (;tensioned,indexed) = connectivity
     (;nfull,nfree,sysfree,mem2sysfree,mem2sysfull) = indexed
     T = get_numbertype(tg)
     ndim = get_ndim(tg)
@@ -182,7 +182,7 @@ function build_∂Q̌∂q̌!(∂Q̌∂q̌,tg)
     D = @MMatrix zeros(T,ndim,ndim)
     Im = Symmetric(SMatrix{ndim,ndim}(one(T)*I))
     J̌ = zeros(T,ndim,nfree)
-    foreach(connected.cables) do cc
+    foreach(tensioned.cables) do cc
         cable = cables[cc.id]
         (;end1,end2) = cc
         rb1 = end1.rbsig
@@ -216,9 +216,9 @@ function build_∂Q̌∂q̌!(∂Q̌∂q̌,tg)
     return ∂Q̌∂q̌
 end
 
-function build_∂Q̌∂q̌(tg,@eponymargs(cables,))
-    (;cables,connectivity) = tg
-    (;connected,indexed) = connectivity
+function build_∂Q̌∂q̌(tg,@eponymargs(connected,))
+    (;cables) = tg.tensiles
+    (;indexed) = tg.connectivity
     (;nfull,nfree,sysfree,mem2sysfree,mem2sysfull) = indexed
     T = get_numbertype(tg)
     ndim = get_ndim(tg)
@@ -226,7 +226,7 @@ function build_∂Q̌∂q̌(tg,@eponymargs(cables,))
     D = @MMatrix zeros(T,ndim,ndim)
     Im = Symmetric(SMatrix{ndim,ndim}(one(T)*I))
     J̌ = zeros(T,ndim,nfree)
-    foreach(connected.cables) do cc
+    foreach(connected) do cc
         cable = cables[cc.id]
         (;end1,end2) = cc
         rb1 = end1.rbsig
@@ -260,9 +260,9 @@ function build_∂Q̌∂q̌(tg,@eponymargs(cables,))
     return ∂Q̌∂q̌
 end
 
-function build_∂Q̌∂q̌(tg,@eponymargs(clustercables))
-    (;clustercables,connectivity) = tg
-    (;connected,indexed) = connectivity
+function build_∂Q̌∂q̌(tg,@eponymargs(clustered))
+    (;clustercables) = tg.tensiles
+    (;indexed) = tg.connectivity
     (;nfull,nfree,sysfree,mem2sysfree,mem2sysfull) = indexed
     T = get_numbertype(tg)
     ndim = get_ndim(tg)
@@ -271,10 +271,10 @@ function build_∂Q̌∂q̌(tg,@eponymargs(clustercables))
     Im = Symmetric(SMatrix{ndim,ndim}(one(T)*I))
     J̌ = zeros(T,ndim,nfree)
     i = 0
-    foreach(connected.clustercables) do clustercable
+    foreach(clustered) do clustercable
         i += 1
         foreach(clustercable) do cc
-            cable = tg.clustercables[i].segs[cc.id]
+            cable = clustercables[i].segs[cc.id]
             (;end1,end2) = cc
             rb1 = end1.rbsig
             rb2 = end2.rbsig
@@ -305,18 +305,18 @@ function build_∂Q̌∂q̌(tg,@eponymargs(clustercables))
 end
 
 function build_∂Q̌∂q̌(tg)
-    build_∂Q̌∂q̌(tg, tg.tensiles)
+    build_∂Q̌∂q̌(tg, tg.connectivity.tensioned)
 end
 
-function build_∂Q̌∂q̌(tg, @eponymargs(cables, clustercables))
-    ∂Q̌∂q̌1 = build_∂Q̌∂q̌(tg, @eponymtuple(cables))
-    ∂Q̌∂q̌2 = build_∂Q̌∂q̌(tg, @eponymtuple(clustercables))
+function build_∂Q̌∂q̌(tg, @eponymargs(connected, clustered))
+    ∂Q̌∂q̌1 = build_∂Q̌∂q̌(tg, @eponymtuple(connected))
+    ∂Q̌∂q̌2 = build_∂Q̌∂q̌(tg, @eponymtuple(clustered))
     return ∂Q̌∂q̌1 + ∂Q̌∂q̌2
 end
 
 function build_∂Q̌∂q̌̇!(∂Q̌∂q̌̇,tg)
     (;cables,connectivity) = tg
-    (;connected,indexed) = connectivity
+    (;tensioned,indexed) = connectivity
     (;nfull,nfree,sysfree,mem2sysfree,mem2sysfull) = indexed
     T = get_numbertype(tg)
     ndim = get_ndim(tg)
@@ -324,7 +324,7 @@ function build_∂Q̌∂q̌̇!(∂Q̌∂q̌̇,tg)
     D = @MMatrix zeros(T,ndim,ndim)
     Im = Symmetric(SMatrix{ndim,ndim}(one(T)*I))
     J̌ = zeros(T,ndim,nfree)
-    foreach(connected.cables) do cc
+    foreach(tensioned.cables) do cc
         cable = cables[cc.id]
         (;end1,end2) = cc
         rb1 = end1.rbsig
@@ -355,9 +355,9 @@ function build_∂Q̌∂q̌̇!(∂Q̌∂q̌̇,tg)
     end
 end
 
-function build_∂Q̌∂q̌̇(tg, @eponymargs(cables, ))
-    (;cables,connectivity) = tg
-    (;connected,indexed) = connectivity
+function build_∂Q̌∂q̌̇(tg, @eponymargs(connected, ))
+    (;cables) = tg.tensiles
+    (;indexed) = tg.connectivity
     (;nfull,nfree,sysfree,mem2sysfree,mem2sysfull) = indexed
     T = get_numbertype(tg)
     ndim = get_ndim(tg)
@@ -365,7 +365,7 @@ function build_∂Q̌∂q̌̇(tg, @eponymargs(cables, ))
     D = @MMatrix zeros(T,ndim,ndim)
     Im = Symmetric(SMatrix{ndim,ndim}(one(T)*I))
     J̌ = zeros(T,ndim,nfree)
-    foreach(connected.cables) do cc
+    foreach(connected) do cc
         cable = cables[cc.id]
         (;end1,end2) = cc
         rb1 = end1.rbsig
@@ -397,9 +397,9 @@ function build_∂Q̌∂q̌̇(tg, @eponymargs(cables, ))
     return ∂Q̌∂q̌̇
 end
 
-function build_∂Q̌∂q̌̇(tg, @eponymargs(clustercables, ))
-    (;cables,connectivity) = tg
-    (;connected,indexed) = connectivity
+function build_∂Q̌∂q̌̇(tg, @eponymargs(clustered, ))
+    (;clustercables) = tg.tensiles
+    (;indexed) = tg.connectivity
     (;nfull,nfree,sysfree,mem2sysfree,mem2sysfull) = indexed
     T = get_numbertype(tg)
     ndim = get_ndim(tg)
@@ -408,7 +408,7 @@ function build_∂Q̌∂q̌̇(tg, @eponymargs(clustercables, ))
     Im = Symmetric(SMatrix{ndim,ndim}(one(T)*I))
     J̌ = zeros(T,ndim,nfree)
     i = 0
-    foreach(connected.clustercables) do clustercable
+    foreach(clustered) do clustercable
         i += 1
         foreach(clustercable) do cc
             cable = clustercables[i].segs[cc.id]
@@ -440,18 +440,20 @@ function build_∂Q̌∂q̌̇(tg, @eponymargs(clustercables, ))
 end
 
 function build_∂Q̌∂q̌̇(tg)
-    return build_∂Q̌∂q̌̇(tg, tg.tensiles)
+    build_∂Q̌∂q̌̇(tg, tg.connectivity.tensioned)
 end
 
-function build_∂Q̌∂q̌̇(tg, @eponymargs(cables, clustercables))
-    ∂Q̌∂q̌̇1 = build_∂Q̌∂q̌̇(tg, @eponymtuple(cables))
-    ∂Q̌∂q̌̇2 = build_∂Q̌∂q̌̇(tg, @eponymtuple(clustercables))
+function build_∂Q̌∂q̌̇(tg, @eponymargs(connected, clustered))
+    ∂Q̌∂q̌̇1 = build_∂Q̌∂q̌̇(tg, @eponymtuple(connected))
+    ∂Q̌∂q̌̇2 = build_∂Q̌∂q̌̇(tg, @eponymtuple(clustered))
     return ∂Q̌∂q̌̇1 + ∂Q̌∂q̌̇2
 end
 
 function build_∂Q̌∂s̄(tg)
-    (;cables,clustercables,connectivity, nclustercables) = tg
-    (;connected,indexed) = connectivity
+    (;connectivity) = tg
+    (;cables,clustercables) = tg.tensiles
+    nclustercables = length(clustercables)
+    (;tensioned,indexed) = connectivity
     (;nfull,nfree,sysfree,mem2sysfree,mem2sysfull) = indexed
     ns = sum([length(clustercables[i].sps) for i in 1:nclustercables])
     T = get_numbertype(tg)
@@ -479,7 +481,7 @@ function build_∂Q̌∂s̄(tg)
     end
     N = reduce(blockdiag,N_list)
     i = 0; j = 0
-    foreach(connected.clustercables) do clustercable
+    foreach(tensioned.clustered) do clustercable
         i += 1
         foreach(clustercable) do cc
             j += 1

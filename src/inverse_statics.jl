@@ -74,13 +74,13 @@ end
 
 function build_Q̃(tg)
     (;ncables,cables,connectivity) = tg
-    (;connected,indexed) = connectivity
+    (;tensioned,indexed) = connectivity
     (;nfull,nfree,sysfree,mem2sysfree,mem2sysfull) = indexed
     T = get_numbertype(tg)
     ndim = get_ndim(tg)
     Q̃ = zeros(T,nfree,ndim*ncables)
 
-    foreach(connected) do cc
+    foreach(tensioned) do cc
         j = cc.id
         cable = cables[j]
         (;end1,end2) = cc
@@ -179,17 +179,17 @@ function build_Ǧ(tginput;factor=1.0)
 end
 
 # Not ready
-function build_Ji(tg::ClusterTensegrityStructure,i)
-    rbs = tg.rigidbodies
-    cnt = tg.connectivity
-    (;connected) = cnt.connectivity
-    ap = connected[1][i]
-    C1 = rbs[ap[1].rbid].state.cache.Cp[ap[1].apid]
-    C2 = rbs[ap[2].rbid].state.cache.Cp[ap[2].apid]
-    T1 = build_Ti(tg,ap[1].rbid)
-    T2 = build_Ti(tg,ap[2].rbid)
-    Ji = C2*T2-C1*T1
-end
+# function build_Ji(tg::AbstractTensegrityStructure,i)
+#     rbs = tg.rigidbodies
+#     cnt = tg.connectivity
+#     (;tensioned) = cnt.connectivity
+#     ap = tensioned[1][i]
+#     C1 = rbs[ap[1].rbid].state.cache.Cp[ap[1].apid]
+#     C2 = rbs[ap[2].rbid].state.cache.Cp[ap[2].apid]
+#     T1 = build_Ti(tg,ap[1].rbid)
+#     T2 = build_Ti(tg,ap[2].rbid)
+#     Ji = C2*T2-C1*T1
+# end
 
 function build_U(tg)
     @unpack ncoords,ncables,ndim,cables = tg
@@ -270,11 +270,11 @@ end
 
 function build_KE(tg)
     (;ncables,ndim,cables,connectivity) = tg
-    (;numbered,indexed,connected) = connectivity
+    (;numbered,indexed,tensioned) = connectivity
     (;nfull,mem2sysfull) = indexed
     function inner_KE(q,s,k,c)
         ret = zeros(eltype(s),nfull,nfull)
-        foreach(connected) do scnt
+        foreach(tensioned) do scnt
             j = scnt.id
             rb1 = scnt.end1.rbsig
             rb2 = scnt.end2.rbsig
@@ -578,7 +578,7 @@ function check_static_equilibrium_output_multipliers(tg_input,q,F=nothing;gravit
     tg = deepcopy(tg_input)
     clear_forces!(tg)
     update_rigids!(tg)
-    update_cables!(tg)
+    update_tensiles!(tg)
     # check_restlen(tg,get_cables_restlen(tg))
     if gravity
         apply_gravity!(tg)

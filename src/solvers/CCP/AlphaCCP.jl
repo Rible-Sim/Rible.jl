@@ -1,4 +1,4 @@
-struct AlphaCCP{T}
+struct AlphaCCP{T} <: AbstractSolver
     ρ∞::T
 end
 
@@ -134,7 +134,7 @@ end
 function solve!(intor::Integrator,solvercache::AlphaCCPCache;
                 dt,ftol=1e-14,xtol=ftol,verbose=false,maxiters=50,
                 progress=true,exception=true)
-    (;prob,state,control!,tspan,restart,totalstep) = intor
+    (;prob,state,controller,tspan,restart,totalstep) = intor
     (;bot,dynfuncs) = prob
     (;traj) = bot
     # @unpack t,q,q̇,tprev,qprev,q̇prev = state

@@ -1,4 +1,4 @@
-struct ZhongCCP end
+struct ZhongCCP <: AbstractSolver end
 
 struct ZhongCCPCache{CacheType}
     cache::CacheType
@@ -182,7 +182,7 @@ end
 function solve!(intor::Integrator,solvercache::ZhongCCPCache;
                 dt,ftol=1e-14,xtol=ftol,verbose=false,maxiters=50,
                 progress=true,exception=true)
-    (;prob,state,control!,tspan,restart,totalstep) = intor
+    (;prob,state,controller,tspan,restart,totalstep) = intor
     (;bot,dynfuncs) = prob
     (;traj,contacts_traj) = bot
     # @unpack t,q,q̇,tprev,qprev,q̇prev = state

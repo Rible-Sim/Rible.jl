@@ -430,8 +430,7 @@ function NC2P1V(ri::AbstractVector{T},rj::AbstractVector{T},
     invR = transpose(R) # because this is a rotation matrix
     r̄i = invR*(ri-ro)
     r̄j = invR*(rj-ro)
-    u = rj-ri
-    ū = invR*u
+    ū = r̄j-r̄i
     v̄ = rotation_matrix(π/2)*ū
     v = R*v̄
     X̄ = hcat(ū,v̄)
@@ -1254,7 +1253,7 @@ function make_X(lncs::LNC,q::AbstractVector)
     Y = get_conversion(lncs)
     qstd = Y*q
     ndim = get_ndim(lncs)
-    reshape(q[ndim+1:end],ndim,:)
+    reshape(qstd[ndim+1:end],ndim,:)
 end
 
 find_R(q::AbstractVector, lncs::LNC) = find_R(lncs,q)
@@ -1272,6 +1271,15 @@ function find_R(lncs::LNC,q::AbstractVector)
         u = rj -ri
         v,w = HouseholderOrthogonalization(u)
         R = SMatrix{ndim,ndim}([u;;v;;w]*inv([ū;;v̄;;w̄]))
+    elseif lncs isa LNC2D2P
+        (;r̄i,r̄j) = lncs
+        ū = r̄j - r̄i
+        v̄ = rotation_matrix(π/2)*ū
+        ri = @view q[1:2]
+        rj = @view q[3:4]
+        u = rj - ri
+        v = rotation_matrix(π/2)*u
+        R = SMatrix{ndim,ndim}([u;;v]*inv([ū;;v̄]))
     else
         R = SMatrix{ndim,ndim}(X*invX̄)
     end

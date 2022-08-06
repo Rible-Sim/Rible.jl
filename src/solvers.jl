@@ -1,4 +1,4 @@
-struct Wendlandt end
+abstract type AbstractSolver end
 
 struct SimProblem{BotType,FuncsType}
     bot::BotType
@@ -35,16 +35,9 @@ const DEFAULT_CALLBACK = DiscreteCallback(
                         (integrator)->nothing)
 const NO_CONTROL = (intor,cache) -> nothing
 
-mutable struct IntegratorState{StateT}
-    now::StateT
-    prv::StateT
-    convergence::Bool
-end
-
-struct Integrator{ProbType,StateType,CtrlType,T}
+struct Integrator{ProbType,CtrlType,T}
     prob::ProbType
-    state::StateType
-    control!::CtrlType
+    controller::CtrlType
     tspan::Tuple{T,T}
     restart::Bool
     totalstep::Int
@@ -64,23 +57,19 @@ function prepare_traj!(traj;tspan,dt,restart=true)
     totalstep
 end
 
-function solve!(prob::SimProblem,solver,
-                control! = nothing;
+function solve!(prob::SimProblem,solver::AbstractSolver,
+                controller = (prescribe! = nothing, actuate! = nothing);
                 tspan,dt,restart=true,karg...)
     (;bot,dynfuncs) = prob
     (;tg,traj,contacts_traj) = bot
     if restart; resize!(contacts_traj,1); end
     totalstep = prepare_traj!(traj;tspan,dt,restart)
-    if !isa(control!, Nothing)
+    if !isa(controller.prescribe!, Nothing)
         for i in enumerate(traj)
-            control!(traj[i],tg)
+            prescribe!(traj[i],tg)
         end
     end
-    now = deepcopy(traj[end])
-    prv = deepcopy(traj[end])
-    convergence = false
-    state = IntegratorState(now,prv,convergence)
-    intor = Integrator(prob,state,control!,tspan,restart,totalstep)
+    intor = Integrator(prob,controller,tspan,restart,totalstep)
     solve!(intor,solver;dt,karg...)
 end
 
@@ -92,8 +81,9 @@ function solve!(intor,solver;karg...)
     # intor.prob.bot
 end
 
-include("solvers/Wendlandt.jl")
+# include("solvers/Wendlandt.jl")
 include("solvers/Zhong06.jl")
+include("solvers/FBZhong06.jl")
 include("solvers/Alpha.jl")
 include("solvers/CCP/CCPsolvers.jl")
 include("solvers/CCP/ZhongCCP.jl")

@@ -31,47 +31,28 @@ function hidey(ax)
     ax.ylabelvisible = false
 end
 
-my_theme = Theme(;
+theme_try = Theme(;
     font = "CMU Serif",
     fontsize,
     markersize,
     linewidth,
     figure_padding = (2fontsize,fontsize,fontsize,fontsize),
+    palette = (
+        vlinecolor = [:slategrey],
+    ),
     Axis3 = (
         titlefont = "CMU Serif Bold",
         titlesize = fontsize,
         titlegap = 0
-    )
-)
-sg_theme = Theme(;
-    font = "CMU Serif",
-    fontsize,
-    markersize,
-    linewidth,
-    figure_padding = (fontsize,fontsize,fontsize,fontsize),
-    resolution=(0.5tw,0.4tw),
-    Label = (
-        textsize = fontsize,
-        font = "CMU Serif Bold",
-        halign = :left
+    ),
+    Mesh = (
+        color = :slategrey,
+        transparency = true
     )
 )
 
-mh_theme = Theme(;
-    font = "CMU Serif",
-    fontsize,
-    markersize,
-    linewidth,
-    figure_padding = (fontsize,fontsize,fontsize,fontsize),
-    resolution=(0.9tw,0.4tw),
-    Label = (
-        textsize = fontsize,
-        font = "CMU Serif Bold",
-        halign = :left
-    )
-)
-
-mv_theme = Theme(;
+set_theme!(theme_try)
+theme_pub = Theme(;
     font = "CMU Serif",
     fontsize,
     markersize,
@@ -81,6 +62,11 @@ mv_theme = Theme(;
     palette = (
         vlinecolor = [:slategrey],
     ),
+    Axis3 = (
+        titlefont = "CMU Serif Bold",
+        titlesize = fontsize,
+        titlegap = 0
+    ),
     Label = (
         textsize = fontsize,
         font = "CMU Serif Bold",
@@ -88,17 +74,20 @@ mv_theme = Theme(;
         padding = (0, 0, 0, 0),
     ),
     VLines = (
-        # linewidth = 4,
         cycle = [:color => :vlinecolor],
+    ),
+    Mesh = (
+        color = :slategrey,
+        transparency = true
     )
 )
 
-function plot_rigid(rb::TR.AbstractRigidBody;showmesh=true)
+function plot_rigid(rb::TR.AbstractRigidBody;showmesh=true,showupdatemesh=false)
     (;r̄g,r̄ps,nr̄ps) = rb.prop
     (;mesh) = rb
     fig = Figure(resolution=(1920,1080))
     ndim = TR.get_ndim(rb)
-    if ndim == 2
+    if ndim == 2 && !showmesh
         ax = Axis(fig[1,1])
         ax.aspect = DataAspect()
     else
@@ -120,8 +109,13 @@ function plot_rigid(rb::TR.AbstractRigidBody;showmesh=true)
         align = (:left, :baseline),
         offset = (-5, 10)
     )
-    if !(mesh isa Nothing) && showmesh
-        mesh!(ax,mesh,color=:slategrey)
+    if !(mesh isa Nothing)
+        if showmesh
+            mesh!(ax,mesh;transparency=true)
+        end
+        if showupdatemesh
+            mesh!(ax,update_rigidmesh(rb))
+        end
     end
     fig
 end
@@ -155,13 +149,13 @@ function time2step(at,t)
 end
 
 function get_groundmesh(f::Function,rect)
-    GeometryBasics.Mesh(f, rect, NaiveSurfaceNets())
+    GeometryBasics.Mesh(f, rect, NaiveSurfaceNets()) |> make_patch()
 end
 
 function get_groundmesh(plane::TR.Plane,rect)
     GeometryBasics.Mesh(rect, NaiveSurfaceNets()) do v
         TR.signed_distance(v,plane)
-    end
+    end |> make_patch()
 end
 
 function get_groundmesh(::Nothing,rect)
@@ -172,6 +166,7 @@ function get_groundmesh(::Nothing,rect)
 end
 
 function plot_traj!(bot::TR.TensegrityRobot;
+            AxisType=Axis3,
             figsize=:FHD,
             gridsize=(1,1),
             attimes=nothing,
@@ -235,25 +230,30 @@ function plot_traj!(bot::TR.TensegrityRobot;
 
         tgob = Observable(deepcopy(tg))
         axtitle = lift(this_time) do tt
-            @sprintf "(%s) t = %.10G(s)" alphabet[sgi] tt
+            @sprintf "(%s) t = %.10G (s)" alphabet[sgi] tt
         end
-        if ndim == 2
+        if ndim == 2 && !showmesh
             ax = Axis(sg[1,1],title=axtitle)
             ax.aspect = DataAspect()
-        else
+            xlims!(ax,xmin,xmax)
+            ylims!(ax,ymin,ymax)
+        elseif AxisType <: Axis3
             ax = Axis3(sg[1,1],
                 title=axtitle,
                 aspect=:data,
             )
+            xlims!(ax,xmin,xmax)
+            ylims!(ax,ymin,ymax)
             zlims!(ax,zmin,zmax)
+        elseif AxisType <: LScene
             # ax = LScene(fig[1,1], show_axis=false, scenekw = (clear=true,))
-            # ax = LScene(fig[1,1], ) #scenekw = (clear=true,)
+            ax = LScene(fig[1,1], ) #scenekw = (clear=true,)
             # cam = Makie.camera(ax.scene)
             # cam = cam3d!(ax.scene, projectiontype=Makie.Orthographic)
             # update_cam!(ax.scene, cam)
+        else
+            error("Unknown AxisType")
         end
-        xlims!(ax,xmin,xmax)
-        ylims!(ax,ymin,ymax)
         if showground
             rect = Rect3f((xmin,ymin,zmin),(xwid,ywid,zwid))
             groundmesh = get_groundmesh(ground,rect)
@@ -342,7 +342,8 @@ function init_plot!(ax,tgob;isref=false,
         rigidcolor=:slategray4,
         rigidlabelcolor=:darkblue,
         kargs...)
-    (;ncables,nrigids) = tgob[]
+    (;tensiles,nrigids) = tgob[]
+    ncables = length(tensiles.cables)
     ndim = TR.get_ndim(tgob[])
     if isref
         showlabels = false
@@ -355,7 +356,7 @@ function init_plot!(ax,tgob;isref=false,
     if ncables !== 0
     # if false
         linesegs_cables = @lift begin
-            (;connected) = $tgob.connectivity
+            (;tensioned) = $tgob.connectivity
             ndim = TR.get_ndim($tgob)
             T = TR.get_numbertype($tgob)
             ret = Vector{Pair{Point{ndim,T},Point{ndim,T}}}()
@@ -364,13 +365,13 @@ function init_plot!(ax,tgob;isref=false,
                 Point(scnt.end1.rbsig.state.rps[scnt.end1.pid]) =>
                 Point(scnt.end2.rbsig.state.rps[scnt.end2.pid]),
                 vcat,
-                connected.cables
+                tensioned.connected
                 ;init=ret
             )
         end
         linesegments!(ax, linesegs_cables, color = cablecolor, linewidth = 2)
         rcs_by_cables = @lift begin
-            (;connected) = $tgob.connectivity
+            (;tensioned) = $tgob.connectivity
             ndim = TR.get_ndim($tgob)
             T = TR.get_numbertype($tgob)
             ret = Vector{MVector{ndim,T}}()
@@ -381,7 +382,7 @@ function init_plot!(ax,tgob;isref=false,
                     scnt.end2.rbsig.state.rps[scnt.end2.pid]
                 )./2],
                 vcat,
-                connected.cables
+                tensioned.connected
                 ;init=ret
             )
         end
@@ -444,10 +445,14 @@ function init_plot!(ax,tgob;isref=false,
             else
                 strokewidth = 0
             end
-            poly!(ax, rigid_mesh;
+            # poly!(ax, rigid_mesh;
+            #         color = rigidcolor,
+            #         shading = true,
+            #         strokewidth
+            # )
+            mesh!(ax, rigid_mesh;
                     color = rigidcolor,
-                    shading = true,
-                    strokewidth
+                    shading = true
             )
         end
     end
@@ -492,16 +497,52 @@ function init_plot!(ax,tgob;isref=false,
     end
 end
 
+function get3Dstate(rb)
+    (;state) = rb
+    (;ro,R,ṙo,ω) = state
+    ndim = TR.get_ndim(rb)
+    T = TR.get_numbertype(rb)
+    o = zero(T)
+    i = one(T)
+    if ndim == 3
+        return ro, R, ṙo, ω
+    else
+        ro3 = MVector{3}(ro[1],ro[2],o)
+        ṙo3 = MVector{3}(ṙo[1],ṙo[2],o)
+        R3 = MMatrix{3,3}(
+            [
+                R[1,1] -R[2,1] o;
+                -R[1,2] R[2,2] o;
+                o      o      i;
+            ]
+        )
+        ω3 = MVector{3}(o,o,ω[1])
+        return ro3, R3, ṙo3, ω3
+    end
+end
+
 function update_rigidmesh(rb)
-    (;state,mesh) = rb
+    (;mesh) = rb
     @assert !(mesh isa Nothing)
-    trans = Translation(state.ro)
-    rot = LinearMap(state.R)
+    ro,R,ṙo,ω = get3Dstate(rb)
+    trans = Translation(ro)
+    rot = LinearMap(R)
     ct = trans ∘ rot
     updated_pos = ct.(mesh.position)
     fac = faces(mesh)
     nls = normals(updated_pos,fac)
     GeometryBasics.Mesh(meta(updated_pos,normals=nls),fac)
+end
+
+
+function make_patch(;trans=[0.0,0,0],rot=RotX(0.0))
+    function patch(mesh)
+        ct = Translation(trans) ∘ LinearMap(rot)
+        updated_pos = ct.(mesh.position)
+        fac = faces(mesh)
+        nls = normals(updated_pos,fac)
+        GeometryBasics.Mesh(meta(updated_pos,normals=nls),fac)
+    end
 end
 
 function bar2mesh(bar_state)

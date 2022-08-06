@@ -75,7 +75,7 @@ function make_top(ro = [0.0,0.0,0.0],
     ss = Vector{Int}()
 	tensiles = (cables = ss,)
 	connections = TR.connect(rbs,zeros(Int,0,0))
-	cnt = TR.Connectivity(numberedpoints,indexedcoords,connections)
+	cnt = TR.Connectivity(numberedpoints,indexedcoords,(cables=connections,))
 	contacts = [TR.Contact(i,μ,e) for i = [5]]
 	tg = TR.TensegrityStructure(rbs,tensiles,cnt,contacts)
     bot = TR.TensegrityRobot(tg)
@@ -86,7 +86,7 @@ function top_contact_dynfuncs(bot)
     function F!(F,q,q̇,t)
         TR.clear_forces!(tg)
         TR.update_rigids!(tg,q,q̇)
-        TR.update_cables_apply_forces!(tg)
+        TR.update_tensiles!(tg)
         TR.apply_gravity!(tg)
         F .= TR.generate_forces!(tg)
     end
@@ -95,7 +95,7 @@ function top_contact_dynfuncs(bot)
         ∂F∂q̌̇ .= 0
         TR.clear_forces!(tg)
         TR.update_rigids!(tg,q,q̇)
-        TR.update_cables_apply_forces!(tg)
+        TR.update_tensiles!(tg)
         TR.build_∂Q̌∂q̌!(∂F∂q̌,tg)
         TR.build_∂Q̌∂q̌̇!(∂F∂q̌̇,tg)
     end

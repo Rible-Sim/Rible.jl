@@ -1,4 +1,4 @@
-struct Alpha{T}
+struct Alpha{T} <: AbstractSolver
     αm::T
     αf::T
     γ::T

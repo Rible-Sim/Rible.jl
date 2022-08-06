@@ -1,8 +1,8 @@
-function distribute_s̄!(tg::ClusterTensegrityStructure, s̄)
+function distribute_s̄!(tg::AbstractTensegrityStructure, s̄)
     s⁺ = @view s̄[begin:2:end]
     s⁻ = @view s̄[begin+1:2:end]
     is = 0
-    for cs in tg.clustercables
+    for cs in tg.tensiles.clustercables
         nsi = length(cs.sps)
         cs.sps.s⁺ .= s⁺[is+1:is+nsi]
         cs.sps.s⁻ .= s⁻[is+1:is+nsi]
@@ -11,8 +11,8 @@ function distribute_s̄!(tg::ClusterTensegrityStructure, s̄)
     end
 end
 
-function get_s̄(tg::ClusterTensegrityStructure)
-    ns = sum([length(tg.clustercables[i].sps) for i in 1:tg.nclustercables])
+function get_s̄(tg::AbstractTensegrityStructure)
+    ns = sum([length(tg.tensiles.clustercables[i].sps) for i in 1:tg.nclustercables])
     s̄ = zeros(get_numbertype(tg),2ns)
     s⁺ = @view s̄[begin:2:end]
     s⁻ = @view s̄[begin+1:2:end]
@@ -36,8 +36,9 @@ function (f::FischerBurmeister)(x,y)
     √((x/f.X₁)^2+(y*f.X₂)^2+2f.ϵ^2) - (x/f.X₁+y*f.X₂)
 end
 
-function make_Ψ(tg::ClusterTensegrityStructure)
-    (;clustercables, nclustercables) = tg
+function make_Ψ(tg::AbstractTensegrityStructure)
+    (;clustercables) = tg.tensiles
+    nclustercables = length(clustercables)
     ns = sum([length(clustercables[i].sps) for i in 1:nclustercables])
     FB = FischerBurmeister(1e-14,10.,10.)
     function _inner_Ψ(s̄)
@@ -70,14 +71,15 @@ function make_Ψ(tg::ClusterTensegrityStructure)
         reset_forces!(tg)
         distribute_q_to_rbs!(tg, q)
         distribute_s̄!(tg,s̄)
-        update_cables!(tg)
+        update_tensiles!(tg)
         _inner_Ψ(s̄)
     end
     inner_Ψ
 end
 
-function build_ζ(tg::ClusterTensegrityStructure)
-    (;clustercables, nclustercables) = tg
+function build_ζ(tg::AbstractTensegrityStructure)
+    (;clustercables) = tg.tensiles
+    nclustercables = length(clustercables)
     ns = sum([length(clustercables[i].sps) for i in 1:nclustercables])
     ζ = Vector{Float64}(undef,2ns)
     ζ⁺ = @view ζ[begin:2:end]
@@ -106,9 +108,11 @@ function get_TransMatrix(n)
     return sparse(T)
 end
 
-function build_∂ζ∂q(tg::ClusterTensegrityStructure,q̌)
-    (;nclustercables, clustercables, ndim, connectivity) = tg
-    (;connected, indexed) = connectivity
+function build_∂ζ∂q(tg::AbstractTensegrityStructure,q̌)
+    (;ndim, connectivity) = tg
+    (;clustercables) = tg.tensiles
+    nclustercables = length(clustercables)
+    (;tensioned, indexed) = connectivity
     # (;q̌) = tg.state.system
     (;nfull, nfree, sysfree, mem2sysfree, mem2sysfull) = indexed
     ns = sum([length(clustercables[i].sps) for i in 1:nclustercables])
@@ -116,12 +120,12 @@ function build_∂ζ∂q(tg::ClusterTensegrityStructure,q̌)
     Type = get_numbertype(tg)
     ∂l∂q = zeros(Type, nclustersegs, nfree)
     i = 0; j = 0
-    foreach(connected.clustercables) do clustercable
+    foreach(tensioned.clustered) do clustercable
         i += 1
         foreach(clustercable) do cc
             J̌ = zeros(Type,ndim,nfree)
             j += 1
-            cable = tg.clustercables[i].segs[cc.id]
+            cable = clustercables[i].segs[cc.id]
             (;end1,end2) = cc
             rb1 = end1.rbsig
             rb2 = end2.rbsig
@@ -166,9 +170,9 @@ function build_∂ζ∂q(tg::ClusterTensegrityStructure,q̌)
     return T*b*∂l∂q
 end
 
-function Record_build_∂ζ∂q(tg::ClusterTensegrityStructure,q̌, xlsxname, sheetname)
+function Record_build_∂ζ∂q(tg::AbstractTensegrityStructure,q̌, xlsxname, sheetname)
     (;nclustercables, clustercables, ndim, connectivity) = tg
-    (;connected, indexed) = connectivity
+    (;tensioned, indexed) = connectivity
     # (;q̌) = tg.state.system
     (;nfull, nfree, sysfree, mem2sysfree, mem2sysfull) = indexed
     ns = sum([length(clustercables[i].sps) for i in 1:nclustercables])
@@ -176,7 +180,7 @@ function Record_build_∂ζ∂q(tg::ClusterTensegrityStructure,q̌, xlsxname, sh
     Type = get_numbertype(tg)
     ∂l∂q = zeros(Type, nclustersegs, nfree)
     i = 0; j = 0
-    foreach(connected.clustercables) do clustercable
+    foreach(tensioned.clustercables) do clustercable
         i += 1
         foreach(clustercable) do cc
             J̌ = zeros(Type,ndim,nfree)
@@ -246,7 +250,7 @@ function Record_build_∂ζ∂q(tg::ClusterTensegrityStructure,q̌, xlsxname, sh
 end
 
 function get_clusterA(tg)
-    (;clustercables) = tg
+    (;clustercables) = tg.tensiles
     A_list = [Matrix{Float64}(undef,1,1) for i in 1:length(clustercables)]
     for (csid, cs) in enumerate(clustercables)
         (;k) = cs.segs
@@ -266,7 +270,7 @@ function get_clusterA(tg)
 end
 
 function build_∂ζ∂s̄(tg)
-    (;clustercables) = tg
+    (;clustercables) = tg.tensiles
     A_list = Vector{SparseMatrixCSC{Float64,Int64}}()
     clusterA = get_clusterA(tg)
     for (cid,clustercable) in enumerate(clustercables)

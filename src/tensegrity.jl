@@ -197,44 +197,48 @@ function connect(rbs,cm_input)
         rbid1,rbid2 = ifelse(row[rbids[1]]>0,rbids,reverse(rbids))
         pid1,pid2 = Int64.(abs.(row[[rbid1,rbid2]]))
         is += 1
-        push!(ret_raw,Point2Point(is,ID(rbs_sorted[rbid1],pid1),ID(rbs_sorted[rbid2],pid2)))
+        push!(ret_raw,End2End(is,ID(rbs_sorted[rbid1],pid1),ID(rbs_sorted[rbid2],pid2)))
     end
     ret = TypeSortedCollection(ret_raw)
 end
 
-function connect(rbs, cm_input, cm2_input)
-    ret1 = connect(rbs, cm_input)
-    rbs_sorted = sort_rigidbodies(rbs)
-    ret_raw = []
-    cm = cm2_input
-    for row in eachrow(cm)
-        iret = Vector{Point2Point}()
-        is = 0
-        rbids = findall(!iszero,row)
+function cluster(rbs, cm2_input)
+	rbs_sorted = sort_rigidbodies(rbs)
+	ret_raw = []
+	cm = cm2_input
+	for row in eachrow(cm)
+		iret = Vector{End2End}()
+		is = 0
+		rbids = findall(!iszero,row)
 		if isempty(rbids)
 			continue
 		end
-        nrbid = length(rbids)
-        for i in 1:nrbid-1
-            is += 1
-            rbid1 = rbids[i]; rbid2 = rbids[i+1]
-            pid1 = Int64(row[rbids[i]]); pid2 = Int64(row[rbids[i+1]])
-            push!(iret,Point2Point(is,ID(rbs_sorted[rbid1],pid1),ID(rbs_sorted[rbid2],pid2)))
-        end
-        push!(ret_raw, iret)
-    end
-    ret2 = TypeSortedCollection(ret_raw)
-    return (cables=ret1, clustercables=ret2)
+		nrbid = length(rbids)
+		for i in 1:nrbid-1
+			is += 1
+			rbid1 = rbids[i]; rbid2 = rbids[i+1]
+			pid1 = Int64(row[rbids[i]]); pid2 = Int64(row[rbids[i+1]])
+			push!(iret,End2End(is,ID(rbs_sorted[rbid1],pid1),ID(rbs_sorted[rbid2],pid2)))
+		end
+		push!(ret_raw, iret)
+	end
+	ret2 = TypeSortedCollection(ret_raw)
+end
+
+function connect_and_cluster(rbs, cm_input, cm2_input)
+    ret1 = connect(rbs, cm_input)
+	ret2 = cluster(rbs, cm2_input)
+    return (connected=ret1, clustered=ret2)
 end
 
 """
 刚体连接性类。
 $(TYPEDEF)
 """
-struct Connectivity{numberType,indexType,connectType,jointType}
+struct Connectivity{numberType,indexType,tensionType,jointType}
     numbered::numberType
     indexed::indexType
-    connected::connectType
+    tensioned::tensionType
     jointed::jointType
 end
 
@@ -242,8 +246,8 @@ end
 连接性构造子。
 $(TYPEDSIGNATURES)
 """
-function Connectivity(numbered,indexed,connected)
-	Connectivity(numbered,indexed,connected,unjoin())
+function Connectivity(numbered,indexed,tensioned)
+	Connectivity(numbered,indexed,tensioned,unjoin())
 end
 
 function get_nconstraints(rbs::TypeSortedCollection)
@@ -270,14 +274,14 @@ mutable struct NaturalCoordinatesState{T,qT,qviewT}
 	F̌::qviewT
 end
 
-mutable struct ClusterNaturalCoordinatesState{T,qT,sT,qviewT}
+mutable struct ClusterNaturalCoordinatesState{T,qT,qviewT}
 	t::T
 	q::qT
 	q̇::qT
 	q̈::qT
     F::qT
 	λ::qT
-    s::sT
+    s::qT
 	q̌::qviewT
 	q̌̇::qviewT
 	q̌̈::qviewT
@@ -328,7 +332,7 @@ end
 张拉整体状态构造子。
 $(TYPEDSIGNATURES)
 """
-function TensegrityState(rbs,cnt::Connectivity)
+function TensegrityState(rbs,tensiles,cnt::Connectivity{<:Any,<:Any,<:NamedTuple{(:connected, )},<:Any})
 	(;indexed,jointed) = cnt
 	(;nfull,ninconstraints,sysfree,syspres) = indexed
 	(;mem2sysincst,mem2sysfull,mem2sysfree,mem2syspres) = indexed
@@ -371,11 +375,14 @@ function TensegrityState(rbs,cnt::Connectivity)
 	TensegrityState(system,rigids)
 end
 
-function TensegrityState(rbs,cnt::Connectivity, ns)
+function TensegrityState(rbs,tensiles,cnt::Connectivity{<:Any,<:Any,<:NamedTuple{(:connected, :clustered)},<:Any})
+	(;clustercables) = tensiles
 	(;indexed,jointed) = cnt
 	(;nfull,ninconstraints,sysfree,syspres) = indexed
 	(;mem2sysincst,mem2sysfull,mem2sysfree,mem2syspres) = indexed
 	(;nexconstraints) = jointed
+	nclustercables = length(clustercables)
+	ns = sum([length(clustercables[i].sps) for i in 1:nclustercables])
 	nconstraints = ninconstraints + nexconstraints
 	nb = length(rbs)
 	ci_by_member = Vector{Vector{Int}}(undef,nb)
@@ -391,7 +398,7 @@ function TensegrityState(rbs,cnt::Connectivity, ns)
 	q̇ = zero(q)
 	q̈ = zero(q)
 	F = zero(q)
-    s = zeros(Float64, 2ns)
+    s = zeros(T, 2ns)
 	λ = Vector{T}(undef,nconstraints)
 	system = ClusterNaturalCoordinatesState(t,q,q̇,q̈,F,λ,sysfree,syspres,s)
 	rigids = [
@@ -419,16 +426,14 @@ end
 张拉整体结构类。
 $(TYPEDEF)
 """
-struct TensegrityStructure{RigidType,CableType,TenType,CntType,StateType,ContactsType} <: AbstractTensegrityStructure
+struct TensegrityStructure{RigidType,TenType,CntType,StateType,ContactsType} <: AbstractTensegrityStructure
     ndim::Int
 	ndof::Int
 	nconstraints::Int
     nrigids::Int
-    ncables::Int
     ntensiles::Int
     # nprespoints::Int
     rigidbodies::RigidType
-    cables::CableType
     tensiles::TenType
     connectivity::CntType
 	state::StateType
@@ -442,7 +447,6 @@ $(TYPEDSIGNATURES)
 function TensegrityStructure(rbs,tensiles,cnt::Connectivity,contacts=nothing)
     ndim = get_ndim(rbs)
     nrigids = length(rbs)
-    ncables = length(tensiles.cables)
     ntensiles = sum(map(length,tensiles))
 	(;nfree,ninconstraints) = cnt.indexed
 	(;nexconstraints) = cnt.jointed
@@ -453,62 +457,13 @@ function TensegrityStructure(rbs,tensiles,cnt::Connectivity,contacts=nothing)
 	end
 	# nprespoints = 0
 	# prespoints = nothing
-    cables = tensiles.cables
-	state = TensegrityState(rbs,cnt)
+	state = TensegrityState(rbs,tensiles,cnt)
     tg = TensegrityStructure(
 		ndim,ndof,nconstraints,
-        nrigids,ncables,ntensiles,
-        rbs,cables,tensiles,
+        nrigids,ntensiles,
+        rbs,tensiles,
         cnt,state,
 		contacts
-	)
-    # check_jacobian_singularity(tg)
-    tg
-end
-
-struct ClusterTensegrityStructure{BodyType,StrType,CStrType,TenType,CntType,StateType,ContactsType} <: AbstractTensegrityStructure
-    ndim::Int
-	ndof::Int
-	nconstraints::Int
-    nrigids::Int
-    ncables::Int
-    nclustercables::Int
-    ntensiles::Int
-    # nprespoints::Int
-    rigidbodies::BodyType
-    cables::StrType
-    clustercables::CStrType
-    tensiles::TenType
-    connectivity::CntType
-	state::StateType
-	contacts::ContactsType
-end
-
-function ClusterTensegrityStructure(rbs,tensiles,cnt::Connectivity,contacts=nothing)
-    ndim = get_ndim(rbs)
-    nrigids = length(rbs)
-    ncables = length(tensiles.cables)
-    nclustercables = length(tensiles.clustercables)
-    ns = sum([length(tensiles.clustercables[i].sps) for i in 1:nclustercables])
-    ntensiles = sum(map(length,tensiles))
-	(;nfree,ninconstraints) = cnt.indexed
-	(;nexconstraints) = cnt.jointed
-	nconstraints = ninconstraints + nexconstraints
-	ndof = nfree - nconstraints
-	if ndof <= 0
-		@warn "Non positive degree of freedom: $ndof."
-	end
-	# nprespoints = 0
-	# prespoints = nothing
-    (;cables, clustercables) = tensiles
-    # cables = tensiles.cables
-	state = TensegrityState(rbs,cnt,ns)
-    tg = ClusterTensegrityStructure(
-			ndim,ndof,nconstraints,
-	        nrigids,ncables,nclustercables,ntensiles,
-	        rbs,cables,clustercables,tensiles,
-	        cnt,state,
-			contacts
 	)
     # check_jacobian_singularity(tg)
     tg
@@ -529,11 +484,7 @@ end
 清除刚体所受作用力和力矩。
 $(TYPEDSIGNATURES)
 """
-function clear_forces!(tg::TensegrityStructure)
-    tg.state.system.F .= 0
-	clear_forces!(tg.rigidbodies)
-end
-function clear_forces!(tg::ClusterTensegrityStructure)
+function clear_forces!(tg::AbstractTensegrityStructure)
     tg.state.system.F .= 0
 	clear_forces!(tg.rigidbodies)
 end
@@ -559,14 +510,13 @@ end
 更新绳索拉力
 $(TYPEDSIGNATURES)
 """
-function update_cables!(tg)
-    update_cables!(tg, tg.tensiles)
+function update_tensiles!(tg::AbstractTensegrityStructure)
+    update_tensiles!(tg, tg.connectivity.tensioned)
 end
 
-function update_cables!(tg, @eponymargs(cables,))
-    (;cables) = tg
-    (;connected) = tg.connectivity
-    foreach(connected.cables) do scnt
+function update_tensiles!(tg, @eponymargs(connected,))
+    (;cables) = tg.tensiles
+    foreach(connected) do scnt
         scable = cables[scnt.id]
         state1 = scnt.end1.rbsig.state
         state2 = scnt.end2.rbsig.state
@@ -590,11 +540,10 @@ function lengthdir(v)
     l,τ
 end
 
-function update_cables!(tg, @eponymargs(clustercables,))
-    (;clustercables) = tg
-    (;connected) = tg.connectivity
+function update_tensiles!(tg, @eponymargs(clustered,))
+    (;clustercables) = tg.tensiles
     id = 0
-    foreach(connected.clustercables) do scnt
+    foreach(clustered) do scnt
         id += 1
         clustercable = clustercables[id]
         (;s) = clustercable.sps
@@ -633,9 +582,9 @@ function update_cables!(tg, @eponymargs(clustercables,))
     end
 end
 
-function update_cables!(tg, @eponymargs(cables, clustercables))
-    update_cables!(tg, @eponymtuple(cables))
-    update_cables!(tg, @eponymtuple(clustercables))
+function update_tensiles!(tg, @eponymargs(connected, clustered))
+    update_tensiles!(tg, @eponymtuple(connected))
+    update_tensiles!(tg, @eponymtuple(clustered))
 end
 
 """
@@ -698,24 +647,6 @@ function generate_forces!(tg::TensegrityStructure)
 	system.F̌
 end
 
-function generate_forces!(tg::ClusterTensegrityStructure)
-	(;rigidbodies,state) = tg
-	(;system,rigids) = tg.state
-	system.F .= 0.0
-    foreach(rigidbodies) do rb
-		(;f,fps,cache) = rb.state
-        (;Cps,Cg) = cache
-        (;F) = rigids[rb.prop.id]
-        for (pid,fp) in enumerate(fps)
-            # F .+= transpose(Cps[pid])*fp
-			mul!(F,transpose(Cps[pid]),fp,1,1)
-        end
-        # F .+= transpose(Cg)*f
-		mul!(F,transpose(Cg),f,1,1)
-    end
-	system.F̌
-end
-
 function get_force(tg::AbstractTensegrityStructure)
 	tg.state.system.F̌
 end
@@ -739,7 +670,7 @@ end
 function update!(tg::AbstractTensegrityStructure; gravity=false)
     clear_forces!(tg)
     update_rigids!(tg)
-    update_cables!(tg)
+    update_tensiles!(tg)
     # update_clustercables_apply_forces!(tg)
 	if gravity
 		apply_gravity!(tg)
@@ -1003,16 +934,14 @@ end
 $(TYPEDSIGNATURES)
 """
 get_ndim(bot::TensegrityRobot) = get_ndim(bot.tg)
-get_ndim(tg::TensegrityStructure) = get_ndim(tg.rigidbodies)
-get_ndim(tg::ClusterTensegrityStructure) = get_ndim(tg.rigidbodies)
+get_ndim(tg::AbstractTensegrityStructure) = get_ndim(tg.rigidbodies)
 get_ndim(rbs::AbstractVector{<:AbstractRigidBody}) = get_ndim(eltype(rbs))
 get_ndim(rbs::TypeSortedCollection) = get_ndim(eltype(rbs.data[1]))
 get_ndim(rb::AbstractRigidBody) = get_ndim(typeof(rb))
 get_ndim(::Type{<:AbstractRigidBody{N,T}}) where {N,T} = N
 
 get_numbertype(bot::TensegrityRobot) = get_numbertype(bot.tg)
-get_numbertype(tg::TensegrityStructure) = get_numbertype(tg.rigidbodies)
-get_numbertype(tg::ClusterTensegrityStructure) = get_numbertype(tg.rigidbodies)
+get_numbertype(tg::AbstractTensegrityStructure) = get_numbertype(tg.rigidbodies)
 get_numbertype(rbs::AbstractVector{<:AbstractRigidBody}) = get_numbertype(eltype(rbs))
 get_numbertype(rbs::TypeSortedCollection) = get_numbertype(eltype(rbs.data[1]))
 get_numbertype(rb::AbstractRigidBody) = get_numbertype(typeof(rb))
@@ -1049,19 +978,15 @@ get_cables_tension(bot::TensegrityRobot) = get_cables_tension(bot.tg)
 get_cables_stiffness(bot::TensegrityRobot) = get_cables_stiffness(bot.tg)
 get_cables_force_density(bot::TensegrityRobot) = get_cables_force_density(bot.tg)
 
-function get_rigidbodies(tg::TensegrityStructure)
-	sort_rigidbodies(tg.rigidbodies)
-end
-function get_rigidbodies(tg::ClusterTensegrityStructure)
+get_rigidbodies(bot::TensegrityRobot) = get_rigidbodies(bot.tg)
+
+function get_rigidbodies(tg::AbstractTensegrityStructure)
 	sort_rigidbodies(tg.rigidbodies)
 end
 
-function get_rigidbars(tg::TensegrityStructure)
-	rbs = get_rigidbodies(tg)
-	[rb for rb in rbs
-	if rb.state.cache.funcs.lncs isa Union{NaturalCoordinates.LNC2D4C,NaturalCoordinates.LNC3D6C}]
-end
-function get_rigidbars(tg::ClusterTensegrityStructure)
+get_rigidbars(bot::TensegrityRobot) = get_rigidbars(bot.tg)
+
+function get_rigidbars(tg::AbstractTensegrityStructure)
 	rbs = get_rigidbodies(tg)
 	[rb for rb in rbs
 	if rb.state.cache.funcs.lncs isa Union{NaturalCoordinates.LNC2D4C,NaturalCoordinates.LNC3D6C}]
@@ -1220,7 +1145,7 @@ function goto_step!(bot::TensegrityRobot,that_step;actuate=false)
 end
 
 function analyse_slack(tg::AbstractTensegrityStructure,verbose=false)
-	(;cables) = tg
+	(;cables) = tg.tensiles
 	slackcases = [cable.id for cable in cables if cable.state.length <= cable.state.restlen]
 	if verbose && !isempty(slackcases)
 		@show slackcases

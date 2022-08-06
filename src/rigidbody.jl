@@ -203,7 +203,7 @@ $(TYPEDEF)
 ---
 $(TYPEDFIELDS)
 """
-struct Point2Point{end1Type<:ID,end2Type<:ID}
+struct End2End{end1Type<:ID,end2Type<:ID}
 	"编号"
 	id::Int
 	"起始点"

@@ -1,8 +1,5 @@
-struct RigidData
-    r̄g
-    m
-    i
-    r̄l
+function RigidData(r̄g,m,i,r̄l,mesh=nothing)
+    @eponymtuple(r̄g,m,i,r̄l,mesh)
 end
 
 """
@@ -222,8 +219,6 @@ function BuildTail()
     end
     cables = [TR.Cable2D(i, restlens[i], ks[i], 0.0) for i in 1:nstrings]
     tensiles = (cables=cables,)
-    acs = []
-    hub = (actuators = acs, )
 
     matrix_cnt_raw = Vector{Matrix{Int}}()
     s = zeros(4, nb)
@@ -251,11 +246,11 @@ function BuildTail()
         push!(matrix_cnt_raw, s)
     end
     matrix_cnt = reduce(vcat, matrix_cnt_raw)
-    connections = (cables=TR.connect(rigdibodies, matrix_cnt),)
-    cnt = TR.Connectivity(numberedpoints, indexedcoords, connections)
+    tensiled = (connected=TR.connect(rigdibodies, matrix_cnt),)
+    cnt = TR.Connectivity(numberedpoints, indexedcoords, tensiled)
     tg = TR.TensegrityStructure(rigdibodies, tensiles, cnt)
-    return TR.TensegrityRobot(tg, hub)
-end  
+    bot = TR.TensegrityRobot(tg,)
+end
 
 """
 包含滑动绳索的模型构建函数。
@@ -330,32 +325,50 @@ function BuildTail(type; β=1.0, μ=0.02)
             4 => Get_apsC()
         end
     end
+    asbMid = load("STL/装配体-中间部分.STL") |> make_patch(;trans=[0.0,0,0],rot=RotZ(deg2rad(-77)))
+    crSec1 = load("STL/截面形状-1.STL") |> make_patch(;trans=[0.0,-5,0]) |> (x)->merge([x,asbMid])
+    crSec2 = load("STL/截面形状-2.STL") |> make_patch(;trans=[0.0,-5,0]) |> (x)->merge([x,asbMid])
+    crSec3 = load("STL/截面形状-3.STL") |> make_patch(;trans=[0.0,-5,0]) |> (x)->merge([x,asbMid])
+    crSec4f = load("STL/截面形状-4-随动段.STL") |> make_patch(;trans=[40,0,0.],rot=RotZ(-π/2))
+    crSec5f = load("STL/截面形状-5-随动段.STL") |> make_patch(;trans=[40,0,0.],rot=RotZ(-π/2))
+    crSec6f = load("STL/截面形状-6-随动段.STL") |> make_patch(;trans=[30,0,0.],rot=RotZ(-π/2))
+    crSec7f = load("STL/截面形状-7-随动段.STL") |> make_patch(;trans=[25,0,0.],rot=RotZ(-π/2))
+    crSec8f = load("STL/截面形状-8-随动段.STL") |> make_patch(;trans=[25,0,0.],rot=RotZ(-π/2))
+    crSec9f = load("STL/截面形状-9-随动段.STL") |> make_patch(;trans=[25,0,0.],rot=RotZ(-π/2))
+    crSec10f = load("STL/截面形状-10-随动段.STL") |> make_patch(;trans=[30,0,0.],rot=RotZ(-π/2))
+
+    asbMot = load("STL/装配体-电机.STL") |> make_patch(;trans=[45.0,0,0],rot=RotZ(π))
+
+    asbB32 = load("STL/装配体-中间梁6.0-32.STL") |> make_patch(;trans=[25.0,0,0])
+    asbB40 = load("STL/装配体-中间梁6.0-40.STL") |> make_patch(;trans=[25.0,0,0])
+    asbLF = load("STL/装配体-主动-随动.STL") |> make_patch(;trans=[55,0,0.],rot=RotZ( π/2))
 
     rds = [
-        RigidData(r̄gC, mC, iC, r̄lC),
-        RigidData(r̄g1, m1, i1, r̄l1),
-        RigidData(r̄gB, mB, iB, r̄lB),
-        RigidData(r̄g1, m1, i1, r̄l1),
-        RigidData(r̄gA, mA, iA, r̄lA),
-        RigidData(r̄g1, m1, i1, r̄l1),
-        RigidData(r̄gB, mB, iB, r̄lB),
-        RigidData(r̄g1, m1, i1, r̄l1),
-        RigidData(r̄gA, mA, iA, r̄lA),
-        RigidData(r̄g2, m2, i2, r̄l2),
-        RigidData(r̄gB, mB, iB, r̄lB),
-        RigidData(r̄g2, m2, i2, r̄l2),
-        RigidData(r̄gA, mA, iA, r̄lA),
-        RigidData(r̄g2, m2, i2, r̄l2),
-        RigidData(r̄gB, mB, iB, r̄lB),
-        RigidData(r̄g3, m3, i3, r̄l3),
-        RigidData(r̄g4⁺, m4⁺, i4⁺, r̄l4⁺),
-        RigidData(r̄g4, m4, i4, r̄l4),
-        RigidData(r̄g5, m5, i5, r̄l5),
-        RigidData(r̄g6, m6, i6, r̄l6),
-        RigidData(r̄g7, m7, i7, r̄l7),
-        RigidData(r̄g8, m8, i8, r̄l8),
-        RigidData(r̄g9, m9, i9, r̄l9),
-        RigidData(r̄g10, m10, i10, r̄l10)]
+        RigidData(r̄gC, mC, iC, r̄lC, asbMot), #1
+        RigidData(r̄g1, m1, i1, r̄l1, crSec1), #2
+        RigidData(r̄gB, mB, iB, r̄lB, asbB32), #3
+        RigidData(r̄g1, m1, i1, r̄l1, crSec1), #4
+        RigidData(r̄gA, mA, iA, r̄lA, asbB40), #5
+        RigidData(r̄g1, m1, i1, r̄l1, crSec1), #6
+        RigidData(r̄gB, mB, iB, r̄lB, asbB32), #7
+        RigidData(r̄g1, m1, i1, r̄l1, crSec1), #8
+        RigidData(r̄gA, mA, iA, r̄lA, asbB40), #9
+        RigidData(r̄g2, m2, i2, r̄l2, crSec2), #10
+        RigidData(r̄gB, mB, iB, r̄lB, asbB32), #11
+        RigidData(r̄g2, m2, i2, r̄l2, crSec2), #12
+        RigidData(r̄gA, mA, iA, r̄lA, asbB40), #13
+        RigidData(r̄g2, m2, i2, r̄l2, crSec2), #14
+        RigidData(r̄gB, mB, iB, r̄lB, asbB32), #15
+        RigidData(r̄g3, m3, i3, r̄l3, crSec3), #16
+        RigidData(r̄g4⁺, m4⁺, i4⁺, r̄l4⁺, asbLF), #17
+        RigidData(r̄g4, m4, i4, r̄l4, crSec4f), #18
+        RigidData(r̄g5, m5, i5, r̄l5, crSec5f), #19
+        RigidData(r̄g6, m6, i6, r̄l6, crSec6f), #20
+        RigidData(r̄g7, m7, i7, r̄l7, crSec7f), #21
+        RigidData(r̄g8, m8, i8, r̄l8, crSec8f), #22
+        RigidData(r̄g9, m9, i9, r̄l9, crSec9f), #23
+        RigidData(r̄g10, m10, i10, r̄l10, crSec10f) #24
+    ]
 
     function Computer̄s(rds)
         n = length(rds)
@@ -439,7 +452,7 @@ function BuildTail(type; β=1.0, μ=0.02)
             lncs, _ = TR.NaturalCoordinates.NC2D2P(SVector{2}(ri), SVector{2}(rj), ro, α, ṙo, ω)
         end
         state = TR.RigidBodyState(prop, lncs, ri, α, ṙo, ω, ci, Φi)
-        rb = TR.RigidBody(prop, state)
+        rb = TR.RigidBody(prop, state, rdsi.mesh)
     end
 
     rbs = [rigidbody(i, rds[i], r̄s[i]) for i in 1:nb]
@@ -482,7 +495,7 @@ function BuildTail(type; β=1.0, μ=0.02)
             cs1 = TR.ClusterCables(1, 2, deepcopy(c_section); μ=μ)
             cs2 = TR.ClusterCables(2, 2, deepcopy(c_section); μ=μ)
             tensiles = (cables=cables, clustercables=[cs1, cs2])
-            s = zeros(2, nb)
+            s = zeros(Int, 2, nb)
             s[1, 1] = 3; s[1, 2] = 2; s[1, 4] = 2; s[1, 6] = 2
             s[2, 1] = 2; s[2, 2] = 1; s[2, 4] = 1; s[2, 6] = 1
             matrix_cnt2 = s
@@ -494,7 +507,7 @@ function BuildTail(type; β=1.0, μ=0.02)
             cs1 = TR.ClusterCables(1, 7, deepcopy(c_section); μ=μ)
             cs2 = TR.ClusterCables(2, 7, deepcopy(c_section); μ=μ)
             tensiles = (cables=cables, clustercables=[cs1, cs2])
-            s = zeros(2, nb)
+            s = zeros(Int, 2, nb)
             s[1, 1] = 3; s[2, 1] = 2
             for i in 1:8
                 s[1, 2i] = 2
@@ -511,7 +524,7 @@ function BuildTail(type; β=1.0, μ=0.02)
             cs1 = [TR.ClusterCables(i, 1, deepcopy(c_section1); μ=μ) for i in 1:2]
             cs2 = [TR.ClusterCables(i, 1, deepcopy(c_section2); μ=μ) for i in 3:8]
             tensiles = (cables=cables, clustercables=vcat(cs1, cs2))
-            s = zeros(8, nb)
+            s = zeros(Int, 8, nb)
             s[1, 1] = 3; s[1, 2] = 2; s[1, 4] = 2;
             s[2, 1] = 2; s[2, 2] = 1; s[2, 4] = 1;
             for i in 1:3
@@ -531,7 +544,7 @@ function BuildTail(type; β=1.0, μ=0.02)
             cs1 = [TR.ClusterCables(i, 2, deepcopy(c_section1); μ=μ) for i in 1:2]
             cs2 = [TR.ClusterCables(i, 2, deepcopy(c_section2); μ=μ) for i in 3:6]
             tensiles = (cables=cables, clustercables=vcat(cs1, cs2))
-            s = zeros(6, nb)
+            s = zeros(Int, 6, nb)
             s[1, 1] = 3; s[1, 2] = 2; s[1, 4] = 2; s[1, 6] = 2
             s[2, 1] = 2; s[2, 2] = 1; s[2, 4] = 1; s[2, 6] = 1
             for i in 1:4
@@ -543,8 +556,8 @@ function BuildTail(type; β=1.0, μ=0.02)
             matrix_cnt2 = s
         end
     end
-    acs = []
-    hub = (actuators = acs, )
+    # acs = []
+    # hub = (actuators = acs, )
 
     matrix_cnt_raw = Vector{Matrix{Int}}()
     s = zeros(4, nb)
@@ -572,8 +585,8 @@ function BuildTail(type; β=1.0, μ=0.02)
         push!(matrix_cnt_raw, s)
     end
     matrix_cnt = reduce(vcat, matrix_cnt_raw)
-    connections = TR.connect(rigdibodies, matrix_cnt, matrix_cnt2)
-    cnt = TR.Connectivity(numberedpoints, indexedcoords, connections)
-    tg = TR.ClusterTensegrityStructure(rigdibodies, tensiles, cnt)
-    return TR.TensegrityRobot(tg, hub)
+    cc = TR.connect_and_cluster(rigdibodies, matrix_cnt, matrix_cnt2)
+    cnt = TR.Connectivity(numberedpoints, indexedcoords, cc)
+    tg = TR.TensegrityStructure(rigdibodies, tensiles, cnt)
+    bot = TR.TensegrityRobot(tg,)
 end
