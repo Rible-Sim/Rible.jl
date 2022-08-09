@@ -64,8 +64,9 @@ function solve!(prob::SimProblem,solver::AbstractSolver,
     (;tg,traj,contacts_traj) = bot
     if restart; resize!(contacts_traj,1); end
     totalstep = prepare_traj!(traj;tspan,dt,restart)
-    if !isa(controller.prescribe!, Nothing)
-        for i in enumerate(traj)
+    (;prescribe!, actuate!) = controller
+    if !isa(prescribe!, Nothing)
+        for i in eachindex(traj)
             prescribe!(traj[i],tg)
         end
     end

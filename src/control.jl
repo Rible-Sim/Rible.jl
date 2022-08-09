@@ -29,7 +29,7 @@ function ManualActuator(actid,ids::AbstractVector,values::AbstractVector,coupler
 end
 
 function actuate!(tg,act::AbstractActuator{<:Uncoupled},μ::AbstractVector)
-    (;cables) = tg
+    (;cables) = tg.tensiles
     (;reg) = act
     (;ids, values) = reg
     for (id, original_restlen) in zip(ids,values)
@@ -39,7 +39,7 @@ function actuate!(tg,act::AbstractActuator{<:Uncoupled},μ::AbstractVector)
 end
 
 function actuate!(tg,act::AbstractActuator{<:Serial},μ::Number)
-    (;cables) = tg
+    (;cables) = tg.tensiles
     (;reg) = act
     (;ids, values) = reg
     for (id, original_restlen) in zip(ids,values)
@@ -162,7 +162,7 @@ end
 # end
 
 function set_restlen!(tg,u)
-    for (i,s) in enumerate(tg.cables)
+    for (i,s) in enumerate(tg.tensiles.cables)
         s.state.restlen = u[i]
     end
 end

@@ -84,7 +84,7 @@ end
 
 function get_tension!(bot::TR.TensegrityRobot,cid::Int,step_range=:)
     (; tg, traj)= bot
-    (; cables) = tg
+    (; cables) = tg.tensiles
     T = TR.get_numbertype(tg)
     f = Vector{T}()
     h = traj.t[2] - traj.t[1]

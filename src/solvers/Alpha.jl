@@ -22,9 +22,8 @@ struct AlphaCache{solverT,MMT,funcsT,T}
 end
 
 function generate_cache(solver::Alpha,intor;dt,kargs...)
-    (;prob,state) = intor
+    (;prob,) = intor
     (;bot,dynfuncs) = prob
-    (;q,q̇) = state.now
     (;αm,αf,γ,β) = solver
     # F!,_ = dynfuncs
     mm = build_MassMatrices(bot)
@@ -46,10 +45,9 @@ end
 function solve!(intor::Integrator,cache::AlphaCache;
                 dt,ftol=1e-14,verbose=false,iterations=50,
                 progress=true,exception=true)
-    (;prob,state,control!,tspan,restart,totalstep) = intor
+    (;prob,controller,tspan,restart,totalstep) = intor
     (;bot,dynfuncs) = prob
     (;traj) = bot
-    # @unpack t,q,q̇,tprev,qprev,q̇prev = state
     (;F!,Jac_F!) = dynfuncs
     (;solver,mass_matrices,funcs,β′,γ′) = cache
     (;A,Φ,∂Ǎᵀλ∂q̌) = funcs
@@ -168,8 +166,6 @@ function solve!(intor::Integrator,cache::AlphaCache;
         #---------Step k finisher-----------
         step += 1
         aᵏ,aᵏ⁻¹ = aᵏ⁻¹,aᵏ
-        state.prv = traj[timestep]
-        state.now = traj[timestep+1]
         #---------Step k finisher-----------
         if verbose
             dg_step = ceil(Int,log10(totalstep))+1

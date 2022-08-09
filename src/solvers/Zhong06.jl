@@ -7,9 +7,8 @@ struct Zhong06Cache{MMT,AT,ΦT}
 end
 
 function generate_cache(::Zhong06,intor;dt,kargs...)
-    (;prob,state) = intor
+    (;prob) = intor
     (;bot,dynfuncs) = prob
-    (;q,q̇) = state.now
     # F!,_ = dynfuncs
     mm = build_MassMatrices(bot)
     # (;M) = mm

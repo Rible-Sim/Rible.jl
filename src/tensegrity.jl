@@ -1003,7 +1003,7 @@ end
 $(TYPEDSIGNATURES)
 """
 function get_cables_stiffness(tg::TensegrityStructure)
-    [s.k for s in tg.cables]
+    [s.k for s in tg.tensiles.cables]
 end
 
 """
@@ -1011,11 +1011,11 @@ end
 $(TYPEDSIGNATURES)
 """
 function get_cables_len(tg::TensegrityStructure)
-    [s.state.length for s in tg.cables]
+    [s.state.length for s in tg.tensiles.cables]
 end
 
 function get_cables_len_dot(tg::TensegrityStructure)
-    [s.state.lengthdot for s in tg.cables]
+    [s.state.lengthdot for s in tg.tensiles.cables]
 end
 
 """
@@ -1023,7 +1023,7 @@ end
 $(TYPEDSIGNATURES)
 """
 function get_cables_deform(tg::TensegrityStructure)
-    [s.state.length - s.state.restlen for s in tg.cables]
+    [s.state.length - s.state.restlen for s in tg.tensiles.cables]
 end
 
 """
@@ -1031,7 +1031,7 @@ end
 $(TYPEDSIGNATURES)
 """
 function get_cables_restlen(tg::TensegrityStructure)
-    [s.state.restlen for s in tg.cables]
+    [s.state.restlen for s in tg.tensiles.cables]
 end
 
 """
@@ -1039,7 +1039,7 @@ end
 $(TYPEDSIGNATURES)
 """
 function get_cables_tension(tg::TensegrityStructure)
-    [s.state.tension for s in tg.cables]
+    [s.state.tension for s in tg.tensiles.cables]
 end
 
 """
@@ -1047,7 +1047,7 @@ end
 $(TYPEDSIGNATURES)
 """
 function get_cables_force_density(tg::TensegrityStructure)
-    [s.state.tension/s.state.length for s in tg.cables]
+    [s.state.tension/s.state.length for s in tg.tensiles.cables]
 end
 
 """
@@ -1070,13 +1070,14 @@ function force_densities_to_restlen(tg::TensegrityStructure,γs)
         c = s.c
         u = l-(γ*l-c*l̇)/k
     end
-        for (γ,s) in zip(γs,tg.cables)]
+        for (γ,s) in zip(γs,tg.tensiles.cables)]
 end
 
 function build_Y(bot)
 	(;tg, hub) = bot
 	(;actuators) = hub
-    (;ncables,cables) = tg
+    (;cables) = tg.tensiles
+	ncables = length(cables)
     nact = length(actuators)
     ret = spzeros(Int,ncables,nact)
     foreach(actuators) do act
@@ -1185,8 +1186,8 @@ function mechanical_energy(tg::TensegrityStructure;gravity=false)
 	if gravity
 		V += potential_energy_gravity(tg)
 	end
-	if !isempty(tg.cables)
-		V += sum(potential_energy.(tg.cables))
+	if !isempty(tg.tensiles.cables)
+		V += sum(potential_energy.(tg.tensiles.cables))
 	end
 	E = T+V
 	@eponymtuple(T,V,E)

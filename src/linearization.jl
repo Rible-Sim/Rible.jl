@@ -173,8 +173,9 @@ function build_Ǩ(tg)
 end
 
 function build_∂Q̌∂q̌!(∂Q̌∂q̌,tg)
-    (;cables,connectivity) = tg
-    (;tensioned,indexed) = connectivity
+    (;tensioned,indexed) = tg.connectivity
+    (;cables) = tg.tensiles
+    (;connected) = tensioned
     (;nfull,nfree,sysfree,mem2sysfree,mem2sysfull) = indexed
     T = get_numbertype(tg)
     ndim = get_ndim(tg)
@@ -182,7 +183,7 @@ function build_∂Q̌∂q̌!(∂Q̌∂q̌,tg)
     D = @MMatrix zeros(T,ndim,ndim)
     Im = Symmetric(SMatrix{ndim,ndim}(one(T)*I))
     J̌ = zeros(T,ndim,nfree)
-    foreach(tensioned.cables) do cc
+    foreach(connected) do cc
         cable = cables[cc.id]
         (;end1,end2) = cc
         rb1 = end1.rbsig
@@ -315,8 +316,9 @@ function build_∂Q̌∂q̌(tg, @eponymargs(connected, clustered))
 end
 
 function build_∂Q̌∂q̌̇!(∂Q̌∂q̌̇,tg)
-    (;cables,connectivity) = tg
-    (;tensioned,indexed) = connectivity
+    (;tensioned,indexed) = tg.connectivity
+    (;connected) = tensioned
+    (;cables) = tg.tensiles
     (;nfull,nfree,sysfree,mem2sysfree,mem2sysfull) = indexed
     T = get_numbertype(tg)
     ndim = get_ndim(tg)
@@ -324,7 +326,7 @@ function build_∂Q̌∂q̌̇!(∂Q̌∂q̌̇,tg)
     D = @MMatrix zeros(T,ndim,ndim)
     Im = Symmetric(SMatrix{ndim,ndim}(one(T)*I))
     J̌ = zeros(T,ndim,nfree)
-    foreach(tensioned.cables) do cc
+    foreach(connected) do cc
         cable = cables[cc.id]
         (;end1,end2) = cc
         rb1 = end1.rbsig

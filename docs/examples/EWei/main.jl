@@ -106,8 +106,8 @@ plot_traj!(bot1;
 # try Axis3
 with_theme(theme_try;
         Axis3 = (
-            azimuth = 5.4355306333269855,
-            elevation = 0.3126990816987244,
+            azimuth = 5.10553063332698,
+            elevation = 0.9397963267948968
         ),
         Mesh = (
             # color = :black,
@@ -118,7 +118,7 @@ with_theme(theme_try;
         showinfo=true,
         showground=false,
         showlabels=false,
-        rigidcolor=:white,
+        rigidcolor=:blue,
         xlims=(-100,100),
         ylims=(-100,1000),
         zlims=(-100,200)
@@ -140,9 +140,10 @@ with_theme(theme_pub;
         ),
     ) do
     plot_traj!(bot1;
+        figsize=(0.9tw,1.2tw),
         doslide=false,
         showinfo=false,
-        gridsize=(1,4),
+        gridsize=(2,2),
         attimes=[0,1,2,3],
         atsteps=nothing,
         showground=false,

@@ -330,6 +330,7 @@ function savefig(fig,figname=nothing)
             GM.save(figpath*".png",fig)
         end
     end
+    fig
 end
 function init_plot!(ax,tgob;isref=false,
         showlabels=true,

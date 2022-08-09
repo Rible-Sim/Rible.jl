@@ -73,14 +73,16 @@ function build_D(tg)
 end
 
 function build_Q̃(tg)
-    (;ncables,cables,connectivity) = tg
-    (;tensioned,indexed) = connectivity
+    (;tensioned,indexed) = tg.connectivity
+    (;connected) = tensioned
+    (;cables) = tg.tensiles
+    ncables = length(cables)
     (;nfull,nfree,sysfree,mem2sysfree,mem2sysfull) = indexed
     T = get_numbertype(tg)
     ndim = get_ndim(tg)
     Q̃ = zeros(T,nfree,ndim*ncables)
 
-    foreach(tensioned) do cc
+    foreach(connected) do cc
         j = cc.id
         cable = cables[j]
         (;end1,end2) = cc
@@ -128,7 +130,9 @@ end
 
 
 function build_L̂(tg)
-    (;ncables, ndim, cables) = tg
+    (;ndim) = tg
+    (;cables) = tg.tensiles
+    ncables = length(cables)
     T = get_numbertype(tg)
     L̂ = spzeros(T, ncables*ndim, ncables)
     for (i,ss) in enumerate(cables)
@@ -403,7 +407,7 @@ function build_inverse_statics_core(tginput,tgref::TensegrityStructure,Fˣ=nothi
     tg = deepcopy(tginput)
     clear_forces!(tg)
     update_rigids!(tg,q)
-    update_cables_apply_forces!(tg)
+    update_tensiles!(tg)
     if gravity
         Ǧ = build_Ǧ(tg)
     else
