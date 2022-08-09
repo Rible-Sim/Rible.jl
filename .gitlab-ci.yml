@@ -1,0 +1,28 @@
+# To contribute improvements to CI/CD templates, please follow the Development guide at:
+# https://docs.gitlab.com/ee/development/cicd/templates.html
+# This specific template is located at:
+# https://gitlab.com/gitlab-org/gitlab/-/blob/master/lib/gitlab/ci/templates/Julia.gitlab-ci.yml
+
+
+# Example documentation deployment
+pages:
+  image: julia:1.7
+  stage: deploy
+  script:
+    - apt-get update -qq && apt-get install -y git  # needed by Documenter
+    - julia --project=docs/ -e 'using Pkg; Pkg.develop(PackageSpec(path=pwd())); Pkg.instantiate()'
+    - julia --project=docs/ docs/make.jl
+    - mv docs/build public  # move to the directory picked up by Gitlab pages
+  artifacts:
+    paths:
+      - public
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
+# WARNING: This template is using the `julia` images from [Docker
+# Hub][3]. One can use custom Julia images and/or the official ones found
+# in the same place. However, care must be taken to correctly locate the binary
+# file (`/opt/julia/bin/julia` above), which is usually given on the image's
+# description page.
+#
+# [3]: https://hub.docker.com/_/julia/
