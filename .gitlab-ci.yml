@@ -9,9 +9,9 @@ pages:
   image: julia:1.7
   stage: deploy
   script:
-    - apt-get update -qq && apt-get install -y git  # needed by Documenter
-    - julia --project=docs/ -e 'using Pkg; Pkg.develop(PackageSpec(path=pwd())); Pkg.instantiate()'
-    - julia --project=docs/ docs/make.jl
+    - apt-get update -qq && apt-get install -y git xorg-dev mesa-utils xvfb libgl1 freeglut3-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev libxext-dev # needed by Documenter
+    - DISPLAY=:0 xvfb-run -s '-screen 0 1024x768x24' julia --project=docs/ -e 'using Pkg; Pkg.develop(PackageSpec(path=pwd())); Pkg.instantiate()'
+    - DISPLAY=:0 xvfb-run -s '-screen 0 1024x768x24' julia --project=docs/ docs/make.jl
     - mv docs/build public  # move to the directory picked up by Gitlab pages
   artifacts:
     paths:

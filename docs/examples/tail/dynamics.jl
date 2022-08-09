@@ -1,3 +1,21 @@
+# # 二维类脊椎张拉整体动力学仿真
+## using Literate #hide
+## Literate.markdown("examples/tail/dynamics.jl", "src/";name="tail") #hide
+# 加载所需程序包
+using LinearAlgebra
+using StaticArrays, SparseArrays, TypeSortedCollections
+using EponymTuples
+using Unitful, Match, Printf
+using GeometryBasics, Meshing
+using Rotations, CoordinateTransformations
+using Makie
+import GLMakie as GM
+GM.activate!()
+using Revise
+import TensegrityRobots as TR
+include("examples/vis.jl")
+
+# 定义一个函数来新建机器人
 function make_new_tail(n)
 
     nver = n
@@ -140,10 +158,56 @@ function make_new_tail(n)
     end
     matrix_cnt = reduce(vcat, matrix_cnt_raw)
     display(matrix_cnt)
-    connections = TR.connect(rigdibodies, matrix_cnt)
-
-    cnt = TR.Connectivity(numberedpoints, indexedcoords, connections)
+    connected = TR.connect(rigdibodies, matrix_cnt)
+    tensioned = @eponymtuple(connected,)
+    cnt = TR.Connectivity(numberedpoints, indexedcoords, tensioned)
 
     tg = TR.TensegrityStructure(rigdibodies, tensiles, cnt)
     bot = TR.TensegrityRobot(tg, hub)
 end
+
+# 节数
+n = 4
+
+# 张拉整体脊椎
+tail = make_new_tail(n)
+
+# 检查连接点
+rbs = TR.get_rigidbodies(tail.tg)
+plot_rigid(rbs[2])
+
+
+# 设置初始条件
+tail.traj.q̇[begin][tail.tg.connectivity.indexed.mem2sysfull[end][1:4]] .= [0.1,0.0,0.1,0.0]
+
+# 定义广义力函数
+function dynfuncs(bot)
+    (;tg) = bot
+    function F!(F,q,q̇,t)
+        TR.clear_forces!(tg)
+        TR.update_rigids!(tg,q,q̇)
+        TR.update_tensiles!(tg)
+        ## TR.apply_gravity!(tg)
+        TR.generate_forces!(tg)
+        TR.get_force!(F,tg)
+    end
+    Jac_F! = nothing
+    @eponymtuple(F!)
+end
+
+# 动力学仿真问题
+## dynfuncs(tail)
+prob = TR.SimProblem(tail,dynfuncs)
+## @code_warntype TR.SimProblem(twobaronetri,dynfuncs)
+
+# 动力学仿真求解
+TR.solve!(prob,TR.Zhong06();dt=0.01,tspan=(0.0,10.0),ftol=1e-13,verbose=true)
+## sol = TR.solve(prob,TR.ConstSPARK(1),dt=dt,ftol=1e-12,verbose=true)
+##@code_warntype TR.solve(prob,TR.Zhong06(),dt=dt,ftol=1e-14,verbose=true)
+
+# 可视化
+plot_traj!(tail;showmesh=false,showinfo=false,showground=false)
+
+# 系统机械能
+me = TR.mechanical_energy!(tail)
+scatter(me.E)
