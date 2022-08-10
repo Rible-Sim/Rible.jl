@@ -1,6 +1,7 @@
 # # 二维类脊椎张拉整体动力学仿真
 ## using Literate #hide
 ## Literate.markdown("examples/tail/dynamics.jl", "src/";name="tail") #hide
+
 # 加载所需程序包
 using LinearAlgebra
 using StaticArrays, SparseArrays, TypeSortedCollections
@@ -13,6 +14,7 @@ import GLMakie as GM
 GM.activate!()
 using Revise
 import TensegrityRobots as TR
+
 include("examples/vis.jl")
 
 # 定义一个函数来新建机器人
@@ -196,14 +198,10 @@ function dynfuncs(bot)
 end
 
 # 动力学仿真问题
-## dynfuncs(tail)
 prob = TR.SimProblem(tail,dynfuncs)
-## @code_warntype TR.SimProblem(twobaronetri,dynfuncs)
 
 # 动力学仿真求解
 TR.solve!(prob,TR.Zhong06();dt=0.01,tspan=(0.0,10.0),ftol=1e-13,verbose=true)
-## sol = TR.solve(prob,TR.ConstSPARK(1),dt=dt,ftol=1e-12,verbose=true)
-##@code_warntype TR.solve(prob,TR.Zhong06(),dt=dt,ftol=1e-14,verbose=true)
 
 # 可视化
 plot_traj!(tail;showmesh=false,showinfo=false,showground=false)

@@ -328,27 +328,27 @@ end
 刚体铰接约束类。
 $(TYPEDEF)
 """
-struct PinJoint{valueType,p2pType} <: ExternalConstraints{valueType}
+struct PinJoint{valueType,e2eType} <: ExternalConstraints{valueType}
 	nconstraints::Int
 	values::valueType
-	p2p::p2pType
+	e2e::e2eType
 end
 
 """
 铰接约束构造子。
 $(TYPEDSIGNATURES)
 """
-function PinJoint(p2p)
-	rb1 = p2p.end1.rbsig
+function PinJoint(e2e)
+	rb1 = e2e.end1.rbsig
     nΦ = get_ndim(rb1)
 	T = get_numbertype(rb1)
 	values = zeros(T,nΦ)
-	PinJoint(nΦ,values,p2p)
+	PinJoint(nΦ,values,e2e)
 end
 
 function make_Φ(cst::PinJoint,mem2sysfull)
-	(;nconstraints,values,p2p) = cst
-	(;end1,end2) = p2p
+	(;nconstraints,values,e2e) = cst
+	(;end1,end2) = e2e
 	pid1 = end1.pid
 	pid2 = end2.pid
 	C1 = end1.rbsig.state.cache.Cps[pid1]
@@ -366,8 +366,8 @@ function make_Φ(cst::PinJoint,mem2sysfull)
 end
 
 function make_A(cst::PinJoint,mem2sysfree,nq)
-	(;nconstraints,values,p2p) = cst
-	(;end1,end2) = p2p
+	(;nconstraints,values,e2e) = cst
+	(;end1,end2) = e2e
 	pid1 = end1.pid
 	pid2 = end2.pid
 	C1 = end1.rbsig.state.cache.Cps[pid1]
@@ -381,6 +381,48 @@ function make_A(cst::PinJoint,mem2sysfree,nq)
         ret
     end
 end
+
+
+"""
+刚体通用线性约束类。
+$(TYPEDEF)
+"""
+struct LinearJoint{valueType} <: ExternalConstraints{valueType}
+	nconstraints::Int
+	values::Vector{valueType}
+	A::Matrix{valueType}
+end
+
+"""
+铰接约束构造子。
+$(TYPEDSIGNATURES)
+"""
+function LinearJoint(A,values)
+	nΦ = size(A,1)
+	LinearJoint(nΦ,values,A)
+end
+
+function make_Φ(cst::LinearJoint,mem2sysfull)
+	(;nconstraints,values,A) = cst
+	function _inner_Φ(q,d)
+		ret = zeros(eltype(q),nconstraints)
+		ret .= A*q .- d
+		ret
+	end
+	inner_Φ(q)   = _inner_Φ(q,values)
+	inner_Φ(q,d) = _inner_Φ(q,d)
+	inner_Φ
+end
+
+function make_A(cst::LinearJoint,mem2sysfree,nq)
+	(;nconstraints,values,A) = cst
+	function inner_A(q)
+        ret = zeros(eltype(q),nconstraints,nq)
+        ret .= A
+        ret
+    end
+end
+
 
 """
 返回约束方程编号。

@@ -188,6 +188,9 @@ function plot_traj!(bot::TR.TensegrityRobot;
             figname=nothing,
             kargs...)
     (;tg,traj) = bot
+    showmesh = mapreduce(&, TR.get_rigidbodies(tg)) do rb
+            rb.mesh isa GeometryBasics.Mesh
+    end
     ndim = TR.get_ndim(tg)
     fig = Figure(resolution=match_figsize(figsize))
     xmin,xmax = xlims
@@ -246,6 +249,7 @@ function plot_traj!(bot::TR.TensegrityRobot;
             ylims!(ax,ymin,ymax)
             zlims!(ax,zmin,zmax)
         elseif AxisType <: LScene
+            showinfo = false
             # ax = LScene(fig[1,1], show_axis=false, scenekw = (clear=true,))
             ax = LScene(fig[1,1], ) #scenekw = (clear=true,)
             # cam = Makie.camera(ax.scene)
@@ -332,6 +336,7 @@ function savefig(fig,figname=nothing)
     end
     fig
 end
+
 function init_plot!(ax,tgob;isref=false,
         showlabels=true,
         showpoints=true,
@@ -546,14 +551,12 @@ function make_patch(;trans=[0.0,0,0],rot=RotX(0.0))
     end
 end
 
-function bar2mesh(bar_state)
-	p1 = Meshes.Point(bar_state.rps[1])
-	p2 = Meshes.Point(bar_state.rps[2])
-	s = Meshes.Segment(p1,p2)
-	cyl_bar = Meshes.Cylinder(Meshes.length(s)/40,s)
-    # cylsurf_bar = Meshes.boundary(cyl_bar)
+function ep2mesh(p1,p2)
+	s = Meshes.Segment(Meshes.Point(p1),Meshes.Point(p2))
+	cyl_bar = Meshes.Cylinder(Meshes.length(s)/400,s)
+    cylsurf_bar = Meshes.boundary(cyl_bar)
     # Meshes.sample(cylsurf_bar,Meshes.RegularSampling(10,3))
-	cyl_bar_simple = Meshes.triangulate(cylsurf_bar)
+	cyl_bar_simple = Meshes.discretize(cylsurf_bar,Meshes.RegularDiscretization(10,2))
     cyl_bar_simple |> simple2mesh
 end
 

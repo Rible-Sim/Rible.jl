@@ -23,6 +23,7 @@ import GLMakie as GM
 GM.activate!()
 using Revise
 import TensegrityRobots as TR
+
 include("examples/vis.jl")
 ````
 
@@ -226,17 +227,13 @@ end
 动力学仿真问题
 
 ````@example tail
-# dynfuncs(tail)
 prob = TR.SimProblem(tail,dynfuncs)
-# @code_warntype TR.SimProblem(twobaronetri,dynfuncs)
 ````
 
 动力学仿真求解
 
 ````@example tail
 TR.solve!(prob,TR.Zhong06();dt=0.01,tspan=(0.0,10.0),ftol=1e-13,verbose=true)
-# sol = TR.solve(prob,TR.ConstSPARK(1),dt=dt,ftol=1e-12,verbose=true)
-##@code_warntype TR.solve(prob,TR.Zhong06(),dt=dt,ftol=1e-14,verbose=true)
 ````
 
 可视化

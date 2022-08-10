@@ -9,10 +9,9 @@ makedocs(
     workdir = @__DIR__,
     pages = [
         "index.md",
+        "setup.md",
         "建模基础" => [
             "naturalcoordinates.md",
-        ],
-        "元件" => [
             "rigidbody.md",
             "cable.md",
         ],
@@ -27,10 +26,9 @@ makedocs(
         "动力学分析" => [
             "solvers.md"
         ],
-        "setup.md",
-        # "例子" => [
-        #     "tail.md"
-        # ]
+        "例子" => [
+            "tail.md"
+        ]
     ]
 )
 

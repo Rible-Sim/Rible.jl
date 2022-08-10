@@ -722,7 +722,7 @@ end
 
 make_Φ(bot::TensegrityRobot) = make_Φ(bot.tg)
 
-function make_Φ(tg)
+function make_Φ(tg::AbstractTensegrityStructure)
     (;rigidbodies,nconstraints) = tg
     (;indexed,jointed) = tg.connectivity
 	(;nfree,mem2sysfull,mem2sysfree,ninconstraints,mem2sysincst) = indexed
@@ -773,7 +773,7 @@ end
 
 make_A(bot::TensegrityRobot) = make_A(bot.tg)
 
-function make_A(tg)
+function make_A(tg::AbstractTensegrityStructure)
     (;rigidbodies,nconstraints) = tg
     (;indexed,jointed) = tg.connectivity
 	(;nfree,mem2sysfull,mem2sysfree,ninconstraints,mem2sysincst) = indexed
