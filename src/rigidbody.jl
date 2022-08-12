@@ -294,7 +294,7 @@ end
 固定约束构造子。
 $(TYPEDSIGNATURES)
 """
-function FixedBodyConstraint(rbs,body2q,rbid)
+function FixedBodyConstraint(rbs,mem2sysfull,rbid)
 	rb = rbs[rbid]
 	lncs = rb.state.cache.funcs.lncs
 	q_rb = rb.state.coords.q
@@ -305,7 +305,7 @@ function FixedBodyConstraint(rbs,body2q,rbid)
 end
 
 function make_Φ(cst::FixedBodyConstraint)
-	@unpack indices, values = cst
+	(;indices, values) = cst
 	@inline @inbounds inner_Φ(q)   = q[indices]-values
 	@inline @inbounds inner_Φ(q,d) = q[indices]-d
 	inner_Φ

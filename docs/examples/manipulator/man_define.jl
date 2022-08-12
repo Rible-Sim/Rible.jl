@@ -1,0 +1,247 @@
+
+function man_ndof(ndof,onedir=[0.0,-1.0];θ=0.0,k=0.0,c=0.0,unit="mks",restlen=0.16,isvirtual=true)
+    nbodies = ndof + 1
+    nbp = 2nbodies - ndof
+    n_lower = count(isodd,1:nbodies)
+    n_upper = count(iseven,1:nbodies)
+    lower_index = 1:2:nbodies
+    upper_index = 2:2:nbodies
+    a = zeros(nbodies)
+    m = zeros(nbodies)
+    Ia = zeros(nbodies)
+    if unit == "cgs"
+        unit_L = 1e2
+        unit_M = 1e3
+        unit_I = unit_M*unit_L^2
+    else # "mks"
+        unit_L = 1
+        unit_M = 1
+        unit_I = 1
+    end
+	for (i,j) in enumerate(lower_index)
+        # a[j] = 20.0e-2unit_L
+		# if j==nbodies
+		# 	a[j] = 12252e-5unit_L
+		# 	m[j] = 90.153058e-3unit_M
+		# 	Ia[j] = 2580.2e-7unit_I
+		# else
+	        a[j] = 12252e-5unit_L
+	        #m[j] = 835.90254985e-3unit_M
+	        m[j] = 200.40071778e-3unit_M
+	        # Ia[j] = Ic_lower[i] + m[j]*1/3*a[j]^2
+	        #Ia[j] = 28130.53053840*2e-7unit_I
+	        Ia[j] = 3738.8e-7unit_I  #??2e-7??
+		# end
+        # @show a[j],m[j],Ia[j]
+    end
+    for (i,k) in enumerate(upper_index)
+		# if k==nbodies
+		# 	a[k] = 12252e-5unit_L
+		# 	m[k] = 90.153058e-3unit_M
+		# 	Ia[k] = 2580.2e-7unit_I
+		# else
+	        # a[k] = 16.0e-2unit_L
+	        a[k] = 12252e-5unit_L
+	        #m[k] = 666.25659673e-3unit_M
+	        m[k] = 200.40071778e-3unit_M
+	        # Ia[k] = Ic_upper[i] + m[k]*1/3*a[k]^2
+	        Ia[k] = 3738.8e-7unit_I
+	        # @show a[k],m[k],Ia[k]
+		# end
+    end
+    R = [
+		cos(θ) -sin(θ);
+		sin(θ) cos(θ)
+	]
+    A = zeros(2,nbp)
+    A[:,2] .= A[:,1] .+ a[1]*onedir
+    for i in 3:nbp
+        A[:,i] .= A[:,i-1] .+ a[i-1]*R^(i-2)*onedir
+    end
+
+    function rigidbody(i,m,a,Ia,ri,rj)
+		movable = true
+		# if i == nbodies
+		# 	CoM_x = 0.05933624
+		# 	CoM_y = 0.03109915
+		# else
+        CoM_x = 0.06535974
+        CoM_y = 0.03465684
+		# end
+
+        if isodd(i)
+            CoM_y = -CoM_y
+        end
+        r̄g = SVector{2}([CoM_x,CoM_y])
+
+        # nap = 3 #?
+		sti_l = 0.01832
+		rao_l = 0.00475
+        ap1 = SVector{2}([0.0,0.0])
+        ap2 = SVector{2}([a,0.0])
+        ap3_x = a/2
+        ap3_y = √3/2*a
+		ap4_x = a-sti_l*cos(pi/6)
+		ap4_y = sti_l*sin(pi/6)
+		ap5_x = a/2
+		ap5_y = √3/2*a-sti_l
+		ap6_x = -rao_l*cos(pi/6)
+		ap6_y = -rao_l*sin(pi/6)
+		ap7_x = a/2
+		ap7_y = √3/2*a+rao_l
+
+        if isodd(i)
+            ap3_y = -ap3_y
+			ap4_y = -ap4_y
+			ap5_y = -ap5_y
+			ap6_y = -ap6_y
+			ap7_y = -ap7_y
+
+        end
+        ap3 = SVector{2}([ap3_x,ap3_y])
+		ap4 = SVector{2}([ap4_x,ap4_y])
+		ap5 = SVector{2}([ap5_x,ap5_y])
+		ap6 = SVector{2}([ap6_x,ap6_y])
+		ap7 = SVector{2}([ap7_x,ap7_y])
+
+        aps = [ap1,ap2,ap3,ap4,ap5,ap6,ap7]
+
+		Ī = SMatrix{2, 2}([
+			0.99Ia 0
+			0 0.01Ia
+		])
+		# only to get lncs
+		constrained = false
+        ci = Vector{Int}()
+        prop = TR.RigidBodyProperty(
+					i,movable,m,
+					Ī,
+                    r̄g,
+					aps;
+					constrained=constrained
+                    )
+		α = 0.0
+		ω = 0.0
+		ro = ri
+		ṙo = zero(ro)
+
+		constrained = false
+		ci = Int[]
+		Φi =  collect(1:3)
+        if i in [1,2]
+			constrained = true
+			if i == 1
+            	ci = collect(1:6)
+				Φi = Int[]
+			else
+				ci = collect(1:2)
+			end
+		end
+		prop = TR.RigidBodyProperty(
+					i,movable,m,
+					Ī,
+					r̄g,
+					aps;
+					constrained=constrained
+					)
+		lncs, _ = TR.NaturalCoordinates.NC2P1V(SVector{2}(ri), SVector{2}(rj), ro, α, ṙo, ω)
+		state = TR.RigidBodyState(prop, lncs, ri, α, ṙo, ω, ci, Φi)
+
+        rb = TR.RigidBody(prop,state)
+    end
+    rbs = [rigidbody(i,m[i],a[i],
+            Ia[i],A[:,i],A[:,i+1]) for i = 1:nbodies]
+
+	rigdibodies = TypeSortedCollection(rbs)
+    numbered = TR.number(rigdibodies)
+
+    matrix_sharing = zeros(Int,2nbodies-2,nbodies)
+	for i = 1:nbodies-1
+		matrix_sharing[2(i-1)+1,i:i+1] = [3, 1]
+		matrix_sharing[2(i-1)+2,i:i+1] = [4, 2]
+	end
+	# display(matrix_sharing)
+    indexed = TR.index(rigdibodies, matrix_sharing)
+
+    ncables = 2(nbodies-1)
+    # upstringlen = 0.182-5.2024/292.14
+    # lostringlen = 0.182-5.2024/292.14
+    upstringlen = restlen
+    lostringlen = restlen
+    original_restlens = zeros(ncables)
+    restlens = zeros(ncables)
+    actuallengths = zeros(ncables)
+    ks = zeros(ncables)
+    cs = zeros(ncables)
+    cs .= c
+    for i = 1:ncables
+        j = i % 4
+        original_restlens[i] = ifelse(j∈[1,0],upstringlen,lostringlen)
+        ks[i] = ifelse(j∈[1,0],k,k)
+    end
+    ss = [TR.Cable2D(i, original_restlens[i],ks[i],cs[i]) for i = 1:ncables]
+	tensiles = (cables=ss,)
+
+	matrix_cnt = zeros(Int,2(nbodies-1),nbodies)
+    for i = 1:nbodies-1
+		if isvirtual
+			matrix_cnt[2(i-1)+1,i:i+1] = [1,-3]
+			matrix_cnt[2(i-1)+2,i:i+1] = [3,-2]
+		else
+			matrix_cnt[2(i-1)+1,i:i+1] = [6,-5]
+			matrix_cnt[2(i-1)+2,i:i+1] = [7,-4]
+		end
+    end
+
+	connected = TR.connect(rigdibodies, matrix_cnt)
+	tensioned = @eponymtuple(connected,)
+
+	function ganged_act(actid,id1,id2,original_restlens)
+		ids = [id1,id2]
+		original_values = original_restlens[[id1,id2]]
+		TR.ManualActuator(actid,ids,original_values,TR.Ganged())
+	end
+    acs = [ifelse(isodd(i),ganged_act(i,2(i-1)+1,2i,original_restlens),
+						   ganged_act(i,2i,2(i-1)+1,original_restlens)) for i = 1:nbodies-1]
+	hub = (actuators=acs,)
+
+    cnt = TR.Connectivity(numbered,indexed,tensioned)
+    tg = TR.TensegrityStructure(rigdibodies,tensiles,cnt)
+    bot = TR.TensegrityRobot(tg,hub)
+end
+
+
+
+# function build_Y(tr)
+# 	@unpack tg, hub = tr
+# 	@unpack actuators = hub
+#     @unpack ncables,cables = tg
+#     nact = length(actuators)
+#     ret = spzeros(Int,ncables,nact)
+#     for (i,ctrller) in enumerate(actuators)
+#         is1, is2 = ctrller.acts.id_cables
+#         ret[is1,i] = 1
+#         ret[is2,i] = -1
+#     end
+#     ret
+# end
+
+function get_angle(v,w)
+	atan(w[2]*v[1]-w[1]*v[2],w[1]*v[1]+w[2]*v[2])
+end
+
+function get_angles(bot)
+    (;tg) = bot
+    rbs = TR.get_rigidbodies(tg)
+    angles = zeros(tg.nrigids-1)
+    for (rbid,rb) in enumerate(rbs)
+        if rbid > 1
+			state0 = rbs[rbid-1].state
+            v = state0.rps[2]-state0.rps[1]
+            state1 = rbs[rbid].state
+            w = state1.rps[2]-state1.rps[1]
+            angles[rbid-1] = get_angle(v,w)
+        end
+    end
+    rad2deg.(angles)
+end

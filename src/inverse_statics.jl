@@ -195,10 +195,13 @@ end
 #     Ji = C2*T2-C1*T1
 # end
 
-function build_U(tg)
-    @unpack ncoords,ncables,ndim,cables = tg
+function make_U(tg)
+    (;ndim) = tg
+    (;nfull) = tg.connectivity.indexed
+    (;cables) = tg.tensiles
+    ncables = length(cables)
     function inner_U(s,u)
-        ret = zeros(eltype(s),ncables*ndim,ncoords)
+        ret = zeros(eltype(s),ncables*ndim,nfull)
         for i = 1:ncables
             k = cables[i].k
             Ji = Array(build_Ji(tg,i))
@@ -207,7 +210,7 @@ function build_U(tg)
         ret
     end
     function inner_U(s,u,k)
-        ret = zeros(eltype(s),ncables*ndim,ncoords)
+        ret = zeros(eltype(s),ncables*ndim,nfull)
         for i = 1:ncables
             Ji = Array(build_Ji(tg,i))
             ret[(i-1)*ndim+1:i*ndim,:] = k[i]*Ji*(1-s[i]*u[i])
@@ -217,59 +220,70 @@ function build_U(tg)
     inner_U
 end
 
-function build_Q(tg)
-    @unpack nfullcoords,ncables,ndim,cables = tg
-    cnt = tg.connectivity
-    @unpack string2ap,apnb = cnt
-    function inner_Q(q,s,u,k,c)
-        ret = zeros(eltype(u),nfullcoords)
-        foreach(string2ap) do scnt
+function make_Q̌(tg,q0)
+    (;ndim) = tg
+    (;numbered,indexed,tensioned) = tg.connectivity
+    (;nfull,nfree,syspres,sysfree,mem2sysfull) = indexed
+    (;connected) = tensioned
+    (;cables) = tg.tensiles
+    (;mem2num,num2sys) = numbered
+    function inner_Q̌(q̌,s,u)
+		q = Vector{eltype(q̌)}(undef,nfull)
+		q[syspres] .= q0[syspres]
+		q[sysfree] .= q̌
+        ret = zeros(eltype(q̌),nfree)
+        Jj = zeros(eltype(q̌),ndim,nfull)
+        foreach(connected) do scnt
             j = scnt.id
+            (;k) = cables[j]
             rb1 = scnt.end1.rbsig
             rb2 = scnt.end2.rbsig
             rb1id = rb1.prop.id
             rb2id = rb2.prop.id
             ap1id = scnt.end1.pid
             ap2id = scnt.end2.pid
-            is1 = (apnb[rb1id][ap1id]-1)*ndim
-            is2 = (apnb[rb2id][ap2id]-1)*ndim
-            c1 = c[is1+1:is1+ndim]
-            c2 = c[is2+1:is2+ndim]
-            C1 = rb1.state.cache.funcs.C(c1)
-            C2 = rb2.state.cache.funcs.C(c2)
-            T1 = build_Ti(tg,rb1id)
-            T2 = build_Ti(tg,rb2id)
-            Jj = C2*T2-C1*T1
-            Uj = transpose(Jj)*Jj
-            ret .+= k[j]*(u[j]*s[j]-1)*Uj*q
+            # c1 = c[num2sys[mem2num[rb1id][ap1id]]]
+            # c2 = c[num2sys[mem2num[rb2id][ap2id]]]
+            # C1 = rb1.state.cache.funcs.C(c1)
+            # C2 = rb2.state.cache.funcs.C(c2)
+            C1 = rb1.state.cache.Cps[ap1id]
+            C2 = rb2.state.cache.Cps[ap2id]
+            mfull1 = mem2sysfull[rb1.prop.id]
+            mfull2 = mem2sysfull[rb2.prop.id]
+            Jj .= 0
+            Jj[:,mfull2] .+= C2
+            Jj[:,mfull1] .-= C1
+            Ūj = @view (transpose(Jj)*Jj)[sysfree,:]
+            # k = k[j]
+            ret .+= k*(u[j]*s[j]-1)*Ūj*q
         end
         ret
     end
-    function inner_Q(q,γ,c)
-        ret = zeros(eltype(γ),nfullcoords)
-        foreach(string2ap) do scnt
-            j = scnt.id
-            rb1 = scnt.end1.rbsig
-            rb2 = scnt.end2.rbsig
-            rb1id = rb1.prop.id
-            rb2id = rb2.prop.id
-            ap1id = scnt.end1.pid
-            ap2id = scnt.end2.pid
-            is1 = (apnb[rb1id][ap1id]-1)*ndim
-            is2 = (apnb[rb2id][ap2id]-1)*ndim
-            c1 = c[is1+1:is1+ndim]
-            c2 = c[is2+1:is2+ndim]
-            C1 = rb1.state.cache.funcs.C(c1)
-            C2 = rb2.state.cache.funcs.C(c2)
-            T1 = build_Ti(tg,rb1id)
-            T2 = build_Ti(tg,rb2id)
-            Jj = C2*T2-C1*T1
-            Uj = transpose(Jj)*Jj
-            ret .+= γ[j]*Uj*q
-        end
-        ret
-    end
-    inner_Q
+    # function inner_Q̌(q̌,γ,c)
+    #     ret = zeros(eltype(γ),nfullcoords)
+    #     foreach(string2ap) do scnt
+    #         j = scnt.id
+    #         rb1 = scnt.end1.rbsig
+    #         rb2 = scnt.end2.rbsig
+    #         rb1id = rb1.prop.id
+    #         rb2id = rb2.prop.id
+    #         ap1id = scnt.end1.pid
+    #         ap2id = scnt.end2.pid
+    #         is1 = (apnb[rb1id][ap1id]-1)*ndim
+    #         is2 = (apnb[rb2id][ap2id]-1)*ndim
+    #         c1 = c[is1+1:is1+ndim]
+    #         c2 = c[is2+1:is2+ndim]
+    #         C1 = rb1.state.cache.funcs.C(c1)
+    #         C2 = rb2.state.cache.funcs.C(c2)
+    #         T1 = build_Ti(tg,rb1id)
+    #         T2 = build_Ti(tg,rb2id)
+    #         Jj = C2*T2-C1*T1
+    #         Uj = transpose(Jj)*Jj
+    #         ret .+= γ[j]*Uj*q̌
+    #     end
+    #     ret
+    # end
+    # inner_Q̌
 end
 
 function build_KE(tg)
@@ -334,12 +348,21 @@ function build_KG(tg)
     end
 end
 
-function build_S(tg)
-    (;ndim,ncables) = tg
-    (;string2ap,apnb) = tg.connectivity
-    function inner_S(q,s,c)
-        ret = zeros(eltype(s),ncables)
-        foreach(string2ap) do scnt
+function make_S(tg,q0)
+    (;ndim) = tg
+    (;numbered,indexed,tensioned) = tg.connectivity
+    (;syspres,sysfree,nfull,mem2sysfull) = indexed
+    (;mem2num,num2sys) = numbered
+    (;connected) = tensioned
+    (;cables) = tg.tensiles
+    ncables = length(cables)
+    function inner_S(q̌,s)
+		q = Vector{eltype(q̌)}(undef,nfull)
+		q[syspres] .= q0[syspres]
+		q[sysfree] .= q̌
+        ret = zeros(eltype(q̌),ncables)
+        Jj = zeros(eltype(q̌),ndim,nfull)
+        foreach(connected) do scnt
             j = scnt.id
             rb1 = scnt.end1.rbsig
             rb2 = scnt.end2.rbsig
@@ -347,15 +370,17 @@ function build_S(tg)
             rb2id = rb2.prop.id
             ap1id = scnt.end1.pid
             ap2id = scnt.end2.pid
-            is1 = (apnb[rb1id][ap1id]-1)*ndim
-            is2 = (apnb[rb2id][ap2id]-1)*ndim
-            c1 = c[is1+1:is1+ndim]
-            c2 = c[is2+1:is2+ndim]
-            C1 = rb1.state.cache.funcs.C(c1)
-            C2 = rb2.state.cache.funcs.C(c2)
-            T1 = build_Ti(tg,rb1id)
-            T2 = build_Ti(tg,rb2id)
-            Jj = C2*T2-C1*T1
+            # c1 = c[num2sys[mem2num[rb1id][ap1id]]]
+            # c2 = c[num2sys[mem2num[rb2id][ap2id]]]
+            # C1 = rb1.state.cache.funcs.C(c1)
+            # C2 = rb2.state.cache.funcs.C(c2)
+            C1 = rb1.state.cache.Cps[ap1id]
+            C2 = rb2.state.cache.Cps[ap2id]
+            mfull1 = mem2sysfull[rb1.prop.id]
+            mfull2 = mem2sysfull[rb2.prop.id]
+            Jj .= 0
+            Jj[:,mfull2] .+= C2
+            Jj[:,mfull1] .-= C1
             Uj = transpose(Jj)*Jj
             ret[j] = transpose(q)*Uj*q*s[j]^2 - 1
         end
@@ -609,7 +634,7 @@ end
 
 function inverse_for_restlength(tginput,tgref::TensegrityStructure,Fˣ=nothing;gravity=false,scale=true,recheck=true)
     B,F̃ = build_inverse_statics_for_restlength(tginput,tgref,Fˣ;gravity,scale)
-    nu = tg.ncables
+    nu = tgref.tensiles.cables |> length
     if check_inverse_sanity(B)
         y0 = B\F̃
     else
@@ -625,7 +650,7 @@ function inverse_for_restlength(tginput,tgref::TensegrityStructure,Fˣ=nothing;g
         JuMP.@constraint(model, static, B*y .== F̃)
         ϵ = 1e-2
         JuMP.@constraint(model, positive_u, y[1:nu].- ϵ .>= 0)
-        JuMP.@constraint(model, positive_f, y[1:nu].+ ϵ .<= get_cables_len(tg))
+        JuMP.@constraint(model, positive_f, y[1:nu].+ ϵ .<= get_cables_len(tgref))
         # JuMP.print(model)
         JuMP.optimize!(model)
         if JuMP.termination_status(model) == JuMP.MathOptInterface.OPTIMAL

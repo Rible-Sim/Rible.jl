@@ -172,6 +172,10 @@ function Base.isless(rb1::AbstractRigidBody,rb2::AbstractRigidBody)
     isless(rb1.prop.id,rb2.prop.id)
 end
 
+function sort_rigidbodies(rbs::AbstractVector{<:AbstractRigidBody})
+    sort!(rbs)
+end
+
 function sort_rigidbodies(rbs::TypeSortedCollection)
     sort!(reduce(vcat,rbs.data))
 end
@@ -722,6 +726,57 @@ end
 
 make_Φ(bot::TensegrityRobot) = make_Φ(bot.tg)
 
+function make_Φ(tg::AbstractTensegrityStructure,q0::AbstractVector)
+    (;rigidbodies,nconstraints) = tg
+    (;indexed,jointed) = tg.connectivity
+	(;nfree,nfull,syspres,sysfree,mem2sysfull,mem2syspres,mem2sysfree,ninconstraints,mem2sysincst) = indexed
+	@inline @inbounds function inner_Φ(q̌)
+		q = Vector{eltype(q̌)}(undef,nfull)
+		q[syspres] .= q0[syspres]
+		q[sysfree] .= q̌
+        ret = Vector{eltype(q̌)}(undef,nconstraints)
+        foreach(rigidbodies) do rb
+            rbid = rb.prop.id
+			memfull = mem2sysfull[rbid]
+			memfree = mem2sysfree[rbid]
+			memincst = mem2sysincst[rbid]
+            if !isempty(memfree)
+                ret[memincst] .= rb.state.cache.funcs.Φ(q[memfull])
+            end
+        end
+        is = Ref(ninconstraints)
+		foreach(jointed.joints) do joint
+            nc = joint.nconstraints
+            ret[is[]+1:is[]+nc,:] .= make_Φ(joint,mem2sysfull)(q)
+            is[] += nc
+        end
+        ret
+    end
+    @inline @inbounds function inner_Φ(q̌,d)
+		q = Vector{eltype(q̌)}(undef,nfull)
+		q[syspres] .= q0[syspres]
+		q[sysfree] .= q̌
+        ret = Vector{eltype(q̌)}(undef,nconstraints)
+		foreach(rigidbodies) do rb
+			rbid = rb.prop.id
+			memfull = mem2sysfull[rbid]
+			memfree = mem2sysfree[rbid]
+			memincst = mem2sysincst[rbid]
+			if !isempty(memfree)
+				ret[memincst] .= rb.state.cache.funcs.Φ(q[memfull],d[memincst])
+			end
+		end
+        is = Ref(ninconstraints)
+        foreach(jointed.joints) do joint
+            nc = joint.nconstraints
+            ret[is[]+1:is[]+nc] .= make_Φ(joint)(q,d[is[]+1:is[]+nc])
+            is[] += nc
+        end
+        ret
+    end
+    inner_Φ
+end
+
 function make_Φ(tg::AbstractTensegrityStructure)
     (;rigidbodies,nconstraints) = tg
     (;indexed,jointed) = tg.connectivity
@@ -773,6 +828,34 @@ end
 
 make_A(bot::TensegrityRobot) = make_A(bot.tg)
 
+function make_A(tg::AbstractTensegrityStructure,q0::AbstractVector)
+    (;rigidbodies,nconstraints) = tg
+    (;indexed,jointed) = tg.connectivity
+	(;nfull,nfree,syspres,sysfree,mem2sysfull,mem2sysfree,ninconstraints,mem2sysincst) = indexed
+    @inline @inbounds function inner_A(q̌)
+		q = Vector{eltype(q̌)}(undef,nfull)
+		q[syspres] .= q0[syspres]
+		q[sysfree] .= q̌
+        ret = zeros(eltype(q̌),nconstraints,nfree)
+        foreach(rigidbodies) do rb
+            rbid = rb.prop.id
+			memfull = mem2sysfull[rbid]
+			memfree = mem2sysfree[rbid]
+			memincst = mem2sysincst[rbid]
+            if !isempty(memfree)
+                ret[memincst,memfree] .= rb.state.cache.funcs.Φq(q[memfull])
+            end
+        end
+        is = Ref(ninconstraints)
+        foreach(jointed.joints) do joint
+            nc = joint.nconstraints
+            ret[is[]+1:is[]+nc,:] .= make_A(joint,mem2sysfree,nfree)(q)
+            is[] += nc
+        end
+        ret
+    end
+end
+
 function make_A(tg::AbstractTensegrityStructure)
     (;rigidbodies,nconstraints) = tg
     (;indexed,jointed) = tg.connectivity
@@ -798,12 +881,19 @@ function make_A(tg::AbstractTensegrityStructure)
     end
 end
 
-function build_F(tg,rbid,pid,f)
-    rbs = tg.rigidbodies
-    Ti = build_Ti(tg,rbid)
-    C = rbs[rbid].state.cache.Cps[pid]
-    F = transpose(C*Ti)*f
-    reshape(F,:,1)
+function build_F̌(tg,rbid,pid,f)
+	T = get_numbertype(tg)
+	(;nfree,mem2sysfree) = tg.connectivity.indexed
+	F̌ = zeros(T,nfree)
+	foreach(tg.rigidbodies) do rb
+		if rb.prop.id == rbid
+	    	C = rb.state.cache.Cps[pid]
+			memfree = mem2sysfree[rbid]
+	        uci = rb.state.cache.unconstrained_index
+			F̌[memfree] = (transpose(C)*f)[uci,:]
+	    end
+	end
+    reshape(F̌,:,1)
 end
 
 get_q(tg) = copy(tg.state.system.q)
@@ -909,21 +999,22 @@ function set_C!(tg,c)
 end
 
 function get_d(tg)
-    @unpack nconstraint = tg
-    rbs = tg.rigidbodies
-    csts = tg.constraints
+    (;nconstraints,rigidbodies) = tg
+	(;indexed,jointed) = tg.connectivity
+	(;mem2sysincst,ninconstraints) = indexed
     T = get_numbertype(tg)
-    d = Vector{T}(undef,nconstraint)
-    nbodyc = get_nbodyconstraint(tg)
-    is = Ref(0)
-    for rbid in tg.mvbodyindex
-        rb = rbs[rbid]
-        d[is[]+1:is[]+nbodyc] .= NaturalCoordinates.get_deform(rb.state.cache.funcs.lncs)
-        is[] += nbodyc
+    d = Vector{T}(undef,nconstraints)
+	is = Ref(ninconstraints)
+    foreach(rigidbodies) do rb
+        rbid = rb.prop.id
+		memincst = mem2sysincst[rbid]
+		if !isempty(memincst)
+        	d[memincst] .= NaturalCoordinates.get_deform(rb.state.cache.funcs.lncs)
+		end
     end
-    foreach(csts) do cst
-        nc = cst.nconstraints
-        d[is[]+1:is[]+nc] .= cst.values
+    foreach(jointed.joints) do joint
+        nc = joint.nconstraints
+        d[is[]+1:is[]+nc] .= joint.values
         is[] += nc
     end
     d
@@ -1115,8 +1206,8 @@ function reset!(bot::TensegrityRobot)
     (;q, q̇) = traj
     clear_forces!(tg)
     update_rigids!(tg,q[begin],q̇[begin])
-    update_cables_apply_forces!(tg)
-    reset!(traj,1)
+    update_tensiles!(tg)
+    resize!(traj,1)
 end
 
 """

@@ -166,7 +166,7 @@ function get_groundmesh(::Nothing,rect)
 end
 
 function plot_traj!(bot::TR.TensegrityRobot;
-            AxisType=Axis3,
+            AxisType=LScene,
             figsize=:FHD,
             gridsize=(1,1),
             attimes=nothing,
@@ -236,6 +236,8 @@ function plot_traj!(bot::TR.TensegrityRobot;
             @sprintf "(%s) t = %.10G (s)" alphabet[sgi] tt
         end
         if ndim == 2 && !showmesh
+            showinfo = false
+            showground = false
             ax = Axis(sg[1,1],title=axtitle)
             ax.aspect = DataAspect()
             xlims!(ax,xmin,xmax)

@@ -47,10 +47,13 @@ function GECP(A_input)
 end
 
 function find_full_constrained_index(lncs,q)
-    cf = NaturalCoordinates.CoordinateFunctions(lncs)
+    cf = NaturalCoordinates.CoordinateFunctions(lncs,
+            collect(1:NaturalCoordinates.get_ncoords(lncs)),
+            collect(1:NaturalCoordinates.get_nconstraints(lncs))
+        )
     Aq = cf.Φq(q)
     col_index = GECP(Aq)
-    col_index[size(Aq,1)+1:end]
+    col_index[size(Aq,1)+1:end] |> sort
 end
 
 function ∂Aᵀλ∂q̌(tg::AbstractTensegrityStructure,λ)

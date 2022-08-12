@@ -21,7 +21,7 @@ struct ManualActuator{CT<:AbstractCoupler,RT} <: AbstractActuator{CT}
 end
 
 function ManualActuator(actid,id::Int,value::Number)
-    ManualActuator(actid,Serial,(ids=[id],values=[value]))
+    ManualActuator(actid,Serial(),(ids=[id],values=[value]))
 end
 
 function ManualActuator(actid,ids::AbstractVector,values::AbstractVector,coupler=Serial())
