@@ -242,10 +242,6 @@ function make_Q̌(tg,q0)
             rb2id = rb2.prop.id
             ap1id = scnt.end1.pid
             ap2id = scnt.end2.pid
-            # c1 = c[num2sys[mem2num[rb1id][ap1id]]]
-            # c2 = c[num2sys[mem2num[rb2id][ap2id]]]
-            # C1 = rb1.state.cache.funcs.C(c1)
-            # C2 = rb2.state.cache.funcs.C(c2)
             C1 = rb1.state.cache.Cps[ap1id]
             C2 = rb2.state.cache.Cps[ap2id]
             mfull1 = mem2sysfull[rb1.prop.id]
@@ -254,8 +250,37 @@ function make_Q̌(tg,q0)
             Jj[:,mfull2] .+= C2
             Jj[:,mfull1] .-= C1
             Ūj = @view (transpose(Jj)*Jj)[sysfree,:]
-            # k = k[j]
             ret .+= k*(u[j]*s[j]-1)*Ūj*q
+        end
+        ret
+    end
+    function inner_Q̌(q̌,s,μ,k,c)
+		q = Vector{eltype(q̌)}(undef,nfull)
+		q[syspres] .= q0[syspres]
+		q[sysfree] .= q̌
+        ret = zeros(eltype(q̌),nfree)
+        Jj = zeros(eltype(q̌),ndim,nfull)
+        foreach(connected) do scnt
+            j = scnt.id
+            rb1 = scnt.end1.rbsig
+            rb2 = scnt.end2.rbsig
+            rb1id = rb1.prop.id
+            rb2id = rb2.prop.id
+            ap1id = scnt.end1.pid
+            ap2id = scnt.end2.pid
+            c1 = c[num2sys[mem2num[rb1id][ap1id]]]
+            c2 = c[num2sys[mem2num[rb2id][ap2id]]]
+            C1 = rb1.state.cache.funcs.C(c1)
+            C2 = rb2.state.cache.funcs.C(c2)
+            C1 = rb1.state.cache.Cps[ap1id]
+            C2 = rb2.state.cache.Cps[ap2id]
+            mfull1 = mem2sysfull[rb1.prop.id]
+            mfull2 = mem2sysfull[rb2.prop.id]
+            Jj .= 0
+            Jj[:,mfull2] .+= C2
+            Jj[:,mfull1] .-= C1
+            Ūj = @view (transpose(Jj)*Jj)[sysfree,:]
+            ret .+= k[j]*(μ[j]*s[j]-1)*Ūj*q
         end
         ret
     end
@@ -286,13 +311,21 @@ function make_Q̌(tg,q0)
     # inner_Q̌
 end
 
-function build_KE(tg)
-    (;ncables,ndim,cables,connectivity) = tg
-    (;numbered,indexed,tensioned) = connectivity
-    (;nfull,mem2sysfull) = indexed
-    function inner_KE(q,s,k,c)
-        ret = zeros(eltype(s),nfull,nfull)
-        foreach(tensioned) do scnt
+function make_Ǩm_Ǩg(tg,q0)
+    (;ndim) = tg
+    (;numbered,indexed,tensioned) = tg.connectivity
+    (;nfull,nfree,syspres,sysfree,mem2sysfull) = indexed
+    (;connected) = tensioned
+    (;cables) = tg.tensiles
+    (;mem2num,num2sys) = numbered
+    function inner_Ǩm_Ǩg(q̌,s,μ,k,c)
+		q = Vector{eltype(q̌)}(undef,nfull)
+		q[syspres] .= q0[syspres]
+		q[sysfree] .= q̌
+        Jj = zeros(eltype(q̌),ndim,nfull)
+        retǨm = zeros(eltype(q̌),nfree,nfree)
+        retǨg = zeros(eltype(q̌),nfree,nfree)
+        foreach(connected) do scnt
             j = scnt.id
             rb1 = scnt.end1.rbsig
             rb2 = scnt.end2.rbsig
@@ -300,51 +333,24 @@ function build_KE(tg)
             rb2id = rb2.prop.id
             ap1id = scnt.end1.pid
             ap2id = scnt.end2.pid
-            is1 = (apnb[rb1id][ap1id]-1)*ndim
-            is2 = (apnb[rb2id][ap2id]-1)*ndim
-            c1 = c[is1+1:is1+ndim]
-            c2 = c[is2+1:is2+ndim]
+            c1 = c[num2sys[mem2num[rb1id][ap1id]]]
+            c2 = c[num2sys[mem2num[rb2id][ap2id]]]
             C1 = rb1.state.cache.funcs.C(c1)
             C2 = rb2.state.cache.funcs.C(c2)
-            T1 = build_Ti(tg,rb1id)
-            T2 = build_Ti(tg,rb2id)
-            Jj = C2*T2-C1*T1
+            C1 = rb1.state.cache.Cps[ap1id]
+            C2 = rb2.state.cache.Cps[ap2id]
+            mfull1 = mem2sysfull[rb1.prop.id]
+            mfull2 = mem2sysfull[rb2.prop.id]
+            Jj .= 0
+            Jj[:,mfull2] .+= C2
+            Jj[:,mfull1] .-= C1
             Uj = transpose(Jj)*Jj
-            Ujq = Uj*q
-            ret .+= k[j]*s[j]^2*(Ujq*transpose(Ujq))
+            Ǔj = @view Uj[sysfree,sysfree]
+            Ūjq = Uj[sysfree,:]*q
+            retǨm .-= k[j]*s[j]^2*(Ūjq*transpose(Ūjq))
+            retǨg .-= k[j]*(1-μ[j]*s[j])*(Ǔj-s[j]^2*Ūjq*transpose(Ūjq))
         end
-        ret
-    end
-end
-
-function build_KG(tg)
-    @unpack nfullcoords,ncables,ndim,cables = tg
-    cnt = tg.connectivity
-    @unpack string2ap,apnb = cnt
-    function inner_KG(q,s,μ,k,c)
-        ret = zeros(eltype(s),nfullcoords,nfullcoords)
-        foreach(string2ap) do scnt
-            j = scnt.id
-            rb1 = scnt.end1.rbsig
-            rb2 = scnt.end2.rbsig
-            rb1id = rb1.prop.id
-            rb2id = rb2.prop.id
-            ap1id = scnt.end1.pid
-            ap2id = scnt.end2.pid
-            is1 = (apnb[rb1id][ap1id]-1)*ndim
-            is2 = (apnb[rb2id][ap2id]-1)*ndim
-            c1 = c[is1+1:is1+ndim]
-            c2 = c[is2+1:is2+ndim]
-            C1 = rb1.state.cache.funcs.C(c1)
-            C2 = rb2.state.cache.funcs.C(c2)
-            T1 = build_Ti(tg,rb1id)
-            T2 = build_Ti(tg,rb2id)
-            Jj = C2*T2-C1*T1
-            Uj = transpose(Jj)*Jj
-            Ujq = Uj*q
-            ret .+= k[j]*(1-μ[j]*s[j])*(Uj-s[j]^2*Ujq*transpose(Ujq))
-        end
-        ret
+        retǨm,retǨg
     end
 end
 
@@ -386,6 +392,35 @@ function make_S(tg,q0)
         end
         ret
     end
+    function inner_S(q̌,s,c)
+        q = Vector{eltype(q̌)}(undef,nfull)
+        q[syspres] .= q0[syspres]
+        q[sysfree] .= q̌
+        ret = zeros(eltype(q̌),ncables)
+        Jj = zeros(eltype(q̌),ndim,nfull)
+        foreach(connected) do scnt
+            j = scnt.id
+            rb1 = scnt.end1.rbsig
+            rb2 = scnt.end2.rbsig
+            rb1id = rb1.prop.id
+            rb2id = rb2.prop.id
+            ap1id = scnt.end1.pid
+            ap2id = scnt.end2.pid
+            c1 = c[num2sys[mem2num[rb1id][ap1id]]]
+            c2 = c[num2sys[mem2num[rb2id][ap2id]]]
+            C1 = rb1.state.cache.funcs.C(c1)
+            C2 = rb2.state.cache.funcs.C(c2)
+            mfull1 = mem2sysfull[rb1.prop.id]
+            mfull2 = mem2sysfull[rb2.prop.id]
+            Jj .= 0
+            Jj[:,mfull2] .+= C2
+            Jj[:,mfull1] .-= C1
+            Uj = transpose(Jj)*Jj
+            ret[j] = transpose(q)*Uj*q*s[j]^2 - 1
+        end
+        ret
+    end
+    inner_S
 end
 
 function compensate_gravity_funcs(tgstruct)

@@ -186,6 +186,7 @@ function plot_traj!(bot::TR.TensegrityRobot;
             fontsize=20,
             actuate=false,
             figname=nothing,
+            sup! = (x)->nothing,
             kargs...)
     (;tg,traj) = bot
     showmesh = mapreduce(&, TR.get_rigidbodies(tg)) do rb
@@ -227,7 +228,8 @@ function plot_traj!(bot::TR.TensegrityRobot;
         sg = subgrids[sgi]
         this_time = Observable(traj.t[parsed_steps[sgi]])
         tg.state.system.q .= traj.q[parsed_steps[sgi]]
-
+        tg.state.system.c .= traj.c[parsed_steps[sgi]]
+        TR.update_points!(tg)
         TR.update!(tg)
         TR.update_orientations!(tg)
 
@@ -236,7 +238,7 @@ function plot_traj!(bot::TR.TensegrityRobot;
             @sprintf "(%s) t = %.10G (s)" alphabet[sgi] tt
         end
         if ndim == 2 && !showmesh
-            showinfo = false
+            # showinfo = false
             showground = false
             ax = Axis(sg[1,1],title=axtitle)
             ax.aspect = DataAspect()
@@ -260,6 +262,7 @@ function plot_traj!(bot::TR.TensegrityRobot;
         else
             error("Unknown AxisType")
         end
+        sup!(ax)
         if showground
             rect = Rect3f((xmin,ymin,zmin),(xwid,ywid,zwid))
             groundmesh = get_groundmesh(ground,rect)
@@ -275,10 +278,16 @@ function plot_traj!(bot::TR.TensegrityRobot;
                 grid2 = sg[:,2] = GridLayout(;tellheight=false)
                 grid_info = grid2[1,1] = GridLayout(;tellheight=false)
                 dict_info = [
-                    "azimuth" => lift(string,ax.azimuth),
-                    "elevation" => lift(string,ax.elevation)
+                    "fig. height" => lift(string,ax.height),
+                    "fig. width" => lift(string,ax.width)
                 ]
-
+                if ndim == 3 && AxisType isa Axis3
+                    cam_info = [
+                        "azimuth" => lift(string,ax.azimuth),
+                        "elevation" => lift(string,ax.elevation)
+                    ]
+                end
+                # dict_info = cam_info
                 for (i,(infoname,infovalue)) in enumerate(dict_info)
                     Label(grid_info[i,1],
                         lift(infovalue) do iv
@@ -305,7 +314,8 @@ function plot_traj!(bot::TR.TensegrityRobot;
             )
             on(slidergrid.sliders[1].value) do this_step
                 tg.state.system.q .= traj.q[this_step]
-                # tg.state.system.q̇ .= traj.q̇[this_step]
+                # tg.state.system.c .= traj.c[this_step]
+                TR.update_points!(tg)
                 if actuate
                     TR.actuate!(bot,[traj.t[this_step]])
                 end
@@ -320,6 +330,7 @@ function plot_traj!(bot::TR.TensegrityRobot;
         end
     end
     savefig(fig,figname)
+    DataInspector(fig)
     fig
 end
 

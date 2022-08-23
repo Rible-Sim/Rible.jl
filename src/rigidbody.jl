@@ -346,27 +346,41 @@ function PinJoint(e2e)
 	PinJoint(nΦ,values,e2e)
 end
 
-function make_Φ(cst::PinJoint,mem2sysfull)
+function make_Φ(cst::PinJoint,indexed,numbered)
 	(;nconstraints,values,e2e) = cst
+	(;mem2num,num2sys) = numbered
+	(;mem2sysfull) = indexed
 	(;end1,end2) = e2e
 	pid1 = end1.pid
 	pid2 = end2.pid
 	C1 = end1.rbsig.state.cache.Cps[pid1]
 	C2 = end2.rbsig.state.cache.Cps[pid2]
-	function _inner_Φ(q,d)
+	function inner_Φ(q)
 		ret = zeros(eltype(q),nconstraints)
 		q1 = @view q[mem2sysfull[end1.rbsig.prop.id]]
 		q2 = @view q[mem2sysfull[end2.rbsig.prop.id]]
 		ret .= C1*q1.-C2*q2
 		ret
 	end
-	inner_Φ(q)   = _inner_Φ(q,values)
-	inner_Φ(q,d) = _inner_Φ(q,d)
+	function inner_Φ(q,d,c)
+		ret = zeros(eltype(q),nconstraints)
+		rbid1 = end1.rbsig.prop.id
+		rbid2 = end2.rbsig.prop.id
+		q1 = @view q[mem2sysfull[rbid1]]
+		q2 = @view q[mem2sysfull[rbid2]]
+		c1 = c[num2sys[mem2num[rbid1][pid1]]]
+		c2 = c[num2sys[mem2num[rbid2][pid2]]]
+		ret .= end1.rbsig.state.cache.funcs.C(c1)*q1 .-
+		       end2.rbsig.state.cache.funcs.C(c2)*q2
+		ret
+	end
 	inner_Φ
 end
 
-function make_A(cst::PinJoint,mem2sysfree,nq)
+function make_A(cst::PinJoint,indexed,numbered)
 	(;nconstraints,values,e2e) = cst
+	(;mem2sysfree,nfree) = indexed
+	(;mem2num,num2sys) = numbered
 	(;end1,end2) = e2e
 	pid1 = end1.pid
 	pid2 = end2.pid
@@ -375,11 +389,22 @@ function make_A(cst::PinJoint,mem2sysfree,nq)
 	uci1 =  end1.rbsig.state.cache.unconstrained_index
 	uci2 =  end2.rbsig.state.cache.unconstrained_index
 	function inner_A(q)
-        ret = zeros(eltype(q),nconstraints,nq)
-        ret[:,mem2sysfree[end1.rbsig.prop.id]] =  C1[:,uci1]
-        ret[:,mem2sysfree[end2.rbsig.prop.id]] = -C2[:,uci2]
+		ret = zeros(eltype(q),nconstraints,nfree)
+		ret[:,mem2sysfree[end1.rbsig.prop.id]] =  C1[:,uci1]
+		ret[:,mem2sysfree[end2.rbsig.prop.id]] = -C2[:,uci2]
+		ret
+	end
+	function inner_A(q,c)
+        ret = zeros(eltype(q),nconstraints,nfree)
+		rbid1 = end1.rbsig.prop.id
+		rbid2 = end2.rbsig.prop.id
+		c1 = c[num2sys[mem2num[rbid1][pid1]]]
+		c2 = c[num2sys[mem2num[rbid2][pid2]]]
+        ret[:,mem2sysfree[end1.rbsig.prop.id]] =  end1.rbsig.state.cache.funcs.C(c1)[:,uci1]
+        ret[:,mem2sysfree[end2.rbsig.prop.id]] = -end2.rbsig.state.cache.funcs.C(c2)[:,uci2]
         ret
     end
+	inner_A
 end
 
 

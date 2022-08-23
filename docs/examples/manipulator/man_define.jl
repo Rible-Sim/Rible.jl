@@ -128,23 +128,23 @@ function man_ndof(ndof,onedir=[0.0,-1.0];θ=0.0,k=0.0,c=0.0,unit="mks",restlen=0
 		constrained = false
 		ci = Int[]
 		Φi =  collect(1:3)
-        if i in [1,2]
-			constrained = true
-			if i == 1
-            	ci = collect(1:6)
-				Φi = Int[]
-			else
-				ci = collect(1:2)
-			end
-		end
 		prop = TR.RigidBodyProperty(
 					i,movable,m,
 					Ī,
 					r̄g,
 					aps;
-					constrained=constrained
+					constrained=ifelse(i in [1,2],true,false)
 					)
-		lncs, _ = TR.NaturalCoordinates.NC2P1V(SVector{2}(ri), SVector{2}(rj), ro, α, ṙo, ω)
+		lncs, q, _ = TR.NaturalCoordinates.NC2P1V(SVector{2}(ri), SVector{2}(rj), ro, α, ṙo, ω)
+
+        if i in [1,2]
+			constrained = true
+			if i == 1
+            	ci = TR.find_full_constrained_index(lncs, q)
+			else
+				ci = collect(1:1)
+			end
+		end
 		state = TR.RigidBodyState(prop, lncs, ri, α, ṙo, ω, ci, Φi)
 
         rb = TR.RigidBody(prop,state)
@@ -185,12 +185,17 @@ function man_ndof(ndof,onedir=[0.0,-1.0];θ=0.0,k=0.0,c=0.0,unit="mks",restlen=0
 	matrix_cnt = zeros(Int,2(nbodies-1),nbodies)
     for i = 1:nbodies-1
 		if isvirtual
-			matrix_cnt[2(i-1)+1,i:i+1] = [1,-3]
-			matrix_cnt[2(i-1)+2,i:i+1] = [3,-2]
+			ul = [1,-3]
+			dl = [3,-2]
 		else
-			matrix_cnt[2(i-1)+1,i:i+1] = [6,-5]
-			matrix_cnt[2(i-1)+2,i:i+1] = [7,-4]
+			ul = [6,-5]
+			dl = [7,-4]
 		end
+		if iseven(i)
+			ul,dl = dl,ul
+		end
+		matrix_cnt[2(i-1)+1,i:i+1] = ul
+		matrix_cnt[2(i-1)+2,i:i+1] = dl
     end
 
 	connected = TR.connect(rigdibodies, matrix_cnt)

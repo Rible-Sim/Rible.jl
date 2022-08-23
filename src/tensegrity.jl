@@ -276,6 +276,7 @@ mutable struct NaturalCoordinatesState{T,qT,qviewT}
 	q̃̇::qviewT
 	q̃̈::qviewT
 	F̌::qviewT
+	c::qT
 end
 
 mutable struct ClusterNaturalCoordinatesState{T,qT,qviewT}
@@ -299,7 +300,7 @@ end
 自然坐标状态构造子。
 $(TYPEDSIGNATURES)
 """
-function NaturalCoordinatesState(t,q,q̇,q̈,F,λ,freei,presi)
+function NaturalCoordinatesState(t,q,q̇,q̈,F,λ,freei,presi,c)
 	t = zero(eltype(q))
 	q̌ = @view q[freei]
 	q̌̇ = @view q̇[freei]
@@ -308,7 +309,7 @@ function NaturalCoordinatesState(t,q,q̇,q̈,F,λ,freei,presi)
 	q̃̇ = @view q̇[presi]
 	q̃̈ = @view q̈[presi]
 	F̌ = @view F[freei]
-	NaturalCoordinatesState(t,q,q̇,q̈,F,λ,q̌,q̌̇,q̌̈,q̃,q̃̇,q̃̈,F̌)
+	NaturalCoordinatesState(t,q,q̇,q̈,F,λ,q̌,q̌̇,q̌̈,q̃,q̃̇,q̃̈,F̌,c)
 end
 
 function ClusterNaturalCoordinatesState(t,q,q̇,q̈,F,λ,freei,presi,s)
@@ -336,28 +337,30 @@ end
 张拉整体状态构造子。
 $(TYPEDSIGNATURES)
 """
-function TensegrityState(rbs,tensiles,cnt::Connectivity{<:Any,<:Any,<:NamedTuple{(:connected, )},<:Any})
-	(;indexed,jointed) = cnt
+function TensegrityState(rigidbodies,tensiles,cnt::Connectivity{<:Any,<:Any,<:NamedTuple{(:connected, )},<:Any})
+	(;numbered,indexed,jointed) = cnt
+	(;mem2num,num2sys) = numbered
 	(;nfull,ninconstraints,sysfree,syspres) = indexed
 	(;mem2sysincst,mem2sysfull,mem2sysfree,mem2syspres) = indexed
 	(;nexconstraints) = jointed
 	nconstraints = ninconstraints + nexconstraints
-	nb = length(rbs)
+	nb = length(rigidbodies)
 	ci_by_member = Vector{Vector{Int}}(undef,nb)
 	uci_by_member = Vector{Vector{Int}}(undef,nb)
-	foreach(rbs) do rb
+	foreach(rigidbodies) do rb
 		rbid = rb.prop.id
 		ci_by_member[rbid] = rb.state.cache.constrained_index
 		uci_by_member[rbid] = rb.state.cache.unconstrained_index
 	end
-	T = get_numbertype(rbs)
+	T = get_numbertype(rigidbodies)
 	t = zero(T)
 	q = Vector{T}(undef,nfull)
 	q̇ = zero(q)
 	q̈ = zero(q)
 	F = zero(q)
 	λ = Vector{T}(undef,nconstraints)
-	system = NaturalCoordinatesState(t,q,q̇,q̈,F,λ,sysfree,syspres)
+	c = get_c(rigidbodies,numbered)
+	system = NaturalCoordinatesState(t,q,q̇,q̈,F,λ,sysfree,syspres,c)
 	rigids = [
 		begin
 			qmem = @view q[mem2sysfull[rbid]]
@@ -365,12 +368,14 @@ function TensegrityState(rbs,tensiles,cnt::Connectivity{<:Any,<:Any,<:NamedTuple
 			q̈mem = @view q̈[mem2sysfull[rbid]]
 			Fmem = @view F[mem2sysfull[rbid]]
 			λmem = @view λ[mem2sysincst[rbid]]
+			cmem = @view c[reduce(vcat,num2sys[mem2num[rbid]])]
 			NaturalCoordinatesState(t,qmem,q̇mem,q̈mem,Fmem,λmem,
-									uci_by_member[rbid],ci_by_member[rbid])
+									uci_by_member[rbid],ci_by_member[rbid],
+									cmem)
 		end
 		for rbid = 1:nb
 	]
-	foreach(rbs) do rb
+	foreach(rigidbodies) do rb
 		(;ro,R,ṙo,ω,cache) = rb.state
 		q,q̇ = NaturalCoordinates.rigidstate2naturalcoords(cache.funcs.lncs,ro,R,ṙo,ω)
 		rigids[rb.prop.id].q .= q
@@ -379,7 +384,7 @@ function TensegrityState(rbs,tensiles,cnt::Connectivity{<:Any,<:Any,<:NamedTuple
 	TensegrityState(system,rigids)
 end
 
-function TensegrityState(rbs,tensiles,cnt::Connectivity{<:Any,<:Any,<:NamedTuple{(:connected, :clustered)},<:Any})
+function TensegrityState(rigidbodies,tensiles,cnt::Connectivity{<:Any,<:Any,<:NamedTuple{(:connected, :clustered)},<:Any})
 	(;clustercables) = tensiles
 	(;indexed,jointed) = cnt
 	(;nfull,ninconstraints,sysfree,syspres) = indexed
@@ -388,15 +393,15 @@ function TensegrityState(rbs,tensiles,cnt::Connectivity{<:Any,<:Any,<:NamedTuple
 	nclustercables = length(clustercables)
 	ns = sum([length(clustercables[i].sps) for i in 1:nclustercables])
 	nconstraints = ninconstraints + nexconstraints
-	nb = length(rbs)
+	nb = length(rigidbodies)
 	ci_by_member = Vector{Vector{Int}}(undef,nb)
 	uci_by_member = Vector{Vector{Int}}(undef,nb)
-	foreach(rbs) do rb
+	foreach(rigidbodies) do rb
 		rbid = rb.prop.id
 		ci_by_member[rbid] = rb.state.cache.constrained_index
 		uci_by_member[rbid] = rb.state.cache.unconstrained_index
 	end
-	T = get_numbertype(rbs)
+	T = get_numbertype(rigidbodies)
 	t = zero(T)
 	q = Vector{T}(undef,nfull)
 	q̇ = zero(q)
@@ -417,7 +422,7 @@ function TensegrityState(rbs,tensiles,cnt::Connectivity{<:Any,<:Any,<:NamedTuple
 		end
 		for rbid = 1:nb
 	]
-	foreach(rbs) do rb
+	foreach(rigidbodies) do rb
 		(;ro,R,ṙo,ω,cache) = rb.state
 		q,q̇ = NaturalCoordinates.rigidstate2naturalcoords(cache.funcs.lncs,ro,R,ṙo,ω)
 		rigids[rb.prop.id].q .= q
@@ -591,6 +596,23 @@ function update_tensiles!(tg, @eponymargs(connected, clustered))
     update_tensiles!(tg, @eponymtuple(clustered))
 end
 
+function update_points!(tg,c)
+	tg.state.system.c .= c
+	update_points!(tg)
+end
+
+function update_points!(tg)
+	(;rigidbodies,state) = tg
+    foreach(rigidbodies) do rb
+        rbid = rb.prop.id
+		(;nr̄ps) = rb.prop
+        (;Cps,funcs) = rb.state.cache
+		(;c) = state.rigids[rbid]
+        for pid in 1:nr̄ps
+            Cps[pid] = funcs.C(c[2pid-1:2pid])
+        end
+    end
+end
 """
 更新刚体状态。
 $(TYPEDSIGNATURES)
@@ -600,6 +622,7 @@ function update_rigids!(tg,q,q̇=zero(q))
 	tg.state.system.q̇ .= q̇
 	update_rigids!(tg)
 end
+
 function update_rigids!(tg)
     (;rigidbodies,state) = tg
     foreach(rigidbodies) do rb
@@ -728,31 +751,10 @@ make_Φ(bot::TensegrityRobot) = make_Φ(bot.tg)
 
 function make_Φ(tg::AbstractTensegrityStructure,q0::AbstractVector)
     (;rigidbodies,nconstraints) = tg
-    (;indexed,jointed) = tg.connectivity
+    (;numbered,indexed,jointed) = tg.connectivity
 	(;nfree,nfull,syspres,sysfree,mem2sysfull,mem2syspres,mem2sysfree,ninconstraints,mem2sysincst) = indexed
-	@inline @inbounds function inner_Φ(q̌)
-		q = Vector{eltype(q̌)}(undef,nfull)
-		q[syspres] .= q0[syspres]
-		q[sysfree] .= q̌
-        ret = Vector{eltype(q̌)}(undef,nconstraints)
-        foreach(rigidbodies) do rb
-            rbid = rb.prop.id
-			memfull = mem2sysfull[rbid]
-			memfree = mem2sysfree[rbid]
-			memincst = mem2sysincst[rbid]
-            if !isempty(memfree)
-                ret[memincst] .= rb.state.cache.funcs.Φ(q[memfull])
-            end
-        end
-        is = Ref(ninconstraints)
-		foreach(jointed.joints) do joint
-            nc = joint.nconstraints
-            ret[is[]+1:is[]+nc,:] .= make_Φ(joint,mem2sysfull)(q)
-            is[] += nc
-        end
-        ret
-    end
-    @inline @inbounds function inner_Φ(q̌,d)
+
+    function _inner_Φ(q̌,d,c)
 		q = Vector{eltype(q̌)}(undef,nfull)
 		q[syspres] .= q0[syspres]
 		q[sysfree] .= q̌
@@ -769,11 +771,22 @@ function make_Φ(tg::AbstractTensegrityStructure,q0::AbstractVector)
         is = Ref(ninconstraints)
         foreach(jointed.joints) do joint
             nc = joint.nconstraints
-            ret[is[]+1:is[]+nc] .= make_Φ(joint)(q,d[is[]+1:is[]+nc])
+            ret[is[]+1:is[]+nc] .= make_Φ(joint,indexed,numbered)(q,d[is[]+1:is[]+nc],c)
             is[] += nc
         end
         ret
     end
+
+	function inner_Φ(q̌)
+		_inner_Φ(q̌,get_d(tg),get_c(tg))
+	end
+	function inner_Φ(q̌,d)
+		_inner_Φ(q̌,d,get_c(tg))
+	end
+	function inner_Φ(q̌,d,c)
+		_inner_Φ(q̌,d,c)
+	end
+
     inner_Φ
 end
 
@@ -784,7 +797,6 @@ function make_Φ(tg::AbstractTensegrityStructure)
     @inline @inbounds function inner_Φ(q)
         ret = Vector{eltype(q)}(undef,nconstraints)
         is = Ref(ninconstraints)
-        #is[] += nbodydof*nfixbodies
         foreach(rigidbodies) do rb
             rbid = rb.prop.id
 			memfull = mem2sysfull[rbid]
@@ -796,29 +808,7 @@ function make_Φ(tg::AbstractTensegrityStructure)
         end
 		foreach(jointed.joints) do joint
             nc = joint.nconstraints
-            ret[is[]+1:is[]+nc,:] .= make_Φ(joint,mem2sysfull)(q)
-            is[] += nc
-        end
-        ret
-    end
-    @inline @inbounds function inner_Φ(q,d)
-        ret = Vector{eltype(q)}(undef,nconstraint)
-        is = Ref(0)
-        #is += nbodydof*nfixbodies
-        for rbid in tg.mvbodyindex
-            pindex = body2q[rbid]
-            rb = rbs[rbid]
-            # nc = rb.state.cache.nc
-            # if nc > 0
-            #     ret[is[]+1:is[]+nc] = rb.state.cache.cfuncs.Φ(q[pindex],d[is[]+1:is[]+nc])
-            #     is[] += nc
-            # end
-            ret[is[]+1:is[]+nbodyc] .=rb.state.cache.funcs.Φ(q[pindex],d[is[]+1:is[]+nbodyc])
-            is[] += nbodyc
-        end
-        foreach(csts) do cst
-            nc = cst.nconstraints
-            ret[is[]+1:is[]+nc] .= make_Φ(cst)(q,d[is[]+1:is[]+nc])
+            ret[is[]+1:is[]+nc] .= make_Φ(joint,indexed,numbered)(q)
             is[] += nc
         end
         ret
@@ -830,9 +820,10 @@ make_A(bot::TensegrityRobot) = make_A(bot.tg)
 
 function make_A(tg::AbstractTensegrityStructure,q0::AbstractVector)
     (;rigidbodies,nconstraints) = tg
-    (;indexed,jointed) = tg.connectivity
+    (;numbered,indexed,jointed) = tg.connectivity
 	(;nfull,nfree,syspres,sysfree,mem2sysfull,mem2sysfree,ninconstraints,mem2sysincst) = indexed
-    @inline @inbounds function inner_A(q̌)
+
+    function _inner_A(q̌,c)
 		q = Vector{eltype(q̌)}(undef,nfull)
 		q[syspres] .= q0[syspres]
 		q[sysfree] .= q̌
@@ -849,16 +840,23 @@ function make_A(tg::AbstractTensegrityStructure,q0::AbstractVector)
         is = Ref(ninconstraints)
         foreach(jointed.joints) do joint
             nc = joint.nconstraints
-            ret[is[]+1:is[]+nc,:] .= make_A(joint,mem2sysfree,nfree)(q)
+            ret[is[]+1:is[]+nc,:] .= make_A(joint,indexed,numbered)(q,c)
             is[] += nc
         end
         ret
     end
+	function inner_A(q̌)
+		_inner_A(q̌,get_c(tg))
+	end
+	function inner_A(q̌,c)
+		_inner_A(q̌,c)
+	end
+	inner_A
 end
 
 function make_A(tg::AbstractTensegrityStructure)
     (;rigidbodies,nconstraints) = tg
-    (;indexed,jointed) = tg.connectivity
+    (;numbered,indexed,jointed) = tg.connectivity
 	(;nfree,mem2sysfull,mem2sysfree,ninconstraints,mem2sysincst) = indexed
     @inline @inbounds function inner_A(q)
         ret = zeros(eltype(q),nconstraints,nfree)
@@ -874,7 +872,7 @@ function make_A(tg::AbstractTensegrityStructure)
         end
         foreach(jointed.joints) do joint
             nc = joint.nconstraints
-            ret[is[]+1:is[]+nc,:] .= make_A(joint,mem2sysfree,nfree)(q)
+            ret[is[]+1:is[]+nc,:] .= make_A(joint,indexed,numbered)(q)
             is[] += nc
         end
         ret
@@ -970,12 +968,14 @@ end
 
 get_c(bot::TensegrityRobot) = get_c(bot.tg)
 function get_c(tg::TensegrityStructure)
-    ndim = get_ndim(tg)
-    T = get_numbertype(tg)
-    (;numbered,indexed) = tg.connectivity
+	get_c(tg.rigidbodies,tg.connectivity.numbered)
+end
+function get_c(rigidbodies,numbered::NumberedPoints)
+    ndim = get_ndim(rigidbodies)
+    T = get_numbertype(rigidbodies)
 	(;mem2num,num2ID,num2sys,nc) = numbered
     ret = zeros(T,nc)
-    foreach(tg.rigidbodies) do rb
+    foreach(rigidbodies) do rb
         rbid = rb.prop.id
         for i in 1:rb.prop.nr̄ps
             ip = mem2num[rbid][i]
@@ -983,8 +983,8 @@ function get_c(tg::TensegrityStructure)
         end
     end
     ret
-end
 
+end
 function set_C!(tg,c)
 	T = get_numbertype(tg)
 	(;numbered,indexed) = tg.connectivity

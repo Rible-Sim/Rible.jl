@@ -31,17 +31,63 @@ includet("man_define.jl")
 includet("../analysis.jl")
 includet("../vis.jl")
 
-texroot = raw"D:"
-texroot = raw"C:\Users\luo22"
+figdir = raw"C:\Users\luo22\OneDrive\Papers\Ph.D.Thesis\ff"
 
 k = 1275; c = 100.0;
 restlen = 0.163-2.7246/318.16
-man_inv = man_ndof(2,[1.0,0.0];θ=0.0,k,c,restlen,isvirtual=false)
+man_inv = man_ndof(2,[1.0,0.0];θ=0.0,k,c,restlen,isvirtual=false); man_inv_plot = deepcopy(man_inv)
+man_inv |> typeof |> isconcretetype
 plot_traj!(man_inv)
+man_inv.tg.rigidbodies.data[1]
 @code_warntype man_ndof(1,[1.0,0.0];θ=0.0,k,c,restlen,isvirtual=false)
 @descend_code_warntype man_ndof(1,[1.0,0.0];θ=0.0,k,c,restlen,isvirtual=false)
-plot_traj!(man_inv)
+rb1 = man_inv.tg.rigidbodies.data[1][1]
+TR.update_points!(man_inv.tg)
 
+
+(;mem2num,num2ID,num2sys) = man_inv.tg.connectivity.numbered
+TR.get_c(man_inv)[indr1p2]
+
+# !!!! Check inverse statics first !!!!
+function get_testall_seq(bot;g=0.0,amax=0.01,amin=-0.01,n=20)
+    (;mem2num,num2ID,num2sys) = bot.tg.connectivity.numbered
+    indr1p2 = num2sys[mem2num[1][2]]
+    indr2p5 = num2sys[mem2num[2][5]]
+    start_sol,parameters0 = TR.get_start_system(bot,TR.AllMode())
+    c0 = parameters0.c
+    u0 = parameters0.u
+    d0 = parameters0.d
+    k0 = parameters0.k
+    @show indr1p2,indr2p5
+    @show c0[indr1p2]
+    @show c0[indr2p5]
+    u1 = copy(u0)
+    a1 = amax
+    u1[[1,3]] .+= a1
+    u1[[2,4]] .-= a1
+    u2 = copy(u0)
+    a2 = amin
+    u2[[1,3]] .+= a2
+    u2[[2,4]] .-= a2
+
+    g1 = g
+    g2 = g
+
+    c1 = copy(c0)
+    c2 = copy(c0)
+    c2[indr1p2] = [0.11,0.02]
+    c2[indr2p5] = [0.0 ,0.09]
+    parameters1 = (d=d0, c=c1, k=k0, u=u0, g=[g1], )
+    parameters2 = (d=d0, c=c2, k=k0, u=u0, g=[g2], )
+    parameters_seq = [parameters0,parameters1,parameters2]
+    seqs = TR.forward_multi_sequence(bot.tg,start_sol,parameters_seq,TR.AllMode();n)
+
+    seqs[2]
+end
+seq = get_testall_seq(man_inv)
+VectorOfArray(seq.c)[[25,26],:]
+TR.apply!(man_inv_plot,seq)
+plot_traj!(man_inv_plot)
 # !!!! Check inverse statics first !!!!
 function get_actuate_seq(bot;g=0.0,amax=0.01,amin=-0.01,n=20)
     # plot_traj!(man_inv)
@@ -92,7 +138,7 @@ function get_actuate_seq(bot;g=0.0,amax=0.01,amin=-0.01,n=20)
     seqs[2]
 end
 seq = get_actuate_seq(man_inv)
-plot_traj!(man_inv)
+
 seq_g = get_actuate_seq(man_inv;g=1.0,amax=0.00,amin=-0.015,n=15)
 plot_traj!(man_inv,seq_g)
 
@@ -533,3 +579,5 @@ end
 
 compare_loop(3:3:12)
 compare_loop([12])
+
+""
