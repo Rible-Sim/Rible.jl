@@ -793,7 +793,7 @@ end
 
 function make_Φ(tg::AbstractTensegrityStructure)
     (;rigidbodies,nconstraints) = tg
-    (;indexed,jointed) = tg.connectivity
+    (;indexed,jointed,numbered) = tg.connectivity
 	(;nfree,mem2sysfull,mem2sysfree,ninconstraints,mem2sysincst) = indexed
     @inline @inbounds function inner_Φ(q)
         ret = Vector{eltype(q)}(undef,nconstraints)

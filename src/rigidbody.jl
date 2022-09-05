@@ -427,7 +427,8 @@ function LinearJoint(A,values)
 	LinearJoint(nΦ,values,A)
 end
 
-function make_Φ(cst::LinearJoint,mem2sysfull)
+function make_Φ(cst::LinearJoint,indexed,numbered)
+	(;mem2sysfull) = indexed
 	(;nconstraints,values,A) = cst
 	function _inner_Φ(q,d)
 		ret = zeros(eltype(q),nconstraints)
@@ -439,10 +440,11 @@ function make_Φ(cst::LinearJoint,mem2sysfull)
 	inner_Φ
 end
 
-function make_A(cst::LinearJoint,mem2sysfree,nq)
+function make_A(cst::LinearJoint,indexed,numbered)
+	(;mem2sysfree,nfull) = indexed
 	(;nconstraints,values,A) = cst
 	function inner_A(q)
-        ret = zeros(eltype(q),nconstraints,nq)
+        ret = zeros(eltype(q),nconstraints,nfull)
         ret .= A
         ret
     end
