@@ -13,7 +13,6 @@ using CoordinateTransformations
 using Rotations
 using Interpolations
 using GeometryBasics
-using Peaks
 using OffsetArrays
 using Printf
 using Unitful
@@ -74,8 +73,9 @@ function make_top(ro = [0.0,0.0,0.0],
 	indexedcoords = TR.index(rbs,matrix_sharing)
     ss = Vector{Int}()
 	tensiles = (cables = ss,)
-	connections = TR.connect(rbs,zeros(Int,0,0))
-	cnt = TR.Connectivity(numberedpoints,indexedcoords,(cables=connections,))
+	connected = TR.connect(rbs,zeros(Int,0,0))
+	tensioned = @eponymtuple(connected,)
+	cnt = TR.Connectivity(numberedpoints,indexedcoords,tensioned)
 	contacts = [TR.Contact(i,μ,e) for i = [5]]
 	tg = TR.TensegrityStructure(rbs,tensiles,cnt,contacts)
     bot = TR.TensegrityRobot(tg)
@@ -156,10 +156,15 @@ TR.solve!(prob,TR.ZhongCCP();tspan,dt=h,ftol=1e-14,maxiters=50,exception=true)
 plot_traj!(top;showinfo=false,rigidcolor=:white,showwire=true,figsize=(0.6tw,0.6tw))
 
 contacts_traj_voa = VectorOfArray(top.contacts_traj)
-for (i,c) in enumerate(contacts_traj_voa[1,1:end])
+for (i,c) in enumerate(contacts_traj_voa[1,end-10:end])
 	check_Coulomb(i,c)
 end
 
+r1v5 = get_mid_velocity!(top,1,5)
+r1v5[3,:] |> scatter
+
+r1p5 = get_trajectory!(top,1,5)
+r1p5[3,:] |> scatter
 function plotsave_energy(bot,figname=nothing)
 	(;traj) = bot
 	(;t) = traj
@@ -169,7 +174,7 @@ function plotsave_energy(bot,figname=nothing)
 		"动能",
 		"势能"
 	]
-	with_theme(mv_theme; resolution = (0.9tw,0.6tw)) do
+	with_theme(theme_pub; resolution = (0.9tw,0.6tw)) do
 		ME = TR.mechanical_energy!(bot;gravity=true)
 		fig = Figure()
 		axs = [
@@ -207,13 +212,14 @@ CM.activate!(); plotsave_energy(top,"spinningtop_energy")
 
 # contacts_traj = TR.solve!(prob,TR.AlphaCCP(0.95);tspan,dt=h,ftol=1e-8,maxiters=50,exception=true)
 
-with_theme(my_theme;
+with_theme(theme_try;
 		Axis3 = (
 			azimuth = 4.2555306333269835,
 			elevation = 0.2326990816987238
 		)
 	) do
 	plot_traj!(top;
+		AxisType=Axis3,
 		doslide=false,
 		gridsize=(2,3),
 		attimes=[0,2,4,6,8,10],
@@ -266,7 +272,7 @@ tops = [
 GM.activate!(); plotsave_contact_persistent(tops[3])
 
 function plotsave_velocity_restitution(bots,ymax,showlegend,figname=nothing)
-	with_theme(mv_theme;
+	with_theme(theme_pub;
 			resolution = (0.9tw,0.4th)
 		) do
 		fig = Figure()
@@ -336,7 +342,7 @@ tops_e0 = [
 ]
 
 function plotsave_friction_direction(bots,x,xs,figname=nothing)
-	with_theme(mv_theme;
+	with_theme(theme_pub;
 		resolution = (0.9tw,0.4tw)
 	) do
 		fig = Figure()
@@ -426,7 +432,7 @@ CM.activate!(); plotsave_friction_direction(tops_e0,"\\mu",μs,"friction_directi
 
 
 function plotsave_point_traj_vel(bots,figname=nothing)
-	with_theme(mv_theme;
+	with_theme(theme_pub;
 		resolution=(0.9tw,0.4tw),
 	) do
 		fig = Figure()
@@ -497,7 +503,7 @@ CM.activate!(); plotsave_point_traj_vel(tops_e0,"contact_point_traj_vel")
 ωs = [5.0,10.0,20.0]
 tops_ω = [
 	begin
-		top = make_top([0,0,cos(π/24)*0.5-1e-6],Ro,[0,0,0.0],[0,0,ω]; μ=0.9, e = 0.0)
+		top = make_top([0,0,cos(π/24)*0.5-1e-4],Ro,[0,0,0.0],[0,0,ω]; μ=0.9, e = 0.0)
 		TR.solve!(TR.SimProblem(top,top_contact_dynfuncs),
 				TR.ZhongCCP();
 				tspan=(0.0,500.0),dt=1e-2,ftol=1e-14,maxiters=50,exception=false)
@@ -511,16 +517,21 @@ plot_traj!(tops_ω[1];showinfo=false,rigidcolor=:white,showwire=true,figsize=(0.
 	zlims=(-1e-3,1.0),
 )
 
-me = TR.mechanical_energy!(tops_ω500s[1])
-me.E[100:end]./me.E[end] |> lines
+
+r1v5 = get_mid_velocity!(tops_ω[1],1,5)
+r1v5[3,:] |> scatter
+
+r1p5 = get_trajectory!(tops_ω[1],1,5)
+r1p5[3,:] |> scatter
 
 # energy conserving
 function plotsave_energy_conserving(bots,figname=nothing)
-	with_theme(mv_theme;
+	with_theme(theme_pub;
 			resolution = (0.7tw,0.5tw)
 		) do
 		fig = Figure()
-		mos = [4,5,6]
+		# mos = [4,5,6]
+		mos = 12 .*[1,1,1]
 		for (botid,bot) in enumerate(bots)
 			ax1 = Axis(
 				fig[botid,1],
@@ -530,7 +541,7 @@ function plotsave_energy_conserving(bots,figname=nothing)
 			)
 			Label(fig[botid,1,TopLeft()],"($(alphabet[botid]))")
 			if botid !== 3
-				hidex(ax1)
+				# hidex(ax1)
 			end
 			(;t) = bot.traj
 			mo = mos[botid]
@@ -628,7 +639,7 @@ tops_dt_v = [
 ]
 
 function plotsave_error(mbots,figname=nothing)
-	with_theme(mv_theme;
+	with_theme(theme_pub;
 			resolution = (0.8tw,0.3tw),
 		) do
 		fig = Figure()
@@ -668,11 +679,23 @@ end
 GM.activate!(); plotsave_error(hcat(tops_dt,tops_dt_v))
 CM.activate!(); plotsave_error(hcat(tops_dt,tops_dt_v),"top_err")
 
-plot_traj!(tops_dt_v[1];showinfo=false,rigidcolor=:white,showwire=true,figsize=(0.6tw,0.6tw),
+plot_traj!(tops_dt_v[6];showinfo=false,rigidcolor=:white,showwire=true,figsize=(0.6tw,0.6tw),
 	xlims=(-1.0,2.0),
 	ylims=(-1.0,1.0),
 	zlims=(-1e-3,1.0),
 )
+
+
+itp = interpolate(get_trajectory!(tops_dt_v[8],1,0)[1,:], BSpline(Linear()))
+ref_traj = scale(itp,0:dts[8]:2.0)
+
+get_trajectory!(tops_dt_v[6],1,0)[1,begin:end-1].-ref_traj(tops_dt_v[6].traj.t[begin:end-1])  .|> abs |> scatter
+
+
+err_avg = [
+	get_trajectory!(tops_dt_v[i],1,0)[1,begin:end-1].-ref_traj(tops_dt_v[i].traj.t[begin:end-1]) .|> abs |> mean
+	for (i,dt) in enumerate(dts[1:8-1])
+]
 
 # friction_direction
 # Dare you try

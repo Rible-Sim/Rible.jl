@@ -152,9 +152,10 @@ function quad(c=100.0;
         end
     end
     # display(matrix_cnt)
-    connections = TR.connect(rigdibodies, matrix_cnt)
+    connected = TR.connect(rigdibodies, matrix_cnt)
+    tensioned = @eponymtuple(connected,)
     #
-    cnt = TR.Connectivity(numberedpoints, indexedcoords, connections)
+    cnt = TR.Connectivity(numberedpoints, indexedcoords, tensioned)
     # #
 
 	contacts = [TR.Contact(i,μ,e) for i = 1:4]

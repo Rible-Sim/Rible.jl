@@ -14,6 +14,7 @@ using EponymTuples
 using TypeSortedCollections
 using Printf
 using CoordinateTransformations
+using Meshing
 using Test
 using Unitful
 using Match
@@ -29,8 +30,11 @@ includet("../vis.jl")
 
 
 quadbot = quad(10.0)
+quadbot.tg.connectivity.numbered
+
 plot_traj!(quadbot;
-	zlims = (0,1)
+	zlims = (0,1),
+	showground = false
 )
 
 
@@ -39,7 +43,7 @@ function quad_dynfuncs(bot)
     function F!(F,q,q̇,t)
         TR.clear_forces!(tg)
         TR.update_rigids!(tg,q,q̇)
-        TR.update_cables_apply_forces!(tg)
+        TR.update_tensiles!(tg)
         TR.apply_gravity!(tg)
         F .= TR.generate_forces!(tg)
     end
@@ -48,7 +52,7 @@ function quad_dynfuncs(bot)
         ∂F∂q̌̇ .= 0
         TR.clear_forces!(tg)
         TR.update_rigids!(tg,q,q̇)
-        TR.update_cables_apply_forces!(tg)
+        TR.update_tensiles!(tg)
         TR.build_∂Q̌∂q̌!(∂F∂q̌,tg)
         TR.build_∂Q̌∂q̌̇!(∂F∂q̌̇,tg)
     end
@@ -101,7 +105,10 @@ TR.solve!(prob,TR.ZhongCCP();tspan,dt=h,ftol=1e-14,maxiters=50,exception=true)
 
 TR.solve!(prob,TR.AlphaCCP(0.8);tspan,dt=h,ftol=1e-10,maxiters=50,exception=true)
 
-plot_traj!(quadbot)
+plot_traj!(quadbot;
+	zlims = (0,1),
+	showground = false
+)
 
 me = TR.mechanical_energy!(quadbot)
 

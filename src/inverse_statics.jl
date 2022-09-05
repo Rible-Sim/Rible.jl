@@ -347,8 +347,8 @@ function make_Ǩm_Ǩg(tg,q0)
             Uj = transpose(Jj)*Jj
             Ǔj = @view Uj[sysfree,sysfree]
             Ūjq = Uj[sysfree,:]*q
-            retǨm .-= k[j]*s[j]^2*(Ūjq*transpose(Ūjq))
-            retǨg .-= k[j]*(1-μ[j]*s[j])*(Ǔj-s[j]^2*Ūjq*transpose(Ūjq))
+            retǨm .+= k[j]*s[j]^2*(Ūjq*transpose(Ūjq))
+            retǨg .+= k[j]*(1-μ[j]*s[j])*(Ǔj-s[j]^2*Ūjq*transpose(Ūjq))
         end
         retǨm,retǨg
     end
@@ -652,12 +652,12 @@ function check_static_equilibrium_output_multipliers(tg_input,q,F=nothing;gravit
         generalized_forces .+= F[:]
     end
     A = make_A(tg)(q)
-    λ = inv(A*transpose(A))*A*(generalized_forces)
+    λ = inv(A*transpose(A))*A*(-generalized_forces)
     constraint_forces = transpose(A)*λ
-    static_equilibrium = constraint_forces ≈ generalized_forces
-    @debug "Res. forces = $(generalized_forces-constraint_forces)"
+    static_equilibrium = constraint_forces ≈ -generalized_forces
+    @debug "Res. forces = $(generalized_forces+constraint_forces)"
     if !static_equilibrium
-        @error "System not in static equilibrium. Err = $(norm(generalized_forces-constraint_forces))"
+        @error "System not in static equilibrium. Err = $(norm(generalized_forces+constraint_forces))"
         @info "This error could be harmless, if the error is sufficiently small, or nonpositive tension occurs."
     end
     static_equilibrium, λ

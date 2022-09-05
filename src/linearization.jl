@@ -244,7 +244,7 @@ function build_∂Q̌∂q̌(tg,@eponymargs(connected,))
         (;k,c,state,slack) = cable
         (;direction,tension,length,lengthdot) = state
         if slack && (tension==0)
-            ∂Q̌∂q̌ .-= 0
+            ∂Q̌∂q̌ .= 0
         else
             D .= direction*transpose(direction)
             density = tension/length
@@ -522,8 +522,7 @@ function build_Ǩ(tg,λ)
     (;nfree) = tg.connectivity.indexed
     T = get_numbertype(tg)
     # Ǩ = zeros(T,nfree,nfree)
-    Ǩ = build_∂Q̌∂q̌(tg)
-    Ǩ .= ∂Aᵀλ∂q̌(tg,λ) .-Ǩ
+    Ǩ = -build_∂Q̌∂q̌(tg) .- ∂Aᵀλ∂q̌(tg,λ)
     # Ǩ .= Ǩ
     Ǩ
 end

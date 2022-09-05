@@ -32,6 +32,8 @@ k = 453.09; c = 100.0;
 restlen = 0.174-3.9061/k
 man_inv = man_ndof(8,[1.0,0.0];θ=0.0,k,c,restlen,isvirtual=true); man_inv_plot = deepcopy(man_inv)
 
+plot_traj!(man_inv)
+
 function get_interactive(bot_input;g0=[0.0])
     bot = deepcopy(bot_input)
     (;tg) = bot
@@ -64,11 +66,12 @@ function get_interactive(bot_input;g0=[0.0])
     )
     dummy_parameter_points = [parameters0,dummy_parameters1]
 
-    P,variable_groups,parameters = TR.forward_system(tg,TR.DeformMode();)
-    Psys, ide_pindx = TR.find_diff_system(P,variable_groups,parameters,dummy_parameter_points)
+    P,var_lens,parameters = TR.forward_system(tg,TR.DeformMode();)
+    Psys, ide_pindx = TR.find_diff_system(P,parameters,dummy_parameter_points)
 
     # precompile
     TR.forward_once(Psys,
+                        var_lens,
                         [[startsols.q̌; startsols.s; startsols.λ]],
                         reduce(vcat,(d=d0[indx_d], u=u0, )),
                         reduce(vcat,(d=d1[indx_d], u=u1, ))
@@ -120,6 +123,7 @@ function get_interactive(bot_input;g0=[0.0])
         u1[collect(2:2:2nsegs)] .-= av
 
         rst = TR.forward_once(Psys,
+                            var_lens,
                             [[startsols.q̌; startsols.s; startsols.λ]],
                             reduce(vcat,(d=d0[indx_d], u=u0, )),
                             reduce(vcat,(d=d1[indx_d], u=u1, ))

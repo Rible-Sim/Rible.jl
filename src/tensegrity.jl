@@ -608,8 +608,9 @@ function update_points!(tg)
 		(;nr̄ps) = rb.prop
         (;Cps,funcs) = rb.state.cache
 		(;c) = state.rigids[rbid]
+		nld = get_nlocaldim(rb)
         for pid in 1:nr̄ps
-            Cps[pid] = funcs.C(c[2pid-1:2pid])
+            Cps[pid] = funcs.C(c[nld*(pid-1)+1:nld*pid])
         end
     end
 end
@@ -908,9 +909,30 @@ end
 $(TYPEDSIGNATURES)
 """
 function get_initial(tg)
-    q0,q̇0 = get_q(tg)
-    λ0 = get_λ(tg)
-    q0,q̇0,λ0
+    _,λ = check_static_equilibrium_output_multipliers(tg)
+	q̌ = get_q̌(tg)
+	q = get_q(tg)
+	ℓ = get_cables_len(tg)
+	s = 1 ./ℓ
+	d = get_d(tg)
+	c = get_c(tg)
+	k = get_cables_stiffness(tg)
+	μ = get_cables_restlen(tg)
+	@eponymtuple(q̌,q,s,λ,d,c,k,μ,)
+end
+
+function get_polyvar(tg)
+	ini = get_initial(tg)
+	# state variables
+    @polyvar q̌[1:length(ini.q̌)]
+    @polyvar s[1:length(ini.s)]
+    @polyvar λ[1:length(ini.λ)]
+    # parameters
+	@polyvar d[1:length(ini.d)]
+    @polyvar c[1:length(ini.c)]
+    @polyvar k[1:length(ini.k)]
+    @polyvar μ[1:length(ini.μ)]
+	@eponymtuple(q̌,s,λ,d,c,k,μ,)
 end
 
 function lucompletepiv!(A)

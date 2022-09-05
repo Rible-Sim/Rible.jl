@@ -67,22 +67,22 @@ function forward_system(tg,mode=PrimalMode();F̌=reshape(build_Ǧ(tg),:,1))
     (;nc) = tg.connectivity.numbered
     ns = tg.tensiles.cables |> length
     nλ = nconstraints
-    @var q̌[1:nfree]
-    @var s[1:ns]
-    @var λ[1:nλ]
-    @var d[1:nλ]
-    @var c[1:nc]
-    @var k[1:ns]
-    @var u[1:ns]
-    @var g[1:size(F̌,2)]
-    polyq̌ = 1.0q̌
-    polys = 1.0s
-    polyλ = 1.0λ
-    polyd = 1.0d
-    polyc = 1.0c
-    polyk = 1.0k
-    polyu = 1.0u
-    polyg = 1.0g
+    @polyvar q̌[1:nfree]
+    @polyvar s[1:ns]
+    @polyvar λ[1:nλ]
+    @polyvar d[1:nλ]
+    @polyvar c[1:nc]
+    @polyvar k[1:ns]
+    @polyvar u[1:ns]
+    @polyvar g[1:size(F̌,2)]
+    polyq̌ = 1.0q̌ .+ 0.0
+    polys = 1.0s .+ 0.0
+    polyλ = 1.0λ .+ 0.0
+    polyd = 1.0d .+ 0.0
+    polyc = 1.0c .+ 0.0
+    polyk = 1.0k .+ 0.0
+    polyu = 1.0u .+ 0.0
+    polyg = 1.0g .+ 0.0
     q0 = get_q(tg)
     Φ = make_Φ(tg,q0)
     A = make_A(tg,q0)
@@ -90,25 +90,25 @@ function forward_system(tg,mode=PrimalMode();F̌=reshape(build_Ǧ(tg),:,1))
     S = make_S(tg,q0)
 
     variable_groups = [q̌,s,λ]
-
+    var_lens = length.(variable_groups)
     scaling = 1
     if mode isa PrimalMode
-        P = [transpose(A(polyq̌))*polyλ - Q̌(polyq̌,polys,polyu) - F̌*g;
+        P = [-transpose(A(polyq̌))*polyλ - Q̌(polyq̌,polys,polyu) - F̌*g;
             S(polyq̌,polys);
             Φ(polyq̌)]
         parameters = [u;g]
     elseif mode isa StiffMode
-        P = [transpose(A(polyq̌))*polyλ - Q̌(polyq̌,polys,polyu,polyk) - F̌*g;
+        P = [-transpose(A(polyq̌))*polyλ - Q̌(polyq̌,polys,polyu,polyk) - F̌*g;
             S(polyq̌,polys);
             Φ(polyq̌)]
         parameters = [k;u;g]
     elseif mode isa DeformMode
-        P = [transpose(A(polyq̌))*polyλ - Q̌(polyq̌,polys,polyu) - F̌*g;
+        P = [-transpose(A(polyq̌))*polyλ - Q̌(polyq̌,polys,polyu) - F̌*g;
             S(polyq̌,polys);
             Φ(polyq̌,polyd)]
         parameters = [d;u;g]
     elseif mode isa AllMode
-        P = [transpose(A(polyq̌,polyc))*polyλ -  Q̌(polyq̌,polys,polyu,polyk,polyc) - F̌*g;
+        P = [-transpose(A(polyq̌,polyc))*polyλ -  Q̌(polyq̌,polys,polyu,polyk,polyc) - F̌*g;
             S(polyq̌,polys,polyc);
             Φ(polyq̌,polyd,polyc)]
         parameters= [d;c;k;u;g]
@@ -117,19 +117,19 @@ function forward_system(tg,mode=PrimalMode();F̌=reshape(build_Ǧ(tg),:,1))
     end
     # PPP = [subs(f, u=>l,g=>0.0) for f in P]
     # vars = (q̌=q̌,s=s,λ=λ,d=d,u=u,k=k,g=g)
-    P,variable_groups,parameters
+    P,var_lens,parameters
 end
 
 function forward_once(Psys::HomotopyContinuation.System,
-                        startsols,start_parameters,target_parameters)
+                        var_lens,startsols,start_parameters,target_parameters)
     tracker_options = TrackerOptions(;extended_precision=true,parameters=:default)
     result = HomotopyContinuation.solve(Psys, startsols; start_parameters, target_parameters, tracker_options, threading = false)
     # result = HomotopyContinuation.solve(Fsys, startsols)
-    check_and_retrieve(result,Psys)
+    check_and_retrieve(result,var_lens)
 end
 
 function find_diff_system(
-            P,variable_groups,parameters,
+            P,parameters,
             parameter_points
         )
     diff_parameters = copy(parameters)
@@ -156,18 +156,20 @@ function find_diff_system(
     end
     ide_pindx = reduce(vcat,pidxs)
     deleteat!(diff_parameters,ide_pindx)
-    Psys = System(P;variable_groups,parameters=diff_parameters)
+    # Psys = System(P;variable_groups,parameters=diff_parameters)
+    Psys = System(P;parameters=diff_parameters)
     Psys,ide_pindx
 end
 
-function forward_once(tg::TensegrityStructure,startsols_input,
+function forward_once(tg::TensegrityStructure,
+                        startsols_input,
                         start_parameters_input,
                         target_parameters_input,
                         mode=PrimalMode();F=reshape(build_G(tg),:,1))
 
-    P_all,variable_groups,parameters = forward_system(tg,mode;F)
+    P_all,var_lens,parameters = forward_system(tg,mode;F)
     Psys, diff_parameter_points  = find_diff_system(
-                P_all,variable_groups,parameters,
+                P_all,parameters,
                 start_parameters_input,
                 target_parameters_input
             )
@@ -176,13 +178,13 @@ function forward_once(tg::TensegrityStructure,startsols_input,
 
 
     # forward_once(Psys,startsols,start_parameters,target_parameters)
-    target_sol = forward_once(Psys,startsols,diff_start_parameters,diff_target_parameters)
+    target_sol = forward_once(Psys,var_lens,startsols,diff_start_parameters,diff_target_parameters)
     check_slackness(inv.(target_sol.s),target_parameters_input.u)
     target_sol
 end
 
 function forward_sequence(Psys::HomotopyContinuation.System,
-                        startsols_input,
+                        var_lens,startsols_input,
                         start_parameters_input,
                         target_parameters_input,
                         ide_pindx;n=1)
@@ -201,7 +203,8 @@ function forward_sequence(Psys::HomotopyContinuation.System,
         pᵏ⁻¹ = start_parameters .+ (k-1).*diff_parameters
         pᵏ = start_parameters .+ k.*diff_parameters
         xᵏ⁻¹ = [[solseq[k].q̌; solseq[k].s; solseq[k].λ]]
-        sol = forward_once(Psys, xᵏ⁻¹,
+        sol = forward_once(Psys,
+                    var_lens,xᵏ⁻¹,
                     deleteat!(copy(pᵏ⁻¹),ide_pindx),
                     deleteat!(copy(pᵏ),  ide_pindx)
             )
@@ -213,16 +216,18 @@ function forward_sequence(Psys::HomotopyContinuation.System,
     solseq
 end
 
-function forward_sequence(tg::TensegrityStructure,startsols,
+function forward_sequence(tg::TensegrityStructure,
+                        startsols,
                         start_parameters,
                         target_parameters,
                         mode=PrimalMode();F̌=reshape(build_Ǧ(tg),:,1))
-    P,variable_groups,parameters = forward_system(tg,mode;F̌)
-    Psys = System(P;variable_groups,parameters)
-    forward_sequence(Psys,startsols,start_parameters,target_parameters)
+    P,var_lens,parameters = forward_system(tg,mode;F̌)
+    Psys = System(P;parameters)
+    forward_sequence(Psys,var_lens,startsols,start_parameters,target_parameters)
 end
 
-function forward_multi_sequence(Psys::HomotopyContinuation.System,startsols_input,
+function forward_multi_sequence(Psys::HomotopyContinuation.System,
+                        var_lens,startsols_input,
                         parameter_points, ide_pindx, mode=PrimalMode();n=1)
 
     # parameter_point1 = parameter_points[1]
@@ -231,6 +236,7 @@ function forward_multi_sequence(Psys::HomotopyContinuation.System,startsols_inpu
         begin
             @debug "Forwarding the $(i)th sequence."
             seq = forward_sequence(Psys,
+                                var_lens,
                                 startsols_inputs[i],
                                 parameter_points[i],
                                 parameter_points[i+1],
@@ -245,7 +251,7 @@ end
 function forward_multi_sequence(tg::TensegrityStructure,startsols,
                         parameter_points,mode=PrimalMode();
                         F̌=reshape(build_Ǧ(tg),:,1),n=1)
-    P,variable_groups,parameters = forward_system(tg,mode;F̌)
+    P,var_lens,parameters = forward_system(tg,mode;F̌)
     # q̌0,s0,λ0 = startsols
     # q̌,s,λ = variable_groups
     # Pz = map(P) do z
@@ -254,10 +260,10 @@ function forward_multi_sequence(tg::TensegrityStructure,startsols,
     # Psys = System(P;variable_groups,parameters)
 
     Psys, ide_pindx = find_diff_system(
-                P,variable_groups,parameters,
+                P,parameters,
                 parameter_points
             )
-    seqs = forward_multi_sequence(Psys,startsols,parameter_points, ide_pindx,mode;n)
+    seqs = forward_multi_sequence(Psys,var_lens,startsols,parameter_points, ide_pindx,mode;n)
     [recover.(seq,Ref(tg)) for seq in seqs]
 end
 

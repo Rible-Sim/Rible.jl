@@ -186,7 +186,7 @@ function plot_traj!(bot::TR.TensegrityRobot;
             fontsize=20,
             actuate=false,
             figname=nothing,
-            sup! = (x)->nothing,
+            sup! = (x,y)->nothing,
             kargs...)
     (;tg,traj) = bot
     showmesh = mapreduce(&, TR.get_rigidbodies(tg)) do rb
@@ -262,7 +262,7 @@ function plot_traj!(bot::TR.TensegrityRobot;
         else
             error("Unknown AxisType")
         end
-        sup!(ax)
+        sup!(ax,tgob)
         if showground
             rect = Rect3f((xmin,ymin,zmin),(xwid,ywid,zwid))
             groundmesh = get_groundmesh(ground,rect)
@@ -464,15 +464,15 @@ function init_plot!(ax,tgob;isref=false,
             else
                 strokewidth = 0
             end
-            # poly!(ax, rigid_mesh;
-            #         color = rigidcolor,
-            #         shading = true,
-            #         strokewidth
-            # )
-            mesh!(ax, rigid_mesh;
+            poly!(ax, rigid_mesh;
                     color = rigidcolor,
-                    shading = true
+                    shading = true,
+                    strokewidth
             )
+            # mesh!(ax, rigid_mesh;
+            #         color = rigidcolor,
+            #         shading = true
+            # )
         end
     end
     # mass centers

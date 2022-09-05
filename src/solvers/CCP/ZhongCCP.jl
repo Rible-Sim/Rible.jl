@@ -5,10 +5,9 @@ struct ZhongCCPCache{CacheType}
 end
 
 function generate_cache(::ZhongCCP,intor;dt,kargs...)
-    (;prob,state) = intor
+    (;prob) = intor
     (;bot,dynfuncs) = prob
     (;tg) = bot
-    (;q,q̇) = state.now
     # F!,_ = dynfuncs
     # mm = TR.build_MassMatrices(bot)
     M = Matrix(build_M(tg))
@@ -16,8 +15,8 @@ function generate_cache(::ZhongCCP,intor;dt,kargs...)
     A = make_A(bot)
     Φ = make_Φ(bot)
 
-    nq = length(q)
-    T = eltype(q)
+    nq = size(M,2)
+    T = get_numbertype(bot)
     Ψ(q,q̇) = Vector{T}()
     ∂Ψ∂q(q,q̇) = Matrix{T}(undef,0,nq)
     B(q) = Matrix{T}(undef,0,nq)
@@ -182,10 +181,9 @@ end
 function solve!(intor::Integrator,solvercache::ZhongCCPCache;
                 dt,ftol=1e-14,xtol=ftol,verbose=false,maxiters=50,
                 progress=true,exception=true)
-    (;prob,state,controller,tspan,restart,totalstep) = intor
+    (;prob,controller,tspan,restart,totalstep) = intor
     (;bot,dynfuncs) = prob
     (;traj,contacts_traj) = bot
-    # @unpack t,q,q̇,tprev,qprev,q̇prev = state
     F!, Jac_F!, prepare_contacts! = dynfuncs
     (;cache) = solvercache
     (;M,Φ,A,Ψ,B,∂Ψ∂q,∂Aᵀλ∂q,∂Bᵀμ∂q) = cache
