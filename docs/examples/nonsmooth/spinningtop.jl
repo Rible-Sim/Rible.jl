@@ -165,48 +165,6 @@ r1v5[3,:] |> scatter
 
 r1p5 = get_trajectory!(top,1,5)
 r1p5[3,:] |> scatter
-function plotsave_energy(bot,figname=nothing)
-	(;traj) = bot
-	(;t) = traj
-	tmin,tmax = t[begin], t[end]
-	titles = [
-		"机械能",
-		"动能",
-		"势能"
-	]
-	with_theme(theme_pub; resolution = (0.9tw,0.6tw)) do
-		ME = TR.mechanical_energy!(bot;gravity=true)
-		fig = Figure()
-		axs = [
-			begin
-				ax = Axis(
-					fig[i,1],
-					xlabel=L"t~\mathrm{(s)}",
-					ylabel="Energy (J)",
-					title=titles[i]
-				)
-				xlims!(ax,tmin,tmax)
-				# ylims!(ax,,)
-				if i !== 3
-					ax.xlabelvisible = false
-					ax.xticklabelsvisible = false
-				end
-				Label(fig[i,1,TopLeft()], "($(alphabet[i]))")
-				ax
-			end
-			for i = 1:3
-		]
-
-		lines!(axs[1], t, ME.E)
-		lines!(axs[2], t, ME.T)
-		lines!(axs[3], t, ME.V)
-
-
-		savefig(fig,figname)
-
-		fig
-	end
-end
 GM.activate!(); plotsave_energy(top)
 CM.activate!(); plotsave_energy(top,"spinningtop_energy")
 
@@ -341,79 +299,6 @@ tops_e0 = [
 	for μ in μs
 ]
 
-function plotsave_friction_direction(bots,x,xs,figname=nothing)
-	with_theme(theme_pub;
-		resolution = (0.9tw,0.4tw)
-	) do
-		fig = Figure()
-
-		for (botid,bot) in enumerate(bots)
-			ax1 = Axis(fig[botid,1],
-						xlabel=tlabel,
-						ylabel=L"\delta\alpha~(\mathrm{Rad})",
-						title=latexstring("$x=$(xs[botid])")
-				)
-			ax2 = Axis(fig[botid,2],
-						xlabel=tlabel,
-						ylabel=L"\delta\theta~(\mathrm{Rad})",
-						title=latexstring("$x=$(xs[botid])")
-				)
-			Label(fig[botid,1,TopLeft()],"($(alphabet[2botid-1]))")
-			Label(fig[botid,2,TopLeft()],"($(alphabet[2botid]))")
-			(;t) = bot.traj
-			contacts_traj_voa = VectorOfArray(bot.contacts_traj)
-			c1s = contacts_traj_voa[1,:]
-			idx_sli = findall(c1s) do c
-						issliding(c;vtol=1e-5)
-					end
-			idx_imp = findall(isimpact,c1s) ∩ idx_sli
-			δα_imp = map(c1s[idx_imp]) do c
-						get_contact_angle(c)
-					end
-			idx_per = findall(doespersist,c1s) ∩ idx_sli
-			δα_per = map(c1s[idx_per]) do c
-						get_contact_angle(c)
-					end
-			mo = 8
-			scaling = 10.0^(-mo)
-			Label(fig[botid,1,Top()],latexstring("\\times 10^{-$(mo)}"))
-			markersize = fontsize
-			scatter!(ax1,t[idx_per],δα_per./scaling;
-						marker=:diamond, markersize)
-			scatter!(ax1,t[idx_imp],δα_imp./scaling;
-						marker=:xcross, markersize)
-			ylims!(ax1,-1.0,1.0)
-			xlims!(ax1,extrema(t)...)
-
-			θ_imp = map(c1s[idx_imp]) do c
-					get_friction_direction(c)
-				end
-			θ_per = map(c1s[idx_per]) do c
-					get_friction_direction(c)
-				end
-			mo = 8
-			scaling = 10.0^(-mo)
-			Label(fig[botid,2,Top()],latexstring("\\times 10^{-$(mo)}"))
-			scatter!(ax2,t[idx_per],(θ_per.-π/4)./scaling, label="Persistent";
-						marker=:diamond, markersize)
-			scatter!(ax2,t[idx_imp],(θ_imp.-π/4)./scaling, label="Impact";
-						marker=:xcross, markersize)
-			xlims!(ax2,extrema(t)...)
-			ylims!(ax2,-1.0,1.0)
-			if botid !== length(bots)
-				hidex(ax1)
-				hidex(ax2)
-			else
-				Legend(fig[length(bots)+1,:],ax2;
-					orientation=:horizontal
-				)
-			end
-		end
-		rowgap!(fig.layout,fontsize/2)
-		savefig(fig,figname)
-		fig
-	end
-end
 δα = map(tops[6].contacts_traj) do c
 		get_contact_angle(c[1])
 	end |> skipmissing |> collect |> scatter
@@ -638,43 +523,6 @@ tops_dt_v = [
 	for dt in dts
 ]
 
-function plotsave_error(mbots,figname=nothing)
-	with_theme(theme_pub;
-			resolution = (0.8tw,0.3tw),
-		) do
-		fig = Figure()
-		for j = 1:2
-			bots = mbots[:,j]
-			nbots = length(bots)
-			itp = interpolate(get_trajectory!(bots[nbots],1,0)[1,:], BSpline(Linear()))
-			ref_traj = scale(itp,0:dts[nbots]:2.0)
-			# ref_traj(0:0.1:2)
-			err_avg = [
-				get_trajectory!(bots[i],1,0)[1,begin:end-1].-ref_traj(bots[i].traj.t[begin:end-1]) .|> abs |> mean
-				for (i,dt) in enumerate(dts[1:nbots-1])
-			]
-
-			ax = Axis(fig[1,j];
-				xlabel = L"h",
-				ylabel = "Avg. Err.",
-				yscale = Makie.log10,yminorticksvisible = true, yminorgridvisible = true,yminorticks = IntervalsBetween(8),
-				xscale = Makie.log10,xminorticksvisible = true, xminorgridvisible = true,xminorticks = IntervalsBetween(8),
-				)
-			Label(fig[1,j,TopLeft()],"($(alphabet[j]))")
-			scatterlines!(ax,dts[1:nbots-1],err_avg;marker=:rect,color=:red,label="Error of NMSI")
-			lines!(ax,dts[1:nbots-1],err_avg[1].*100 .*dts[1:nbots-1].^2,label="2nd-Order")
-			lines!(ax,dts[1:nbots-1],err_avg[1].*10  .*dts[1:nbots-1],label="1st-Order")
-			ylims!(ax,1e-11,1e-2)
-			if j == 1
-				axislegend(ax;position=:rb)
-			else
-				hidey(ax)
-			end
-		end
-		savefig(fig,figname)
-		fig
-	end
-end
 
 GM.activate!(); plotsave_error(hcat(tops_dt,tops_dt_v))
 CM.activate!(); plotsave_error(hcat(tops_dt,tops_dt_v),"top_err")

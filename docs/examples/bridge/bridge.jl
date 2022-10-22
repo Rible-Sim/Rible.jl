@@ -35,7 +35,7 @@ function make_strut(id,ri,rj;ci = Vector{Int}())
 	ω = zero(ro)
 	lncs,q0,q̇0 = TR.NaturalCoordinates.NC3D2P(ri,rj,ro,R,ṙo,ω)
 	state = TR.RigidBodyState(prop,lncs,ro,R,ṙo,ω,ci)
-	strutmesh = ep2mesh(r̄p1,r̄p2)
+	strutmesh = endpoints2mesh(r̄p1,r̄p2)
 	rb = TR.RigidBody(prop,state,strutmesh)
 end
 

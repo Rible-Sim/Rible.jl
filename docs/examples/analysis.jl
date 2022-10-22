@@ -255,6 +255,7 @@ function check_Coulomb(it,contact;tol=1e-3,report=false)
 		δα = (abs(Meshes.∠(vₜ_dir,Λₜ_dir)) - π) |> abs
 		if vₙ > tol
 			@info "Taking-off"
+			@show δα, δΛ
 		elseif vₙ > -tol && vₜ > tol
 			@info "Sliding"
 			@show δα, δΛ

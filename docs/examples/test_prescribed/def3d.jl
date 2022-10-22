@@ -37,10 +37,12 @@ function make_3d_bar(id,ri,rj;ci = Vector{Int}())
 	rb
 end
 
-function make_3d_tri(id,r̄ps,ro,R,ri,rj=nothing,rk=nothing,rl=nothing;)
-	movable = true
-	constrained = false
-	ci = Vector{Int}()
+function make_3d_tri(id,r̄ps,ro,R,ri,rj=nothing,rk=nothing,rl=nothing;
+		movable = true,
+		constrained = false,
+		ci = Int[],
+		Φi = collect(1:6),
+	)
 	# uci = collect(1:6)
 	m = 0.2999233976
 	Īg = SMatrix{3,3}(
@@ -67,8 +69,18 @@ function make_3d_tri(id,r̄ps,ro,R,ri,rj=nothing,rk=nothing,rl=nothing;)
 	end
 	# cf = TR.NaturalCoordinates.CoordinateFunctions(lncs,q0,ci,uci)
 	# @show typeof(lncs)
-	state = TR.RigidBodyState(prop,lncs,ro,R,ṙo,ω,ci)
-	rb = TR.RigidBody(prop,state)
+	long = 32
+	trimesh = GeometryBasics.merge(
+		[
+			endpoints2mesh(r̄ps[i],r̄ps[j];long)
+			for (i,j) in [
+				[1,2],[1,3],[1,4],
+				[2,3],[3,4],[4,2]
+			]
+		]
+	)
+	state = TR.RigidBodyState(prop,lncs,ro,R,ṙo,ω,ci,Φi)
+	rb = TR.RigidBody(prop,state,trimesh)
 end
 
 function tower3d(;k=500.0,k1=1000.0,c=0.0,
@@ -272,18 +284,13 @@ function get_linesegs_cables(tg)
 	linesegs_noslack_cables, linesegs_slack_cables
 end
 
-function get_linesegs_bars(tg)
+function get_linesegs_tets(tg)
 	ndim = TR.get_ndim(tg)
 	T = TR.get_numbertype(tg)
 	rbs = TR.get_rigidbodies(tg)
 	linesegs = Vector{Pair{Point{ndim,T},Point{ndim,T}}}()
 	for rb in rbs
 		if rb.state.cache.funcs.lncs isa TR.NaturalCoordinates.LNC3D2P
-			push!(
-				linesegs,
-				Point(rb.state.rps[1]) => Point(rb.state.rps[2]),
-			)
-		elseif rb.state.cache.funcs.lncs isa TR.NaturalCoordinates.LNCMP
 		else
 			# @show typeof(rb.state.cache.funcs.lncs)
 			append!(
@@ -301,11 +308,25 @@ function get_linesegs_bars(tg)
 	end
 	linesegs
 end
+function get_linesegs_bars(tg)
+	ndim = TR.get_ndim(tg)
+	T = TR.get_numbertype(tg)
+	rbs = TR.get_rigidbars(tg)
+	linesegs = Vector{Pair{Point{ndim,T},Point{ndim,T}}}()
+	for rb in rbs
+		push!(
+			linesegs,
+			Point(rb.state.rps[1]) => Point(rb.state.rps[2]),
+		)
+	end
+	linesegs
+end
 
 function plot_tower3d!(ax,
 					tg::TR.TensegrityStructure;
 					cablecolor = :dodgerblue,
 					barcolor = :darkred,
+					tetcolor = :darkorchid4,
 					markercolor = :darkblue,
 					markit = false,
 					textsize = 10)
@@ -315,11 +336,21 @@ function plot_tower3d!(ax,
     linesegments!(ax, linesegs_slack_cables, color = cablecolor, linewidth = cablewidth, linestyle = :dash)
 
 	linesegs_bars = get_linesegs_bars(tg)
+	linesegs_tets = get_linesegs_tets(tg)
 	linesegments!(ax, linesegs_bars, color = barcolor, linewidth = barwidth)
+	linesegments!(ax, linesegs_tets, color = tetcolor, linewidth = barwidth)
 
 	rbs = TR.get_rigidbodies(tg)
 	if markit
-		meshscatter!(ax,[rbs[end].state.rg], color = markercolor, markersize = 0.008)
+		for rbid in 7:10
+		# for rbid in [10]
+			if rbid in 7:8
+				pid = 4
+			else
+				pid = 3
+			end
+			meshscatter!(ax,[rbs[rbid].state.rps[pid]], color = markercolor, markersize = 0.008)
+		end
 	end
 
 	xlims!(ax,-0.125,0.125)
@@ -511,4 +542,194 @@ function plot_compose_tower3d(bot0,bot1;
 	end
 	colgap!(fig.layout,2fontsize)
 	fig
+end
+
+function class1(;
+		k=500.0,c=0.0,
+		d = 0.1*√2/2, r2 = 0.11,
+		ijkl=1,
+		R1 = RotX(0),
+		)
+	r1 = 0.1
+	b = 0.22
+	h = 0.1*√2/2
+	γ = acos((d^2+r1^2+r2^2-b^2)/(2r1*r2))
+	θ =  γ - 2π/3
+	@show rad2deg.([γ,θ])
+	deg120 = deg2rad(120)
+	r̄pss = [
+		SVector{3}.([
+		       [           0,           0, 1.5h],
+		    r.*[           1,           0,  0],
+		    r.*[cos( deg120), sin( deg120), 0],
+		    r.*[cos(-deg120), sin(-deg120), 0]
+		])
+		for r in [r1,r1]
+	]
+	r̄ps = r̄pss[1]
+
+	ro_by_rbid = [
+		SVector(0.0,0.0,0.0),
+		SVector(0.0,0.0,1.0h)
+	]
+	R_by_rbid = [
+		SMatrix(RotZ(0.0)),
+		SMatrix(R1),
+	]
+	rirjrkrl_by_rbid = [
+		Ref(ro_by_rbid[i]) .+ Ref(R_by_rbid[i]).*r̄pss[i] for i = 1:2
+	]
+	
+	cycle3 = [2,3,4,2]
+	rb1 = make_3d_tri(1,r̄ps,ro_by_rbid[1],R_by_rbid[1],rirjrkrl_by_rbid[1][1];			
+		constrained = true,
+		ci = collect(1:12),
+		Φi = Int[]
+	)
+
+	rb2 = make_3d_tri(2,r̄ps,ro_by_rbid[2],R_by_rbid[2],rirjrkrl_by_rbid[2][1:ijkl]...)
+
+	rbs = TypeSortedCollection([rb1,rb2])
+	numberedpoints = TR.number(rbs)
+	# matrix_sharing = [
+	# ]
+	# indexedcoords = TR.index(rbs,matrix_sharing)
+	indexedcoords = TR.index(rbs)
+	# #
+	ncables = 6
+	restlen = 0.01
+    restlens = fill(restlen,ncables)
+    ks = fill(k,ncables)
+    cs = fill(c,ncables)
+    cables = [TR.Cable3D(i,restlens[i],ks[i],cs[i];slack=true) for i = 1:ncables]
+    acs = [TR.ManualActuator(1,collect(1:ncables),restlens[1:ncables])]
+    tensiles = (cables = cables,)
+    hub = (actuators = acs,)
+	cnt_matrix_cables = [
+		# Outer
+		2 -2;
+		3 -3;
+		4 -4;
+		# Inner
+		-1 2;
+		-1 3;
+		-1 4;
+	]
+	connected = TR.connect(rbs,cnt_matrix_cables)
+	#
+    cnt = TR.Connectivity(numberedpoints,indexedcoords,@eponymtuple(connected,))
+
+    tg = TR.TensegrityStructure(rbs,tensiles,cnt)
+    TR.TensegrityRobot(tg,hub)
+end
+
+function spine3d(n;
+		c=0.0,
+		RR=RotX(0.0)
+	)
+    nbp = 4*n
+
+    a = 0.04 #m
+    h = 0.04 #m
+    θ = π/4
+
+    mass = 0.1 #kg
+    #inertia = Matrix(Diagonal([45.174,45.174,25.787]))*1e-8 # N/m^2
+    inertia = Matrix(Diagonal([45.174,45.174,25.787]))*1e-2
+    r̄g = [0.0, 0.0, 0.0]
+
+    ap_x = cos(θ)*a
+    ap_y = sin(θ)*a
+    ap5 = SVector{3}([  0.0,   0.0,   0.0])
+    ap4 = SVector{3}([  0.0,  ap_x,  ap_y])
+    ap3 = SVector{3}([  0.0, -ap_y,  ap_y])
+    ap2 = SVector{3}([ ap_x,   0.0, -ap_y])
+    ap1 = SVector{3}([-ap_x,   0.0, -ap_y])
+    aps = [ap1,ap2,ap3,ap4,ap5]
+
+    movable = ones(Bool,n)
+    movable[1] = false
+    constrained = zeros(Bool,n)
+    constrained[1] = true
+
+    props = [TR.RigidBodyProperty(i,movable[i],mass,
+                SMatrix{3,3}(inertia),
+                SVector{3}(r̄g),
+                aps;constrained=constrained[i]) for i = 1:n]
+
+    rs = [[0.0,0.0,i*h] for i = 0:n-1]
+    Rs = [Matrix(RR)^i for i = 0:n-1]
+    ṙs = [zeros(3) for i = 0:n-1]
+    ωs = [zeros(3) for i = 0:n-1]
+
+    function rigidbody(i,prop,aps,r,R,ṙ,ω)
+        if i == 1
+            ci = collect(1:12)
+            Φi = Int[]
+        else
+            ci = Int[]
+			Φi = collect(1:6)
+        end
+
+        # ri,rj,rk,rl = [r+R*ap for ap in aps]
+        # lncs,q,q̇ = TR.NaturalCoordinates.NC4P(ri,rj,rk,rl,r,R,ṙ,ω)
+        # lncs,q,q̇ = TR.NaturalCoordinates.NC3P1V(ri,rk,rl,r,R,ṙ,ω)
+        # lncs,q,q̇ = TR.NaturalCoordinates.NC2P2V(rk,rl,r,R,ṙ,ω)
+        lncs,_ = TR.NaturalCoordinates.NC1P3V(r,r,R,ṙ,ω)
+        state = TR.RigidBodyState(prop,lncs,r,R,ṙ,ω,ci,Φi)
+		long = 24
+		vertmesh = merge([
+			endpoints2mesh(aps[i],aps[5];long)
+			for i in 1:4
+		])
+        rb = TR.RigidBody(prop,state,vertmesh)
+    end
+    rbs = [rigidbody(i,props[i],aps,rs[i],Rs[i],ṙs[i],ωs[i]) for i = 1:n]
+	rigdibodies = TypeSortedCollection(rbs)
+    numberedpoints = TR.number(rigdibodies)
+	indexedcoords = TR.index(rigdibodies)
+
+    ncables = 8*(n-1)
+    cablelenH = 0.6h
+    cablelenR = 0.04
+    cablelens = repeat(vcat(fill(cablelenH,4),fill(cablelenR,4)),n-1)
+    kH = 400e1
+    kR = 400e1
+    ks = repeat(vcat(fill(kH,4),fill(kR,4)),n-1)
+    # c = 0.0
+    cs = repeat(fill(c,8),n-1)
+    cables = [TR.Cable3D(i,cablelens[i],ks[i],cs[i]) for i = 1:ncables]
+    tensiles = (cables=cables,)	
+    acs = [TR.ManualActuator(1,collect(1:ncables),cablelens[1:ncables])]
+    hub = (actuators=acs,)
+
+	matrix_cnt_raw = Vector{Matrix{Int}}()
+    for i = 2:n
+        s = zeros(Int,8, n)
+		for j = 1:4
+        	s[j,   i-1] = j;  s[j, i] = -j
+        end
+		s[5, i-1] = 3;  s[5, i] = -1
+		s[6, i-1] = 4;  s[6, i] = -1
+		s[7, i-1] = 3;  s[7, i] = -2
+		s[8, i-1] = 4;  s[8, i] = -2
+
+		# s = zeros(Int,6, n)
+		# for j = 1:2
+        # 	s[j,   i-1] = j+2;  s[j, i] = -(j+2)
+        # end
+		# s[3, i-1] = 3;  s[3, i] = -1
+		# s[4, i-1] = 4;  s[4, i] = -1
+		# s[5, i-1] = 3;  s[5, i] = -2
+		# s[6, i-1] = 4;  s[6, i] = -2
+
+        push!(matrix_cnt_raw, s)
+    end
+    matrix_cnt = reduce(vcat, matrix_cnt_raw)
+	# display(matrix_cnt)
+    connected = TR.connect(rigdibodies, matrix_cnt)
+	tensioned = @eponymtuple(connected,)
+    cnt = TR.Connectivity(numberedpoints, indexedcoords, tensioned)
+    tg = TR.TensegrityStructure(rigdibodies,tensiles,cnt)
+    bot = TR.TensegrityRobot(tg,hub)
 end

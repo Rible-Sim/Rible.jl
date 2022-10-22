@@ -11,6 +11,8 @@ import DifferentialEquations as DE
 using BenchmarkTools
 using RecursiveArrayTools
 using Interpolations
+# using CubicSplines
+# import FLOWMath
 using Makie
 import GLMakie as GM
 import CairoMakie as CM
@@ -32,27 +34,32 @@ import TensegrityRobots as TR
 cd("examples/test_prescribed")
 includet("../vis.jl")
 includet("../analysis.jl")
+includet("../dyn.jl")
 includet("dyn.jl")
 includet("def.jl")
 includet("def3d.jl")
-# includet("bridge.jl")
-# texroot = raw"D:"
-texroot = raw"C:\Users\luo22"
-const figdir=raw"C:\Users\luo22\OneDrive\Papers\Ph.D.Thesis\dyn"
+# figdir::String = raw"C:\Users\luo22\OneDrive\Papers\DynamicTensegrity\CS"
+figdir::String =raw"C:\Users\luo22\OneDrive\Papers\Ph.D.Thesis\dyn"
+
 fontsize = 8 |> pt2px
 markersize = fontsize
 linewidth = 0.5 |> pt2px
 cablewidth = 0.75 |> pt2px
 barwidth = 1.5 |> pt2px
-columnwidth = 252 |> pt2px
-testwidth = 522 |> pt2px
+cw = 252 |> pt2px
+tw = 522 |> pt2px
+
+# fontsize = 10 |> pt2px
+# cw = lw = tw = 455.24411 |> pt2px
+
 # set_theme!(;font = "Nimbus Rom No9 L", fontsize)
 my_theme = Theme(;
     font = "CMU Serif",
     fontsize,
     markersize,
     resolution = (0.9tw,0.5tw),
-    figure_padding = (fontsize,fontsize,fontsize,fontsize),
+    # figure_padding = (fontsize,fontsize,fontsize,fontsize),
+    figure_padding = (fontsize/2,fontsize/2,fontsize/2,fontsize/2),
     Lines = (
         linewidth = linewidth,
     ),
@@ -231,10 +238,11 @@ adams_frequency = parse_Adams_frequency("./tower2d_frequency_3.xml")
 function plot_frequency_comparison(ref_frequency,bot_frequency,figname=nothing)
     frequency_rel_err = abs.(tower2d_frequency.-adams_frequency)./tower2d_frequency
     @show frequency_rel_err, frequency_rel_err |> maximum
-    fig_width = columnwidth
-    fig_height = 0.4columnwidth
+    # fig_width = cw
+    # fig_height = 0.4cw
     with_theme(my_theme;
-            resolution=(0.6tw,0.3tw),
+            # resolution=(0.6tw,0.3tw),
+            resolution=(cw,0.4cw),
             palette = (color = [:black,:red],),
             cycle = [[:linecolor, :markercolor] => :color,],
         ) do
@@ -245,8 +253,9 @@ function plot_frequency_comparison(ref_frequency,bot_frequency,figname=nothing)
         ylims!(ax1,0,30)
         ax1.yticks = collect(0:5:30)
         # ax1.xlabelpadding = -15
-        axislegend(ax1;position=:lt)
-        # colsize!(fig.layout,1,Fixed(0.6columnwidth))
+        # axislegend(ax1;position=:lt)
+        fig[1,2] = Legend(fig,ax1)
+        colsize!(fig.layout,1,Fixed(0.6cw))
         savefig(fig,figname)
         fig
     end
@@ -261,11 +270,10 @@ function plot_tower2d_mode_shape(bot,figname=nothing)
     (;q,t) = traj
     shapes = q
     frequencies = t[begin+1:end]./2pi
-    fig_width = 0.8testwidth
-    fig_height = 0.5columnwidth
     # @sprintf "Mode %s \n %.4f (Hz)"  1  tower2d_frequency[1]
     with_theme(my_theme;
-            resolution=(tw,0.3tw),
+            # resolution=(tw,0.3tw),
+            resolution=(0.8tw,0.5cw),
             Axis = (
                 titlefont = "CMU Serif",
             )
@@ -341,16 +349,16 @@ adams_ratio = [
 ]
 
 function plot_frequency_varying_restlengths(figname=nothing)
-    fig_width = columnwidth
-    fig_height = 0.5columnwidth
     cg = cgrad(:Dark2_6, 6, categorical = true)[[1,2,3,4,6]]
     mk = ['⨉','○','◇','✳','◻']
     with_theme(my_theme;
+            # resolution=(0.7tw,0.4tw),
+            resolution=(cw,0.5cw),
             palette = (color = cg, marker = mk),
             Lines = (cycle = [:color],),
             Scatter = (cycle = Cycle([:color, :marker, :strokecolor=>:color],covary=true),),
         ) do
-        fig = Figure(;resolution=(0.7tw,0.4tw))
+        fig = Figure(;)
         ax1 = Axis(fig[1,1];
                 ylabel = L"\mathrm{Frequency}~(\mathrm{Hz})",
                 xlabel = L"\alpha~\mathrm{and}~\beta",
@@ -454,10 +462,66 @@ f = TR.get_cables_tension(tower2dbot_undamped_slack)
 l = TR.get_cables_len(tower2dbot_undamped_slack)
 μ = TR.get_cables_restlen(tower2dbot_undamped_slack)
 k = TR.get_cables_stiffness(tower2dbot_undamped_slack)
-approx_slack(;k=k[1],μ=μ[1],l0=l[1],filename="xy1")
-approx_slack(;k=k[3],μ=μ[3],l0=l[3],filename="xy2")
-approx_slack(;k=k[5],μ=μ[5],l0=l[5],filename="xy3")
-approx_slack(;k=k[11],μ=μ[11],l0=l[11],filename="xy4")
+x1,y1 = approx_slack(;k=k[1],μ=μ[1],l0=l[1],filename="xy1")
+x2,y2 = approx_slack(;k=k[3],μ=μ[3],l0=l[3],filename="xy2")
+x3,y3 = approx_slack(;k=k[5],μ=μ[5],l0=l[5],filename="xy3")
+x4,y4 = approx_slack(;k=k[11],μ=μ[11],l0=l[11],filename="xy4")
+
+x0,y0 = approx_slack(;k=100.0,μ=0.0,l0=0.0)
+function plot_data_points(x,y,figname=nothing)
+    with_theme(my_theme;
+        resolution = (cw,0.8cw),
+        Scatter = (
+            marker=:xcross,
+        )
+    ) do
+        fig = Figure(;)
+        ax1 = Axis(fig[1,1],
+            xlabel = L"\Delta l_j~(\mathrm{m})",
+            ylabel = L"f_j~(\mathrm{N})",
+        )
+        ax2 = Axis(fig[2,1],
+            # xlabel = L"l_j-\mu_j",
+            # ylabel = L"f_j",
+            tellwidth = false,
+            tellheight = false,
+            width = 0.225cw,
+            height = 0.16cw,
+            xlabelsize = 5 |> pt2px,
+            ylabelsize = 5 |> pt2px,
+            xticklabelsize = 5 |> pt2px,
+            yticklabelsize = 5 |> pt2px,
+
+        )
+        lines!(ax1, x, y; label = "ideal curve")
+        scatter!(ax1, x, y; markersize = fontsize*0.8, color = :red, label = "data points")
+        ylims!(ax1,-0.5,10.5)
+        lines!(ax2, x, y, )
+        scatter!(ax2, x, y; markersize = fontsize*0.6, color = :red,)
+        xlims!(ax2, -0.002, 0.002)
+        ylims!(ax2,-0.02,0.20)
+        fig[1,2] = Legend(fig,ax1;)
+        savefig(fig,figname)
+        fig
+    end
+end
+
+GM.activate!(); plot_data_points(x0,y0)
+CM.activate!(); plot_data_points(x0,y0,"f_curve")
+
+dy1 = map(xs1) do x
+    CubicSplines.gradient(spline1, x, 1)
+end
+lines(xs1,dy1)
+
+spline1 = FLOWMath.Akima(x1, y1)
+ys1 = spline1(xs1)
+lines(xs1, ys1)
+scatter!(x1,y1)
+dydx1 = FLOWMath.gradient(spline1, xs1)
+lines(xs1, dydx1)
+
+scatter(x1,y1)
 TR.solve!(TR.SimProblem(tower2dbot_undamped_slack,(x)->dynfuncs(x;gravity=true)),
           TR.Zhong06(),
           (
@@ -783,12 +847,12 @@ print(TexTables.to_tex(table_μ))
 
 fig_decompose_tower3d = plot_decompose_tower3d(tower3dbot0,tower3dbot1)
 GM.activate!()
-CM.activate!(type="pdf")
+CM.activate!()
 CM.save(texroot*raw"\OneDrive - 中山大学\Papers\DynamicTensegrity\CS\images\decompose_tower3d.pdf", fig_decompose_tower3d)
 
 fig_compose_tower3d = plot_compose_tower3d(tower3dbot0,tower3dbot1)
 GM.activate!()
-CM.activate!(type="pdf")
+CM.activate!()
 CM.save(texroot*raw"\OneDrive - 中山大学\Papers\DynamicTensegrity\CS\images\compose_tower3d.pdf", fig_compose_tower3d)
 
 
@@ -810,7 +874,7 @@ end
 
 fig_rest_lengths = plot_rest_lengths([tower3dbot0,tower3dbot1])
 GM.activate!()
-CM.activate!(type="pdf")
+CM.activate!()
 CM.save(texroot*raw"\OneDrive - 中山大学\Papers\DynamicTensegrity\CS\images\rest_lengths.pdf", fig_rest_lengths)
 
 function plot_first_frequencies(bots,figname=nothing)
@@ -818,15 +882,14 @@ function plot_first_frequencies(bots,figname=nothing)
     frqs = [bot.traj.t[begin+1:end]./(2π) for bot in bots]
     @show frqs[1][1], frqs[2][1]
     unqfrqs = [(round.(frq;sigdigits=4)|> unique)[1:n] for frq in frqs]
-    fig_width = columnwidth
-    fig_height = 0.5columnwidth
     # cg = cgrad(:Dark2_6, 6, categorical = true)[[4,3,6]]
     # set_theme!(my_theme;
     #         palette = (color = cg, ),
     #         Lines = (cycle = [:color],),
     # )
     with_theme(my_theme;
-            resolution = (0.7tw,0.3tw),
+            # resolution = (0.7tw,0.3tw),
+            resolution = (cw,0.5cw),
         ) do
         fig = Figure(;)
         ax1 = Axis(fig[1,1]; xlabel = L"\mathrm{Mode~(Exclude~duplicates)}", ylabel = L"\mathrm{Frequency}~(\mathrm{Hz})")
@@ -835,8 +898,9 @@ function plot_first_frequencies(bots,figname=nothing)
         ax1.yticks = collect(0:15)
         ax1.xticks = collect(1:n)
         # ax1.xlabelpadding = -15
-        # colsize!(fig.layout,1,Fixed(0.6columnwidth))
-        axislegend(ax1; position = :lt,)
+        # axislegend(ax1; position = :lt,)
+        fig[1,2] = Legend(fig,ax1)
+        colsize!(fig.layout,1,Fixed(0.6cw))
         savefig(fig,figname)
     end
 end
@@ -868,11 +932,11 @@ TR.solve!(TR.SimProblem(tower3dbot1_nodpl,(x)->dynfuncs(x;gravity=true)),
 plot_traj!(tower3dbot1_nodpl)
 
 function plot_tower3d_seis_traj(bots,figname=nothing)
-    fig_width = 1columnwidth
-    fig_height = 0.7columnwidth
     cg = cgrad(:seaborn_bright6, 6, categorical = true)
     with_theme(my_theme;
-            resolution=(0.9tw,0.4tw),
+            # resolution=(0.9tw,0.4tw),
+            resolution=(tw,0.7cw),
+            figure_padding = (fontsize,fontsize,0,0),
             palette = (color = cg, ),
             Lines = (cycle = [:color],linewidth=2),
         ) do
@@ -880,39 +944,47 @@ function plot_tower3d_seis_traj(bots,figname=nothing)
         for i = 1:2
             bot = bots[i]
             (;t) = bot.traj
-            ax1 = Makie.Axis(fig[i,1];xlabel=L"t~(\mathrm{s})",ylabel=L"x~(\mathrm{m})")
-            ax2 = Makie.Axis(fig[i,2];xlabel=L"t~(\mathrm{s})",ylabel=L"z~(\mathrm{m})")
-            scalings = [-2,-1]
-            rb7rg = get_trajectory!(bot,7,0)
-            rb8rg = get_trajectory!(bot,8,0)
-            rb9rg = get_trajectory!(bot,9,0)
-            rb10rg = get_trajectory!(bot,10,0)
-            lines!(ax1,t,rb7rg[1,:]./10.0^scalings[1];linewidth)
-            lines!(ax1,t,rb8rg[1,:]./10.0^scalings[1];linewidth)
-            lines!(ax1,t,rb9rg[1,:]./10.0^scalings[1];linewidth)
-            lines!(ax1,t,rb10rg[1,:]./10.0^scalings[1];linewidth)
+            ax1 = Makie.Axis(fig[i,1];xlabel=L"t~(\mathrm{s})",ylabel=L"\Delta x~(\mathrm{m})")
+            ax2 = Makie.Axis(fig[i,2];xlabel=L"t~(\mathrm{s})",ylabel=L"\Delta y~(\mathrm{m})")
+            ax3 = Makie.Axis(fig[i,3];xlabel=L"t~(\mathrm{s})",ylabel=L"\Delta z~(\mathrm{m})")
+            scalings = [-2,-3,-3]
+            rb7r4 = get_trajectory!(bot,7,4)
+            rb8r4 = get_trajectory!(bot,8,4)
+            rb9r3 = get_trajectory!(bot,9,3)
+            rb10r3 = get_trajectory!(bot,10,3)
+            lines!(ax1,t,(rb7r4[1,:].-rb7r4[1,1])./10.0^scalings[1];label=L"\mathbf{r}_{7,1}")
+            lines!(ax1,t,(rb8r4[1,:].-rb8r4[1,1])./10.0^scalings[1];label=L"\mathbf{r}_{8,1}")
+            lines!(ax1,t,(rb9r3[1,:].-rb9r3[1,1])./10.0^scalings[1];label=L"\mathbf{r}_{9,1}")
+            lines!(ax1,t,(rb10r3[1,:].-rb10r3[1,1])./10.0^scalings[1];label=L"\mathbf{r}_{10,1}")
             ylims!(ax1,-5,5)
             ax1.yticks = collect(-5:2.5:5)
-            lines!(ax2,t,rb7rg[3,:]./10.0^scalings[2];linewidth,label=L"\mathbf{r}_{7,g}")
-            lines!(ax2,t,rb8rg[3,:]./10.0^scalings[2];linewidth,label=L"\mathbf{r}_{8,g}")
-            lines!(ax2,t,rb9rg[3,:]./10.0^scalings[2];linewidth,label=L"\mathbf{r}_{9,g}")
-            lines!(ax2,t,rb10rg[3,:]./10.0^scalings[2];linewidth,label=L"\mathbf{r}_{10,g}")
-            ylims!(ax2,1,5)
+
+            lines!(ax2,t,(rb7r4[2,:].-rb7r4[2,1])./10.0^scalings[2];)
+            lines!(ax2,t,(rb8r4[2,:].-rb8r4[2,1])./10.0^scalings[2];)
+            lines!(ax2,t,(rb9r3[2,:].-rb9r3[2,1])./10.0^scalings[2];)
+            lines!(ax2,t,(rb10r3[2,:].-rb10r3[2,1])./10.0^scalings[2];)
+
+            lines!(ax3,t,(rb7r4[3,:].-rb7r4[3,1])./10.0^scalings[3];)
+            lines!(ax3,t,(rb8r4[3,:].-rb8r4[3,1])./10.0^scalings[3];)
+            lines!(ax3,t,(rb9r3[3,:].-rb9r3[3,1])./10.0^scalings[3];)
+            lines!(ax3,t,(rb10r3[3,:].-rb10r3[3,1])./10.0^scalings[3];)
+            @show rb10r3[3,1]
+            # ylims!(ax3,1,5)
 
             function set_ax!(ax)
                 # xlims!(ax,0,5)
-                ax.xlabelpadding = -15
+                # ax.xlabelpadding = -15
                 # ax.alignmode =  Mixed(;left = -20, right = 20)
                 if i == 1
-                    ax.xlabelvisible = false
-                    ax.xticklabelsvisible = false
+                    hidex(ax)
                 else
 
-                    axislegend(ax2;position=:rb,orientation=:horizontal,)
+                    axislegend(ax1;position=:rb,orientation=:horizontal,)
                 end
                 xlims!(ax,t[begin],t[end])
+                # xlims!(ax,0,10)
             end
-            foreach(set_ax!,[ax1,ax2])
+            foreach(set_ax!,[ax1,ax2,ax3])
             for (ilabel,label) in enumerate(scalings)
                 Label(fig.layout[i, ilabel, Top()], latexstring("×10^{$label}"),
                     # textsize = fontsize,
@@ -921,7 +993,7 @@ function plot_tower3d_seis_traj(bots,figname=nothing)
                     # halign = :left
                     )
             end
-            for (ilabel,label) in enumerate(alphabet[2(i-1)+1:2(i-1)+2])
+            for (ilabel,label) in enumerate(alphabet[3(i-1)+1:3(i-1)+3])
                 Label(fig.layout[i, ilabel, TopLeft()], "($label)",
                     # textsize = fontsize,
                     font = "CMU Serif Bold",
@@ -939,6 +1011,55 @@ end
 GM.activate!(); plot_tower3d_seis_traj([tower3dbot0_nodpl,tower3dbot1_nodpl])
 CM.activate!(); plot_tower3d_seis_traj([tower3dbot0_nodpl,tower3dbot1_nodpl],"tower3d_seis_traj")
 
+
+function plot_tower3d_vis_nodpl(bots,figname=nothing)
+    fig_width = 1cw
+    fig_height = 0.8cw
+    fig = Figure(;resolution=(fig_width,fig_height),figure_padding=(10,0,0,0))
+    dt = 1e-3
+    ts = [
+        [2.5],
+        [3.5]
+    ]
+    nbot = length(bots)
+    for i in 1:nbot
+        ax = Axis3(fig[1,i],aspect=:data,)
+        boti = bots[i]
+        TR.goto_step!(boti,1;)
+        plot_tower3d!(ax,boti.tg,cablecolor=:slategrey,barcolor=:slategrey,tetcolor=:slategrey)
+        for t in ts[i]
+            stepj = round(Int,t/dt)
+            TR.goto_step!(boti,stepj;)
+            # @show TR.get_cables_tension(boti)
+            plot_tower3d!(ax,boti.tg;markit = true)
+        end
+    end
+
+    for (ilabel,label) in enumerate(alphabet[1:nbot])
+        Label(fig.layout[1, ilabel, Bottom()],
+            "($label)",
+            textsize = fontsize,
+            font = "CMU Serif Bold",
+            padding = (-110, 0, 0, 80),
+            halign = :center,
+            valign = :top)
+    end
+    titles = ["initial","target"]
+    for (ilabel,label) in enumerate(alphabet[1:nbot])
+        Label(fig.layout[1, ilabel, Bottom()],
+            latexstring("\\mathrm{$(titles[ilabel])}"),
+            textsize = fontsize,
+            padding = (50, 0, 0, 90),
+            halign = :center,
+            valign = :top)
+    end
+    colgap!(fig.layout,0)
+    savefig(fig,figname)
+    fig
+end
+
+GM.activate!(); plot_tower3d_vis_nodpl([tower3dbot0_nodpl,tower3dbot1_nodpl])
+CM.activate!(); plot_tower3d_vis_nodpl([tower3dbot0_nodpl,tower3dbot1_nodpl], "tower3d_vis_nodpl")
 
 ## deploy
 Td = [5.0,10.0,15.0,20.0]
@@ -983,11 +1104,10 @@ plot_traj!(tower3d_seis_hi;actuate=true)
 me_series = TR.mechanical_energy!(tower3d_seis;actuate=true,gravity=true)
 lines(tower3d_seis.traj.t,me_series.E)
 function plot_tower3d_dpl_traj(bots,figname=nothing)
-    fig_width = testwidth
-    fig_height = 1.25columnwidth
     cg = cgrad(:seaborn_bright6, 6, categorical = true)
     with_theme(my_theme;
-            resolution = (tw,0.8tw),
+            # resolution = (tw,0.8tw),
+            resolution = (tw,1.25cw),
             palette = (color = cg, ),
             Lines = (cycle = [:color], linewidth = 2),
         ) do
@@ -997,75 +1117,86 @@ function plot_tower3d_dpl_traj(bots,figname=nothing)
         axs = [
             [
                 Makie.Axis(fig[i,1];xlabel=L"t~(\mathrm{s})",ylabel=L"x~(\mathrm{m})"),
-                Makie.Axis(fig[i,2];xlabel=L"t~(\mathrm{s})",ylabel=L"z~(\mathrm{m})")
+                Makie.Axis(fig[i,2];xlabel=L"t~(\mathrm{s})",ylabel=L"z~(\mathrm{m})"),
+                Makie.Axis(fig[i,3];xlabel=L"t~(\mathrm{s})",ylabel=L"\Delta z~(\mathrm{m})")
             ]
             for i = 1:4
         ]
-        scalings = [-1,-1]
+        scalings = [-1,-1,-2]
 
         for i = 1:4
             bot0, bot1, botlo, bothi = bots[i]
             at = ats[i]
             Td = Tds[i]
-            ax1,ax2 = axs[i]
+            ax1,ax2,ax3 = axs[i]
             t0 = bot0.traj.t
             step_collapse = findfirst((x)->x>=at,bot1.traj.t)
+            step_Td = findfirst((x)->x>=Td,bot1.traj.t)
+            step_Tdp1 = findfirst((x)->x>=Td+1,bot1.traj.t)
             tsteps = 1:step_collapse
             t1 = bot1.traj.t[tsteps]
             # bot0
-            bot0rb10rg = get_trajectory!(bot0,10,0)
+            bot0rb10r3 = get_trajectory!(bot0,10,3)
             # bot1
-            bot1rb10rg = get_trajectory!(bot1,10,0)
+            bot1rb10r3 = get_trajectory!(bot1,10,3)
             # botlo
-            botlorb10rg = get_trajectory!(botlo,10,0)
+            botlorb10r3 = get_trajectory!(botlo,10,3)
             # bothi
-            bothirb10rg = get_trajectory!(bothi,10,0)
+            bothirb10r3 = get_trajectory!(bothi,10,3)
 
             # x
-            lines!(ax1,t0,bot0rb10rg[1,:]./10.0^scalings[1];linewidth)
-            lines!(ax1,t0,botlorb10rg[1,:]./10.0^scalings[1];linewidth)
-            lines!(ax1,t1,bot1rb10rg[1,tsteps]./10.0^scalings[1];linewidth)
-            lines!(ax1,t0,bothirb10rg[1,:]./10.0^scalings[1];linewidth)
-            ylims!(ax1,-1.5,1.5)
+            lines!(ax1,t0,bot0rb10r3[1,:]./10.0^scalings[1];linewidth)
+            lines!(ax1,t0,botlorb10r3[1,:]./10.0^scalings[1];linewidth)
+            lines!(ax1,t1,bot1rb10r3[1,tsteps]./10.0^scalings[1];linewidth)
+            lines!(ax1,t0,bothirb10r3[1,:]./10.0^scalings[1];linewidth)
+            ylims!(ax1,0,2.0)
             # ax1.yticks = collect(-5:2.5:5)
             xlims!(ax1,t0[begin],t0[end])
 
             # # y
-            # lines!(ax2,t0,bot0rb10rg[2,:]./10.0^scalings[2];linewidth,label=L"\mathrm{Static~ground}")
-            # lines!(ax2,t0,botlorb10rg[2,:]./10.0^scalings[2];linewidth,label=L"\mathrm{Seismic~ground},~\nu = 0.2~(\mathrm{Hz})")
-            # lines!(ax2,t0,bothirb10rg[2,:]./10.0^scalings[2];linewidth,label=L"\mathrm{Seismic~ground},~\nu = 1.0~(\mathrm{Hz})")
-            # lines!(ax2,t1,bot1rb10rg[2,tsteps]./10.0^scalings[2];linewidth,label=L"\mathrm{Seismic~ground},~\nu = 0.5~(\mathrm{Hz})")
+            # lines!(ax2,t0,bot0rb10r3[2,:]./10.0^scalings[2];linewidth,label=L"\mathrm{Static~ground}")
+            # lines!(ax2,t0,botlorb10r3[2,:]./10.0^scalings[2];linewidth,label=L"\mathrm{Seismic~ground},~\nu = 0.2~(\mathrm{Hz})")
+            # lines!(ax2,t0,bothirb10r3[2,:]./10.0^scalings[2];linewidth,label=L"\mathrm{Seismic~ground},~\nu = 1.0~(\mathrm{Hz})")
+            # lines!(ax2,t1,bot1rb10r3[2,tsteps]./10.0^scalings[2];linewidth,label=L"\mathrm{Seismic~ground},~\nu = 0.5~(\mathrm{Hz})")
             # # ylims!(ax2,-0.5,7.5)
             # xlims!(ax2,t0[begin],t0[end])
             # ax2.yticks = collect(-1.0:1.0:7.5)
 
             # z
-            lines!(ax2,t0,bot0rb10rg[3,:]./10.0^scalings[2];linewidth,label=L"\mathrm{Static~ground}")
-            lines!(ax2,t0,botlorb10rg[3,:]./10.0^scalings[2];linewidth,label=L"\mathrm{Seismic~ground},~\nu = 0.2~(\mathrm{Hz})")
-            lines!(ax2,t1,bot1rb10rg[3,tsteps]./10.0^scalings[2];linewidth,label=L"\mathrm{Seismic~ground},~\nu = 0.5~(\mathrm{Hz})")
-            lines!(ax2,t0,bothirb10rg[3,:]./10.0^scalings[2];linewidth,label=L"\mathrm{Seismic~ground},~\nu = 1.0~(\mathrm{Hz})")
-            ylims!(ax2,3.2,5)
+            lines!(ax2,t0,bot0rb10r3[3,:]./10.0^scalings[2];linewidth,label=L"\mathrm{Static~ground}")
+            lines!(ax2,t0,botlorb10r3[3,:]./10.0^scalings[2];linewidth,label=L"\mathrm{Seismic~ground},~\nu = 0.2~(\mathrm{Hz})")
+            lines!(ax2,t1,bot1rb10r3[3,tsteps]./10.0^scalings[2];linewidth,label=L"\mathrm{Seismic~ground},~\nu = 0.5~(\mathrm{Hz})")
+            lines!(ax2,t0,bothirb10r3[3,:]./10.0^scalings[2];linewidth,label=L"\mathrm{Seismic~ground},~\nu = 1.0~(\mathrm{Hz})")
+            ylims!(ax2,3.5,5.5)
             xlims!(ax2,t0[begin],t0[end])
 
-            # xlims!(ax3,t0[begin],t0[end])
-
-            if i == 2
-                axislegend(ax2;position=:rb,orientation=:vertical,labelsize=pt2px(6.5))
+            rb10r3_z0 = 0.49497474683058335
+            lines!(ax3,t0,(bot0rb10r3[3,:].-rb10r3_z0)./10.0^scalings[3];linewidth)
+            lines!(ax3,t0,(botlorb10r3[3,:].-rb10r3_z0)./10.0^scalings[3];linewidth)
+            lines!(ax3,t1,(bot1rb10r3[3,tsteps].-rb10r3_z0)./10.0^scalings[3];linewidth)
+            lines!(ax3,t0,(bothirb10r3[3,:].-rb10r3_z0)./10.0^scalings[3];linewidth)
+            if i == 1
+                ylims!(ax3,-1.5,1.5)
+            else
+                ylims!(ax3,-.8,1.0)
             end
+            xlims!(ax3,Td,Td+2)
+
+            # if i == 2
+            fig[5,1:3] = Legend(fig,ax2;orientation=:horizontal,)
+            # end labelsize=pt2px(6.5)
             function set_ax!(ax)
                 # xlims!(ax,0,5)
-                ax.xlabelpadding = -15
                 # ax.alignmode =  Mixed(;left = -20, right = 20)
                 vlines!(ax,[Td];linewidth,color=:slategrey)
                 # ax.xticks = collect(0:1:15)
                 ax.xminorticks = collect(0:1:25)
                 ax.xminorgridvisible = true
                 if i !== 4
-                    ax.xlabelvisible = false
-                    ax.xticklabelsvisible = false
+                    hidex(ax)
                 end
             end
-            foreach(set_ax!,[ax1,ax2])
+            foreach(set_ax!,axs[i])
             leftpads = [90,80,80]
             for (ilabel,label) in enumerate(scalings)
                 Label(fig.layout[i, ilabel, Top()], latexstring("×10^{$label}"),)
@@ -1081,6 +1212,7 @@ function plot_tower3d_dpl_traj(bots,figname=nothing)
         end
         # colgap!(fig.layout,0)
         # rowgap!(fig.layout,0)
+        colsize!(fig.layout,3,Relative(0.15))
         savefig(fig,figname)
     end
 end
@@ -1094,6 +1226,7 @@ GM.activate!(); plot_tower3d_dpl_traj(
     ]
 )
 
+
 CM.activate!(); plot_tower3d_dpl_traj(
     [
         [tower3d_noseis_5,tower3d_seis_5,tower3d_seis_lo_5,tower3d_seis_hi_5],
@@ -1105,10 +1238,10 @@ CM.activate!(); plot_tower3d_dpl_traj(
 )
 
 
-function plot_tower3d_vis(bot0,bot1)
-    fig_width = 0.95testwidth
-    fig_height = 0.8columnwidth
-    fig = Figure(;resolution=(fig_width,fig_height),figure_padding=(0,0,40,0))
+function plot_tower3d_vis(bot0,bot1,figname=nothing)
+    fig_width = 0.95tw
+    fig_height = 0.8cw
+    fig = Figure(;resolution=(fig_width,fig_height),figure_padding=(0,0,0,0))
     dt = 1e-3
     ts = [1,5.5,10]
 
@@ -1116,7 +1249,7 @@ function plot_tower3d_vis(bot0,bot1)
         ax = Axis3(fig[1,i],aspect=:data,)
         stepi = round(Int,ts[i]/dt)
         TR.goto_step!(bot0,stepi;actuate=true)
-        plot_tower3d!(ax,bot0.tg,cablecolor=:slategrey,barcolor=:slategrey)
+        plot_tower3d!(ax,bot0.tg,cablecolor=:slategrey,barcolor=:slategrey,tetcolor=:slategrey)
         TR.goto_step!(bot1,stepi;actuate=true)
         plot_tower3d!(ax,bot1.tg;markit = true)
     end
@@ -1125,24 +1258,23 @@ function plot_tower3d_vis(bot0,bot1)
         Label(fig.layout[1, ilabel, Bottom()], "($label)",
             textsize = fontsize,
             font = "CMU Serif Bold",
-            padding = (-110, 0, -20, 85),
+            padding = (-110, 0, 0, 70),
             halign = :center,
             valign = :top)
     end
     for (ilabel,label) in enumerate(alphabet[1:3])
         Label(fig.layout[1, ilabel, Bottom()], latexstring("t=$(ts[ilabel])~(\\mathrm{s})"),
             textsize = fontsize,
-            padding = (110, 0, -20, 80),
+            padding = (110, 0, 0, 80),
             halign = :center,
             valign = :top)
     end
     colgap!(fig.layout,0)
+    savefig(fig,figname)
     fig
 end
-fig_tower3d_vis = plot_tower3d_vis(tower3d_noseis,tower3d_seis)
-GM.activate!()
-CM.activate!(type="pdf")
-CM.save(texroot*raw"\OneDrive - 中山大学\Papers\DynamicTensegrity\CS\images\tower3d_vis.pdf", fig_tower3d_vis)
+GM.activate!(); plot_tower3d_vis(tower3d_noseis_10,tower3d_seis_10,)
+CM.activate!(); plot_tower3d_vis(tower3d_noseis_10,tower3d_seis_10,"tower3d_vis")
 
 function plot_actuate(bot)
     (;t) = bot.traj
@@ -1166,14 +1298,14 @@ end
 
 fig_actuate = plot_actuate(tower3d_noseis)
 GM.activate!()
-CM.activate!(type="pdf")
+CM.activate!()
 CM.save(texroot*raw"\OneDrive - 中山大学\Papers\DynamicTensegrity\CS\images\actuate.pdf", fig_actuate)
 
 fig_tower3d_traj = plot_tower3d_traj(tower3d_noseis)
 fig_tower3d_traj = plot_tower3d_traj(tower3d_seis)
 
 GM.activate!()
-CM.activate!(type="pdf")
+CM.activate!()
 CM.save(texroot*raw"\OneDrive - 中山大学\Papers\DynamicTensegrity\CS\images\tower3d_traj.pdf", fig_tower3d_traj)
 
 tower3dbot0 = tower3d(;k=500.0,c=2.0)

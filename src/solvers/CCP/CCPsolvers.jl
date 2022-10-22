@@ -201,7 +201,7 @@ function IPM!(output,nu,nΛ,Λ,y,N,r;ftol=1e-14,Nmax=50)
 
             break
         elseif k == Nmax
-            @warn "IPM: Max iteration $k reached"
+            # @warn "IPM: Max iteration $k reached"
         end
 
         𝐉[   1:n1,   1:n1] .=  N
@@ -224,10 +224,10 @@ function IPM!(output,nu,nΛ,Λ,y,N,r;ftol=1e-14,Nmax=50)
         αpmax = min(αp_Λ,αp_y)
         # αpmax = find_cone_step_length(z_split,W_blocks,Δyp_split,ΔΛp_split,J)
         αp = min(one(αpmax),0.99αpmax)
-        Λp_split = Λ_split .+ αp.*ΔΛp_split
-        yp_split = y_split .+ αp.*Δyp_split
-        Λp_cone = [transpose(Λi)*J*Λi for Λi in Λp_split]
-        yp_cone = [transpose(yi)*J*yi for yi in yp_split]
+        # Λp_split = Λ_split .+ αp.*ΔΛp_split
+        # yp_split = y_split .+ αp.*Δyp_split
+        # Λp_cone = [transpose(Λi)*J*Λi for Λi in Λp_split]
+        # yp_cone = [transpose(yi)*J*yi for yi in yp_split]
         # @show Λp_cone
         # @show yp_cone
         Λp = Λ .+ αp.*ΔΛp

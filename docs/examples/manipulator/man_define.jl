@@ -1,5 +1,5 @@
 
-function man_ndof(ndof,onedir=[0.0,-1.0];θ=0.0,k=0.0,c=0.0,unit="mks",restlen=0.16,isvirtual=true)
+function man_ndof(ndof,onedir=[1.0,0.0];θ=0.0,k=0.0,c=0.0,unit="mks",restlen=0.16,isvirtual=true)
     nbodies = ndof + 1
     nbp = 2nbodies - ndof
     n_lower = count(isodd,1:nbodies)
@@ -141,8 +141,9 @@ function man_ndof(ndof,onedir=[0.0,-1.0];θ=0.0,k=0.0,c=0.0,unit="mks",restlen=0
 			constrained = true
 			if i == 1
             	ci = TR.find_full_constrained_index(lncs, q)
+				display(ci)
 			else
-				ci = collect(1:1)
+				ci = [1]
 			end
 		end
 		state = TR.RigidBodyState(prop, lncs, ri, α, ṙo, ω, ci, Φi)

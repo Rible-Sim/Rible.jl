@@ -31,6 +31,8 @@ includet("man_define.jl")
 includet("../analysis.jl")
 includet("../vis.jl")
 
+cw = 252 |> pt2px
+tw = 522 |> pt2px
 figdir = raw"C:\Users\luo22\OneDrive\Papers\Ph.D.Thesis\ff"
 
 k = 1275; c = 100.0;
@@ -580,4 +582,80 @@ end
 compare_loop(3:3:12)
 compare_loop([12])
 
-""
+includet("../dyn.jl")
+
+mandyn = man_ndof_2022(2)
+mandyn.tg.tensiles.cables
+
+_ = TR.check_static_equilibrium_output_multipliers(mandyn.tg)
+
+plot_traj!(mandyn)
+
+# 动力学仿真
+dt = 0.0062
+
+TR.solve!(
+    TR.SimProblem(mandyn,
+    (x)->dynfuncs(x;gravity=true)),
+    TR.Zhong06(),
+    dt=dt,
+    tspan=(0.0,5.0),
+    ftol=1e-14
+)
+
+plot_traj!(mandyn)
+
+
+df = DataFrame(XLSX.readtable("9.4-2k-0.005-0deg-0g--2.xlsx", "Sheet1";infer_eltypes=true))
+
+θ_g = [
+    begin
+        TR.update_rigids!(mandyn.tg,q)
+        -get_angles(mandyn)
+    end
+    for q in mandyn.traj.q
+] |> VectorOfArray
+
+
+
+lines(df.Column01)
+lines!(θ_g[1,:])
+lines(df.Column02)
+lines!(θ_g[2,:])
+
+
+(θ_g[1,:] .- df.Column1[1:length(θ_g)]) .|> abs |> maximum
+
+(θ_g[2,:] .- df.Column2[1:length(θ_g)]) .|> abs |> maximum
+
+
+figdir = raw"C:\Users\luo22\OneDrive\Papers\DynamicTensegrity\CS"
+
+function plotsave_dyn(figname=nothing)
+    with_theme(theme_pub;
+            resolution = (0.9cw,0.6cw),
+            figure_padding = (fontsize/2,fontsize,fontsize/2,fontsize),
+
+        ) do
+        fig = Figure()
+        ax = Axis(fig[1,1], xlabel = tlabel, ylabel = L"\theta")
+
+        lines!(ax,mandyn.traj.t,θ_g[1,:])
+
+        ts1 = [0.00615*i for i = 0:length(df.Column1)-1]
+        scatter!(ax,ts1,df.Column1,marker=:xcross)
+        errorbars!(ax, ts1, df.Column1, fill(0.35,length(df.Column1)), color = :red)
+
+        lines!(ax,mandyn.traj.t,θ_g[2,:])
+        ts2 = [0.00615*i for i = 0:length(df.Column2)-1]
+        scatter!(ax,ts2,df.Column2,marker=:xcross)
+        errorbars!(ax, ts2, df.Column2, fill(0.35,length(df.Column2)), color = :red)
+        xlims!(ax,0,1)
+        ylims!(ax,-5,25)
+        savefig(fig,figname)
+        fig
+    end
+end
+GM.activate!(); plotsave_dyn()
+
+CM.activate!(); plotsave_dyn("dyn.pdf")

@@ -77,14 +77,13 @@ function build_Q̃(tg)
     (;connected) = tensioned
     (;cables) = tg.tensiles
     ncables = length(cables)
-    (;nfull,nfree,sysfree,mem2sysfree,mem2sysfull) = indexed
+    (;nfree,mem2sysfree) = indexed
     T = get_numbertype(tg)
     ndim = get_ndim(tg)
     Q̃ = zeros(T,nfree,ndim*ncables)
 
     foreach(connected) do cc
         j = cc.id
-        cable = cables[j]
         (;end1,end2) = cc
         rb1 = end1.rbsig
         rb2 = end2.rbsig
@@ -130,25 +129,49 @@ end
 
 
 function build_L̂(tg)
-    (;ndim) = tg
+    (;connectivity,ndim) = tg
+    (;connected) = connectivity.tensioned
     (;cables) = tg.tensiles
     ncables = length(cables)
     T = get_numbertype(tg)
     L̂ = spzeros(T, ncables*ndim, ncables)
-    for (i,ss) in enumerate(cables)
-        is = (i-1)*ndim
-        L̂[is+1:is+ndim,i] = ss.state.direction
+    foreach(connected) do scnt
+        j = scnt.id
+        scable = cables[j]
+        js = (j-1)*ndim
+        L̂[js+1:js+ndim,j] = scable.state.direction
     end
     L̂
 end
 
+function build_K̂(tg)
+    (;connectivity,ndim) = tg
+    (;connected) = connectivity.tensioned
+    (;cables) = tg.tensiles
+    ncables = length(cables)
+    T = get_numbertype(tg)
+    K̂ = spzeros(T, ncables*ndim, ncables)
+    foreach(connected) do scnt
+        j = scnt.id
+        scable = cables[j]
+        js = (j-1)*ndim
+        K̂[js+1:js+ndim,j] = scable.state.direction*scable.k
+    end
+    K̂
+end
+
 function build_L(tg)
-    (;ncables, ndim, cables) = tg
+    (;connectivity,ndim) = tg
+    (;connected) = connectivity.tensioned
+    (;cables) = tg.tensiles
+    ncables = length(cables)
     T = get_numbertype(tg)
     L = spzeros(T, ncables*ndim, ncables)
-    for (i,ss) in enumerate(cables)
-        is = (i-1)*ndim
-        L[is+1:is+ndim,i] = ss.state.direction*ss.state.length
+    foreach(connected) do scnt
+        j = scnt.id
+        scable = cables[j]
+        js = (j-1)*ndim
+        L[js+1:js+ndim,j] = scable.state.direction*scable.state.length
     end
     L
 end
@@ -163,10 +186,6 @@ function build_Γ(tg)
     end
 end
 
-function build_K̂(tg)
-     k = get_cables_stiffness(tg)
-     K̂ = build_L̂(tg)*Diagonal(k)
-end
 
 function build_W(tgstruct)
     q = get_q(tgstruct)
@@ -272,8 +291,8 @@ function make_Q̌(tg,q0)
             c2 = c[num2sys[mem2num[rb2id][ap2id]]]
             C1 = rb1.state.cache.funcs.C(c1)
             C2 = rb2.state.cache.funcs.C(c2)
-            C1 = rb1.state.cache.Cps[ap1id]
-            C2 = rb2.state.cache.Cps[ap2id]
+            # C1 = rb1.state.cache.Cps[ap1id]
+            # C2 = rb2.state.cache.Cps[ap2id]
             mfull1 = mem2sysfull[rb1.prop.id]
             mfull2 = mem2sysfull[rb2.prop.id]
             Jj .= 0
@@ -309,118 +328,6 @@ function make_Q̌(tg,q0)
     #     ret
     # end
     # inner_Q̌
-end
-
-function make_Ǩm_Ǩg(tg,q0)
-    (;ndim) = tg
-    (;numbered,indexed,tensioned) = tg.connectivity
-    (;nfull,nfree,syspres,sysfree,mem2sysfull) = indexed
-    (;connected) = tensioned
-    (;cables) = tg.tensiles
-    (;mem2num,num2sys) = numbered
-    function inner_Ǩm_Ǩg(q̌,s,μ,k,c)
-		q = Vector{eltype(q̌)}(undef,nfull)
-		q[syspres] .= q0[syspres]
-		q[sysfree] .= q̌
-        Jj = zeros(eltype(q̌),ndim,nfull)
-        retǨm = zeros(eltype(q̌),nfree,nfree)
-        retǨg = zeros(eltype(q̌),nfree,nfree)
-        foreach(connected) do scnt
-            j = scnt.id
-            rb1 = scnt.end1.rbsig
-            rb2 = scnt.end2.rbsig
-            rb1id = rb1.prop.id
-            rb2id = rb2.prop.id
-            ap1id = scnt.end1.pid
-            ap2id = scnt.end2.pid
-            c1 = c[num2sys[mem2num[rb1id][ap1id]]]
-            c2 = c[num2sys[mem2num[rb2id][ap2id]]]
-            C1 = rb1.state.cache.funcs.C(c1)
-            C2 = rb2.state.cache.funcs.C(c2)
-            C1 = rb1.state.cache.Cps[ap1id]
-            C2 = rb2.state.cache.Cps[ap2id]
-            mfull1 = mem2sysfull[rb1.prop.id]
-            mfull2 = mem2sysfull[rb2.prop.id]
-            Jj .= 0
-            Jj[:,mfull2] .+= C2
-            Jj[:,mfull1] .-= C1
-            Uj = transpose(Jj)*Jj
-            Ǔj = @view Uj[sysfree,sysfree]
-            Ūjq = Uj[sysfree,:]*q
-            retǨm .+= k[j]*s[j]^2*(Ūjq*transpose(Ūjq))
-            retǨg .+= k[j]*(1-μ[j]*s[j])*(Ǔj-s[j]^2*Ūjq*transpose(Ūjq))
-        end
-        retǨm,retǨg
-    end
-end
-
-function make_S(tg,q0)
-    (;ndim) = tg
-    (;numbered,indexed,tensioned) = tg.connectivity
-    (;syspres,sysfree,nfull,mem2sysfull) = indexed
-    (;mem2num,num2sys) = numbered
-    (;connected) = tensioned
-    (;cables) = tg.tensiles
-    ncables = length(cables)
-    function inner_S(q̌,s)
-		q = Vector{eltype(q̌)}(undef,nfull)
-		q[syspres] .= q0[syspres]
-		q[sysfree] .= q̌
-        ret = zeros(eltype(q̌),ncables)
-        Jj = zeros(eltype(q̌),ndim,nfull)
-        foreach(connected) do scnt
-            j = scnt.id
-            rb1 = scnt.end1.rbsig
-            rb2 = scnt.end2.rbsig
-            rb1id = rb1.prop.id
-            rb2id = rb2.prop.id
-            ap1id = scnt.end1.pid
-            ap2id = scnt.end2.pid
-            # c1 = c[num2sys[mem2num[rb1id][ap1id]]]
-            # c2 = c[num2sys[mem2num[rb2id][ap2id]]]
-            # C1 = rb1.state.cache.funcs.C(c1)
-            # C2 = rb2.state.cache.funcs.C(c2)
-            C1 = rb1.state.cache.Cps[ap1id]
-            C2 = rb2.state.cache.Cps[ap2id]
-            mfull1 = mem2sysfull[rb1.prop.id]
-            mfull2 = mem2sysfull[rb2.prop.id]
-            Jj .= 0
-            Jj[:,mfull2] .+= C2
-            Jj[:,mfull1] .-= C1
-            Uj = transpose(Jj)*Jj
-            ret[j] = transpose(q)*Uj*q*s[j]^2 - 1
-        end
-        ret
-    end
-    function inner_S(q̌,s,c)
-        q = Vector{eltype(q̌)}(undef,nfull)
-        q[syspres] .= q0[syspres]
-        q[sysfree] .= q̌
-        ret = zeros(eltype(q̌),ncables)
-        Jj = zeros(eltype(q̌),ndim,nfull)
-        foreach(connected) do scnt
-            j = scnt.id
-            rb1 = scnt.end1.rbsig
-            rb2 = scnt.end2.rbsig
-            rb1id = rb1.prop.id
-            rb2id = rb2.prop.id
-            ap1id = scnt.end1.pid
-            ap2id = scnt.end2.pid
-            c1 = c[num2sys[mem2num[rb1id][ap1id]]]
-            c2 = c[num2sys[mem2num[rb2id][ap2id]]]
-            C1 = rb1.state.cache.funcs.C(c1)
-            C2 = rb2.state.cache.funcs.C(c2)
-            mfull1 = mem2sysfull[rb1.prop.id]
-            mfull2 = mem2sysfull[rb2.prop.id]
-            Jj .= 0
-            Jj[:,mfull2] .+= C2
-            Jj[:,mfull1] .-= C1
-            Uj = transpose(Jj)*Jj
-            ret[j] = transpose(q)*Uj*q*s[j]^2 - 1
-        end
-        ret
-    end
-    inner_S
 end
 
 function compensate_gravity_funcs(tgstruct)
@@ -640,7 +547,15 @@ end
 
 function check_static_equilibrium_output_multipliers(tg_input,q,F=nothing;gravity=false)
     tg = deepcopy(tg_input)
+    check_static_equilibrium_output_multipliers!(tg,q,F;gravity)
+end
+
+function check_static_equilibrium_output_multipliers!(tg,q,F=nothing;
+        gravity=false,
+        # stpt = nothing
+    )
     clear_forces!(tg)
+    update_points!(tg)
     update_rigids!(tg)
     update_tensiles!(tg)
     # check_restlen(tg,get_cables_restlen(tg))
@@ -651,7 +566,26 @@ function check_static_equilibrium_output_multipliers(tg_input,q,F=nothing;gravit
     if !isnothing(F)
         generalized_forces .+= F[:]
     end
-    A = make_A(tg)(q)
+    q = get_q(tg)
+    c = get_c(tg)
+    q̌ = get_q̌(tg)
+    A = make_A(tg,q)(q̌,c)
+    # # @show A
+    # s = get_s(tg)
+    # u = get_cables_restlen(tg)
+    # k = get_cables_stiffness(tg)
+    # if !(stpt isa Nothing) 
+    #     @show stpt.q - q |> norm
+    #     @show stpt.q̌ - q̌ |> norm
+    #     @show stpt.s - s |> norm
+    #     @show stpt.u - u |> norm
+    #     @show stpt.k - k |> norm
+    #     @show stpt.c - c |> norm
+    # end
+
+    # ǧeneralized_forces = make_Q̌(tg,q)(q̌,s,u,k,c)
+    # # @show s 
+    # @show generalized_forces - ǧeneralized_forces
     λ = inv(A*transpose(A))*A*(-generalized_forces)
     constraint_forces = transpose(A)*λ
     static_equilibrium = constraint_forces ≈ -generalized_forces
@@ -663,29 +597,38 @@ function check_static_equilibrium_output_multipliers(tg_input,q,F=nothing;gravit
     static_equilibrium, λ
 end
 
-function inverse_for_restlength(botinput,botref::TensegrityRobot,Fˣ=nothing;gravity=false,scale=true,recheck=true)
-    inverse_for_restlength(botinput.tg,botref.tg,Fˣ;gravity,scale,recheck)
+function inverse_for_restlength(botinput,botref::TensegrityRobot,Fˣ=nothing;
+        gravity=false,scale=true,recheck=true,kwarg...
+    )
+    inverse_for_restlength(botinput.tg,botref.tg,Fˣ;gravity,scale,recheck,kwarg...)
 end
 
-function inverse_for_restlength(tginput,tgref::TensegrityStructure,Fˣ=nothing;gravity=false,scale=true,recheck=true)
+function inverse_for_restlength(tginput,tgref::TensegrityStructure,Fˣ=nothing;
+        gravity=false,scale=true,recheck=true,eps_abs=1e-6,eps_rel=1e-6,verbose=false
+    )
     B,F̃ = build_inverse_statics_for_restlength(tginput,tgref,Fˣ;gravity,scale)
-    nu = tgref.tensiles.cables |> length
+    nμ = tgref.tensiles.cables |> length
+    κ = get_cables_stiffness(tginput)
+    ℓ = get_cables_len(tgref)
+    h = -ℓ.*κ
     if check_inverse_sanity(B)
-        y0 = B\F̃
+        x0 = B\F̃
     else
         @info "Using Quadratic Programming."
         # COSMO.Settings(verbose = false, eps_abs = 1e-7, eps_rel = 1e-16)
         model = JuMP.Model(COSMO.Optimizer)
-        JuMP.set_optimizer_attribute(model, "verbose", false)
-        JuMP.set_optimizer_attribute(model, "eps_abs", 1e-7)
-        JuMP.set_optimizer_attribute(model, "eps_rel", 1e-16)
-        JuMP.@variable(model, y[1:nu])
-        JuMP.@objective(model, Min, sum(y[1:nu].^2))
-        # JuMP.@objective(model, Max, 0.0)
-        JuMP.@constraint(model, static, B*y .== F̃)
-        ϵ = 1e-2
-        JuMP.@constraint(model, positive_u, y[1:nu].- ϵ .>= 0)
-        JuMP.@constraint(model, positive_f, y[1:nu].+ ϵ .<= get_cables_len(tgref))
+        JuMP.set_optimizer_attribute(model, "verbose", verbose)
+        JuMP.set_optimizer_attribute(model, "eps_abs", eps_abs)
+        JuMP.set_optimizer_attribute(model, "eps_rel", eps_rel)
+        JuMP.@variable(model, x[1:nμ])
+        # JuMP.@objective(model, Min, sum(x.^2))
+        JuMP.@objective(model, Min, 
+            0.5*transpose(x)*Diagonal(κ)*x + transpose(h)*x
+        )
+        JuMP.@constraint(model, static, B*x .== F̃)
+        ϵ = 1e-3minimum(ℓ)
+        JuMP.@constraint(model, positive_u, x .- ϵ .>= 0)
+        JuMP.@constraint(model, positive_f, κ.*(ℓ .- x) .>= 1.0)
         # JuMP.print(model)
         JuMP.optimize!(model)
         if JuMP.termination_status(model) == JuMP.MathOptInterface.OPTIMAL
@@ -697,18 +640,17 @@ function inverse_for_restlength(tginput,tgref::TensegrityStructure,Fˣ=nothing;g
         # @show JuMP.primal_status(model)
         # @show JuMP.dual_status(model)
         # @show JuMP.objective_value(model)
-        y0 = JuMP.value.(y)
-        # @show abs.(B*y0 .- F̃)
-        # y0 = pinv(B)*F̃
+        x0 = JuMP.value.(x)
+        # @show abs.(B*x0 .- F̃)
+        # x0 = pinv(B)*F̃
     end
-    u = y0[1:nu]
     if recheck
         tgcheck = deepcopy(tginput)
         q = get_q(tgref)
-        set_restlen!(tgcheck,u)
-        _,λ = check_static_equilibrium_output_multipliers(tgcheck,q;gravity)
+        set_restlen!(tgcheck,x0)
+        _,λ = check_static_equilibrium_output_multipliers!(tgcheck,q;gravity)
     end
-    λ,u
+    x0
 end
 
 function inverse_for_multipliers(botinput::TensegrityRobot,botref::TensegrityRobot=botinput,F=nothing;gravity=false,scale=true,recheck=true)

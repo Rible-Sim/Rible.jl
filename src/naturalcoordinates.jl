@@ -114,15 +114,16 @@ rotation_matrix(θ) = @SMatrix [cos(θ) -sin(θ); sin(θ) cos(θ)]
 # $(TYPEDSIGNATURES)
 # """
 @inline @inbounds function HouseholderOrthogonalization(n)
-    n̄ = norm(n)
-    h1 = max(n[1]-n̄,n[1]+n̄)
-    h2 = n[2]
-    h3 = n[3]
-    h = SVector(h1,h2,h3)
+    n̂ = norm(n)
+    _, i = findmax(n.+n̂)
+    ei = 1:3 .== i
+    h = n + n̂*ei
     H = I - 2h*transpose(h)/(transpose(h)*h)
-    t = H[1:3,2]
-    b = H[1:3,3]
-    t,b
+    u, v  = [H[:,j] for j = 1:3 if j != i]
+    if i == 2
+        u, v = v, u
+    end
+    u, v
 end
 
 """
@@ -135,6 +136,18 @@ function skew(w)
     @SMatrix [o -w3 w2;
               w3 o -w1;
              -w2 w1 o]
+end
+
+function skew(w::SVector{3})
+    w1,w2,w3 = w
+    o = zero(w1)
+    @SMatrix [o -w3 w2;
+              w3 o -w1;
+             -w2 w1 o]
+end
+
+function skew(a::SVector{2})
+	[-a[2],a[1]]
 end
 
 """
@@ -1287,7 +1300,14 @@ function find_R(lncs::LNC,q::AbstractVector)
 end
 
 find_ω(q::AbstractVector,q̇::AbstractVector,lncs::LNC3D) = find_ω(lncs,q,q̇)
-find_ω(lncs::LNCMP,q::AbstractVector,q̇::AbstractVector) = zeros(eltype(q),get_ndim(lncs))
+function find_ω(lncs::LNCMP,q::AbstractVector,q̇::AbstractVector)
+    ndim = get_ndim(lncs)
+    if ndim == 3
+        return zeros(eltype(q),ndim)
+    else
+        return zeros(eltype(q),1)
+    end
+end
 
 function find_ω(lncs::LNC,q::AbstractVector,q̇::AbstractVector)
     Ẋ = make_X(lncs,q̇)
@@ -1302,6 +1322,55 @@ function find_ω(lncs::LNC,q::AbstractVector,q̇::AbstractVector)
         Ω = Ẋ*pinv(X)
         ω = SVector{3}(Ω[3,2],Ω[1,3],Ω[2,1])
     end
+end
+
+function get_uvw(lncs,q)
+    if lncs isa LNC1P3V
+        u = q[4:6]
+        v = q[7:9]
+        w = q[10:12]
+    elseif lncs isa LNC2P2V
+        ri = q[1:3]
+        rj = q[4:6]
+        v = q[7:9]
+        w = q[10:12]
+        u = rj - ri
+    elseif lncs isa LNC3P1V
+        ri = q[1:3]
+        rj = q[4:6]
+        rk = q[7:9]
+        w = q[10:12]
+        u = rj - ri
+        v = rk - ri
+    elseif lncs isa LNC4P
+        ri = q[1:3]
+        rj = q[4:6]
+        rk = q[7:9]
+        rl = q[10:12]
+        u = rj - ri
+        v = rk - ri
+        w = rl - ri
+    end
+    SVector{3}(u),SVector{3}(v),SVector{3}(w)
+end
+
+function get_uv(lncs,q)
+    if lncs isa LNC1P2V
+        u = q[3:4]
+        v = q[5:6]
+    elseif lncs isa LNC2P1V
+        ri = q[1:2]
+        rj = q[3:4]
+        v = q[5:6]
+        u = rj - ri
+    elseif lncs isa LNC3P
+        ri = q[1:2]
+        rj = q[3:4]
+        rk = q[5:6]
+        u = rj - ri
+        v = rk - ri
+    end
+    SVector{2}(u),SVector{2}(v)
 end
 
 end

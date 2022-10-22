@@ -279,7 +279,12 @@ function solve!(intor::Integrator,solvercache::ZhongCCPCache;
                 # Jacobi_B = make_B(na,D,invM)
                 # 𝚲ₖ,_ = Jacobi(Jacobi_B,r4,ηs,𝐍,𝐫;τ=1e-10,Nmax=1000)
                 # 𝚲uₖ₊₁,GS_k,GS_res = GaussSeidel(u,B,r,ηs,𝐍,𝐫)
-                IPM!(𝚲ₖ,na,nΛ,repeat([0.1,0,0],na),repeat([0.1,0,0],na),𝐍,𝐫;ftol=1e-14,Nmax=50)
+                if iteration < 4
+                    Nmax = 50
+                else
+                    Nmax = 50
+                end
+                IPM!(𝚲ₖ,na,nΛ,repeat([1.0,0,0],na),repeat([1.0,0,0],na),𝐍,𝐫;ftol=1e-14,Nmax)
                 # @show iteration, 𝚲ₖ, y_split[1]
                 # y = 𝐍*𝚲ₖ+𝐫
                 # @show timestep, iteration, 𝐫, 𝚲ₖ, y, 𝚲ₖ⋅y

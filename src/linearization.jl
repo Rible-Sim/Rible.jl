@@ -175,6 +175,119 @@ function build_Ǩ(tg)
     build_Ǩ(tg,λ)
 end
 
+function make_Ǩm_Ǩg(tg,q0)
+    (;ndim) = tg
+    (;numbered,indexed,tensioned) = tg.connectivity
+    (;nfull,nfree,syspres,sysfree,mem2sysfull) = indexed
+    (;connected) = tensioned
+    (;cables) = tg.tensiles
+    (;mem2num,num2sys) = numbered
+    function inner_Ǩm_Ǩg(q̌,s,μ,k,c)
+		q = Vector{eltype(q̌)}(undef,nfull)
+		q[syspres] .= q0[syspres]
+		q[sysfree] .= q̌
+        Jj = zeros(eltype(q̌),ndim,nfull)
+        retǨm = zeros(eltype(q̌),nfree,nfree)
+        retǨg = zeros(eltype(q̌),nfree,nfree)
+        foreach(connected) do scnt
+            j = scnt.id
+            rb1 = scnt.end1.rbsig
+            rb2 = scnt.end2.rbsig
+            rb1id = rb1.prop.id
+            rb2id = rb2.prop.id
+            ap1id = scnt.end1.pid
+            ap2id = scnt.end2.pid
+            c1 = c[num2sys[mem2num[rb1id][ap1id]]]
+            c2 = c[num2sys[mem2num[rb2id][ap2id]]]
+            C1 = rb1.state.cache.funcs.C(c1)
+            C2 = rb2.state.cache.funcs.C(c2)
+            C1 = rb1.state.cache.Cps[ap1id]
+            C2 = rb2.state.cache.Cps[ap2id]
+            mfull1 = mem2sysfull[rb1.prop.id]
+            mfull2 = mem2sysfull[rb2.prop.id]
+            Jj .= 0
+            Jj[:,mfull2] .+= C2
+            Jj[:,mfull1] .-= C1
+            Uj = transpose(Jj)*Jj
+            Ǔj = @view Uj[sysfree,sysfree]
+            Ūjq = Uj[sysfree,:]*q
+            retǨm .+= k[j]*s[j]^2*(Ūjq*transpose(Ūjq))
+            retǨg .+= k[j]*(1-μ[j]*s[j])*(Ǔj-s[j]^2*Ūjq*transpose(Ūjq))
+        end
+        retǨm,retǨg
+    end
+end
+
+function make_S(tg,q0)
+    (;ndim) = tg
+    (;numbered,indexed,tensioned) = tg.connectivity
+    (;syspres,sysfree,nfull,mem2sysfull) = indexed
+    (;mem2num,num2sys) = numbered
+    (;connected) = tensioned
+    (;cables) = tg.tensiles
+    ncables = length(cables)
+    function inner_S(q̌,s)
+		q = Vector{eltype(q̌)}(undef,nfull)
+		q[syspres] .= q0[syspres]
+		q[sysfree] .= q̌
+        ret = zeros(eltype(q̌),ncables)
+        Jj = zeros(eltype(q̌),ndim,nfull)
+        foreach(connected) do scnt
+            j = scnt.id
+            rb1 = scnt.end1.rbsig
+            rb2 = scnt.end2.rbsig
+            rb1id = rb1.prop.id
+            rb2id = rb2.prop.id
+            ap1id = scnt.end1.pid
+            ap2id = scnt.end2.pid
+            # c1 = c[num2sys[mem2num[rb1id][ap1id]]]
+            # c2 = c[num2sys[mem2num[rb2id][ap2id]]]
+            # C1 = rb1.state.cache.funcs.C(c1)
+            # C2 = rb2.state.cache.funcs.C(c2)
+            C1 = rb1.state.cache.Cps[ap1id]
+            C2 = rb2.state.cache.Cps[ap2id]
+            mfull1 = mem2sysfull[rb1.prop.id]
+            mfull2 = mem2sysfull[rb2.prop.id]
+            Jj .= 0
+            Jj[:,mfull2] .+= C2
+            Jj[:,mfull1] .-= C1
+            Uj = transpose(Jj)*Jj
+            ret[j] = transpose(q)*Uj*q*s[j]^2 - 1
+        end
+        ret
+    end
+    function inner_S(q̌,s,c)
+        q = Vector{eltype(q̌)}(undef,nfull)
+        q[syspres] .= q0[syspres]
+        q[sysfree] .= q̌
+        ret = zeros(eltype(q̌),ncables)
+        Jj = zeros(eltype(q̌),ndim,nfull)
+        foreach(connected) do scnt
+            j = scnt.id
+            rb1 = scnt.end1.rbsig
+            rb2 = scnt.end2.rbsig
+            rb1id = rb1.prop.id
+            rb2id = rb2.prop.id
+            ap1id = scnt.end1.pid
+            ap2id = scnt.end2.pid
+            c1 = c[num2sys[mem2num[rb1id][ap1id]]]
+            c2 = c[num2sys[mem2num[rb2id][ap2id]]]
+            C1 = rb1.state.cache.funcs.C(c1)
+            C2 = rb2.state.cache.funcs.C(c2)
+            mfull1 = mem2sysfull[rb1.prop.id]
+            mfull2 = mem2sysfull[rb2.prop.id]
+            Jj .= 0
+            Jj[:,mfull2] .+= C2
+            Jj[:,mfull1] .-= C1
+            Uj = transpose(Jj)*Jj
+            ret[j] = transpose(q)*Uj*q*s[j]^2 - 1
+        end
+        ret
+    end
+    inner_S
+end
+
+
 function build_∂Q̌∂q̌!(∂Q̌∂q̌,tg)
     (;tensioned,indexed) = tg.connectivity
     (;cables) = tg.tensiles
@@ -674,27 +787,280 @@ end
 校核稳定性。
 $(TYPEDSIGNATURES)
 """
-function check_stability(tg;verbose=false)
-    λ = inverse_for_multipliers(tg,tg)
+function check_stability(tg::TensegrityStructure;F̌=nothing,verbose=false)
+    static_equilibrium,λ = check_static_equilibrium_output_multipliers(tg;F=F̌)
+    @assert static_equilibrium
     check_stability(tg,λ;verbose)
 end
 
-function check_stability(tg,λ;verbose=false)
-    K = build_K(tg,λ)
-    A = build_A(tg)
-    q,_ = get_q(tg)
-    N = nullspace(A(q))
-    # N = find_nullspace(A(q))
-    Ǩ = transpose(N)*K*N
-    eigen_result = eigen(Ǩ)
+function check_stability(tg::TensegrityStructure,λ;verbose=false)
+    q = get_q(tg)
+    c = get_c(tg)
+    A = make_A(tg,q)
+    Ň(q̌,c) = nullspace(A(q̌))
+    check_stability(tg,λ,Ň;verbose)
+end
+
+function check_stability(tg::TensegrityStructure,λ,Ň;verbose=false)
+    q̌ = get_q̌(tg)
+    c = get_c(tg)
+    Ǩ0 = build_Ǩ(tg,λ)
+    Ň0 = Ň(q̌,c)
+    𝒦0 = transpose(Ň0)*Ǩ0*Ň0
+    eigen_result = eigen(𝒦0)
     eigen_min = eigen_result.values[1]
-    if verbose
-        @show eigen_min
-    end
     if eigen_min<0
-        @warn "Instability detected!"
-        return false
+        @warn "Instability detected! Minimum eigen value: $eigen_min"
+        isstable = false
     else
-        return true
+        isstable = true
+    end
+    isstable, Ň0, eigen_result
+end
+
+function check_stability!(bot::TensegrityRobot,Ň;
+        gravity=false,
+        scaling=0.01,
+        scalings=nothing
+    )
+    (;tg,traj) = bot
+    static_equilibrium,λ = check_static_equilibrium_output_multipliers(tg)
+    @assert static_equilibrium
+    q̌ = get_q̌(tg)
+    _, Ň0, er = check_stability(bot.tg,λ,Ň;verbose=true)
+    resize!(traj,1)
+    for i in 1:length(er.values)
+        push!(traj,deepcopy(traj[end]))
+        traj.t[end] = er.values[i]
+        δq̌i = Ň0*er.vectors[:,i]
+        # @show δq̌i, er.vectors[:,i]
+        if scalings isa Nothing
+            si = scaling
+        else
+            si = scalings[i]
+        end
+        ratio = norm(δq̌i) / norm(q̌) 
+        traj.q̌[end] .= q̌ .+ si.*δq̌i/ratio
+    end
+    bot
+end
+
+function make_N(tg::TensegrityStructure,q0::AbstractVector)
+	(;rigidbodies,connectivity) = tg
+    (;nfree,nfull,syspres,sysfree,mem2sysfree,mem2sysincst,ninconstraints) = connectivity.indexed
+    function inner_N(q̌)
+        T = eltype(q̌)
+		q = Vector{T}(undef,nfull)
+		q[syspres] .= q0[syspres]
+		q[sysfree] .= q̌
+        ret = zeros(T,nfree,nfree-ninconstraints)
+        foreach(rigidbodies) do rb
+            rbid = rb.prop.id
+            (;lncs) = rb.state.cache.funcs
+			memfree = mem2sysfree[rbid]
+            if !isempty(mem2sysincst[rbid])
+                if lncs isa NaturalCoordinates.LNC3D12C
+                        u,v,w = NaturalCoordinates.get_uvw(lncs,q̌[memfree])
+                        N = @view ret[mem2sysfree[rbid],mem2sysincst[rbid]]
+                        N[1:3,1:3]   .= Matrix(1I,3,3)
+                        N[4:6,4:6]   .= -NaturalCoordinates.skew(u)
+                        N[7:9,4:6]   .= -NaturalCoordinates.skew(v)
+                        N[10:12,4:6] .= -NaturalCoordinates.skew(w)
+                elseif lncs isa NaturalCoordinates.LNC2D6C                    
+                        u,v = NaturalCoordinates.get_uv(lncs,q̌[memfree])
+                        N = @view ret[mem2sysfree[rbid],mem2sysincst[rbid]]
+                        N[1:2,1:2] .= Matrix(1I,2,2)
+                        N[3:4,3] .= -NaturalCoordinates.skew(u)
+                        N[5:6,3] .= -NaturalCoordinates.skew(v)
+                end
+            end
+        end
+        ret
     end
 end
+
+function get_poly(bot_input;
+        Ň
+    )
+    bot = deepcopy(bot_input)
+    (;tg) = bot
+    # (;ndof,nconstraints,connectivity) = bot.tg
+    # (;cables) = tg.tensiles
+    # (;nfull,nfree) = connectivity.indexed
+    # ncables = length(cables)
+    # nλ = nconstraints
+    gue = get_initial(tg)
+    Φ = make_Φ(tg,gue.q)
+    A = make_A(tg,gue.q)
+    Q̌ = make_Q̌(tg,gue.q)
+    S = make_S(tg,gue.q)
+    Ǩm_Ǩg = make_Ǩm_Ǩg(tg,gue.q)
+
+    pv = get_polyvar(tg)
+
+    pnq̌ = 1.0pv.q̌ .+ 0.0
+    pns = 1.0pv.s .+ 0.0
+    pnλ = 1.0pv.λ .+ 0.0
+    pnd = 1.0pv.d .+ 0.0
+    pnc = 1.0pv.c .+ 0.0
+    pnk = 1.0pv.k .+ 0.0
+    pnμ = 1.0pv.μ .+ 0.0
+    polyΦ = Φ(pnq̌,pnd,pnc)
+    polyA = A(pnq̌,pnc)
+    polyQ̌ = Q̌(pnq̌,pns,pnμ,pnk,pnc)
+    polyS = S(pnq̌,pns,pnc)
+    polyQ̌a = transpose(polyA)*pnλ
+    polyǨa = reduce(hcat,differentiate.(-polyQ̌a,Ref(pv.q̌))) |> transpose
+    polyǨm, polyǨg = Ǩm_Ǩg(pnq̌,pns,pnμ,pnk,pnc)
+    polyǨ = polyǨm .+ polyǨg .+ polyǨa
+    polyŇ = Ň(pnq̌,pnc)
+    poly𝒦 = transpose(polyŇ)*polyǨ*polyŇ
+
+    polyP = [
+        - polyQ̌ .- transpose(polyA)*pnλ ;
+        polyS;
+        polyΦ;
+        # poly𝒦*pnξ.-pnζ.*pnξ;
+        # transpose(pnξ)*pnξ-1;
+    ]
+
+    # Ǩ0 = TR.build_Ǩ(bot.tg,gue.λ)
+    # Ǩx = map(polyǨ) do z
+    # 		z(
+    # 			pv.q̌=>gue.q̌,
+    # 			pv.s=>gue.s,
+    # 			pv.λ=>gue.λ,
+    # 			pv.μ=>gue.μ,
+    # 			pv.k=>gue.k,
+    # 			pv.d=>gue.d,
+    # 			pv.c=>gue.c
+    # 		)
+    # 	end
+    # # @show Ǩ0
+    # @show Ǩ0.- Ǩx |> norm
+
+    # P0 = map(polyP) do z
+    # 	z(
+    # 		pvq̌=>q̌0,
+    # 		pvs=>s0,
+    # 		pvλ=>λ0,
+    # 		# pvξ=>ξ0,
+    # 		pvμ=>μ0,
+    # 		pvk=>k0,
+    # 	    pvd=>d0,
+    # 		pvc=>c0,
+    # 		# pv.ζ=>ζ0
+    # 	)
+    # end
+    # @show P0[                 1:nfree] |> norm
+    # @show P0[           nfree+1:nfree+ncables] |> norm
+    # @show P0[   nfree+ncables+1:nfree+ncables+nλ] |> norm
+    # @show P0[nfree+ncables+nλ+1:nfree+ncables+nλ+ndof]
+    # @show P0[end]
+    polyP,poly𝒦,gue,pv
+end
+
+function pinpoint(bot_input;
+        Ň
+    )
+	polyP, poly𝒦, gue, pv = get_poly(bot_input;Ň)
+	ň = length(pv.q̌)
+	ns = length(pv.s)
+	nλ = length(pv.λ)
+    function make_bf()
+        function inner_pp!(f,x)
+            q̌x = @view x[        1:ň]
+            sx = @view x[      ň+1:ň+ns]
+            λx = @view x[   ň+ns+1:ň+ns+nλ]
+			Px = map(polyP) do z
+                z(
+                    pv.q̌=>q̌x,
+                    pv.s=>sx,
+                    pv.λ=>λx,
+                    pv.μ=>gue.μ,
+                    pv.k=>gue.k,
+                    pv.d=>gue.d,
+                    pv.c=>gue.c,
+                )
+			end
+
+			f .= Px
+        end
+    end
+    f_holder = zeros(ň+ns+nλ)
+    x_initial = vcat(gue.q̌,gue.s,gue.λ)
+    pp! = make_bf()
+
+    pp = nlsolve(pp!,x_initial,ftol=1e-10,iterations=100,method=:newton)
+    # @show
+    pp!(f_holder,pp.zero)
+	# @show f_holder |> norm
+    # @show f_holder[                 1:ň+ns+nλ] |> norm
+    # @show f_holder[ň+ns+nλ+1:ň+ns+nλ+ndof] |> norm
+    # @show f_holder[end]
+    # @show  pp.zero[ň+ns+nλ+1:ň+ns+nλ+ndof]
+    # @show  pp.zero[end]
+    q̌ = pp.zero[        1:ň]
+    s = pp.zero[      ň+1:ň+ns]
+    λ = pp.zero[   ň+ns+1:ň+ns+nλ]
+    ini = @eponymtuple(
+			q̌,s,λ,
+			isconverged=converged(pp),
+			d=gue.d, c=gue.c, μ=gue.μ, k=gue.k
+	)
+	polyP, poly𝒦, ini, pv
+end
+
+function path_follow(bot_input;Ň)
+	polyP, poly𝒦, ini, pv = pinpoint(bot_input;Ň)
+	variable_groups = [pv.q̌,pv.s,pv.λ]
+	parameters = [pv.d;pv.c;pv.k;pv.μ]
+	startsols = [[ini.q̌;ini.s;ini.λ]]
+	start_parameters = [ini.d;ini.c;ini.k;ini.μ]
+	target_parameters = [ini.d;ini.c;ini.k;ini.μ.+1.0]
+	Psys = System(polyP;parameters)
+	result = HomotopyContinuation.solve(
+			Psys,
+			startsols;
+			start_parameters,
+			target_parameters,
+			threading = false
+	)
+	path_results = results(result)
+	if length(path_results) != 1
+		@show failed(result)
+		error("Tracking failed.")
+	end
+	path_result1 = path_results[1]
+	sol = real(solution(path_result1))
+	q̌,s,λ = split_by_lengths(sol,length.(variable_groups))
+	@eponymtuple(q̌,s,λ)
+end
+
+function path_follow_critical(bot_input)
+	polyP, ini, pv = pinpoint_critical(bot_input)
+	variable_groups = [pv.q̌,pv.s,pv.λ,pv.ξ,[pv.ζ]]
+	parameters = [pv.d;pv.c;pv.k;pv.μ]
+	startsols = [[ini.q̌;ini.s;ini.λ;ini.ξ;ini.ζ]]
+	start_parameters = [ini.d;ini.c;ini.k;ini.μ]
+	target_parameters = [ini.d;ini.c;ini.k;ini.μ.+1.0]
+	Psys = System(polyP;parameters)
+	result = HomotopyContinuation.solve(
+			Psys,
+			startsols;
+			start_parameters,
+			target_parameters,
+			threading = false
+	)
+	path_results = results(result)
+	if length(path_results) != 1
+		@show failed(result)
+		error("Tracking failed.")
+	end
+	path_result1 = path_results[1]
+	sol = real(solution(path_result1))
+	q̌,s,λ,ξ,ζ = TR.split_by_lengths(sol,length.(variable_groups))
+	@eponymtuple(q̌,s,λ,ξ,ζ)
+end
+
+

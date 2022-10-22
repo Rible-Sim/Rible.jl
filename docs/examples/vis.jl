@@ -6,20 +6,26 @@ to_resolution(dpi,len) = uconvert(Unitful.NoUnits,dpi*len)
 
 pt2px(x, ppi = 300*u"px"/1u"inch") = ustrip(u"px",x*u"pt"*ppi)
 
-fontsize = 8 |> pt2px
-markersize = 0.5fontsize
-linewidth = 0.5 |> pt2px
+fontsize::Float64 = 8 |> pt2px
+markersize::Float64 = 0.5fontsize
+linewidth::Float64 = 0.5 |> pt2px
 # cablewidth = 0.75 |> pt2px
 # barwidth = 1.5 |> pt2px
-const cw = 455 |> pt2px
-const tw = 455 |> pt2px
-const th = 688.5 |> pt2px
+cw::Float64 = 455 |> pt2px
+tw::Float64 = 455 |> pt2px
+th::Float64 = 688.5 |> pt2px
 455.24411
-const mks_cyc = Iterators.cycle(["o","v","^","s","P","X","d","<",">","h"])
-const lss_cyc = Iterators.cycle(["-","--","-.",":"])
-const alphabet = join('a':'z')
-
-const tlabel = L"t~(\mathrm{s})"
+mks_cyc::Base.Iterators.Cycle{Vector{String}} = Iterators.cycle(["o","v","^","s","P","X","d","<",">","h"])
+lss_cyc::Base.Iterators.Cycle{Vector{String}} = Iterators.cycle(["-","--","-.",":"])
+alphabet::String = join('a':'z')
+tenmarkers::Vector{Symbol} = [
+    :xcross,:cross,
+    :utriangle,:dtriangle,
+    :ltriangle,:rtriangle,
+    :diamond,:hexagon,
+    :star8,:star5
+]
+tlabel::LaTeXString = L"t~(\mathrm{s})"
 
 function hidex(ax)
     ax.xticklabelsvisible = false
@@ -61,6 +67,11 @@ theme_pub = Theme(;
     resolution=(0.9tw,0.8tw),
     palette = (
         vlinecolor = [:slategrey],
+    ),
+    Axis = (
+        titlefont = "CMU Serif Bold",
+        titlesize = fontsize,
+        titlegap = 0
     ),
     Axis3 = (
         titlefont = "CMU Serif Bold",
@@ -165,9 +176,14 @@ function get_groundmesh(::Nothing,rect)
     get_groundmesh(plane,rect)
 end
 
+function fullupdate!(tg)
+    TR.update!(tg)
+    TR.update_orientations!(tg)
+end
 function plot_traj!(bot::TR.TensegrityRobot;
             AxisType=LScene,
             figsize=:FHD,
+            fig = Figure(resolution=match_figsize(figsize)),
             gridsize=(1,1),
             attimes=nothing,
             atsteps=nothing,
@@ -186,14 +202,22 @@ function plot_traj!(bot::TR.TensegrityRobot;
             fontsize=20,
             actuate=false,
             figname=nothing,
-            sup! = (x,y)->nothing,
+            colorbar=nothing,
+            showcb=false,
+            rowgap=2fontsize,
+            titleformatfunc = (sgi,tt)-> begin
+                @sprintf "(%s) t = %.10G (s)" alphabet[sgi] tt
+            end,
+            sup! = (ax,tgob,sgi)->nothing,
             kargs...)
     (;tg,traj) = bot
+    tg.state.system.q .= traj.q[begin]
+    fullupdate!(tg)
+    tgobini = Observable(deepcopy(tg))
     showmesh = mapreduce(&, TR.get_rigidbodies(tg)) do rb
             rb.mesh isa GeometryBasics.Mesh
     end
     ndim = TR.get_ndim(tg)
-    fig = Figure(resolution=match_figsize(figsize))
     xmin,xmax = xlims
     ymin,ymax = ylims
     zmin,zmax = zlims
@@ -222,20 +246,22 @@ function plot_traj!(bot::TR.TensegrityRobot;
 
     # @warn "Overwriting `atsteps`"
     # @warn "Ignoring `attimes`"
-    rowgap!(grid1,2fontsize)
+    rowgap!(grid1,rowgap)
 	# colgap!(grid1,10fontsize)
-    for sgi in eachindex(subgrids)
-        sg = subgrids[sgi]
-        this_time = Observable(traj.t[parsed_steps[sgi]])
-        tg.state.system.q .= traj.q[parsed_steps[sgi]]
-        tg.state.system.c .= traj.c[parsed_steps[sgi]]
-        TR.update_points!(tg)
-        TR.update!(tg)
-        TR.update_orientations!(tg)
-
+    for sgi in eachindex(parsed_steps)
+        if sgi > length(subgrids)
+            sg = subgrids[end]
+        else
+            sg = subgrids[sgi]
+        end
+        this_step = parsed_steps[sgi]
+        this_time = Observable(traj.t[this_step])
+        tg.state.system.c .= traj.c[this_step]
+        tg.state.system.q .= traj.q[this_step]
+        fullupdate!(tg)
         tgob = Observable(deepcopy(tg))
         axtitle = lift(this_time) do tt
-            @sprintf "(%s) t = %.10G (s)" alphabet[sgi] tt
+            titleformatfunc(sgi,tt)
         end
         if ndim == 2 && !showmesh
             # showinfo = false
@@ -262,16 +288,33 @@ function plot_traj!(bot::TR.TensegrityRobot;
         else
             error("Unknown AxisType")
         end
-        sup!(ax,tgob)
         if showground
             rect = Rect3f((xmin,ymin,zmin),(xwid,ywid,zwid))
             groundmesh = get_groundmesh(ground,rect)
             mesh!(ax,groundmesh;color = :snow)
         end
         if showinit
-            init_plot!(ax,deepcopy(tgob);showmesh,showwire,isref=true,kargs...)
+            # init_plot!(ax,deepcopy(tgob);showmesh,showwire,isref=true,showpoints,kargs...)
+            sup!(ax,tgobini,sgi)
+            init_plot!(ax,tgobini;showmesh,showwire,isref=true,showpoints,kargs...)
         end
-        init_plot!(ax,tgob;showlabels,showmesh,showwire,fontsize,kargs...)
+        if colorbar isa Nothing
+            rigidcolor = :slategray4
+        else
+            rigidcolor = colorbar.colormap[sgi]
+            if showcb
+                Colorbar(sg[1, 2]; 
+                        size = fontsize,
+                        colorbar...
+                    )
+            end
+        end
+        sup!(ax,tgob,sgi)
+        init_plot!(ax,tgob;
+            showlabels,showmesh,showwire,fontsize,showpoints,
+            rigidcolor,
+            kargs...
+        )
 
         if doslide
             if showinfo
@@ -281,13 +324,13 @@ function plot_traj!(bot::TR.TensegrityRobot;
                     "fig. height" => lift(string,ax.height),
                     "fig. width" => lift(string,ax.width)
                 ]
-                if ndim == 3 && AxisType isa Axis3
+                if ndim == 3 && AxisType == Axis3
                     cam_info = [
                         "azimuth" => lift(string,ax.azimuth),
                         "elevation" => lift(string,ax.elevation)
                     ]
+                    append!(dict_info,cam_info)
                 end
-                # dict_info = cam_info
                 for (i,(infoname,infovalue)) in enumerate(dict_info)
                     Label(grid_info[i,1],
                         lift(infovalue) do iv
@@ -310,17 +353,15 @@ function plot_traj!(bot::TR.TensegrityRobot;
             grid3 = sg[2,:] = GridLayout()
             slidergrid = SliderGrid(
                 grid3[1,1],
-                (label = "Step", range = 1:length(traj), startvalue = parsed_steps[sgi]),
+                (label = "Step", range = 1:length(traj), startvalue = this_step),
             )
             on(slidergrid.sliders[1].value) do this_step
-                tg.state.system.q .= traj.q[this_step]
-                # tg.state.system.c .= traj.c[this_step]
-                TR.update_points!(tg)
                 if actuate
                     TR.actuate!(bot,[traj.t[this_step]])
                 end
-                TR.update!(tg)
-                TR.update_orientations!(tg)
+                tg.state.system.q .= traj.q[this_step]
+                tg.state.system.c .= traj.c[this_step]
+                fullupdate!(tg)
                 # @show TR.mechanical_energy(tg)
                 #
                 this_time[] = traj.t[this_step]
@@ -329,8 +370,10 @@ function plot_traj!(bot::TR.TensegrityRobot;
             end
         end
     end
-    savefig(fig,figname)
-    DataInspector(fig)
+    if fig isa Figure
+        savefig(fig,figname)
+        DataInspector(fig)
+    end
     fig
 end
 
@@ -341,9 +384,11 @@ function savefig(fig,figname=nothing)
         else
             figpath = figname
         end
-        if Makie.current_backend[] isa CM.CairoBackend
+        if Makie.current_backend() == CM
+            @info "Saving to $figpath.pdf"
             CM.save(figpath*".pdf",fig)
         else
+            @info "Saving to $figpath.png"
             GM.save(figpath*".png",fig)
         end
     end
@@ -359,8 +404,8 @@ function init_plot!(ax,tgob;isref=false,
         cablecolor=:deepskyblue,
         cablelabelcolor=:darkgreen,
         rigidcolor=:slategray4,
-        rigidlabelcolor=:darkblue,
-        kargs...)
+        rigidlabelcolor=:darkblue
+    )
     (;tensiles,nrigids) = tgob[]
     ncables = length(tensiles.cables)
     ndim = TR.get_ndim(tgob[])
@@ -417,38 +462,7 @@ function init_plot!(ax,tgob;isref=false,
             )
         end
     end
-    # rigid bars
-    # rigidbars = TR.get_rigidbars(tgob[])
-    # if !isempty(rigidbars)
-    #     if ndim == 2
-    #         linesegs_bars = @lift begin
-    #             bars = TR.get_rigidbars($tgob)
-    #             ndim = TR.get_ndim($tgob)
-    #             T = TR.get_numbertype($tgob)
-    #             ret = Vector{Pair{Point{ndim,T},Point{ndim,T}}}()
-    #             mapreduce(
-    #                 (bar)->
-    #                 Point(bar.state.rps[1]) =>
-    #                 Point(bar.state.rps[2]),
-    #                 vcat,
-    #                 bars
-    #                 ;init=ret
-    #             )
-    #         end
-    #         linesegments!(ax, linesegs_bars, color = rigidcolor, linewidth = 4)
-    #     else
-    #         cyl_bars_mesh = @lift begin
-    #         	bars = TR.get_rigidbars($tgob)
-    #         	mapreduce(
-    #         		bar2mesh,
-    #         		Meshes.merge,
-    #         		bars[2:end]
-    #         		;init = bar2mesh(bars[1])
-    #         	) |> simple2mesh
-    #         end
-    #         mesh!(ax, cyl_bars_mesh, color = :slategray4, shading = true, )
-    #     end
-    # end
+
     rbsob = @lift begin
         TR.get_rigidbodies($tgob)
     end
@@ -488,7 +502,7 @@ function init_plot!(ax,tgob;isref=false,
         for rbid = 1:nrigids
     ]
     if showpoints
-        scatter!(ax,rg_by_rbs; color = rigidlabelcolor, markersize)
+        scatter!(ax,rg_by_rbs; color = rigidlabelcolor)
         for (rbid,rps) in enumerate(rps_by_rbs)
             scatter!(ax,rps)
         end
@@ -548,7 +562,7 @@ function update_rigidmesh(rb)
     rot = LinearMap(R)
     ct = trans ∘ rot
     updated_pos = ct.(mesh.position)
-    fac = faces(mesh)
+    fac = GeometryBasics.faces(mesh)
     nls = normals(updated_pos,fac)
     GeometryBasics.Mesh(meta(updated_pos,normals=nls),fac)
 end
@@ -558,15 +572,15 @@ function make_patch(;trans=[0.0,0,0],rot=RotX(0.0))
     function patch(mesh)
         ct = Translation(trans) ∘ LinearMap(rot)
         updated_pos = ct.(mesh.position)
-        fac = faces(mesh)
+        fac = GeometryBasics.faces(mesh)
         nls = normals(updated_pos,fac)
         GeometryBasics.Mesh(meta(updated_pos,normals=nls),fac)
     end
 end
 
-function ep2mesh(p1,p2)
+function endpoints2mesh(p1,p2;long=400)
 	s = Meshes.Segment(Meshes.Point(p1),Meshes.Point(p2))
-	cyl_bar = Meshes.Cylinder(Meshes.length(s)/400,s)
+	cyl_bar = Meshes.Cylinder(Meshes.length(s)/long,s)
     cylsurf_bar = Meshes.boundary(cyl_bar)
     # Meshes.sample(cylsurf_bar,Meshes.RegularSampling(10,3))
 	cyl_bar_simple = Meshes.discretize(cylsurf_bar,Meshes.RegularDiscretization(10,2))
@@ -640,4 +654,171 @@ function simple2mesh(sp)
 	# tmatrix = reduce(hcat, tconnec) |> transpose |> Matrix
     nls = normals(points,faces)
     GeometryBasics.Mesh(meta(points,normals=nls),faces)
+end
+
+function plotsave_energy(bot,figname=nothing)
+	(;traj) = bot
+	(;t) = traj
+	tmin,tmax = t[begin], t[end]
+	titles = [
+		"机械能",
+		"动能",
+		"势能"
+	]
+	with_theme(theme_pub; resolution = (0.9tw,0.6tw)) do
+		ME = TR.mechanical_energy!(bot;gravity=true)
+		fig = Figure()
+		axs = [
+			begin
+				ax = Axis(
+					fig[i,1],
+					xlabel=L"t~\mathrm{(s)}",
+					ylabel="Energy (J)",
+					title=titles[i]
+				)
+				xlims!(ax,tmin,tmax)
+				# ylims!(ax,,)
+				if i !== 3
+					ax.xlabelvisible = false
+					ax.xticklabelsvisible = false
+				end
+				Label(fig[i,1,TopLeft()], "($(alphabet[i]))")
+				ax
+			end
+			for i = 1:3
+		]
+
+		lines!(axs[1], t, ME.E)
+		lines!(axs[2], t, ME.T)
+		lines!(axs[3], t, ME.V)
+
+
+		savefig(fig,figname)
+
+		fig
+	end
+end
+
+
+function plotsave_friction_direction(bots,x,xs,figname=nothing;
+        resolution = (0.9tw,0.4tw),
+        mo = 8,
+        mo_α = mo,
+        vtol=1e-5,
+    )
+	with_theme(theme_pub;
+        resolution
+	) do
+		fig = Figure()
+		for (botid,bot) in enumerate(bots)
+			ax1 = Axis(fig[botid,1],
+						xlabel=tlabel,
+						ylabel=L"\delta\alpha~(\mathrm{Rad})",
+						title=latexstring("$x$(xs[botid])")
+				)
+			ax2 = Axis(fig[botid,2],
+						xlabel=tlabel,
+						ylabel=L"\delta\theta~(\mathrm{Rad})",
+						title=latexstring("$x$(xs[botid])")
+				)
+			Label(fig[botid,1,TopLeft()],"($(alphabet[2botid-1]))")
+			Label(fig[botid,2,TopLeft()],"($(alphabet[2botid]))")
+			(;t) = bot.traj
+			contacts_traj_voa = VectorOfArray(bot.contacts_traj)
+            if eltype(xs) <: Int
+			    c1s = contacts_traj_voa[xs[botid],:]
+            else
+                c1s = contacts_traj_voa[1,:]
+            end
+			idx_sli = findall(c1s) do c
+						issliding(c;vtol)
+					end
+			idx_imp = findall(isimpact,c1s) ∩ idx_sli
+			δα_imp = map(c1s[idx_imp]) do c
+						get_contact_angle(c)
+					end
+			idx_per = findall(doespersist,c1s) ∩ idx_sli
+            # @show idx_per[begin]
+			δα_per = map(c1s[idx_per]) do c
+						get_contact_angle(c)
+					end
+			scaling = 10.0^(-mo_α)
+			Label(fig[botid,1,Top()],latexstring("\\times 10^{-$(mo_α)}"))
+			markersize = fontsize
+			scatter!(ax1,idx_per,δα_per./scaling;
+						marker=:diamond, markersize)
+			scatter!(ax1,idx_imp,δα_imp./scaling;
+						marker=:xcross, markersize)
+			ylims!(ax1,-1.0,1.0)
+			# xlims!(ax1,extrema(t)...)
+
+			θ_imp = map(c1s[idx_imp]) do c
+					get_friction_direction(c)
+				end
+			θ_per = map(c1s[idx_per]) do c
+					get_friction_direction(c)
+				end
+			scaling = 10.0^(-mo)
+			Label(fig[botid,2,Top()],latexstring("\\times 10^{-$(mo)}"))
+			scatter!(ax2,t[idx_per],(θ_per.-π/4)./scaling, label="Persistent";
+						marker=:diamond, markersize)
+			scatter!(ax2,t[idx_imp],(θ_imp.-π/4)./scaling, label="Impact";
+						marker=:xcross, markersize)
+			xlims!(ax2,extrema(t)...)
+			ylims!(ax2,-1.0,1.0)
+			if botid !== length(bots)
+				hidex(ax1)
+				hidex(ax2)
+			else
+				Legend(fig[length(bots)+1,:],ax2;
+					orientation=:horizontal
+				)
+			end
+		end
+		rowgap!(fig.layout,fontsize/2)
+		savefig(fig,figname)
+		fig
+	end
+end
+
+
+function plotsave_error(mbots,dts,figname=nothing;
+        resolution = (0.8tw,0.3tw),
+    )
+	with_theme(theme_pub;
+            resolution,
+            figure_padding = (0,fontsize,0,0),
+		) do
+		fig = Figure()
+		for j in axes(mbots,2)
+			bots = mbots[:,j]
+			nbots = length(bots)
+			itp = interpolate(get_trajectory!(bots[nbots],1,0)[1,:], BSpline(Linear()))
+			ref_traj = scale(itp,0:dts[nbots]:bots[nbots].traj.t[end])
+			# ref_traj(0:0.1:2)
+			err_avg = [
+				get_trajectory!(bots[i],1,0)[1,begin:end-1].-ref_traj(bots[i].traj.t[begin:end-1]) .|> abs |> mean
+				for (i,dt) in enumerate(dts[1:nbots-1])
+			]
+
+			ax = Axis(fig[1,j];
+				xlabel = L"h",
+				ylabel = "Avg. Err.",
+				yscale = Makie.log10,yminorticksvisible = true, yminorgridvisible = true,yminorticks = IntervalsBetween(8),
+				xscale = Makie.log10,xminorticksvisible = true, xminorgridvisible = true,xminorticks = IntervalsBetween(8),
+				)
+			Label(fig[1,j,TopLeft()],"($(alphabet[j]))")
+			scatterlines!(ax,dts[1:nbots-1],err_avg;marker=:rect,color=:red,label="Error of NMSI")
+			lines!(ax,dts[1:nbots-1],err_avg[1] .*(dts[1:nbots-1]./dts[1]).^2,label="2nd-Order")
+			lines!(ax,dts[1:nbots-1],err_avg[1] .*(dts[1:nbots-1]./dts[1]),label="1st-Order")
+			# ylims!(ax,1e-11,1e-2)
+			if j == 1
+				axislegend(ax;position=:rb)
+			else
+				hidey(ax)
+			end
+		end
+		savefig(fig,figname)
+		fig
+	end
 end

@@ -217,13 +217,24 @@ function forward_sequence(Psys::HomotopyContinuation.System,
 end
 
 function forward_sequence(tg::TensegrityStructure,
-                        startsols,
-                        start_parameters,
-                        target_parameters,
-                        mode=PrimalMode();F̌=reshape(build_Ǧ(tg),:,1))
+        startsols,
+        start_parameters,
+        target_parameters,
+        mode=PrimalMode();
+        F̌=reshape(build_Ǧ(tg),:,1),
+        n=1
+    )
     P,var_lens,parameters = forward_system(tg,mode;F̌)
-    Psys = System(P;parameters)
-    forward_sequence(Psys,var_lens,startsols,start_parameters,target_parameters)
+    parameter_points = [
+        start_parameters,
+        target_parameters,
+    ]
+    Psys, ide_pindx = find_diff_system(
+                P,parameters,
+                parameter_points
+            )
+    # Psys = System(P;parameters)
+    forward_sequence(Psys,var_lens,startsols,start_parameters,target_parameters,ide_pindx;n)
 end
 
 function forward_multi_sequence(Psys::HomotopyContinuation.System,

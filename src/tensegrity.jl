@@ -603,14 +603,15 @@ end
 
 function update_points!(tg)
 	(;rigidbodies,state) = tg
+    (;mem2num,num2sys) = tg.connectivity.numbered
+    (;c) = state.system
     foreach(rigidbodies) do rb
         rbid = rb.prop.id
 		(;nr̄ps) = rb.prop
         (;Cps,funcs) = rb.state.cache
-		(;c) = state.rigids[rbid]
-		nld = get_nlocaldim(rb)
         for pid in 1:nr̄ps
-            Cps[pid] = funcs.C(c[nld*(pid-1)+1:nld*pid])
+			cidx = mem2num[rbid][pid]
+            Cps[pid] = funcs.C(c[num2sys[cidx]])
         end
     end
 end
@@ -697,6 +698,7 @@ end
 
 function update!(tg::AbstractTensegrityStructure; gravity=false)
     clear_forces!(tg)
+    update_points!(tg)
     update_rigids!(tg)
     update_tensiles!(tg)
     # update_clustercables_apply_forces!(tg)
@@ -922,16 +924,22 @@ function get_initial(tg)
 end
 
 function get_polyvar(tg)
-	ini = get_initial(tg)
+    (;nconstraints,connectivity,tensiles) = tg
+    (;cables) = tensiles
+    (;indexed,numbered,) = connectivity
+    (;nc) = numbered
+    (;ninconstraints) = indexed
+    (;nfree) = indexed
+    ncables = length(cables)
 	# state variables
-    @polyvar q̌[1:length(ini.q̌)]
-    @polyvar s[1:length(ini.s)]
-    @polyvar λ[1:length(ini.λ)]
+    @polyvar q̌[1:nfree]
+    @polyvar s[1:ncables]
+    @polyvar λ[1:nconstraints]
     # parameters
-	@polyvar d[1:length(ini.d)]
-    @polyvar c[1:length(ini.c)]
-    @polyvar k[1:length(ini.k)]
-    @polyvar μ[1:length(ini.μ)]
+	@polyvar d[1:nconstraints]
+    @polyvar c[1:nc]
+    @polyvar k[1:ncables]
+    @polyvar μ[1:ncables]
 	@eponymtuple(q̌,s,λ,d,c,k,μ,)
 end
 
@@ -988,10 +996,16 @@ function get_s(tg::TensegrityStructure)
     1 ./get_cables_len(tg)
 end
 
-get_c(bot::TensegrityRobot) = get_c(bot.tg)
-function get_c(tg::TensegrityStructure)
-	get_c(tg.rigidbodies,tg.connectivity.numbered)
+function get_c(tg,rbid,pid)
+    (;mem2num,num2sys) = tg.connectivity.numbered
+    (;c) = tg.state.system
+    cidx = mem2num[rbid][pid]
+    c[num2sys[cidx]]
 end
+
+get_c(bot::TensegrityRobot) = get_c(bot.tg)
+get_c(tg::TensegrityStructure) = copy(tg.state.system.c)
+
 function get_c(rigidbodies,numbered::NumberedPoints)
     ndim = get_ndim(rigidbodies)
     T = get_numbertype(rigidbodies)
@@ -1227,6 +1241,7 @@ function reset!(bot::TensegrityRobot)
     (;tg, traj) = bot
     (;q, q̇) = traj
     clear_forces!(tg)
+    update_points!(tg)
     update_rigids!(tg,q[begin],q̇[begin])
     update_tensiles!(tg)
     resize!(traj,1)
@@ -1249,6 +1264,7 @@ $(TYPEDSIGNATURES)
 """
 function goto_step!(bot::TensegrityRobot,that_step;actuate=false)
 	(;tg, traj) = bot
+    tg.state.system.c .= traj.c[that_step]
     tg.state.system.q .= traj.q[that_step]
     tg.state.system.q̇ .= traj.q̇[that_step]
 	if actuate
@@ -1260,7 +1276,7 @@ end
 
 function analyse_slack(tg::AbstractTensegrityStructure,verbose=false)
 	(;cables) = tg.tensiles
-	slackcases = [cable.id for cable in cables if cable.state.length <= cable.state.restlen]
+	slackcases = [cable.id for cable in cables if cable.slack && (cable.state.length <= cable.state.restlen)]
 	if verbose && !isempty(slackcases)
 		@show slackcases
 	end
@@ -1288,20 +1304,23 @@ function potential_energy_gravity(tg::TensegrityStructure)
 	end
 	V[]
 end
-
-"""
-返回系统机械能。
-$(TYPEDSIGNATURES)
-"""
-function mechanical_energy(tg::TensegrityStructure;gravity=false)
-	T = kinetic_energy(tg)
-	V = zero(T)
+function potential_energy(tg::TensegrityStructure;gravity=false)
+	V = zero(get_numbertype(tg))
 	if gravity
 		V += potential_energy_gravity(tg)
 	end
 	if !isempty(tg.tensiles.cables)
 		V += sum(potential_energy.(tg.tensiles.cables))
 	end
+	V
+end
+"""
+返回系统机械能。
+$(TYPEDSIGNATURES)
+"""
+function mechanical_energy(tg::TensegrityStructure;gravity=false)
+	T = kinetic_energy(tg)
+	V = potential_energy(tg;gravity)
 	E = T+V
 	@eponymtuple(T,V,E)
 end
