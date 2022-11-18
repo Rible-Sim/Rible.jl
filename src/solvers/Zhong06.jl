@@ -1,12 +1,13 @@
 struct Zhong06 <: AbstractSolver end
 
-struct Zhong06Cache{MMT,AT,ΦT}
+struct Zhong06Cache{solT,MMT,AT,ΦT}
+    solver::solT
     mass_matrices::MMT
     A::AT
     Φ::ΦT
 end
 
-function generate_cache(::Zhong06,intor;dt,kargs...)
+function generate_cache(solver::Zhong06,intor;dt,kargs...)
     (;prob) = intor
     (;bot,dynfuncs) = prob
     # F!,_ = dynfuncs
@@ -14,7 +15,7 @@ function generate_cache(::Zhong06,intor;dt,kargs...)
     # (;M) = mm
     A = make_A(bot)
     Φ = make_Φ(bot)
-    Zhong06Cache(mm,A,Φ)
+    Zhong06Cache(solver,mm,A,Φ)
 end
 
 function retrieve!(intor,cache::Zhong06Cache)

@@ -216,7 +216,7 @@ me = TR.mechanical_energy!(unibot_e5)
 me.E |> lines
 
 
-GM.activate!(); plotsave_friction_direction([unibot_e5],L"e=",[0.5]; resolution = (0.9tw,0.28tw))
+GM.activate!(); plotsave_friction_direction([unibot_e5],L"e",[0.5]; resolution = (0.9tw,0.28tw))
 
 CM.activate!(); plotsave_friction_direction(
 		[unibot_e5],L"e=",[0.5], 
@@ -294,7 +294,7 @@ CM.activate!(); plotsave_point_traj_vel([unibot_e5],"unibot_contact_point_traj_v
 
 #dt
 dts = [1e-2,3e-3,1e-3,3e-4,1e-4,1e-5]
-dts = [1e-2]
+# dts = [1e-2]
 
 unibot_z0 = [
 	TR.solve!(
@@ -347,7 +347,7 @@ GM.activate!(); with_theme(theme_pub;
 		showinfo = false,
 		# showlabels = false,
 		showground = false,
-		sup! = (ax,_) -> begin
+		sup! = (ax,_,_) -> begin
 			ax.zlabeloffset = 2fontsize
 			ax.azimuth = 3.315530633326984
 			ax.elevation = 0.2326990816987242

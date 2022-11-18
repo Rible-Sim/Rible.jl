@@ -48,19 +48,24 @@ function RigidBodyProperty(id::Integer,movable::Bool,
 							mtype(inertia_input),vtype(r̄g),nr̄ps,vtype.(r̄ps))
 end
 
-struct NaturalCoordinatesCache{ArrayT,MT,fT}
+struct NonminimalCoordinatesCache{fT,MT,JT,VT,ArrayT}
     constrained_index::Vector{Int}
     unconstrained_index::Vector{Int}
 	Φi::Vector{Int}
     nΦ::Int
     funcs::fT
     M::MT
+	M⁻¹::MT
+	∂Mq̇∂q::JT
+	∂M⁻¹p∂q::JT
+	Ṁq̇::VT
+    ∂T∂qᵀ::VT
     Co::ArrayT
     Cg::ArrayT
     Cps::Vector{ArrayT}
 end
 
-function NaturalCoordinatesCache(prop::RigidBodyProperty{N,T,iT},
+function get_CoordinatesCache(prop::RigidBodyProperty{N,T,iT},
                                  lncs::NaturalCoordinates.LNC,
 								 ci=Vector{Int}(),
 								 Φi=get_all_Φi(lncs)) where {N,T,iT}
@@ -69,6 +74,11 @@ function NaturalCoordinatesCache(prop::RigidBodyProperty{N,T,iT},
 	nΦ = length(Φi)
 	cf = NaturalCoordinates.CoordinateFunctions(lncs,uci,Φi)
     M = NaturalCoordinates.make_M(cf,mass,inertia,r̄g)
+	M⁻¹ = inv(M)
+	∂Mq̇∂q = zero(M)
+	∂M⁻¹p∂q = zero(M)
+	Ṁq̇ = @MVector zeros(T,size(M,2))
+	∂T∂qᵀ = @MVector zeros(T,size(M,2))
     (;C,c) = cf
     Co = C(c(zeros(T,N)))
     Cg = C(c(r̄g))
@@ -80,7 +90,38 @@ function NaturalCoordinatesCache(prop::RigidBodyProperty{N,T,iT},
             @error "Rigid body not constrained. No index should be specified."
         end
     end
-    NaturalCoordinatesCache(ci,uci,Φi,nΦ,cf,M,Co,Cg,Cps)
+    NonminimalCoordinatesCache(ci,uci,Φi,nΦ,cf,M,M⁻¹,∂Mq̇∂q,∂M⁻¹p∂q,Ṁq̇,∂T∂qᵀ,Co,Cg,Cps)
+end
+
+function get_CoordinatesCache(prop::RigidBodyProperty{N,T,iT},
+								qcs::QuaternionCoordinates.QC,
+								ci=Vector{Int}(),
+								Φi=get_all_Φi(qcs)) where {N,T,iT}
+	(;mass,inertia,r̄g,nr̄ps,r̄ps) = prop
+	# uci = QuaternionCoordinates.get_unconstrained_indices(qcs,ci)
+	uci = deleteat!(collect(1:7),ci)
+	nΦ = length(Φi)
+	cf = QuaternionCoordinates.CoordinateFunctions(qcs)
+	M = MMatrix{7,7}(Matrix(one(T)*I,7,7))
+	M⁻¹ = MMatrix{7,7}(Matrix(one(T)*I,7,7))
+	∂Mq̇∂q = @MMatrix zeros(T,7,7)
+	∂M⁻¹p∂q = @MMatrix zeros(T,7,7)
+	Ṁq̇ = @MVector zeros(T,7)
+	∂T∂qᵀ = @MVector zeros(T,7)
+    Co = MMatrix{3,7}(zeros(T,3,7))
+	for i = 1:3
+		Co[i,i] = 1
+	end
+    Cg = deepcopy(Co)
+    Cps = [deepcopy(Co) for i in 1:nr̄ps]
+    if prop.movable
+        if prop.constrained && ci == Vector{Int}()
+            @error "Rigid body constrained, but no index specified."
+        elseif !prop.constrained && !(ci == Vector{Int}())
+            @error "Rigid body not constrained. No index should be specified."
+        end
+    end
+	NonminimalCoordinatesCache(ci,uci,Φi,nΦ,cf,M,M⁻¹,∂Mq̇∂q,∂M⁻¹p∂q,Ṁq̇,∂T∂qᵀ,Co,Cg,Cps)
 end
 
 """
@@ -126,7 +167,7 @@ $(TYPEDSIGNATURES)
 `Φi`为约束方程的索引。
 """
 function RigidBodyState(prop::RigidBodyProperty{N,T},
-                        lncs::NaturalCoordinates.LNC,
+                        lncs,
                         r_input,rotation_input,ṙ_input,ω_input,
                         ci=Vector{Int}(),
 						Φi=get_all_Φi(lncs)) where {N,T}
@@ -142,7 +183,7 @@ function RigidBodyState(prop::RigidBodyProperty{N,T},
 	if N==3
 	    ω = MVector{N}(ω_input)
 	else
-		ω =MVector{1}([ω_input])
+		ω = MVector{1}([ω_input])
 	end
     rg = MVector{N}(ro+R*r̄g)
     ṙg = MVector{N}(ṙo+ω×(rg-ro))
@@ -154,7 +195,7 @@ function RigidBodyState(prop::RigidBodyProperty{N,T},
     fps = [@MVector zeros(T,N) for i in 1:nr̄ps]
     τps = [zero(τ) for i in 1:nr̄ps]
 
-	cache = NaturalCoordinatesCache(prop,lncs,ci,Φi)
+	cache = get_CoordinatesCache(prop,lncs,ci,Φi)
 
     RigidBodyState(ro,R,ṙo,ω,rg,ṙg,rps,ṙps,f,τ,fps,τps,cache)
 end
@@ -175,6 +216,121 @@ struct RigidBody{N,T,L,M,cacheType,meshType} <: AbstractRigidBody{N,T}
 end
 
 RigidBody(prop,state) = RigidBody(prop,state,nothing)
+
+
+update_rigid!(rb::RigidBody,q,q̇) = update_rigid!(rb.state,rb.state.cache,rb.prop,q,q̇)
+move_rigid!(rb::RigidBody,q,q̇)	= move_rigid!(rb.state,rb.state.cache,rb.prop,q,q̇)
+stretch_rigid!(rb::RigidBody,c) = stretch_rigid!(rb.state.cache,rb.prop,c)
+update_transformations!(rb::RigidBody,q) = update_transformations!(rb.state.cache,rb.state,rb.prop,q)
+
+function update_rigid!(state::RigidBodyState,
+			cache::NonminimalCoordinatesCache{<:NaturalCoordinates.CoordinateFunctions},
+			prop::RigidBodyProperty,q,q̇)
+	(;cache,ro,R,ṙo,ω,rg,ṙg) = state
+	(;funcs,Co,Cg) = cache
+	(;nmcs) = funcs
+	mul!(ro, Co, q)
+	mul!(ṙo, Co, q̇)
+	mul!(rg, Cg, q)
+	mul!(ṙg, Cg, q̇)
+	R .= NaturalCoordinates.find_R(nmcs,q)
+	ω .= NaturalCoordinates.find_ω(nmcs,q,q̇)
+end
+
+function update_rigid!(state::RigidBodyState,
+			cache::NonminimalCoordinatesCache{<:QuaternionCoordinates.CoordinateFunctions},
+			prop::RigidBodyProperty,x,ẋ)
+	(;cache,ro,R,ṙo,ω,rg,ṙg) = state
+	(;M,M⁻¹,∂Mq̇∂q,∂M⁻¹p∂q,∂T∂qᵀ,funcs) = cache
+	# update inertia
+	# @show x[4:7],ẋ[4:7]
+	M .= funcs.build_M(x)
+	M⁻¹ .= funcs.build_M⁻¹(x)	
+	∂Mq̇∂q .= funcs.build_∂Mẋ∂x(x,ẋ)
+	∂M⁻¹p∂q .= funcs.build_∂M⁻¹y∂x(x,M*ẋ)
+	∂T∂qᵀ .= funcs.build_∂T∂xᵀ(x,ẋ)
+	ro .= rg .= x[1:3]
+	ṙo .= ṙg .= ẋ[1:3]
+	R .= QuaternionCoordinates.find_R(x)
+	ω .= R*QuaternionCoordinates.find_Ω(x,ẋ)
+end
+
+function stretch_rigid!(cache::NonminimalCoordinatesCache{<:NaturalCoordinates.CoordinateFunctions},
+					prop::RigidBodyProperty,c)
+	(;nr̄ps) = prop
+	(;Cps,funcs) = cache
+	nlocaldim = get_nlocaldim(cache)
+	for pid in 1:nr̄ps
+		Cps[pid] = funcs.C(c[nlocaldim*(pid-1)+1:nlocaldim*pid])
+	end
+end
+
+function stretch_rigid!(cache::NonminimalCoordinatesCache{<:QuaternionCoordinates.CoordinateFunctions},
+				prop::RigidBodyProperty,c)
+end
+
+function move_rigid!(state::RigidBodyState,
+					cache::NonminimalCoordinatesCache{<:NaturalCoordinates.CoordinateFunctions},
+					prop::RigidBodyProperty,q,q̇)
+	(;rps,ṙps) = state
+	(;Cps) = cache
+	for (i,(rp,ṙp)) in enumerate(zip(rps,ṙps))
+		mul!(rp, Cps[i], q)
+		mul!(ṙp, Cps[i], q̇)
+	end
+end
+
+function move_rigid!(state::RigidBodyState,
+					cache::NonminimalCoordinatesCache{<:QuaternionCoordinates.CoordinateFunctions},
+					prop::RigidBodyProperty,q,q̇)
+	update_rigid!(state,cache,prop,q,q̇)
+	(;r̄ps) = prop
+	(;ro,R,ṙo,ω,rps,ṙps) = state
+	for (i,(rp,ṙp)) in enumerate(zip(rps,ṙps))
+		vp = R * r̄ps[i]
+		rp .= ro .+ vp
+		ṙp .= ṙo .+ ω × vp
+	end
+end
+
+function update_transformations!(
+		cache::NonminimalCoordinatesCache{<:NaturalCoordinates.CoordinateFunctions},
+		state::RigidBodyState,
+		prop::RigidBodyProperty,q,q̇)
+end
+
+function update_transformations!(
+		cache::NonminimalCoordinatesCache{<:QuaternionCoordinates.CoordinateFunctions},
+		state::RigidBodyState,
+		prop::RigidBodyProperty,q)
+	(;r̄g,r̄ps) = prop
+	(;R,) = state
+	(;Cg,Cps) = cache
+	L = QuaternionCoordinates.Lmat(q[4:7])
+	for (Cp,r̄p) in zip(Cps,r̄ps)
+		# for i = 1:3 
+		# 	Cp[i,i] = 1
+		# end
+		Cp[1:3,4:7] .= -2R*NaturalCoordinates.skew(r̄p)*L
+	end 
+	# for i = 1:3 
+	# 	Cg[i,i] = 1
+	# end
+	Cg[1:3,4:7] .= -2R*NaturalCoordinates.skew(r̄g)*L
+end
+
+function generalize_force!(F,state)
+	(;cache,f,fps) = state
+	(;Cps,Cg,∂T∂qᵀ) = cache
+	for (pid,fp) in enumerate(fps)
+		# F .+= transpose(Cps[pid])*fp
+		mul!(F,transpose(Cps[pid]),fp,1,1)
+	end
+	# F .+= transpose(Cg)*f
+	mul!(F,transpose(Cg),f,1,1)
+	F .+= ∂T∂qᵀ
+	F
+end
 
 # kinematic joint constraints
 
@@ -459,6 +615,8 @@ function get_all_Φi(lncs::NaturalCoordinates.LNC)
 	nΦ = NaturalCoordinates.get_nconstraints(lncs)
 	collect(1:nΦ)
 end
+
+get_all_Φi(::QuaternionCoordinates.QC) = collect(1:1)
 ##
 
 # operations on rigid body
@@ -478,8 +636,9 @@ $(TYPEDSIGNATURES)
 """
 function kinetic_energy_rotation(rb::AbstractRigidBody)
     (;inertia) = rb.prop
-	(;ω) = rb.state
-	T = 1/2*transpose(ω)*inertia*ω
+	(;R,ω) = rb.state
+	Ω = inv(R)*ω
+	T = 1/2*transpose(Ω)*inertia*Ω
 end
 
 """

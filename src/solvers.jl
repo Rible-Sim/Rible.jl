@@ -84,10 +84,12 @@ end
 
 # include("solvers/Wendlandt.jl")
 include("solvers/Zhong06.jl")
+include("solvers/Zhong06Q.jl")
 include("solvers/FBZhong06.jl")
 include("solvers/Alpha.jl")
 include("solvers/CCP/CCPsolvers.jl")
 include("solvers/CCP/ZhongCCP.jl")
+include("solvers/CCP/ZhongQCCP.jl")
 include("solvers/CCP/AlphaCCP.jl")
 
 # include("solvers/nonsmooth.jl")

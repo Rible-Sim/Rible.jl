@@ -12,6 +12,7 @@ struct NumberedPoints
 	mem2num::Vector{Vector{Int}}
 	num2ID::Vector{ID{Int,Int}}
 	num2sys::Vector{Vector{Int}}
+    mem2sys::Vector{Vector{Int}}
 	nc::Int
 end
 
@@ -40,7 +41,12 @@ function number(rbs)
 			js += nld
         end
     end
-    NumberedPoints(mem2num,num2ID,num2sys,js)
+    mem2sys = [
+        reduce(vcat,num2sys[mem2num[rbid]])
+        for rbid = 1:nb
+    ]
+    # @show mem2sys
+    NumberedPoints(mem2num,num2ID,num2sys,mem2sys,js)
 end
 
 struct IndexedMemberCoords{mem2sysType,sysType}
@@ -262,7 +268,7 @@ end
 刚体自然坐标状态类。
 $(TYPEDEF)
 """
-mutable struct NaturalCoordinatesState{T,qT,qviewT}
+mutable struct NonminimalCoordinatesState{T,qT,qviewT}
 	t::T
 	q::qT
 	q̇::qT
@@ -279,7 +285,7 @@ mutable struct NaturalCoordinatesState{T,qT,qviewT}
 	c::qT
 end
 
-mutable struct ClusterNaturalCoordinatesState{T,qT,qviewT}
+mutable struct ClusterNonminimalCoordinatesState{T,qT,qviewT}
 	t::T
 	q::qT
 	q̇::qT
@@ -300,7 +306,7 @@ end
 自然坐标状态构造子。
 $(TYPEDSIGNATURES)
 """
-function NaturalCoordinatesState(t,q,q̇,q̈,F,λ,freei,presi,c)
+function NonminimalCoordinatesState(t,q,q̇,q̈,F,λ,freei,presi,c)
 	t = zero(eltype(q))
 	q̌ = @view q[freei]
 	q̌̇ = @view q̇[freei]
@@ -309,10 +315,10 @@ function NaturalCoordinatesState(t,q,q̇,q̈,F,λ,freei,presi,c)
 	q̃̇ = @view q̇[presi]
 	q̃̈ = @view q̈[presi]
 	F̌ = @view F[freei]
-	NaturalCoordinatesState(t,q,q̇,q̈,F,λ,q̌,q̌̇,q̌̈,q̃,q̃̇,q̃̈,F̌,c)
+	NonminimalCoordinatesState(t,q,q̇,q̈,F,λ,q̌,q̌̇,q̌̈,q̃,q̃̇,q̃̈,F̌,c)
 end
 
-function ClusterNaturalCoordinatesState(t,q,q̇,q̈,F,λ,freei,presi,s)
+function ClusterNonminimalCoordinatesState(t,q,q̇,q̈,F,λ,freei,presi,s)
 	t = zero(eltype(q))
 	q̌ = @view q[freei]
 	q̌̇ = @view q̇[freei]
@@ -321,7 +327,7 @@ function ClusterNaturalCoordinatesState(t,q,q̇,q̈,F,λ,freei,presi,s)
 	q̃̇ = @view q̇[presi]
 	q̃̈ = @view q̈[presi]
 	F̌ = @view F[freei]
-	ClusterNaturalCoordinatesState(t,q,q̇,q̈,F,λ,s,q̌,q̌̇,q̌̈,q̃,q̃̇,q̃̈,F̌)
+	ClusterNonminimalCoordinatesState(t,q,q̇,q̈,F,λ,s,q̌,q̌̇,q̌̈,q̃,q̃̇,q̃̈,F̌)
 end
 
 """
@@ -333,6 +339,14 @@ struct TensegrityState{sysT, msT}
 	rigids::msT
 end
 
+
+function rigidState2coordinates(nmcs::NaturalCoordinates.LNC,ro,R,ṙo,ω)
+    NaturalCoordinates.rigidstate2naturalcoords(nmcs,ro,R,ṙo,ω)
+end
+
+function rigidState2coordinates(nmcs::QuaternionCoordinates.QC,ro,R,ṙo,ω)
+    QuaternionCoordinates.rigidState2coordinates(ro,R,ṙo,ω)
+end
 """
 张拉整体状态构造子。
 $(TYPEDSIGNATURES)
@@ -360,7 +374,7 @@ function TensegrityState(rigidbodies,tensiles,cnt::Connectivity{<:Any,<:Any,<:Na
 	F = zero(q)
 	λ = Vector{T}(undef,nconstraints)
 	c = get_c(rigidbodies,numbered)
-	system = NaturalCoordinatesState(t,q,q̇,q̈,F,λ,sysfree,syspres,c)
+	system = NonminimalCoordinatesState(t,q,q̇,q̈,F,λ,sysfree,syspres,c)
 	rigids = [
 		begin
 			qmem = @view q[mem2sysfull[rbid]]
@@ -369,7 +383,7 @@ function TensegrityState(rigidbodies,tensiles,cnt::Connectivity{<:Any,<:Any,<:Na
 			Fmem = @view F[mem2sysfull[rbid]]
 			λmem = @view λ[mem2sysincst[rbid]]
 			cmem = @view c[reduce(vcat,num2sys[mem2num[rbid]])]
-			NaturalCoordinatesState(t,qmem,q̇mem,q̈mem,Fmem,λmem,
+			NonminimalCoordinatesState(t,qmem,q̇mem,q̈mem,Fmem,λmem,
 									uci_by_member[rbid],ci_by_member[rbid],
 									cmem)
 		end
@@ -377,7 +391,7 @@ function TensegrityState(rigidbodies,tensiles,cnt::Connectivity{<:Any,<:Any,<:Na
 	]
 	foreach(rigidbodies) do rb
 		(;ro,R,ṙo,ω,cache) = rb.state
-		q,q̇ = NaturalCoordinates.rigidstate2naturalcoords(cache.funcs.lncs,ro,R,ṙo,ω)
+		q,q̇ = rigidState2coordinates(cache.funcs.nmcs,ro,R,ṙo,ω)
 		rigids[rb.prop.id].q .= q
 		rigids[rb.prop.id].q̇ .= q̇
 	end
@@ -409,7 +423,7 @@ function TensegrityState(rigidbodies,tensiles,cnt::Connectivity{<:Any,<:Any,<:Na
 	F = zero(q)
     s = zeros(T, 2ns)
 	λ = Vector{T}(undef,nconstraints)
-	system = ClusterNaturalCoordinatesState(t,q,q̇,q̈,F,λ,sysfree,syspres,s)
+	system = ClusterNonminimalCoordinatesState(t,q,q̇,q̈,F,λ,sysfree,syspres,s)
 	rigids = [
 		begin
 			qmem = @view q[mem2sysfull[rbid]]
@@ -417,7 +431,7 @@ function TensegrityState(rigidbodies,tensiles,cnt::Connectivity{<:Any,<:Any,<:Na
 			q̈mem = @view q̈[mem2sysfull[rbid]]
 			Fmem = @view F[mem2sysfull[rbid]]
 			λmem = @view λ[mem2sysincst[rbid]]
-			NaturalCoordinatesState(t,qmem,q̇mem,q̈mem,Fmem,λmem,
+			NonminimalCoordinatesState(t,qmem,q̇mem,q̈mem,Fmem,λmem,
 									uci_by_member[rbid],ci_by_member[rbid])
 		end
 		for rbid = 1:nb
@@ -596,61 +610,60 @@ function update_tensiles!(tg, @eponymargs(connected, clustered))
     update_tensiles!(tg, @eponymtuple(clustered))
 end
 
-function update_points!(tg,c)
+function stretch_rigids!(tg,c)
 	tg.state.system.c .= c
-	update_points!(tg)
+	stretch_rigids!(tg)
 end
 
-function update_points!(tg)
+function stretch_rigids!(tg)
 	(;rigidbodies,state) = tg
-    (;mem2num,num2sys) = tg.connectivity.numbered
+    (;mem2sys) = tg.connectivity.numbered
     (;c) = state.system
     foreach(rigidbodies) do rb
         rbid = rb.prop.id
-		(;nr̄ps) = rb.prop
-        (;Cps,funcs) = rb.state.cache
-        for pid in 1:nr̄ps
-			cidx = mem2num[rbid][pid]
-            Cps[pid] = funcs.C(c[num2sys[cidx]])
-        end
+        stretch_rigid!(rb,c[mem2sys[rbid]])
     end
 end
-"""
-更新刚体状态。
-$(TYPEDSIGNATURES)
-"""
-function update_rigids!(tg,q,q̇=zero(q))
+
+function move_rigids!(tg,q,q̇=zero(q))
 	tg.state.system.q .= q
 	tg.state.system.q̇ .= q̇
-	update_rigids!(tg)
+	move_rigids!(tg)
 end
 
-function update_rigids!(tg)
+function move_rigids!(tg)
     (;rigidbodies,state) = tg
     foreach(rigidbodies) do rb
         rbid = rb.prop.id
 		(;q,q̇) = state.rigids[rbid]
-        (;cache,rps,ṙps,ro,ṙo,rg,ṙg) = rb.state
-        (;Co,Cg,Cps) = cache
-        mul!(ro, Co, q)
-        mul!(ṙo, Co, q̇)
-        mul!(rg, Cg, q)
-        mul!(ṙg, Cg, q̇)
-        for (i,(rp,ṙp)) in enumerate(zip(rps,ṙps))
-            mul!(rp, Cps[i], q)
-            mul!(ṙp, Cps[i], q̇)
-        end
+        move_rigid!(rb,q,q̇)
     end
 end
 
-function update_orientations!(tg)
+"""
+更新刚体状态。
+$(TYPEDSIGNATURES)
+"""
+function update_rigids!(tg,q)
+	tg.state.system.q .= q
+    tg.state.system.q̇ .= 0.0
+    update_rigids!(tg)
+end
+
+function update_rigids!(tg,q,q̇)
+	tg.state.system.q .= q
+    tg.state.system.q̇ .= q̇
+    update_rigids!(tg)
+end
+
+function update_rigids!(tg)
 	(;rigidbodies,state) = tg
 	foreach(rigidbodies) do rb
 		rbid = rb.prop.id
 		(;q, q̇) = state.rigids[rbid]
-		(;lncs) = rb.state.cache.funcs
-		rb.state.R .= NaturalCoordinates.find_R(lncs,q)
-		rb.state.ω .= NaturalCoordinates.find_ω(lncs,q,q̇)
+        update_rigid!(rb,q,q̇)
+        update_transformations!(rb,q)
+        move_rigid!(rb,q,q̇)
 	end
 end
 
@@ -660,18 +673,11 @@ $(TYPEDSIGNATURES)
 """
 function generate_forces!(tg::TensegrityStructure)
 	(;rigidbodies,state) = tg
-	(;system,rigids) = tg.state
+	(;system,rigids) = state
 	system.F .= 0.0
     foreach(rigidbodies) do rb
-		(;f,fps,cache) = rb.state
-        (;Cps,Cg) = cache
         (;F) = rigids[rb.prop.id]
-        for (pid,fp) in enumerate(fps)
-            # F .+= transpose(Cps[pid])*fp
-			mul!(F,transpose(Cps[pid]),fp,1,1)
-        end
-        # F .+= transpose(Cg)*f
-		mul!(F,transpose(Cg),f,1,1)
+		generalize_force!(F,rb.state)
     end
 	system.F̌
 end
@@ -698,7 +704,8 @@ end
 
 function update!(tg::AbstractTensegrityStructure; gravity=false)
     clear_forces!(tg)
-    update_points!(tg)
+    stretch_rigids!(tg)
+    # move_rigids!(tg)
     update_rigids!(tg)
     update_tensiles!(tg)
     # update_clustercables_apply_forces!(tg)
@@ -714,7 +721,6 @@ function update!(tg::TensegrityStructure,q,q̇=zero(q))
 	update!(tg)
 end
 
-# function build_M(tg::TensegrityStructure)
 function build_M(tg::AbstractTensegrityStructure)
     (;nfull,mem2sysfull) = tg.connectivity.indexed
 	T = get_numbertype(tg)
@@ -723,15 +729,78 @@ function build_M(tg::AbstractTensegrityStructure)
         memfull = mem2sysfull[rb.prop.id]
         M[memfull,memfull] .+= rb.state.cache.M
     end
-    @assert issymmetric(M)
+    # @assert issymmetric(M)
 	M
-	# symsparsecsr(M;symmetrize=true)
+end
+
+function build_M⁻¹(tg::AbstractTensegrityStructure)
+    (;nfull,mem2sysfull) = tg.connectivity.indexed
+	T = get_numbertype(tg)
+    M⁻¹ = spzeros(T,nfull,nfull)
+    foreach(tg.rigidbodies) do rb
+        memfull = mem2sysfull[rb.prop.id]
+        M⁻¹[memfull,memfull] .+= rb.state.cache.M⁻¹
+    end
+    # @assert issymmetric(M⁻¹)
+	M⁻¹
 end
 
 function build_M̌(tg::AbstractTensegrityStructure)
 	(;sysfree) = tg.connectivity.indexed
 	M = build_M(tg)
 	M̌ = Symmetric(M[sysfree,sysfree])
+end
+
+function build_∂Mq̇∂q(tg::AbstractTensegrityStructure)
+    (;nfull,mem2sysfull) = tg.connectivity.indexed
+	T = get_numbertype(tg)
+    ∂Mq̇∂q = spzeros(T,nfull,nfull)
+    foreach(tg.rigidbodies) do rb
+        memfull = mem2sysfull[rb.prop.id]
+        ∂Mq̇∂q[memfull,memfull] .+= rb.state.cache.∂Mq̇∂q
+    end
+	∂Mq̇∂q
+	# symsparsecsr(M;symmetrize=true)
+end
+
+function build_∂M⁻¹p∂q(tg::AbstractTensegrityStructure)
+    (;nfull,mem2sysfull) = tg.connectivity.indexed
+	T = get_numbertype(tg)
+    ∂M⁻¹p∂q = spzeros(T,nfull,nfull)
+    foreach(tg.rigidbodies) do rb
+        memfull = mem2sysfull[rb.prop.id]
+        ∂M⁻¹p∂q[memfull,memfull] .+= rb.state.cache.∂M⁻¹p∂q
+    end
+	∂M⁻¹p∂q
+	# symsparsecsr(M;symmetrize=true)
+end
+
+function make_M!(tg)
+    function inner_M!(M,q)
+        update_rigids!(tg,q)
+        M .= build_M(tg)
+    end
+end
+
+function make_M⁻¹!(tg)
+    function inner_M⁻¹!(M⁻¹,q)
+        update_rigids!(tg,q)
+        M⁻¹ .= build_M⁻¹(tg)
+    end
+end
+
+function make_Jac_M!(tg)
+    function Jac_M!(∂Mq̇∂q,q,q̇)
+        update_rigids!(tg,q,q̇)
+        ∂Mq̇∂q .= build_∂Mq̇∂q(tg)
+    end
+end
+
+function make_Jac_M⁻¹!(tg)
+    function Jac_M⁻¹!(∂M⁻¹p∂q,q,q̇)
+        update_rigids!(tg,q,q̇)
+        ∂M⁻¹p∂q .= build_∂M⁻¹p∂q(tg)
+    end
 end
 
 """
@@ -748,6 +817,17 @@ function build_MassMatrices(bot::TensegrityRobot)
     invM̌_raw = inv(Matrix(M̌))
     invM̌ = Symmetric(sparse(invM̌_raw))
 	@eponymtuple(Ḿ,M̌,M̄,invM̌)
+end
+
+function build_∂T∂qᵀ(tg::AbstractTensegrityStructure)
+    (;nfull,mem2sysfull) = tg.connectivity.indexed
+    T = get_numbertype(tg)
+    ∂T∂qᵀ = zeros(T,nfull)
+    foreach(tg.rigidbodies) do rb
+        memfull = mem2sysfull[rb.prop.id]
+        ∂T∂qᵀ[memfull] .+= rb.state.cache.∂T∂qᵀ
+    end
+    ∂T∂qᵀ
 end
 
 make_Φ(bot::TensegrityRobot) = make_Φ(bot.tg)
@@ -1066,6 +1146,7 @@ get_ndim(rbs::AbstractVector{<:AbstractRigidBody}) = get_ndim(eltype(rbs))
 get_ndim(rbs::TypeSortedCollection) = get_ndim(eltype(rbs.data[1]))
 get_ndim(rb::AbstractRigidBody) = get_ndim(typeof(rb))
 get_ndim(::Type{<:AbstractRigidBody{N,T}}) where {N,T} = N
+get_ndim(::RigidBodyProperty{N}) where {N} = N
 
 get_numbertype(bot::TensegrityRobot) = get_numbertype(bot.tg)
 get_numbertype(tg::AbstractTensegrityStructure) = get_numbertype(tg.rigidbodies)
@@ -1073,6 +1154,7 @@ get_numbertype(rbs::AbstractVector{<:AbstractRigidBody}) = get_numbertype(eltype
 get_numbertype(rbs::TypeSortedCollection) = get_numbertype(eltype(rbs.data[1]))
 get_numbertype(rb::AbstractRigidBody) = get_numbertype(typeof(rb))
 get_numbertype(::Type{<:AbstractRigidBody{N,T}}) where {N,T} = T
+get_numbertype(::RigidBodyProperty{N,T}) where {N,T} = T
 
 """
 返回系统约束数量。
@@ -1080,10 +1162,21 @@ $(TYPEDSIGNATURES)
 """
 get_nconstraints(tg::TensegrityStructure) = tg.nconstraints
 
-get_ninconstraints(rb::AbstractRigidBody) = NaturalCoordinates.get_nconstraints(rb.state.cache.funcs.lncs)
-get_nbodycoords(rb::AbstractRigidBody) = NaturalCoordinates.get_ncoords(rb.state.cache.funcs.lncs)
-get_ndof(rb::AbstractRigidBody) = NaturalCoordinates.get_nlocaldim(rb.state.cache.funcs.lncs)
-get_nlocaldim(rb::AbstractRigidBody) = NaturalCoordinates.get_nlocaldim(rb.state.cache.funcs.lncs)
+get_ninconstraints(rb::AbstractRigidBody) = get_nconstraints(rb.state.cache.funcs.nmcs)
+get_nbodycoords(rb::AbstractRigidBody) = get_nbodycoords(rb.state.cache.funcs.nmcs)
+get_ndof(rb::AbstractRigidBody) = get_ndof(rb.state.cache.funcs.nmcs)
+get_nlocaldim(rb::AbstractRigidBody) = get_nlocaldim(rb.state.cache)
+get_nlocaldim(cache::NonminimalCoordinatesCache) = get_nlocaldim(cache.funcs.nmcs)
+
+get_nconstraints(nmcs::NaturalCoordinates.LNC) = NaturalCoordinates.get_nconstraints(nmcs)
+get_nbodycoords(nmcs::NaturalCoordinates.LNC) = NaturalCoordinates.get_ncoords(nmcs)
+get_ndof(nmcs::NaturalCoordinates.LNC) = NaturalCoordinates.get_ndof(nmcs)
+get_nlocaldim(nmcs::NaturalCoordinates.LNC) = NaturalCoordinates.get_nlocaldim(nmcs)
+
+get_nconstraints(nmcs::QuaternionCoordinates.QC) = QuaternionCoordinates.get_nconstraints(nmcs)
+get_nbodycoords(nmcs::QuaternionCoordinates.QC) = QuaternionCoordinates.get_ncoords(nmcs)
+get_ndof(nmcs::QuaternionCoordinates.QC) = QuaternionCoordinates.get_ndof(nmcs)
+get_nlocaldim(nmcs::QuaternionCoordinates.QC) = QuaternionCoordinates.get_nlocaldim(nmcs)
 
 """
 返回系统重力。
@@ -1116,7 +1209,7 @@ get_rigidbars(bot::TensegrityRobot) = get_rigidbars(bot.tg)
 function get_rigidbars(tg::AbstractTensegrityStructure)
 	rbs = get_rigidbodies(tg)
 	[rb for rb in rbs
-	if rb.state.cache.funcs.lncs isa Union{NaturalCoordinates.LNC2D4C,NaturalCoordinates.LNC3D6C}]
+	if rb.state.cache.funcs.nmcs isa Union{NaturalCoordinates.LNC2D4C,NaturalCoordinates.LNC3D6C}]
 end
 
 function get_cables_len!(tg::TensegrityStructure,q)

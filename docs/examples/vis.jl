@@ -178,8 +178,8 @@ end
 
 function fullupdate!(tg)
     TR.update!(tg)
-    TR.update_orientations!(tg)
 end
+
 function plot_traj!(bot::TR.TensegrityRobot;
             AxisType=LScene,
             figsize=:FHD,
@@ -714,12 +714,12 @@ function plotsave_friction_direction(bots,x,xs,figname=nothing;
 			ax1 = Axis(fig[botid,1],
 						xlabel=tlabel,
 						ylabel=L"\delta\alpha~(\mathrm{Rad})",
-						title=latexstring("$x$(xs[botid])")
+						title=latexstring("$x=$(xs[botid])")
 				)
 			ax2 = Axis(fig[botid,2],
 						xlabel=tlabel,
 						ylabel=L"\delta\theta~(\mathrm{Rad})",
-						title=latexstring("$x$(xs[botid])")
+						title=latexstring("$x=$(xs[botid])")
 				)
 			Label(fig[botid,1,TopLeft()],"($(alphabet[2botid-1]))")
 			Label(fig[botid,2,TopLeft()],"($(alphabet[2botid]))")

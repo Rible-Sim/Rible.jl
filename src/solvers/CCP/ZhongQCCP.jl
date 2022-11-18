@@ -1,19 +1,26 @@
-struct ZhongCCP <: AbstractSolver end
+struct ZhongQCCP <: AbstractSolver end
 
-struct ZhongCCPCache{CacheType}
+struct ZhongQCCPCache{CacheType}
     cache::CacheType
 end
 
-function generate_cache(::ZhongCCP,intor;dt,kargs...)
-    (;prob) = intor
-    (;bot,dynfuncs) = prob
-    (;tg) = bot
-    M = Matrix(build_M(tg))
-    Φ = make_Φ(bot)
-    A = make_A(bot)
+function generate_cache(::ZhongQCCP,intor;dt,kargs...)
+    (;tg) = intor.prob.bot
+    M = build_M(tg) 
+    M⁻¹ = build_M⁻¹(tg) 
+    ∂Mq̇∂q = build_∂Mq̇∂q(tg)
+    ∂M⁻¹p∂q = build_∂M⁻¹p∂q(tg)
+    M! = make_M!(tg)
+    M⁻¹! = make_M⁻¹!(tg)
+    Jac_M! = make_Jac_M!(tg)
+    Jac_M⁻¹! = make_Jac_M⁻¹!(tg)
+    Φ = make_Φ(tg)
+    A = make_A(tg)
 
     nq = size(M,2)
-    T = get_numbertype(bot)
+    T = get_numbertype(tg)
+    ∂F∂q = zeros(T,nq,nq)
+    ∂F∂q̇ = zeros(T,nq,nq)
     Ψ(q,q̇) = Vector{T}()
     ∂Ψ∂q(q,q̇) = Matrix{T}(undef,0,nq)
     B(q) = Matrix{T}(undef,0,nq)
@@ -22,71 +29,92 @@ function generate_cache(::ZhongCCP,intor;dt,kargs...)
     ∂Aᵀλ∂q(q,λ) = ∂Aᵀλ∂q̌(tg,λ)
     # ∂𝚽𝐪𝐯∂𝒒(q,v) = TR.∂Aq̇∂q(tg,v)
     ∂Bᵀμ∂q(q,μ) = zeros(T,nq,nq)
-    cache = @eponymtuple(M,Φ,A,Ψ,B,∂Ψ∂q,∂Aᵀλ∂q,∂Bᵀμ∂q)
-    ZhongCCPCache(cache)
+    cache = @eponymtuple(
+        M,M⁻¹,∂Mq̇∂q,∂M⁻¹p∂q,
+        M!,Jac_M!,M⁻¹!,Jac_M⁻¹!,
+        Φ,A,Ψ,B,∂Ψ∂q,∂Aᵀλ∂q,∂Bᵀμ∂q,∂F∂q,∂F∂q̇)
+    ZhongQCCPCache(cache)
 end
 
-function Momentum_k(qₖ₋₁,pₖ₋₁,qₖ,λₘ,Mₘ,A,h)
-    pₖ = -pₖ₋₁ .+ 2/h.*Mₘ*(qₖ.-qₖ₋₁) .+ 1/(h).*(transpose(A(qₖ))-transpose(A(qₖ₋₁)))*λₘ
+function Momentum_k(qₖ₋₁,pₖ₋₁,qₖ,λₘ,Mₘ,A,Λₘ,Dₖ₋₁,Dₖ,h)
+    pₖ = -pₖ₋₁ .+ 
+        2/h.*Mₘ*(qₖ.-qₖ₋₁) .+ 
+        1/h.*(transpose(A(qₖ))-transpose(A(qₖ₋₁)))*λₘ .+
+        1/h.*(transpose(Dₖ)-transpose(Dₖ₋₁))*Λₘ
 end
 
-function make_zhongccp_ns_stepk(nq,nλ,na,qₖ₋₁,vₖ₋₁,pₖ₋₁,tₖ₋₁,pₖ,vₖ,dynfuncs,cache,invM,h,scalingΛ,persistent_indices)
-    F!,Jac_F!,_ = dynfuncs
-    (;M,Φ,A,∂Aᵀλ∂q) = cache
-
+function make_zhongccp_ns_stepk(
+        nq,nλ,na,qₖ₋₁,vₖ₋₁,pₖ₋₁,tₖ₋₁,pₖ,vₖ,
+        F!,Jac_F!,get_D,get_∂Dq̇∂q,get_∂DᵀΛ∂q,
+        cache,h,scalingΛ,persistent_indices
+    )
+    (;M!,Jac_M!,M⁻¹!,Jac_M⁻¹!,Φ,A,∂Aᵀλ∂q) = cache
+    ∂Fₘ∂qₘ = cache.∂F∂q
+    ∂Fₘ∂q̇ₘ = cache.∂F∂q̇
+    ∂Mₘqₖ∂qₘ = cache.∂Mq̇∂q
+    ∂M⁻¹ₖpₖ∂qₖ = cache.∂M⁻¹p∂q
+    Mₘ = cache.M
+    M⁻¹ₘ = cache.M⁻¹
+    M⁻¹ₖ = deepcopy(M⁻¹ₘ)
     n1 = nq
     n2 = nq+nλ
     nΛ = 3na
     nx = n2
-    function ns_stepk!(𝐫𝐞𝐬,𝐉,𝐁,𝐛,𝐜ᵀ,𝐍,𝐫,x,𝚲ₖ,D,Dₘ,Dₖ,H,filtered_gaps,es,timestep,iteration)
+    function ns_stepk!(𝐫𝐞𝐬,𝐉,𝐁,𝐛,𝐜ᵀ,𝐍,𝐫,x,𝚲ₘ,Dₖ₋₁,Dₘ,Dₖ,H,filtered_gaps,es,timestep,iteration)
         # @show timestep, iteration, na, persistent_indices
         qₖ = @view x[   1:n1]
         λₘ = @view x[n1+1:n2]
+        T = eltype(qₖ)
         qₘ = (qₖ.+qₖ₋₁)./2
         q̇ₘ = (qₖ.-qₖ₋₁)./h
         vₘ = q̇ₘ
         tₘ = tₖ₋₁+h/2
-        T = eltype(qₖ)
         Fₘ = zeros(T,nq)
+        M!(Mₘ,qₘ)
+        Jac_M!(∂Mₘqₖ∂qₘ,qₘ,qₖ)
         F!(Fₘ,qₘ,q̇ₘ,tₘ)
-        ∂F∂q = zeros(T,nq,nq)
-        ∂F∂q̇ = zeros(T,nq,nq)
-        Jac_F!(∂F∂q,∂F∂q̇,qₘ,q̇ₘ,tₘ)
-
+        Jac_F!(∂Fₘ∂qₘ,∂Fₘ∂q̇ₘ,qₘ,q̇ₘ,tₘ)
         Aₖ₋₁ = A(qₖ₋₁)
         Aₖ   = A(qₖ)
 
-        ∂vₘ∂qₖ = 1/h*I
-
-        ∂vₖ∂qₖ = 2/h*I + 1/(h).*invM*(∂Aᵀλ∂q(qₖ,λₘ))
-        ∂vₖ∂λₘ = invM*transpose(Aₖ-Aₖ₋₁)/(h)
-
-        ∂DᵀHΛₖ∂qₖ = zeros(T,nq,nq)
-
-        𝐫𝐞𝐬[   1:n1] .= -h.*pₖ₋₁ .+ M*(qₖ.-qₖ₋₁) .-
-                        scalingΛ .*transpose(D)*H*𝚲ₖ .-
+        𝐫𝐞𝐬[   1:n1] .= Mₘ*(qₖ.-qₖ₋₁) .- 
+                        h.*pₖ₋₁ .-
+                        (h^2)/2 .*Fₘ .-
                         transpose(Aₖ₋₁)*λₘ .-
-                        (h^2)/2 .*Fₘ
-
+                        scalingΛ .*transpose(Dₖ₋₁)*H*𝚲ₘ 
         𝐫𝐞𝐬[n1+1:n2] .= Φ(qₖ)
         
         𝐉 .= 0.0
-        𝐉[   1:n1,   1:n1] .=  M .- scalingΛ .*∂DᵀHΛₖ∂qₖ .-h^2/2 .*(1/2 .*∂F∂q .+ 1/h.*∂F∂q̇)
+        𝐉[   1:n1,   1:n1] .=  Mₘ .+ 1/2 .*∂Mₘqₖ∂qₘ .-h^2/2 .*(1/2 .*∂Fₘ∂qₘ .+ 1/h.*∂Fₘ∂q̇ₘ)
         𝐉[   1:n1,n1+1:n2] .= -transpose(Aₖ₋₁)
-
         𝐉[n1+1:n2,   1:n1] .=  Aₖ
-
-        𝐁 .= 0
-        𝐁[   1:n1,1:nΛ] .= scalingΛ .*transpose(D)*H
-
         
-        pₖ .= Momentum_k(qₖ₋₁,pₖ₋₁,qₖ,λₘ,M,A,h)
-        vₖ .= invM*pₖ        
         if na != 0
-            v́⁺ = Dₘ*vₘ .+ Dₖ*vₖ
-            ∂v́⁺∂qₖ = Dₘ*∂vₘ∂qₖ .+ Dₖ*∂vₖ∂qₖ
+            Dₖ .= get_D(qₖ)
+            pₖ .= Momentum_k(qₖ₋₁,pₖ₋₁,qₖ,λₘ,Mₘ,A,𝚲ₘ,Dₖ₋₁,Dₖ,h)
+            M⁻¹!(M⁻¹ₖ,qₖ) 
+            vₖ .= M⁻¹ₖ*pₖ
+            M⁻¹!(M⁻¹ₘ,qₘ)    
+            Jac_M⁻¹!(∂M⁻¹ₖpₖ∂qₖ,qₖ,vₖ)
+            ∂Aᵀₖλₘ∂qₖ = ∂Aᵀλ∂q(qₖ,λₘ)
+            ∂DᵀₖHΛₘ∂qₖ = get_∂DᵀΛ∂q(qₖ,H*𝚲ₘ)
+            ∂qₘ∂qₖ = 1/2*I
+            ∂q̇ₘ∂qₖ = 1/h*I
+            ∂Mₘq̇ₘ∂qₘ = zero(∂Mₘqₖ∂qₘ)
+            Jac_M!(∂Mₘq̇ₘ∂qₘ,qₘ,q̇ₘ)
+            ∂pₖ∂qₖ = 2/h.*Mₘ + 
+                    ∂Mₘq̇ₘ∂qₘ .+
+                    1/(h).*∂Aᵀₖλₘ∂qₖ .+ 
+                    1/(h).*∂DᵀₖHΛₘ∂qₖ
+            ∂vₖ∂qₖ = M⁻¹ₖ*∂pₖ∂qₖ .+ ∂M⁻¹ₖpₖ∂qₖ
+            ∂vₖ∂λₘ = M⁻¹ₘ*transpose(Aₖ-Aₖ₋₁)/(h)
+            𝐁 .= 0
+            𝐁[  1:n1,   1:nΛ] .= scalingΛ .*transpose(Dₖ₋₁)*H
+            ∂Dₖvₖ∂qₖ = get_∂Dq̇∂q(qₖ,vₖ)
+            v́⁺ = Dₖ*vₖ
+            ∂v́⁺∂qₖ = Dₖ*∂vₖ∂qₖ .+ ∂Dₖvₖ∂qₖ 
             𝐜ᵀ .= 0
-            v́ₖ₋₁ = Dₖ*vₖ₋₁
+            v́ₖ₋₁ = Dₖ₋₁*vₖ₋₁
             for i = 1:na
                 is = 3(i-1)
                 vⁱₖ₋₁ = @view v́ₖ₋₁[is+1:is+3]
@@ -95,54 +123,51 @@ function make_zhongccp_ns_stepk(nq,nλ,na,qₖ₋₁,vₖ₋₁,pₖ₋₁,tₖ�
                 vₜⁱ⁺   = norm(vⁱ⁺[2:3])
                 vₙⁱₖ₋₁ = vⁱₖ₋₁[1]
                 vₙⁱ   = vⁱ⁺[1]
-                # @show timestep,iteration, vₙⁱₖ₋₁, vₙⁱ, vₜⁱₖ₋₁, vₜⁱ, 𝚲ₖ
+                # @show timestep,iteration, vₙⁱₖ₋₁, vₙⁱ, vₜⁱₖ₋₁, vₜⁱ, 𝚲ₘ
                 v́ₜⁱ = vₜⁱ⁺ + es[i]*min(vₙⁱₖ₋₁,zero(T))
                 𝐛[is+1:is+3] .= [v́ₜⁱ+filtered_gaps[i],0,0]
                 
-                Dⁱₘ = @view Dₘ[is+1:is+3,:]
                 Dⁱₖ = @view Dₖ[is+1:is+3,:]
                 𝐜ᵀ[is+1     ,   1:n1] .= 1/(norm(v́⁺[is+2:is+3])+1e-14)*(v́⁺[is+2]*∂v́⁺∂qₖ[is+2,:] .+ v́⁺[is+3]*∂v́⁺∂qₖ[is+3,:])
                 𝐜ᵀ[is+1:is+3,   1:n1] .+= ∂v́⁺∂qₖ[is+1:is+3,:]
                 𝐜ᵀ[is+1:is+3,n1+1:n2] .= Dⁱₖ*∂vₖ∂λₘ
             end
 
-
             𝐜ᵀinv𝐉 = 𝐜ᵀ*inv(𝐉)
             𝐍 .= 𝐜ᵀinv𝐉*𝐁
-            𝐫 .= (v́⁺ + 𝐛) - 𝐜ᵀinv𝐉*(𝐫𝐞𝐬 + 𝐁*𝚲ₖ)
+            # debug
+            # @show norm(D*vₖ + 𝐛), norm(𝐫𝐞𝐬)
+            # @show 𝚲ₘ, D*vₖ, 𝐛
+            # @show v́⁺
+            # @show 𝚲ₘ[1:3]⋅(v́⁺ + 𝐛)[1:3]
+            𝐫 .= (v́⁺ + 𝐛) - 𝐜ᵀinv𝐉*(𝐫𝐞𝐬 + 𝐁*𝚲ₘ)
         end
-        # debug
-        # @show norm(D*vₖ + 𝐛), norm(𝐫𝐞𝐬)
-        # @show 𝚲ₖ, D*vₖ, 𝐛
-        # @show 𝚲ₖ[1:3]⋅(D*vₖ + 𝐛)[1:3]
 
     end
     ns_stepk!
 end
 
-function solve!(intor::Integrator,solvercache::ZhongCCPCache;
+function solve!(intor::Integrator,solvercache::ZhongQCCPCache;
                 dt,ftol=1e-14,xtol=ftol,verbose=false,maxiters=50,
                 progress=true,exception=true)
-    (;prob,controller,tspan,restart,totalstep) = intor
+    (;prob,totalstep) = intor
     (;bot,dynfuncs) = prob
     (;traj,contacts_traj) = bot
-    F!, Jac_F!, prepare_contacts! = dynfuncs
+    F!, Jac_F!, prepare_contacts!,get_D,get_∂Dq̇∂q,get_∂DᵀΛ∂q = dynfuncs
     (;cache) = solvercache
-    (;M,Φ,A,Ψ,B,∂Ψ∂q,∂Aᵀλ∂q,∂Bᵀμ∂q) = cache
-    invM = inv(M)
+    (;M,M⁻¹,M!,M⁻¹!,A) = cache
     q0 = traj.q[begin]
     λ0 = traj.λ[begin]
     q̇0 = traj.q̇[begin]
+    M!(M,q0)
     pₖ₋₁ = M*q̇0
-    pₖ   = zero(pₖ₋₁)
+    pₖ   = deepcopy(pₖ₋₁)
+    qₖ₋½ = deepcopy(q0)
     T = eltype(q0)
     nq = length(q0)
     nλ = length(λ0)
-    ∂F∂q = zeros(T,nq,nq)
-    ∂F∂q̇ = zeros(T,nq,nq)
     prepare_contacts!(contacts_traj[end],q0)
     nx = nq + nλ
-
     Δx = zeros(T,nx)
     x = zero(Δx)
     Res = zero(Δx)
@@ -160,28 +185,26 @@ function solve!(intor::Integrator,solvercache::ZhongCCPCache;
         cₖ = contacts_traj[timestep+1]
         qₖ₋₁ = traj.q[timestep]
         q̇ₖ₋₁ = traj.q̇[timestep]
-        # pₖ₋₁ = traj.p[timestep]
-        # λₖ₋₁ = traj.λ[timestep]
         tₖ₋₁ = traj.t[timestep]
         qₖ   = traj.q[timestep+1]
         q̇ₖ   = traj.q̇[timestep+1]
-        # pₖ   = traj.p[timestep+1]
         λₘ   = traj.λ[timestep+1]
-        pₖ₋₁ = M*q̇ₖ₋₁
-        qˣ = qₖ₋₁ .+ dt./2 .*q̇ₖ₋₁
+        qₖ₋½ .= qₖ₋₁ .+ dt./2 .*q̇ₖ₋₁
         qₖ .= qₖ₋₁ .+ dt .*q̇ₖ₋₁
         q̇ₖ .= q̇ₖ₋₁
-        active_contacts,na,gaps,D,H,es = prepare_contacts!(cₖ,qˣ)
+        active_contacts,gaps,H,es = prepare_contacts!(cₖ,qₖ₋½)
+        na = length(active_contacts)
+        Dₖ₋₁ = get_D(active_contacts,qₖ₋₁)
         persistent_indices = findall((c)->c.state.persistent,active_contacts)
-        Dₘ = zero(D)
-        Dₖ = copy(D)
+        Dₘ = zero(Dₖ₋₁)
+        Dₖ = copy(Dₖ₋₁)
         # Dₘ = copy(D)
         # Dₖ = zero(D)
         filtered_gaps = zero(gaps)
         if (na !== 0) && !isempty(persistent_indices)
             epi = reduce(vcat,[collect(3(i-1)+1:3i) for i in persistent_indices])
-            Dₘ[epi,:] .= D[epi,:]
-            Dₖ[epi,:] .= 0
+            # Dₘ[epi,:] .= D[epi,:]
+            # Dₖ[epi,:] .= 0
             # filtered_gaps[persistent_indices] = gaps[persistent_indices]
         end
         isconverged = false
@@ -191,20 +214,27 @@ function solve!(intor::Integrator,solvercache::ZhongCCPCache;
         x[   nq+1:nq+nλ]       .= 0.0
         isconverged = false
         nΛ = 3na
-        𝚲ₖ = zeros(T,nΛ)
-        𝚲ʳₖ = copy(𝚲ₖ)
-        Δ𝚲ₖ = copy(𝚲ₖ)
+        𝚲ₘ = zeros(T,nΛ)
+        𝚲ʳₖ = copy(𝚲ₘ)
+        Δ𝚲ₖ = copy(𝚲ₘ)
         𝐁 = zeros(T,nx,nΛ)
         𝐛 = zeros(T,nΛ)
         𝐜ᵀ = zeros(T,nΛ,nx)
         𝐍 = zeros(T,nΛ,nΛ)
         𝐫 = zeros(T,nΛ)
-        scalingΛ = dt
-        ns_stepk! = make_zhongccp_ns_stepk(nq,nλ,na,qₖ₋₁,q̇ₖ₋₁,pₖ₋₁,tₖ₋₁,pₖ,q̇ₖ,dynfuncs,cache,invM,dt,scalingΛ,persistent_indices)
+        scalingΛ = 1
+        get_D_active(q) = get_D(active_contacts,q)
+        get_∂Dq̇∂q_active(q,q̇) = get_∂Dq̇∂q(active_contacts,q,q̇)
+        get_∂DᵀΛ∂q_active(q,Λ) = get_∂DᵀΛ∂q(active_contacts,q,Λ)
+        ns_stepk! = make_zhongccp_ns_stepk(
+            nq,nλ,na,qₖ₋₁,q̇ₖ₋₁,pₖ₋₁,tₖ₋₁,pₖ,q̇ₖ,
+            F!,Jac_F!,get_D_active,get_∂Dq̇∂q_active,get_∂DᵀΛ∂q_active,
+            cache,dt,scalingΛ,persistent_indices
+        )
 
         for iteration = 1:maxiters
             # @show iteration,D,ηs,es,gaps
-            ns_stepk!(Res,Jac,𝐁,𝐛,𝐜ᵀ,𝐍,𝐫,x,𝚲ₖ,D,Dₘ,Dₖ,H,filtered_gaps,es,timestep,iteration)
+            ns_stepk!(Res,Jac,𝐁,𝐛,𝐜ᵀ,𝐍,𝐫,x,𝚲ₘ,Dₖ₋₁,Dₘ,Dₖ,H,filtered_gaps,es,timestep,iteration)
             normRes = norm(Res)
             if na == 0
                 if normRes < ftol
@@ -220,9 +250,9 @@ function solve!(intor::Integrator,solvercache::ZhongCCPCache;
                 else
                     Nmax = 50
                 end
-                IPM!(𝚲ₖ,na,nΛ,repeat([0.1,0,0],na),repeat([0.1,0,0],na),𝐍,𝐫;ftol=1e-14,Nmax)
+                IPM!(𝚲ₘ,na,nΛ,repeat([1.0,0,0],na),repeat([1.0,0,0],na),𝐍,𝐫;ftol=1e-14,Nmax)
                 
-                Δ𝚲ₖ .= 𝚲ₖ - 𝚲ʳₖ
+                Δ𝚲ₖ .= 𝚲ₘ - 𝚲ʳₖ
                 minusRes𝚲 = -Res + 𝐁*(Δ𝚲ₖ)
                 normRes = norm(minusRes𝚲)
                 if  normRes < ftol
@@ -231,17 +261,20 @@ function solve!(intor::Integrator,solvercache::ZhongCCPCache;
                     break
                 end
                 Δx .= Jac\minusRes𝚲
-                𝚲ʳₖ .= 𝚲ₖ
+                𝚲ʳₖ .= 𝚲ₘ
                 x .+= Δx
                 # @show timestep, iteration, normRes, norm(Δx), norm(Δ𝚲ₖ),persistent_indices
             end
         end
         qₖ .= x[      1:nq]
         λₘ .= x[   nq+1:nq+nλ]
-        pₖ .= Momentum_k(qₖ₋₁,pₖ₋₁,qₖ,λₘ,M,A,dt)
-        q̇ₖ .= invM*pₖ
+        qₖ₋½ .= (qₖ.+qₖ₋₁)./2
+        M!(M,qₖ₋½)
+        pₖ .= Momentum_k(qₖ₋₁,pₖ₋₁,qₖ,λₘ,M,A,𝚲ₘ,Dₖ₋₁,Dₖ,dt)
+        M⁻¹!(M⁻¹,qₖ)
+        q̇ₖ .= M⁻¹*pₖ
         if na != 0
-            update_contacts!(active_contacts,Dₘ*(qₖ.-qₖ₋₁).+Dₖ*q̇ₖ,𝚲ₖ./scalingΛ)
+            update_contacts!(active_contacts,Dₘ*(qₖ.-qₖ₋₁).+Dₖ*q̇ₖ,𝚲ₘ./scalingΛ)
         end
         if !isconverged
             @warn "Newton max iterations $maxiters, at timestep=$timestep, normRes=$(normRes)"
@@ -255,6 +288,7 @@ function solve!(intor::Integrator,solvercache::ZhongCCPCache;
         end
 
         #---------Time Step k finisher-----------
+        pₖ₋₁, pₖ = pₖ, pₖ₋₁
         if verbose
             dg_step = ceil(Int,log10(totalstep))+1
             dg_dt = max(1,-floor(Int,log10(dt)))

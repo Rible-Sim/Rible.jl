@@ -1,24 +1,11 @@
 function build_T(tg,i)
     (;indexed) = tg.connectivity
     (;nfull,mem2sysfull) = indexed
-    T = zeros(Int,length(mem2sysfull[i]),nfull)
+    T = spzeros(Int,length(mem2sysfull[i]),nfull)
     # Ť = zeros(Int,length(mem2sysfull[i]),nfree)
     # T̃ = zeros(Int,length(mem2sysfull[i]),npres)
     for (i,j) in enumerate(mem2sysfull[i])
         T[i,j] = 1
-    end
-    T
-end
-
-function build_T(tg)
-    nbodycoords = get_nbodycoords(tg)
-    @unpack nmvbodies, ncoords, connectivity = tg
-    body2q = connectivity.body2q
-    T = spzeros(Int,ncoords,nbodycoords*tg.nmvbodies)
-    for (mvrbid,rbid) in enumerate(tg.mvbodyindex)
-        q_index = body2q[rbid]
-        Ti = build_Ti(nbodycoords,ncoords,q_index)
-        T[:,(mvrbid-1)*nbodycoords+1:mvrbid*nbodycoords] = transpose(Ti)
     end
     T
 end
