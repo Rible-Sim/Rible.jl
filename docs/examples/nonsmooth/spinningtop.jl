@@ -111,20 +111,21 @@ function top_contact_dynfuncs(bot)
 	rbs = TR.get_rigidbodies(tg)
 	rb1 = rbs[1]
 
-	function get_D(active_contacts,q)
+	function get_directions_and_positions(active_contacts,q)
 		na = length(active_contacts)
 		TR.update_rigids!(tg,q)
 		D = Matrix{eltype(q)}(undef,3na,length(q))
+		ŕ = Vector{eltype(q)}(undef,3na)
 		for (i,ac) in enumerate(active_contacts)
 			(;id,state) = ac
 			(;n,t1,t2) = state.frame
             C = rb1.state.cache.Cps[id]
 			CT = C*TR.build_T(tg,1)
-			D[3(i-1)+1,:] = transpose(n)*CT
-			D[3(i-1)+2,:] = transpose(t1)*CT
-			D[3(i-1)+3,:] = transpose(t2)*CT
+			dm = hcat(n,t1,t2) |> transpose
+			D[3(i-1)+1:3(i-1)+3,:] = dm*CT
+			ŕ[3(i-1)+1:3(i-1)+3] = dm*rb1.state.rps[id]
 		end
-		D
+		D,ŕ
 	end
 
 	function get_∂Dq̇∂q(active_contacts,q,q̇)
@@ -193,7 +194,7 @@ function top_contact_dynfuncs(bot)
 		H = Diagonal(inv_μ_vec)
         active_contacts, gaps, H, es
     end
-    @eponymtuple(F!,Jac_F!,prepare_contacts!,get_D,get_∂Dq̇∂q,get_∂DᵀΛ∂q)
+    @eponymtuple(F!,Jac_F!,prepare_contacts!,get_directions_and_positions,get_∂Dq̇∂q,get_∂DᵀΛ∂q)
 end
 
 # Spinning
@@ -267,10 +268,10 @@ ṙo = [1.0,0.0,0.0]
 # Φ = TR.make_Φ(top.tg)(q)
 # A = TR.make_A(top.tg)(q)
 
-# tspan = (0.0,0.555)
-μ = 0.95
-e = 0.9
-tspan = (0.0,10.0)
+# tspan = (0.0,1.0)
+μ = 0.001
+e = 0.0
+tspan = (0.0,2.0)
 h = 1e-3
 
 topq = make_top(ro,R,ṙo,Ω;μ,e)
@@ -664,8 +665,8 @@ tops_dt = [
 	begin
 		top = make_top([0,0,cos(π/24)*0.5-1e-6],R,[0,0,0.0],[0,0,5.0]; μ=0.9, e = 0.0)
 		TR.solve!(TR.SimProblem(top,top_contact_dynfuncs),
-				TR.ZhongCCP();
-				tspan=(0.0,2.0),dt,ftol=1e-14,maxiters=50,exception=false)
+				TR.ZhongQCCP();
+				tspan=(0.0,0.5),dt,ftol=1e-14,maxiters=50,exception=false)
 	end
 	for dt in dts
 ]
@@ -676,7 +677,7 @@ tops_dt_v = [
 		top = make_top([0,0,cos(π/24)*0.5-1e-4],R,[1.0,0,0.0],[0,0,5.0]; μ=0.01, e = 0.0)
 		TR.solve!(TR.SimProblem(top,top_contact_dynfuncs),
 				TR.ZhongCCP();
-				tspan=(0.0,2.0),dt,ftol=1e-14,maxiters=50,exception=false)
+				tspan=(0.0,0.5),dt,ftol=1e-14,maxiters=50,exception=false)
 	end
 	for dt in dts
 ]
@@ -685,7 +686,7 @@ tops_dt_v = [
 GM.activate!(); plotsave_error(hcat(tops_dt,tops_dt_v),dts)
 CM.activate!(); plotsave_error(hcat(tops_dt,tops_dt_v),"top_err")
 
-plot_traj!(tops_dt_v[6];showinfo=false,rigidcolor=:white,showwire=true,figsize=(0.6tw,0.6tw),
+plot_traj!(tops_dt[6];showinfo=false,rigidcolor=:white,showwire=true,figsize=(0.6tw,0.6tw),
 	xlims=(-1.0,2.0),
 	ylims=(-1.0,1.0),
 	zlims=(-1e-3,1.0),

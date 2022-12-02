@@ -126,7 +126,7 @@ function solve!(intor::Integrator,solvercache::ZhongCCPCache;
     (;prob,controller,tspan,restart,totalstep) = intor
     (;bot,dynfuncs) = prob
     (;traj,contacts_traj) = bot
-    F!, Jac_F!, prepare_contacts!,get_D,get_∂Dq̇∂q,get_∂DᵀΛ∂q = dynfuncs
+    F!, Jac_F!, prepare_contacts!,get_directions_and_positions,get_∂Dq̇∂q,get_∂DᵀΛ∂q = dynfuncs
     (;cache) = solvercache
     (;M,Φ,A,Ψ,B,∂Ψ∂q,∂Aᵀλ∂q,∂Bᵀμ∂q) = cache
     invM = inv(M)
@@ -173,7 +173,7 @@ function solve!(intor::Integrator,solvercache::ZhongCCPCache;
         q̇ₖ .= q̇ₖ₋₁
         active_contacts,gaps,H,es = prepare_contacts!(cₖ,qˣ)
         na = length(active_contacts)
-        D = get_D(active_contacts,qˣ)        
+        D,_ = get_directions_and_positions(active_contacts,qˣ)        
         persistent_indices = findall((c)->c.state.persistent,active_contacts)
         Dₘ = zero(D)
         Dₖ = copy(D)
@@ -194,6 +194,7 @@ function solve!(intor::Integrator,solvercache::ZhongCCPCache;
         isconverged = false
         nΛ = 3na
         𝚲ₖ = zeros(T,nΛ)
+        𝚲ₖ .= repeat([0.1,0,0],na)
         𝚲ʳₖ = copy(𝚲ₖ)
         Δ𝚲ₖ = copy(𝚲ₖ)
         𝐁 = zeros(T,nx,nΛ)
@@ -222,7 +223,12 @@ function solve!(intor::Integrator,solvercache::ZhongCCPCache;
                 else
                     Nmax = 50
                 end
-                IPM!(𝚲ₖ,na,nΛ,repeat([0.1,0,0],na),repeat([0.1,0,0],na),𝐍,𝐫;ftol=1e-14,Nmax)
+                𝚲ₖini = deepcopy(𝚲ₖ)
+                𝚲ₖini[begin+1:3:end] .= 0.0
+                𝚲ₖini[begin+2:3:end] .= 0.0
+                𝚲ₖini .*= 10
+                yini = deepcopy(𝚲ₖini)
+                IPM!(𝚲ₖ,na,nΛ,𝚲ₖini,yini,𝐍,𝐫;ftol=1e-14,Nmax)
                 
                 Δ𝚲ₖ .= 𝚲ₖ - 𝚲ʳₖ
                 minusRes𝚲 = -Res + 𝐁*(Δ𝚲ₖ)
