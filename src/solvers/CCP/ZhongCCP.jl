@@ -126,7 +126,7 @@ function solve!(intor::Integrator,solvercache::ZhongCCPCache;
     (;prob,controller,tspan,restart,totalstep) = intor
     (;bot,dynfuncs) = prob
     (;traj,contacts_traj) = bot
-    F!, Jac_F!, prepare_contacts! = dynfuncs
+    F!, Jac_F!, prepare_contacts!,get_D,get_∂Dq̇∂q,get_∂DᵀΛ∂q = dynfuncs
     (;cache) = solvercache
     (;M,Φ,A,Ψ,B,∂Ψ∂q,∂Aᵀλ∂q,∂Bᵀμ∂q) = cache
     invM = inv(M)
@@ -171,7 +171,9 @@ function solve!(intor::Integrator,solvercache::ZhongCCPCache;
         qˣ = qₖ₋₁ .+ dt./2 .*q̇ₖ₋₁
         qₖ .= qₖ₋₁ .+ dt .*q̇ₖ₋₁
         q̇ₖ .= q̇ₖ₋₁
-        active_contacts,na,gaps,D,H,es = prepare_contacts!(cₖ,qˣ)
+        active_contacts,gaps,H,es = prepare_contacts!(cₖ,qˣ)
+        na = length(active_contacts)
+        D = get_D(active_contacts,qˣ)        
         persistent_indices = findall((c)->c.state.persistent,active_contacts)
         Dₘ = zero(D)
         Dₖ = copy(D)

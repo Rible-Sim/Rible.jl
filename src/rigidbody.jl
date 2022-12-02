@@ -296,7 +296,7 @@ end
 function update_transformations!(
 		cache::NonminimalCoordinatesCache{<:NaturalCoordinates.CoordinateFunctions},
 		state::RigidBodyState,
-		prop::RigidBodyProperty,q,q̇)
+		prop::RigidBodyProperty,q)
 end
 
 function update_transformations!(

@@ -29,11 +29,11 @@ include("../vis.jl"); includet("../vis.jl")
 include("../dyn.jl"); includet("../dyn.jl")
 figdir::String = raw"C:\Users\luo22\OneDrive\Papers\Ph.D.Thesis\ns"
 
-
 function make_top(ro = [0.0,0.0,0.0],
        R = one(RotMatrix{3}),
        ṙo = [0.0,0.0,0.0],
-       Ω = [0.0,0.0,5.0];
+       Ω = [0.0,0.0,5.0],
+	   cT = TR.QuaternionCoordinates.QC;
 	   μ = 0.5,
 	   e = 0.9,
 	   constrained=false
@@ -68,10 +68,12 @@ function make_top(ro = [0.0,0.0,0.0],
 	top_mesh = GeometryBasics.Mesh(meta(pts,normals=nls),fcs)
     prop = TR.RigidBodyProperty(1,movable,m,Ī,r̄g,r̄ps;constrained)
     ri = ro+R*r̄ps[5]
-    # lncs, _ = TR.NaturalCoordinates.NC1P3V(ri,ro,R,ṙo,ω)
-    # state = TR.RigidBodyState(prop,lncs,ro,R,ṙo,ω,constrained_index)
-	qcs = TR.QuaternionCoordinates.QC(m,Ī)
-	state = TR.RigidBodyState(prop,qcs,ro,R,ṙo,ω,constrained_index)
+	if cT == TR.QuaternionCoordinates.QC
+		nmcs = TR.QuaternionCoordinates.QC(m,Ī)
+	else
+    	nmcs, _ = TR.NaturalCoordinates.NC1P3V(ri,ro,R,ṙo,ω)
+	end
+	state = TR.RigidBodyState(prop,nmcs,ro,R,ṙo,ω,constrained_index)
     rb1 = TR.RigidBody(prop,state,top_mesh)
 	rbs = TypeSortedCollection((rb1,))
 	numberedpoints = TR.number(rbs)
@@ -135,12 +137,14 @@ function top_contact_dynfuncs(bot)
 			(;id,state) = ac
 			(;n,t1,t2) = state.frame
 			r̄p = rb1.prop.r̄ps[id]
-			∂Cẋ∂x = TR.QuaternionCoordinates.make_∂Cẋ∂x(r̄p)
-			TI = TR.build_T(tg,1)
-			∂Cq̇∂q = ∂Cẋ∂x(TI*q,TI*q̇)*TI
-			∂Dq̇∂q[3(i-1)+1,:] = transpose(n)*∂Cq̇∂q
-			∂Dq̇∂q[3(i-1)+2,:] = transpose(t1)*∂Cq̇∂q
-			∂Dq̇∂q[3(i-1)+3,:] = transpose(t2)*∂Cq̇∂q
+			if rb1.state.cache.funcs.nmcs isa TR.QuaternionCoordinates.QC
+				∂Cẋ∂x = TR.QuaternionCoordinates.make_∂Cẋ∂x(r̄p)
+				TI = TR.build_T(tg,1)
+				∂Cq̇∂q = ∂Cẋ∂x(TI*q,TI*q̇)*TI
+				∂Dq̇∂q[3(i-1)+1,:] = transpose(n)*∂Cq̇∂q
+				∂Dq̇∂q[3(i-1)+2,:] = transpose(t1)*∂Cq̇∂q
+				∂Dq̇∂q[3(i-1)+3,:] = transpose(t2)*∂Cq̇∂q
+			end
 		end
 		∂Dq̇∂q
 	end
@@ -155,11 +159,13 @@ function top_contact_dynfuncs(bot)
 			(;id,state) = ac
 			(;n,t1,t2) = state.frame
 			r̄p = rb1.prop.r̄ps[id]
-			∂Cᵀf∂x = TR.QuaternionCoordinates.make_∂Cᵀf∂x(r̄p)
-			TI = TR.build_T(tg,1)
-			Λi = @view Λ[3(i-1)+1:3(i-1)+3]
-			fi = hcat(n,t1,t2)*Λi
-			∂DᵀΛ∂q .+= transpose(TI)*∂Cᵀf∂x(TI*q,fi)*TI
+			if rb1.state.cache.funcs.nmcs isa TR.QuaternionCoordinates.QC
+				∂Cᵀf∂x = TR.QuaternionCoordinates.make_∂Cᵀf∂x(r̄p)
+				TI = TR.build_T(tg,1)
+				Λi = @view Λ[3(i-1)+1:3(i-1)+3]
+				fi = hcat(n,t1,t2)*Λi
+				∂DᵀΛ∂q .+= transpose(TI)*∂Cᵀf∂x(TI*q,fi)*TI
+			end
 		end
 		∂DᵀΛ∂q
 	end
@@ -198,80 +204,101 @@ ṙo = [1.0,0.0,0.0]
 # R = rand(RotMatrix3)
 # ṙo = rand(3)
 # Ω = rand(3)
-top = make_top(ro,R,ṙo,Ω;μ = 0.95,e = 0.0)
 
-q = TR.get_q(top.tg)
-q̇ = TR.get_q̇(top.tg)
+# q = TR.get_q(top.tg)
+# q̇ = TR.get_q̇(top.tg)
 
-rb1 = TR.get_rigidbodies(top.tg)[1]
-rb1cf = rb1.state.cache.funcs
+# rb1 = TR.get_rigidbodies(top.tg)[1]
+# rb1cf = rb1.state.cache.funcs
 
-@btime $rb1cf.build_M⁻¹($q)
+# @btime $rb1cf.build_M⁻¹($q)
 
-inv(rb1cf.build_M(q)) .- rb1cf.build_M⁻¹(q) |> norm
+# inv(rb1cf.build_M(q)) .- rb1cf.build_M⁻¹(q) |> norm
 
-crand = rand(3)
-C = TR.QuaternionCoordinates.make_C(crand)
-C(q)
-@btime  $C($q)
+# crand = rand(3)
+# C = TR.QuaternionCoordinates.make_C(crand)
+# C(q)
+# @btime  $C($q)
 
-∂Cẋ∂x = TR.QuaternionCoordinates.make_∂Cẋ∂x(crand)
-∂Cẋ∂x(q,q̇)
-@btime $∂Cẋ∂x($q,$q̇)
-∂Cẋ∂x_forwarddiff = TR.QuaternionCoordinates.make_∂Cẋ∂x_forwarddiff(C,3,7)
-∂Cẋ∂x_forwarddiff(q,q̇) .- ∂Cẋ∂x(q,q̇)
+# ∂Cẋ∂x = TR.QuaternionCoordinates.make_∂Cẋ∂x(crand)
+# ∂Cẋ∂x(q,q̇)
+# @btime $∂Cẋ∂x($q,$q̇)
+# ∂Cẋ∂x_forwarddiff = TR.QuaternionCoordinates.make_∂Cẋ∂x_forwarddiff(C,3,7)
+# ∂Cẋ∂x_forwarddiff(q,q̇) .- ∂Cẋ∂x(q,q̇)
 
-frand = rand(3)
-∂Cᵀf∂x = TR.QuaternionCoordinates.make_∂Cᵀf∂x(crand)
-∂Cᵀf∂x(q,frand)
-@btime $∂Cᵀf∂x($q,$frand)
-∂Cᵀf∂x_forwarddiff = TR.QuaternionCoordinates.make_∂Cẋ∂x_forwarddiff((q)->transpose(C(q)),7,7)
-∂Cᵀf∂x_forwarddiff(q,frand) .- ∂Cᵀf∂x(q,frand) |> norm
+# frand = rand(3)
+# ∂Cᵀf∂x = TR.QuaternionCoordinates.make_∂Cᵀf∂x(crand)
+# ∂Cᵀf∂x(q,frand)
+# @btime $∂Cᵀf∂x($q,$frand)
+# ∂Cᵀf∂x_forwarddiff = TR.QuaternionCoordinates.make_∂Cẋ∂x_forwarddiff((q)->transpose(C(q)),7,7)
+# ∂Cᵀf∂x_forwarddiff(q,frand) .- ∂Cᵀf∂x(q,frand) |> norm
 
-Rmat = TR.QuaternionCoordinates.Rmat
-∂Rη∂q_forwarddiff = TR.QuaternionCoordinates.make_∂Cẋ∂x_forwarddiff(Rmat,3,4)
+# Rmat = TR.QuaternionCoordinates.Rmat
+# ∂Rη∂q_forwarddiff = TR.QuaternionCoordinates.make_∂Cẋ∂x_forwarddiff(Rmat,3,4)
 
-qrand = rand(4)
-ηrand = rand(3)
+# qrand = rand(4)
+# ηrand = rand(3)
 
-@btime TR.QuaternionCoordinates.Rmat($qrand)
-@btime $∂Rη∂q_forwarddiff($qrand,$ηrand)
+# @btime TR.QuaternionCoordinates.Rmat($qrand)
+# @btime $∂Rη∂q_forwarddiff($qrand,$ηrand)
 
-TR.QuaternionCoordinates.∂Rη∂q(qrand,ηrand)
+# TR.QuaternionCoordinates.∂Rη∂q(qrand,ηrand)
 
-∂Rη∂q_forwarddiff(qrand,ηrand) .- TR.QuaternionCoordinates.∂Rη∂q(qrand,ηrand)
+# ∂Rη∂q_forwarddiff(qrand,ηrand) .- TR.QuaternionCoordinates.∂Rη∂q(qrand,ηrand)
 
-@btime TR.QuaternionCoordinates.∂Rη∂q($qrand,$ηrand)
-
+# @btime TR.QuaternionCoordinates.∂Rη∂q($qrand,$ηrand)
 
 
-@btime $∂Cq̇∂q($q,$q̇)
 
-@code_warntype ∂Cq̇∂q(q,q̇)
+# @btime $∂Cq̇∂q($q,$q̇)
 
-Size
-rb1cf.
-rb1cf.build_∂T∂xᵀ∂x(q̇) |> display
+# @code_warntype ∂Cq̇∂q(q,q̇)
 
-M = TR.build_M(top.tg)
-inv(Matrix(M))
-rank(M)
+# Size
+# rb1cf.
+# rb1cf.build_∂T∂xᵀ∂x(q̇) |> display
 
-∂T∂qᵀ = TR.build_∂T∂qᵀ(top.tg)
+# M = TR.build_M(top.tg)
+# inv(Matrix(M))
+# rank(M)
 
-Φ = TR.make_Φ(top.tg)(q)
-A = TR.make_A(top.tg)(q)
+# ∂T∂qᵀ = TR.build_∂T∂qᵀ(top.tg)
 
-tspan = (0.0,0.555)
+# Φ = TR.make_Φ(top.tg)(q)
+# A = TR.make_A(top.tg)(q)
+
+# tspan = (0.0,0.555)
+μ = 0.95
+e = 0.9
 tspan = (0.0,10.0)
 h = 1e-3
 
-prob = TR.SimProblem(top,top_contact_dynfuncs)
+topq = make_top(ro,R,ṙo,Ω;μ,e)
 
-TR.solve!(prob,TR.ZhongQCCP();tspan,dt=h,ftol=1e-14,maxiters=50,exception=false,verbose=false)
+TR.solve!(
+	TR.SimProblem(topq,top_contact_dynfuncs),
+	TR.ZhongQCCP();
+	tspan,dt=h,ftol=1e-14,maxiters=50,exception=false,verbose=false)
 
-plot_traj!(top;showinfo=false,rigidcolor=:white,showwire=true,figsize=(0.6tw,0.6tw))
+plot_traj!(topq;showinfo=false,rigidcolor=:white,showwire=true,figsize=(0.6tw,0.6tw))
 
+
+topn = make_top(ro,R,ṙo,Ω,TR.NaturalCoordinates.LNC;μ,e)
+TR.solve!(
+	TR.SimProblem(topn,top_contact_dynfuncs),
+	TR.ZhongCCP();
+	tspan,dt=h,ftol=1e-14,maxiters=50,exception=false,verbose=false)
+
+plot_traj!(topn;showinfo=false,rigidcolor=:white,showwire=true,figsize=(0.6tw,0.6tw))
+
+
+c1_topq = get_trajectory!(topq,1,5)
+c1_topn = get_trajectory!(topn,1,5)
+fig = Figure()
+ax = Axis(fig[1,1])
+lines!(ax,c1_topq[3,:])
+lines!(ax,c1_topn[3,:])
+fig
 
 # no contact
 prob = TR.SimProblem(top,(x)->dynfuncs(x;gravity=true))
