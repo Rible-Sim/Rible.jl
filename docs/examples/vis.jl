@@ -783,6 +783,7 @@ end
 
 
 function plotsave_error(mbots,dts,figname=nothing;
+        pid = 0,
         resolution = (0.8tw,0.3tw),
     )
 	with_theme(theme_pub;
@@ -793,11 +794,11 @@ function plotsave_error(mbots,dts,figname=nothing;
 		for j in axes(mbots,2)
 			bots = mbots[:,j]
 			nbots = length(bots)
-			itp = interpolate(get_trajectory!(bots[nbots],1,0)[1,:], BSpline(Linear()))
+			itp = interpolate(get_trajectory!(bots[nbots],1,pid)[1,:], BSpline(Linear()))
 			ref_traj = scale(itp,0:dts[nbots]:bots[nbots].traj.t[end])
 			# ref_traj(0:0.1:2)
 			err_avg = [
-				get_trajectory!(bots[i],1,0)[1,begin:end-1].-ref_traj(bots[i].traj.t[begin:end-1]) .|> abs |> mean
+				get_trajectory!(bots[i],1,pid)[1,begin:end-1].-ref_traj(bots[i].traj.t[begin:end-1]) .|> abs |> mean
 				for (i,dt) in enumerate(dts[1:nbots-1])
 			]
 

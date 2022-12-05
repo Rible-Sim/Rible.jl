@@ -269,9 +269,9 @@ ṙo = [1.0,0.0,0.0]
 # A = TR.make_A(top.tg)(q)
 
 # tspan = (0.0,1.0)
-μ = 0.001
-e = 0.0
-tspan = (0.0,2.0)
+μ = 0.95
+e = 0.5
+tspan = (0.0,10.0)
 h = 1e-3
 
 topq = make_top(ro,R,ṙo,Ω;μ,e)
@@ -282,6 +282,7 @@ TR.solve!(
 	tspan,dt=h,ftol=1e-14,maxiters=50,exception=false,verbose=false)
 
 plot_traj!(topq;showinfo=false,rigidcolor=:white,showwire=true,figsize=(0.6tw,0.6tw))
+
 
 
 topn = make_top(ro,R,ṙo,Ω,TR.NaturalCoordinates.LNC;μ,e)
@@ -661,12 +662,13 @@ CM.activate!(); plotsave_compare_traj(top_fix,top_ω5,"compare_traj")
 #dt
 dts = [1e-1,3e-2,1e-2,3e-3,1e-3,3e-4,1e-4,1e-5]
 
+dts = [1e-1,3e-2,1e-2,3e-3,1e-3,1e-4]
 tops_dt = [
 	begin
-		top = make_top([0,0,cos(π/24)*0.5-1e-6],R,[0,0,0.0],[0,0,5.0]; μ=0.9, e = 0.0)
+		top = make_top([0,0,cos(π/24)*0.5-1e-6],R,[0,0,0.0],[0,0,10.0]; μ=0.9, e = 0.0)
 		TR.solve!(TR.SimProblem(top,top_contact_dynfuncs),
 				TR.ZhongQCCP();
-				tspan=(0.0,0.5),dt,ftol=1e-14,maxiters=50,exception=false)
+				tspan=(0.0,5.0),dt,ftol=1e-14,maxiters=50,exception=false)
 	end
 	for dt in dts
 ]
@@ -674,36 +676,26 @@ tops_dt = [
 #v
 tops_dt_v = [
 	begin
-		top = make_top([0,0,cos(π/24)*0.5-1e-4],R,[1.0,0,0.0],[0,0,5.0]; μ=0.01, e = 0.0)
+		top = make_top([0,0,cos(π/24)*0.5-1e-4],R,[4.0,0,0.0],[0,0,10.0]; μ=0.01, e = 0.0)
 		TR.solve!(TR.SimProblem(top,top_contact_dynfuncs),
-				TR.ZhongCCP();
-				tspan=(0.0,0.5),dt,ftol=1e-14,maxiters=50,exception=false)
+				TR.ZhongQCCP();
+				tspan=(0.0,2.0),dt,ftol=1e-14,maxiters=50,exception=false)
 	end
 	for dt in dts
 ]
 
 
-GM.activate!(); plotsave_error(hcat(tops_dt,tops_dt_v),dts)
+GM.activate!(); plotsave_error(hcat(tops_dt,tops_dt_v),dts,pid=2)
 CM.activate!(); plotsave_error(hcat(tops_dt,tops_dt_v),"top_err")
 
-plot_traj!(tops_dt[6];showinfo=false,rigidcolor=:white,showwire=true,figsize=(0.6tw,0.6tw),
+plot_traj!(tops_dt_v[end];showinfo=false,rigidcolor=:white,showwire=true,figsize=(0.6tw,0.6tw),
 	xlims=(-1.0,2.0),
 	ylims=(-1.0,1.0),
 	zlims=(-1e-3,1.0),
 )
 
-
-itp = interpolate(get_trajectory!(tops_dt_v[8],1,0)[1,:], BSpline(Linear()))
-ref_traj = scale(itp,0:dts[8]:2.0)
-
-get_trajectory!(tops_dt_v[6],1,0)[1,begin:end-1].-ref_traj(tops_dt_v[6].traj.t[begin:end-1])  .|> abs |> scatter
-
-
-err_avg = [
-	get_trajectory!(tops_dt_v[i],1,0)[1,begin:end-1].-ref_traj(tops_dt_v[i].traj.t[begin:end-1]) .|> abs |> mean
-	for (i,dt) in enumerate(dts[1:8-1])
-]
-
+r1p5 = get_trajectory!(tops_dt[end],1,5)
+lines(r1p5[1,:])
 # friction_direction
 # Dare you try
 GM.activate!(); plotsave_friction_direction(tops_e0)
