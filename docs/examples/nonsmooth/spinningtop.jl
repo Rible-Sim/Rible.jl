@@ -13,7 +13,7 @@ using CoordinateTransformations
 using Rotations
 using ForwardDiff
 using Interpolations
-using GeometryBasics
+import GeometryBasics as GB
 using OffsetArrays
 using Printf
 using Unitful
@@ -41,9 +41,9 @@ function make_top(ro = [0.0,0.0,0.0],
 	ω = R*Ω
     movable = true
 	if constrained
-		constrained_index = [1,2,3]
+		pres_idx = [1,2,3]
 	else
-		constrained_index = Vector{Int}()
+		pres_idx = Int[]
     end
 
     m = 1.0
@@ -73,13 +73,13 @@ function make_top(ro = [0.0,0.0,0.0],
 	else
     	nmcs, _ = TR.NaturalCoordinates.NC1P3V(ri,ro,R,ṙo,ω)
 	end
-	state = TR.RigidBodyState(prop,nmcs,ro,R,ṙo,ω,constrained_index)
+	state = TR.RigidBodyState(prop,nmcs,ro,R,ṙo,ω,pres_idx)
     rb1 = TR.RigidBody(prop,state,top_mesh)
 	rbs = TypeSortedCollection((rb1,))
 	numberedpoints = TR.number(rbs)
 	matrix_sharing = zeros(Int,0,0)
 	indexedcoords = TR.index(rbs,matrix_sharing)
-    ss = Vector{Int}()
+    ss = Int[]
 	tensiles = (cables = ss,)
 	connected = TR.connect(rbs,zeros(Int,0,0))
 	tensioned = @eponymtuple(connected,)
@@ -110,6 +110,30 @@ function top_contact_dynfuncs(bot)
 
 	rbs = TR.get_rigidbodies(tg)
 	rb1 = rbs[1]
+	
+    function prepare_contacts!(contacts,q)
+		TR.update_rigids!(tg,q)
+		rb = rbs[1]
+		for (cid,pid) in enumerate([5])
+			gap = rb.state.rps[pid][3] 
+			TR.activate!(contacts[cid],gap)
+		end
+		active_contacts = filter(contacts) do c
+			c.state.active
+		end
+		na = length(active_contacts)
+		inv_μ_vec = ones(eltype(q),3na)
+		n = [0,0,1.0]
+		for (i,ac) in enumerate(active_contacts)
+			(;id,state) = ac
+			state.frame = TR.SpatialFrame(n)
+			inv_μ_vec[3(i-1)+1] = 1/ac.μ
+		end
+        es = [ac.e for ac in active_contacts]
+		gaps = [ac.state.gap for ac in active_contacts]
+		H = Diagonal(inv_μ_vec)
+        active_contacts, gaps, H, es
+    end
 
 	function get_directions_and_positions(active_contacts,q)
 		na = length(active_contacts)
@@ -171,29 +195,6 @@ function top_contact_dynfuncs(bot)
 		∂DᵀΛ∂q
 	end
 
-    function prepare_contacts!(contacts,q)
-		TR.update_rigids!(tg,q)
-		rb = rbs[1]
-		for (cid,pid) in enumerate([5])
-			gap = rb.state.rps[pid][3] 
-			TR.activate!(contacts[cid],gap)
-		end
-		active_contacts = filter(contacts) do c
-			c.state.active
-		end
-		na = length(active_contacts)
-		inv_μ_vec = ones(eltype(q),3na)
-		n = [0,0,1.0]
-		for (i,ac) in enumerate(active_contacts)
-			(;id,state) = ac
-			state.frame = TR.SpatialFrame(n)
-			inv_μ_vec[3(i-1)+1] = 1/ac.μ
-		end
-        es = [ac.e for ac in active_contacts]
-		gaps = [ac.state.gap for ac in active_contacts]
-		H = Diagonal(inv_μ_vec)
-        active_contacts, gaps, H, es
-    end
     @eponymtuple(F!,Jac_F!,prepare_contacts!,get_directions_and_positions,get_∂Dq̇∂q,get_∂DᵀΛ∂q)
 end
 
@@ -353,26 +354,6 @@ with_theme(theme_try;
 	)
 end
 
-function plotsave_contact_persistent(bot,figname=nothing)
-	with_theme(mv_theme;) do
-		contacts_traj_voa = VectorOfArray(bot.contacts_traj)
-		c1_traj = contacts_traj_voa[1,:]
-		Λtol = 1e-7 # rule out false active
-		# steps = 1:length(c1_traj)
-		active_nonpersist = findall(c1_traj) do c
-			c.state.active && !c.state.persistent && norm(c.state.Λ) > Λtol
-		end
-		active_persist = findall(c1_traj) do c
-			c.state.active && c.state.persistent && norm(c.state.Λ) > Λtol
-		end
-		fig = Figure()
-		ax = Axis(fig[1,1], xlabel = "Step", ylabel = "Contact Type")
-		scatter!(ax,active_nonpersist,one.(active_nonpersist))
-		scatter!(ax,active_persist,zero.(active_persist))
-		savefig(fig,figname)
-		fig
-	end
-end
 GM.activate!(); plotsave_contact_persistent(top)
 CM.activate!(); plotsave_contact_persistent(top,"spinningtop_contact_persistent")
 
@@ -684,7 +665,6 @@ tops_dt_v = [
 	for dt in dts
 ]
 
-
 GM.activate!(); plotsave_error(hcat(tops_dt,tops_dt_v),dts,pid=2)
 CM.activate!(); plotsave_error(hcat(tops_dt,tops_dt_v),"top_err")
 
@@ -745,7 +725,6 @@ CM.activate!(); plotsave_contact_friction(tops_e0,"contact_friction")
 
 
 # Bar
-
 function make_bar(;
 		μ = 0.1,
 		e = 0.0
@@ -792,7 +771,7 @@ function make_bar(;
 	numberedpoints = TR.number(rbs)
 	matrix_sharing = zeros(Int,0,0)
 	indexedcoords = TR.index(rbs,matrix_sharing)
-    ss = Vector{Int}()
+    ss = Int[]
 	tensiles = (cables = ss,)
 	connections = TR.connect(rbs,zeros(Int,0,0))
 	contacts = [TR.Contact(i,μ,e) for i = 1:2]
@@ -910,8 +889,8 @@ function new_pointmass(;
 	ω = zero(ro)
 	rps = Ref(ro) .+ Ref(R).*r̄ps
 	lncs, _ = TR.NaturalCoordinates.NCMP(rps,ro,R,ṙo,ω)
-	ci = Vector{Int}()
-	Φi = Vector{Int}()
+	ci = Int[]
+	Φi = Int[]
 	state = TR.RigidBodyState(prop,lncs,ro,R,ṙo,ω,ci,Φi)
 	rb1 = TR.RigidBody(prop,state)
 
@@ -919,7 +898,7 @@ function new_pointmass(;
 	numberedpoints = TR.number(rbs)
 	matrix_sharing = zeros(Int,0,0)
 	indexedcoords = TR.index(rbs,matrix_sharing)
-	ss = Vector{Int}()
+	ss = Int[]
 	tensiles = (cables = ss,)
 	connections = TR.connect(rbs,zeros(Int,0,0))
 	cnt = TR.Connectivity(numberedpoints,indexedcoords,connections)
@@ -1273,9 +1252,58 @@ end
 GM.activate!(); plotsave_pointmass_energy_friction(pm)
 CM.activate!(); plotsave_pointmass_energy_friction(pm,"pointmass_energy_friction")
 
+using TypedPolynomials
+@polyvar L ξ
+using LinearAlgebra
+using StaticArrays
+S_raw = SA[
+            1//2 - 3//4*ξ + 1//4*ξ^3, 1//8*L*( 1 - ξ - ξ^2 + ξ^3),
+            1//2 + 3//4*ξ - 1//4*ξ^3, 1//8*L*(-1 - ξ + ξ^2 + ξ^3),
+        ]
+S = kron(S_raw,Matrix(1I,3,3))
+@which TypedPolynomials.differentiate(S[1],ξ)
+\
+TypedPolynomials.differentiate.(terms(S[1]), ξ)
+terms(S[1])
+@which  TypedPolynomials.differentiate(TypedPolynomials.monomial(terms(S[1])[1]),ξ)
+@which terms(S[1])
+latexify(SᵀS)
+integrate(SᵀS[1],L) 
+using ForceImport
+import Reduce
+@force using Reduce.Algebra
+1-1/:n
+:((n - 1) // n)
 
-v1 = LinRange(-1.0,1.0,1000)
-v2 = LinRange(-1.0,1.0,1000)
-vt = [sqrt(x^2 + y^2) for x in v1, y in v2]
+ans^-:n
+:(1 // ((n - 1) // n) ^ n)
 
-surface(v1,v2,vt)
+limit(ans,:n,Inf)
+int(sin(im*:x+π)^2-1,:x)
+:(int(sin(im*x+pi)^2-1,x)) |> Reduce.rcall
+
+L = :L
+ξ = :ξ
+I3 = Matrix(1I,3,3)
+S = [
+		(1//2 - ξ*3/4 + (ξ^3)/4)*I3  L/8*( 1 - ξ - ξ^2 + ξ^3)*I3 (1//2 + ξ*3/4 - (ξ^3)/4)*I3  L/8*(-1 - ξ + ξ^2 + ξ^3)*I3;
+	] .|> Reduce.RExpr
+S
+SᵀS = transpose(S)*S
+S
+
+
+using LinearAlgebra
+using StaticArrays
+function f(ξ,p=0)
+	L = 1.0
+	S_raw = SA[1//2 - 3//4*ξ + 1//4*ξ^3  1//8*L*( 1 - ξ - ξ^2 + ξ^3) 1//2 + 3//4*ξ - 1//4*ξ^3  1//8*L*(-1 - ξ + ξ^2 + ξ^3);]
+	S = kron(S_raw,SMatrix{3,3}(1I))
+	SᵀS = Symmetric(transpose(S)*S)
+	# SᵀS = transpose(S)*S
+end
+f(0.0,)
+prob = IntegralProblem(f,0.0,1.0)
+sol = solve(prob,HCubatureJL(),reltol=1e-14,abstol=1e-14)
+sol.u
+

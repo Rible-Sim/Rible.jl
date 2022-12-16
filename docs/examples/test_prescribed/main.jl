@@ -25,13 +25,22 @@ using CSV, Tables
 using Printf
 using StructArrays
 using EponymTuples
-using GeometryBasics, Meshing
+import GeometryBasics as GB
+using Meshing
 # using FloatingTableView
+import Meshes
 using Match
 using Cthulhu
 using Revise
 import TensegrityRobots as TR
 cd("examples/test_prescribed")
+include("../vis.jl")
+include("../analysis.jl")
+include("../dyn.jl")
+include("dyn.jl")
+include("def.jl")
+include("def3d.jl")
+
 includet("../vis.jl")
 includet("../analysis.jl")
 includet("../dyn.jl")
@@ -53,27 +62,6 @@ tw = 522 |> pt2px
 # cw = lw = tw = 455.24411 |> pt2px
 
 # set_theme!(;font = "Nimbus Rom No9 L", fontsize)
-my_theme = Theme(;
-    font = "CMU Serif",
-    fontsize,
-    markersize,
-    resolution = (0.9tw,0.5tw),
-    # figure_padding = (fontsize,fontsize,fontsize,fontsize),
-    figure_padding = (fontsize/2,fontsize/2,fontsize/2,fontsize/2),
-    Lines = (
-        linewidth = linewidth,
-    ),
-    ScatterLines = (
-        linewidth = linewidth,
-    ),
-    Label = (
-        textsize = fontsize,
-        halign = :left,
-        padding = (0, 0, 0, 0),
-    )
-)
-set_theme!(my_theme)
-scatter(rand(10))
 
 ## 1st example, validation and verification
 ## comparison with Adams
@@ -111,9 +99,9 @@ function plot_comparison(sol,M,bot,figname=nothing)
     rb2rg_ = rb2rg .- rb1rp2
     θ2 = atan.(rb2rg_[1,:],-rb2rg_[2,:])#.-sol[4,:]
 
-    fig_width = columnwidth
-    fig_height = columnwidth
-    with_theme(my_theme;
+    fig_width = cw
+    fig_height = cw
+    with_theme(theme_pub;
             resolution = (0.8tw,0.5tw),
             palette = (
                 color = [:black],
@@ -180,7 +168,6 @@ mean(err_θ1)
 
 obot.traj.t
 
-
 ## comparison with Alpha
 obot_zhong = one_bar_one_tri(); obot_alpha = deepcopy(obot)
 prob_zhong = TR.SimProblem(obot_zhong,(x)->dynfuncs(x;gravity=true));
@@ -197,7 +184,7 @@ function plot_energy!(bot_zhong,bot_alpha,figname=nothing)
     ms_alpha = TR.mechanical_energy!(bot_alpha;gravity=true)
     fig_width = 0.9columnwidth
     fig_height = 0.35columnwidth
-    with_theme(my_theme;
+    with_theme(theme_pub;
             resolution=(0.6tw,0.3tw),
             figure_padding = (fontsize,fontsize,fontsize,fontsize),
             palette = (color = [:black,:red],),
@@ -240,7 +227,7 @@ function plot_frequency_comparison(ref_frequency,bot_frequency,figname=nothing)
     @show frequency_rel_err, frequency_rel_err |> maximum
     # fig_width = cw
     # fig_height = 0.4cw
-    with_theme(my_theme;
+    with_theme(theme_pub;
             # resolution=(0.6tw,0.3tw),
             resolution=(cw,0.4cw),
             palette = (color = [:black,:red],),
@@ -271,7 +258,7 @@ function plot_tower2d_mode_shape(bot,figname=nothing)
     shapes = q
     frequencies = t[begin+1:end]./2pi
     # @sprintf "Mode %s \n %.4f (Hz)"  1  tower2d_frequency[1]
-    with_theme(my_theme;
+    with_theme(theme_pub;
             # resolution=(tw,0.3tw),
             resolution=(0.8tw,0.5cw),
             Axis = (
@@ -321,7 +308,6 @@ CM.activate!(); plot_tower2d_mode_shape(tower2dbot,"mode_shapes")
 
 plot_traj!(tower2dbot)
 
-
 ## Natural frequency with varying rest lengths
 function vary_restlengths(ratio_range)
     VectorOfArray([
@@ -351,7 +337,7 @@ adams_ratio = [
 function plot_frequency_varying_restlengths(figname=nothing)
     cg = cgrad(:Dark2_6, 6, categorical = true)[[1,2,3,4,6]]
     mk = ['⨉','○','◇','✳','◻']
-    with_theme(my_theme;
+    with_theme(theme_pub;
             # resolution=(0.7tw,0.4tw),
             resolution=(cw,0.5cw),
             palette = (color = cg, marker = mk),
@@ -397,11 +383,11 @@ CM.activate!(); plot_frequency_varying_restlengths("frequency_varying_restlength
 
 function pres2d!(sysstate,tg;aux=true)
     (;t,q̃,q̃̇,q̃̈) = sysstate
-    (;rigidbodies,connectivity) = tg
+    (;bodies,connectivity) = tg
     (;mem2syspres) = connectivity.indexed
     amp = 0.01
     p = 6π
-    foreach(rigidbodies) do rb
+    foreach(bodies) do rb
         rbid = rb.prop.id
         if rbid == 1
             q̃[mem2syspres[rbid]] .= [     amp*sin(p*t),0]
@@ -469,7 +455,7 @@ x4,y4 = approx_slack(;k=k[11],μ=μ[11],l0=l[11],filename="xy4")
 
 x0,y0 = approx_slack(;k=100.0,μ=0.0,l0=0.0)
 function plot_data_points(x,y,figname=nothing)
-    with_theme(my_theme;
+    with_theme(theme_pub;
         resolution = (cw,0.8cw),
         Scatter = (
             marker=:xcross,
@@ -549,7 +535,7 @@ function plot_tower2d_point_traj(ba,figname=nothing;at=1.23)
     fig_height = 0.75columnwidth
     cg = cgrad(:seaborn_bright6, 6, categorical = true)
     mk = ['○','□','×','+']
-    with_theme(my_theme;
+    with_theme(theme_pub;
             resolution=(tw,0.5tw),
             palette = (color = cg, marker = mk),
             Lines = (cycle = [:color],),
@@ -583,7 +569,7 @@ function plot_tower2d_point_traj(ba,figname=nothing;at=1.23)
             )
         end
         vlines!(ax1,[at],color=:slategrey)
-        text!(ax1,latexstring("t=$at~(\\mathrm{Collapse})"), textsize = fontsize, position = (at+0.02, 0.015), align = (:left, :center))
+        text!(ax1,latexstring("t=$at~(\\mathrm{Collapse})"), fontsize = fontsize, position = (at+0.02, 0.015), align = (:left, :center))
         xlims!(ax1,0.,2.)
         ylims!(ax1,-0.005,0.092)
         ax1.yticks = collect(0.00:0.01:0.09)
@@ -615,7 +601,7 @@ function plot_slack_cables(bots,figname=nothing;at=1.23)
     fig_width = 0.95columnwidth
     fig_height = 0.7columnwidth
     cg = cgrad(:mk_12, 12, categorical = true)
-    with_theme(my_theme;
+    with_theme(theme_pub;
             resolution=(0.7tw,0.5tw),
             # figure_padding=(0,50,0,0),
             palette = (color = cg, ),
@@ -634,7 +620,7 @@ function plot_slack_cables(bots,figname=nothing;at=1.23)
                 ax.xticklabelsvisible = false
                 ax.yticks = collect(1:12)
                 ylims!(ax,0.5,12.5)
-                text!(ax,latexstring("t=$at~(\\mathrm{Collapse})"), textsize = fontsize,
+                text!(ax,latexstring("t=$at~(\\mathrm{Collapse})"), fontsize = fontsize,
                             position = (at+0.055, 4.5),
                             align = (:left, :center)
                 )
@@ -661,7 +647,7 @@ function plot_slack_cables(bots,figname=nothing;at=1.23)
         end
         for (ilabel,label) in enumerate(alphabet[1:2])
             Label(fig.layout[ilabel, 1, TopLeft()], "($label)",
-                textsize = fontsize,
+                fontsize = fontsize,
                 font = "CMU Serif Bold",
                 padding = (10, 0, -10, 0),
                 halign = :left)
@@ -689,7 +675,7 @@ CM.activate!(); plot_slack_cables(
 function plot_tower2d_at_time(bots,figname=nothing;at=1.23)
     fig_width = 1.5columnwidth
     fig_height = 0.45columnwidth
-    with_theme(my_theme;
+    with_theme(theme_pub;
             resolution=(0.8tw,0.25tw),
         ) do
         fig = Figure(;)
@@ -713,7 +699,7 @@ function plot_tower2d_at_time(bots,figname=nothing;at=1.23)
         end
         for (ilabel,label) in enumerate(alphabet[1:4])
             Label(fig.layout[1, ilabel, TopLeft()], "($label)",
-                textsize = fontsize,
+                fontsize = fontsize,
                 font = "CMU Serif Bold",
                 padding = (0, -50, -50, 0),
                 halign = :right)
@@ -752,11 +738,11 @@ ms_tower2d = TR.mechanical_energy!(tower2dbot_undamped_noslack;gravity=true)
 ## Seismic and deploy
 function pres3d!(sysstate,tg;ν=0.5)
     (;t,q̃,q̃̇,q̃̈) = sysstate
-    (;rigidbodies,connectivity) = tg
+    (;bodies,connectivity) = tg
     (;mem2syspres) = connectivity.indexed
     amp = 0.01
     p = ν*2π
-    foreach(rigidbodies) do rb
+    foreach(bodies) do rb
         rbid = rb.prop.id
         if rbid in [1,2,3]
             r0 = zeros(3)
@@ -797,7 +783,7 @@ rest = deleteat!(collect(1:24),13:21)
 ## inverse statics and modal analysis
 tower3dbot0 = tower3d(;k=500.0,c=2.0)
 TR.get_cables_stiffness(tower3dbot0)
-GM.activate!(); plot_traj!(tower3dbot0;showmesh=false,textsize=20)
+GM.activate!(); plot_traj!(tower3dbot0;showmesh=false,fontsize=20)
 
 ℓ0 = TR.get_cables_len(tower3dbot0.tg)
 ℓ0[begin:3:end]
@@ -822,7 +808,7 @@ tower3dbot0.traj.t./(2π)
 
 tower3dbot1 = tower3d(;k=500.0,c=2.0,d = 0.1*√2, r2 = 0.07)
 TR.get_cables_stiffness(tower3dbot1)[begin:3:end]
-plot_traj!(tower3dbot1;textsize=20)
+plot_traj!(tower3dbot1;fontsize=20)
 μ1 = zero(TR.get_cables_restlen(tower3dbot1.tg))
 μ1[13:21] .= μ0[13:21]
 B,F̃ = TR.build_inverse_statics_for_restlength(tower3dbot1.tg,tower3dbot1.tg;gravity=true)
@@ -883,11 +869,11 @@ function plot_first_frequencies(bots,figname=nothing)
     @show frqs[1][1], frqs[2][1]
     unqfrqs = [(round.(frq;sigdigits=4)|> unique)[1:n] for frq in frqs]
     # cg = cgrad(:Dark2_6, 6, categorical = true)[[4,3,6]]
-    # set_theme!(my_theme;
+    # set_theme!(theme_pub;
     #         palette = (color = cg, ),
     #         Lines = (cycle = [:color],),
     # )
-    with_theme(my_theme;
+    with_theme(theme_pub;
             # resolution = (0.7tw,0.3tw),
             resolution = (cw,0.5cw),
         ) do
@@ -916,7 +902,7 @@ TR.solve!(TR.SimProblem(tower3dbot0_nodpl,(x)->dynfuncs(x;gravity=true)),
                 prescribe! = pres3d!,
                 actuate! = nothing
             );
-            dt=1e-3,tspan=(0.0,15.0),ftol=1e-14)
+            dt=1e-3,tspan=(0.0,15.0),verbose=false,ftol=1e-14)
 # plot_tower3d_traj(tower3dbot0_nodpl)
 plot_traj!(tower3dbot0_nodpl)
 
@@ -933,7 +919,7 @@ plot_traj!(tower3dbot1_nodpl)
 
 function plot_tower3d_seis_traj(bots,figname=nothing)
     cg = cgrad(:seaborn_bright6, 6, categorical = true)
-    with_theme(my_theme;
+    with_theme(theme_pub;
             # resolution=(0.9tw,0.4tw),
             resolution=(tw,0.7cw),
             figure_padding = (fontsize,fontsize,0,0),
@@ -987,7 +973,7 @@ function plot_tower3d_seis_traj(bots,figname=nothing)
             foreach(set_ax!,[ax1,ax2,ax3])
             for (ilabel,label) in enumerate(scalings)
                 Label(fig.layout[i, ilabel, Top()], latexstring("×10^{$label}"),
-                    # textsize = fontsize,
+                    # fontsize = fontsize,
                     # # font = "Nimbus Rom No9 L",
                     # padding = (ifelse(ilabel==1,90,55), 0, 0, 0),
                     # halign = :left
@@ -995,7 +981,7 @@ function plot_tower3d_seis_traj(bots,figname=nothing)
             end
             for (ilabel,label) in enumerate(alphabet[3(i-1)+1:3(i-1)+3])
                 Label(fig.layout[i, ilabel, TopLeft()], "($label)",
-                    # textsize = fontsize,
+                    # fontsize = fontsize,
                     font = "CMU Serif Bold",
                     padding = (0, 0, fontsize/2, 0),
                     # halign = :right
@@ -1038,7 +1024,7 @@ function plot_tower3d_vis_nodpl(bots,figname=nothing)
     for (ilabel,label) in enumerate(alphabet[1:nbot])
         Label(fig.layout[1, ilabel, Bottom()],
             "($label)",
-            textsize = fontsize,
+            fontsize = fontsize,
             font = "CMU Serif Bold",
             padding = (-110, 0, 0, 80),
             halign = :center,
@@ -1048,7 +1034,7 @@ function plot_tower3d_vis_nodpl(bots,figname=nothing)
     for (ilabel,label) in enumerate(alphabet[1:nbot])
         Label(fig.layout[1, ilabel, Bottom()],
             latexstring("\\mathrm{$(titles[ilabel])}"),
-            textsize = fontsize,
+            fontsize = fontsize,
             padding = (50, 0, 0, 90),
             halign = :center,
             valign = :top)
@@ -1105,7 +1091,7 @@ me_series = TR.mechanical_energy!(tower3d_seis;actuate=true,gravity=true)
 lines(tower3d_seis.traj.t,me_series.E)
 function plot_tower3d_dpl_traj(bots,figname=nothing)
     cg = cgrad(:seaborn_bright6, 6, categorical = true)
-    with_theme(my_theme;
+    with_theme(theme_pub;
             # resolution = (tw,0.8tw),
             resolution = (tw,1.25cw),
             palette = (color = cg, ),
@@ -1203,7 +1189,7 @@ function plot_tower3d_dpl_traj(bots,figname=nothing)
             end
             for (ilabel,label) in enumerate(alphabet[[2i-1,2i]])
                 Label(fig.layout[i, ilabel, TopLeft()], "($label)",
-                    textsize = fontsize,
+                    fontsize = fontsize,
                     font = "CMU Serif Bold",
                     padding = (0, 0, fontsize/2, 0),
                     # halign = :right
@@ -1256,7 +1242,7 @@ function plot_tower3d_vis(bot0,bot1,figname=nothing)
 
     for (ilabel,label) in enumerate(alphabet[1:3])
         Label(fig.layout[1, ilabel, Bottom()], "($label)",
-            textsize = fontsize,
+            fontsize = fontsize,
             font = "CMU Serif Bold",
             padding = (-110, 0, 0, 70),
             halign = :center,
@@ -1264,7 +1250,7 @@ function plot_tower3d_vis(bot0,bot1,figname=nothing)
     end
     for (ilabel,label) in enumerate(alphabet[1:3])
         Label(fig.layout[1, ilabel, Bottom()], latexstring("t=$(ts[ilabel])~(\\mathrm{s})"),
-            textsize = fontsize,
+            fontsize = fontsize,
             padding = (110, 0, 0, 80),
             halign = :center,
             valign = :top)
@@ -1346,7 +1332,7 @@ function plot_compare_ijkl(boti,botj,botk,botl)
     fig_width = 0.7columnwidth
     fig_height = 0.4columnwidth
     cg = [:black,:red,:blue]
-    set_theme!(my_theme;
+    set_theme!(theme_pub;
             palette = (color = cg, ),
             Lines = (cycle = [:color],),
     )
@@ -1361,7 +1347,7 @@ function plot_compare_ijkl(boti,botj,botk,botl)
     # ylims!(ax1,-7,7)
     ax1.xlabelpadding = -15
     Label(fig.layout[1, 1, Top()], latexstring("×10^{$scaling}"),
-        textsize = fontsize,
+        fontsize = fontsize,
         font = "CMU Serif Bold",
         padding = (0, 0, 0, 0),
         halign = :left

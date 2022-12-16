@@ -4,7 +4,7 @@ using SparseArrays
 using StaticArrays
 using Rotations
 # using Parameters
-using GeometryBasics
+import GeometryBasics as GB
 using OffsetArrays
 using Makie
 import GLMakie as GM
@@ -63,42 +63,50 @@ function uni_dynfuncs(bot)
         TR.build_∂Q̌∂q̌̇!(∂F∂q̌̇,tg)
     end
 	bars = TR.get_rigidbars(tg)
-	function prepare_contacts!(contacts, q)
+	bar1 = bars[1]
+	rbid = bar1.prop.id
+
+	function prepare_contacts!(contacts,q)
 		TR.update_rigids!(tg,q)
-		foreach(bars) do rb
-			(;id) = rb.prop
-			gap = rb.state.rps[2][3]
-			TR.activate!(contacts[id],gap)
+		for c in contacts
+			gap = bar1.state.rps[c.id][3]
+			TR.activate!(c,gap)
 		end
 		active_contacts = filter(contacts) do c
 			c.state.active
 		end
 		na = length(active_contacts)
-		D = Matrix{eltype(q)}(undef,3na,length(q))
 		inv_μ_vec = ones(eltype(q),3na)
 		n = [0,0,1.0]
 		for (i,ac) in enumerate(active_contacts)
-			(;state) = ac
+			(;id,state) = ac
 			state.frame = TR.SpatialFrame(n)
-			(;n,t1,t2) = state.frame
-			rbid = ac.id
-			C = bars[rbid].state.cache.Cps[2]
-			CT = C*TR.build_T(tg,rbid)
-			Dn = Matrix(transpose(n)*CT)
-			Dt1 = Matrix(transpose(t1)*CT)
-			Dt2 = Matrix(transpose(t2)*CT)
-			D[3(i-1)+1,:] = Dn
-			D[3(i-1)+2,:] = Dt1
-			D[3(i-1)+3,:] = Dt2
 			inv_μ_vec[3(i-1)+1] = 1/ac.μ
 		end
-		es = [ac.e for ac in active_contacts]
+        es = [ac.e for ac in active_contacts]
 		gaps = [ac.state.gap for ac in active_contacts]
 		H = Diagonal(inv_μ_vec)
-		active_contacts, na, gaps, D, H, es
+        active_contacts, gaps, H, es
+    end
+
+	function get_directions_and_positions(active_contacts,q)
+		na = length(active_contacts)
+		TR.update_rigids!(tg,q)
+		D = Matrix{eltype(q)}(undef,3na,length(q))
+		ŕ = Vector{eltype(q)}(undef,3na)
+		for (i,ac) in enumerate(active_contacts)
+			(;id,state) = ac
+			(;n,t1,t2) = state.frame
+            C = bar1.state.cache.Cps[id]
+			CT = C*TR.build_T(tg,rbid)
+			dm = hcat(n,t1,t2) |> transpose
+			D[3(i-1)+1:3(i-1)+3,:] = dm*CT
+			ŕ[3(i-1)+1:3(i-1)+3] = dm*bar1.state.rps[id]
+		end
+		D,ŕ
 	end
 
-    F!,Jac_F!,prepare_contacts!
+	@eponymtuple(F!,Jac_F!,prepare_contacts!,get_directions_and_positions)
 end
 
 tspan = (0.0,1.5)
@@ -106,7 +114,12 @@ h = 1e-3
 
 prob = TR.SimProblem(unibot,uni_dynfuncs)
 
-TR.solve!(prob,TR.ZhongCCP();tspan,dt=h,ftol=1e-14,maxiters=50,exception=true)
+
+TR.solve!(prob,TR.Zhong06();tspan,dt=h,ftol=1e-14,maxiters=50,exception=false)
+
+TR.solve!(prob,TR.ZhongCCP();tspan,dt=h,ftol=1e-14,maxiters=50,exception=false,verbose=true)
+
+plot_traj!(unibot)
 
 GM.activate!()
 with_theme(theme_pub;
@@ -155,6 +168,7 @@ unibots = [
 ]
 
 plot_traj!(unibots[1])
+GM.activate!(); plotsave_energy(unibots[3])
 function plotsave_velocity_restitution(bots,showlegend,
 		figname=nothing;
 		ymids = [1.0,0.7,0.3,0.0]
@@ -182,16 +196,17 @@ function plotsave_velocity_restitution(bots,showlegend,
 			vz = get_velocity!(bot,1,2)[3,:]
 
 			contacts_traj_voa = VectorOfArray(bot.contacts_traj)
-			c1_traj = contacts_traj_voa[1,:]
+			c1_traj = contacts_traj_voa[2,:]
 			# steps = 1:length(c1_traj)
 			idx_imp = findall(isimpact, c1_traj)
 			@show idx_imp |> length
 			e_eff = -vz[idx_imp]./vz[idx_imp.-1]
 			scatter!(ax2,e_eff)
+			# @show e_eff
 			@show mean(e_eff)
 			ylims!(ax2,ymids[botid]-0.08,ymids[botid]+0.08)
 			# ax2.yticks = [0,0.3,0.7,1.0]
-			ax2.xticks = collect(1:length(e_eff))
+			# ax2.xticks = collect(1:length(e_eff))
 			Label(grids[botid,2][1,1,TopLeft()], "($(alphabet[2botid]))")
 		end
 		rowgap!(fig.layout,-fontsize)
@@ -208,15 +223,18 @@ unibot_e5 = TR.solve!(
 		uni_dynfuncs
 	),
 	TR.ZhongCCP();
-	tspan,dt=0.5h,ftol=1e-14,maxiters=50,exception=false
+	tspan,dt=0.5h,ftol=1e-14,maxiters=50,exception=false,verbose=true,
 )
 GM.activate!(); plot_traj!(unibot_e5)
 
 me = TR.mechanical_energy!(unibot_e5)
 me.E |> lines
 
-
-GM.activate!(); plotsave_friction_direction([unibot_e5],L"e",[0.5]; resolution = (0.9tw,0.28tw))
+GM.activate!(); plotsave_friction_direction(
+	[unibot_e5],L"e",[0.5]; 
+	resolution = (0.9tw,0.28tw),
+	cid=2
+	)
 
 CM.activate!(); plotsave_friction_direction(
 		[unibot_e5],L"e=",[0.5], 
@@ -316,7 +334,6 @@ plot_traj!(unibot_z0[6];
 GM.activate!(); plotsave_error(unibot_z0,dts;resolution = (0.4tw,0.3tw),)
 CM.activate!(); plotsave_error(unibot_z0,dts,"unibot_err";resolution = (0.4tw,0.3tw),)
 
-
 GM.activate!(); plotsave_velocity_restitution([unibot_z0],true; ymids = [0.0])
 plot_traj!(unibot_z0)
 
@@ -331,8 +348,8 @@ GM.activate!(); plot_traj!(unibot_z0)
 
 # -------- SUPERBall ---------
 ballbot = superball(
-	1.0;
-	μ = 0.9,
+	0.0;
+	μ = 0.5,
 	e = 0.5
 )
 
@@ -342,7 +359,7 @@ GM.activate!(); with_theme(theme_pub;
 	plot_traj!(ballbot;
 		AxisType = Axis3,
 		figsize = (0.6tw,0.5tw),
-		zlims = [1.0,3.0],
+		zlims = [1.0,3.0].-2.0,
 		doslide = false,
 		showinfo = false,
 		# showlabels = false,
@@ -362,7 +379,6 @@ GM.activate!(); plot_traj!(ballbot;
 	zlims = [-1e-3,2.4],
 )
 
-
 function ball_dynfuncs(bot)
     (;tg) = bot
     function F!(F,q,q̇,t)
@@ -381,8 +397,10 @@ function ball_dynfuncs(bot)
         TR.build_∂Q̌∂q̌!(∂F∂q̌,tg)
         TR.build_∂Q̌∂q̌̇!(∂F∂q̌̇,tg)
     end
+
 	bars = TR.get_rigidbars(tg)
-	function prepare_contacts!(contacts, q)
+	
+	function prepare_contacts!(contacts,q)
 		TR.update_rigids!(tg,q)
 		foreach(bars) do rb
 			rbid = rb.prop.id
@@ -395,39 +413,49 @@ function ball_dynfuncs(bot)
 			c.state.active
 		end
 		na = length(active_contacts)
-		D = Matrix{eltype(q)}(undef,3na,length(q))
 		inv_μ_vec = ones(eltype(q),3na)
 		n = [0,0,1.0]
 		for (i,ac) in enumerate(active_contacts)
 			(;state) = ac
 			state.frame = TR.SpatialFrame(n)
-			(;n,t1,t2) = state.frame
-			rbid,pid = divrem(ac.id-1,2) .+ 1
-			C = bars[rbid].state.cache.Cps[pid]
-			CT = C*TR.build_T(tg,rbid)
-			Dn = Matrix(transpose(n)*CT)
-			Dt1 = Matrix(transpose(t1)*CT)
-			Dt2 = Matrix(transpose(t2)*CT)
-			D[3(i-1)+1,:] = Dn
-			D[3(i-1)+2,:] = Dt1
-			D[3(i-1)+3,:] = Dt2
 			inv_μ_vec[3(i-1)+1] = 1/ac.μ
 		end
-		es = [ac.e for ac in active_contacts]
+        es = [ac.e for ac in active_contacts]
 		gaps = [ac.state.gap for ac in active_contacts]
 		H = Diagonal(inv_μ_vec)
-		active_contacts, na, gaps, D, H, es
+        active_contacts, gaps, H, es
+    end
+
+	function get_directions_and_positions(active_contacts,q)
+		na = length(active_contacts)
+		TR.update_rigids!(tg,q)
+		D = Matrix{eltype(q)}(undef,3na,length(q))
+		ŕ = Vector{eltype(q)}(undef,3na)
+		for (i,ac) in enumerate(active_contacts)
+			(;id,state) = ac
+			rbid,pid = divrem(ac.id-1,2) .+ 1
+			(;n,t1,t2) = state.frame
+			C = bars[rbid].state.cache.Cps[pid]
+			CT = C*TR.build_T(tg,rbid)
+			dm = hcat(n,t1,t2) |> transpose
+			D[3(i-1)+1:3(i-1)+3,:] = dm*CT
+			ŕ[3(i-1)+1:3(i-1)+3] = dm*bars[rbid].state.rps[pid]
+		end
+		D,ŕ
 	end
 
-    F!,Jac_F!,prepare_contacts!
+    @eponymtuple(F!,Jac_F!,prepare_contacts!,get_directions_and_positions)
 end
 
-tspan = (0.0,10.0)
+tspan = (0.0,2.0)
 h = 1e-3
 
 prob = TR.SimProblem(ballbot,ball_dynfuncs)
 
 TR.solve!(prob,TR.ZhongCCP();tspan,dt=h,ftol=1e-14,maxiters=50,exception=false)
+
+plot_traj!(ballbot)
+
 GM.activate!(); 
 with_theme(theme_pub;
 		figure_padding = (0,1.5fontsize,fontsize,fontsize),
@@ -444,12 +472,12 @@ with_theme(theme_pub;
 		showinfo = false,
 		showpoints = false,
 		showlabels = false,
-		sup! = (ax,_) -> begin
+		sup! = (ax,_,_) -> begin
 			ax.azimuth = 4.865530633326983
 			ax.elevation = 0.2926990816987241
 			ax.zlabeloffset = 2fontsize
 		end,
-		figname = "ballbot"
+		# figname = "ballbot"
 	)
 end
 
@@ -574,20 +602,36 @@ GM.activate!(); plotsave_friction_direction(
 		[ballbot,ballbot,ballbot],L"\mathrm{Cable~No.}",
 		[3,6,12]; 
 		resolution = (tw,0.5tw),
-		mo_α = 2,
-		mo = 4,
-		vtol=1e-4,
+		mo_α = 8,
+		mo = 8,
+		vtol=1e-7,
 )
+
 
 CM.activate!(); plotsave_friction_direction(
 		[ballbot,ballbot,ballbot],L"\mathrm{Cable~No.}",
 		[3,6,12], 
 		"ballbot_friction_direction"; 
 		resolution = (tw,0.5tw),
-		mo_α = 2,
-		mo = 4,
-		vtol=1e-4,
+		mo_α = 8,
+		mo = 8,
+		vtol=1e-7,
 )
+
+dts = [1e-2,3e-3,1e-3,3e-4,1e-4,1e-5]
+superballs_dt = [
+	begin
+		prob = 
+		TR.solve!(TR.SimProblem(superball(0.0;μ = 0.5,e = 0.5),
+			ball_dynfuncs),
+			TR.ZhongCCP();
+			tspan=(0.0,0.12),dt,ftol=1e-14,
+			maxiters=50,exception=false
+		)
+	end
+	for dt in dts
+]
+GM.activate!(); plotsave_error(superballs_dt,dts,bid=5,pid=1)
 
 # ----------- quadruped ---------------
 quadbot = quad(10.0)

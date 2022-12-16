@@ -315,7 +315,7 @@ function man_ndof_2022(ndof,onedir=[1.0,0.0];θ=0.0,k=1250.0,c=0.0,unit="mks")
 			Φi = collect(1:3)
         else
             constrained = false
-            ci = Vector{Int}()
+            ci = Int[]
 			Φi = collect(1:3)
         end
 

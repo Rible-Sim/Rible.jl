@@ -71,7 +71,6 @@ function get_angular_velocity!(bot::TR.TensegrityRobot,rbid::Int,step_range=:)
     rb = rbs[rbid]
     for (q,q̇) in zip(traj.q, traj.q̇)
         TR.update_rigids!(tg,q,q̇)
-        TR.update_orientations!(tg)
         push!(ω,rb.state.ω)
     end
     ω

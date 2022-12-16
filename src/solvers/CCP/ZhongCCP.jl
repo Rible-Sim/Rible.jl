@@ -125,7 +125,7 @@ function solve!(intor::Integrator,solvercache::ZhongCCPCache;
     (;prob,controller,tspan,restart,totalstep) = intor
     (;bot,dynfuncs) = prob
     (;traj,contacts_traj) = bot
-    F!, Jac_F!, prepare_contacts!,get_directions_and_positions,get_∂Dq̇∂q,get_∂DᵀΛ∂q = dynfuncs
+    (;F!, Jac_F!, prepare_contacts!,get_directions_and_positions) = dynfuncs
     (;cache) = solvercache
     (;M,Φ,A,Ψ,B,∂Ψ∂q,∂Aᵀλ∂q,∂Bᵀμ∂q) = cache
     invM = inv(M)
@@ -194,6 +194,8 @@ function solve!(intor::Integrator,solvercache::ZhongCCPCache;
         nΛ = 3na
         𝚲ₖ = zeros(T,nΛ)
         𝚲ₖ .= repeat([0.1,0,0],na)
+        yₖ = zeros(T,nΛ)
+        yₖ .= repeat([1.0,0,0],na)
         𝚲ʳₖ = copy(𝚲ₖ)
         Δ𝚲ₖ = copy(𝚲ₖ)
         𝐁 = zeros(T,nx,nΛ)
@@ -222,12 +224,16 @@ function solve!(intor::Integrator,solvercache::ZhongCCPCache;
                 else
                     Nmax = 50
                 end
-                𝚲ₖini = deepcopy(𝚲ₖ)
+                𝚲ₖini = 2 .*abs.(𝚲ₖ)
                 𝚲ₖini[begin+1:3:end] .= 0.0
                 𝚲ₖini[begin+2:3:end] .= 0.0
-                𝚲ₖini .*= 10
-                yini = deepcopy(𝚲ₖini)
-                IPM!(𝚲ₖ,na,nΛ,𝚲ₖini,yini,𝐍,𝐫;ftol=1e-14,Nmax)
+                yₖ .= 𝐍*𝚲ₖ + 𝐫
+                yₖini = 2 .*abs.(yₖ)
+                yₖini[begin+1:3:end] .= 0.0
+                yₖini[begin+2:3:end] .= 0.0
+                # @show 𝚲ₖini[begin:3:end], yₖini[begin:3:end]
+                # yini = repeat([0.1,0,0],na)
+                IPM!(𝚲ₖ,na,nΛ,𝚲ₖini,yₖini,𝐍,𝐫;ftol=1e-14,Nmax)
                 
                 Δ𝚲ₖ .= 𝚲ₖ - 𝚲ʳₖ
                 minusRes𝚲 = -Res + 𝐁*(Δ𝚲ₖ)

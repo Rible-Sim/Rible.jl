@@ -1,7 +1,7 @@
-function make_strut(id,ri,rj;ci = Vector{Int}())
+function make_strut(id,ri,rj;ci = Int[])
 
     movable = true
-	if ci == Vector{Int}()
+	if ci == Int[]
 		constrained = false
 	else
 		constrained = true
@@ -100,10 +100,10 @@ function nbridge(n,m=2;θ=missing,r=missing,c=0.0,h=1.0,o2=[0,4.0,0],right=false
 		[
 			make_strut(k*nhalf+(j-1)*3*n+(i-1)*3+1,CA(aslr[:,k*(m+1)+j  ])[i  ],
 										  		   CA(aslr[:,k*(m+1)+j+1])[i+1];
-										  		   ci=ifelse(j==1,[1,2,3],Vector{Int}())),
+										  		   ci=ifelse(j==1,[1,2,3],Int[])),
 			make_strut(k*nhalf+(j-1)*3*n+(i-1)*3+2,CA(aslr[:,k*(m+1)+j])[i  ],
 										  	   	   CA(bslr[:,k*m+j])[i-2];
-										  		   ci=ifelse(j==1,[1,2,3],Vector{Int}())),
+										  		   ci=ifelse(j==1,[1,2,3],Int[])),
 			make_strut(k*nhalf+(j-1)*3*n+(i-1)*3+3,CA(bslr[:,k*m+j  ])[i-2],
 										  	       CA(aslr[:,k*(m+1)+j+1])[i+2];)
 		]

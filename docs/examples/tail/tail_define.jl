@@ -62,11 +62,11 @@ function make_tail(n)
         if i == 1
             movable = true
             constrained = true
-            constrained_index = [1,2,4]
+            pres_idx = [1,2,4]
         else
             movable = true
             constrained = false
-            constrained_index = Vector{Int}()
+            pres_idx = Int[]
         end
         nap = length(aps)
         aps = [SVector{2}(aps[i]) for i = 1:nap]
@@ -75,7 +75,7 @@ function make_tail(n)
                     SVector{2}(r̄g),
                     aps;constrained=constrained
                     )
-        state = TR.RigidBodyState(prop,ri,rj,constrained_index)
+        state = TR.RigidBodyState(prop,ri,rj,pres_idx)
         rb = TR.RigidBody(prop,state)
     end
     rbs = [rigidbody(i,r̄g[i],m[i],inertia[i],ri[i],rj[i],[p1[i],p2[i]]) for i = 1:nb]
@@ -226,15 +226,15 @@ function make_curve_tail(n)
         if i == 0
             movable = true
             constrained = true
-            constrained_index = [1,2]
+            pres_idx = [1,2]
         elseif i in [7,21]
             movable = true
             constrained = true
-            constrained_index = [1]
+            pres_idx = [1]
         else
             movable = true
             constrained = false
-            constrained_index = Vector{Int}()
+            pres_idx = Int[]
         end
         nap = length(aps)
         aps = [SVector{2}(aps[i]) for i = 1:nap]
@@ -243,7 +243,7 @@ function make_curve_tail(n)
                     SVector{2}(r̄g),
                     aps;constrained=constrained
                     )
-        state = TR.RigidBodyState(prop,ri,rj,vi,vj,constrained_index)
+        state = TR.RigidBodyState(prop,ri,rj,vi,vj,pres_idx)
         rb = TR.RigidBody(prop,state)
     end
     rbs = [rigidbody(i,r̄g[i],m[i],inertia[i],

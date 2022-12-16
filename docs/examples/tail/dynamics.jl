@@ -39,7 +39,7 @@ function make_new_tail(n)
             movable = false
             constrained = true
             ci = collect(1:6)
-            Φi = Vector{Int}()
+            Φi = Int[]
         else
             movable = true
             if i == 2
@@ -48,7 +48,7 @@ function make_new_tail(n)
                 Φi = [1]
             else
                 constrained = false
-                ci = Vector{Int}()
+                ci = Int[]
                 if isodd(pos)
                     Φi = collect(1:3)
                 else

@@ -1200,8 +1200,8 @@ end
 返回未约束的自然坐标编号。
 $(TYPEDSIGNATURES)
 """
-function get_unconstrained_indices(nmcs::LNC,constrained_index)
-    deleteat!(collect(1:get_ncoords(nmcs)),constrained_index)
+function get_free_idx(nmcs::LNC,pres_idx)
+    deleteat!(collect(1:get_ncoords(nmcs)),pres_idx)
 end
 
 """

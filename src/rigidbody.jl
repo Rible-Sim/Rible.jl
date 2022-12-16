@@ -1,6 +1,10 @@
-abstract type AbstractRigidBody{N,T} end
-abstract type AbstractRigidBodyProperty{N,T} end
-abstract type AbstractRigidBodyState{N,T} end
+abstract type AbstractBody{N,T} end
+abstract type AbstractBodyProperty{N,T} end
+abstract type AbstractBodyState{N,T} end
+
+abstract type AbstractRigidBody{N,T} <: AbstractBody{N,T}end
+abstract type AbstractRigidBodyProperty{N,T} <: AbstractBodyProperty{N,T} end
+abstract type AbstractRigidBodyState{N,T} <: AbstractBodyState{N,T} end
 abstract type ExternalConstraints{T} end
 
 """
@@ -9,7 +13,7 @@ $(TYPEDEF)
 ---
 $(TYPEDFIELDS)
 """
-struct RigidBodyProperty{N,T,L} <: AbstractRigidBodyProperty{N,T}
+struct RigidBodyProperty{N,T} <: AbstractRigidBodyProperty{N,T}
 	"是否可动（大概的确已经没用了）"
     movable::Bool
 	"是否受约束"
@@ -21,13 +25,13 @@ struct RigidBodyProperty{N,T,L} <: AbstractRigidBodyProperty{N,T}
 	"质量"
     mass::T
 	"转动惯量"
-    inertia::Union{T,SArray{Tuple{N,N},T,2,L}}
+    inertia::SMatrix{N,N,T}
 	"质心（在固连系中的）坐标"
-    r̄g::SArray{Tuple{N},T,1,N}
+    r̄g::SVector{N,T}
 	"连接点个数"
     nr̄ps::Int
 	"连接点（在固连系中的）坐标"
-    r̄ps::Vector{SArray{Tuple{N},T,1,N}}
+    r̄ps::Vector{SVector{N,T}}
 end
 
 """
@@ -49,9 +53,9 @@ function RigidBodyProperty(id::Integer,movable::Bool,
 end
 
 struct NonminimalCoordinatesCache{fT,MT,JT,VT,ArrayT}
-    constrained_index::Vector{Int}
-    unconstrained_index::Vector{Int}
-	Φi::Vector{Int}
+    pres_idx::Vector{Int}
+    free_idx::Vector{Int}
+	Φ_mask::Vector{Int}
     nΦ::Int
     funcs::fT
     M::MT
@@ -65,14 +69,14 @@ struct NonminimalCoordinatesCache{fT,MT,JT,VT,ArrayT}
     Cps::Vector{ArrayT}
 end
 
-function get_CoordinatesCache(prop::RigidBodyProperty{N,T,iT},
+function get_CoordinatesCache(prop::RigidBodyProperty{N,T},
                                  lncs::NaturalCoordinates.LNC,
-								 ci=Vector{Int}(),
-								 Φi=get_all_Φi(lncs)) where {N,T,iT}
+								 pres_idx=Int[],
+								 Φ_mask=get_Φ_mask(lncs)) where {N,T}
     (;mass,inertia,r̄g,nr̄ps,r̄ps) = prop
-	uci = NaturalCoordinates.get_unconstrained_indices(lncs,ci)
-	nΦ = length(Φi)
-	cf = NaturalCoordinates.CoordinateFunctions(lncs,uci,Φi)
+	free_idx = NaturalCoordinates.get_free_idx(lncs,pres_idx)
+	nΦ = length(Φ_mask)
+	cf = NaturalCoordinates.CoordinateFunctions(lncs,free_idx,Φ_mask)
     M = NaturalCoordinates.make_M(cf,mass,inertia,r̄g)
 	M⁻¹ = inv(M)
 	∂Mq̇∂q = zero(M)
@@ -84,23 +88,22 @@ function get_CoordinatesCache(prop::RigidBodyProperty{N,T,iT},
     Cg = C(c(r̄g))
     Cps = [typeof(Cg)(C(c(r̄ps[i]))) for i in 1:nr̄ps]
     if prop.movable
-        if prop.constrained && ci == Vector{Int}()
+        if prop.constrained && pres_idx == Int[]
             @error "Rigid body constrained, but no index specified."
-        elseif !prop.constrained && !(ci == Vector{Int}())
+        elseif !prop.constrained && !(pres_idx == Int[])
             @error "Rigid body not constrained. No index should be specified."
         end
     end
-    NonminimalCoordinatesCache(ci,uci,Φi,nΦ,cf,M,M⁻¹,∂Mq̇∂q,∂M⁻¹p∂q,Ṁq̇,∂T∂qᵀ,Co,Cg,Cps)
+    NonminimalCoordinatesCache(pres_idx,free_idx,Φ_mask,nΦ,cf,M,M⁻¹,∂Mq̇∂q,∂M⁻¹p∂q,Ṁq̇,∂T∂qᵀ,Co,Cg,Cps)
 end
 
-function get_CoordinatesCache(prop::RigidBodyProperty{N,T,iT},
+function get_CoordinatesCache(prop::RigidBodyProperty{N,T},
 								qcs::QuaternionCoordinates.QC,
-								ci=Vector{Int}(),
-								Φi=get_all_Φi(qcs)) where {N,T,iT}
+								pres_idx=Int[],
+								Φ_mask=get_Φ_mask(qcs)) where {N,T}
 	(;mass,inertia,r̄g,nr̄ps,r̄ps) = prop
-	# uci = QuaternionCoordinates.get_unconstrained_indices(qcs,ci)
-	uci = deleteat!(collect(1:7),ci)
-	nΦ = length(Φi)
+	free_idx = deleteat!(collect(1:7),pres_idx)
+	nΦ = length(Φ_mask)
 	cf = QuaternionCoordinates.CoordinateFunctions(qcs)
 	M = MMatrix{7,7}(Matrix(one(T)*I,7,7))
 	M⁻¹ = MMatrix{7,7}(Matrix(one(T)*I,7,7))
@@ -115,13 +118,13 @@ function get_CoordinatesCache(prop::RigidBodyProperty{N,T,iT},
     Cg = deepcopy(Co)
     Cps = [deepcopy(Co) for i in 1:nr̄ps]
     if prop.movable
-        if prop.constrained && ci == Vector{Int}()
+        if prop.constrained && pres_idx == Int[]
             @error "Rigid body constrained, but no index specified."
-        elseif !prop.constrained && !(ci == Vector{Int}())
+        elseif !prop.constrained && !(pres_idx == Int[])
             @error "Rigid body not constrained. No index should be specified."
         end
     end
-	NonminimalCoordinatesCache(ci,uci,Φi,nΦ,cf,M,M⁻¹,∂Mq̇∂q,∂M⁻¹p∂q,Ṁq̇,∂T∂qᵀ,Co,Cg,Cps)
+	NonminimalCoordinatesCache(pres_idx,free_idx,Φ_mask,nΦ,cf,M,M⁻¹,∂Mq̇∂q,∂M⁻¹p∂q,Ṁq̇,∂T∂qᵀ,Co,Cg,Cps)
 end
 
 """
@@ -130,31 +133,31 @@ $(TYPEDEF)
 ---
 $(TYPEDFIELDS)
 """
-mutable struct RigidBodyState{N,T,L,M,cacheType} <: AbstractRigidBodyState{N,T}
+mutable struct RigidBodyState{N,T,M,cacheType} <: AbstractRigidBodyState{N,T}
 	"固连系原点"
-    ro::MArray{Tuple{N},T,1,N}
+    ro::MVector{N,T}
 	"固连系旋转矩阵"
-    R::MArray{Tuple{N,N},T,2,L}
+    R::MMatrix{N,N,T}
 	"固连系原点平移速度"
-    ṙo::MArray{Tuple{N},T,1,N}
+    ṙo::MVector{N,T}
 	"固连系角速度"
-    ω::MArray{Tuple{M},T,1,M}
+    ω::MVector{M,T}
 	"质心坐标"
-    rg::MArray{Tuple{N},T,1,N}
+    rg::MVector{N,T}
 	"质心速度"
-    ṙg::MArray{Tuple{N},T,1,N}
+    ṙg::MVector{N,T}
 	"各连接点坐标"
-    rps::Vector{MArray{Tuple{N},T,1,N}} # Anchor Points in global frame
+    rps::Vector{MVector{N,T}} # Anchor Points in global frame
 	"各连接点速度"
-    ṙps::Vector{MArray{Tuple{N},T,1,N}} # Anchor Points in global frame
+    ṙps::Vector{MVector{N,T}} # Anchor Points in global frame
 	"合力"
-    f::MArray{Tuple{N},T,1,N}
+    f::MVector{N,T}
 	"合力矩"
-    τ::MArray{Tuple{M},T,1,M}
+    τ::MVector{M,T}
 	"各连接点所受作用力"
-    fps::Vector{MArray{Tuple{N},T,1,N}}
+    fps::Vector{MVector{N,T}}
 	"各连接点所受力矩"
-    τps::Vector{MArray{Tuple{M},T,1,M}}
+    τps::Vector{MVector{M,T}}
 	"其他重要信息"
     cache::cacheType
 end
@@ -163,14 +166,14 @@ end
 刚体状态构造子
 $(TYPEDSIGNATURES)
 ---
-`ci`为约束坐标的索引。
-`Φi`为约束方程的索引。
+`pres_idx`为约束坐标的索引。
+`Φ_mask`为约束方程的索引。
 """
 function RigidBodyState(prop::RigidBodyProperty{N,T},
                         lncs,
                         r_input,rotation_input,ṙ_input,ω_input,
-                        ci=Vector{Int}(),
-						Φi=get_all_Φi(lncs)) where {N,T}
+                        pres_idx=Int[],
+						Φ_mask=get_Φ_mask(lncs)) where {N,T}
     (;r̄g,nr̄ps,r̄ps) = prop
     ro = MVector{N}(r_input)
     ṙo = MVector{N}(ṙ_input)
@@ -195,7 +198,7 @@ function RigidBodyState(prop::RigidBodyProperty{N,T},
     fps = [@MVector zeros(T,N) for i in 1:nr̄ps]
     τps = [zero(τ) for i in 1:nr̄ps]
 
-	cache = get_CoordinatesCache(prop,lncs,ci,Φi)
+	cache = get_CoordinatesCache(prop,lncs,pres_idx,Φ_mask)
 
     RigidBodyState(ro,R,ṙo,ω,rg,ṙg,rps,ṙps,f,τ,fps,τps,cache)
 end
@@ -206,11 +209,11 @@ $(TYPEDEF)
 ---
 $(TYPEDFIELDS)
 """
-struct RigidBody{N,T,L,M,cacheType,meshType} <: AbstractRigidBody{N,T}
+struct RigidBody{N,T,M,cacheType,meshType} <: AbstractRigidBody{N,T}
 	"刚体属性"
-    prop::RigidBodyProperty{N,T,L}
+    prop::RigidBodyProperty{N,T}
 	"刚体状态"
-    state::RigidBodyState{N,T,L,M,cacheType}
+    state::RigidBodyState{N,T,M,cacheType}
 	"可视化网格"
 	mesh::meshType
 end
@@ -218,10 +221,10 @@ end
 RigidBody(prop,state) = RigidBody(prop,state,nothing)
 
 
-update_rigid!(rb::RigidBody,q,q̇) = update_rigid!(rb.state,rb.state.cache,rb.prop,q,q̇)
-move_rigid!(rb::RigidBody,q,q̇)	= move_rigid!(rb.state,rb.state.cache,rb.prop,q,q̇)
-stretch_rigid!(rb::RigidBody,c) = stretch_rigid!(rb.state.cache,rb.prop,c)
-update_transformations!(rb::RigidBody,q) = update_transformations!(rb.state.cache,rb.state,rb.prop,q)
+update_rigid!(rb::AbstractBody,q,q̇) = update_rigid!(rb.state,rb.state.cache,rb.prop,q,q̇)
+move_rigid!(rb::AbstractBody,q,q̇)	= move_rigid!(rb.state,rb.state.cache,rb.prop,q,q̇)
+stretch_rigid!(rb::AbstractBody,c) = stretch_rigid!(rb.state.cache,rb.prop,c)
+update_transformations!(rb::AbstractBody,q) = update_transformations!(rb.state.cache,rb.state,rb.prop,q)
 
 function update_rigid!(state::RigidBodyState,
 			cache::NonminimalCoordinatesCache{<:NaturalCoordinates.CoordinateFunctions},
@@ -319,7 +322,7 @@ function update_transformations!(
 	Cg[1:3,4:7] .= -2R*NaturalCoordinates.skew(r̄g)*L
 end
 
-function generalize_force!(F,state)
+function generalize_force!(F,state::AbstractRigidBodyState)
 	(;cache,f,fps) = state
 	(;Cps,Cg,∂T∂qᵀ) = cache
 	for (pid,fp) in enumerate(fps)
@@ -335,7 +338,7 @@ end
 # kinematic joint constraints
 
 function get_rbids(rbs)
-    ids = mapreduce((rb)->rb.prop.id,vcat,rbs;init=Vector{Int}())
+    ids = mapreduce((rb)->rb.prop.id,vcat,rbs;init=Int[])
     nb = length(ids)
 	ids,nb
 end
@@ -416,25 +419,27 @@ function FixedIndicesConstraint(indices,values)
 	FixedIndicesConstraint(length(indices),indices,values)
 end
 
-function make_Φ(cst::FixedIndicesConstraint)
+function make_Φ(cst::FixedIndicesConstraint,indexed,numbered)
 	@unpack indices, values = cst
 	@inline @inbounds inner_Φ(q)   = q[indices]-values
 	@inline @inbounds inner_Φ(q,d) = q[indices]-d
 	inner_Φ
 end
 
-function make_A(cst::FixedIndicesConstraint)
+function make_A(cst::FixedIndicesConstraint,indexed,numbered)
 	nΦ = cst.nconstraints
 	indices = cst.indices
+	(;sysfree,nfree) = indexed
 	@inline @inbounds function inner_A(q)
 		nq = length(q)
 		ret = zeros(eltype(q),nΦ,nq)
 		for (iΦ,i) in enumerate(indices)
 			ret[iΦ,i] = 1
 		end
-		ret
+		ret[:,sysfree]
 	end
 end
+
 
 """
 刚体固定约束类。
@@ -454,9 +459,9 @@ function FixedBodyConstraint(rbs,mem2sysfull,rbid)
 	rb = rbs[rbid]
 	lncs = rb.state.cache.funcs.lncs
 	q_rb = rb.state.coords.q
-	constrained_index = find_full_constrained_index(lncs,q_rb)
-	indices = body2q[rbid][constrained_index]
-	values = q_rb[constrained_index]
+	pres_idx = find_full_pres_indices(lncs,q_rb)
+	indices = body2q[rbid][pres_idx]
+	values = q_rb[pres_idx]
 	FixedBodyConstraint(length(indices),indices,values)
 end
 
@@ -542,8 +547,8 @@ function make_A(cst::PinJoint,indexed,numbered)
 	pid2 = end2.pid
 	C1 = end1.rbsig.state.cache.Cps[pid1]
 	C2 = end2.rbsig.state.cache.Cps[pid2]
-	uci1 =  end1.rbsig.state.cache.unconstrained_index
-	uci2 =  end2.rbsig.state.cache.unconstrained_index
+	uci1 =  end1.rbsig.state.cache.free_idx
+	uci2 =  end2.rbsig.state.cache.free_idx
 	function inner_A(q)
 		ret = zeros(eltype(q),nconstraints,nfree)
 		ret[:,mem2sysfree[end1.rbsig.prop.id]] =  C1[:,uci1]
@@ -611,12 +616,12 @@ end
 返回约束方程编号。
 $(TYPEDSIGNATURES)
 """
-function get_all_Φi(lncs::NaturalCoordinates.LNC)
+function get_Φ_mask(lncs::NaturalCoordinates.LNC)
 	nΦ = NaturalCoordinates.get_nconstraints(lncs)
 	collect(1:nΦ)
 end
 
-get_all_Φi(::QuaternionCoordinates.QC) = collect(1:1)
+get_Φ_mask(::QuaternionCoordinates.QC) = collect(1:1)
 ##
 
 # operations on rigid body
@@ -651,3 +656,12 @@ function potential_energy_gravity(rb::AbstractRigidBody)
     gravity_acceleration = get_gravity(rb)
     -transpose(rg)*gravity_acceleration*mass
 end
+
+"""
+返回刚体应变势能。
+$(TYPEDSIGNATURES)
+"""
+function potential_energy_strain(rb::AbstractRigidBody)
+	zero(get_numbertype(rb))
+end
+

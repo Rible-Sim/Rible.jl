@@ -35,7 +35,7 @@ function make_rollingdisk()
 	matrix_sharing = zeros(Int,0,0)
 	indexedcoords = TR.index(rbs,matrix_sharing)
 	#
-	ss = Vector{Int}()
+	ss = Int[]
 	tensiles = (cables = ss,)
 	hub = nothing
 	#

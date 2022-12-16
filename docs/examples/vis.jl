@@ -79,7 +79,7 @@ theme_pub = Theme(;
         titlegap = 0
     ),
     Label = (
-        textsize = fontsize,
+        fontsize = fontsize,
         font = "CMU Serif Bold",
         halign = :left,
         padding = (0, 0, 0, 0),
@@ -125,7 +125,7 @@ function plot_rigid(rb::TR.AbstractRigidBody;showmesh=true,showupdatemesh=false)
             mesh!(ax,mesh;transparency=true)
         end
         if showupdatemesh
-            mesh!(ax,update_rigidmesh(rb))
+            mesh!(ax,build_mesh(rb))
         end
     end
     fig
@@ -160,11 +160,11 @@ function time2step(at,t)
 end
 
 function get_groundmesh(f::Function,rect)
-    GeometryBasics.Mesh(f, rect, NaiveSurfaceNets()) |> make_patch()
+    GB.Mesh(f, rect, NaiveSurfaceNets()) |> make_patch()
 end
 
 function get_groundmesh(plane::TR.Plane,rect)
-    GeometryBasics.Mesh(rect, NaiveSurfaceNets()) do v
+    GB.Mesh(rect, NaiveSurfaceNets()) do v
         TR.signed_distance(v,plane)
     end |> make_patch()
 end
@@ -188,6 +188,8 @@ function plot_traj!(bot::TR.TensegrityRobot;
             attimes=nothing,
             atsteps=nothing,
             doslide=true,
+            dorecord=false,
+            speedup=1,
             showinit=false,
             showlabels=true,
             showpoints=true,
@@ -214,8 +216,8 @@ function plot_traj!(bot::TR.TensegrityRobot;
     tg.state.system.q .= traj.q[begin]
     fullupdate!(tg)
     tgobini = Observable(deepcopy(tg))
-    showmesh = mapreduce(&, TR.get_rigidbodies(tg)) do rb
-            rb.mesh isa GeometryBasics.Mesh
+    showmesh = showmesh || mapreduce(&, TR.get_rigidbodies(tg)) do rb
+            rb.mesh isa GB.Mesh
     end
     ndim = TR.get_ndim(tg)
     xmin,xmax = xlims
@@ -316,7 +318,7 @@ function plot_traj!(bot::TR.TensegrityRobot;
             kargs...
         )
 
-        if doslide
+        if doslide || dorecord
             if showinfo
                 grid2 = sg[:,2] = GridLayout(;tellheight=false)
                 grid_info = grid2[1,1] = GridLayout(;tellheight=false)
@@ -350,23 +352,44 @@ function plot_traj!(bot::TR.TensegrityRobot;
                     end
                 end
             end
-            grid3 = sg[2,:] = GridLayout()
-            slidergrid = SliderGrid(
-                grid3[1,1],
-                (label = "Step", range = 1:length(traj), startvalue = this_step),
-            )
-            on(slidergrid.sliders[1].value) do this_step
-                if actuate
-                    TR.actuate!(bot,[traj.t[this_step]])
+            if dorecord
+                dt = traj.t[begin+1] - traj.t[begin]
+                framerate = 30 
+                skipstep = round(Int,1/framerate/dt*speedup)
+                recordsteps = 1:skipstep:length(traj.t)
+                record(fig, figname, recordsteps;
+                    framerate) do this_step
+                    if actuate
+                        TR.actuate!(bot,[traj.t[this_step]])
+                    end
+                    tg.state.system.q .= traj.q[this_step]
+                    tg.state.system.c .= traj.c[this_step]
+                    fullupdate!(tg)
+                    # @show TR.mechanical_energy(tg)
+                    #
+                    this_time[] = traj.t[this_step]
+                    TR.analyse_slack(tg,true)
+                    tgob[] = tg
                 end
-                tg.state.system.q .= traj.q[this_step]
-                tg.state.system.c .= traj.c[this_step]
-                fullupdate!(tg)
-                # @show TR.mechanical_energy(tg)
-                #
-                this_time[] = traj.t[this_step]
-                TR.analyse_slack(tg,true)
-                tgob[] = tg
+            else
+                grid3 = sg[2,:] = GridLayout()
+                slidergrid = SliderGrid(
+                    grid3[1,1],
+                    (label = "Step", range = 1:length(traj), startvalue = this_step),
+                )
+                on(slidergrid.sliders[1].value) do this_step
+                    if actuate
+                        TR.actuate!(bot,[traj.t[this_step]])
+                    end
+                    tg.state.system.q .= traj.q[this_step]
+                    tg.state.system.c .= traj.c[this_step]
+                    fullupdate!(tg)
+                    # @show TR.mechanical_energy(tg)
+                    #
+                    this_time[] = traj.t[this_step]
+                    TR.analyse_slack(tg,true)
+                    tgob[] = tg
+                end
             end
         end
     end
@@ -406,7 +429,7 @@ function init_plot!(ax,tgob;isref=false,
         rigidcolor=:slategray4,
         rigidlabelcolor=:darkblue
     )
-    (;tensiles,nrigids) = tgob[]
+    (;tensiles,nbodies) = tgob[]
     ncables = length(tensiles.cables)
     ndim = TR.get_ndim(tgob[])
     if isref
@@ -455,7 +478,7 @@ function init_plot!(ax,tgob;isref=false,
             text!(ax,
                 ["c$(i)" for (i,rc) in enumerate(rcs_by_cables[])] ,
                 position = rcs_by_cables,
-                textsize = fontsize,
+                fontsize = fontsize,
                 color = cablelabelcolor,
                 align = (:left, :top),
                 offset = (-5, -10)
@@ -471,7 +494,7 @@ function init_plot!(ax,tgob;isref=false,
         for rbid = 1:nb
             rigid_mesh = @lift begin
                 rb = ($rbsob)[rbid]
-                update_rigidmesh(rb)
+                build_mesh(rb)
             end
             if showwire
                 strokewidth = linewidth
@@ -499,7 +522,7 @@ function init_plot!(ax,tgob;isref=false,
             rbs = TR.get_rigidbodies($tgob)
             rbs[rbid].state.rps
         end
-        for rbid = 1:nrigids
+        for rbid = 1:nbodies
     ]
     if showpoints
         scatter!(ax,rg_by_rbs; color = rigidlabelcolor)
@@ -511,7 +534,7 @@ function init_plot!(ax,tgob;isref=false,
         text!(ax,
             ["r$(i)g" for (i,rg) in enumerate(rg_by_rbs[])] ,
             position = rg_by_rbs,
-            textsize = fontsize,
+            fontsize = fontsize,
             color = rigidlabelcolor,
             align = (:left, :top),
             offset = (-5, -10)
@@ -521,7 +544,7 @@ function init_plot!(ax,tgob;isref=false,
                 # ["r$(rbid)p$pid $(string(rp))" for (pid,rp) in enumerate(rps[])],
                 ["r$(rbid)p$pid" for (pid,rp) in enumerate(rps[])],
                 position = rps,
-                textsize = fontsize,
+                fontsize = fontsize,
                 color = :darkred,
                 align = (:left, :top),
                 offset = (20(rand()-0.5), 20(rand()-0.5))
@@ -554,27 +577,26 @@ function get3Dstate(rb)
     end
 end
 
-function update_rigidmesh(rb)
+function build_mesh(rb::TR.AbstractRigidBody)
     (;mesh) = rb
     @assert !(mesh isa Nothing)
-    ro,R,ṙo,ω = get3Dstate(rb)
+    ro,R = get3Dstate(rb)
     trans = Translation(ro)
     rot = LinearMap(R)
     ct = trans ∘ rot
     updated_pos = ct.(mesh.position)
-    fac = GeometryBasics.faces(mesh)
-    nls = normals(updated_pos,fac)
-    GeometryBasics.Mesh(meta(updated_pos,normals=nls),fac)
+    fac = GB.faces(mesh)
+    nls = GB.normals(updated_pos,fac)
+    GB.Mesh(GB.meta(updated_pos,normals=nls),fac)
 end
-
 
 function make_patch(;trans=[0.0,0,0],rot=RotX(0.0))
     function patch(mesh)
         ct = Translation(trans) ∘ LinearMap(rot)
         updated_pos = ct.(mesh.position)
-        fac = GeometryBasics.faces(mesh)
-        nls = normals(updated_pos,fac)
-        GeometryBasics.Mesh(meta(updated_pos,normals=nls),fac)
+        fac = GB.faces(mesh)
+        nls = GB.normals(updated_pos,fac)
+        GB.Mesh(GB.meta(updated_pos,normals=nls),fac)
     end
 end
 
@@ -585,6 +607,62 @@ function endpoints2mesh(p1,p2;long=400)
     # Meshes.sample(cylsurf_bar,Meshes.RegularSampling(10,3))
 	cyl_bar_simple = Meshes.discretize(cylsurf_bar,Meshes.RegularDiscretization(10,2))
     cyl_bar_simple |> simple2mesh
+end
+
+function spbasis(n)
+    a = abs.(n)
+    if (a[1]≥0 && a[2]≥0) || (a[1]≤0 && a[2]≤0) 
+        v = SVector(n[1]+1,n[2]-1,n[3])
+    else
+        v = SVector(n[1]-1,n[2]-1,n[3])
+    end
+    t = n×v |> normalize
+    b = n×t |> normalize
+    t,b
+end
+
+function build_mesh(fb::TR.FlexibleBody,nsegs=100)
+    (;state) = fb
+    (;cache) = state
+    (;funcs,e) = cache
+    (;ancs) = funcs
+    (;L,radius) = ancs
+    T = typeof(L)
+    V = T <: AbstractFloat ? T : Float64
+    _r = TR.ANCF.make_r(ancs,e)
+    _rₓ = TR.ANCF.make_rₓ(ancs,e)
+
+    sz = (10,nsegs)
+    φmin, φmax = V(0), V(2π)
+    xmin, xmax = V(0), V(L)
+    δφ = (φmax - φmin) / sz[1]
+    φrange = range(φmin, stop=φmax-δφ, length=sz[1])
+    xrange = range(xmin, stop=xmax,    length=sz[2])
+
+    function point(φ, x)
+        o = _r(x) |> Meshes.Point
+        n = _rₓ(x) |> normalize
+        u,v = spbasis(n)
+        R = [u v n]
+        R*Meshes.Vec(radius*cos(φ), radius*sin(φ), 0.0) + o
+    end
+
+    points = Meshes.ivec(point(φ, x) for φ in φrange, x in xrange) |> collect
+     # connect regular samples with quadrangles
+    nx, ny = sz
+    topo   = Meshes.GridTopology((nx-1, ny-1))
+    middle = collect(Meshes.elements(topo))
+    for j in 1:ny-1
+        u = (j  )*nx
+        v = (j-1)*nx + 1
+        w = (j  )*nx + 1
+        z = (j+1)*nx
+        quad = Meshes.connect((u, v, w, z))
+        push!(middle, quad)
+    end
+
+    connec = middle
+    Meshes.SimpleMesh(points, connec) |> simple2mesh 
 end
 
 
@@ -646,14 +724,14 @@ function simple2mesh(sp)
 	# flatten vector of triangles
 	tris = [tri for tris in tris4elem for tri in tris]
 
-	points  = Point.(coords)
-	faces  = TriangleFace{UInt64}.(tris)
+	points  = GB.Point.(coords)
+	faces  = GB.TriangleFace{UInt64}.(tris)
 	# tcolors  = colorant
 
 	# convert connectivities to matrix format
 	# tmatrix = reduce(hcat, tconnec) |> transpose |> Matrix
-    nls = normals(points,faces)
-    GeometryBasics.Mesh(meta(points,normals=nls),faces)
+    nls = GB.normals(points,faces)
+    GB.Mesh(GB.meta(points,normals=nls),faces)
 end
 
 function plotsave_energy(bot,figname=nothing)
@@ -699,12 +777,12 @@ function plotsave_energy(bot,figname=nothing)
 	end
 end
 
-
 function plotsave_friction_direction(bots,x,xs,figname=nothing;
         resolution = (0.9tw,0.4tw),
         mo = 8,
         mo_α = mo,
         vtol=1e-5,
+        cid = 1,
     )
 	with_theme(theme_pub;
         resolution
@@ -728,7 +806,7 @@ function plotsave_friction_direction(bots,x,xs,figname=nothing;
             if eltype(xs) <: Int
 			    c1s = contacts_traj_voa[xs[botid],:]
             else
-                c1s = contacts_traj_voa[1,:]
+                c1s = contacts_traj_voa[cid,:]
             end
 			idx_sli = findall(c1s) do c
 						issliding(c;vtol)
@@ -745,12 +823,12 @@ function plotsave_friction_direction(bots,x,xs,figname=nothing;
 			scaling = 10.0^(-mo_α)
 			Label(fig[botid,1,Top()],latexstring("\\times 10^{-$(mo_α)}"))
 			markersize = fontsize
-			scatter!(ax1,idx_per,δα_per./scaling;
+			scatter!(ax1,t[idx_per],δα_per./scaling;
 						marker=:diamond, markersize)
-			scatter!(ax1,idx_imp,δα_imp./scaling;
+			scatter!(ax1,t[idx_imp],δα_imp./scaling;
 						marker=:xcross, markersize)
 			ylims!(ax1,-1.0,1.0)
-			# xlims!(ax1,extrema(t)...)
+			xlims!(ax1,extrema(t)...)
 
 			θ_imp = map(c1s[idx_imp]) do c
 					get_friction_direction(c)
@@ -781,9 +859,10 @@ function plotsave_friction_direction(bots,x,xs,figname=nothing;
 	end
 end
 
-
 function plotsave_error(mbots,dts,figname=nothing;
+        bid = 1,
         pid = 0,
+        di = 1,
         resolution = (0.8tw,0.3tw),
     )
 	with_theme(theme_pub;
@@ -794,14 +873,14 @@ function plotsave_error(mbots,dts,figname=nothing;
 		for j in axes(mbots,2)
 			bots = mbots[:,j]
 			nbots = length(bots)
-			itp = interpolate(get_trajectory!(bots[nbots],1,pid)[1,:], BSpline(Linear()))
+			itp = interpolate(get_trajectory!(bots[nbots],bid,pid)[di,:], BSpline(Linear()))
 			ref_traj = scale(itp,0:dts[nbots]:bots[nbots].traj.t[end])
 			# ref_traj(0:0.1:2)
 			err_avg = [
-				get_trajectory!(bots[i],1,pid)[1,begin:end-1].-ref_traj(bots[i].traj.t[begin:end-1]) .|> abs |> mean
+				get_trajectory!(bots[i],bid,pid)[di,begin:end-1].-ref_traj(bots[i].traj.t[begin:end-1]) .|> abs |> mean
 				for (i,dt) in enumerate(dts[1:nbots-1])
 			]
-
+            @show err_avg
 			ax = Axis(fig[1,j];
 				xlabel = L"h",
 				ylabel = "Avg. Err.",
@@ -820,6 +899,30 @@ function plotsave_error(mbots,dts,figname=nothing;
 			end
 		end
 		savefig(fig,figname)
+		fig
+	end
+end
+
+function plotsave_contact_persistent(bot,figname=nothing;
+    cid=1,
+    tol = 1e-7 # rule out false active
+    )
+	with_theme(theme_pub;) do
+		contacts_traj_voa = VectorOfArray(bot.contacts_traj)
+		c1_traj = contacts_traj_voa[cid,:]
+		# steps = 1:length(c1_traj)
+		active_nonpersist = findall(c1_traj) do c
+			c.state.active && !c.state.persistent && norm(c.state.Λ) > tol
+		end
+		active_persist = findall(c1_traj) do c
+			c.state.active && c.state.persistent && norm(c.state.Λ) > tol
+		end
+		fig = Figure()
+		ax = Axis(fig[1,1], xlabel = "Step", ylabel = "Contact Type")
+		scatter!(ax,active_nonpersist,one.(active_nonpersist),label="Impact")
+		scatter!(ax,active_persist,zero.(active_persist),label="Persistent")
+		axislegend(ax)
+        savefig(fig,figname)
 		fig
 	end
 end

@@ -98,11 +98,11 @@ function rigidbody(i,CoM,m,inertia,ri,rj,aps)
     if i==1
         movable = true
         constrained = true
-        constrained_index = [1,2,4]
+        pres_idx = [1,2,4]
     else
         movable = true
         constrained = false
-        constrained_index = Vector{Int}()
+        pres_idx = Int[]
     end
 
     nap = length(aps)
@@ -113,7 +113,7 @@ function rigidbody(i,CoM,m,inertia,ri,rj,aps)
                     SVector{2}(CoM),
                     aps;constrained=constrained
                     )
-    state = TR.RigidBodyState(prop,ri,rj,constrained_index)
+    state = TR.RigidBodyState(prop,ri,rj,pres_idx)
     rb = TR.RigidBody(prop,state)
 
 end

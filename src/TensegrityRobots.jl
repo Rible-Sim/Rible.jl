@@ -30,12 +30,19 @@ include("quaternions.jl")
 using .QuaternionCoordinates
 include("naturalcoordinates.jl")
 using .NaturalCoordinates
+include("ANCF.jl")
+import .ANCF
 
 include("rigidbody.jl")
 
+include("flexiblebody.jl")
+
 include("cable.jl")
 
+
 include("tensegrity.jl")
+
+include("clustertensegrity.jl")
 
 include("inverse_statics.jl")
 
@@ -45,14 +52,14 @@ include("dynamic_relax.jl")
 
 include("control.jl")
 
-
 # include("plotting.jl")
 include("contact.jl")
+
 include("linearization.jl")
-include("tangent.jl")
+# include("tangent.jl")
 include("miscellaneous.jl")
+
 include("solvers.jl")
-include("planning.jl")
-include("clustercables.jl")
+# include("planning.jl")
 
 end

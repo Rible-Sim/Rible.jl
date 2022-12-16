@@ -56,7 +56,7 @@ function Chart(tg, qc::AbstractVector{T}, q̇c::AbstractVector{T};
         end
         inner_ψc!, inner_Jac_ψc!
     end
-    neighbor_indices = Vector{Int}()
+    neighbor_indices = Int[]
     neighbor_vectors = Vector{Vector{T}}()
     @assert σ > ρ
     Chart(nq, nX,

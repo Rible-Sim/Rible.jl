@@ -70,11 +70,11 @@ function spine(n,dis,rm,heating_law;k=1000.0,c=0.0)
 		# lncs,q,q̇ = TR.NaturalCoordinates.NC2P2V(ri,rk,ro,R,ṙo,ω)
 		lncs,q,q̇ = TR.NaturalCoordinates.NC1P3V(ri,ro,R,ṙo,ω)
 		if i == 1
-			constrained_index = TR.find_full_constrained_index(lncs,q)
+			pres_idx = TR.find_full_pres_indices(lncs,q)
 		else
-			constrained_index = Vector{Int}()
+			pres_idx = Int[]
 		end
-        state = TR.RigidBodyState(prop,lncs,ro,R,ṙo,ω,q,q̇,constrained_index)
+        state = TR.RigidBodyState(prop,lncs,ro,R,ṙo,ω,q,q̇,pres_idx)
         rb = TR.RigidBody(prop,state)
     end
     rbs = [rigidbody(i,props[i],aps,rs[i],Rs[i],ṙs[i],ωs[i]) for i = 1:n]
@@ -199,10 +199,10 @@ function spine_true(n,dis,rm;
 		# lncs,q,q̇ = TR.NaturalCoordinates.NC2P2V(ri,rk,ro,R,ṙo,ω)
 		lncs,q,q̇ = TR.NaturalCoordinates.NC1P3V(ri,ro,R,ṙo,ω)
 		if i == 1
-			ci = TR.find_full_constrained_index(lncs,q)
+			ci = TR.find_full_pres_indices(lncs,q)
 			Φi = collect(1:6)
 		else
-			ci = Vector{Int}()
+			ci = Int[]
 			Φi = collect(1:6)
 		end
         state = TR.RigidBodyState(prop,lncs,ro,R,ṙo,ω,ci,Φi)

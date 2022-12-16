@@ -25,7 +25,7 @@ function rigidbody(i, rij, apss, rg)
         movable = false
         constrained = true
         ci = collect(1:6)
-        Φi = Vector{Int}()
+        Φi = Int[]
     else
         movable = true
         if i == 2
@@ -34,7 +34,7 @@ function rigidbody(i, rij, apss, rg)
             Φi = [1]
         else
             constrained = false
-            ci = Vector{Int}()
+            ci = Int[]
             if i == 4
                 Φi = [1]
             else

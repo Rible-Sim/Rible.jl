@@ -24,7 +24,7 @@ function quad(c=100.0;
 
         movable = true
         constrained = false
-        ci = Vector{Int}()
+        ci = Int[]
         Φi = collect(1:6)
         ri = p[0]
         ro = ri
@@ -60,7 +60,7 @@ function quad(c=100.0;
     function rigidbar(i,p)
         movable = true
         constrained = false
-        ci = Vector{Int}()
+        ci = Int[]
         Φi = [1]
 
         ri = p[12+2(i-1)+1]
@@ -166,20 +166,20 @@ end
 
 
 function rigidbar(i,ri,rj;
-            ṙo = zeros(3),
+            ṙi,ṙj,
             m = 0.05
         )
     movable = true
     constrained = false
-    ci = Vector{Int}()
+    ci = Int[]
     Φi = [1]
 
     ro = (ri + rj)/2
+    ṙo = (ṙi + ṙj)/2
     u = rj - ri
     u /= norm(u)
     v,w = Meshes.householderbasis(u)
     R = SMatrix{3,3}(hcat(u,v,w))
-    ω = zero(ri)
     # if isodd(pos)
     b = norm(rj-ri)
     r̄g  = SVector{3}(   0,0.0,0.0)
@@ -201,7 +201,9 @@ function rigidbar(i,ri,rj;
         r̄ps;
         constrained = constrained,
     )
-    lncs, _ = TR.NaturalCoordinates.NC3D2P(ri, rj, ro, R, ṙo, ω)
+    
+    lncs, _ = TR.NaturalCoordinates.NC3D2P(ri, rj, ro, R)
+    ω = TR.NaturalCoordinates.find_ω(lncs,vcat(ri,rj),vcat(ṙi,ṙj))
     state = TR.RigidBodyState(prop, lncs, ro, R, ṙo, ω, ci, Φi)
     # leg_mesh = load("400杆.STL")
     barmesh = endpoints2mesh(r̄p1,r̄p2;long=40)
@@ -238,7 +240,7 @@ function uni(c=100.0;
 
         movable = true
         constrained = false
-        ci = Vector{Int}()
+        ci = Int[]
         Φi = collect(1:6)
         ri = p[0]
         ro = ri
@@ -337,10 +339,10 @@ function superball(c=0.0;
             e = 0.0
         )
     l = 1.7/2
-    d = l/2
-
-    z0 = 2.0
-    p = SVector{3}.(
+    d = l/2    
+    z0 = l^2/(sqrt(5)*d) - 1e-7
+    θ = atan(0.5,1)
+    p = Ref(RotY(θ)) .* SVector{3}.(
         [
             [ 0,  d,  l], [ 0,  d, -l],
             [ 0, -d, -l], [ 0, -d,  l],
@@ -348,13 +350,20 @@ function superball(c=0.0;
             [-d, -l,  0], [-d,  l,  0],
             [ l,  0,  d], [-l,  0,  d],
             [-l,  0, -d], [ l,  0, -d],
-        ].+Ref([0,0,z0])
-    )
+        ]
+    ).+Ref([0,0,z0])
     # p |> display
-    ṙo = SVector(5.0,1.0,0)
-
+    ṗ = [
+        SVector(5.0,1.0,0) + SVector(0.0,0.0,0.0)×r
+        for r in p
+    ]
     rbs = [
-        rigidbar(i,p[2i-1],p[2i];ṙo, m = 5.0)
+        rigidbar(i,
+            p[2i-1],
+            p[2i  ];
+            ṙi=ṗ[2i-1],
+            ṙj=ṗ[2i  ], 
+            m = 5.0)
         for i = 1:6
     ]
     rigdibodies = TypeSortedCollection(rbs)

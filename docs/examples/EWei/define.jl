@@ -134,7 +134,7 @@ function BuildTail()
             movable = false
             constrained = true
             ci = collect(1:6)
-            Φi = Vector{Int}()
+            Φi = Int[]
         else
             movable = true
             if i in 2:3
@@ -147,7 +147,7 @@ function BuildTail()
                 end
             else
                 constrained = false
-                ci = Vector{Int}()
+                ci = Int[]
                 if i in rigidIndex
                     Φi = collect(1:3)
                 else
@@ -403,7 +403,7 @@ function BuildTail(type; β=1.0, μ=0.02)
             movable = false
             constrained = true
             ci = collect(1:6)
-            Φi = Vector{Int}()
+            Φi = Int[]
         else
             movable = true
             if i in 2:3
@@ -416,7 +416,7 @@ function BuildTail(type; β=1.0, μ=0.02)
                 end
             else
                 constrained = false
-                ci = Vector{Int}()
+                ci = Int[]
                 if i in rigidIndex
                     Φi = collect(1:3)
                 else

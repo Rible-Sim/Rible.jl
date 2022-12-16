@@ -22,14 +22,14 @@ function initialize_GDR(tg,F::Nothing)
     Γ = build_Γ(tg)
     # 𝛚(x) =
     function 𝛚(x)
-        Q = Q̃*Γ(x)
+        # Q = Q̃*Γ(x)
         clear_forces!(tg)
         update_rigids!(tg,x)
-        update_cables_apply_forces!(tg)
-        # apply_gravity!(tg)
+        update_tensiles!(tg)
+        apply_gravity!(tg)
         F = generate_forces!(tg)
-        @show abs.(F-Q) |> maximum
-        F
+        # @show abs.(F-Q) |> maximum
+        -F
     end
     𝐛 = make_Φ(tg)
     𝐉 = make_A(tg)
@@ -86,7 +86,7 @@ function pull_back!(x,x̌,𝐛,𝐉;N=10,ξ=1e-14)
     end
 end
 
-function GDR!(bot,F=nothing;β=1e-3,maxiters=1e4,ϵ=1e-7,N=10,ξ=1e-7)
+function GDR!(bot,F=nothing;β=1e-3,maxiters=Int(1e4),ϵ=1e-7,N=10,ξ=1e-7)
     (;tg,traj) = bot
     x,x̌,𝛚,𝐛,𝐉 = initialize_GDR(tg,F)
     # 𝛄 = make_viscous_damper()
@@ -97,7 +97,7 @@ function GDR!(bot,F=nothing;β=1e-3,maxiters=1e4,ϵ=1e-7,N=10,ξ=1e-7)
     q = β.*r
     rs = Vector{eltype(r)}([Inf])
     bs = Vector{eltype(r)}([Inf])
-    ss = Vector{Int}()
+    ss = Int[]
     for itr = 1:maxiters
         J = 𝐉(x)
         ω = 𝛚(x)
@@ -118,15 +118,17 @@ function GDR!(bot,F=nothing;β=1e-3,maxiters=1e4,ϵ=1e-7,N=10,ξ=1e-7)
         push!(traj,deepcopy(traj[end]))
         traj.t[end] = t
         traj.q[end] .= x
-
+        # @show itr,normr
         if normr < ϵ
             break
         elseif itr == maxiters
-            @warn "Max iternation reached for GDR"
+            @warn "Max iternation reached for GDR. Res = $normr"
+
         elseif rs[end] > rs[end-1]
             # @error("Diverging")
             # break
         end
     end
     rs,bs,ss,bot
+    bot
 end

@@ -1,7 +1,7 @@
-function make_3d_bar(id,ri,rj;ci = Vector{Int}())
+function make_3d_bar(id,ri,rj;ci = Int[])
 	# @show id,ri,rj
 	movable = true
-	if ci == Vector{Int}()
+	if ci == Int[]
 		constrained = false
 	else
 		constrained = true
@@ -70,7 +70,7 @@ function make_3d_tri(id,r̄ps,ro,R,ri,rj=nothing,rk=nothing,rl=nothing;
 	# cf = TR.NaturalCoordinates.CoordinateFunctions(lncs,q0,ci,uci)
 	# @show typeof(lncs)
 	long = 32
-	trimesh = GeometryBasics.merge(
+	trimesh = GB.merge(
 		[
 			endpoints2mesh(r̄ps[i],r̄ps[j];long)
 			for (i,j) in [
@@ -145,7 +145,7 @@ function tower3d(;k=500.0,k1=1000.0,c=0.0,
 	# rb4 = make_3d_tri(4,r̄ps[2:4],ro_by_rbid[2],R_by_rbid[2],rirjrkrl_by_rbid[2][2:4]...)
 	rb4_to_6 = [
 		make_3d_bar(i+3,rirjrkrl_by_rbid[2][cycle3[i  ]],
-					    rirjrkrl_by_rbid[3][cycle3[i+1]]; ci = Vector{Int}()) for i = 1:3
+					    rirjrkrl_by_rbid[3][cycle3[i+1]]; ci = Int[]) for i = 1:3
 	]
 
 	 rb7 = make_3d_tri( 7,r̄ps,ro_by_rbid[3],R_by_rbid[3],rirjrkrl_by_rbid[3][1:4]...)
@@ -262,7 +262,7 @@ function tower3d(;k=500.0,k1=1000.0,c=0.0,
 end
 
 function get_linesegs_cables(tg)
-	(;nrigids) = tg
+	(;nbodies) = tg
 	(;connected) = tg.connectivity.tensioned
 	(;cables) = tg.tensiles
 	ndim = TR.get_ndim(tg)

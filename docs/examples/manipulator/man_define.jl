@@ -112,7 +112,7 @@ function man_ndof(ndof,onedir=[1.0,0.0];θ=0.0,k=0.0,c=0.0,unit="mks",restlen=0.
 		])
 		# only to get lncs
 		constrained = false
-        ci = Vector{Int}()
+        ci = Int[]
         prop = TR.RigidBodyProperty(
 					i,movable,m,
 					Ī,
@@ -140,7 +140,7 @@ function man_ndof(ndof,onedir=[1.0,0.0];θ=0.0,k=0.0,c=0.0,unit="mks",restlen=0.
         if i in [1,2]
 			constrained = true
 			if i == 1
-            	ci = TR.find_full_constrained_index(lncs, q)
+            	ci = TR.find_full_pres_indices(lncs, q)
 				display(ci)
 			else
 				ci = [1]

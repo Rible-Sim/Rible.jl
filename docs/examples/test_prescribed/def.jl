@@ -1,6 +1,6 @@
-function build_2d_bar(id,ri,rj;α = 0.0, ci = Vector{Int}())
+function build_2d_bar(id,ri,rj;α = 0.0, ci = Int[])
 	movable = true
-	if ci == Vector{Int}()
+	if ci == Int[]
 		constrained = false
 	else
 		constrained = true
@@ -30,7 +30,7 @@ function build_2d_bar(id,ri,rj;α = 0.0, ci = Vector{Int}())
 	rb = TR.RigidBody(prop,state)
 end
 
-function build_2d_tri(id,ri,rj=nothing,rk=nothing;α = 0.0, ci = Vector{Int}(), Φi = collect(1:3))
+function build_2d_tri(id,ri,rj=nothing,rk=nothing;α = 0.0, ci = Int[], Φi = collect(1:3))
 	movable = true
 	if isempty(ci)
 		constrained = false
@@ -115,8 +115,8 @@ function build_2d_ground(id)
 	# @show typeof(lncs)
 	nq = length(q0)
 	ci = collect(1:nq)
-	uci = Vector{Int}()
-	Φi = Vector{Int}()
+	uci = Int[]
+	Φi = Int[]
 	state = TR.RigidBodyState(prop,lncs,ro,α,ṙo,ω,ci,Φi)
 	rb = TR.RigidBody(prop,state)
 end
@@ -137,7 +137,7 @@ function two_tri(;k=100.0,c=0.0,ratio=0.8)
 	display(bps)
 	α_tri1 = -π/2
 	α_tri2 =  π/2
-	rb1 = build_2d_tri(1,bps[3],bps[1],bps[5];α=α_tri1,ci=collect(1:6),Φi=Vector{Int}())
+	rb1 = build_2d_tri(1,bps[3],bps[1],bps[5];α=α_tri1,ci=collect(1:6),Φi=Int[])
 	rb2 = build_2d_tri(2,bps[2],bps[4],bps[5];α=α_tri2,ci=collect(5:6))
 
 	rbs = TypeSortedCollection((rb1,rb2))
@@ -192,7 +192,7 @@ function one_bar(k=0.0,c=0.0;ratio=0.8)
 	matrix_sharing = zeros(Int,0,0)
 	indexedcoords = TR.index(rbs,matrix_sharing)
 	#
-	ss = Vector{Int}()
+	ss = Int[]
     tensiles = (cables = ss,)
     hub = nothing
 	#
@@ -228,7 +228,7 @@ function one_bar_one_tri()
 	]
 	indexedcoords = TR.index(rbs,matrix_sharing)
 	# cables
-	cables = Vector{Int}()
+	cables = Int[]
     tensiles = (cables = cables,)
     hub = nothing
 	connected = TR.connect(rbs,zeros(Int,0,0))
@@ -342,7 +342,7 @@ function plot_tower2d!(ax,
 		barcolor = refcolor
 		markercolor = refcolor
 	end
-    (;nrigids) = tg
+    (;nbodies) = tg
     (;tensioned) = tg.connectivity
 	(;cables) = tg.tensiles
 	ncables = length(cables)
@@ -354,12 +354,12 @@ function plot_tower2d!(ax,
 	linesegs_tris =  Vector{Pair{Point{ndim,T},Point{ndim,T}}}()
 	ploys_tris = Vector{Vector{Point{ndim,T}}}()
 	for rb in rbs
-		if rb.state.cache.funcs.lncs isa TR.NaturalCoordinates.LNC2D2P
+		if rb.state.cache.funcs.nmcs isa TR.NaturalCoordinates.LNC2D2P
 			push!(
 				linesegs_bars,
 				Point(rb.state.rps[1]) => Point(rb.state.rps[2]),
 			)
-		elseif rb.state.cache.funcs.lncs isa TR.NaturalCoordinates.LNCMP
+		elseif rb.state.cache.funcs.nmcs isa TR.NaturalCoordinates.LNCMP
 		else
 			append!(
 				linesegs_tris,

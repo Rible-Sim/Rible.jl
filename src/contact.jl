@@ -10,7 +10,6 @@ function SpatialFrame(n)
     SpatialFrame(SVector{3}(n),SVector{3}(t1),SVector{3}(t2))
 end
 
-
 mutable struct FrictionalContactState{T}
     active::Bool
     persistent::Bool

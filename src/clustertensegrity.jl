@@ -1,9 +1,8 @@
-function distribute_s̄!(tg::ClusterTensegrityStructure,s̄)
-    css = tg.clusterstrings
+function distribute_s̄!(tg::AbstractTensegrityStructure, s̄)
     s⁺ = @view s̄[begin:2:end]
     s⁻ = @view s̄[begin+1:2:end]
     is = 0
-    for cs in tg.clusterstrings
+    for cs in tg.tensiles.clustercables
         nsi = length(cs.sps)
         cs.sps.s⁺ .= s⁺[is+1:is+nsi]
         cs.sps.s⁻ .= s⁻[is+1:is+nsi]
@@ -12,8 +11,8 @@ function distribute_s̄!(tg::ClusterTensegrityStructure,s̄)
     end
 end
 
-function get_s̄(tg::ClusterTensegrityStructure)
-    ns = tg.nslidings
+function get_s̄(tg::AbstractTensegrityStructure)
+    ns = sum([length(tg.tensiles.clustercables[i].sps) for i in 1:tg.nclustercables])
     s̄ = zeros(get_numbertype(tg),2ns)
     s⁺ = @view s̄[begin:2:end]
     s⁻ = @view s̄[begin+1:2:end]
@@ -27,17 +26,29 @@ function get_s̄(tg::ClusterTensegrityStructure)
     s̄
 end
 
-function build_Ψ(tg::ClusterTensegrityStructure)
-    @unpack clusterstrings = tg
-    FB = FischerBurmeister(1e-14,1000.,1000.)
+struct FischerBurmeister{T}
+    ϵ::T
+    X₁::T
+    X₂::T
+end
+FischerBurmeister() = FischerBurmeister(1e-14,1.0,1.0)
+function (f::FischerBurmeister)(x,y)
+    √((x/f.X₁)^2+(y*f.X₂)^2+2f.ϵ^2) - (x/f.X₁+y*f.X₂)
+end
+
+function make_Ψ(tg::AbstractTensegrityStructure)
+    (;clustercables) = tg.tensiles
+    nclustercables = length(clustercables)
+    ns = sum([length(clustercables[i].sps) for i in 1:nclustercables])
+    FB = FischerBurmeister(1e-14,10.,10.)
     function _inner_Ψ(s̄)
-        ψ = Vector{eltype(s̄)}(undef,2tg.nslidings)
+        ψ = Vector{eltype(s̄)}(undef,2ns)
         ψ⁺ = @view ψ[begin:2:end]
         ψ⁻ = @view ψ[begin+1:2:end]
         s⁺ = @view s̄[begin:2:end]
         s⁻ = @view s̄[begin+1:2:end]
         is = 0
-        for (csid,cs) in enumerate(clusterstrings)
+        for (csid,cs) in enumerate(clustercables)
             @unpack sps,segs = cs
             nsi = length(cs.sps)
             for (i,sp) in enumerate(sps)
@@ -60,19 +71,21 @@ function build_Ψ(tg::ClusterTensegrityStructure)
         reset_forces!(tg)
         distribute_q_to_rbs!(tg, q)
         distribute_s̄!(tg,s̄)
-        update_strings!(tg)
+        update_tensiles!(tg)
         _inner_Ψ(s̄)
     end
     inner_Ψ
 end
 
-function build_ζ(tg::ClusterTensegrityStructure)
-    @unpack clusterstrings = tg
-    ζ = Vector{Float64}(undef,2tg.nslidings)
+function build_ζ(tg::AbstractTensegrityStructure)
+    (;clustercables) = tg.tensiles
+    nclustercables = length(clustercables)
+    ns = sum([length(clustercables[i].sps) for i in 1:nclustercables])
+    ζ = Vector{Float64}(undef,2ns)
     ζ⁺ = @view ζ[begin:2:end]
     ζ⁻ = @view ζ[begin+1:2:end]
     is = 0
-    for cs in clusterstrings
+    for cs in clustercables
         @unpack sps,segs = cs
         nsi = length(cs.sps)
         for (i,sp) in enumerate(sps)
@@ -83,12 +96,165 @@ function build_ζ(tg::ClusterTensegrityStructure)
     end
     ζ
 end
+
+function get_TransMatrix(n)
+    T = zeros(Float64, 2n, 2n)
+    for (j,i) in enumerate(1:2:2n)
+        T[i,j] = 1
+    end
+    for (j,i) in enumerate(2:2:2n)
+        T[i,j+n] = 1
+    end
+    return sparse(T)
+end
+
+function build_∂ζ∂q(tg::AbstractTensegrityStructure,q̌)
+    (;ndim, connectivity) = tg
+    (;clustercables) = tg.tensiles
+    nclustercables = length(clustercables)
+    (;tensioned, indexed) = connectivity
+    # (;q̌) = tg.state.system
+    (;nfull, nfree, sysfree, mem2sysfree, mem2sysfull) = indexed
+    ns = sum([length(clustercables[i].sps) for i in 1:nclustercables])
+    nclustersegs = ns + nclustercables
+    Type = get_numbertype(tg)
+    ∂l∂q = zeros(Type, nclustersegs, nfree)
+    i = 0; j = 0
+    foreach(tensioned.clustered) do clustercable
+        i += 1
+        foreach(clustercable) do cc
+            J̌ = zeros(Type,ndim,nfree)
+            j += 1
+            cable = clustercables[i].segs[cc.id]
+            (;end1,end2) = cc
+            rb1 = end1.rbsig
+            rb2 = end2.rbsig
+            C1 = rb1.state.cache.Cps[end1.pid]
+            C2 = rb2.state.cache.Cps[end2.pid]
+            uci1 = rb1.state.cache.free_idx
+            uci2 = rb2.state.cache.free_idx
+            mfree1 = mem2sysfree[rb1.prop.id]
+            mfree2 = mem2sysfree[rb2.prop.id]
+            (;length, direction) = cable.state
+            J̌[:,mfree2] .+= C2[:,uci2]
+            J̌[:,mfree1] .-= C1[:,uci1]
+            # ∂l∂q[j,:] = q̌'*transpose(J̌)*J̌/length
+            ∂l∂q[j,:] = direction' * J̌
+            # @show J̌*q̌/length, direction
+        end
+    end
+    kc = Vector{Float64}()
+    αc = Vector{Float64}()
+    b_list = Vector{SparseMatrixCSC{Float64,Int64}}()
+    T_list = Vector{SparseMatrixCSC{Float64,Int64}}()
+    for (cid,clustercable) in enumerate(clustercables)
+        @unpack segs,sps = clustercable
+        nsegs = length(segs)
+        for (sid, seg) in enumerate(segs)
+            push!(kc, seg.k)
+        end
+        for sp in sps
+            append!(αc,sp.α)
+        end
+        b⁺ = sparse(zeros(Float64, nsegs-1, nsegs))
+        b⁻ = sparse(zeros(Float64, nsegs-1, nsegs))
+        for i in 1:nsegs-1
+            b⁺[i,i:i+1] = [-kc[i] kc[i+1]/αc[i]]
+            b⁻[i,i:i+1] = [kc[i] -αc[i]*kc[i+1]]
+        end
+        push!(b_list, vcat(b⁺,b⁻))
+        push!(T_list, get_TransMatrix(nsegs-1))
+    end
+    b = reduce(blockdiag, b_list)
+    T = reduce(blockdiag, T_list)
+    return T*b*∂l∂q
+end
+
+function Record_build_∂ζ∂q(tg::AbstractTensegrityStructure,q̌, xlsxname, sheetname)
+    (;nclustercables, clustercables, ndim, connectivity) = tg
+    (;tensioned, indexed) = connectivity
+    # (;q̌) = tg.state.system
+    (;nfull, nfree, sysfree, mem2sysfree, mem2sysfull) = indexed
+    ns = sum([length(clustercables[i].sps) for i in 1:nclustercables])
+    nclustersegs = ns + nclustercables
+    Type = get_numbertype(tg)
+    ∂l∂q = zeros(Type, nclustersegs, nfree)
+    i = 0; j = 0
+    foreach(tensioned.clustercables) do clustercable
+        i += 1
+        foreach(clustercable) do cc
+            J̌ = zeros(Type,ndim,nfree)
+            j += 1
+            cable = tg.clustercables[i].segs[cc.id]
+            (;end1,end2) = cc
+            rb1 = end1.rbsig
+            rb2 = end2.rbsig
+            C1 = rb1.state.cache.Cps[end1.pid]
+            C2 = rb2.state.cache.Cps[end2.pid]
+            uci1 = rb1.state.cache.free_idx
+            uci2 = rb2.state.cache.free_idx
+            mfree1 = mem2sysfree[rb1.prop.id]
+            mfree2 = mem2sysfree[rb2.prop.id]
+            (;length, direction) = cable.state
+            J̌[:,mfree2] .+= C2[:,uci2]
+            J̌[:,mfree1] .-= C1[:,uci1]
+            # ∂l∂q[j,:] = q̌'*transpose(J̌)*J̌/length
+            if (i==1) & (j==2)
+                display(C1)
+                display(C2)
+                display(J̌)
+                display(C1[:, uci1])
+                @show uci1, uci2, mfree1, mfree2
+            end
+            ∂l∂q[j,:] = direction' * J̌
+        end
+    end
+    kc = Vector{Float64}()
+    αc = Vector{Float64}()
+    b_list = Vector{SparseMatrixCSC{Float64,Int64}}()
+    T_list = Vector{SparseMatrixCSC{Float64,Int64}}()
+    for (cid,clustercable) in enumerate(clustercables)
+        @unpack segs,sps = clustercable
+        nsegs = length(segs)
+        for (sid, seg) in enumerate(segs)
+            push!(kc, seg.k)
+        end
+        for sp in sps
+            append!(αc,sp.α)
+        end
+        b⁺ = sparse(zeros(Float64, nsegs-1, nsegs))
+        b⁻ = sparse(zeros(Float64, nsegs-1, nsegs))
+        for i in 1:nsegs-1
+            b⁺[i,i:i+1] = [-kc[i] kc[i+1]/αc[i]]
+            b⁻[i,i:i+1] = [kc[i] -αc[i]*kc[i+1]]
+        end
+        push!(b_list, vcat(b⁺,b⁻))
+        push!(T_list, get_TransMatrix(nsegs-1))
+    end
+    b = reduce(blockdiag, b_list)
+    T = reduce(blockdiag, T_list)
+    h1,w1 = size(b); h2, w2 = size(T); h3, w3 = size(∂l∂q)
+    XLSX.openxlsx(xlsxname, mode="rw") do xf
+        sh = xf[sheetname]
+        for i in 1:h1
+            sh[i, 1:w1] = b[i,:]
+        end
+        for i in h1+1:h1+h2
+            sh[i, 1:w2] = T[i-h1, :]
+        end
+        for i in h1+h2+1:h1+h2+h3
+            sh[i, 1:w3] = ∂l∂q[i-h1-h2,:]
+        end
+    end
+    return T*b*∂l∂q
+end
+
 function get_clusterA(tg)
-    @unpack clusterstrings  = tg
-    A_list = [Matrix{Float64}(undef,1,1) for i in 1:length(clusterstrings)]
-    for (csid, cs) in enumerate(clusterstrings)
-        @unpack k = cs.segs
-        @unpack α = cs.sps
+    (;clustercables) = tg.tensiles
+    A_list = [Matrix{Float64}(undef,1,1) for i in 1:length(clustercables)]
+    for (csid, cs) in enumerate(clustercables)
+        (;k) = cs.segs
+        (;α) = cs.sps
         n = length(α)
         ap = [-k[i+1] for i in 1:n-1]
         ap0 = [k[i]+k[i+1]/α[i] for i in 1:n]
@@ -103,52 +269,15 @@ function get_clusterA(tg)
     return A_list
 end
 
-function get_clusterB(tg)
-    @unpack clusterstrings = tg
-    B_list = [Vector{Float64}() for i in 1:length(clusterstrings)]
-    for (csid, cs) in enumerate(clusterstrings)
-        @unpack k,state = cs.segs
-        @unpack α,s = cs.sps
-        n = length(α)
-        restlen = [state[i].restlen for i in 1:n+1]
-        for rid in 1:length(restlen)
-            if rid == 1
-                restlen[rid] += s[rid]
-            elseif rid == length(restlen)
-                restlen[rid] += -s[rid-1]
-            else
-                restlen[rid] += s[rid] - s[rid-1]
-            end
-        end
-        len = [state[i].length for i in 1:n+1]
-        B⁺ = [-k[i]*(len[i]-restlen[i])+k[i+1]*(len[i+1]-restlen[i+1])/α[i] for i in 1:n]
-        B⁻ = [k[i]*(len[i]-restlen[i])-α[i]*k[i+1]*(len[i+1]-restlen[i+1]) for i in 1:n]
-        B = [B⁺;B⁻]
-        B_list[csid] = B
+function build_∂ζ∂s̄(tg)
+    (;clustercables) = tg.tensiles
+    A_list = Vector{SparseMatrixCSC{Float64,Int64}}()
+    clusterA = get_clusterA(tg)
+    for (cid,clustercable) in enumerate(clustercables)
+        nseg = length(clustercable.segs)
+        T = get_TransMatrix(nseg-1)
+        A = sparse(T*clusterA[cid]*T')
+        push!(A_list,A)
     end
-    return B_list
-end
-
-function get_clusterZ(tg)
-    @unpack clusterstrings = tg
-    Z_list = [Vector{Float64}() for i in 1:length(clusterstrings)]
-    for (csid, cs) in enumerate(clusterstrings)
-        @unpack sps = cs
-        Z_list[csid] = vcat(sps.s⁺,sps.s⁻)
-    end
-    return Z_list
-end
-
-function get_clusterζ(tg::ClusterTensegrityStructure)
-    @unpack clusterstrings = tg
-    ζ_list = [Vector{Float64}() for i in 1:length(clusterstrings)]
-    for (csid,cs) in enumerate(clusterstrings)
-        @unpack sps,segs = cs
-        n = length(sps)
-        ζ⁺ = [segs[i+1].state.tension/sps[i].α - segs[i].state.tension for i in 1:n]
-        ζ⁻ = [segs[i].state.tension - sps[i].α*segs[i+1].state.tension for i in 1:n]
-        ζ = vcat(ζ⁺,ζ⁻)
-        ζ_list[csid] = ζ
-    end
-    return ζ_list
+    return reduce(blockdiag,A_list)
 end

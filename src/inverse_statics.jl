@@ -76,8 +76,8 @@ function build_Q̃(tg)
         rb2 = end2.rbsig
         C1 = rb1.state.cache.Cps[end1.pid]
         C2 = rb2.state.cache.Cps[end2.pid]
-        uci1 = rb1.state.cache.unconstrained_index
-        uci2 = rb2.state.cache.unconstrained_index
+        uci1 = rb1.state.cache.free_idx
+        uci2 = rb2.state.cache.free_idx
         m2sf1 = mem2sysfree[rb1.prop.id]
         m2sf2 = mem2sysfree[rb2.prop.id]
         Q̃[m2sf2,(j-1)*ndim+1:j*ndim] .-= transpose(C2)[uci2,:]
@@ -542,7 +542,6 @@ function check_static_equilibrium_output_multipliers!(tg,q,F=nothing;
         # stpt = nothing
     )
     clear_forces!(tg)
-    update_points!(tg)
     update_rigids!(tg)
     update_tensiles!(tg)
     # check_restlen(tg,get_cables_restlen(tg))
