@@ -38,7 +38,7 @@ function rigidbody(i,m,Ia,ri,rj,aps)
 				aps;
 				constrained
 				)
-	lncs, q, _ = TR.NaturalCoordinates.NC2P1V(SVector{2}(ri), SVector{2}(rj), ro, α, ṙo, ω)
+	lncs, q, _ = TR.NCF.NC2P1V(SVector{2}(ri), SVector{2}(rj), ro, α, ṙo, ω)
 
 	state = TR.RigidBodyState(prop, lncs, ri, α, ṙo, ω, ci, Φi)
 
@@ -268,7 +268,7 @@ function make_spine(n,θ=0.0)
         ro = SVector{2}(r)
         ω = 0.0
         ṙo = @SVector zeros(2)
-        lncs,_,_ = TR.NaturalCoordinates.NC1P2V(ri,ro,θ,ṙo,ω)
+        lncs,_,_ = TR.NCF.NC1P2V(ri,ro,θ,ṙo,ω)
         state = TR.RigidBodyState(prop,lncs,ro,θ,ṙo,ω, ci, Φi)
         TR.RigidBody(prop,state)
     end
@@ -405,7 +405,7 @@ function dualtri(ndof,onedir=[1.0,0.0];θ=0.0,k=400.0,c=0.0,restlen=0.16)
 					constrained=constrained
                     )
 
-		lncs, q, _ = TR.NaturalCoordinates.NC1P2V(SVector{2}(ri), ro, α, ṙo, ω)
+		lncs, q, _ = TR.NCF.NC1P2V(SVector{2}(ri), ro, α, ṙo, ω)
 
 		state = TR.RigidBodyState(prop, lncs, ri, α, ṙo, ω, ci, Φi)
 

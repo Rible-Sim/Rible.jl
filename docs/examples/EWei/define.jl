@@ -178,9 +178,9 @@ function BuildTail()
         )
         ro = SVector{2}(ri)
         if i in rigidIndex
-            lncs, _ = TR.NaturalCoordinates.NC2P1V(SVector{2}(ri), SVector{2}(rj), ro, α, ṙo, ω)
+            lncs, _ = TR.NCF.NC2P1V(SVector{2}(ri), SVector{2}(rj), ro, α, ṙo, ω)
         else
-            lncs, _ = TR.NaturalCoordinates.NC2D2P(SVector{2}(ri), SVector{2}(rj), ro, α, ṙo, ω)
+            lncs, _ = TR.NCF.NC2D2P(SVector{2}(ri), SVector{2}(rj), ro, α, ṙo, ω)
         end
         state = TR.RigidBodyState(prop, lncs, ri, α, ṙo, ω, ci, Φi)
         rb = TR.RigidBody(prop, state)
@@ -447,9 +447,9 @@ function BuildTail(type; β=1.0, μ=0.02)
         )
         ro = SVector{2}(ri)
         if i in rigidIndex
-            lncs, _ = TR.NaturalCoordinates.NC2P1V(SVector{2}(ri), SVector{2}(rj), ro, α, ṙo, ω)
+            lncs, _ = TR.NCF.NC2P1V(SVector{2}(ri), SVector{2}(rj), ro, α, ṙo, ω)
         else
-            lncs, _ = TR.NaturalCoordinates.NC2D2P(SVector{2}(ri), SVector{2}(rj), ro, α, ṙo, ω)
+            lncs, _ = TR.NCF.NC2D2P(SVector{2}(ri), SVector{2}(rj), ro, α, ṙo, ω)
         end
         state = TR.RigidBodyState(prop, lncs, ri, α, ṙo, ω, ci, Φi)
         rb = TR.RigidBody(prop, state, rdsi.mesh)

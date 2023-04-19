@@ -27,7 +27,7 @@ function make_rollingdisk()
 	constrained = false
     prop = TR.RigidBodyProperty(1,true,m,Īg,r̄g,aps)
     ri = copy(ro)
-    lncs,q,q̇ = TR.NaturalCoordinates.NC1P2V(ri,ro,α,ṙo,ω)
+    lncs,q,q̇ = TR.NCF.NC1P2V(ri,ro,α,ṙo,ω)
     state = TR.RigidBodyState(prop,lncs,ro,α,ṙo,ω)
     rb1 = TR.RigidBody(prop,state)
 	rbs = TypeSortedCollection((rb1,))

@@ -1,0 +1,13 @@
+{
+	"folders": [
+		{
+			"path": "../../../Projects/TensegrityRobots/docs"
+		},
+		{
+			"path": "../../../Projects/TensegrityRobots"
+		}
+	],
+	"settings": {
+		"julia.environmentPath": "c:\\Users\\luo22\\OneDrive\\Projects\\TensegrityRobots\\docs"
+	}
+}

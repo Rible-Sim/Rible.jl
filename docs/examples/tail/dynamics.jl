@@ -98,9 +98,9 @@ function make_new_tail(n)
         )
         ro = ri
         if isodd(pos)
-            lncs, _ = TR.NaturalCoordinates.NC2P1V(ri, rj, ro, α, ṙo, ω)
+            lncs, _ = TR.NCF.NC2P1V(ri, rj, ro, α, ṙo, ω)
         else
-            lncs, _ = TR.NaturalCoordinates.NC2D2P(ri, rj, ro, α, ṙo, ω)
+            lncs, _ = TR.NCF.NC2D2P(ri, rj, ro, α, ṙo, ω)
         end
         state = TR.RigidBodyState(prop, lncs, ri, α, ṙo, ω, ci, Φi)
         rb = TR.RigidBody(prop, state)

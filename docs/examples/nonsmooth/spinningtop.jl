@@ -33,7 +33,7 @@ function make_top(ro = [0.0,0.0,0.0],
        R = one(RotMatrix{3}),
        ṙo = [0.0,0.0,0.0],
        Ω = [0.0,0.0,5.0],
-	   cT = TR.QuaternionCoordinates.QC;
+	   cT = TR.QBF.QC;
 	   μ = 0.5,
 	   e = 0.9,
 	   constrained=false
@@ -54,7 +54,7 @@ function make_top(ro = [0.0,0.0,0.0],
     r̄ps = [h.*[x,y,z] for x = [-1,1] for y = [-1,1] for z = [1]]
     push!(r̄ps,[0,0,-h])
 	pts = Point3.(r̄ps)
-	fcs = TriangleFace.([
+	fcs = GB.TriangleFace.([
 		[5,1,2],
 		[5,4,3],
 		[5,3,1],
@@ -64,14 +64,14 @@ function make_top(ro = [0.0,0.0,0.0],
 		[3,2,1],
 		[2,3,4]
 	])
-	nls = normals(pts,fcs)
-	top_mesh = GeometryBasics.Mesh(meta(pts,normals=nls),fcs)
+	nls = GB.normals(pts,fcs)
+	top_mesh = GB.Mesh(GB.meta(pts,normals=nls),fcs)
     prop = TR.RigidBodyProperty(1,movable,m,Ī,r̄g,r̄ps;constrained)
     ri = ro+R*r̄ps[5]
-	if cT == TR.QuaternionCoordinates.QC
-		nmcs = TR.QuaternionCoordinates.QC(m,Ī)
+	if cT == TR.QBF.QC
+		nmcs = TR.QBF.QC(m,Ī)
 	else
-    	nmcs, _ = TR.NaturalCoordinates.NC1P3V(ri,ro,R,ṙo,ω)
+    	nmcs, _ = TR.NCF.NC1P3V(ri,ro,R,ṙo,ω)
 	end
 	state = TR.RigidBodyState(prop,nmcs,ro,R,ṙo,ω,pres_idx)
     rb1 = TR.RigidBody(prop,state,top_mesh)
@@ -162,8 +162,8 @@ function top_contact_dynfuncs(bot)
 			(;id,state) = ac
 			(;n,t1,t2) = state.frame
 			r̄p = rb1.prop.r̄ps[id]
-			if rb1.state.cache.funcs.nmcs isa TR.QuaternionCoordinates.QC
-				∂Cẋ∂x = TR.QuaternionCoordinates.make_∂Cẋ∂x(r̄p)
+			if rb1.state.cache.funcs.nmcs isa TR.QBF.QC
+				∂Cẋ∂x = TR.QBF.make_∂Cẋ∂x(r̄p)
 				TI = TR.build_T(tg,1)
 				∂Cq̇∂q = ∂Cẋ∂x(TI*q,TI*q̇)*TI
 				∂Dq̇∂q[3(i-1)+1,:] = transpose(n)*∂Cq̇∂q
@@ -184,8 +184,8 @@ function top_contact_dynfuncs(bot)
 			(;id,state) = ac
 			(;n,t1,t2) = state.frame
 			r̄p = rb1.prop.r̄ps[id]
-			if rb1.state.cache.funcs.nmcs isa TR.QuaternionCoordinates.QC
-				∂Cᵀf∂x = TR.QuaternionCoordinates.make_∂Cᵀf∂x(r̄p)
+			if rb1.state.cache.funcs.nmcs isa TR.QBF.QC
+				∂Cᵀf∂x = TR.QBF.make_∂Cᵀf∂x(r̄p)
 				TI = TR.build_T(tg,1)
 				Λi = @view Λ[3(i-1)+1:3(i-1)+3]
 				fi = hcat(n,t1,t2)*Λi
@@ -218,37 +218,37 @@ ṙo = [1.0,0.0,0.0]
 # inv(rb1cf.build_M(q)) .- rb1cf.build_M⁻¹(q) |> norm
 
 # crand = rand(3)
-# C = TR.QuaternionCoordinates.make_C(crand)
+# C = TR.QBF.make_C(crand)
 # C(q)
 # @btime  $C($q)
 
-# ∂Cẋ∂x = TR.QuaternionCoordinates.make_∂Cẋ∂x(crand)
+# ∂Cẋ∂x = TR.QBF.make_∂Cẋ∂x(crand)
 # ∂Cẋ∂x(q,q̇)
 # @btime $∂Cẋ∂x($q,$q̇)
-# ∂Cẋ∂x_forwarddiff = TR.QuaternionCoordinates.make_∂Cẋ∂x_forwarddiff(C,3,7)
+# ∂Cẋ∂x_forwarddiff = TR.QBF.make_∂Cẋ∂x_forwarddiff(C,3,7)
 # ∂Cẋ∂x_forwarddiff(q,q̇) .- ∂Cẋ∂x(q,q̇)
 
 # frand = rand(3)
-# ∂Cᵀf∂x = TR.QuaternionCoordinates.make_∂Cᵀf∂x(crand)
+# ∂Cᵀf∂x = TR.QBF.make_∂Cᵀf∂x(crand)
 # ∂Cᵀf∂x(q,frand)
 # @btime $∂Cᵀf∂x($q,$frand)
-# ∂Cᵀf∂x_forwarddiff = TR.QuaternionCoordinates.make_∂Cẋ∂x_forwarddiff((q)->transpose(C(q)),7,7)
+# ∂Cᵀf∂x_forwarddiff = TR.QBF.make_∂Cẋ∂x_forwarddiff((q)->transpose(C(q)),7,7)
 # ∂Cᵀf∂x_forwarddiff(q,frand) .- ∂Cᵀf∂x(q,frand) |> norm
 
-# Rmat = TR.QuaternionCoordinates.Rmat
-# ∂Rη∂q_forwarddiff = TR.QuaternionCoordinates.make_∂Cẋ∂x_forwarddiff(Rmat,3,4)
+# Rmat = TR.QBF.Rmat
+# ∂Rη∂q_forwarddiff = TR.QBF.make_∂Cẋ∂x_forwarddiff(Rmat,3,4)
 
 # qrand = rand(4)
 # ηrand = rand(3)
 
-# @btime TR.QuaternionCoordinates.Rmat($qrand)
+# @btime TR.QBF.Rmat($qrand)
 # @btime $∂Rη∂q_forwarddiff($qrand,$ηrand)
 
-# TR.QuaternionCoordinates.∂Rη∂q(qrand,ηrand)
+# TR.QBF.∂Rη∂q(qrand,ηrand)
 
-# ∂Rη∂q_forwarddiff(qrand,ηrand) .- TR.QuaternionCoordinates.∂Rη∂q(qrand,ηrand)
+# ∂Rη∂q_forwarddiff(qrand,ηrand) .- TR.QBF.∂Rη∂q(qrand,ηrand)
 
-# @btime TR.QuaternionCoordinates.∂Rη∂q($qrand,$ηrand)
+# @btime TR.QBF.∂Rη∂q($qrand,$ηrand)
 
 
 
@@ -286,7 +286,7 @@ plot_traj!(topq;showinfo=false,rigidcolor=:white,showwire=true,figsize=(0.6tw,0.
 
 
 
-topn = make_top(ro,R,ṙo,Ω,TR.NaturalCoordinates.LNC;μ,e)
+topn = make_top(ro,R,ṙo,Ω,TR.NCF.LNC;μ,e)
 TR.solve!(
 	TR.SimProblem(topn,top_contact_dynfuncs),
 	TR.ZhongCCP();
@@ -312,7 +312,6 @@ plot_traj!(top;showinfo=false,rigidcolor=:white,showwire=true,figsize=(0.6tw,0.6
 
 me = TR.mechanical_energy!(top)
 me.E |> lines
-
 
 
 
@@ -614,7 +613,7 @@ function plotsave_compare_traj(top1,top2,figname=nothing)
 	ro_top1 = get_trajectory!(top1,1,0)
 	ro_top2 = get_trajectory!(top2,1,0)
 	ylabels = ["x","y","z"]
-	with_theme(mv_theme;
+	with_theme(theme_pub;
 			resolution = (0.8tw,0.5tw),
 		) do
 		fig = Figure()
@@ -682,7 +681,7 @@ GM.activate!(); plotsave_friction_direction(tops_e0)
 
 # contact_friction
 function plotsave_contact_friction(bots,figname=nothing)
-	with_theme(mv_theme;
+	with_theme(theme_pub;
 		resolution = (0.9tw,0.5tw)
 	) do
 		fig = Figure()
@@ -756,7 +755,7 @@ function make_bar(;
 
     prop = TR.RigidBodyProperty(1,movable,m,Ī,r̄g,r̄ps;constrained)
 
-    lncs, _ = TR.NaturalCoordinates.NC3D2P(ri,rj,ro,R,ṙo,ω)
+    lncs, _ = TR.NCF.NC3D2P(ri,rj,ro,R,ṙo,ω)
     state = TR.RigidBodyState(prop,lncs,ro,R,ṙo,ω)
 
 	p1 = Meshes.Point(r̄ps[1])
@@ -888,7 +887,7 @@ function new_pointmass(;
 	R = RotX(0.0)
 	ω = zero(ro)
 	rps = Ref(ro) .+ Ref(R).*r̄ps
-	lncs, _ = TR.NaturalCoordinates.NCMP(rps,ro,R,ṙo,ω)
+	lncs, _ = TR.NCF.NCMP(rps,ro,R,ṙo,ω)
 	ci = Int[]
 	Φi = Int[]
 	state = TR.RigidBodyState(prop,lncs,ro,R,ṙo,ω,ci,Φi)
@@ -900,8 +899,9 @@ function new_pointmass(;
 	indexedcoords = TR.index(rbs,matrix_sharing)
 	ss = Int[]
 	tensiles = (cables = ss,)
-	connections = TR.connect(rbs,zeros(Int,0,0))
-	cnt = TR.Connectivity(numberedpoints,indexedcoords,connections)
+	connected = TR.connect(rbs,zeros(Int,0,0))
+	tensioned = @eponymtuple(connected,)
+	cnt = TR.Connectivity(numberedpoints,indexedcoords,tensioned)
 	contacts = [TR.Contact(i,μ,e) for i = [1]]
 	tg = TR.TensegrityStructure(rbs,tensiles,cnt,contacts)
 	bot = TR.TensegrityRobot(tg)
@@ -912,7 +912,7 @@ function pm_contact_dynfuncs(bot;θ=0.0)
     function F!(F,q,q̇,t)
         TR.clear_forces!(tg)
         TR.update_rigids!(tg,q,q̇)
-        TR.update_cables_apply_forces!(tg)
+        TR.update_tensiles!(tg)
         TR.apply_gravity!(tg)
         F .= TR.generate_forces!(tg)
     end
@@ -921,7 +921,7 @@ function pm_contact_dynfuncs(bot;θ=0.0)
         ∂F∂q̌̇ .= 0
         TR.clear_forces!(tg)
         TR.update_rigids!(tg,q,q̇)
-        TR.update_cables_apply_forces!(tg)
+        TR.update_tensiles!(tg)
         TR.build_∂Q̌∂q̌!(∂F∂q̌,tg)
         TR.build_∂Q̌∂q̌̇!(∂F∂q̌̇,tg)
     end
@@ -943,30 +943,36 @@ function pm_contact_dynfuncs(bot;θ=0.0)
 		end
 
 		na = length(active_contacts)
-		D = Matrix{T}(undef,3na,length(q))
 		inv_μ_vec = ones(T,3na)
 		for (i,ac) in enumerate(active_contacts)
-			(;state) = ac
+			(;id,state) = ac
 			state.frame = TR.SpatialFrame(n)
-			(;n,t1,t2) = state.frame
-			rbid = ac.id
-			C = rbs[rbid].state.cache.Cps[1]
-			CT = C*TR.build_T(tg,rbid)
-			Dn = Matrix(transpose(n)*CT)
-			Dt1 = Matrix(transpose(t1)*CT)
-			Dt2 = Matrix(transpose(t2)*CT)
-			D[3(i-1)+1,:] = Dn
-			D[3(i-1)+2,:] = Dt1
-			D[3(i-1)+3,:] = Dt2
 			inv_μ_vec[3(i-1)+1] = 1/ac.μ
 		end
 		es = [ac.e for ac in active_contacts]
 		gaps = [ac.state.gap for ac in active_contacts]
 		H = Diagonal(inv_μ_vec)
-		active_contacts, na, gaps, D, H, es
+		active_contacts, gaps, H, es
     end
 
-    F!,Jac_F!,prepare_contacts!
+	function get_directions_and_positions(active_contacts,q)
+		na = length(active_contacts)
+		TR.update_rigids!(tg,q)
+		D = Matrix{eltype(q)}(undef,3na,length(q))
+		ŕ = Vector{eltype(q)}(undef,3na)
+		for (i,ac) in enumerate(active_contacts)
+			(;id,state) = ac
+			(;n,t1,t2) = state.frame
+			rbid = ac.id
+			C = rbs[rbid].state.cache.Cps[1]
+			CT = C*TR.build_T(tg,1)
+			dm = hcat(n,t1,t2) |> transpose
+			D[3(i-1)+1:3(i-1)+3,:] = dm*CT
+			ŕ[3(i-1)+1:3(i-1)+3] = dm*rbs[rbid].state.rps[id]
+		end
+		D,ŕ
+	end
+	@eponymtuple(F!,Jac_F!,prepare_contacts!,get_directions_and_positions)
 end
 
 tspan = (0.0,0.455)
@@ -987,7 +993,7 @@ pms_hp = [
 ]
 
 CM.activate!()
-with_theme(my_theme;
+with_theme(theme_pub;
 		fontsize = 6 |> pt2px,
 		Axis3 = (
 			azimuth = 4.575530633326986,
@@ -1010,7 +1016,7 @@ with_theme(my_theme;
 end
 
 function plotsave_z_energy(bots,figname=nothing)
-	with_theme(mv_theme;
+	with_theme(theme_pub;
 			resolution = (0.9tw,0.45tw),
 		) do
 		fig = Figure()
@@ -1047,7 +1053,7 @@ GM.activate!(); plotsave_z_energy(reshape(pms_hp,3,2)[:,1])
 CM.activate!(); plotsave_z_energy(reshape(pms_hp,3,2)[:,1],"pointmass_z_energy")
 
 function plotsave_pointmass_xz_energy(bots,figname=nothing)
-	with_theme(mv_theme;
+	with_theme(theme_pub;
 			resolution = (0.9tw,0.45tw),
 		) do
 		fig = Figure()
@@ -1081,7 +1087,7 @@ GM.activate!(); plotsave_pointmass_xz_energy(reshape(pms_hp,3,2)[:,2])
 CM.activate!(); plotsave_pointmass_xz_energy(reshape(pms_hp,3,2)[:,2],"pointmass_xz_energy")
 
 function plotsave_pointmass_velocity_restitution(bots,figname=nothing)
-	with_theme(mv_theme;
+	with_theme(theme_pub;
 			resolution = (0.9tw,0.6tw),
 		) do
 		fig = Figure()
@@ -1127,12 +1133,43 @@ CM.activate!(); plotsave_pointmass_velocity_restitution(reshape(pms_hp,3,2)[:,2]
 
 θ = 15 |> deg2rad
 inclined_plane = TR.Plane([-tan(θ),0,1],zeros(3))
-
-pm = new_pointmass(;e=0.0, μ=0.3, ro = [0.0,0,0], ṙo = [2.0cos(θ),0,2.0sin(θ)])
+ro = [0.0,0,-1e-7]
+ṙo = [2.0cos(θ),0,2.0sin(θ)]
+ṙo = [0,-2.0,0]
 
 tspan = (0.0,0.6)
+pm = new_pointmass(;e=0.0, μ=0.3, ro, ṙo)
+
 prob = TR.SimProblem(pm,(x)->pm_contact_dynfuncs(x;θ))
 TR.solve!(prob,TR.ZhongCCP();tspan,dt=1e-4,ftol=1e-14,maxiters=50,exception=false)
+
+plot_traj!(pm;
+	showmesh=false,
+	# showinfo=false,
+	# AxisType=Axis3,
+	xlims=(-1.0,0.5),
+	ylims=(-1.0,0.1),
+	zlims=(-1.0,0.1),
+	showlabels=false,
+	ground=inclined_plane,
+	# figname="pointmass_sliding"
+)
+
+
+#dt
+dts = [1e-1,3e-2,1e-2,3e-3,1e-3,1e-4]
+pms = [
+	begin
+		pm = new_pointmass(;e=0.0, μ=0.3, ro, ṙo)
+		TR.solve!(
+			TR.SimProblem(pm,(x)->pm_contact_dynfuncs(x;θ)),
+			TR.ZhongCCP();tspan,dt,ftol=1e-14,maxiters=50,exception=false
+		)
+	end
+	for dt in dts
+]
+
+GM.activate!(); plotsave_error(pms,dts,pid=1,di=1)
 
 GM.activate!(); plotsave_contact_persistent(pm)
 
@@ -1140,7 +1177,7 @@ GM.activate!(); plotsave_contact_persistent(pm)
 
 function plotsave_dis_vel(bot,figname=nothing)
 	(;t) = bot.traj
-	with_theme(mv_theme;
+	with_theme(theme_pub;
 			resolution = (0.9tw,0.3tw)
 		) do
 		fig = Figure()
@@ -1161,11 +1198,11 @@ function plotsave_dis_vel(bot,figname=nothing)
 		xlims!(ax2,0,0.6)
 		vlines!(ax1,t[stopstep])
 		vlines!(ax2,t[stopstep])
-		text!(ax1,latexstring("t=$at"), textsize = fontsize,
+		text!(ax1,latexstring("t=$at"), 
 					position = (at+0.02, 0.19),
 					align = (:left, :center)
 		)
-		text!(ax2,latexstring("t=$at"), textsize = fontsize,
+		text!(ax2,latexstring("t=$at"), 
 					position = (at+0.02, 1.0),
 					align = (:left, :center)
 		)
@@ -1191,7 +1228,7 @@ for (i,c) in enumerate(contacts_traj_voa[1,:])
 	check_Coulomb(i,c)
 end
 
-GM.activate!(); with_theme(my_theme;
+GM.activate!(); with_theme(theme_pub;
 		fontsize = 6 |> pt2px,
 		Axis3 = (
 			azimuth = 4.575530633326984,
@@ -1204,6 +1241,7 @@ GM.activate!(); with_theme(my_theme;
 		doslide=false,
 		showmesh=false,
 		# showinfo=false,
+		AxisType=Axis3,
 		gridsize=(1,3),
 		attimes=(0.0,0.15,0.372),
 		xlims=(-8e-3,0.5),
@@ -1212,13 +1250,13 @@ GM.activate!(); with_theme(my_theme;
 		showlabels=false,
 		ground=inclined_plane,
 		figsize=(0.9tw,0.2tw),
-		figname="pointmass_sliding"
+		# figname="pointmass_sliding"
 	)
 end
 
 # contact_friction
 function plotsave_pointmass_energy_friction(bot,figname=nothing)
-	with_theme(mv_theme;
+	with_theme(theme_pub;
 		resolution = (0.9tw,0.3tw)
 	) do
 		(;t) = bot.traj
@@ -1251,59 +1289,3 @@ function plotsave_pointmass_energy_friction(bot,figname=nothing)
 end
 GM.activate!(); plotsave_pointmass_energy_friction(pm)
 CM.activate!(); plotsave_pointmass_energy_friction(pm,"pointmass_energy_friction")
-
-using TypedPolynomials
-@polyvar L ξ
-using LinearAlgebra
-using StaticArrays
-S_raw = SA[
-            1//2 - 3//4*ξ + 1//4*ξ^3, 1//8*L*( 1 - ξ - ξ^2 + ξ^3),
-            1//2 + 3//4*ξ - 1//4*ξ^3, 1//8*L*(-1 - ξ + ξ^2 + ξ^3),
-        ]
-S = kron(S_raw,Matrix(1I,3,3))
-@which TypedPolynomials.differentiate(S[1],ξ)
-\
-TypedPolynomials.differentiate.(terms(S[1]), ξ)
-terms(S[1])
-@which  TypedPolynomials.differentiate(TypedPolynomials.monomial(terms(S[1])[1]),ξ)
-@which terms(S[1])
-latexify(SᵀS)
-integrate(SᵀS[1],L) 
-using ForceImport
-import Reduce
-@force using Reduce.Algebra
-1-1/:n
-:((n - 1) // n)
-
-ans^-:n
-:(1 // ((n - 1) // n) ^ n)
-
-limit(ans,:n,Inf)
-int(sin(im*:x+π)^2-1,:x)
-:(int(sin(im*x+pi)^2-1,x)) |> Reduce.rcall
-
-L = :L
-ξ = :ξ
-I3 = Matrix(1I,3,3)
-S = [
-		(1//2 - ξ*3/4 + (ξ^3)/4)*I3  L/8*( 1 - ξ - ξ^2 + ξ^3)*I3 (1//2 + ξ*3/4 - (ξ^3)/4)*I3  L/8*(-1 - ξ + ξ^2 + ξ^3)*I3;
-	] .|> Reduce.RExpr
-S
-SᵀS = transpose(S)*S
-S
-
-
-using LinearAlgebra
-using StaticArrays
-function f(ξ,p=0)
-	L = 1.0
-	S_raw = SA[1//2 - 3//4*ξ + 1//4*ξ^3  1//8*L*( 1 - ξ - ξ^2 + ξ^3) 1//2 + 3//4*ξ - 1//4*ξ^3  1//8*L*(-1 - ξ + ξ^2 + ξ^3);]
-	S = kron(S_raw,SMatrix{3,3}(1I))
-	SᵀS = Symmetric(transpose(S)*S)
-	# SᵀS = transpose(S)*S
-end
-f(0.0,)
-prob = IntegralProblem(f,0.0,1.0)
-sol = solve(prob,HCubatureJL(),reltol=1e-14,abstol=1e-14)
-sol.u
-

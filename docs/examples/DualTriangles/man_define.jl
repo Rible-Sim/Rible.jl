@@ -125,7 +125,7 @@ function man_ndof(ndof,onedir=[0.0,-1.0];θ=0.0,k=0.0,c=0.0,unit="mks",restlen=0
         ω = 0.0
         ṙo = @SVector zeros(2)
 		α = get_angle([1.0,0.0],rj-ri)
-        lncs, q0, _ = TR.NaturalCoordinates.NC1P2V(ri,ro,α,ṙo,ω)
+        lncs, q0, _ = TR.NCF.NC1P2V(ri,ro,α,ṙo,ω)
 		if i == 1
 			ci = collect(1:6)
 			Φi = Int[]
@@ -437,7 +437,7 @@ function man_ndof_2022(ndof,onedir=[1.0,0.0];θ=0.0,k=1250.0,c=0.0,unit="mks")
 		ro = ri
 		ṙo = zero(ro)
 
-        lncs, q0, _ = TR.NaturalCoordinates.NC2P1V(ri,rj,ro,α,ṙo,ω)
+        lncs, q0, _ = TR.NCF.NC2P1V(ri,rj,ro,α,ṙo,ω)
 
         state = TR.RigidBodyState(prop,lncs,ro,α,ṙo,ω,ci,Φi)
 

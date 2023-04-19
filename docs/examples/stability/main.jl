@@ -64,7 +64,7 @@ function compute_evs(bot,μs,Ň)
 			rb2 = TR.get_rigidbodies(tg)[2]
 			ka = [
 				transpose(rb2.state.rps[i]-rb2.state.ro)*rb2.state.fps[i]
-				for i = 1:rb2.prop.nr̄ps
+				for i in eachindex(rb2.prop.r̄ps)
 			] |> sum
 			Ň0 = Ň(ini.q̌,ini.c)
 			# Ň0 = Ň(ini.q̌)
@@ -382,12 +382,12 @@ function pinpoint_equilibriums(μ0,Δμ,
 		begin
 			bot = dualtri(1;θ)
 			TR.set_restlen!(bot.tg,μ0.+σ.*Δμ)
-			# fullupdate!(bot.tg)
+			# TR.update!(bot.tg)
 			polyP, poly𝒦, ini, pv = TR.pinpoint(bot;Ň)
 			@assert ini.isconverged
 			inirc = TR.recover(ini,bot.tg)
 			TR.set_new_initial!(bot,inirc.q)
-			fullupdate!(bot.tg)
+			TR.update!(bot.tg)
 			_, _, er = TR.check_stability(bot.tg)
 			@show er.values
 			# plot_traj!(dualtri_up;)
@@ -703,7 +703,7 @@ function pinpoint_gripper(Ň)
 			@assert ini.isconverged
 			inirc = TR.recover(ini,bot.tg)
 			TR.set_new_initial!(bot,inirc.q)
-			fullupdate!(bot.tg)
+			TR.update!(bot.tg)
 			_, _, er = TR.check_stability(bot.tg)
 			@show er.values
 			# plot_traj!(dualtri_up;)
@@ -717,7 +717,7 @@ function pinpoint_gripper(Ň)
 	@assert inicri.isconverged
 	inicrirc = TR.recover(inicri,botcri.tg)
 	TR.set_new_initial!(botcri,inicrirc.q)
-	fullupdate!(botcri.tg)
+	TR.update!(botcri.tg)
 	@show inicri.ζ
 	_, _, er = TR.check_stability(botcri.tg;F̌=inicri.ζ.*F̌)
 	@show er.values

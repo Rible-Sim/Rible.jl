@@ -65,9 +65,9 @@ function rigidbody(i, rij, apss, rg)
     )
     ro = SVector{2}(ri)
     if isodd(i)
-        lncs, _ = TR.NaturalCoordinates.NC2P1V(SVector{2}(ri), SVector{2}(rj), ro, α, ṙo, ω)
+        lncs, _ = TR.NCF.NC2P1V(SVector{2}(ri), SVector{2}(rj), ro, α, ṙo, ω)
     else
-        lncs, _ = TR.NaturalCoordinates.NC2D2P(SVector{2}(ri), SVector{2}(rj), ro, α, ṙo, ω)
+        lncs, _ = TR.NCF.NC2D2P(SVector{2}(ri), SVector{2}(rj), ro, α, ṙo, ω)
     end
     state = TR.RigidBodyState(prop, lncs, ri, α, ṙo, ω, ci, Φi)
     rb = TR.RigidBody(prop, state)

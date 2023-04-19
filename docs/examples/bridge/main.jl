@@ -13,7 +13,8 @@ import GLMakie as GM
 import CairoMakie as CM
 GM.activate!()
 using LaTeXStrings, Unitful, Printf
-using GeometryBasics, Meshing
+import GeometryBasics as GB
+import Meshing
 using EponymTuples
 using Match
 using Revise
@@ -23,13 +24,18 @@ import TensegrityRobots as TR
 const CA = CircularArray
 
 # 加载所需源代码
+include("bridge.jl")
+include("../vis.jl")
+include("../analysis.jl")
+include("../dyn.jl")
+
 includet("bridge.jl")
 includet("../vis.jl")
 includet("../analysis.jl")
 includet("../dyn.jl")
 
 ## deployable bridge
-n = 5; m = 2
+n = 5; m = 1
 
 # 初始构型
 tgbridge1 = nrailbridge(n,m;θ=0.0,c=0.0,h=1.0)
@@ -40,7 +46,11 @@ plot_traj!(tgbridge1;AxisType=LScene,showground=false)
 Y = TR.build_Y(tgbridge1)
 ax = float.(Y)\ℓ
 B,F̃ = TR.build_inverse_statics_for_actuation(tgbridge1,tgbridge1)
+# B,F̃ = TR.build_inverse_statics_for_restlength(tgbridge1.tg,tgbridge1.tg)
+rank(B)
+size(B)
 ap,an = TR.get_solution_set(B,F̃)
+
 a1 = ap
 
 # 目标构型

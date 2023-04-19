@@ -65,10 +65,10 @@ function spine(n,dis,rm,heating_law;k=1000.0,c=0.0)
 	rs = map((r)->r+=[0,0,124.2/1000],rs_raw)
     function rigidbody(i,prop,aps,ro,R,ṙo,ω)
         ri,rj,rk,rl = [ro+R*ap for ap in [aps[13],aps[10],aps[11],aps[12]]]
-        # lncs,q,q̇ = TR.NaturalCoordinates.NC4P(ri,rj,rk,rl,ro,R,ṙo,ω)
-		# lncs,q,q̇ = TR.NaturalCoordinates.NC3P1V(ri,rj,rk,ro,R,ṙo,ω)
-		# lncs,q,q̇ = TR.NaturalCoordinates.NC2P2V(ri,rk,ro,R,ṙo,ω)
-		lncs,q,q̇ = TR.NaturalCoordinates.NC1P3V(ri,ro,R,ṙo,ω)
+        # lncs,q,q̇ = TR.NCF.NC4P(ri,rj,rk,rl,ro,R,ṙo,ω)
+		# lncs,q,q̇ = TR.NCF.NC3P1V(ri,rj,rk,ro,R,ṙo,ω)
+		# lncs,q,q̇ = TR.NCF.NC2P2V(ri,rk,ro,R,ṙo,ω)
+		lncs,q,q̇ = TR.NCF.NC1P3V(ri,ro,R,ṙo,ω)
 		if i == 1
 			pres_idx = TR.find_full_pres_indices(lncs,q)
 		else
@@ -194,10 +194,10 @@ function spine_true(n,dis,rm;
         # ri,rj,rk,rl = [ro+R*ap for ap in [aps[1],aps[10],aps[11],aps[12]]]
 		ri = copy(ro)
 		# @show ri
-        # lncs,q,q̇ = TR.NaturalCoordinates.NC4P(ri,rj,rk,rl,ro,R,ṙo,ω)
-		# lncs,q,q̇ = TR.NaturalCoordinates.NC3P1V(ri,rj,rk,ro,R,ṙo,ω)
-		# lncs,q,q̇ = TR.NaturalCoordinates.NC2P2V(ri,rk,ro,R,ṙo,ω)
-		lncs,q,q̇ = TR.NaturalCoordinates.NC1P3V(ri,ro,R,ṙo,ω)
+        # lncs,q,q̇ = TR.NCF.NC4P(ri,rj,rk,rl,ro,R,ṙo,ω)
+		# lncs,q,q̇ = TR.NCF.NC3P1V(ri,rj,rk,ro,R,ṙo,ω)
+		# lncs,q,q̇ = TR.NCF.NC2P2V(ri,rk,ro,R,ṙo,ω)
+		lncs,q,q̇ = TR.NCF.NC1P3V(ri,ro,R,ṙo,ω)
 		if i == 1
 			ci = TR.find_full_pres_indices(lncs,q)
 			Φi = collect(1:6)

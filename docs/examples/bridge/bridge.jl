@@ -9,7 +9,7 @@ function make_strut(id,ri,rj;ci = Int[])
 	u = rj - ri
 	b = norm(u)
 	û = u./b
-	v̂,ŵ = TR.NaturalCoordinates.HouseholderOrthogonalization(û)
+	v̂,ŵ = TR.NCF.HouseholderOrthogonalization(û)
 	R = SMatrix{3,3}(hcat(û,v̂,ŵ))
 	d = 28/1000
 	r = d/2
@@ -33,7 +33,7 @@ function make_strut(id,ri,rj;ci = Int[])
 	ro = ri
 	ṙo = zero(ro)
 	ω = zero(ro)
-	lncs,q0,q̇0 = TR.NaturalCoordinates.NC3D2P(ri,rj,ro,R,ṙo,ω)
+	lncs,q0,q̇0 = TR.NCF.NC3D2P(ri,rj,ro,R,ṙo,ω)
 	state = TR.RigidBodyState(prop,lncs,ro,R,ṙo,ω,ci)
 	strutmesh = endpoints2mesh(r̄p1,r̄p2)
 	rb = TR.RigidBody(prop,state,strutmesh)
@@ -393,8 +393,8 @@ function nrailbridge(n,m=2;θ=missing,r=missing,c=0.0,h=1.0,o2=[0,4.0,0],right=f
 	    inds = indexed.mem2sysfull[j]
 	    indx, indy, indz = inds[1:3]
 		rb = rbs[j]
-		q, _ = TR.NaturalCoordinates.rigidstate2naturalcoords(
-						rb.state.cache.funcs.lncs,
+		q, _ = TR.NCF.rigidstate2naturalcoords(
+						rb.state.cache.funcs.nmcs,
 						rb.state.ro,
 						rb.state.R,
 						rb.state.ṙo,

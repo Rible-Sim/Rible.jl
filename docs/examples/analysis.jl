@@ -3,7 +3,7 @@ using Test
 function get_trajectory!(bot::TR.TensegrityRobot,rbid::Int,pid::Int,step_range=:)
     (; tg, traj)= bot
 	T = TR.get_numbertype(bot)
-    rp = VectorOfArray(Vector{Vector{T}}())
+    rp = Vector{T}[]
     rbs = TR.get_rigidbodies(tg)
     rb = rbs[rbid]
     for q in traj.q
@@ -14,13 +14,13 @@ function get_trajectory!(bot::TR.TensegrityRobot,rbid::Int,pid::Int,step_range=:
             push!(rp,rb.state.rps[pid])
         end
     end
-    rp
+    rp[step_range] |> VectorOfArray
 end
 
 function get_velocity!(bot::TR.TensegrityRobot,rbid::Int,pid::Int,step_range=:)
     (; tg, traj)= bot
 	T = TR.get_numbertype(bot)
-    ṙp = VectorOfArray(Vector{Vector{T}}())
+    ṙp = Vector{T}[]
     rbs = TR.get_rigidbodies(tg)
     rb = rbs[rbid]
     for (q,q̇) in zip(traj.q, traj.q̇)
@@ -31,7 +31,7 @@ function get_velocity!(bot::TR.TensegrityRobot,rbid::Int,pid::Int,step_range=:)
 	        push!(ṙp,rb.state.ṙps[pid])
 		end
     end
-    ṙp
+    ṙp[step_range] |> VectorOfArray
 end
 
 function get_mid_velocity!(bot::TR.TensegrityRobot,rbid::Int,pid::Int,step_range=:)
@@ -39,14 +39,14 @@ function get_mid_velocity!(bot::TR.TensegrityRobot,rbid::Int,pid::Int,step_range
 	(; t, q) = traj
 	T = TR.get_numbertype(bot)
 	h = t[begin+1] - t[begin]
-    ṙp = VectorOfArray(Vector{Vector{T}}())
+    ṙp = Vector{T}[]
     rbs = TR.get_rigidbodies(tg)
     rb = rbs[rbid]
     for (qₖ,qₖ₋₁) in zip(traj.q[begin+1:end], traj.q[begin:end-1])
         TR.update_rigids!(tg,(qₖ.+qₖ₋₁)./2,(qₖ.-qₖ₋₁)./h)
         push!(ṙp,rb.state.ṙps[pid])
     end
-    ṙp
+    ṙp[step_range] |> VectorOfArray
 end
 
 function get_orientation!(bot::TR.TensegrityRobot,rbid::Int,step_range=:)
@@ -60,20 +60,20 @@ function get_orientation!(bot::TR.TensegrityRobot,rbid::Int,step_range=:)
         TR.update_orientations!(tg)
         push!(R,rb.state.R)
     end
-    R
+    R[step_range] |> VectorOfArray
 end
 
 function get_angular_velocity!(bot::TR.TensegrityRobot,rbid::Int,step_range=:)
     (; tg, traj)= bot
 	T = TR.get_numbertype(bot)
-    ω = VectorOfArray(Vector{Vector{T}}())
+    ω = Vector{T}[]
     rbs = TR.get_rigidbodies(tg)
     rb = rbs[rbid]
     for (q,q̇) in zip(traj.q, traj.q̇)
         TR.update_rigids!(tg,q,q̇)
         push!(ω,rb.state.ω)
     end
-    ω
+    ω[step_range] |> VectorOfArray
 end
 
 function get_time_mids(bot::TR.TensegrityRobot)

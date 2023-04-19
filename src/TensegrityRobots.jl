@@ -17,6 +17,7 @@ using Tullio
 using Quaternions
 using ForwardDiff
 using FiniteDiff
+using RowEchelon
 using HomotopyContinuation
 using DynamicPolynomials
 using TypeSortedCollections
@@ -24,42 +25,48 @@ using EzXML
 using ProgressMeter, Printf
 using EponymTuples
 using DocStringExtensions
+
+const ASSETS_DIR = joinpath(@__DIR__, "..", "assets")
+assetpath(files...) = normpath(joinpath(ASSETS_DIR, files...))
+
 rotation_matrix(θ) = @SMatrix [cos(θ) -sin(θ); sin(θ) cos(θ)]
 
-include("quaternions.jl")
-using .QuaternionCoordinates
-include("naturalcoordinates.jl")
-using .NaturalCoordinates
-include("ANCF.jl")
+include("coordinates/QBF.jl")
+using .QBF
+include("coordinates/NCF.jl")
+using .NCF
+include("coordinates/ANCF.jl")
 import .ANCF
 
-include("rigidbody.jl")
+include("members/rigidbody.jl")
 
-include("flexiblebody.jl")
+include("members/flexiblebody.jl")
 
-include("cable.jl")
+include("members/cable.jl")
 
+include("members/joints.jl")
 
-include("tensegrity.jl")
+include("robots/tensegrity.jl")
 
-include("clustertensegrity.jl")
+include("robots/clustertensegrity.jl")
 
-include("inverse_statics.jl")
+include("control/control.jl")
 
-include("forward_statics.jl")
+include("mechanics/inverse_statics.jl")
 
-include("dynamic_relax.jl")
+include("mechanics/forward_statics.jl")
 
-include("control.jl")
+include("mechanics/dynamic_relax.jl")
 
-# include("plotting.jl")
-include("contact.jl")
+include("mechanics/contact.jl")
 
-include("linearization.jl")
-# include("tangent.jl")
-include("miscellaneous.jl")
+include("mechanics/linearization.jl")
 
-include("solvers.jl")
-# include("planning.jl")
+include("mechanics/solvers.jl")
+
+include("misc/miscellaneous.jl")
+
+include("misc/URDF.jl")
+import .URDF
 
 end
