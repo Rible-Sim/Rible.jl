@@ -19,7 +19,6 @@ function build_2d_bar(id,ri,rj;α = 0.0, ci = Int[])
 			       0.0 0.0;
 		]
 	)
-	@show b,m,Īg[1]
 	prop = TR.RigidBodyProperty(id,movable,m,Īg,
 				r̄g,r̄ps;constrained=constrained
 				)

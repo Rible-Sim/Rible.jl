@@ -638,18 +638,24 @@ function inverse_for_restlength(tginput,tgref::TensegrityStructure,Fˣ=nothing;
         x0 = B\F̃
     else
         @info "Using Quadratic Programming."
-        # COSMO.Settings(verbose = false, eps_abs = 1e-7, eps_rel = 1e-16)
         model = JuMP.Model(COSMO.Optimizer)
         JuMP.set_optimizer_attribute(model, "verbose", verbose)
         JuMP.set_optimizer_attribute(model, "eps_abs", eps_abs)
         JuMP.set_optimizer_attribute(model, "eps_rel", eps_rel)
+        # JuMP.set_optimizer_attribute(model, "rho", 1e-5)
+        # JuMP.set_optimizer_attribute(model, "adaptive_rho", false)
+        # JuMP.set_optimizer_attribute(model, "alpha", 1.0)
+        # JuMP.set_optimizer_attribute(model, "scaling", 0)
+        JuMP.set_optimizer_attribute(model, "max_iter", 10_000)
         JuMP.@variable(model, x[1:nμ])
         # JuMP.@objective(model, Min, sum(x.^2))
         JuMP.@objective(model, Min, 
             0.5*transpose(x)*Diagonal(κ)*x + transpose(h)*x
         )
+        _,xn = get_solution_set(B,F̃)
+        @show size(xn)
         JuMP.@constraint(model, static, B*x .== F̃)
-        ϵ = 1e-3minimum(ℓ)
+        # ϵ = 1e-3minimum(ℓ)
         JuMP.@constraint(model, positive_u, x .>= 0.0)
         JuMP.@constraint(model, positive_f, κ.*(ℓ .- x) .>= fmin)
         # JuMP.print(model)
@@ -718,7 +724,7 @@ function optimize_for_stiffness_and_restlen(
     )
 
     f0,Z = get_solution_set(B,F̃)
-
+    @show size(Z)
     ncables = bot.tg.tensiles.cables |> length
     Y = build_Y(bot)
     l0 = get_cables_len(bot.tg)
@@ -741,7 +747,7 @@ function optimize_for_stiffness_and_restlen(
     q = zeros(size(P,2))
 
     model = COSMO.Model()
-    custom_settings = COSMO.Settings(eps_abs = 1e-14)
+    custom_settings = COSMO.Settings(eps_abs = 1e-6)
     COSMO.assemble!(model, P, q, constraint1, settings = custom_settings)
     results = COSMO.optimize!(model)
     results.x

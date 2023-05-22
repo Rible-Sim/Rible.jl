@@ -1,11 +1,10 @@
+Unitful.register(@__MODULE__)
 @unit pt "pt" Point (100//7227)*u"inch" false
-Unitful.register(@__MODULE__)
 @unit px "px" Pixel (3//4)*u"pt" false
-Unitful.register(@__MODULE__)
 to_resolution(dpi,len) = uconvert(Unitful.NoUnits,dpi*len)
 
 pt2px(x, ppi = 300*u"px"/1u"inch") = ustrip(u"px",x*u"pt"*ppi)
-
+px2pt(x, ppi = 300*u"px"/1u"inch") = ustrip(u"pt",x*u"px"/ppi)
 fontsize::Float64 = 8 |> pt2px
 markersize::Float64 = 0.5fontsize
 linewidth::Float64 = 0.5 |> pt2px
@@ -37,10 +36,23 @@ function hidey(ax)
     ax.ylabelvisible = false
 end
 
+function hidez(ax)
+    ax.zticklabelsvisible = false
+    ax.zlabelvisible = false
+end
+
+function hidexyz(ax)
+    hidex(ax)
+    hidey(ax)
+    hidez(ax)
+end
+
 theme_pub = Theme(;
     fonts = (; 
         regular = "CMU Serif", 
-        bold = "CMU Serif Bold"
+        bold = "CMU Serif Bold",
+        italic = "CMU Serif Italic",
+        math = "NewComputerModern 10 Italic"
     ),
     fontsize,
     markersize,
@@ -49,6 +61,20 @@ theme_pub = Theme(;
     resolution=(0.9tw,0.8tw),
     palette = (
         vlinecolor = [:slategrey],
+        linestyle = [
+            :solid,
+            :dash, 
+            :dot,
+            :dashdot,
+            :dashdotdot,
+        ],
+        marker = [
+            :xcross,:cross,
+            :utriangle,:dtriangle,
+            :ltriangle,:rtriangle,
+            :diamond,:hexagon,
+            :star8,:star5
+        ],
     ),
     Axis = (
         # titlefont = "CMU Serif Bold",
@@ -75,36 +101,44 @@ theme_pub = Theme(;
     )
 )
 
-function plot_rigid(rb::TR.AbstractRigidBody;showmesh=true,showupdatemesh=false)
+function plot_rigid(rb::TR.AbstractRigidBody;
+        AxisType = LScene,
+        fig = Figure(resolution=(1920,1080)),
+        showpoints=true,
+        showmesh=true,
+        showupdatemesh=false
+    )
     (;r̄g,r̄ps) = rb.prop
     (;mesh) = rb
-    fig = Figure(resolution=(1920,1080))
     ndim = TR.get_ndim(rb)
     if ndim == 2 && !showmesh
         ax = Axis(fig[1,1])
         ax.aspect = DataAspect()
     else
-        ax = LScene(fig[1,1], scenekw = (clear=true,))
+        # ax = LScene(fig[1,1], scenekw = (clear=true,))
+        ax = Axis3(fig[1,1],aspect=:data,)
     end
-    scatter!(ax,r̄ps,markersize=5)
-    scatter!(ax,r̄g,markersize=5)
-    text!(ax,
-        ["$i $(string(r̄p))" for (i,r̄p) in enumerate(r̄ps)] ,
-        position = r̄ps,
-        color = :darkblue,
-        align = (:left, :baseline),
-        offset = (-5, 10)
-    )
-    text!(ax,
-        "r̄g $(string(r̄g))",
-        position = r̄g,
-        color = :darkred,
-        align = (:left, :baseline),
-        offset = (-5, 10)
-    )
+    if showpoints
+        scatter!(ax,r̄ps,markersize=5)
+        scatter!(ax,r̄g,markersize=5)
+        text!(ax,
+            ["$i $(string(r̄p))" for (i,r̄p) in enumerate(r̄ps)] ,
+            position = r̄ps,
+            color = :darkblue,
+            align = (:left, :baseline),
+            offset = (-5, 10)
+        )
+        text!(ax,
+            "r̄g $(string(r̄g))",
+            position = r̄g,
+            color = :darkred,
+            align = (:left, :baseline),
+            offset = (-5, 10)
+        )
+    end
     if !(mesh isa Nothing)
         if showmesh
-            mesh!(ax,mesh;transparency=true)
+            mesh!(ax,mesh;)
         end
         if showupdatemesh
             mesh!(ax,build_mesh(rb))
@@ -142,13 +176,13 @@ function time2step(at,t)
 end
 
 function get_groundmesh(f::Function,rect)
-    GB.Mesh(f, rect, NaiveSurfaceNets()) |> make_patch()
+    GB.Mesh(f, rect, NaiveSurfaceNets()) |> make_patch(;color = :snow)
 end
 
 function get_groundmesh(plane::TR.Plane,rect)
     GB.Mesh(rect, NaiveSurfaceNets()) do v
         TR.signed_distance(v,plane)
-    end |> make_patch()
+    end |> make_patch(;color = :snow)
 end
 
 function get_groundmesh(::Nothing,rect)
@@ -159,37 +193,43 @@ function get_groundmesh(::Nothing,rect)
 end
 
 function plot_traj!(bot::TR.TensegrityRobot;
-            AxisType=LScene,
-            figsize=:FHD,
-            fig = Figure(resolution=match_figsize(figsize)),
-            gridsize=(1,1),
-            attimes=nothing,
-            atsteps=nothing,
-            doslide=true,
-            dorecord=false,
-            speedup=1,
-            showlabels=true,
-            showpoints=true,
-            showmesh=true,
-            showwire=false,
-            showinfo=true,
-            xlims=(-1.0,1.0),
-            ylims=(-1.0,1.0),
-            zlims=(-1e-3,1.0),
-            showground=true,
-            ground=nothing,
-            showback=false,
-            fontsize=20,
-            actuate=false,
-            figname=nothing,
-            showinit=false,
-            tgini=nothing,
-            rowgap=2fontsize,
-            titleformatfunc = (sgi,tt)-> begin
-                @sprintf "(%s) t = %.10G (s)" alphabet[sgi] tt
-            end,
-            sup! = (ax,tgob,sgi)->nothing,
-            kargs...)
+        AxisType=LScene,
+        figsize=:FHD,
+        fig = Figure(resolution=match_figsize(figsize)),
+        gridsize=(1,1),
+        attimes=nothing,
+        atsteps=nothing,
+        doslide=true,
+        dorecord=false,
+        speedup=1,
+        showlabels=true,
+        showpoints=true,
+        showmesh=true,
+        showwire=false,
+        showtitle=true,
+        showinfo=true,
+        xlims=(-1.0,1.0),
+        ylims=(-1.0,1.0),
+        zlims=(-1e-3,1.0),
+        showground=true,
+        ground=nothing,
+        showback=false,
+        fontsize=20,
+        actuate=false,
+        figname=nothing,
+        showinit=false,
+        tgini=nothing,
+        rowgap=2fontsize,
+        colgap=2fontsize,
+        titleformatfunc = (sgi,tt)-> begin
+            rich(
+                rich("($(alphabet[sgi])) ", font=:bold),
+                (@sprintf "t = %.10G (s)" tt)
+            )
+        end,
+        sup! = (ax,tgob,sgi)->nothing,
+        kargs...
+    )
     (;tg,traj) = bot
     tg.state.system.q .= traj.q[begin]
     TR.update!(tg)
@@ -211,9 +251,9 @@ function plot_traj!(bot::TR.TensegrityRobot;
     xwid = xmax - xmin
     ywid = ymax - ymin
     zwid = zmax - zmin
-    grid1 = fig[1,1] = GridLayout()
+    grid1 = fig[1,1] = GridLayout(;tellheight=false)
     subgrids = [
-        grid1[i,j] = GridLayout()
+        grid1[i,j] = GridLayout(;tellheight=false)
         for i in 1:gridsize[1], j = 1:gridsize[2]
     ] |> permutedims
     parsed_steps = @match (attimes,atsteps) begin
@@ -234,7 +274,7 @@ function plot_traj!(bot::TR.TensegrityRobot;
     # @warn "Overwriting `atsteps`"
     # @warn "Ignoring `attimes`"
     rowgap!(grid1,rowgap)
-	# colgap!(grid1,10fontsize)
+	colgap!(grid1,colgap)
     for sgi in eachindex(parsed_steps)
         if sgi > length(subgrids)
             sg = subgrids[end]
@@ -243,9 +283,7 @@ function plot_traj!(bot::TR.TensegrityRobot;
         end
         this_step = parsed_steps[sgi]
         this_time = Observable(traj.t[this_step])
-        tg.state.system.c .= traj.c[this_step]
-        tg.state.system.q .= traj.q[this_step]
-        TR.update!(tg)
+        TR.goto_step!(bot,this_step;actuate)
         tgob = Observable(deepcopy(tg))
         axtitle = lift(this_time) do tt
             titleformatfunc(sgi,tt)
@@ -259,7 +297,7 @@ function plot_traj!(bot::TR.TensegrityRobot;
             ylims!(ax,ymin,ymax)
         elseif AxisType <: Axis3
             ax = Axis3(sg[1,1],
-                title=axtitle,
+                # title=axtitle,
                 aspect=:data,
             )
             xlims!(ax,xmin,xmax)
@@ -285,7 +323,9 @@ function plot_traj!(bot::TR.TensegrityRobot;
             # println("Showing init")
             # sup!(ax,tgobini,sgi)
             init_plot!(ax,tgobini;
-                showmesh,showwire,isref=true,
+                showmesh,showwire,
+                isref=true,
+                showcables=false,
                 showpoints,kargs...)
         end
         sup!(ax,tgob,sgi)
@@ -293,6 +333,17 @@ function plot_traj!(bot::TR.TensegrityRobot;
             showlabels,showmesh,showwire,fontsize,showpoints,
             kargs...
         )
+        if showtitle    
+            Label(
+                sg[1, 1, Top()],
+                axtitle,
+                padding = (0,0,0,0),
+                justification = :right,
+                lineheight = 1.0,
+                halign = :center,
+                valign = :bottom,
+            )
+        end
         # add background
         if showback
             subWinWidth,subWinHeight = match_figsize(figsize)
@@ -417,7 +468,9 @@ function init_plot!(ax,tgob;
         showpoints=true,
         showmesh=true,
         showwire=false,
+        showcables=true,
         fontsize=10,
+        slack_linestyle = :dash,
         cablecolor=:deepskyblue,
         cablelabelcolor=:darkgreen,
         rigidlabelcolor=:darkblue,
@@ -434,7 +487,7 @@ function init_plot!(ax,tgob;
         rigidlabelcolor=refcolor
     end
     # cables
-    if ncables !== 0
+    if (ncables !== 0) && showcables
         linesegs_noslack_cables = @lift begin
             get_linesegs_cables($tgob;slackonly=false,noslackonly=true)
         end
@@ -444,7 +497,7 @@ function init_plot!(ax,tgob;
         linesegments!(ax, linesegs_noslack_cables, 
             color = cablecolor, linewidth = cablewidth)
         linesegments!(ax, linesegs_slack_cables, 
-            color = cablecolor, linewidth = cablewidth, linestyle = :dash)
+            color = cablecolor, linewidth = cablewidth, linestyle = slack_linestyle)
 
         rcs_by_cables = @lift begin
             (;tensioned) = $tgob.connectivity
@@ -476,7 +529,7 @@ function init_plot!(ax,tgob;
     end
 
     rbsob = @lift begin
-        TR.get_rigidbodies($tgob;visual=false)
+        TR.get_rigidbodies($tgob;visual=true)
     end
     nb = length(rbsob[])
     if showmesh || showwire
@@ -602,10 +655,15 @@ function get_linesegs_cables(tg;slackonly=false,noslackonly=false)
 	linesegs_cables
 end
 
-function build_mesh(rb::TR.AbstractRigidBody;color=nothing)
+function build_mesh(rb::TR.AbstractRigidBody;update=true,color=nothing)
     (;mesh) = rb
     @assert !(mesh isa Nothing)
-    ro,R = get3Dstate(rb)
+    if update
+        ro,R = get3Dstate(rb)
+    else
+        ro = SVector(0,0,0)
+        R = Matrix(1I,3,3)
+    end
     trans = Translation(ro)
     rot = LinearMap(R)
     ct = trans ∘ rot
@@ -627,22 +685,29 @@ function build_mesh(rb::TR.AbstractRigidBody;color=nothing)
     # GB.Mesh(GB.meta(coloredpoints,normals=nls),fac)
 end
 
-function make_patch(;trans=[0.0,0,0],rot=RotX(0.0))
+function make_patch(;trans=[0.0,0,0],rot=RotX(0.0),color=:slategrey)
+    parsedcolor = parse(Makie.ColorTypes.RGB{Float32},color)
     function patch(mesh)
         ct = Translation(trans) ∘ LinearMap(rot)
         updated_pos = ct.(mesh.position)
         fac = GB.faces(mesh)
         nls = GB.normals(updated_pos,fac)
-        GB.Mesh(GB.meta(updated_pos,normals=nls),fac)
+        colors = fill(parsedcolor,length(updated_pos))
+        GB.Mesh(GB.meta(updated_pos,normals=nls,color=colors),fac)
     end
 end
 
-function endpoints2mesh(p1,p2;radius=norm(p2-p1)/40,color=:slategrey)
+function endpoints2mesh(
+        p1,p2;
+        radius=norm(p2-p1)/40,
+        n1=10,n2=2,
+        color=:slategrey
+    )
 	s = Meshes.Segment(Meshes.Point(p1),Meshes.Point(p2))
 	cyl_bar = Meshes.Cylinder(radius,s)
     cylsurf_bar = Meshes.boundary(cyl_bar)
     # Meshes.sample(cylsurf_bar,Meshes.RegularSampling(10,3))
-	cyl_bar_simple = Meshes.discretize(cylsurf_bar,Meshes.RegularDiscretization(10,2))
+	cyl_bar_simple = Meshes.discretize(cylsurf_bar,Meshes.RegularDiscretization(n1,n2))
     simple2mesh(cyl_bar_simple,color)
 end
 

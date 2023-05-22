@@ -1,12 +1,10 @@
 #-- preamble
-using OhMyREPL
 using LinearAlgebra
 using Statistics
 using SparseArrays
 using StaticArrays
 using ElasticArrays
 using TypeSortedCollections
-using TypedTables
 using Rotations
 # import GeometricalPredicates as GP
 using CoordinateTransformations
@@ -22,15 +20,11 @@ using Interpolations
 using Makie
 import GLMakie as GM
 import CairoMakie as CM
-import WGLMakie as WM
 GM.activate!()
-using FileIO, MeshIO
 using LaTeXStrings
 using TexTables
-using DataStructures
 using Latexify
-using PrettyTables
-auto_display(false)
+auto_display(true)
 using Unitful
 using EzXML
 using CSV, Tables
@@ -79,6 +73,7 @@ tw = 469 |> pt2px
 
 # fontsize = 10 |> pt2px
 # cw = lw = tw = 455.24411 |> pt2px
+
 
 ## 1st example, validation and verification
 ## comparison with Adams
@@ -203,8 +198,8 @@ prob_zhong = TR.SimProblem(obot_zhong,(x)->dynfuncs(x;gravity=true));
 prob_alpha = TR.SimProblem(obot_alpha,(x)->dynfuncs(x;gravity=true));
 
 dt = 1e-3
-TR.solve!(prob_zhong,TR.Zhong06();dt,tspan=(0.0,500.0),ftol=1e-10)
-TR.solve!(prob_alpha,TR.Alpha(0.7);dt,tspan=(0.0,500.0),ftol=1e-10)
+TR.solve!(prob_zhong,TR.Zhong06();dt,tspan=(0.0,500.0),ftol=1e-14)
+TR.solve!(prob_alpha,TR.Alpha(0.7);dt,tspan=(0.0,500.0),ftol=1e-14)
 
 plot_traj!(obot_zhong)
 
@@ -269,7 +264,7 @@ function plot_comparison_and_energy(sol,M,bot,bot_zhong,bot_alpha,figname=nothin
 
     with_theme(theme_pub;
             resolution = (0.8cw,0.3cw),
-            figure_padding = (fontsize,fontsize,0,fontsize),
+            figure_padding = (fontsize,fontsize,0,0.5fontsize),
             # palette = (
             #     color = [:black],
             #     red = [:red]
@@ -286,15 +281,15 @@ function plot_comparison_and_energy(sol,M,bot,bot_zhong,bot_alpha,figname=nothin
         axs = (ax1,ax2,)
         marker='×'#'○'
         # scales = [-2,-2,-1,-1]
-        # lines!(ax1,t,θ1;label="MSI")
-        # scatter!(ax1,sol_t,sol_θ[1,:];label="RK5",marker)
-        lines!(ax1,t,θ2;label="MSI")
-        scatter!(ax1,sol_t,sol_θ[2,:];label="RK5",marker)
-        # lines!(ax3,t,ω1./10;label="MSI")
+        # lines!(ax1,t,θ1;label="Proposed")
+        # scatter!(ax1,sol_t,sol_θ[1,:];label="Minimal",marker)
+        lines!(ax1,t,θ2;label="Proposed")
+        scatter!(ax1,sol_t,sol_θ[2,:];label="Minimal",marker)
+        # lines!(ax3,t,ω1./10;label="Proposed")
         # @show length(sol_t), length(sol_ω)
-        # scatter!(ax3,sol_t,sol_ω[1,:]./10;label="RK5",marker)
-        lines!(ax2,t,ω2./10;label="MSI")
-        scatter!(ax2,sol_t,sol_ω[2,:]./10;label="RK5",marker)
+        # scatter!(ax3,sol_t,sol_ω[1,:]./10;label="Minimal",marker)
+        lines!(ax2,t,ω2./10;label="Proposed")
+        scatter!(ax2,sol_t,sol_ω[2,:]./10;label="Minimal",marker)
         # axislegend()
 
         ylims!(ax1,-5.5,3.0)
@@ -321,7 +316,7 @@ function plot_comparison_and_energy(sol,M,bot,bot_zhong,bot_alpha,figname=nothin
         scale = -2
         si = 5000
         ax3 = Axis(fig[:,2]; ylabel = L"E~(\mathrm{J})", xlabel = L"t~(\mathrm{s})")
-        lines!(ax3,bot_zhong.traj.t[begin:si:end],ms_zhong.E[begin:si:end]./10.0^scale;label="MSI",linewidth)
+        lines!(ax3,bot_zhong.traj.t[begin:si:end],ms_zhong.E[begin:si:end]./10.0^scale;label="Proposed",linewidth)
         lines!(ax3,bot_alpha.traj.t[begin:si:end],ms_alpha.E[begin:si:end]./10.0^scale;label="Generalized-α",linewidth)
         ax3.xticks = collect(0:100:500)
         t = bot_zhong.traj.t
@@ -341,848 +336,524 @@ function plot_comparison_and_energy(sol,M,bot,bot_zhong,bot_alpha,figname=nothin
 end
 GM.activate!(); plot_comparison_and_energy(ode_sol,ode_M,obot,obot_zhong,obot_alpha,)
 CM.activate!(); plot_comparison_and_energy(ode_sol,ode_M,obot,obot_zhong,obot_alpha,"comparison_and_energy")
+## 2nd example, 2D tower
+## Natural frequency comparison
+tower2dbot = tower2d(;k=100.0,ratio=0.9,ratio1=0.9,slack=false)
+TR.undamped_eigen!(tower2dbot;scaling=0.035)
+tower2d_frequency = tower2dbot.traj.t[begin+1:end]./2pi
 
-## simple
-gravity = false
-c = 0.0
-z0 = 0.2
-ωz = 5.0
-mbar = 0.05
-newsim_fixed = simple(;
-    c,
-    z0,
-    ωz,
-    mbar
-)
-GM.activate!(); with_theme(
-        theme_pub;
-        resolution = (0.5cw,0.25cw),
-        figure_padding = (2fontsize,0,0,0),
-        Axis3 = (
-            azimuth = 5.13952996194027,
-            elevation = 0.12269999722606788
-        )
-    ) do 
-    fig = Figure()
-    rbs = TR.get_rigidbodies(newsim_fixed)  
-    rb = rbs[2]
-    gd1 = fig[1,1] = GridLayout(;tellheight = false,)
-    ax = Axis3(gd1[1,1];
-        aspect=:data,        
-        azimuth = 0.0,
-        elevation = π/2,
-        # tellheight = false,
-    )
-    Label(
-        gd1[1, 1, Top()],
-        rich("(a) ", font=:bold),
-        justification = :right,
-        lineheight = 1.0,
-        halign = :center,
-        # tellheight = false,
-        # alignmode = Mixed(top = 0)
-        valign = :bottom,
-    )
-    # # plot_rigid(
-    # #     rbs[2];
-    #     fig,
-    # #     showpoints = false,
-    # #     showmesh = true,
-    # # )
-    mesh!(ax,build_mesh(rb;update=false);shading = false,)
-    xlims!(ax,-0.15,0.15)
-    ylims!(ax,-0.15,0.15)
-    hidezdecorations!(ax)
-    ax.xlabeloffset = 2fontsize
+adams_frequency = parse_Adams_frequency("./tower2d_frequency_3.xml")
 
-    gd2 = fig[1,2] = GridLayout()
-    plot_traj!(newsim_fixed;
-        AxisType = Axis3,
-        fig = gd2,
-        xlims = (-100e-3,100e-3),
-        ylims = (-100e-3,100e-3),
-        zlims = (-1e-3,400e-3),
-        showpoints = false,
-        showlabels = false,
-        doslide = false,
-        showground = false,
-        titleformatfunc = (sgi,tt)-> begin
-            rich(
-                rich("(b) ", font=:bold),
-                # (@sprintf "t = %.10G (s)" tt)
-            )
-        end,
-        sup! = (ax,tgob,sgi) -> begin
-            ax.xticklabelsvisible = false
-            ax.xlabeloffset = 0
-            ax.yticklabelsvisible = false
-            ax.ylabeloffset = 0
-        end,
-    )
-    colsize!(fig.layout,1,Relative(0.4))
-    rowsize!(gd1,1,Fixed(0.12cw))
-    colgap!(fig.layout,0)
-    savefig(fig,"simple")
-    fig
-end
-
-tend = 2.
-dt = 1e-4
-# Fixed
-TR.solve!(
-    TR.SimProblem(newsim_fixed,(x)->dynfuncs(x;gravity)),
-    TR.Zhong06();
-    dt,tspan=(0.0,tend),ftol=1e-14
-)
-
-GM.activate!();plot_traj!(newsim_fixed;)
-# Freed
-newsim_freed = simple(;
-    c,
-    z0,
-    ωz,
-    mbar,
-    free = true
-)
-TR.solve!(
-    TR.SimProblem(newsim_freed,(x)->dynfuncs(x;gravity)),
-    TR.Zhong06();
-    dt,tspan=(0.0,tend),ftol=1e-14
-)
-
-GM.activate!();plot_traj!(newsim_freed;)
-
-WM.activate!(); with_theme(
-        theme_pub;
-        resolution = (0.6cw,0.3cw),
-        figure_padding = (0,0,0,0),
-        Axis3 = (
-            azimuth = 5.13952996194027,
-            elevation = 0.12269999722606788
-        )
-    ) do 
-    fig = Figure()
-    nt = 5
-    g1 = fig[1,1] = GridLayout()
-    plot_traj!(newsim_fixed;
-        AxisType = Axis3,
-        fig = g1,
-        gridsize = (1,nt),
-        attimes = range(0,2,nt),
-        xlims = (-100e-3,100e-3),
-        ylims = (-100e-3,100e-3),
-        zlims = (-1e-3,400e-3),
-        showpoints = false,
-        showlabels = false,
-        doslide = false,
-        titleformatfunc = (sgi,tt)-> begin
-            rich(
-                rich("($(alphabet[sgi])) ", font=:bold),
-                rich("t ", font=:math),
-                (@sprintf "= %.10G (s)" tt)
-            )
-        end,
-        sup! = (ax,tgob,sgi) -> begin
-            hidexyz(ax)
-        end,
-    )
-    g2 = fig[2,1] = GridLayout(;)
-    plot_traj!(newsim_freed;
-        AxisType = Axis3,
-        fig = g2,
-        gridsize = (1,nt),
-        attimes = range(0,tend,nt),
-        xlims = (-100e-3,100e-3),
-        ylims = (-100e-3,100e-3),
-        zlims = (-1e-3,400e-3),
-        showpoints = false,
-        showlabels = false,
-        doslide = false,
-        titleformatfunc = (sgi,tt)-> begin
-            rich(
-                rich("($(alphabet[sgi+nt])) ", font=:bold),
-                rich("t ", font=:math),
-                (@sprintf "= %.10G (s)" tt)
-            )
-        end,
-        sup! = (ax,tgob,sgi) -> begin
-            hidexyz(ax)
-        end,
-    )
-    colgap!(fig.layout,-fontsize)
-    rowgap!(fig.layout,0)
-    savefig(fig,"simple_snapshots")
-    fig
-end
-
-GM.activate!(); with_theme(theme_pub;
-        resolution = (0.7cw,0.2cw),
-        figure_padding = (fontsize/2,fontsize/2,0,0),
-        Lines = (
-            cycle = Cycle([:linestyle,:color];covary=true),
-        )
-    ) do 
-    fig = Figure()
-    (;t) = newsim_freed.traj
-    r2p1_fixed = get_trajectory!(newsim_fixed,1,1)
-    r2p1_freed = get_trajectory!(newsim_freed,1,1)
-    # v2p1_fixed = get_mid_velocity!(newsim_fixed,1,1)
-    # v2p1_freed = get_mid_velocity!(newsim_freed,1,1)
-    T1_fixed = get_kinetic_energy!(newsim_fixed,1)
-    T1_freed = get_kinetic_energy!(newsim_freed,1)
-    E_fixed = TR.mechanical_energy!(newsim_fixed;gravity=false)
-    E_freed = TR.mechanical_energy!(newsim_freed;gravity=false)
-    # TR.kinetic_energy()
-    # ax1 = Axis(fig[1,1],xlabel = tlabel, ylabel = L"x~(\mathrm{m})")
-    # lines!(ax1,t,r2p1_fixed[1,:],label="Case 1")
-    # lines!(ax1,t,r2p1_freed[1,:],label="Case 2")
-   
-    ax1 = Axis(fig[1,1],xlabel = tlabel, ylabel = L"\mathrm{Energy}~(\mathrm{J})")
-    lines!(ax1,t,E_fixed.E,label="E")
-    lines!(ax1,t,E_fixed.T,label="T")
-    lines!(ax1,t,E_fixed.V,label="V")
-
-    ax2 = Axis(fig[1,2],xlabel = tlabel, ylabel = L"\mathrm{Energy}~(\mathrm{J})")
-    lines!(ax2,t,E_freed.E,label="E")
-    lines!(ax2,t,E_freed.T,label="T")
-    lines!(ax2,t,E_freed.V,label="V")
-    
-    # ax2 = Axis(fig[1,2],xlabel = tlabel, ylabel = L"x~(\mathrm{m})")
-    # lines!(ax2,t,r2p1_fixed[2,:],label="Case 1")
-    # lines!(ax2,t,r2p1_freed[2,:],label="Case 2")
-
-    # ax2 = Axis(fig[1,2],xlabel = tlabel, ylabel = L"x~(\mathrm{m})")
-    # lines!(ax2,t,T1_fixed,label="Case 1")
-    # lines!(ax2,t,T1_freed,label="Case 2") 
-
-    
-    # ax3 = Axis(fig[1,3],xlabel = tlabel, ylabel = L"x~(\mathrm{m})")
-    # lines!(ax3,t,r2p1_fixed[3,:],label="Case 1")
-    # lines!(ax3,t,r2p1_freed[3,:],label="Case 2")
-
-    for ilabel in 1:2
-        Label(fig.layout[1, ilabel, TopLeft()], "($(alphabet[ilabel]))",
-            # fontsize = fontsize,
-            font = "CMU Serif Bold",
-            padding = (0, 0, 0, 0),
-            # halign = :right
-        )
-    end
-    xlims!(ax1,0,0.5)
-    xlims!(ax2,0,0.5)
-    # xlims!(ax3,0,0.5)
-    Legend(fig[1,3],ax1)
-    savefig(fig,"simple_energy")
-    fig
-end
-
-#-- bridge 3d 
-n = 2
-newbridge = bridge3d(;n)
-GM.activate!();with_theme(theme_pub;
-        figure_padding = (2fontsize,2fontsize,2fontsize,fontsize),
-        Axis3 = (            
-            azimuth = 6.005530633326975,
-            elevation = 0.13269908169872408
-        )
-    ) do    
-    fig = Figure(
-        resolution = (0.9cw,0.42cw)
-    )
-    subfig1 = fig[1,1] = GridLayout()
-    plot_traj!(newbridge;
-        AxisType = Axis3,
-        fig = subfig1,
-        showinfo = true,
-        xlims = (-10,10),
-        ylims = (-1,25),
-        zlims = (-1e-3,12),
-        doslide = false,
-        showpoints = false,
-        showlabels = false,
-        sup! = (ax,tgob,sgi)->begin
-            # ax.xlabelvisible=false
-            # ax.zlabelvisible=false
-            ax.azimuth = 1.5*π - 1e-7
-            ax.elevation = 1e-7
-            hideydecorations!(ax)
-        end,
-        titleformatfunc = (sgi,tt)-> begin
-            rich(
-                rich("(a) ", font=:bold),
-                @sprintf "left view"
-            )
-        end,
-    )
-    subfig2 = fig[2,1] = GridLayout()
-    plot_traj!(newbridge;
-        AxisType = Axis3,
-        fig = subfig2,
-        showinfo = true,
-        xlims = (-10,10),
-        ylims = (-1,25),
-        zlims = (-1e-3,12),
-        doslide = false,
-        showpoints = false,
-        showlabels = false,
-        showground = false,
-        sup! = (ax,tgob,sgi)->begin
-            # ax.titlevisible=false
-            # ax.xlabelvisible=false
-            # ax.ylabelvisible=false
-            ax.azimuth = 2π
-            ax.elevation = π/2
-            hidezdecorations!(ax)
-        end,
-        titleformatfunc = (sgi,tt)-> begin
-            rich(
-                rich("(b) ", font=:bold),
-                @sprintf "top view"
-            )
-        end,
-    )
-    subfig3 = fig[1:2,2] = GridLayout()
-    plot_traj!(newbridge;
-        AxisType = Axis3,
-        fig = subfig3,
-        showinfo = true,
-        xlims = (-10,10),
-        ylims = (-1,25),
-        zlims = (-1e-3,12),
-        doslide = false,
-        showpoints = false,
-        showlabels = false,
-        sup! = (ax,tgob,sgi)->begin
-            # ax.titlevisible=false
-        end,
-        titleformatfunc = (sgi,tt)-> begin
-            rich(
-                rich("(c) ", font=:bold),
-                @sprintf "oblique view"
-            )
-        end,
-    )
-    colsize!(fig.layout,1,Relative(0.25))
-    # rowsize!(fig.layout,1,Relative(0.5))
-    rowgap!(fig.layout,0)
-    savefig(fig,"bridge")
-    fig
-end
-μ = TR.inverse_for_restlength(newbridge,newbridge;fmin=1e4,gravity = false,eps_rel=1e-10)
-
-Td = 10.0
-
-F̌ = TR.build_F̌(newbridge.tg,2n+1,2*(2n+1)+1,SVector(0.0,0.0,-1.0))
-
-newbridge_modes = deepcopy(newbridge)
-
-TR.set_restlen!(newbridge_modes.tg,μ)
-TR.update!(newbridge_modes.tg; gravity=false)
-TR.get_cables_tension(newbridge_modes.tg) |> extrema
-TR.GDR!(newbridge_modes;β=1e-4, res=1e-9,gravity= true)
-plot_traj!(newbridge_modes)
-TR.set_new_initial!(newbridge_modes,newbridge_modes.traj.q[end])
-TR.check_static_equilibrium_output_multipliers(newbridge_modes.tg;gravity=true)
-TR.undamped_eigen(newbridge_modes.tg;gravity=true)
-TR.undamped_eigen!(newbridge_modes;scaling=-0.1,gravity=true)
-
-with_theme(theme_pub;
-    figure_padding = (0,0,-fontsize,fontsize),
-        Axis3 = (
-            azimuth = 5.565530633326985,
-            elevation = 0.27269908169872414
-        )
-    ) do 
-    plot_traj!(
-        newbridge_modes;
-        AxisType=Axis3,
-        figsize = (1.0cw,0.18cw),
-        gridsize=(1,4),
-        doslide=false,
-        atsteps=collect(2:5),
-        titleformatfunc = (sgi,tt)-> begin
-            rich(
-                rich("($(alphabet[sgi])) ", font = :bold),
-                "Mode $sgi: ",
-                rich(
-                    (@sprintf "%.3G " tt/2π),
-                    font = :math
-                ),
-                "(Hz)"
-            )
-        end,
-        rowgap=0.0,
-        colgap=0.0,
-        sup! = (ax,tgob,sgi)->begin
-            ax.titlevisible = false
-            hidexdecorations!(ax)
-            hideydecorations!(ax)
-            hidezdecorations!(ax)            
-        end,
-        xlims = (-10,10),
-        ylims = (-1,25),
-        zlims = (-1e-3,10),
-        showinfo=false,
-        showground=false,
-        showinit=true,
-        showpoints=false,
-        showlabels=false,
-        slack_linestyle=:solid,
-        figname = "bridge_modes"
-    )
-end
-
-@show newbridge_tag_dyn.traj.t./(2π)
-
-plot_traj!(newbridge_tag_dyn;showinit=true)
-newbridge_tag_dyn.traj.t
-
-νs = [
-    0.453,
-    0.553,
-    0.653,
-]
-
-
-tend = 10.0
-dstep = 45
-dt = 1e-2
-newbridge_loads = [
-    begin
-        bot = deepcopy(newbridge_modes)
-        TR.solve!(
-            TR.SimProblem(
-                bot,
-                (x)->dynfuncs(x;actuate=false,gravity=true,(Fˣ!)=(F,t) -> begin
-                    F .+= 2e4*(sin(ν*2π*t)+1).*F̌
-                end)
-            ),
-            TR.Zhong06();
-            dt,
-            # tspan=(0.0,dt*(dstep-1)),
-            tspan = (0.0,tend),
-            ftol=1e-7,
-            exception=false
-        )
-        bot
-    end
-    for ν in νs
-]
-
-plot_traj!(newbridge_loads)
-
-function plot_bridge_vibes(bots,νs,figname=nothing)
+function plot_frequency_comparison(ref_frequency,bot_frequency,figname=nothing)
+    frequency_rel_err = abs.(tower2d_frequency.-adams_frequency)./tower2d_frequency
+    @show frequency_rel_err, frequency_rel_err |> maximum
+    # fig_width = cw
+    # fig_height = 0.4cw
     with_theme(theme_pub;
-            resolution = (0.4cw,0.15cw),
-            figure_padding = (0,0,0,fontsize/2),
-            Lines = (
-                cycle = Cycle([:linestyle,:color],covary=true),
-                # linewidth = 1 |> pt2px,
-            )
-        ) do 
-        fig = Figure()
-        ax = Axis(fig[1,1],xlabel=tlabel, ylabel = L"z~(\mathrm{m})")
-        for (bot,ν) in zip(bots,νs)
-            p11 = get_trajectory!(bot,5,11)
-            lines!(ax,bot.traj.t,p11[3,:],label = latexstring("\\nu=$ν"))
-            xlims!(ax,bot.traj.t[begin],bot.traj.t[end])
-        end
-        fig[1, 2] = Legend(fig, ax,)
+            # resolution=(0.6tw,0.3tw),
+            resolution=(cw,0.4cw),
+            palette = (color = [:black,:red],),
+            cycle = [[:linecolor, :markercolor] => :color,],
+        ) do
+        fig = Figure(;)
+        ax1 = Axis(fig[1,1]; ylabel = L"\mathrm{Frequency}~(\mathrm{Hz})", xlabel = L"\mathrm{Mode}")
+        scatterlines!(bot_frequency;label="Proposed",marker=:+,linewidth,linestyle=:dashdot)
+        scatterlines!(ref_frequency;label="Adams",marker='×',linewidth=0)
+        ylims!(ax1,0,30)
+        ax1.yticks = collect(0:5:30)
+        # ax1.xlabelpadding = -15
+        # axislegend(ax1;position=:lt)
+        fig[1,2] = Legend(fig,ax1)
+        colsize!(fig.layout,1,Fixed(0.6cw))
         savefig(fig,figname)
         fig
     end
 end
-GM.activate!(); plot_bridge_vibes(newbridge_loads,νs)
-CM.activate!(); plot_bridge_vibes(newbridge_loads,νs,"bridge_vibes")
 
+GM.activate!(); plot_frequency_comparison(adams_frequency,tower2d_frequency)
+CM.activate!(); plot_frequency_comparison(adams_frequency,tower2d_frequency,"frequency")
 
-#-- embedding
-#without outer and gravity, to obtain rest length
-gravity = false
-
-m = 3
-α = 2π/m
-θ = 1.25α
-n = 4
-b = 0.14
-r = 0.04*sqrt(2)
-
-twotre1 = twotre3d(;
-    r1= 0.03*sqrt(2),
-    r,b,m,α,θ,n = 1
-) 
-
-prism1 = embed3d(;
-    r1= 0.03*sqrt(2),
-    r,b,m,α,θ,n = 1,
-    isprism = true,
-)
-
-newembed11 = embed3d(;
-    r1= 0.03*sqrt(2),
-    r,b,m,α,θ,n = 1,
-    outer = true,
-    # isprism = true,
-)
-
-newembed1o = embed3d(;
-    r1= 0.03*sqrt(2),
-    r,b,m,α,θ,n,
-    outer = true,
-)
-
-prism0 = embed3d(;
-    r1= 0.06*sqrt(2),
-    r,b,m,α,θ,n = 1,
-    isprism = true,
-)
-
-newembed0 = embed3d(;
-    r1= 0.06*sqrt(2),
-    r,b,m,α,θ,n = 1,
-    outer = true,
-    # isprism = true,
-)
-
-plot_traj!(newembed11)
-GM.activate!(); with_theme(theme_pub;
-        resolution = (0.6cw,0.2cw),
-        figure_padding = (0,0,-fontsize/2,0),
-        Axis3 = (
-            azimuth = 3.907532586451984,
-            elevation = 0.18379626575974045
-        )
-    ) do
-    fig = Figure()
-    xlims = (-1.8e-1,1.8e-1)
-    ylims = (-1.8e-1,1.8e-1)
-    zlims = (-1e-3,2.4e-1)
-    doslide = false
-    showpoints = false
-    showlabels = false
-    g0 = fig[1,1] = GridLayout(;tellheight=false,)
-    g1 = fig[1,2] = GridLayout(;tellheight=false,)
-    # g11 = g1[1,1] = GridLayout()
-    # g12 = g1[2,1] = GridLayout()
-    g2 = fig[1,3] = GridLayout(;tellheight=false,)
-    # g21 = g2[1,1] = GridLayout()
-    # g22 = g2[2,1] = GridLayout()
-    g3 = fig[1,4] = GridLayout()
-    plot_traj!(
-        twotre1;
-        AxisType = Axis3,
-        fig = g0,
-        xlims,
-        ylims,
-        zlims,
-        doslide,
-        showpoints,
-        showlabels,
-        titleformatfunc = (sgi,tt)-> begin
-            rich(
-                rich("(a) ", font=:bold),
+## Mode shape
+function plot_tower2d_mode_shape(bot,figname=nothing)
+    (;traj,tg) = bot
+    (;q,t) = traj
+    shapes = q
+    frequencies = t[begin+1:end]./2pi
+    # @sprintf "Mode %s \n %.4f (Hz)"  1  tower2d_frequency[1]
+    with_theme(theme_pub;
+            # resolution=(tw,0.3tw),
+            resolution=(0.8tw,0.5cw),
+            Axis = (
+                titlefont = "CMU Serif",
             )
-        end,
-        sup! = (ax,tgob,sgi) -> begin
-            hidexyz(ax)
-        end,
-    )
-    plot_traj!(
-        prism1;
-        AxisType = Axis3,
-        fig = g1,
-        xlims,
-        ylims,
-        zlims,
-        doslide,
-        showpoints,
-        showlabels,
-        titleformatfunc = (sgi,tt)-> begin
-            rich(
-                rich("(b) ", font=:bold),
-            )
-        end,
-        sup! = (ax,tgob,sgi) -> begin
-            hidexyz(ax)
-        end,
-    )
-        # plot_traj!(
-        #     prism0;
-        #     AxisType = Axis3,
-        #     fig = g12,
-        #     xlims,
-        #     ylims,
-        #     zlims = (-1e-3,1e-1),
-        #     doslide,
-        #     showpoints,
-        #     showlabels,
-        #     titleformatfunc = (sgi,tt)-> begin
-        #         rich(
-        #             rich("(d) ", font=:bold),
-        #         )
-        #     end,
-        #     sup! = (ax,tgob,sgi) -> begin
-        #         hidexyz(ax)
-        #     end,
-        # )
-    plot_traj!(newembed11;
-        AxisType = Axis3,
-        fig = g2,
-        xlims,
-        ylims,
-        zlims,
-        doslide,
-        showpoints,
-        showlabels,
-        titleformatfunc = (sgi,tt)-> begin
-            rich(
-                rich("(c) ", font=:bold),
-            )
-        end,
-        sup! = (ax,tgob,sgi) -> begin
-            hidexyz(ax)
-        end,
-    )
-        # plot_traj!(newembed0;
-        #     AxisType = Axis3,
-        #     fig = g22,
-        #     xlims,
-        #     ylims,
-        #     zlims = (-1e-3,1e-1),
-        #     doslide,
-        #     showpoints,
-        #     showlabels,
-        #     titleformatfunc = (sgi,tt)-> begin
-        #         rich(
-        #             rich("(e) ", font=:bold),
-        #         )
-        #     end,
-        #     sup! = (ax,tgob,sgi) -> begin
-        #         hidexyz(ax)
-        #     end,
-        # )
-    plot_traj!(newembed1o;
-        AxisType = Axis3,
-        fig = g3,
-        xlims,
-        ylims,
-        zlims = (-1e-3,8.5e-1),
-        doslide,
-        showpoints,
-        showlabels,
-        titleformatfunc = (sgi,tt)-> begin
-            rich(
-                rich("(d) ", font=:bold),
-            )
-        end,
-        sup! = (ax,tgob,sgi) -> begin
-            hidexyz(ax)
-        end,
-    )
-    colgap!(fig.layout,0)
-    rowsize!(g0,1,Fixed(0.10cw))
-    rowsize!(g1,1,Fixed(0.10cw))
-    rowsize!(g2,1,Fixed(0.10cw))
-    # rowgap!(g1,-fontsize)
-    # rowsize!(g1,2,Relative(0.35))
-    # rowgap!(g2,-fontsize)
-    # rowsize!(g2,2,Relative(0.35))
-    savefig(fig,"embedding")
-    fig
-end
-newembed1 = embed3d(;
-    r1= 0.03*sqrt(2),
-    r,b,m,α,θ,n,
-    outer = false,
-)
-plot_traj!(newembed1)
-μ1 = TR.inverse_for_restlength(
-    newembed1,newembed1;gravity,fmin=100.0
-)
-barplot(μ1)
-# (optional) check μ1 
-TR.set_restlen!(newembed1.tg,μ1)
-TR.update!(newembed1.tg)
-f = TR.get_cables_tension(newembed1.tg) 
-f |> extrema
-TR.check_static_equilibrium_output_multipliers(newembed1.tg;gravity)
-TR.undamped_eigen(newembed1.tg;gravity)
-TR.undamped_eigen!(newembed1;gravity)
-TR.reset!(newembed1)
-#-- without outer, see see gravity
-TR.GDR!(newembed1;gravity=true)
-
-plot_traj!(newembed1)
-
-#-- folded without outer and gravity, to obtain rest length
-newembed0 = embed3d(;
-    r1= 0.06*sqrt(2),
-    r,b,m,α,θ,n
-)
-
-plot_traj!(newembed0)
-
-μ0 = TR.inverse_for_restlength(
-    newembed0,newembed0;gravity,fmin=100.0
-)
-barplot(μ0)
-#-- with outer, using the folded and unfolded 
-outer = true
-gravity = true
-newembed0_outer = embed3d(;
-    r1= 0.06*sqrt(2),
-    r,b,m,α,θ,n,outer = true
-)
-plot_traj!(newembed0_outer)
-μ0o = TR.get_cables_restlen(newembed0_outer)
-μ0o[begin:3n*m] .= μ0
-μ1o = deepcopy(μ0o)
-μ1o[begin:3n*m] .= μ1
-TR.set_restlen!(newembed0_outer.tg,μ0o)
-TR.GDR!(newembed0_outer;gravity)
-GM.activate!();plot_traj!(newembed0_outer;)
-TR.set_new_initial!(newembed0_outer,newembed0_outer.traj.q[end])
-TR.update!(newembed0_outer.tg;gravity)
-TR.check_static_equilibrium_output_multipliers(newembed0_outer.tg;gravity)
-TR.undamped_eigen(newembed0_outer.tg;gravity)
-TR.undamped_eigen!(newembed0_outer;gravity)
-μs = [μ0o,μ1o]
-
-barplot(μ0o)
-barplot!(μ1o)
-pretty_table(
-    Dict(
-        [
-            ("Folded, Cables 1~6", μ0o[1]),
-            ("Deployed, Cables 1~6", μ0o[7]),
-            ("Folded, Cables 1~6", μ1o[1]),
-            ("Deployed, Cables 1~6", μ1o[7]),
-            ("Outer Cables 1~6", μ1o[end-2:end]),
+        ) do
+        fig = Figure(;)
+        axs = [
+            begin
+                ax = Axis(
+                    fig[1,i];
+                    # visible = false,
+                    aspect = DataAspect(),
+                    limits = (nothing,(0,0.4)),
+                    titlegap = -40,
+                    title = @sprintf "Mode %s \n %.4f (Hz)"  i  frequencies[i]
+                )
+                hidedecorations!(ax)
+                hidespines!(ax)
+                ax
+            end
+            for i = 1:5
         ]
-    )
+        TR.update_rigids!(tg,shapes[1])
+        plot_tower2d!(axs[1],tg;isref=true)
+        plot_tower2d!(axs[2],tg;isref=true)
+        plot_tower2d!(axs[3],tg;isref=true)
+        plot_tower2d!(axs[4],tg;isref=true)
+        plot_tower2d!(axs[5],tg;isref=true)
+
+        TR.update_rigids!(tg,shapes[2])
+        plot_tower2d!(axs[1],tg)
+        TR.update_rigids!(tg,shapes[3])
+        plot_tower2d!(axs[2],tg)
+        TR.update_rigids!(tg,shapes[4])
+        plot_tower2d!(axs[3],tg)
+        TR.update_rigids!(tg,shapes[5])
+        plot_tower2d!(axs[4],tg)
+        TR.update_rigids!(tg,shapes[6])
+        plot_tower2d!(axs[5],tg)
+        colgap!(fig.layout,0)
+        savefig(fig,figname)
+    end
+end
+GM.activate!(); plot_tower2d_mode_shape(tower2dbot)
+CM.activate!(); plot_tower2d_mode_shape(tower2dbot,"mode_shapes")
+
+plot_traj!(tower2dbot)
+
+## Natural frequency with varying rest lengths
+function vary_restlengths(ratio_range)
+    VectorOfArray([
+        begin
+            bot = tower2d(;k=100.0,ratio,slack=false)
+            TR.undamped_eigen!(bot)
+            _frequency = bot.traj.t[begin+1:end]./2pi
+        end
+        for ratio in ratio_range
+    ])
+end
+ratio_range = collect(0.845:0.001:0.999)
+frequencies = vary_restlengths(ratio_range)
+adams_frequencies = VectorOfArray(
+    [
+        parse_Adams_frequency("./tower2d_frequency_$i.xml")
+        for i = 1:6
+    ]
 )
 
-Td = 8.0
-tend = 10.0
-
-μs = [
-    begin
-        μ = deepcopy(μ0o)
-        μ[begin:3m*j] .= μ1[begin:3m*j]
-        μ
-    end
-    for j = 0:n
+adams_ratio = [
+    parse_Adams_static("./tower2d_frequency_$i.xml").VARIABLE_ratio
+    for i = 1:6
 ]
 
-function make_multi_stages_pres_actor(μs;start = 0.0, stop = 10.0, len = 2, )
-    nμ = length(μs[begin])
+function plot_frequency_varying_restlengths(figname=nothing)
+    cg = cgrad(:Dark2_6, 6, categorical = true)[[1,2,3,4,6]]
+    mk = ['⨉','○','◇','✳','◻']
+    with_theme(theme_pub;
+            # resolution=(0.7tw,0.4tw),
+            resolution=(cw,0.5cw),
+            palette = (color = cg, marker = mk),
+            Lines = (cycle = [:color],),
+            Scatter = (cycle = Cycle([:color, :marker, :strokecolor=>:color],covary=true),),
+        ) do
+        fig = Figure(;)
+        ax1 = Axis(fig[1,1];
+                ylabel = L"\mathrm{Frequency}~(\mathrm{Hz})",
+                xlabel = L"\alpha~\mathrm{and}~\beta",
+                )
+        nmode = size(frequencies,1)
+        for i = 1:nmode
+            lines!(ax1,ratio_range,frequencies[i,:];linewidth,label="Proposed")
+            scatter!(ax1,adams_ratio,adams_frequencies[i,:];markersize,strokewidth=0,label="Adams (Mode $i)")
+        end
+        ylims!(ax1,0,30)
+        ax1.yticks = collect(0:5:30)
+        xlims!(ax1,0.84,1.0)
+        ax1.xlabelpadding = -15
+        legend_elems = [
+            [
+                LineElement(;color = cg[i],linewidth),
+                MarkerElement(;color = cg[i],marker=mk[i],markersize,strokewidth=0,strokecolor=cg[i])
+            ]
+            for i in nmode:-1:1
+        ]
+        legend_names = [
+            "Mode $i" for i in length(legend_elems):-1:1
+        ]
 
-    function itp(t)
-        scaled_itps = extrapolate(
-            Interpolations.scale(
-                interpolate(
-                    reduce(hcat,μs),
-                    (NoInterp(),BSpline(Linear()))
-                    # (NoInterp(),BSpline(Quadratic(Flat(OnGrid()))))
-                ),
-                1:nμ, range(;start, stop, length = len,)
-            ),
-            (Throw(),Flat())
-        )
-        [scaled_itps(j,t) for j in 1:nμ]
+        fig[1, 2] = Legend(fig, legend_elems, legend_names)
+        # fig[1, 2] = Legend(fig, ax1, nbanks = 2)
+        # colsize!(fig.layout,1,Fixed(0.6columnwidth))
+        savefig(fig,figname)
     end
-
-    TR.PrescribedActuator(
-        1,
-        TR.ManualActuator(1,collect(1:nμ),zeros(nμ),TR.Uncoupled()),
-        itp
-    )
 end
-make_multi_stages_pres_actor(μs;start=0.0,stop=Td,len=n+1)
 
-newembed0_outer_deploy = TR.TensegrityRobot(
-    deepcopy(newembed0_outer.tg),
-    (actuators=[make_multi_stages_pres_actor(μs;start=0.0,stop=Td,len=length(μs))],)
-)
+GM.activate!(); plot_frequency_varying_restlengths()
+CM.activate!(); plot_frequency_varying_restlengths("frequency_varying_restlengths")
 
-TR.solve!(
-    TR.SimProblem(
-        newembed0_outer_deploy,
-        (x)->dynfuncs(x;actuate=true,gravity=true)
-    ),
-    TR.Zhong06();
-    dt=1e-3,
-    tspan=(0.0,tend),
-    ftol=1e-7,
-    exception=true
-)
+## seismic simulation
 
-plot_traj!(newembed0_outer_deploy)
-GM.activate!();with_theme(theme_pub;
-        figure_padding = (0,fontsize,-fontsize/2,fontsize/2),
-        # resolution = (0.9cw,0.25cw),
-        Axis3 = (
-            azimuth = 4.995530633326985,
-            elevation = 0.18269908169872415
+function pres2d!(sysstate,tg;aux=true)
+    (;t,q̃,q̃̇,q̃̈) = sysstate
+    (;bodies,connectivity) = tg
+    (;mem2syspres) = connectivity.indexed
+    amp = 0.01
+    p = 6π
+    foreach(bodies) do rb
+        rbid = rb.prop.id
+        if rbid == 1
+            q̃[mem2syspres[rbid]] .= [     amp*sin(p*t),0]
+            q̃̇[mem2syspres[rbid]] .= [   p*amp*cos(p*t),0]
+            q̃̈[mem2syspres[rbid]] .= [-p^2*amp*sin(p*t),0]
+        end
+        if rbid == 2
+            q̃[mem2syspres[rbid]] .= [ 0.1+amp*sin(p*t),0]
+            q̃̇[mem2syspres[rbid]] .= [   p*amp*cos(p*t),0]
+            q̃̈[mem2syspres[rbid]] .= [-p^2*amp*sin(p*t),0]
+        end
+        if aux
+            if rbid == 8
+                q̃[mem2syspres[rbid][3:4]] .= [-0.1+amp*sin(p*t),0]
+                q̃̇[mem2syspres[rbid][3:4]] .= [   p*amp*cos(p*t),0]
+                q̃̈[mem2syspres[rbid][3:4]] .= [-p^2*amp*sin(p*t),0]
+                q̃[mem2syspres[rbid][5:6]] .= [ 0.2+amp*sin(p*t),0]
+                q̃̇[mem2syspres[rbid][5:6]] .= [   p*amp*cos(p*t),0]
+                q̃̈[mem2syspres[rbid][5:6]] .= [-p^2*amp*sin(p*t),0]
+            end
+        end
+    end
+end
+
+ratio1 = 0.998
+dt = 1e-3
+## undamped noslack
+tower2dbot_undamped_noslack = tower2d(;k=100.0,c=0.0,ratio=0.95,ratio1,slack=false)
+TR.solve!(TR.SimProblem(tower2dbot_undamped_noslack,(x)->dynfuncs(x;gravity=true)),
+          TR.Zhong06(),
+          (
+            prescribe! = (sysstate,tg)->pres2d!(sysstate,tg;aux=true),
+            actuate! = nothing
+          );
+          dt,tspan=(0.0,2.0),ftol=1e-14,verbose=true,exception=false)
+
+adams_undamped_noslack = parse_Adams_dynamic("tower2d_undamped_noslack.xml")
+
+plot_traj!(tower2dbot_undamped_noslack)
+
+
+## damped noslack
+tower2dbot_damped_noslack = tower2d(;k=100.0,c=1.0,ratio=0.95,ratio1,slack=false)
+TR.solve!(TR.SimProblem(tower2dbot_damped_noslack,(x)->dynfuncs(x;gravity=true)),
+          TR.Zhong06(),
+          (
+            prescribe! = (sysstate,tg)->pres2d!(sysstate,tg;aux=true),
+            actuate! = nothing
+          );
+          dt,tspan=(0.0,2.0),ftol=1e-14)
+
+adams_damped_noslack = parse_Adams_dynamic("tower2d_damped_noslack.xml")
+
+## undamped slack
+tower2dbot_undamped_slack = tower2d(;k=100.0,c=0.0,ratio=0.95,ratio1,slack=true)
+f = TR.get_cables_tension(tower2dbot_undamped_slack)
+l = TR.get_cables_len(tower2dbot_undamped_slack)
+μ = TR.get_cables_restlen(tower2dbot_undamped_slack)
+k = TR.get_cables_stiffness(tower2dbot_undamped_slack)
+x1,y1 = approx_slack(;k=k[1],μ=μ[1],l0=l[1],filename="xy1")
+x2,y2 = approx_slack(;k=k[3],μ=μ[3],l0=l[3],filename="xy2")
+x3,y3 = approx_slack(;k=k[5],μ=μ[5],l0=l[5],filename="xy3")
+x4,y4 = approx_slack(;k=k[11],μ=μ[11],l0=l[11],filename="xy4")
+
+x0,y0 = approx_slack(;k=100.0,μ=0.0,l0=0.0)
+function plot_data_points(x,y,figname=nothing)
+    with_theme(theme_pub;
+        resolution = (cw,0.8cw),
+        Scatter = (
+            marker=:xcross,
         )
     ) do
-    plot_traj!(
-        newembed0_outer_deploy;
-        AxisType=Axis3,
-        figsize = (0.7cw,0.25cw),
-        gridsize = (1,5),
-        attimes = range(0,Td,5),
-        xlims = (-2e-1,2e-1),
-        ylims = (-4e-1,2e-1),
-        zlims = (-1e-3,8e-1),
-        showinfo = false,
-        doslide = false,
-        # dorecord = true,
-        slack_linestyle = :solid,
-        actuate = true,
-        showpoints = false,
-        showlabels = false,
-        sup! = (ax,tgob,sgi) -> begin
-            hidex(ax)
-            hidey(ax)
-            if sgi != 5
-                hidez(ax)
-            end
-        end,
-        # rowgap=2fontsize,
-        colgap=0,
-        figname = "newembed0_outer_deploy"
-    )
-end
-nb = newembed0_outer_deploy.tg.nbodies
-ps = [get_trajectory!(newembed0_outer_deploy,nb,j) for j = m+1:m+m]
-GM.activate!();with_theme(theme_pub;
-        resolution = (0.7cw,0.2cw),
-        figure_padding = (0,fontsize,0,0)
-    ) do 
-    fig = Figure()
-    (;t) = newembed0_outer_deploy.traj
-    for i = 1:m
-        ax = Axis(fig[1,i], 
-            xlabel = tlabel, 
-            ylabel = latexstring("""$(["x","y","z"][i])~(\\mathrm{m})""")
+        fig = Figure(;)
+        ax1 = Axis(fig[1,1],
+            xlabel = L"\Delta l_j~(\mathrm{m})",
+            ylabel = L"f_j~(\mathrm{N})",
         )
-        lines!(ax,t,ps[2][i,:])
-        # lines!(ax,t,ps[2][i,:])
-        # lines!(ax,t,ps[3][i,:])
-        xlims!(t[begin],t[end])
-        Label(
-            fig[1,i,TopLeft()],
-            "($(alphabet[i]))",
-            font = "CMU Serif Bold",
-            padding = (0, 0, 0, 0),
-            halign = :right,
-            valign = :bottom
+        ax2 = Axis(fig[2,1],
+            # xlabel = L"l_j-\mu_j",
+            # ylabel = L"f_j",
+            tellwidth = false,
+            tellheight = false,
+            width = 0.225cw,
+            height = 0.16cw,
+            xlabelsize = 5 |> pt2px,
+            ylabelsize = 5 |> pt2px,
+            xticklabelsize = 5 |> pt2px,
+            yticklabelsize = 5 |> pt2px,
+
         )
+        lines!(ax1, x, y; label = "ideal curve")
+        scatter!(ax1, x, y; markersize = fontsize*0.8, color = :red, label = "data points")
+        ylims!(ax1,-0.5,10.5)
+        lines!(ax2, x, y, )
+        scatter!(ax2, x, y; markersize = fontsize*0.6, color = :red,)
+        xlims!(ax2, -0.002, 0.002)
+        ylims!(ax2,-0.02,0.20)
+        fig[1,2] = Legend(fig,ax1;)
+        savefig(fig,figname)
+        fig
     end
-    savefig(fig,"newembed0_outer_deploy_traj")
-    fig
 end
+
+GM.activate!(); plot_data_points(x0,y0)
+CM.activate!(); plot_data_points(x0,y0,"f_curve")
+
+TR.solve!(TR.SimProblem(tower2dbot_undamped_slack,(x)->dynfuncs(x;gravity=true)),
+          TR.Zhong06(),
+          (
+            prescribe! = (sysstate,tg)->pres2d!(sysstate,tg;aux=true),
+            actuate! = nothing
+          );
+          dt,tspan=(0.0,3.0),ftol=1e-14,exception=false)
+
+adams_undamped_slack = parse_Adams_dynamic("tower2d_undamped_slack.xml")
+plot_traj!(tower2dbot_undamped_slack;showmesh)
+
+## undamped slack with fix aux
+tower2dbot_undamped_slack_noaux = tower2d(;k=100.0,c=0.0,ratio=0.95,ratio1,slack=true)
+TR.solve!(TR.SimProblem(tower2dbot_undamped_slack_noaux,(x)->dynfuncs(x;gravity=true)),
+          TR.Zhong06(),
+          (
+            prescribe! = (sysstate,tg)->pres2d!(sysstate,tg;aux=false),
+            actuate! = nothing
+          );
+          dt,tspan=(0.0,3.0),ftol=1e-14)
+adams_undamped_slack_aux = parse_Adams_dynamic("tower2d_undamped_slack_noaux.xml")
+
+function plot_tower2d_point_traj(ba,figname=nothing;at=1.23)
+    cg = cgrad(:seaborn_bright6, 6, categorical = true)
+    mk = ['○','□','×','+']
+    with_theme(theme_pub;
+            resolution=(tw,0.5tw),
+            palette = (color = cg, marker = mk),
+            Lines = (cycle = [:color],),
+            Scatter = (cycle = Cycle([:color, :marker, :strokecolor=>:color],covary=true),),
+    ) do
+        fig = Figure(;)
+        ax1 = Axis(fig[1,1]; xlabel = L"t~(\mathrm{s})", ylabel = L"x~(\mathrm{m})")
+        linewidth = 0.75 |> pt2px
+        markersizes = [8,8,10,10] .|> pt2px
+        begins = [1,21,31,41]
+        cases = ["UN","DN","US","US-AUX"]
+        si = 50
+        for (bot,adams,markersize,be,case) in zip(ba.is...,markersizes,begins,cases)
+            rg = get_trajectory!(bot,3,0)
+            if case == "US"
+                step_collapse = findfirst((x)->x>=at,bot.traj.t)
+                lines!(ax1,bot.traj.t[1:step_collapse],rg[1,1:step_collapse];linewidth,label="Proposed($case)")
+            else
+                lines!(ax1,bot.traj.t,rg[1,:];linewidth,label="Proposed($case)")
+            end
+            if case in ["UN","DN"]
+                strokewidth = 0
+            else
+                strokewidth = 0
+            end
+            scatter!(ax1,adams.time[be:si:end],
+                    adams.PART_3_cm_x[be:si:end];
+                    markersize,
+                    strokewidth,
+                    label="Adams($case)"
+            )
+        end
+        vlines!(ax1,[at],color=:slategrey)
+        text!(ax1,latexstring("t=$at~(\\mathrm{Collapse})"), fontsize = fontsize, position = (at+0.02, 0.015), align = (:left, :center))
+        xlims!(ax1,0.,2.)
+        ylims!(ax1,-0.005,0.092)
+        ax1.yticks = collect(0.00:0.01:0.09)
+        # ax1.xlabelpadding = -15
+        axislegend(ax1,position=:lb,
+                    orientation=:horizontal,
+                    nbanks = 2,
+                    labelsize=round(Int,0.8fontsize))
+        savefig(fig,figname)
+    end
+end
+
+GM.activate!(); plot_tower2d_point_traj(
+    zip(
+        [tower2dbot_undamped_noslack,tower2dbot_damped_noslack,tower2dbot_undamped_slack,tower2dbot_undamped_slack_noaux],
+        [adams_undamped_noslack,adams_damped_noslack,adams_undamped_slack,adams_undamped_slack_aux]
+    )
+)
+
+CM.activate!(); plot_tower2d_point_traj(
+    zip(
+        [tower2dbot_undamped_noslack,tower2dbot_damped_noslack,tower2dbot_undamped_slack,tower2dbot_undamped_slack_noaux],
+        [adams_undamped_noslack,adams_damped_noslack,adams_undamped_slack,adams_undamped_slack_aux]
+    ),
+    "tower2d_point_traj"
+)
+
+function plot_slack_cables(bots,figname=nothing;at=1.23)
+    cg = cgrad(:mk_12, 12, categorical = true)
+    with_theme(theme_pub;
+            resolution=(0.7tw,0.5tw),
+            # figure_padding=(0,50,0,0),
+            palette = (color = cg, ),
+            Lines = (cycle = [:color],),
+            Scatter = (
+                markersize = fontsize/3,
+            )
+        ) do
+        fig = Figure(;)
+        linewidth = 1 |> pt2px
+        for i = 1:2
+            ax = Axis(fig[i,1]; xlabel = tlabel, ylabel = L"\mathrm{Cable}~j")
+            vlines!(ax,[at],color=:slategrey)
+            if i == 1
+                ax.xlabelvisible = false
+                ax.xticklabelsvisible = false
+                ax.yticks = collect(1:12)
+                ylims!(ax,0.5,12.5)
+                text!(ax,latexstring("t=$at~(\\mathrm{Collapse})"), fontsize = fontsize,
+                            position = (at+0.055, 4.5),
+                            align = (:left, :center)
+                )
+            else
+                ax.yticks = collect(1:4)
+                ylims!(ax,0.5,4.5)
+                at = 2.0
+            end
+            bot = bots[i]
+            (;cables) = bot.tg.tensiles
+            ncables = length(cables)
+            f = [get_tension!(bot,j) for j in collect(1:12)]
+            t_mids = get_time_mids(bot)
+            step_at = findfirst((x)->x>=at, t_mids)
+            noslack = [findall((x)->x>0,fj[1:step_at]) for (j,fj) in enumerate(f)]
+            slack   = [findall((x)->x<=0,fj[1:step_at]) for (j,fj) in enumerate(f)]
+            for (i,(ns,s)) in enumerate(zip(noslack,slack))
+                scatter!(ax,t_mids[1:step_at][s],fill(i,length(s));linewidth)
+            end
+            xlims!(ax,0,2)
+            # ax.xlabelpadding = -15
+            # ax.alignmode = Mixed(;left = -20, right = 20)
+            # ax.xticks = [0.275]
+        end
+        for (ilabel,label) in enumerate(alphabet[1:2])
+            Label(fig.layout[ilabel, 1, TopLeft()], "($label)",
+                fontsize = fontsize,
+                font = "CMU Serif Bold",
+                padding = (10, 0, -10, 0),
+                halign = :left)
+        end
+        rowsize!(fig.layout, 2, Relative(1/4))
+        rowgap!(fig.layout, 0)
+        savefig(fig,figname)
+    end
+end
+GM.activate!(); plot_slack_cables(
+    [
+        tower2dbot_undamped_slack,
+        tower2dbot_undamped_slack_noaux
+    ]
+)
+CM.activate!(); plot_slack_cables(
+    [
+        tower2dbot_undamped_slack,
+        tower2dbot_undamped_slack_noaux
+    ],
+    "slack_cable_tensions"
+)
+
+## At time
+function plot_tower2d_at_time(bots,figname=nothing;at=1.23)
+    with_theme(theme_pub;
+            resolution=(0.8tw,0.25tw),
+        ) do
+        fig = Figure(;)
+
+        for i = 1:4
+            ax = Axis(
+                fig[1,i];
+                # visible = true,
+                aspect = DataAspect(),
+                limits = ((-0.12,0.22),(0,0.36)),
+            )
+            hidedecorations!(ax)
+            hidespines!(ax)
+            TR.goto_step!(bots[i],1)
+            plot_tower2d!(ax,bots[i].tg;isref=true,markit=true)
+            istep = findfirst((x)->x>=at, bots[i].traj.t)
+            @show istep
+            TR.goto_step!(bots[i],istep)
+            # @show TR.get_cables_tension(bots[i].tg)
+            plot_tower2d!(ax,bots[i].tg,markit=true)
+        end
+        for (ilabel,label) in enumerate(alphabet[1:4])
+            Label(fig.layout[1, ilabel, TopLeft()], "($label)",
+                fontsize = fontsize,
+                font = "CMU Serif Bold",
+                padding = (0, -50, -50, 0),
+                halign = :right)
+        end
+        colgap!(fig.layout,0)
+        rowgap!(fig.layout,0)
+        savefig(fig,figname)
+    end
+end
+
+GM.activate!(); plot_tower2d_at_time(
+    [
+        tower2dbot_undamped_noslack,
+        tower2dbot_damped_noslack,
+        tower2dbot_undamped_slack,
+        tower2dbot_undamped_slack_noaux
+    ]
+)
+CM.activate!(); plot_tower2d_at_time(
+    [
+        tower2dbot_undamped_noslack,
+        tower2dbot_damped_noslack,
+        tower2dbot_undamped_slack,
+        tower2dbot_undamped_slack_noaux
+    ],
+    "tower2d_at_time"
+)
+
+ms_tower2d = TR.mechanical_energy!(tower2dbot_undamped_noslack;gravity=true)
+
+## simple
+gravity = false
+newsim = simple(;
+    c=0.0,
+    z0 = 0.2,
+    ωz = 5.0,
+    mbar = 0.05,
+    free = true
+)
+
+plot_traj!(newsim)
+
+TR.solve!(
+    TR.SimProblem(newsim,(x)->dynfuncs(x;gravity)),
+    TR.Zhong06();
+    dt=1e-3,tspan=(0.0,15.0),ftol=1e-14
+)
+# plot_tower3d_traj(newsim)
+plot_traj!(newsim;)
+
+me = TR.mechanical_energy!(newsim;gravity)
+me.E |> lines
+
 
 
 ## tower3d
@@ -1242,7 +913,7 @@ tower3dbot0 = tower3d(;k=500.0,k1=1000,c=2.0,α=π/12)
 # size(xn)
 
 plot_traj!(tower3dbot0;fontsize=20)
-μ0 = TR.inverse_for_restlength(tower3dbot0,tower3dbot0;gravity=true,scale=true,fmin=1.0)
+μ0 = TR.inverse_for_restlength(tower3dbot0,tower3dbot0;gravity=true,scale=true,fmin=1.0,verbose=true)
 TR.set_restlen!(tower3dbot0.tg,μ0)
 TR.update!(tower3dbot0.tg)
 TR.get_cables_tension(tower3dbot0.tg) |> extrema
@@ -1252,7 +923,7 @@ TR.undamped_eigen!(tower3dbot0;gravity=true)
 tower3dbot0.traj.t./(2π)
 @show (tower3dbot0.traj.t./(2π))[2]
 
-tower3dbot1 = tower3d(;k=500.0,c=2.0,d = 0.1*√2, r2 = 0.07, α=-π/12)
+tower3dbot1 = tower3d(;k=500.0,c=2.0,d = 0.1*√2, r2 = 0.07, α=-0.0)
 plot_traj!(tower3dbot1;fontsize=20)
 μ1 = TR.inverse_for_restlength(tower3dbot1,tower3dbot1;gravity=true,fmin=1.0)
 TR.set_restlen!(tower3dbot1.tg,μ1)
@@ -1264,158 +935,8 @@ TR.undamped_eigen!(tower3dbot1;gravity=true,scaling=0.2)
 tower3dbot1.traj.t./(2π)
 @show (tower3dbot1.traj.t./(2π))[2]
 
-twotre1 = twotre3d(;
-    r1= 0.03*sqrt(2),
-    r,b,m,α,θ,n = 1,
-    loadmesh = false
-) 
-
-spine1 = twotre3d(;
-    r1= 0.03*sqrt(2),
-    r,b,m,α,θ,n = 1,
-    loadmesh = false,
-    isspine = true,
-) 
-
-GM.activate!();with_theme(theme_pub;
-        figure_padding = (0,0,-fontsize/2,0),
-        resolution = (0.65cw,0.25cw),
-        Axis3 = (
-            azimuth = 7.20553063332698,
-            elevation = 0.22269908169872407
-        )
-    ) do
-    fig = Figure()
-    griddecompose_row = fig[1,1] = GridLayout(;tellheight=true)
-    # griddecompose_row = griddecompose[1,1] = GridLayout(;tellheight=true)
-    griddecompose_twotre = griddecompose_row[1,1] = GridLayout(;tellheight=true)
-    griddecompose_spine = griddecompose_row[2,1] = GridLayout(;tellheight=true)
-    griddecompose_prism = griddecompose_row[:,2] = GridLayout(;tellheight=false)
-    gridfolded = fig[1,2] = GridLayout()
-    griddeployed = fig[1,3] = GridLayout()
-    xlims=(-0.15,0.15)
-    ylims=(-0.15,0.15)
-    zlims=(-1e-3,0.5)
-    doslide=false
-    showpoints=false
-    showlabels=false
-    showground = false
-    plot_traj!(
-        twotre1;
-        AxisType = Axis3,
-        doslide = false,
-        xlims,
-        ylims,
-        zlims=(-1e-3,0.2),
-        showpoints,
-        showlabels,
-        showground,
-        fig = griddecompose_twotre,
-        sup! = (ax,tgob,sgi)->begin
-            hidedecorations!(ax)
-            hidespines!(ax)
-        end,
-        titleformatfunc = (sgi,tt)-> begin
-            rich(
-                rich("($(alphabet[1])) ", font=:bold),
-            )
-        end,
-    )
-    plot_traj!(
-        spine1;
-        AxisType = Axis3,
-        doslide = false,
-        xlims,
-        ylims,
-        zlims=(-1e-3,0.2),
-        showpoints,
-        showlabels,
-        showground,        
-        slack_linestyle = :solid,
-        fig = griddecompose_spine,
-        sup! = (ax,tgob,sgi)->begin
-            hidedecorations!(ax)
-            hidespines!(ax)
-        end,
-        titleformatfunc = (sgi,tt)-> begin
-            rich(
-                rich("($(alphabet[2])) ", font=:bold),
-            )
-        end,
-    )
-    plot_traj!(
-        prism1;
-        AxisType = Axis3,
-        doslide = false,
-        xlims,
-        ylims,
-        zlims=(-1e-3,0.2),
-        showpoints,
-        showlabels,
-        showground,
-        fig = griddecompose_prism,
-        sup! = (ax,tgob,sgi)->begin
-            hidedecorations!(ax)
-            hidespines!(ax)
-        end,
-        titleformatfunc = (sgi,tt)-> begin
-            rich(
-                rich("($(alphabet[3])) ", font=:bold),
-            )
-        end,
-    )
-    plot_traj!(
-        tower3dbot0;
-        AxisType=Axis3,
-        fig = gridfolded,
-        xlims,
-        ylims,
-        zlims,
-        doslide,
-        showpoints,
-        showlabels,
-        sup! = (ax,tgob,sgi)->begin
-            hidexyz(ax)
-        end,
-        titleformatfunc = (sgi,tt)-> begin
-            rich(
-                rich("($(alphabet[4])) ", font = :bold),
-            )
-        end,
-    )
-    plot_traj!(
-        tower3dbot1;
-        AxisType=Axis3,
-        fig = griddeployed,
-        xlims,
-        ylims,
-        zlims,
-        doslide,
-        showpoints,
-        showlabels,
-        sup! = (ax,tgob,sgi)->begin
-            hidexyz(ax)
-        end,
-        titleformatfunc = (sgi,tt)-> begin
-            rich(
-                rich("($(alphabet[5])) ", font = :bold),
-            )
-        end,
-    )
-    colgap!(griddecompose_row,-4fontsize)
-    colsize!(griddecompose_row,1,Fixed(0.12cw))
-    colsize!(griddecompose_row,2,Fixed(0.20cw))
-    # colsize!(griddecompose_row,2,Fixed(0.20cw))
-    rowgap!(griddecompose_row,0)
-    colgap!(fig.layout,0)
-    colgap!(fig.layout,1,-3fontsize)
-    # colsize!(fig.layout,1,Relative(0.25))
-    savefig(fig,"tower3d")
-    fig
-end
-
-WM.activate!();with_theme(theme_pub;
-        figure_padding = (0,0,-fontsize,0),
+GM.activate!();
+with_theme(theme_pub;
         Axis3 = (
             azimuth = 7.00553063332698,
             elevation = 0.22269908169872407
@@ -1424,30 +945,16 @@ WM.activate!();with_theme(theme_pub;
     plot_traj!(
         tower3dbot1;
         AxisType=Axis3,
-        figsize = (0.55cw,0.20cw),
-        gridsize = (1,3),
-        atsteps = 2:4,
         xlims=(-0.2,0.2),
         ylims=(-0.2,0.2),
         zlims=(-1e-3,0.5),
         showmesh=false,
-        doslide=false,
         showpoints=false,
         showlabels=false,
         showinfo=false,
         showinit=true,
         dorecord=false,
-        sup! = (ax,tgob,sgi)->begin
-            hidexyz(ax)
-        end,
-        titleformatfunc = (sgi,tt)-> begin
-            rich(
-                rich("($(alphabet[sgi])) ", font = :bold),
-                "Mode $sgi",
-            )
-        end,
-        colgap = 0,
-        figname="tower3d_modes",
+        # figname="tower3d_seis_hi_15.mp4",
     )
 end
 
@@ -1456,6 +963,70 @@ initial_μ = TableCol("Initial", ["$((3i-2,3i-1,3i))" for i in 1:8], ["\\qty{$μ
 target_μ = TableCol("Target", ["$((3i-2,3i-1,3i))" for i in 1:8], ["\\qty{$μ}{\\meter}" for μ in μ1[begin:3:end]])
 table_μ = hcat(initial_μ,target_μ)
 print(TexTables.to_tex(table_μ))
+
+fig_decompose_tower3d = plot_decompose_tower3d(tower3dbot0,tower3dbot1)
+GM.activate!()
+CM.activate!()
+CM.save(texroot*raw"\OneDrive - 中山大学\Papers\DynamicTensegrity\CS\images\decompose_tower3d.pdf", fig_decompose_tower3d)
+
+fig_compose_tower3d = plot_compose_tower3d(tower3dbot0,tower3dbot1)
+GM.activate!()
+CM.activate!()
+CM.save(texroot*raw"\OneDrive - 中山大学\Papers\DynamicTensegrity\CS\images\compose_tower3d.pdf", fig_compose_tower3d)
+
+function plot_restlengths(bots,figname=nothing)
+    μs = [TR.get_cables_restlen(bot) for bot in bots]
+    # cg = cgrad(:Dark2_6, 6, categorical = true)[[4,3,6]]
+    # set_theme!(theme_pub;
+    #         palette = (color = cg, ),
+    #         Lines = (cycle = [:color],),
+    # )
+    with_theme(theme_pub;
+            # resolution = (0.7tw,0.3tw),
+            # font = "Nimbus Rom No9 L",
+            # font = "Times New Roman",
+            resolution = (2cw,0.7cw),
+        ) do
+        fig = Figure(;)
+        ax1 = Axis(fig[1,1]; 
+            xlabel = "Cable No.", 
+            ylabel = "Rest length (m)"
+        )
+        x = vec([collect(1:24)';collect(1:24)'])
+        grp = repeat([1,2],24)
+        display(x)
+        height = vec([μs[1]';μs[2]'])
+        colors = Makie.wong_colors()
+        barplot!(
+            ax1, x, height; 
+            dodge = grp,
+            color = colors[grp],
+            marker = '+', markersize = 1.5fontsize, 
+            linewidth, linestyle = :dashdot, 
+            # label = "Folded"
+        )
+        # ax1.yticks = collect(0:15)
+        ax1.xticks = collect(1:24)
+        # ax1.xlabelpadding = -15
+        # axislegend(ax1; position = :lt,)
+        # Legend
+        labels = ["Folded", "Deployed"]
+        elements = [PolyElement(polycolor = colors[i]) for i in 1:length(labels)]
+        # title = "Groups"
+
+        Legend(fig[0,1], elements, labels,
+            orientation=:horizontal,
+            tellwidth=false,tellheight=false
+        )
+        # fig[1,2] = Legend(fig,ax1)
+        rowsize!(fig.layout,1,Fixed(0.5cw))
+        # rowgap!(fig.layout,0)
+        # colsize!(fig.layout,1,Fixed(0.6cw))
+        savefig(fig,figname)
+    end
+end
+
+GM.activate!(); plot_restlengths([tower3dbot0,tower3dbot1])
 
 function plot_tensions(bots,figname=nothing)
     fs = [TR.get_cables_tension(bot) for bot in bots]
@@ -1649,24 +1220,24 @@ function plot_tower3d_seis_traj(bots,figname=nothing;
             rb7r4 = get_trajectory!(bot,7,4,1:ss:length(bot.traj))
             rb8r4 = get_trajectory!(bot,8,4,1:ss:length(bot.traj))
             rb9r3 = get_trajectory!(bot,9,3,1:ss:length(bot.traj))
-            # rb9r3 = get_trajectory!(bot,10,3,1:ss:length(bot.traj))
+            # rb10r3 = get_trajectory!(bot,10,3,1:ss:length(bot.traj))
             lines!(ax1,t,(rb7r4[1,:].-rb7r4[1,1])./10.0^scalings[1];label=L"\mathbf{r}_{7,1}")
             lines!(ax1,t,(rb8r4[1,:].-rb8r4[1,1])./10.0^scalings[1];label=L"\mathbf{r}_{8,1}")
             lines!(ax1,t,(rb9r3[1,:].-rb9r3[1,1])./10.0^scalings[1];label=L"\mathbf{r}_{9,1}")
-            # lines!(ax1,t,(rb9r3[1,:].-rb9r3[1,1])./10.0^scalings[1];label=L"\mathbf{r}_{10,1}")
+            # lines!(ax1,t,(rb10r3[1,:].-rb10r3[1,1])./10.0^scalings[1];label=L"\mathbf{r}_{10,1}")
             ylims!(ax1,-5,5)
             ax1.yticks = collect(-5:2.5:5)
 
             lines!(ax2,t,(rb7r4[2,:].-rb7r4[2,1])./10.0^scalings[2];)
             lines!(ax2,t,(rb8r4[2,:].-rb8r4[2,1])./10.0^scalings[2];)
             lines!(ax2,t,(rb9r3[2,:].-rb9r3[2,1])./10.0^scalings[2];)
-            # lines!(ax2,t,(rb9r3[2,:].-rb9r3[2,1])./10.0^scalings[2];)
+            # lines!(ax2,t,(rb10r3[2,:].-rb10r3[2,1])./10.0^scalings[2];)
 
             lines!(ax3,t,(rb7r4[3,:].-rb7r4[3,1])./10.0^scalings[3];)
             lines!(ax3,t,(rb8r4[3,:].-rb8r4[3,1])./10.0^scalings[3];)
             lines!(ax3,t,(rb9r3[3,:].-rb9r3[3,1])./10.0^scalings[3];)
-            # lines!(ax3,t,(rb9r3[3,:].-rb9r3[3,1])./10.0^scalings[3];)
-            # @show rb9r3[3,1]
+            # lines!(ax3,t,(rb10r3[3,:].-rb10r3[3,1])./10.0^scalings[3];)
+            # @show rb10r3[3,1]
             # ylims!(ax3,1,5)
 
             function set_ax!(ax)
@@ -1822,15 +1393,15 @@ GM.activate!(); plot_tower3d_vis_nodpl([tower3dbot0_nodpl,tower3dbot1_nodpl])
 GM.activate!(); plot_tower3d_vis_nodpl([tower3dbot0_nodpl,tower3dbot1_nodpl], "tower3d_vis_nodpl")
 
 ## deploy
-Td = [10.0]
-function do_noseis(;Td,tend=15.0)
+Td = [5.0,10.0,15.0,20.0]
+function do_noseis(;Td,tend=25.0)
     bot   = TR.TensegrityRobot(deepcopy(tower3dbot0.tg),(actuators=[make_pres_actor(μ0,μ1,0.0,Td)],))
     TR.solve!(TR.SimProblem(bot,(x)->dynfuncs(x;actuate=true,gravity=true)),
                 TR.Zhong06();
                 dt=1e-3,tspan=(0.0,tend),ftol=1e-14)
     bot
 end
-function do_seis(;ν,Td,tend=15.0)
+function do_seis(;ν,Td,tend=25.0)
     bot   = TR.TensegrityRobot(deepcopy(tower3dbot0.tg),(actuators=[make_pres_actor(μ0,μ1,0.0,Td)],))
     TR.solve!(TR.SimProblem(bot,(x)->dynfuncs(x;actuate=true,gravity=true)),
                 TR.Zhong06(),
@@ -1841,61 +1412,65 @@ function do_seis(;ν,Td,tend=15.0)
                 dt=1e-3,tspan=(0.0,tend),ftol=1e-14)
     bot
 end
-tower3d_noseis_10 = do_noseis(;Td=Td[1])
-tower3d_seis_10 = do_seis(;ν=1.0,Td=Td[1])
-tower3d_seis_lo_10 = do_seis(;ν=1.5,Td=Td[1])
-tower3d_seis_hi_10 = do_seis(;ν=0.5,Td=Td[1])
+tower3d_noseis_5 = do_noseis(;Td=Td[1])
+tower3d_seis_5 = do_seis(;ν=0.5,Td=Td[1])
+tower3d_seis_lo_5 = do_seis(;ν=0.2,Td=Td[1])
+tower3d_seis_hi_5 = do_seis(;ν=1.0,Td=Td[1],tend=7.0)
+tower3d_noseis_10 = do_noseis(;Td=Td[2])
+tower3d_seis_10 = do_seis(;ν=0.5,Td=Td[2])
+tower3d_seis_lo_10 = do_seis(;ν=0.2,Td=Td[2])
+tower3d_seis_hi_10 = do_seis(;ν=1.0,Td=Td[2])
+tower3d_noseis_15 = do_noseis(;Td=Td[3])
+tower3d_seis_15 = do_seis(;ν=0.5,Td=Td[3])
+tower3d_seis_lo_15 = do_seis(;ν=0.2,Td=Td[3])
+tower3d_seis_hi_15 = do_seis(;ν=1.0,Td=Td[3])
+tower3d_noseis_20 = do_noseis(;Td=Td[4])
+tower3d_seis_20 = do_seis(;ν=0.5,Td=Td[4],tend=21.7)
+tower3d_seis_lo_20 = do_seis(;ν=0.2,Td=Td[4])
+tower3d_seis_hi_20 = do_seis(;ν=1.0,Td=Td[4])
 
-plot_traj!(tower3d_seis_10;actuate=true)
-
-GM.activate!();with_theme(theme_pub;
-        figure_padding = (0,0,-fontsize,0),
+GM.activate!();
+with_theme(theme_pub;
         Axis3 = (
-            azimuth = 7.80553063332698,
+            azimuth = 7.00553063332698,
             elevation = 0.22269908169872407
         )
     ) do
     plot_traj!(
-        tower3d_seis_10;
+        tower3d_seis_15;
         AxisType=Axis3,
-        figsize = (0.9cw,0.2cw),
-        gridsize = (1,5),
-        attimes = range(1,10,5),
-        xlims=(-0.3,0.2),
+        xlims=(-0.2,0.2),
         ylims=(-0.2,0.2),
         zlims=(-1e-3,0.5),
-        # showmesh=false,
+        showmesh=false,
         showpoints=false,
         showlabels=false,
         showinfo=false,
-        doslide=false,
-        # dorecord=true,
+        dorecord=true,
         actuate=true,
-        figname="tower3d_seis_10",
-        sup! = (ax,tgob,sgi)->begin
-            hidexyz(ax)
-        end,
+        figname="tower3d_seis_15.mp4",
     )
 end
 
-plot_traj!(tower3d_seis_10;actuate=true)
+plot_traj!(tower3d_seis_hi_15;actuate=true)
 plot_traj!(tower3d_noseis_15;actuate=true)
 plot_traj!(tower3d_seis_hi;actuate=true)
 me_series = TR.mechanical_energy!(tower3d_seis;actuate=true,gravity=true)
 lines(tower3d_seis.traj.t,me_series.E)
 
+rb10r3 = get_trajectory!(tower3d_seis_hi_20,10,3,1:10:length(tower3d_seis_hi_20.traj))
+
+rb10r3
 function plot_tower3d_dpl_traj(bots,figname=nothing;
         ss=10,
     )
     cg = cgrad(:seaborn_bright6, 6, categorical = true)
     with_theme(theme_pub;
-            # resolution = (cw,0.8cw),
-            resolution = (0.8cw,0.20cw),
-            # palette = (color = cg, ),
-            figure_padding = (0,0,0,0),
-            Lines = (cycle = Cycle([:color,]), linewidth = 4),
+            # resolution = (tw,0.8tw),
+            resolution = (tw,1.25cw),
+            palette = (color = cg, ),
+            Lines = (cycle = [:color], linewidth = 2),
         ) do
-        nrow = length(bots)
         fig = Figure(;)
         ats = [10.5,14.0,18.0]
         Tds = [10.0,15.0,20.0]
@@ -1905,11 +1480,11 @@ function plot_tower3d_dpl_traj(bots,figname=nothing;
                 Makie.Axis(fig[i,2];xlabel=L"t~(\mathrm{s})",ylabel=L"z~(\mathrm{m})"),
                 # Makie.Axis(fig[i,3];xlabel=L"t~(\mathrm{s})",ylabel=L"\Delta z~(\mathrm{m})")
             ]
-            for i = 1:nrow
+            for i = 1:3
         ]
         scalings = [-1,-1]
 
-        for i = 1:nrow
+        for i = 1:3
             bot0, bot1, botlo, bothi = bots[i]
             at = ats[i]
             Td = Tds[i]
@@ -1921,45 +1496,45 @@ function plot_tower3d_dpl_traj(bots,figname=nothing;
             tsteps = 1:ss:step_collapse
             t1 = bot1.traj.t[tsteps]
             # bot0
-            bot0rb9r3 = get_trajectory!(bot0,9,3,1:ss:length(bot0.traj))
+            bot0rb10r3 = get_trajectory!(bot0,10,3,1:ss:length(bot0.traj))
             # bot1
-            bot1rb9r3 = get_trajectory!(bot1,9,3,tsteps)
+            bot1rb10r3 = get_trajectory!(bot1,10,3,tsteps)
             # botlo
-            botlorb9r3 = get_trajectory!(botlo,9,3,1:ss:length(botlo.traj))
+            botlorb10r3 = get_trajectory!(botlo,10,3,1:ss:length(botlo.traj))
             # bothi
-            bothirb9r3 = get_trajectory!(bothi,9,3,1:ss:length(bothi.traj))
+            bothirb10r3 = get_trajectory!(bothi,10,3,1:ss:length(bothi.traj))
 
             # x
-            lines!(ax1,t0,bot0rb9r3[1,:]./10.0^scalings[1];)
-            lines!(ax1,t0,botlorb9r3[1,:]./10.0^scalings[1];)
-            lines!(ax1,t1,bot1rb9r3[1,:]./10.0^scalings[1];)
-            lines!(ax1,t0,bothirb9r3[1,:]./10.0^scalings[1];)
-            ylims!(ax1,-1,2.0)
+            lines!(ax1,t0,bot0rb10r3[1,:]./10.0^scalings[1];linewidth)
+            lines!(ax1,t0,botlorb10r3[1,:]./10.0^scalings[1];linewidth)
+            lines!(ax1,t1,bot1rb10r3[1,:]./10.0^scalings[1];linewidth)
+            lines!(ax1,t0,bothirb10r3[1,:]./10.0^scalings[1];linewidth)
+            ylims!(ax1,0,2.0)
             # ax1.yticks = collect(-5:2.5:5)
             xlims!(ax1,t0[begin],t0[end])
 
             # # y
-            # lines!(ax2,t0,bot0rb9r3[2,:]./10.0^scalings[2];label=L"\mathrm{Static~ground}")
-            # lines!(ax2,t0,botlorb9r3[2,:]./10.0^scalings[2];label=L"\mathrm{Seismic~ground},~\nu = 0.2~(\mathrm{Hz})")
-            # lines!(ax2,t0,bothirb9r3[2,:]./10.0^scalings[2];label=L"\mathrm{Seismic~ground},~\nu = 1.0~(\mathrm{Hz})")
-            # lines!(ax2,t1,bot1rb9r3[2,:]./10.0^scalings[2];label=L"\mathrm{Seismic~ground},~\nu = 0.5~(\mathrm{Hz})")
+            # lines!(ax2,t0,bot0rb10r3[2,:]./10.0^scalings[2];linewidth,label=L"\mathrm{Static~ground}")
+            # lines!(ax2,t0,botlorb10r3[2,:]./10.0^scalings[2];linewidth,label=L"\mathrm{Seismic~ground},~\nu = 0.2~(\mathrm{Hz})")
+            # lines!(ax2,t0,bothirb10r3[2,:]./10.0^scalings[2];linewidth,label=L"\mathrm{Seismic~ground},~\nu = 1.0~(\mathrm{Hz})")
+            # lines!(ax2,t1,bot1rb10r3[2,:]./10.0^scalings[2];linewidth,label=L"\mathrm{Seismic~ground},~\nu = 0.5~(\mathrm{Hz})")
             # # ylims!(ax2,-0.5,7.5)
             # xlims!(ax2,t0[begin],t0[end])
             # ax2.yticks = collect(-1.0:1.0:7.5)
 
             # z
-            lines!(ax2,t0,bot0rb9r3[3,:]./10.0^scalings[2];label=L"\mathrm{Static~ground}")
-            lines!(ax2,t0,botlorb9r3[3,:]./10.0^scalings[2];label=L"\mathrm{Seismic~ground},~\nu = 0.2~(\mathrm{Hz})")
-            lines!(ax2,t1,bot1rb9r3[3,:]./10.0^scalings[2];label=L"\mathrm{Seismic~ground},~\nu = 0.5~(\mathrm{Hz})")
-            lines!(ax2,t0,bothirb9r3[3,:]./10.0^scalings[2];label=L"\mathrm{Seismic~ground},~\nu = 1.0~(\mathrm{Hz})")
-            # ylims!(ax2,3.5,5.5)
+            lines!(ax2,t0,bot0rb10r3[3,:]./10.0^scalings[2];linewidth,label=L"\mathrm{Static~ground}")
+            lines!(ax2,t0,botlorb10r3[3,:]./10.0^scalings[2];linewidth,label=L"\mathrm{Seismic~ground},~\nu = 0.2~(\mathrm{Hz})")
+            lines!(ax2,t1,bot1rb10r3[3,:]./10.0^scalings[2];linewidth,label=L"\mathrm{Seismic~ground},~\nu = 0.5~(\mathrm{Hz})")
+            lines!(ax2,t0,bothirb10r3[3,:]./10.0^scalings[2];linewidth,label=L"\mathrm{Seismic~ground},~\nu = 1.0~(\mathrm{Hz})")
+            ylims!(ax2,3.5,5.5)
             xlims!(ax2,t0[begin],t0[end])
 
-            # rb9r3_z0 = 0.49497474683058335
-            # lines!(ax3,t0,(bot0rb9r3[3,:].-rb9r3_z0)./10.0^scalings[3];)
-            # lines!(ax3,t0,(botlorb9r3[3,:].-rb9r3_z0)./10.0^scalings[3];)
-            # lines!(ax3,t1,(bot1rb9r3[3,:].-rb9r3_z0)./10.0^scalings[3];)
-            # lines!(ax3,t0,(bothirb9r3[3,:].-rb9r3_z0)./10.0^scalings[3];)
+            # rb10r3_z0 = 0.49497474683058335
+            # lines!(ax3,t0,(bot0rb10r3[3,:].-rb10r3_z0)./10.0^scalings[3];linewidth)
+            # lines!(ax3,t0,(botlorb10r3[3,:].-rb10r3_z0)./10.0^scalings[3];linewidth)
+            # lines!(ax3,t1,(bot1rb10r3[3,:].-rb10r3_z0)./10.0^scalings[3];linewidth)
+            # lines!(ax3,t0,(bothirb10r3[3,:].-rb10r3_z0)./10.0^scalings[3];linewidth)
             # if i == 1
             #     ylims!(ax3,-1.5,1.5)
             # else
@@ -1968,7 +1543,7 @@ function plot_tower3d_dpl_traj(bots,figname=nothing;
             # xlims!(ax3,Td,Td+2)
 
             # if i == 2
-            fig[:,3] = Legend(fig,ax2;orientation=:vertical,)
+            fig[4,1:2] = Legend(fig,ax2;orientation=:horizontal,)
             # end labelsize=pt2px(6.5)
             function set_ax!(ax)
                 # xlims!(ax,0,5)
@@ -1977,7 +1552,7 @@ function plot_tower3d_dpl_traj(bots,figname=nothing;
                 # ax.xticks = collect(0:1:15)
                 ax.xminorticks = collect(0:1:25)
                 ax.xminorgridvisible = true
-                if i != nrow
+                if i !== 4
                     hidex(ax)
                 end
             end
@@ -2004,14 +1579,20 @@ end
 
 GM.activate!(); plot_tower3d_dpl_traj(
     [
+        # [tower3d_noseis_5,tower3d_seis_5,tower3d_seis_lo_5,tower3d_seis_hi_5],
         [tower3d_noseis_10,tower3d_seis_10,tower3d_seis_lo_10,tower3d_seis_hi_10],
+        [tower3d_noseis_15,tower3d_seis_15,tower3d_seis_lo_15,tower3d_seis_hi_15],
+        [tower3d_noseis_20,tower3d_seis_20,tower3d_seis_lo_20,tower3d_seis_hi_20],
     ];
     ss=20
 )
 
 CM.activate!(); plot_tower3d_dpl_traj(
     [
+        [tower3d_noseis_5,tower3d_seis_5,tower3d_seis_lo_5,tower3d_seis_hi_5],
         [tower3d_noseis_10,tower3d_seis_10,tower3d_seis_lo_10,tower3d_seis_hi_10],
+        [tower3d_noseis_15,tower3d_seis_15,tower3d_seis_lo_15,tower3d_seis_hi_15],
+        [tower3d_noseis_20,tower3d_seis_20,tower3d_seis_lo_20,tower3d_seis_hi_20],
     ],
     "tower3d_dpl_traj";
     ss=20
@@ -2207,7 +1788,84 @@ newspine = newspine3d(2,)
 
 plot_traj!(newspine;showground=false)
 
+#--sldkr 
+gravity = false
+n = 2
+newbridge_tag = bridge3d(;n)
+plot_traj!(newbridge_tag)
 
+μ = TR.inverse_for_restlength(newbridge_tag,newbridge_tag;fmin=10.0,gravity)
+k,μ = TR.optimize_for_stiffness_and_restlen(newbridge_tag;fmin=100.0)
+μ
+function pres3d!(sysstate,tg;Td=10.0,q_ini,q_tag)
+    (;t,q̃,q̃̇,q̃̈) = sysstate
+    (;connectivity) = tg
+    (;syspres) = connectivity.indexed
+    q̃_ini = @view q_ini[syspres]
+    q̃_tag = @view q_tag[syspres]
+    Δq̃ = q̃_tag .- q̃_ini
+    τ = t/Td
+    q̃ .= q̃_ini .+ τ.*Δq̃
+    q̃̇ .= Δq̃./Td
+    q̃̈ .= 0.0
+end
+Td = 10.0
+
+F̌ = TR.build_F̌(newbridge_tag.tg,2n+1,2*(2n+1)+1,SVector(0.0,0.0,-1.0))
+
+newbridge_tag_dyn = deepcopy(newbridge_tag)
+
+TR.set_restlen!(newbridge_tag_dyn.tg,μ)
+TR.update!(newbridge_tag_dyn.tg)
+TR.get_cables_tension(newbridge_tag_dyn.tg) |> extrema
+TR.GDR!(newbridge_tag_dyn;gravity)
+plot_traj!(newbridge_tag_dyn)
+TR.set_new_initial!(newbridge_tag_dyn,newbridge_tag_dyn.traj.q[end])
+TR.check_static_equilibrium_output_multipliers(newbridge_tag_dyn.tg;gravity)
+TR.undamped_eigen(newbridge_tag_dyn.tg;gravity)
+TR.undamped_eigen!(newbridge_tag_dyn;gravity)
+
+plot_traj!(newbridge_tag_dyn)
+newbridge_tag_dyn.traj.t
+
+tend = 10.0
+dstep = 45
+dt = 1e-4
+TR.solve!(
+    TR.SimProblem(
+        newbridge_tag_dyn,
+        (x)->dynfuncs(x;actuate=false,gravity,(Fˣ!)=(F,t) -> begin
+            F .+= F̌*sin(t)*1e2
+        end)
+    ),
+    TR.Zhong06();
+    dt=1e-3,
+    # tspan=(0.0,dt*(dstep-1)),
+    tspan = (0.0,tend),
+    ftol=1e-13,
+    exception=false
+)
+plot_traj!(newbridge_tag_dyn)
+
+bridge_deploy = TR.TensegrityRobot(
+    deepcopy(newbridge_tag_deploy.tg),
+    (actuators = [make_pres_actor(μ_tag,μ_tag,0.0,Td)],)
+)
+    
+TR.check_static_equilibrium_output_multipliers(bridge_deploy.tg;gravity=true)
+q_tag = TR.get_q(newbridge_tag.tg)
+
+TR.solve!(
+    TR.SimProblem(
+        bridge_deploy,(x)->dynfuncs(x;actuate=false,gravity=true)),
+        TR.Zhong06(),
+        # (
+        #     prescribe! = (sysstate,tg)->pres3d!(sysstate,tg;Td,q_ini,q_tag=q_ini),
+        #     actuate! = nothing
+        # );
+        dt=1e-4,tspan=(0.0,2.0),ftol=1e-7
+)
+plot_traj!(bridge_deploy)
 ## lander
 newlander = lander()
 plot_traj!(newlander;)
@@ -2271,3 +1929,150 @@ TR.set_restlen!(newst_folded.tg,μ_folded)
 TR.update!(newst_folded.tg)
 TR.get_cables_tension(newst_folded.tg) |> extrema
 
+
+#-- without outer and gravity, to obtain rest length
+gravity = false
+m = 3
+α = 2π/m
+θ = 1.25α
+n = 4
+b = 1.4
+r = 0.4*sqrt(2)
+newembed1 = embed3d(;
+    r1= 0.3*sqrt(2),
+    r,b,m,α,θ,n
+)
+
+q = TR.get_q(newembed1.tg)
+Φ = TR.make_Φ(newembed1.tg)
+Φ(q) |> norm
+
+μ1 = TR.inverse_for_restlength(
+    newembed1,newembed1;gravity,fmin=100.0
+)
+
+# (optional) check μ1 
+TR.set_restlen!(newembed1.tg,μ1)
+TR.update!(newembed1.tg)
+f = TR.get_cables_tension(newembed1.tg) 
+f |> extrema
+TR.check_static_equilibrium_output_multipliers(newembed1.tg;gravity)
+TR.undamped_eigen(newembed1.tg;gravity)
+TR.undamped_eigen!(newembed1;gravity)
+TR.reset!(newembed1)
+#-- without outer, see see gravity
+TR.GDR!(newembed1;gravity=true)
+
+plot_traj!(newembed1)
+
+#-- folded without outer and gravity, to obtain rest length
+newembed0 = embed3d(;
+    r1= 0.6*sqrt(2),
+    r,b,m,α,θ,n
+)
+
+plot_traj!(newembed0)
+
+μ0 = TR.inverse_for_restlength(
+    newembed0,newembed0;gravity,fmin=100.0
+)
+
+#-- with outer, using the folded and unfolded 
+outer = true
+newembed0_outer = embed3d(;
+    r1= 0.6*sqrt(2),
+    r,b,m,α,θ,n,outer
+)
+plot_traj!(newembed0_outer)
+μ0o = TR.get_cables_restlen(newembed0_outer)
+μ0o[begin:end-n*m] .= μ0
+μ1o = deepcopy(μ0o)
+μ1o[begin:end-n*m] .= μ1
+TR.set_restlen!(newembed0_outer.tg,μ0o)
+TR.GDR!(newembed0_outer)
+plot_traj!(newembed0_outer;)
+TR.set_new_initial!(newembed0_outer,newembed0_outer.traj.q[end])
+TR.update!(newembed0_outer.tg)
+TR.check_static_equilibrium_output_multipliers(newembed0_outer.tg;gravity)
+TR.undamped_eigen(newembed0_outer.tg;gravity)
+TR.undamped_eigen!(newembed0_outer;gravity)
+μs = [μ0o,μ1o]
+
+Td = 15.0
+tend = 20.0
+
+μs = [
+    begin
+        μ = deepcopy(μ0o)
+        μ[begin:3m*j] .= μ1[begin:3m*j]
+        μ
+    end
+    for j = 0:n
+]
+
+function make_multi_stages_pres_actor(μs;start = 0.0, stop = 10.0, len = 2, )
+    nμ = length(μs[begin])
+
+    function itp(t)
+        scaled_itps = extrapolate(
+            Interpolations.scale(
+                interpolate(
+                    reduce(hcat,μs),
+                    (NoInterp(),BSpline(Linear()))
+                    # (NoInterp(),BSpline(Quadratic(Flat(OnGrid()))))
+                ),
+                1:nμ, range(;start, stop, length = len,)
+            ),
+            (Throw(),Flat())
+        )
+        [scaled_itps(j,t) for j in 1:nμ]
+    end
+
+    TR.PrescribedActuator(
+        1,
+        TR.ManualActuator(1,collect(1:nμ),zeros(nμ),TR.Uncoupled()),
+        itp
+    )
+end
+make_multi_stages_pres_actor(μs;start=0.0,stop=Td,len=n+1)
+
+newembed1_outer_deploy = TR.TensegrityRobot(
+    deepcopy(newembed1_outer.tg),
+    (actuators=[make_multi_stages_pres_actor(μs;start=0.0,stop=Td,len=length(μs))],)
+)
+
+TR.solve!(
+    TR.SimProblem(
+        newembed1_outer_deploy,
+        (x)->dynfuncs(x;actuate=true,gravity=true)
+    ),
+    TR.Zhong06();
+    dt=5e-3,
+    tspan=(0.0,tend),
+    ftol=1e-6,
+    exception=false
+)
+
+with_theme(theme_pub;
+        figure_padding = (2fontsize,fontsize,0,fontsize),
+        Axis3 = (
+            azimuth = 3.995530633326985,
+            elevation = 0.18269908169872415
+        )
+    ) do
+    plot_traj!(
+        newembed1_outer_deploy;
+        figsize = (820,1280),
+        AxisType=Axis3,
+        xlims = (-2,2),
+        ylims = (-2,2),
+        zlims = (-1e-3,7),
+        showinfo = false,
+        doslide = false,
+        dorecord = true,
+        actuate = true,
+        showpoints = false,
+        showlabels = false,
+        figname = "newembed1_outer_deploy.mp4"
+    )
+end

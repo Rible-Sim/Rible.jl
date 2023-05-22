@@ -3,14 +3,13 @@ module TensegrityRobots
 using Logging
 using LinearAlgebra
 using SparseArrays
-using SparseMatricesCSR
 using PreallocationTools
 using Parameters
 using StaticArrays
 using StructArrays
+using SparseMatricesCSR
 using NLsolve
-import JuMP
-import COSMO
+import JuMP, COSMO, Clarabel
 using BlockArrays
 using BlockDiagonals
 using Tullio

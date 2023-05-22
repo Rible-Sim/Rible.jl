@@ -34,6 +34,21 @@ function get_velocity!(bot::TR.TensegrityRobot,rbid::Int,pid::Int,step_range=:)
     ṙp[step_range] |> VectorOfArray
 end
 
+function get_kinetic_energy!(bot::TR.TensegrityRobot,rbid::Int,step_range=:)
+    (; tg, traj)= bot
+	numberType = TR.get_numbertype(bot)
+    T = numberType[]
+    rbs = TR.get_rigidbodies(tg)
+    rb = rbs[rbid]
+    for (q,q̇) in zip(traj.q, traj.q̇)
+        TR.update_rigids!(tg,q,q̇)
+        Tt = TR.kinetic_energy_translation(rb)
+        Tr = TR.kinetic_energy_rotation(rb)
+        push!(T,Tt+Tr)
+    end
+    T[step_range]
+end
+
 function get_mid_velocity!(bot::TR.TensegrityRobot,rbid::Int,pid::Int,step_range=:)
     (; tg, traj)= bot
 	(; t, q) = traj
@@ -168,7 +183,6 @@ function test_slackness(tr)
     end
 end
 
-
 function compute_contraint_error(bot)
     (;tg, traj) = bot
     (;qs, q̇s) = traj
@@ -178,7 +192,6 @@ function compute_contraint_error(bot)
     velocity_constraint_errors = [norm(A(q)*q̇)/norm(q̇) for (q,q̇) in zip(qs,q̇s)]
     position_constraint_errors, velocity_constraint_errors
 end
-
 
 function get_tangent(x)
 	@assert length(x) == 3

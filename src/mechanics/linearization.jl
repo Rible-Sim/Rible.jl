@@ -684,7 +684,7 @@ function undamped_eigen(tg;gravity=false)
     ℳ = transpose(Ň)*M̌*Ň
     𝒦 = transpose(Ň)*Ǩ*Ň
     # @show ℳ, 𝒦
-    ω²,ξ = eigen(𝒦,ℳ)
+    ω²,ξ = eigen(Symmetric(𝒦),Symmetric(ℳ))
     # @show transpose(ξ)*ℳ*ξ
     Ňξ = Ň*ξ
     # @show transpose(Ňξ)*M̌*Ňξ
@@ -709,9 +709,9 @@ function undamped_eigen!(bot::TensegrityRobot;gravity=false,scaling=0.01)
     (;tg,traj) = bot
     q̌ = get_q̌(tg)
     ω²,δq̌ = undamped_eigen(tg;gravity)
-    neg_indices = ω².<=0
+    neg_indices = findall(ω².<=0)
     if !isempty(neg_indices)
-        @warn "Negative ω² occurs. zeroing."
+        @warn "Negative ω² occurs, indices $neg_indices, zeroing."
         ω²[neg_indices] .= 0
     end
     ω = sqrt.(ω²)

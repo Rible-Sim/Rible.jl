@@ -17,7 +17,7 @@ function make_drift_damper(c=0.95,d=20)
     γ(θ) = c + θ/d
 end
 
-function initialize_GDR(tg,F::Nothing)
+function initialize_GDR(tg,F::Nothing;gravity=true)
     Q̃ = build_Q̃(tg)
     Γ = build_Γ(tg)
     # 𝛚(x) =
@@ -26,7 +26,9 @@ function initialize_GDR(tg,F::Nothing)
         clear_forces!(tg)
         update_rigids!(tg,x)
         update_tensiles!(tg)
-        apply_gravity!(tg)
+        if gravity
+            apply_gravity!(tg)
+        end
         F = generate_forces!(tg)
         # @show abs.(F-Q) |> maximum
         -F
@@ -86,9 +88,18 @@ function pull_back!(x,x̌,𝐛,𝐉;N=10,ξ=1e-14)
     end
 end
 
-function GDR!(bot,F=nothing;β=1e-3,maxiters=Int(1e4),ϵ=1e-7,N=10,ξ=1e-7)
+function GDR!(
+        bot,
+        F=nothing;
+        gravity=true,
+        β=1e-3,
+        maxiters=Int(1e4),
+        res=1e-7,
+        N=10,
+        ξ=1e-7
+    )
     (;tg,traj) = bot
-    x,x̌,𝛚,𝐛,𝐉 = initialize_GDR(tg,F)
+    x,x̌,𝛚,𝐛,𝐉 = initialize_GDR(tg,F;gravity)
     # 𝛄 = make_viscous_damper()
     𝛄 = make_kinetic_damper()
     # 𝛄 = make_drift_damper()
@@ -119,7 +130,7 @@ function GDR!(bot,F=nothing;β=1e-3,maxiters=Int(1e4),ϵ=1e-7,N=10,ξ=1e-7)
         traj.t[end] = t
         traj.q[end] .= x
         # @show itr,normr
-        if normr < ϵ
+        if normr < res
             break
         elseif itr == maxiters
             @warn "Max iternation reached for GDR. Res = $normr"

@@ -1,4 +1,10 @@
-function make_3d_bar(id,ri,rj;ci = Int[])
+function make_3d_bar(
+		id,
+		ri,rj;
+		ci = Int[],
+		m = 0.080,
+		mat_name = "Teak",
+	)
 	# @show id,ri,rj
 	movable = true
 	if ci == Int[]
@@ -7,22 +13,55 @@ function make_3d_bar(id,ri,rj;ci = Int[])
 		constrained = true
 	end
 	u = rj - ri
-	b = norm(u)
-	û = u./b
+	bar_length = norm(u)
+	û = u./bar_length
 	v̂,ŵ = TR.NCF.HouseholderOrthogonalization(û)
 	R = SMatrix{3,3}(hcat(û,v̂,ŵ))
-	m = 0.080#19074114753529
-	Īg = SMatrix{3,3}([1/12*m*b^2 0.0 0.0;
-					   		  0.0 0.0 0.0;
-					          0.0 0.0 0.0])
-	@show b,m,Īg[1]
+
 	r̄g  = SVector{3}([ 0.0,0,0])
-	r̄p1 = SVector{3}([-b/2,0,0])
-	r̄p2 = SVector{3}([ b/2,0,0])
+	r̄p1 = SVector{3}([-bar_length/2,0,0])
+	r̄p2 = SVector{3}([ bar_length/2,0,0])
 	r̄ps = [r̄p1,r̄p2]
-	prop = TR.RigidBodyProperty(id,movable,m,Īg,
-				r̄g,r̄ps;constrained=constrained
-				)
+	radius = norm(r̄p2-r̄p1)/120
+	mat = filter(
+		row -> row.name == mat_name, 
+		material_properties
+	)[1]
+	density = mat.density |> ustrip
+	sec_area = π*radius^2
+	density_per_unit_len = density*sec_area
+	mass = density_per_unit_len*bar_length
+	bar_inertia_exp = :(1/12*$mass*$bar_length^2)
+	Īg = SMatrix{3,3}(
+		[	
+			eval(bar_inertia_exp) 0.0 0.0;
+					   		  0.0 0.0 0.0;
+					          0.0 0.0 0.0
+		]
+	)
+	pretty_table(
+		SortedDict(
+			[
+				("id", id),
+				("radius", radius),
+				("density", density),
+				("bar length", bar_length),
+				("mass", mass),
+				("inertia", Īg),
+				("bar_inertia_exp", bar_inertia_exp)
+			]
+		)
+	)
+
+	prop = TR.RigidBodyProperty(
+		id,
+		movable,
+		mass,
+		Īg,
+		r̄g,
+		r̄ps;
+		constrained=constrained
+	)
 	# @show prop.inertia
 	ro = (ri+rj)./2
 	ṙo = zero(ro)
@@ -32,8 +71,7 @@ function make_3d_bar(id,ri,rj;ci = Int[])
 	# cf = TR.NCF.CoordinateFunctions(nmcs,q0,ci,uci)
 	# @show typeof(nmcs)
 	state = TR.RigidBodyState(prop,nmcs,ro,R,ṙo,ω,ci)
-	radius = norm(r̄p2-r̄p1)/60
-	@show radius
+	# @show radius
     barmesh = endpoints2mesh(r̄p1,r̄p2;radius,color=:darkred)
 	rb = TR.RigidBody(prop,state,barmesh)
 	# @show rb.state.cache.M
@@ -42,15 +80,25 @@ end
 
 function make_3d_tri(
 		id,
-		r̄ps,ro,
-		R,ri,rj=nothing,rk=nothing,rl=nothing;
+		r̄ps,
+		ro,
+		R,
+		ri,
+		rj = nothing,
+		rk = nothing,
+		rl = nothing;
 		movable = true,
 		constrained = false,
 		ci = Int[],
 		Φi = collect(1:6),
+		radius = 0.005,
+		height = 1e-2,
+		color = :darkorchid4,
+		loadmesh = false,
+		m = 3,
 	)
 	# uci = collect(1:6)
-	m = 0.2999233976
+	mass = 0.2999233976
 	Īg = SMatrix{3,3}(
 		Matrix(Diagonal([
 			7.6639282053E-04,
@@ -64,9 +112,12 @@ function make_3d_tri(
 	else
 		r̄g = [0,0,0.1562442983-0.1*√2-0.1*√2/2]
 	end
-	@show m,diag(Īg),r̄g
-	prop = TR.RigidBodyProperty(id,
-		movable,m,Īg,
+	# @show m,diag(Īg),r̄g
+
+	prop = TR.RigidBodyProperty(
+		id,
+		movable,
+		mass,Īg,
 		r̄g,r̄ps;
 		constrained=constrained
 	)
@@ -84,22 +135,138 @@ function make_3d_tri(
 	else
 		nmcs,_ = TR.NCF.NC4P(ri,rj,rk,rl,ro,R,ṙo,ω)
 	end
+	pretty_table(
+		SortedDict(
+			[
+				("id", id),
+				("density", density),
+				("mass", mass),
+				("inertia", Īg),
+				("mass center", r̄g),
+				("r̄ps[1]", r̄ps[1]),
+				("r̄ps[2]", r̄ps[2]),
+				("r̄ps[3]", r̄ps[3]),
+				("r̄ps[4]", r̄ps[4])
+			]
+		)
+	)
 	# cf = TR.NCF.CoordinateFunctions(nmcs,q0,ci,uci)
 	# @show typeof(nmcs)
-	radius = norm(r̄ps[2]-r̄ps[1])/32
-	@show radius
+	# radius = norm(r̄ps[2]-r̄ps[1])/32
+	# @show radius
 	trimesh = GB.merge(
 		[
 			endpoints2mesh(r̄ps[i],r̄ps[j];
-			radius=0.0035,color=:darkorchid4)
+			radius,color)
 			for (i,j) in [
 				[1,2],[1,3],[1,4],
 				[2,3],[3,4],[4,2]
 			]
 		]
-	)
+	) |> make_patch(;color = :darkslategrey)
+	if loadmesh
+		platemesh = endpoints2mesh(SVector(0.0,0.0,-height/2),SVector(0.0,0.0,height/2);radius=norm(r̄ps[2]),n1=m,n2=2)
+		trimesh = GB.merge(
+			[
+				trimesh,
+				platemesh
+			]
+		)
+	end
 	state = TR.RigidBodyState(prop,nmcs,ro,R,ṙo,ω,ci,Φi)
 	rb = TR.RigidBody(prop,state,trimesh)
+end
+
+function make_3d_plate(
+		id,
+		r̄ps,
+		ro,
+		R,
+		ri,
+		rj=nothing,
+		rk=nothing,
+		rl=nothing;
+		movable = true,
+		m = 3,
+		height=1e-2,
+		radius=1e-3,
+		ci = Int[],
+		Φi = collect(1:6),
+		loadmesh = true,
+		meshvisible = true,
+	)
+	# uci = collect(1:6)	
+	constrained = ci != Int[]
+	mat = filter(
+		row -> row.name == "Teak", 
+		material_properties
+	)[1]
+	density = mat.density |> ustrip
+	if meshvisible
+		if loadmesh
+			platemesh = load("柚木板3.STL") |> make_patch(;rot=RotZ(π/4))
+		else
+			platemesh = endpoints2mesh(
+				SVector(0.0,0.0,-height/2),
+				SVector(0.0,0.0,height/2);
+				radius,n1=m,n2=2)
+		end
+	else
+		platemesh = nothing
+	end
+	# mass = density*GB.volume(platemesh)
+	if m == 4
+		mass =  0.11008275 #kg
+		Īg = SMatrix{3,3}(
+			Matrix(Diagonal([
+				0.00025403,
+				0.00025403,
+				0.00050623
+			])
+			)
+		)
+	else
+		mass = 0.23569851 #kg
+		Īg = SMatrix{3,3}(
+			Matrix(Diagonal([
+				0.00085048,
+				0.00085048,
+				0.00169704				
+			])
+			)
+		)
+	end
+	r̄g = SVector(0.0,0.0,0.0)
+	pretty_table(
+		SortedDict(
+			[
+				("id", id),
+				("shape", "plate"),
+				("No. vertices",m),
+				("radius", radius),
+				("height", height),
+				("density", density),
+				# ("bar length", bar_length),
+				("mass", mass),
+				("inertia", Īg),
+				# ("bar_inertia_exp", bar_inertia_exp)
+			]
+		)
+	)
+	prop = TR.RigidBodyProperty(
+		id,
+		movable,mass,Īg,
+		r̄g,r̄ps;
+		constrained=constrained
+	)
+	ṙo = zero(ro)
+	ω = zero(ro)
+	# u = R*(r̄ps[2] - r̄ps[1])
+	# v = R*(r̄ps[3] - r̄ps[1])
+	# w = R*(r̄ps[4] - r̄ps[1])
+	nmcs,_ = TR.NCF.NC1P3V(ri,ro,R,ṙo,ω)
+	state = TR.RigidBodyState(prop,nmcs,ro,R,ṙo,ω,ci,Φi)
+	rb = TR.RigidBody(prop,state,platemesh)
 end
 
 function tower3d(;
@@ -124,25 +291,16 @@ function tower3d(;
 		])
 		for r in [r1,r2,r1,r1,r1,r1]
 	]
-	r̄ps = r̄pss[1]
 	for i = 4:6
 		r̄pss[i] .-= Ref(r̄pss[i][1])
 	end
-	# tetra_points = [GP.Point3D(tetra_coord...) for tetra_coord in tetra_coords]
-	# tetra_centroid = GP.centroid(GP.Primitive(tetra_points...))
-	# r̄ps = SVector{3}.(
-	# 	vcat(
-	# 		tetra_coords,
-	# 		# [[GP.getx(tetra_centroid),GP.gety(tetra_centroid),GP.getz(tetra_centroid)]]
-	# 	)
-	# )
 	ro_by_rbid = [
 		SVector(0.0,0.0, 0),
 		SVector(0.0,0.0, d),
 		SVector(0.0,0.0,2d),
-		SVector(0.0,0.0,2d-0.5h),
-		SVector(0.0,0.0,2d-0.5h+2h),
-		SVector(0.0,-0.5h*sin(α),2d-0.5h+2h+0.5h*cos(α))
+		SVector(0.0,0,2d+1.5h),
+		SVector(0.0,0,2d+1.5h),
+		SVector(0.0,-0.5h*sin(α),2d+1.5h+0.5h*cos(α))
 	]
 	R_by_rbid = [
 		SMatrix(RotX(0.0)),
@@ -172,15 +330,15 @@ function tower3d(;
 					    rirjrkrl_by_rbid[3][cycle3[i+1]]; ci = Int[]) for i = 1:3
 	]
 
-	rb7 = make_3d_tri( 7,r̄ps,ro_by_rbid[3],R_by_rbid[3],rirjrkrl_by_rbid[3][1:4]...)
+	rb7  = make_3d_tri( 7,r̄pss[3],ro_by_rbid[3],R_by_rbid[3],rirjrkrl_by_rbid[3][1:4]...)
 
-	rb8 = make_3d_tri( 8,r̄pss[4],ro_by_rbid[4],R_by_rbid[4],rirjrkrl_by_rbid[4][1])
+	rb8  = make_3d_tri( 8,r̄pss[4],ro_by_rbid[4],R_by_rbid[4],rirjrkrl_by_rbid[4][1])
 
-	rb9 = make_3d_tri( 9,r̄pss[5],ro_by_rbid[5],R_by_rbid[5],rirjrkrl_by_rbid[5][1])
+	rb9  = make_3d_tri( 9,r̄pss[5],ro_by_rbid[5],R_by_rbid[5],rirjrkrl_by_rbid[5][1])
 
 	rb10 = make_3d_tri(10,r̄pss[6],ro_by_rbid[6],R_by_rbid[6],rirjrkrl_by_rbid[6][1:ijkl]...)
 
-	rbs = TypeSortedCollection(vcat(rb1_to_3,rb4_to_6,[rb7,rb8,rb9,rb10]))
+	rbs = TypeSortedCollection(vcat(rb1_to_3,rb4_to_6,[rb7,rb8,rb9,]))
 	numberedpoints = TR.number(rbs)
 	matrix_sharing = [
 		4 0 0 0 1 0 0 0 0 0;
@@ -208,14 +366,14 @@ function tower3d(;
 		0 0 0 0 0 0 0 2 2 0;
 		0 0 0 0 0 0 0 3 3 0;
 	]
-	indexedcoords = TR.index(rbs,matrix_sharing)
+	indexedcoords = TR.index(rbs,matrix_sharing[begin:end,begin:end-1])
 	# indexedcoords = TR.index(rbs)
 	# #
 	ndcables = 9
 	nocables = 6
 	nvcables = 3
 	nocables = 6
-	ncables = ndcables + nocables + nvcables + nocables
+	ncables = ndcables + nocables + nvcables #+ nocables
 	restlend = 0.05
 	restleno = 0.01
 	restlenv = 0.05
@@ -224,15 +382,24 @@ function tower3d(;
 		fill(restlend,ndcables),
 		fill(restleno,nocables),
 		fill(restlenv,nvcables),
-		fill(restleno,nocables),
+		# fill(restleno,nocables),
 	)
     ks = vcat(
 		fill(k1,ndcables),
 		fill(k,nocables),
 		fill(k,nvcables),
-		fill(k,nocables),
+		# fill(k,nocables),
 	)
     cs = fill(c,ncables)
+	pretty_table(
+		SortedDict(
+			[
+				("k1 for first $ndcables", k1),
+				("k", k),
+				("c", c),
+			]
+		)
+	)
     cables = [TR.Cable3D(i,restlens[i],ks[i],cs[i];slack=true) for i = 1:ncables]
     acs = [TR.ManualActuator(1,collect(1:ncables),restlens[1:ncables])]
     tensiles = (cables = cables,)
@@ -262,17 +429,17 @@ function tower3d(;
 		0 0 0 0 0 0 0 2 -2 0;
 		0 0 0 0 0 0 0 3 -4 0;
 		0 0 0 0 0 0 0 4 -3 0;
-		# Outer
-		0 0 0 0 0 0 0 0 2 -2;
-		0 0 0 0 0 0 0 0 3 -3;
-		0 0 0 0 0 0 0 0 4 -4;
-		# Inner
-		0 0 0 0 0 0 0 0 2 -1;
-		0 0 0 0 0 0 0 0 3 -1;
-		0 0 0 0 0 0 0 0 4 -1;
+		# # Outer
+		# 0 0 0 0 0 0 0 0 2 -2;
+		# 0 0 0 0 0 0 0 0 3 -3;
+		# 0 0 0 0 0 0 0 0 4 -4;
+		# # Inner
+		# 0 0 0 0 0 0 0 0 2 -1;
+		# 0 0 0 0 0 0 0 0 3 -1;
+		# 0 0 0 0 0 0 0 0 4 -1;
 	]
-	connected = TR.connect(rbs,cnt_matrix_cables)
-	# #
+	connected = TR.connect(rbs,cnt_matrix_cables[begin:end,begin:end-1])
+	#
 	#
 	# cst1 = TR.PinJoint(TR.End2End(1,TR.ID(rb1_to_3[1],2),TR.ID(rb4,1)))
 	# cst2 = TR.PinJoint(TR.End2End(2,TR.ID(rb1_to_3[2],2),TR.ID(rb4,2)))
@@ -280,6 +447,524 @@ function tower3d(;
 	# jointedmembers = TR.join((cst1,cst2,cst3),indexedcoords)
 	#
     cnt = TR.Connectivity(numberedpoints,indexedcoords,@eponymtuple(connected,))
+
+    tg = TR.TensegrityStructure(rbs,tensiles,cnt)
+    bot = TR.TensegrityRobot(tg,hub)
+end
+
+function twotre3d(;
+		κ = nothing,
+		r = 1.0,
+		r1 = 1.0,
+		b = 2.0,
+		m = 4,
+		α = 2π/m,
+		θ = 1.25α, 
+		n = 1,
+		outer = false,
+		loadmesh = true,
+		isspine = false,
+	)
+	# hh = 0.5
+	@assert θ>α
+	c = sqrt(
+		r^2 + r1^2 -2*r*r1*cos(θ)
+	)
+	h² = b^2-c^2
+	@assert h² > 0
+	h = sqrt(b^2-c^2)
+	@show r,r1
+	bps = [
+		vcat(
+			[
+				[0,0,h]
+			],
+			[
+				[3r*cos(i*α),3r*sin(i*α),0.0]
+				for i = 1:m
+			]
+		) .|> SVector{3}
+	]
+	# fig = Figure()
+	# ax = Axis3(fig[1,1])
+	# scatter!(ax,reduce(vcat,bps))
+	# scatter!(ax,reduce(vcat,midps))
+	# fig
+	plates = [
+		begin
+			if j == 1				
+				ci = collect(1:12)
+				Φi = Int[]
+			else
+				ci = Int[]
+				Φi = collect(1:6)
+			end
+			id = j
+			if isspine
+				ro = SVector(0.0,0.0,0.9(j-1)*h)
+				R = RotX(0.0)
+			else
+				ro = SVector(0.0,0.0,(j-1)*2h)
+				R = RotX(((id-1)*π))
+			end
+			ri = ro
+			r̄ps_raw = bps[1] |> Array
+			# r̄ps_ext = [
+			# 	SVector(3r̄p[1],3r̄p[2],0.0)
+			# 	for r̄p in r̄ps_raw
+			# ]
+			r̄ps = vcat(r̄ps_raw,)
+			make_3d_tri(
+				id,
+				r̄ps,ro,
+				R,ri,;
+				# movable = true,
+				# constrained = false,
+				# ci = Int[],
+				# Φi = collect(1:6),
+				color = :slategrey,
+				loadmesh,
+			)
+		end
+		for j = 1:n+1
+	]
+	nb =  length(plates)
+	rbs = plates |> TypeSortedCollection
+	numberedpoints = TR.number(rbs)
+	# indexedcoords = TR.index(rbs,sharing)
+	indexedcoords = TR.index(rbs,)
+
+	connecting_elas = ElasticArray{Int}(undef, nb, 0)
+	# outer
+	if isspine
+		ncables = 2m
+		for i = 2:m+1
+			row = zeros(Int,nb)
+			row[1] =  i
+			row[2] = -i
+			append!(connecting_elas,row)
+		end
+		for i = 2:m+1
+			row = zeros(Int,nb)
+			row[1] =  1
+			row[2] = -i
+			append!(connecting_elas,row)
+		end
+	else
+		ncables = m
+		row = zeros(Int,nb)
+		row[1] =   2
+		row[2] = -(3)
+		append!(connecting_elas,row)
+		row = zeros(Int,nb)
+		row[1] =   3
+		row[2] = -(2)
+		append!(connecting_elas,row)
+		row = zeros(Int,nb)
+		row[1] =   4
+		row[2] = -(4)
+		append!(connecting_elas,row)
+	end
+	connecting = Matrix(connecting_elas')
+	display(connecting)
+	connected = TR.connect(rbs,connecting)
+
+	ncables = size(connecting,1)
+	# @assert ncables == ncables_prism + ncables
+	κ0 = 72e9*π*(3e-3)^2/1.0
+	@show κ0
+
+	cables = [TR.Cable3D(i,0.8*2h,1e3,0.0;slack=true) for i = 1:ncables]
+	
+	acs = [
+		TR.ManualActuator(
+			2,
+			collect(1:ncables),
+			zeros(ncables)
+		),
+	]
+	tensiles = (cables = cables,)
+	hub = (actuators = acs,)
+
+	# jointedmembers = TR.join(csts,indexedcoords)
+	cnt = TR.Connectivity(numberedpoints,indexedcoords,@eponymtuple(connected,),)
+	
+	tg = TR.TensegrityStructure(rbs,tensiles,cnt)
+	TR.TensegrityRobot(tg,hub)
+end
+
+function twoprism3d(;
+		κ = nothing,
+		r = 1.0,
+		r1 = 1.0,
+		b = 2.0,
+		m = 4,
+		α = 2π/m,
+		θ = 1.25α, 
+		n = 1,
+		outer = false,
+	)
+	# hh = 0.5
+	@assert θ>α
+	c = sqrt(
+		r^2 + r1^2 -2*r*r1*cos(θ)
+	)
+	h² = b^2-c^2
+	@assert h² > 0
+	h = sqrt(b^2-c^2)
+	@show r,r1
+	bps = [
+		vcat(
+			[
+				[0,0,h]
+			],
+			[
+				[3r*cos(i*α),3r*sin(i*α),0.0]
+				for i = 1:m
+			]
+		) .|> SVector{3}
+	]
+	# fig = Figure()
+	# ax = Axis3(fig[1,1])
+	# scatter!(ax,reduce(vcat,bps))
+	# scatter!(ax,reduce(vcat,midps))
+	# fig
+	plates = [
+		begin
+			if j == 1				
+				ci = collect(1:12)
+				Φi = Int[]
+			else
+				ci = Int[]
+				Φi = collect(1:6)
+			end
+			id = j
+			ro = SVector(0.0,0.0,(j-1)*2h)
+			ri = ro
+			R = RotX(((id-1)*π))
+			r̄ps_raw = bps[1] |> Array
+			# r̄ps_ext = [
+			# 	SVector(3r̄p[1],3r̄p[2],0.0)
+			# 	for r̄p in r̄ps_raw
+			# ]
+			r̄ps = vcat(r̄ps_raw,)
+			make_3d_tri(
+				id,
+				r̄ps,ro,
+				R,ri,;
+				# movable = true,
+				# constrained = false,
+				# ci = Int[],
+				# Φi = collect(1:6),
+				color = :slategrey,
+				loadmesh = true,
+			)
+		end
+		for j = 1:n+1
+	]
+	nb =  length(plates)
+	rbs = plates |> TypeSortedCollection
+	numberedpoints = TR.number(rbs)
+	# indexedcoords = TR.index(rbs,sharing)
+	indexedcoords = TR.index(rbs,)
+
+	connecting_elas = ElasticArray{Int}(undef, nb, 0)
+	# outer
+	ncables = m
+	row = zeros(Int,nb)
+	row[1] =   2
+	row[2] = -(3)
+	append!(connecting_elas,row)
+	row = zeros(Int,nb)
+	row[1] =   3
+	row[2] = -(2)
+	append!(connecting_elas,row)
+	row = zeros(Int,nb)
+	row[1] =   4
+	row[2] = -(4)
+	append!(connecting_elas,row)
+	connecting = Matrix(connecting_elas')
+	display(connecting)
+	connected = TR.connect(rbs,connecting)
+
+	ncables = size(connecting,1)
+	# @assert ncables == ncables_prism + ncables
+	κ0 = 72e9*π*(3e-3)^2/1.0
+	@show κ0
+
+	cables = [TR.Cable3D(i,0.8*2h,1e3,0.0;slack=true) for i = 1:ncables]
+
+	acs = [
+		TR.ManualActuator(
+			2,
+			collect(1:ncables),
+			zeros(ncables)
+		),
+	]
+	tensiles = (cables = cables,)
+	hub = (actuators = acs,)
+
+	# jointedmembers = TR.join(csts,indexedcoords)
+	cnt = TR.Connectivity(numberedpoints,indexedcoords,@eponymtuple(connected,),)
+
+	tg = TR.TensegrityStructure(rbs,tensiles,cnt)
+	TR.TensegrityRobot(tg,hub)
+end
+
+function embed3d(;
+		κ = nothing,
+		r = 1.0,
+		r1 = 1.0,
+		b = 2.0,
+		m = 4,
+		α = 2π/m,
+		θ = 1.25α, 
+		n = 1,
+		outer = false,
+		isprism = false,
+	)
+	# hh = 0.5
+	@assert θ>α
+	c = sqrt(
+		r^2 + r1^2 -2*r*r1*cos(θ)
+	)
+	h² = b^2-c^2
+	@assert h² > 0
+	h = sqrt(b^2-c^2)
+	@show r,r1
+	bps = [
+		[
+			[r*cos(i*α),r*sin(i*α),j*2h]
+			for i = 1:m
+		] .|> SVector{3} |> CircularArray
+		for j = 0:n
+	]
+	midps = [
+		[
+			[r1*cos(i*α+θ),r1*sin(i*α+θ),j*2h-h]
+			for i = 1:m
+		] .|> SVector{3} |> CircularArray
+		for j = 1:n
+	]
+	# fig = Figure()
+	# ax = Axis3(fig[1,1])
+	# scatter!(ax,reduce(vcat,bps))
+	# scatter!(ax,reduce(vcat,midps))
+	# fig
+	bars = [
+		vcat(
+			[
+				make_3d_bar(
+					2m*(j-1)+i,
+					bps[j][i],
+					midps[j][i]; ci = ifelse(j==1,[1,2,3],Int[])
+				) for i = 1:m
+			],
+			[
+				make_3d_bar(
+					2m*(j-1)+m+i,
+					midps[j][i-1],
+					bps[j+1][i-1];
+				) for i = 1:m
+			]
+		)
+		for j = 1:n
+	]
+	plates = [
+		begin
+			if j == 1				
+				ci = collect(1:12)
+				Φi = Int[]
+			else
+				ci = Int[]
+				Φi = collect(1:6)
+			end
+			id = (2n)*m+j
+			ro = SVector(0.0,0.0,(j-1)*2h)
+			ri = ro
+			R = RotZ(0.0)
+			r̄ps_raw = bps[1] |> Array
+			r̄ps_ext = [
+				SVector(3r̄p[1],3r̄p[2],0.0)
+				for r̄p in r̄ps_raw
+			]
+			r̄ps = vcat(r̄ps_raw,r̄ps_ext)
+			make_3d_plate(
+				id,
+				r̄ps,
+				ro,
+				R,
+				ri;
+				radius=3r,
+				movable = true,
+				m,
+				height=1e-2,
+				ci,
+				Φi,
+				loadmesh = false,
+				meshvisible = !isprism,
+			)
+		end
+		for j = 1:n+1
+	]
+	nb = sum(length.(bars)) + length(plates)
+	rbs = vcat(reduce(vcat,bars),plates) |> TypeSortedCollection
+	numberedpoints = TR.number(rbs)
+	sharing_elas = ElasticArray{Int}(undef, nb, 0)
+	cm = CircularArray(collect(1:m))
+	for j = 1:n
+		is = 2m*(j-1)
+		for i = 1:m
+			for k = 1:3
+				row = zeros(Int,nb)
+				row[is+cm[i]  ]   = k+3
+				row[is+m+cm[i+1]] = k
+				append!(sharing_elas,row)		
+			end
+		end
+	end	
+	for j = 2:n
+		is = 2m*(j-2)+m
+		for i = 1:m
+			for k = 1:3
+				row = zeros(Int,nb)
+				row[is+cm[i]  ]   = k+3
+				row[is+m+cm[i+2]] = k
+				append!(sharing_elas,row)		
+			end
+		end
+	end
+	sharing = Matrix(sharing_elas')
+	# display(sharing)
+	indexedcoords = TR.index(rbs,sharing)
+	# indexedcoords = TR.index(rbs,)
+
+	connecting_elas = ElasticArray{Int}(undef, nb, 0)
+	for j = 1:n
+		is = 2m*(j-1)
+		# lower cross
+		for i = 1:m
+			row = zeros(Int,nb)
+			row[is+cm[i  ]] =  1
+			row[is+cm[i-1]] = -2
+			append!(connecting_elas,row)
+		end
+		# additional lower cross
+		# for i = 1:m
+		# 	row = zeros(Int,nb)
+		# 	row[is+cm[i  ]] =  1
+		# 	row[is+cm[i-2]] = -2
+		# 	append!(connecting_elas,row)
+		# end
+		# upper cross
+		for i = 1:m
+			row = zeros(Int,nb)
+			row[is+cm[i+1]] = -2
+			row[is+m+cm[i]] =  2
+			append!(connecting_elas,row)
+		end
+		# addtional upper cross
+		# for i = 1:m
+		# 	row = zeros(Int,nb)
+		# 	row[is+cm[i+1]] = -2
+		# 	row[is+m+cm[i+1]] =  2
+		# 	append!(connecting_elas,row)
+		# end
+		# mid
+		for i = 1:m
+			row = zeros(Int,nb)
+			row[is+cm[i  ]] =  2
+			row[is+cm[i+1]] = -2
+			append!(connecting_elas,row)
+		end
+		# # upper
+		# for i = 1:m
+		# 	row = zeros(Int,nb)
+		# 	row[is+m+cm[i  ]] =  2
+		# 	row[is+m+cm[i+1]] = -2
+		# 	append!(connecting_elas,row)
+		# end
+	end
+	ncables_prism = size(connecting_elas,2)
+	# outer
+	ncables_outer = 0
+	for j = 1:n
+		if outer
+			is = (2n)*m
+			for i = 1:m
+				row = zeros(Int,nb)
+				row[is+j] =  m+i
+				row[is+j+1] = -i-m
+				append!(connecting_elas,row)
+			end
+			ncables_outer = n*m
+		end
+	end
+	if isprism
+		for j = 1:n
+			is = 0
+			for i = 1:m
+				row = zeros(Int,nb)
+				row[is+cm[i]] =    1
+				row[is+cm[i+1]] = -1
+				append!(connecting_elas,row)
+				row = zeros(Int,nb)
+				row[is+m+cm[i]] =    2
+				row[is+m+cm[i+1]] = -2
+				append!(connecting_elas,row)
+			end
+		end
+		ncables_prism += (n+1)*m
+	end
+	connecting = Matrix(connecting_elas')
+	# display(connecting)
+	connected = TR.connect(rbs,connecting)
+
+	ncables = size(connecting,1)
+	# @assert ncables == ncables_prism + ncables_outer
+
+	mat_cable = filter(
+		row->row.name == "Nylon 66",
+		material_properties
+	)[1]
+	diameter = 1e-3Unitful.m
+	cable_length = 0.1Unitful.m
+	κ = (mat_cable.modulus_elas)*π*(diameter/2)^2/cable_length
+	# @show κ
+	@show uconvert(Unitful.N/Unitful.m,κ),ustrip(Unitful.N/Unitful.m,κ)
+	cables_prism = [TR.Cable3D(i,0.0,   ustrip(Unitful.N/Unitful.m,κ),0.0;slack=true) for i = 1:ncables_prism]
+	cables_outer = [
+		TR.Cable3D(i,[0.95,0.85,0.75][((i-ncables_prism) % 3)+1]*0.2,ustrip(Unitful.N/Unitful.m,κ),0.0;slack=true) 
+		for i = ncables_prism+1:ncables
+	]
+	@show 2h
+	cables = vcat(
+		cables_prism,
+		cables_outer
+	)
+	acs = [
+		TR.ManualActuator(
+			1,
+			collect(1:ncables_prism),
+			zeros(ncables_prism)
+		),
+		TR.ManualActuator(
+			2,
+			collect(ncables_prism+1:ncables),
+			zeros(ncables_outer)
+		),
+	]
+	tensiles = (cables = cables,)
+	hub = (actuators = acs,)
+	
+	csts = [
+		TR.PinJoint(TR.End2End(i,TR.ID(bars[j][m+cm[i]],2),TR.ID(plates[j+1],cm[i-1])))
+		 for j = 1:n for i = 1:m
+	]
+
+	jointedmembers = TR.join(csts,indexedcoords)
+
+	cnt = TR.Connectivity(numberedpoints,indexedcoords,@eponymtuple(connected,),jointedmembers)
 
     tg = TR.TensegrityStructure(rbs,tensiles,cnt)
     bot = TR.TensegrityRobot(tg,hub)
@@ -781,16 +1466,49 @@ function new_deck(id,r̄ps,ro,R,ri,box;
 		ci = Int[],
 		Φi = collect(1:6),
 	)
-	# uci = collect(1:6)
-	m = 0.2999233976
+	mat = filter(
+		row -> row.name == "Teak", 
+		material_properties
+	)[1]
+	density = mat.density |> ustrip
+	box_volume = Meshes.volume(box)
+	mass = density*box_volume
+	# bar_inertia_exp = :(1/12*$mass*$bar_length^2)
+	wid,len,hei = Meshes.sides(box)
+	# m = 0.2999233976
 	Īg = SMatrix{3,3}(
-		Matrix(Diagonal([7.6639282053E-04,7.6638139752E-04,1.2464720496E-03]))
+		Matrix(
+			Diagonal(
+				[
+					mass*(hei^2+len^2)/12, #Ix
+					mass*(hei^2+wid^2)/12, #Iy
+					mass*(len^2+wid^2)/12, #Iz
+				]
+			)
+		)
 	)
 	r̄g = [0,0,0.0]
-	@show m,diag(Īg),r̄g
+	pretty_table(
+		SortedDict(
+			[
+				("id", id),
+				("mass", mass),
+				("density", density),
+				("inertia", Īg),
+				("wid,len,hei", (wid,len,hei)),
+				("box_volume", box_volume)
+			]
+		)
+	)
+
 	prop = TR.RigidBodyProperty(
-		id,movable,m,Īg,
-		r̄g,r̄ps;constrained=constrained
+		id,
+		movable,
+		mass,
+		Īg,
+		r̄g,
+		r̄ps;
+		constrained=constrained
 	)
 	ṙo = zero(ro)
 	ω = zero(ro)
@@ -814,7 +1532,7 @@ function bridge3d(;
 	)
 
 	hw = sqrt(l^2 - (h+b)^2 ) - hww
-
+	
 	up = [
 		[ hw*i,6+3*i+12*j, h+b]
 		for i in [-1,1], j = 0:n-1
@@ -831,10 +1549,10 @@ function bridge3d(;
 			for i in [-1,1], j = 0:2n
 		]
 		reverse!(@view ret[2,:])
-		@show ret
+		# @show ret
 		ret
 	end |> transpose |> vec .|> SVector{3}
-	display(mid)
+	# display(mid)
 	lbars = [
 		make_3d_bar(
 		i,
@@ -850,11 +1568,11 @@ function bridge3d(;
 		for i = 1:n
 	]
 	deckcenter = SVector(0.0,n/2*12,b)
-	r̄ps_deck = mid.-Ref(deckcenter)
-	厚度=0.5
-	box= Meshes.Box(
+	r̄ps_deck = vcat(mid,[SVector(0.0,0.0,b)]).-Ref(deckcenter)
+	hei = 0.25
+	box = Meshes.Box(
 		Meshes.Point(r̄ps_deck[begin]), 
-		Meshes.Point(r̄ps_deck[2n+2]+SVector(0,0,厚度))
+		Meshes.Point(r̄ps_deck[2n+2]+SVector(0,0,hei))
 	)
 	deck = new_deck(
 		2n+1,r̄ps_deck, # r̄ps
@@ -961,12 +1679,33 @@ function bridge3d(;
 		# 	append!(cnt_matrix_elas,row)
 		# end
 	end
-	display(cnt_matrix_elas)
+	# cross
+	for i = 1:n
+		if  i == 1
+			js, je = 2n+1-i, 2n+1-i
+		else
+			js, je = 2n+1-i, 2n+1-i+1
+		end
+		for j = js:je		
+			row = zeros(Int,2n+1)
+			row[i] = 2
+			row[j] = -2
+			append!(cnt_matrix_elas,row)
+		end
+	end
+	# display(cnt_matrix_elas)
 	cnt_matrix = Matrix(transpose(cnt_matrix_elas))
 	ncables = size(cnt_matrix,1)
 	hncables = div(ncables,2)
+	mat_cable = filter(
+		row->row.name == "Nylon 66",
+		material_properties
+	)[1]
+	diameter = 1e-2
+	κ = (mat_cable.modulus_elas |> ustrip)*1e9*π*(diameter/2)^2/10
+	@show κ
 	if k isa Nothing
-		cables = [TR.Cable3D(i,0.0,100.0,0.0;slack=false) for i = 1:ncables]
+		cables = [TR.Cable3D(i,0.0,κ,0.0;slack=false) for i = 1:ncables]
 	else
 		cables = [TR.Cable3D(i,0.0,k[i],0.0;slack=false) for i = 1:ncables]
 	end
@@ -1137,4 +1876,111 @@ function lander(;k=nothing)
 
 	tg = TR.TensegrityStructure(rbs,tensiles,cnt)
 	bot = TR.TensegrityRobot(tg,hub)
+end
+
+function simple(;
+		c=0.0,
+		m = 4,
+		α = 2π/m,
+		k = 100.0,
+		z0 = 0.2,
+		ωz = 5.0,
+		mbar = 0.05,
+		free = false,
+	)
+	lₛ = 15e-3
+	DE = 300e-3
+	d = (150*√2)*1e-3
+	r = d/2
+	bps = [
+		[r*cos(i*α),r*sin(i*α),0.0]
+		for i = 1:m
+	] .|> SVector{3}
+	ro = SVector(0,0,z0)
+	Rplate = RotX(π/4)
+	Rbar = RotY(-π/12)
+	p = Ref(Rbar) .* [
+		[0,0, DE/2],
+		[0,0,-DE/2]
+	] .+ Ref(ro) .|> SVector{3}
+	
+	# fig,ax,plt = scatter(p)
+	# # ax.aspect = DataAspect()
+	# fig
+	ṙo_ref = SVector(0.0,0,0)
+
+	rbs = [
+		make_3d_bar(
+			1, 
+			p[end-1],
+			p[end];
+			# ṙi = ṙo_ref, 
+			# ṙj = ṙo_ref,
+			m = mbar,
+			mat_name = "Teak"
+		),
+		make_3d_plate(
+			2, 
+			bps,ro,
+			Rplate,ro;
+			m,
+			radius = r,
+			# constrained = !free,	
+			ci = ifelse(free,Int[],collect(1:12)),
+			Φi = ifelse(free,collect(1:6),Int[]),
+		)
+	]
+
+	rigdibodies = TypeSortedCollection(rbs)
+	numberedpoints = TR.number(rigdibodies)
+	indexedcoords = TR.index(rigdibodies)
+	#
+	ncables = 2m
+
+	original_restlens = zeros(ncables)
+	original_restlens[  1: m] .= 0.05
+	original_restlens[m+1:2m] .= 0.1
+
+	ks = zeros(ncables)
+	ks[  1: m] .= ks[m+1:2m] .= k
+
+	cables = [
+		TR.Cable3D(i, original_restlens[i], ks[i], c;slack=true) for i = 1:ncables
+	]
+
+	pretty_table(
+		reduce(vcat,[
+				[
+					"No.$i" "Rest length" "$(original_restlens[i])" "Stiffness" "$(ks[i])" "Damping" "$c";
+				] 
+				for i = 1:2m
+			]
+		)
+	)
+	#
+	tensiles = (cables = cables,)
+	acs = [
+	TR.ManualActuator(
+		i,
+		collect(1:2m), [original_restlens[2m*(i-1)+j] for j = 1:6],
+	) for i = [1]
+	]
+	hub = (actuators = acs,)
+	# #
+	matrix_cnt = zeros(Int,ncables,2)
+	for j = 1:ncables
+	if j <= m
+		matrix_cnt[j, 1:2] = [1, -j]
+	else
+		matrix_cnt[j, 1:2] = [2, -(j-m)]
+	end
+	end
+	# display(matrix_cnt)
+	connected = TR.connect(rigdibodies, matrix_cnt)
+	tensioned = @eponymtuple(connected,)
+	#
+	cnt = TR.Connectivity(numberedpoints, indexedcoords, tensioned)
+	# #
+	tg = TR.TensegrityStructure(rigdibodies, tensiles, cnt, )
+	bot = TR.TensegrityRobot(tg, hub)
 end

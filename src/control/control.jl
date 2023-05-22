@@ -107,7 +107,7 @@ function actuate!(bot::TensegrityRobot,μs)
         actuate!(tg,actuator,μs[id])
     end
 end
-#
+
 # function heat!(tr::TensegrityRobot,us;inc=false)
 #     @unpack tg, hub = tr
 #     @unpack heaters = hub
@@ -115,8 +115,6 @@ end
 #         heat!(heater,tg,u;inc)
 #     end
 # end
-#
-#
 #
 # function heat!(ctrller::ManualHeater,tg,u;inc=false,abs=true)
 #     @unpack SMA_cables = tg.tensiles

@@ -45,7 +45,7 @@ plot_traj!(tgbridge1;AxisType=LScene,showground=false)
 ℓ = TR.get_cables_len(tgbridge1.tg)
 Y = TR.build_Y(tgbridge1)
 ax = float.(Y)\ℓ
-B,F̃ = TR.build_inverse_statics_for_actuation(tgbridge1,tgbridge1)
+B,F̃ = TR.build_inverse_statics_for_actuation(tgbridge1,tgbridge1;gravity=false)
 # B,F̃ = TR.build_inverse_statics_for_restlength(tgbridge1.tg,tgbridge1.tg)
 rank(B)
 size(B)
