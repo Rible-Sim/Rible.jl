@@ -241,9 +241,11 @@ function plot_traj!(bot::TR.TensegrityRobot;
         @warn "Not supported type of tgini"
         showinit = false
     end
-    showmesh = showmesh || mapreduce(&, TR.get_rigidbodies(tg)) do rb
-            rb.mesh isa GB.Mesh
+
+    hasmesh = mapreduce(&, TR.get_rigidbodies(tg)) do rb
+        rb.mesh isa GB.Mesh
     end
+    showmesh = showmesh && hasmesh 
     ndim = TR.get_ndim(tg)
     xmin,xmax = xlims
     ymin,ymax = ylims
@@ -557,6 +559,7 @@ function init_plot!(ax,tgob;
                     # color = :grey,
                     shading = true,
                     # strokewidth
+                    transparency = true
                 )
             end
         end
