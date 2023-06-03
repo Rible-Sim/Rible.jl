@@ -65,9 +65,13 @@ includet("dyn.jl")
 includet("def.jl")
 includet("def3d.jl")
 includet("../bridge/bridge.jl")
-figdir::String = raw"C:\Users\luo22\OneDrive\Papers\DynamicTensegrity\ES"
-# figdir::String =raw"C:\Users\luo22\OneDrive\Papers\Ph.D.Thesis\dyn"
-
+figdir::String = ""
+if Sys.iswindows()
+    figdir::String = raw"C:\Users\luo22\OneDrive\Papers\DynamicTensegrity\ES"
+    # figdir::String =raw"C:\Users\luo22\OneDrive\Papers\Ph.D.Thesis\dyn"
+elseif Sys.isapple()
+    figdir::String = raw"."
+end
 fontsize = 8 |> pt2px
 markersize = fontsize
 linewidth = 0.5 |> pt2px
@@ -452,7 +456,7 @@ TR.solve!(
 
 GM.activate!();plot_traj!(newsim_freed;)
 
-WM.activate!(); with_theme(
+GM.activate!(); with_theme(
         theme_pub;
         resolution = (0.6cw,0.3cw),
         figure_padding = (0,0,0,0),

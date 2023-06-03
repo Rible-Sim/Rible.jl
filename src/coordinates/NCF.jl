@@ -4,6 +4,7 @@ using StaticArrays
 using Parameters
 using ForwardDiff
 using DocStringExtensions
+using SymmetricFormats
 
 export get_nconstraints, get_ncoords, get_ndof, get_nlocaldim
 """
@@ -788,109 +789,45 @@ end
 返回二维或三维内部约束，用于刚性直杆。
 $(TYPEDSIGNATURES)
 """
-function make_Φ(nmcs::LNC2D2P,Φi,deforms)
+function make_Φ(nmcs::Union{LNC2D4C,LNC3D6C},Φi,deforms)
+    ndim = get_ndim(nmcs)
+    cv = get_conversion(nmcs)
     @inline @inbounds function _inner_Φ(q,d)
-        xi,yi,xj,yj = q
-        all = [(xj-xi)^2 + (yj-yi)^2 - d^2]
+        qstd = cv*q
+        u = @view qstd[ndim+1:2ndim]
+        all = [u⋅u - d^2]
         all[Φi]
     end
     make_inner_Φ(_inner_Φ,deforms)
 end
-function make_Φ(nmcs::LNC3D2P,Φi,deforms)
+"""
+返回二维内部约束，用于任意形状刚体。
+$(TYPEDSIGNATURES)
+"""
+function make_Φ(nmcs::LNC2D6C,Φi,deforms)
+    cv = get_conversion(nmcs)
     @inline @inbounds function _inner_Φ(q,d)
-        xi,yi,zi,xj,yj,zj = q
-        all = [(xj-xi)^2 + (yj-yi)^2 + (zj-zi)^2- d^2]
+        qstd = cv*q
+        u = @view qstd[3:4]
+        v = @view qstd[5:6]
+        all = [(u⋅u - d[1]^2)/2, (v⋅v - d[2]^2)/2, √2/2*(u⋅v - d[3])]
         all[Φi]
     end
     make_inner_Φ(_inner_Φ,deforms)
 end
 
-"""
-返回二维内部约束，用于任意形状刚体。
-$(TYPEDSIGNATURES)
-"""
-function make_Φ(nmcs::LNC1P2V,Φi,deforms)
-    @inline @inbounds function _inner_Φ(q,d)
-        u = @view q[3:4]
-        v = @view q[5:6]
-        all = [(u⋅u - d[1]^2)/2, (v⋅v - d[2]^2)/2, √2/2*(u⋅v - d[3])]
-        all[Φi]
-    end
-    make_inner_Φ(_inner_Φ,deforms)
-end
-function make_Φ(nmcs::LNC2P1V,Φi,deforms)
-    @inline @inbounds function _inner_Φ(q,d)
-        ri = @view q[1:2]
-        rj = @view q[3:4]
-        u = rj-ri
-        v = @view q[5:6]
-        all = [(u⋅u - d[1]^2)/2, (v⋅v - d[2]^2)/2, √2/2*(u⋅v - d[3])]
-        # all = [√2/4/d[1]*(u⋅u - d[1]^2), √2/4/d[2]*(v⋅v - d[2]^2), sqrt(1/(2d[1]+d[2]))*(u⋅v - d[3]^2)]
-        all[Φi]
-    end
-    make_inner_Φ(_inner_Φ,deforms)
-end
-function make_Φ(nmcs::LNC3P,Φi,deforms)
-    @inline @inbounds function _inner_Φ(q,d)
-        ri = @view q[1:2]
-        rj = @view q[3:4]
-        rk = @view q[5:6]
-        u = rj-ri
-        v = rk-ri
-        all = [(u⋅u - d[1]^2), (v⋅v - d[2]^2), (u⋅v - d[3])]
-        all[Φi]
-    end
-    make_inner_Φ(_inner_Φ,deforms)
-end
 
 """
 返回三维内部约束，用于任意形状刚体。
 $(TYPEDSIGNATURES)
 """
-function make_Φ(nmcs::LNC1P3V,Φi,deforms)
+function make_Φ(nmcs::LNC3D12C,Φi,deforms)
+    cv = get_conversion(nmcs)
     @inline @inbounds function _inner_Φ(q,d)
-        u = @view q[4:6]
-        v = @view q[7:9]
-        w = @view q[10:12]
-        all = [u⋅u - d[1]^2, v⋅v - d[2]^2, w⋅w - d[3]^2, v⋅w - d[4], u⋅w - d[5], u⋅v - d[6]]
-        @view all[Φi]
-    end
-    make_inner_Φ(_inner_Φ,deforms)
-end
-function make_Φ(nmcs::LNC2P2V,Φi,deforms)
-    @inline @inbounds function _inner_Φ(q,d)
-        ri = @view q[1:3]
-        rj = @view q[4:6]
-        u = rj-ri
-        v = @view q[7:9]
-        w = @view q[10:12]
-        all = [u⋅u - d[1]^2, v⋅v - d[2]^2, w⋅w - d[3]^2, v⋅w - d[4], u⋅w - d[5], u⋅v - d[6]]
-        @view all[Φi]
-    end
-    make_inner_Φ(_inner_Φ,deforms)
-end
-function make_Φ(nmcs::LNC3P1V,Φi,deforms)
-    @inline @inbounds function _inner_Φ(q,d)
-        ri = @view q[1:3]
-        rj = @view q[4:6]
-        rk = @view q[7:9]
-        u = rj-ri
-        v = rk-ri
-        w = @view q[10:12]
-        all = [u⋅u - d[1]^2, v⋅v - d[2]^2, w⋅w - d[3]^2, v⋅w - d[4], u⋅w - d[5], u⋅v - d[6]]
-        @view all[Φi]
-    end
-    make_inner_Φ(_inner_Φ,deforms)
-end
-function make_Φ(nmcs::LNC4P,Φi,deforms)
-    @inline @inbounds function _inner_Φ(q,d)
-        ri = @view q[1:3]
-        rj = @view q[4:6]
-        rk = @view q[7:9]
-        rl = @view q[10:12]
-        u = rj-ri
-        v = rk-ri
-        w = rl-ri
+        qstd = cv*q
+        u = @view qstd[4:6]
+        v = @view qstd[7:9]
+        w = @view qstd[10:12]
         all = [u⋅u - d[1]^2, v⋅v - d[2]^2, w⋅w - d[3]^2, v⋅w - d[4], u⋅w - d[5], u⋅v - d[6]]
         @view all[Φi]
     end
@@ -914,15 +851,15 @@ end
 返回二维或三维雅可比矩阵，用于刚性直杆。
 $(TYPEDSIGNATURES)
 """
-function make_Φq(nmcs::Union{LNC2D2P,LNC3D2P},uci,Φi)
+function make_Φq(nmcs::Union{LNC2D4C,LNC3D6C},uci,Φi)
     ndim = get_ndim(nmcs)
+    cv = get_conversion(nmcs)
     @inline @inbounds function inner_Φq(q)
-        ri = @view q[1:ndim]
-        rj = @view q[ndim+1:2ndim]
+        qstd = cv*q
+        u = @view qstd[ndim+1:2ndim]
         ret = zeros(eltype(q),1,2ndim)
-        ret[1,     1: ndim] = -2 .*(rj.-ri)
-        ret[1,ndim+1:2ndim] = -ret[1,1:ndim]
-        @view ret[Φi,uci]
+        ret[ndim+1:2ndim] = 2u
+        @view (ret*cv)[Φi,uci]
     end
 end
 
@@ -930,179 +867,46 @@ end
 返回二维雅可比矩阵，用于任意形状刚体。
 $(TYPEDSIGNATURES)
 """
-function make_Φq(nmcs::LNC1P2V,uci,Φi)
+function make_Φq(nmcs::LNC2D6C,uci,Φi)
+    cv = get_conversion(nmcs)
     @inline @inbounds function inner_Φq(q)
-        u = @view q[3:4]
-        v = @view q[5:6]
+        qstd = cv*q
+        u = @view qstd[3:4]
+        v = @view qstd[5:6]
         ret = zeros(eltype(q),3,6)
         ret[1,3:4] = u
         ret[2,5:6] = v
         ret[3,3:4] = √2/2*v
         ret[3,5:6] = √2/2*u
-        @view ret[Φi,uci]
+        @view (ret*cv)[Φi,uci]
     end
 end
-function make_Φq(nmcs::LNC2P1V,uci,Φi)
-    # d = get_deform(nmcs)
-    # a = sqrt(1/(2d[2]^2+d[1]^2))
-    # weights = zeros(Rational{Int64},3,6)
-    # weights[1,1:4] .= 1//4
-    # weights[2,3:4] .= 1//2
-    # weights[3,1:6] .= 1//6
-    # wsum = sqrt.(inv.(sum(weights[:,uci],dims=2)))
-    @inline @inbounds function inner_Φq(q)
-        ri = @view q[1:2]
-        rj = @view q[3:4]
-        u = rj-ri
-        v = @view q[5:6]
-        ret = zeros(eltype(q),3,6)
-        ret[1,1:2] =-u
-        ret[1,3:4] = u
-        ret[2,5:6] = v
-        ret[3,1:2] =-√2/2*v
-        ret[3,3:4] = √2/2*v
-        ret[3,5:6] = √2/2*u
-        @view ret[Φi,uci]
-    end
-end
-function make_Φq(nmcs::LNC3P,uci,Φi)
-    @inline @inbounds function inner_Φq(q)
-        ri = @view q[1:2]
-        rj = @view q[3:4]
-        rk = @view q[5:6]
-        u = rj-ri
-        v = rk-ri
-        ret = zeros(eltype(q),3,6)
-        ret[1,1:2] = -2u
-        ret[1,3:4] =  2u
-        ret[2,1:2] = -2v
-        ret[2,5:6] =  2v
-        ret[3,1:2] =  -v-u
-        ret[3,3:4] =   v
-        ret[3,5:6] =   u
-        @view ret[Φi,uci]
-    end
-end
-
 """
 返回三维雅可比矩阵，用于任意形状刚体。
 $(TYPEDSIGNATURES)
 """
-function make_Φq(nmcs::LNC1P3V,uci,Φi)
+function make_Φq(nmcs::LNC3D12C,uci,Φi)
+    cv = get_conversion(nmcs)
     @inline @inbounds function inner_Φq(q)
-        ri = @view q[1:3]
-        u  = @view q[4:6]
-        v  = @view q[7:9]
-        w  = @view q[10:12]
+        qstd = cv*q
+        u  = @view qstd[4:6]
+        v  = @view qstd[7:9]
+        w  = @view qstd[10:12]
         ret = zeros(eltype(q), 6, 12)
         ret[1,4:6]   = 2u
         ret[2,7:9]   = 2v
         ret[3,10:12] = 2w
 
-        ret[4,7:9]   = w
+        ret[4 ,7:9]  = w
         ret[4,10:12] = v
 
-        ret[5,4:6] =  w
+        ret[5, 4:6]  = w
         ret[5,10:12] = u
 
         ret[6,4:6] =  v
         ret[6,7:9] =  u
 
-        @view ret[Φi,uci]
-    end
-end
-function make_Φq(nmcs::LNC2P2V,uci,Φi)
-    @inline @inbounds function inner_Φq(q)
-        ri = @view q[1:3]
-        rj = @view q[4:6]
-        u  = rj-ri
-        v  = @view q[7:9]
-        w  = @view q[10:12]
-        ret = zeros(eltype(q), 6, 12)
-        ret[1,1:3] = -2u
-        ret[1,4:6] =  2u
-
-        ret[2,7:9]   = 2v
-        ret[3,10:12] = 2w
-
-        ret[4,7:9]   = w
-        ret[4,10:12] = v
-
-        ret[5,1:3] = -w
-        ret[5,4:6] =  w
-        ret[5,10:12] = u
-
-        ret[6,1:3] = -v
-        ret[6,4:6] =  v
-        ret[6,7:9] =  u
-
-        @view ret[Φi,uci]
-    end
-end
-function make_Φq(nmcs::LNC3P1V,uci,Φi)
-    @inline @inbounds function inner_Φq(q)
-        ri = @view q[1:3]
-        rj = @view q[4:6]
-        u  = rj-ri
-        rk = @view q[7:9]
-        v  = rk-ri
-        w  = @view q[10:12]
-        ret = zeros(eltype(q), 6, 12)
-        ret[1,1:3] = -2u
-        ret[1,4:6] =  2u
-
-        ret[2,1:3] = -2v
-        ret[2,7:9] =  2v
-
-        ret[3,10:12] = 2w
-
-        ret[4,1:3]   =-w
-        ret[4,7:9]   = w
-        ret[4,10:12] = v
-
-        ret[5,1:3] = -w
-        ret[5,4:6] =  w
-        ret[5,10:12] = u
-
-        ret[6,1:3] = -v-u
-        ret[6,4:6] =  v
-        ret[6,7:9] =  u
-
-        @view ret[Φi,uci]
-    end
-end
-function make_Φq(nmcs::LNC4P,uci,Φi)
-    @inline @inbounds function inner_Φq(q)
-        ri = @view q[1:3]
-        rj = @view q[4:6]
-        u  = rj-ri
-        rk = @view q[7:9]
-        v  = rk-ri
-        rl = @view q[10:12]
-        w  = rl-ri
-        ret = zeros(eltype(q), 6, 12)
-        ret[1,1:3] = -2u
-        ret[1,4:6] =  2u
-
-        ret[2,1:3] = -2v
-        ret[2,7:9] =  2v
-
-        ret[3,1:3]   = -2w
-        ret[3,10:12] =  2w
-
-        ret[4,1:3]   =-w-v
-        ret[4,7:9]   = w
-        ret[4,10:12] = v
-
-        ret[5,1:3] = -w-u
-        ret[5,4:6] =  w
-        ret[5,10:12] = u
-
-        ret[6,1:3] = -v-u
-        ret[6,4:6] =  v
-        ret[6,7:9] =  u
-
-        @view ret[Φi,uci]
+        @view (ret*cv)[Φi,uci]
     end
 end
 
@@ -1166,6 +970,77 @@ struct CoordinateFunctions{nmcsType,
     ∂Aq̇∂q::∂Aq̇∂qT
 end
 
+
+get_idx(nmcs::Union{LNC2D4C,LNC3D6C}) = [
+    [CartesianIndex(2,2),CartesianIndex(2,2)],
+]
+
+get_idx(nmcs::LNC2D6C) = [
+    [CartesianIndex(2,2),CartesianIndex(2,2)],
+    [CartesianIndex(3,3),CartesianIndex(3,3)],
+    [CartesianIndex(2,3),CartesianIndex(3,2)]
+]
+
+get_idx(nmcs::LNC3D12C) = [
+    [CartesianIndex(2,2),CartesianIndex(2,2)],
+    [CartesianIndex(3,3),CartesianIndex(3,3)],
+    [CartesianIndex(4,4),CartesianIndex(4,4)],
+    [CartesianIndex(3,4),CartesianIndex(4,3)],
+    [CartesianIndex(2,4),CartesianIndex(4,2)],
+    [CartesianIndex(2,3),CartesianIndex(3,2)]
+]
+
+#todo cache Φqᵀq
+function make_Φqᵀq(nmcs::LNC)
+    cv = get_conversion(nmcs)
+    nld = get_nlocaldim(nmcs)
+    ndim = get_ndim(nmcs)
+    I_int = make_I(Int,ndim)
+    idx = get_idx(nmcs)
+    Φqᵀq = [
+        begin
+            ret_raw = zeros(Int,nld+1,nld+1)
+            for ij in id
+                ret_raw[ij] += 1
+            end
+            SymmetricPacked(transpose(cv)*kron(ret_raw,I_int)*cv)
+        end
+        for id in idx
+    ]
+
+end
+
+#todo use SymmetricPacked to the end
+function make_∂Aᵀλ∂q(nmcs::LNC,uci,Φi)
+    Φqᵀq = make_Φqᵀq(nmcs)
+    function ∂Aᵀλ∂q(λ)
+        ret = [
+            begin
+                a = Φqᵀq[j][uci,uci] .* λ[i]
+                # display(a)
+                a 
+            end
+            for (i,j) in enumerate(Φi)
+        ]
+        sum(ret)
+    end
+end
+
+function make_∂Aq̇∂q(nmcs::LNC,uci,Φi)
+    Φqᵀq = make_Φqᵀq(nmcs)
+    function ∂Aq̇∂q(q̇)
+        q̇uc = @view q̇[uci]
+        ret = [
+            begin
+                a = transpose(q̇uc)*Φqᵀq[j][uci,uci]
+                # display(a)
+                a 
+            end
+            for j in Φi
+        ]
+        sum(ret)
+    end
+end
 """
 返回∂Aᵀλ∂q的前向自动微分结果。
 $(TYPEDSIGNATURES)
@@ -1180,6 +1055,8 @@ function make_∂Aᵀλ∂q_forwarddiff(Φq,nq,nuc)
         ForwardDiff.jacobian!(out,ATλ,ones(λT,nq))
     end
 end
+
+
 
 """
 返回∂Aq̇∂q的前向自动微分结果。
@@ -1216,8 +1093,10 @@ function CoordinateFunctions(nmcs,uci,Φi)
     nq = get_ncoords(nmcs)
     nuc = length(uci)
     nΦ = length(Φi)
-    ∂Aᵀλ∂q = make_∂Aᵀλ∂q_forwarddiff(Φq,nq,nuc)
-    ∂Aq̇∂q = make_∂Aq̇∂q_forwarddiff(Φq,nuc,nΦ)
+    # ∂Aᵀλ∂q = make_∂Aᵀλ∂q_forwarddiff(Φq,nq,nuc)
+    ∂Aᵀλ∂q = make_∂Aᵀλ∂q(nmcs,uci,Φi)
+    # ∂Aq̇∂q = make_∂Aq̇∂q_forwarddiff(Φq,nuc,nΦ)
+    ∂Aq̇∂q = make_∂Aq̇∂q(nmcs,uci,Φi)
     CoordinateFunctions(nmcs,c,C,Φ,Φq,∂Aᵀλ∂q,∂Aq̇∂q)
 end
 

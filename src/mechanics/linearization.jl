@@ -68,7 +68,7 @@ function ∂Aᵀλ∂q̌(tg::AbstractTensegrityStructure,λ)
         memincst = mem2sysincst[rbid]
         free_idx = rb.state.cache.free_idx
         if !isempty(memincst)
-            ret[memfree,memfree] .+= rb.state.cache.funcs.∂Aᵀλ∂q(λ[memincst])[:,free_idx]
+            ret[memfree,memfree] .+= rb.state.cache.funcs.∂Aᵀλ∂q(λ[memincst])#[:,free_idx]
         end
     end
     ret
