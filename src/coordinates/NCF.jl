@@ -323,6 +323,17 @@ function rigidstate2naturalcoords(nmcs::LNCMP,ro,R,ṙo,ω)
     q̇ = reduce(vcat,ṙps)
     q,q̇
 end
+
+function rigidstate2naturalcoords(nmcs,ro,R)
+    (;r̄i,X̄) = nmcs
+    ri = ro + R*r̄i
+    X = R*X̄
+    qstd = vcat(ri,vec(X))
+    Y = get_conversion(nmcs)
+    q = Y\qstd
+    q
+end
+
 function rigidstate2naturalcoords(nmcs,ro,R,ṙo,ω)
     (;r̄i,X̄) = nmcs
     ri = ro + R*r̄i

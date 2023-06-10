@@ -16,10 +16,13 @@ using Meshing
 using Unitful, Match
 using LaTeXStrings
 using Printf
+using AbbreviatedStackTraces
+ENV["JULIA_STACKTRACE_ABBREVIATED"] = true
+ENV["JULIA_STACKTRACE_MINIMAL"] = true
 using Revise
 import TensegrityRobots as TR
-
 include("../vis.jl"); includet("../vis.jl")
+#-- preamble
 
 function parse_vector(T,v)
     parse.(T,split(v))
@@ -510,22 +513,23 @@ function urdf_to_rigidrobot(urdf,T=Float64)
 	tg = TR.TensegrityStructure(rbs,tensiles,cnt,)
     bot = TR.TensegrityRobot(tg)
 end
-
+#-- functions
 
 # urdf = readxml(raw"spot_ros\spot_description\urdf\spot.urdf.xacro")
 
-cd(raw"examples\URDF")
+cd(raw"examples/URDF")
 
-urdf = readxml(raw"anymal_b_simple_description\urdf\anymal.urdf")
+urdf = readxml(raw"anymal_b_simple_description/urdf/anymal.urdf")
 
-cd(raw"examples\URDF\unitree_ros\robots")
-urdf = readxml(raw"a1_description\urdf\a1.urdf")
+cd(raw"examples/URDF/unitree_ros/robots")
+urdf = readxml(raw"a1_description/urdf/a1.urdf")
 
-urdf = readxml(raw"example-robot-data\robots\double_pendulum_description\urdf\double_pendulum.urdf")
+urdf = readxml(raw"example-robot-data/robots/double_pendulum_description/urdf/double_pendulum.urdf")
 
-urdf = readxml(raw"example-robot-data\robots\anymal_b_simple_description\robots\anymal.urdf")
+urdf = readxml(raw"example-robot-data/robots/anymal_b_simple_description/robots/anymal.urdf")
 
-urdf = readxml(raw"example-robot-data\robots\panda_description\urdf\panda.urdf")
+urdf = readxml(raw"example-robot-data/robots/panda_description/urdf/panda.urdf")
+
 newbot = urdf_to_rigidrobot(urdf)
 
 TR.ASSETS_DIR
@@ -549,7 +553,8 @@ mass_matrices.M̌ |> size
 plot_traj!(
     newbot;
     # AxisType=Axis3,
-    showpoints=false,
+    showmesh=true,
+    showpoints=true,
     showlabels=false,
     showground=false
 )
@@ -581,7 +586,7 @@ tspan = (0.0,1.1)
 prob = TR.SimProblem(newbot,dynfuncs)
 
 TR.solve!(prob,TR.Zhong06();tspan,dt,ftol=1e-10,maxiters=50,verbose=true,exception=true)
-
+newbot.traj
 with_theme(theme_pub;
     figure_padding = (0,0,0,0),) do 
     plot_traj!(
@@ -590,14 +595,14 @@ with_theme(theme_pub;
         showpoints=false,
         showlabels=false,
         showground=false,
-        doslide=false
+        doslide=true
     )
 end
 ME = TR.mechanical_energy!(newbot;gravity=true)
 ME.V |> lines
 ME.T |> lines
 ME.E |> lines
-
+ME.E
 jie = load("末节.STL")
 mesh(jie;color=:white)
 scatter!([Point3f(0.0,0.0,0.0)])

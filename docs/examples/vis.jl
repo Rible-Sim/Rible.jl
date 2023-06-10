@@ -242,10 +242,11 @@ function plot_traj!(bot::TR.TensegrityRobot;
         showinit = false
     end
 
-    hasmesh = mapreduce(&, TR.get_rigidbodies(tg)) do rb
+    hasmesh = mapreduce(|, TR.get_rigidbodies(tg)) do rb
         rb.mesh isa GB.Mesh
     end
-    showmesh = showmesh && hasmesh 
+    showmesh = showmesh && hasmesh
+    @show showmesh
     ndim = TR.get_ndim(tg)
     xmin,xmax = xlims
     ymin,ymax = ylims

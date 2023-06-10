@@ -1,3 +1,6 @@
+#todo use the basic types of Constraints
+#todo parameterization of joints
+#note can full rotation constraints be linear?
 """
 ID
 $(TYPEDEF)
@@ -264,10 +267,10 @@ function RevoluteJoint(e2e)
 	C2 = end2.rbsig.state.cache.Cps[pid2]
 	values = zeros(T,nΦ)
 	values[1:3] .= C1*q1 .- C2*q2
-	u1,v1,w1 = NCF.get_uvw(nmcs1,q1)
-	u2,v2,w2 = NCF.get_uvw(nmcs2,q2)
-	a1 = [u1 v1 w1]*ā1
-	inprods = transpose([u2 v2 w2])*a1
+	X1 = NCF.make_X(nmcs1,q1)
+	X2 = NCF.make_X(nmcs2,q2)
+	a1 = X1*ā1
+	inprods = transpose(X2)*a1
 	mask = 1:3 .!== argmax(abs.(inprods))
 	values[4:5] = inprods[mask]
 	RevoluteJoint(nΦ,values,e2e,mask)
@@ -278,6 +281,8 @@ function make_Φ(cst::RevoluteJoint,indexed,numbered)
 	(;mem2num,num2sys) = numbered
 	(;mem2sysfull) = indexed
 	(;end1,end2) = e2e
+	nmcs1 = end1.rbsig.state.cache.funcs.nmcs
+	nmcs2 = end2.rbsig.state.cache.funcs.nmcs
 	pid1 = end1.pid
 	pid2 = end2.pid
 	aid1 = end1.aid
@@ -290,11 +295,11 @@ function make_Φ(cst::RevoluteJoint,indexed,numbered)
 		ret = zeros(eltype(q),nconstraints)
 		q1 = @view q[mem2sysfull[end1.rbsig.prop.id]]
 		q2 = @view q[mem2sysfull[end2.rbsig.prop.id]]
-		u1,v1,w1 = NCF.get_uvw(end1.rbsig.state.cache.funcs.nmcs,q1)
-		u2,v2,w2 = NCF.get_uvw(end2.rbsig.state.cache.funcs.nmcs,q2)
-		a1 = [u1 v1 w1]*ā1
+		X1 = NCF.make_X(nmcs1,q1)
+		X2 = NCF.make_X(nmcs2,q2)
+		a1 = X1*ā1
 		ret[1:3] .= C1*q1.-C2*q2 - values[1:3]
-		ret[4:5] = transpose([u2 v2 w2][:,mask])*a1 - values[4:5]
+		ret[4:5] = transpose(X2[:,mask])*a1 - values[4:5]
 		ret
 	end
 	function inner_Φ(q,d,c)
@@ -303,15 +308,15 @@ function make_Φ(cst::RevoluteJoint,indexed,numbered)
 		rbid2 = end2.rbsig.prop.id
 		q1 = @view q[mem2sysfull[rbid1]]
 		q2 = @view q[mem2sysfull[rbid2]]
-		u1,v1,w1 = NCF.get_uvw(end1.rbsig.state.cache.funcs.nmcs,q1)
-		u2,v2,w2 = NCF.get_uvw(end2.rbsig.state.cache.funcs.nmcs,q2)
-		a1 = [u1 v1 w1]*ā1
+		X1 = NCF.make_X(nmcs1,q1)
+		X2 = NCF.make_X(nmcs2,q2)
+		a1 = X1*ā1
 		c1 = c[num2sys[mem2num[rbid1][pid1]]]
 		c2 = c[num2sys[mem2num[rbid2][pid2]]]
 		ret[1:3] .= end1.rbsig.state.cache.funcs.C(c1)*q1 .-
 		            end2.rbsig.state.cache.funcs.C(c2)*q2
 		ret[1:3] .= C1*q1.-C2*q2 .- values[1:3]
-		ret[4:5] = transpose([u2 v2 w2][:,mask])*a1 - values[4:5]
+		ret[4:5] = transpose(X2[:,mask])*a1 - values[4:5]
 		ret
 	end
 	inner_Φ
@@ -322,6 +327,8 @@ function make_A(cst::RevoluteJoint,indexed,numbered)
 	(;mem2sysfree,mem2sysfull,nfree) = indexed
 	(;mem2num,num2sys) = numbered
 	(;end1,end2) = e2e
+	nmcs1 = end1.rbsig.state.cache.funcs.nmcs
+	nmcs2 = end2.rbsig.state.cache.funcs.nmcs
 	pid1 = end1.pid
 	aid1 = end1.aid
 	pid2 = end2.pid
@@ -330,67 +337,97 @@ function make_A(cst::RevoluteJoint,indexed,numbered)
 	uci1 =  end1.rbsig.state.cache.free_idx
 	uci2 =  end2.rbsig.state.cache.free_idx
 	ā1 = end1.rbsig.prop.ās[aid1]
+	Y1 = NCF.get_conversion(end1.rbsig.state.cache.funcs.nmcs)
+	Y2 = NCF.get_conversion(end2.rbsig.state.cache.funcs.nmcs)
 	function inner_A(q)
 		ret = zeros(eltype(q),nconstraints,nfree)
 		rbid1 = end1.rbsig.prop.id
 		rbid2 = end2.rbsig.prop.id
 		q1 = @view q[mem2sysfull[rbid1]]
 		q2 = @view q[mem2sysfull[rbid2]]
-		u1,v1,w1 = NCF.get_uvw(end1.rbsig.state.cache.funcs.nmcs,q1)
-		u2,v2,w2 = NCF.get_uvw(end2.rbsig.state.cache.funcs.nmcs,q2)
-		a1 = [u1 v1 w1]*ā1
-		ret[1:3,mem2sysfree[end1.rbsig.prop.id]] .=  C1[:,uci1]
-		ret[1:3,mem2sysfree[end2.rbsig.prop.id]] .= -C2[:,uci2]
-		o3 = zero(u2)
-		ret[4:5,mem2sysfree[end1.rbsig.prop.id]] .= (transpose(
-			[o3 o3 o3;
-			ā1[1]*u2 ā1[1]*v2 ā1[1]*w2; 
-			ā1[2]*u2 ā1[2]*v2 ā1[2]*w2; 
-			ā1[3]*u2 ā1[3]*v2 ā1[3]*w2
-			][:,mask])*
-			NCF.get_conversion(end1.rbsig.state.cache.funcs.nmcs))[:,uci1]
-		ret[4:5,mem2sysfree[end2.rbsig.prop.id]] .= (transpose(
+		X1 = NCF.make_X(nmcs1,q1)
+		X2 = NCF.make_X(nmcs2,q2)
+		a1 = X1*ā1
+		ret[1:3,mem2sysfree[rbid1]] .=  C1[:,uci1]
+		ret[1:3,mem2sysfree[rbid2]] .= -C2[:,uci2]
+		o3 = zero(a1)
+		ret[4:5,mem2sysfree[rbid1]] .= (transpose(
+			kron(vcat(0,ā1),X2)[:,mask])*Y1)[:,uci1]
+		ret[4:5,mem2sysfree[rbid2]] .= (transpose(
 			[
 				o3 o3 o3;
 				a1 o3 o3; 
 				o3 a1 o3;  
 				o3 o3 a1; 
-			][:,mask])*
-			NCF.get_conversion(end2.rbsig.state.cache.funcs.nmcs))[:,uci2]
+			][:,mask])*Y2)[:,uci2]
 		ret
 	end
 	function inner_A(q,c)
+		T = eltype(q)
         ret = zeros(eltype(q),nconstraints,nfree)
 		rbid1 = end1.rbsig.prop.id
 		rbid2 = end2.rbsig.prop.id
 		q1 = @view q[mem2sysfull[rbid1]]
 		q2 = @view q[mem2sysfull[rbid2]]
-		u1,v1,w1 = NCF.get_uvw(end1.rbsig.state.cache.funcs.nmcs,q1)
-		u2,v2,w2 = NCF.get_uvw(end2.rbsig.state.cache.funcs.nmcs,q2)
-		a1 = [u1 v1 w1]*ā1
+		X1 = NCF.make_X(nmcs1,q1)
+		X2 = NCF.make_X(nmcs2,q2)
+		a1 = X1*ā1
 		c1 = c[num2sys[mem2num[rbid1][pid1]]]
 		c2 = c[num2sys[mem2num[rbid2][pid2]]]
-        ret[1:3,mem2sysfree[end1.rbsig.prop.id]] .=  end1.rbsig.state.cache.funcs.C(c1)[:,uci1]
-        ret[1:3,mem2sysfree[end2.rbsig.prop.id]] .= -end2.rbsig.state.cache.funcs.C(c2)[:,uci2]
-		o3 = zero(u2)
-		ret[4:5,mem2sysfree[end1.rbsig.prop.id]] .= (transpose(
-			[o3 o3 o3;
-			ā1[1]*u2 ā1[1]*v2 ā1[1]*w2; 
-			ā1[2]*u2 ā1[2]*v2 ā1[2]*w2; 
-			ā1[3]*u2 ā1[3]*v2 ā1[3]*w2
-			][:,mask])*
-			NCF.get_conversion(end1.rbsig.state.cache.funcs.nmcs))[:,uci1]
-		ret[4:5,mem2sysfree[end2.rbsig.prop.id]] .= (transpose(
+        ret[1:3,mem2sysfree[rbid1]] .=  end1.rbsig.state.cache.funcs.C(c1)[:,uci1]
+        ret[1:3,mem2sysfree[rbid2]] .= -end2.rbsig.state.cache.funcs.C(c2)[:,uci2]
+		o3 = zero(a1)
+		ret[4:5,mem2sysfree[rbid1]] .= (transpose(
+			kron(vcat(0,ā1),X2)[:,mask])*Y1)[:,uci1]
+		ret[4:5,mem2sysfree[rbid2]] .= (transpose(
 			[
 				o3 o3 o3;
 				a1 o3 o3;
 				o3 a1 o3;  
 				o3 o3 a1;
-			][:,mask])*
-			NCF.get_conversion(end2.rbsig.state.cache.funcs.nmcs))[:,uci2]
+			][:,mask])*Y2)[:,uci2]
         ret
     end
 	inner_A
+end
+
+function rot_jac!(ret,order,q1,q2,X1,X2,memfree1,memfree2,uci1,uci2,)
+	k = 0
+	for i = 1:3
+		for j = 1:3
+			if 3(i-1)+j in order
+				k += 1
+				tpl1 = zero(q1)
+				tpl2 = zero(q2) 		
+				tpl1[3+3(i-1)+1:3+3i] .= X2[:,j]
+				tpl2[3+3(j-1)+1:3+3j] .= X1[:,i]
+				ret[k, memfree1] .= tpl1[uci1]
+				ret[k, memfree2] .= tpl2[uci2]
+			end
+		end
+	end
+end
+
+function find_order(nmcs1,nmcs2,q1,q2,X1,X2,nΦ1,nΦ2)
+	T = eltype(q1)
+	nq1 = length(q1)
+	nq2 = length(q2)
+	A = zeros(T,nΦ1+nΦ2+9,nq1+nq2)
+	A[    1:nΦ1,          1:nq1    ] = NCF.make_Φq(nmcs1,collect(1:nq1),collect(1:nΦ1))(q1)
+	A[nΦ1+1:nΦ1+nΦ2,  nq1+1:nq1+nq2] = NCF.make_Φq(nmcs2,collect(1:nq2),collect(1:nΦ2))(q2)
+	k = nΦ1+nΦ2	
+	A_rest = @view A[k+1:end,:]
+	rot_jac!(A_rest,collect(1:9),
+		q1,q2,
+		X1,X2,
+		collect(1:nq1),
+		collect(1:nq2),
+		collect(1:nq1),
+		collect(1:nq2),
+	)
+	_,pidx = rref_with_pivots!(Matrix(transpose(A)),min(size(A)...)*eps(real(float(one(eltype(A))))))
+	@assert length(pidx) >= 15
+	order = pidx[end-2:end] .- 12
 end
 
 """
@@ -422,45 +459,20 @@ function PrismaticJoint(e2e)
 	aid1 = end1.aid
 	ā1 = end1.rbsig.prop.ās[aid1]
 	frame = SpatialFrame(ā1)
-	q1,_ = NCF.rigidstate2naturalcoords(nmcs1,state1.ro,state1.R,state1.ṙo,state1.ω)
-	q2,_ = NCF.rigidstate2naturalcoords(nmcs2,state2.ro,state2.R,state2.ṙo,state2.ω)
-	C1 = end1.rbsig.state.cache.Cps[pid1]
-	C2 = end2.rbsig.state.cache.Cps[pid2]
-	u1,v1,w1 = NCF.get_uvw(nmcs1,q1)
-	u2,v2,w2 = NCF.get_uvw(nmcs2,q2)
-	X1 = [u1 v1 w1]
-	X2 = [u2 v2 w2]
+	q1 = NCF.rigidstate2naturalcoords(nmcs1,state1.ro,state1.R)
+	q2 = NCF.rigidstate2naturalcoords(nmcs2,state2.ro,state2.R)
+	X1 = NCF.make_X(nmcs1,q1)
+	X2 = NCF.make_X(nmcs2,q2)
 	t1 = X1*frame.t1
 	t2 = X1*frame.t2
+	C1 = end1.rbsig.state.cache.Cps[pid1]
+	C2 = end2.rbsig.state.cache.Cps[pid2]
 	values = zeros(T,nΦ)
 	values[1:2] .= transpose([t1 t2])*(C1*q1.-C2*q2)
 	nΦ1 = NCF.get_nconstraints(nmcs1)
 	nΦ2 = NCF.get_nconstraints(nmcs2)
-	nq1 = length(q1)
-	nq2 = length(q2)
-	A = zeros(T,
-		nΦ1+nΦ2+9,
-		nq1+nq2
-	)
-	A[    1:nΦ1,          1:nq1    ] = NCF.make_Φq(nmcs1,collect(1:nq1),collect(1:nΦ1))(q1)
-	A[nΦ1+1:nΦ1+nΦ2,  nq1+1:nq1+nq2] = NCF.make_Φq(nmcs2,collect(1:nq2),collect(1:nΦ2))(q2)
-	k = nΦ1+nΦ2
-	for i = 1:3
-		for j = 1:3
-			k += 1
-			tpl1 = zero(q1)
-			tpl2 = zero(q2) 		
-			tpl1[3+3(i-1)+1:3+3i] .= X2[:,j]
-			tpl2[3+3(j-1)+1:3+3j] .= X1[:,i]
-			A[k,     1:nq1    ] .+= tpl1
-			A[k, nq1+1:nq1+nq2] .+= tpl2
-		end
-	end
-	_,pidx = rref_with_pivots!(Matrix(transpose(A)),min(size(A)...)*eps(real(float(one(eltype(A))))))
-	@assert length(pidx) >= 15
-	order = pidx[end-2:end] .- 12
-	# @show order
 	inprods = transpose(X2)*X1
+	order = find_order(nmcs1,nmcs2,q1,q2,X1,X2,nΦ1,nΦ2)
 	values[3:5] .= inprods[order]
 	PrismaticJoint(nΦ,values,e2e,frame,order)
 end
@@ -480,12 +492,10 @@ function make_Φ(cst::PrismaticJoint,indexed,numbered)
 		ret = zeros(eltype(q),nconstraints)
 		q1 = @view q[mem2sysfull[rbid1]]
 		q2 = @view q[mem2sysfull[rbid2]]
+		X1 = NCF.make_X(nmcs1,q1)
+		X2 = NCF.make_X(nmcs2,q2)
 		C1 = end1.rbsig.state.cache.Cps[pid1]
 		C2 = end2.rbsig.state.cache.Cps[pid2]
-		u1,v1,w1 = NCF.get_uvw(nmcs1,q1)
-		u2,v2,w2 = NCF.get_uvw(nmcs2,q2)
-		X1 = [u1 v1 w1]
-		X2 = [u2 v2 w2]
 		t1 = X1*frame.t1
 		t2 = X1*frame.t2
 		ret[1:2] .= transpose([t1 t2])*(C1*q1.-C2*q2) .- values[1:2]
@@ -497,10 +507,8 @@ function make_Φ(cst::PrismaticJoint,indexed,numbered)
 		ret = zeros(eltype(q),nconstraints)
 		q1 = @view q[mem2sysfull[rbid1]]
 		q2 = @view q[mem2sysfull[rbid2]]
-		u1,v1,w1 = NCF.get_uvw(nmcs1,q1)
-		u2,v2,w2 = NCF.get_uvw(nmcs2,q2)
-		X1 = [u1 v1 w1]
-		X2 = [u2 v2 w2]
+		X1 = NCF.make_X(nmcs1,q1)
+		X2 = NCF.make_X(nmcs2,q2)
 		t1 = X1*frame.t1
 		t2 = X1*frame.t2
 		c1 = c[mem2sys[rbid1][pid1]]
@@ -536,62 +544,48 @@ function make_A(cst::PrismaticJoint,indexed,numbered)
 		q2 = @view q[mem2sysfull[rbid2]]
 		C1 = end1.rbsig.state.cache.Cps[pid1]
 		C2 = end2.rbsig.state.cache.Cps[pid2]
-		u1,v1,w1 = NCF.get_uvw(nmcs1,q1)
-		u2,v2,w2 = NCF.get_uvw(nmcs2,q2)
-		X1 = [u1 v1 w1]
-		X2 = [u2 v2 w2]
+		X1 = NCF.make_X(nmcs1,q1)
+		X2 = NCF.make_X(nmcs2,q2)
 		t1 = X1*frame.t1
 		t2 = X1*frame.t2
-		ret[1:2,memfree1] .= kron([0 transpose(frame.t1); 0 transpose(frame.t2)],transpose(C1*q1.-C2*q2))[:,uci1]
+		ret[1:2,memfree1] .= kron(
+				[
+					0 transpose(frame.t1); 
+					0 transpose(frame.t2)
+				],
+				transpose(C1*q1.-C2*q2)
+			)[:,uci1]
 		ret[1:2,memfree1] .+= transpose([t1 t2])*C1[:,uci1]
 		ret[1:2,memfree2] .= -transpose([t1 t2])*C2[:,uci2]
 		k = 2
-		for i = 1:3
-			for j = 1:3
-				if 3(i-1)+j in order
-					k += 1
-					tpl1 = zero(q1)
-					tpl2 = zero(q2) 		
-					tpl1[3+3(i-1)+1:3+3i] .= X2[:,j]
-					tpl2[3+3(j-1)+1:3+3j] .= X1[:,i]
-					ret[k, memfree1] .= tpl1[uci1]
-					ret[k, memfree2] .= tpl2[uci2]
-				end
-			end
-		end
+		ret_rest = @view ret[k+1:end,:]
+		rot_jac!(ret_rest,order,q1,q2,X1,X2,memfree1,memfree2,uci1,uci2,)
 		ret
 	end
 	function inner_A(q,c)
         ret = zeros(eltype(q),nconstraints,nfree)
 		q1 = @view q[mem2sysfull[rbid1]]
 		q2 = @view q[mem2sysfull[rbid2]]
-		u1,v1,w1 = NCF.get_uvw(nmcs1,q1)
-		u2,v2,w2 = NCF.get_uvw(nmcs2,q2)
-		X1 = [u1 v1 w1]
-		X2 = [u2 v2 w2]
+		X1 = NCF.make_X(nmcs1,q1)
+		X2 = NCF.make_X(nmcs2,q2)
 		t1 = X1*frame.t1
 		t2 = X1*frame.t2
 		c1 = c[mem2sys[rbid1][pid1]]
 		c2 = c[mem2sys[rbid2][pid2]]
 		C1 = end1.rbsig.state.cache.funcs.C(c1)
 		C2 = end2.rbsig.state.cache.funcs.C(c2)
-		ret[1:2,memfree1] .= kron([0 transpose(frame.t1); 0 transpose(frame.t2)],transpose(C1*q1.-C2*q2))[:,uci1]
+		ret[1:2,memfree1] .= kron(
+				[
+					0 transpose(frame.t1); 
+					0 transpose(frame.t2)
+				],
+				transpose(C1*q1.-C2*q2)
+			)[:,uci1]
 		ret[1:2,memfree1] .+= transpose([t1 t2])*C1[:,uci1]
 		ret[1:2,memfree2] .= -transpose([t1 t2])*C2[:,uci2]
 		k = 2
-		for i = 1:3
-			for j = 1:3
-				if 3(i-1)+j in order
-					k += 1
-					tpl1 = zero(q1)
-					tpl2 = zero(q2) 		
-					tpl1[3+3(i-1)+1:3+3i] .= X2[:,j]
-					tpl2[3+3(j-1)+1:3+3j] .= X1[:,i]
-					ret[k, memfree1] .= tpl1[uci1]
-					ret[k, memfree2] .= tpl2[uci2]
-				end
-			end
-		end
+		ret_rest = @view ret[k+1:end,:]
+		rot_jac!(ret_rest,order,q1,q2,X1,X2,memfree1,memfree2,uci1,uci2,)
         ret
     end
 	inner_A
@@ -623,41 +617,18 @@ function FixedJoint(e2e)
 	nmcs2 = end2.rbsig.state.cache.funcs.nmcs
 	state1 = end1.rbsig.state
 	state2 = end2.rbsig.state
-	q1,_ = NCF.rigidstate2naturalcoords(nmcs1,state1.ro,state1.R,state1.ṙo,state1.ω)
-	q2,_ = NCF.rigidstate2naturalcoords(nmcs2,state2.ro,state2.R,state2.ṙo,state2.ω)
+	q1 = NCF.rigidstate2naturalcoords(nmcs1,state1.ro,state1.R)
+	q2 = NCF.rigidstate2naturalcoords(nmcs2,state2.ro,state2.R)
+	X1 = NCF.make_X(nmcs1,q1)
+	X2 = NCF.make_X(nmcs2,q2)
 	C1 = end1.rbsig.state.cache.Cps[pid1]
 	C2 = end2.rbsig.state.cache.Cps[pid2]
-	u1,v1,w1 = NCF.get_uvw(nmcs1,q1)
-	u2,v2,w2 = NCF.get_uvw(nmcs2,q2)
 	values = zeros(T,nΦ)
 	values[1:3] .= C1*q1.-C2*q2
 	nΦ1 = NCF.get_nconstraints(nmcs1)
 	nΦ2 = NCF.get_nconstraints(nmcs2)
-	nq1 = length(q1)
-	nq2 = length(q2)
-	A = zeros(T,
-		nΦ1+nΦ2+9,
-		nq1+nq2
-	)
-	A[    1:nΦ1,          1:nq1    ] = NCF.make_Φq(nmcs1,collect(1:nq1),collect(1:nΦ1))(q1)
-	A[nΦ1+1:nΦ1+nΦ2,  nq1+1:nq1+nq2] = NCF.make_Φq(nmcs2,collect(1:nq2),collect(1:nΦ2))(q2)
-	k = nΦ1+nΦ2
-	for i = 1:3
-		for j = 1:3
-			k += 1
-			tpl1 = zero(q1)
-			tpl2 = zero(q2) 		
-			tpl1[3+3(i-1)+1:3+3i] .= [u2 v2 w2][:,j]
-			tpl2[3+3(j-1)+1:3+3j] .= [u1 v1 w1][:,i]
-			A[k,     1:nq1    ] .+= tpl1
-			A[k, nq1+1:nq1+nq2] .+= tpl2
-		end
-	end
-	_,pidx = rref_with_pivots!(Matrix(transpose(A)),min(size(A)...)*eps(real(float(one(eltype(A))))))
-	@assert length(pidx) >= 15
-	order = pidx[end-2:end] .- 12
-	# @show order
-	inprods = transpose([u2 v2 w2])*[u1 v1 w1]
+	order = find_order(nmcs1,nmcs2,q1,q2,X1,X2,nΦ1,nΦ2)
+	inprods = transpose(X2)*X1
 	values[4:6] .= inprods[order]
 	FixedJoint(nΦ,values,e2e,order)
 end
@@ -667,6 +638,8 @@ function make_Φ(cst::FixedJoint,indexed,numbered)
 	(;mem2num,num2sys) = numbered
 	(;mem2sysfull) = indexed
 	(;end1,end2) = e2e
+	nmcs1 = end1.rbsig.state.cache.funcs.nmcs
+	nmcs2 = end2.rbsig.state.cache.funcs.nmcs
 	pid1 = end1.pid
 	pid2 = end2.pid
 	C1 = end1.rbsig.state.cache.Cps[pid1]
@@ -676,9 +649,9 @@ function make_Φ(cst::FixedJoint,indexed,numbered)
 		q1 = @view q[mem2sysfull[end1.rbsig.prop.id]]
 		q2 = @view q[mem2sysfull[end2.rbsig.prop.id]]
 		ret[1:3] .= C1*q1.-C2*q2 .- values[1:3]
-		u1,v1,w1 = NCF.get_uvw(end1.rbsig.state.cache.funcs.nmcs,q1)
-		u2,v2,w2 = NCF.get_uvw(end2.rbsig.state.cache.funcs.nmcs,q2)
-		inprods = transpose([u2 v2 w2])*[u1 v1 w1]
+		X1 = NCF.make_X(nmcs1,q1)
+		X2 = NCF.make_X(nmcs2,q2)
+		inprods = transpose(X2)*X1
 		ret[4:6] .= inprods[order] .- values[4:6]
 		ret
 	end
@@ -688,14 +661,14 @@ function make_Φ(cst::FixedJoint,indexed,numbered)
 		rbid2 = end2.rbsig.prop.id
 		q1 = @view q[mem2sysfull[rbid1]]
 		q2 = @view q[mem2sysfull[rbid2]]
-		u1,v1,w1 = NCF.get_uvw(end1.rbsig.state.cache.funcs.nmcs,q1)
-		u2,v2,w2 = NCF.get_uvw(end2.rbsig.state.cache.funcs.nmcs,q2)
+		X1 = NCF.make_X(nmcs1,q1)
+		X2 = NCF.make_X(nmcs2,q2)
 		c1 = c[num2sys[mem2num[rbid1][pid1]]]
 		c2 = c[num2sys[mem2num[rbid2][pid2]]]
 		C1 = end1.rbsig.state.cache.funcs.C(c1)*q1
 		C2 = end2.rbsig.state.cache.funcs.C(c2)*q2
 		ret[1:3] .= C1*q1.-C2*q2 .- values[1:3]
-		inprods = transpose([u2 v2 w2])*[u1 v1 w1]
+		inprods = transpose(X2)*X1
 		ret[4:6] .= inprods[order] .- values[4:6]
 		ret
 	end
@@ -707,6 +680,8 @@ function make_A(cst::FixedJoint,indexed,numbered)
 	(;mem2sysfree,mem2sysfull,nfree) = indexed
 	(;mem2num,num2sys) = numbered
 	(;end1,end2) = e2e
+	nmcs1 = end1.rbsig.state.cache.funcs.nmcs
+	nmcs2 = end2.rbsig.state.cache.funcs.nmcs
 	pid1 = end1.pid
 	pid2 = end2.pid
 	C1 = end1.rbsig.state.cache.Cps[pid1]
@@ -721,51 +696,28 @@ function make_A(cst::FixedJoint,indexed,numbered)
 		ret = zeros(eltype(q),nconstraints,nfree)
 		q1 = @view q[mem2sysfull[rbid1]]
 		q2 = @view q[mem2sysfull[rbid2]]
-		u1,v1,w1 = NCF.get_uvw(end1.rbsig.state.cache.funcs.nmcs,q1)
-		u2,v2,w2 = NCF.get_uvw(end2.rbsig.state.cache.funcs.nmcs,q2)
+		X1 = NCF.make_X(nmcs1,q1)
+		X2 = NCF.make_X(nmcs2,q2)
 		ret[1:3,memfree1] .=  C1[:,uci1]
 		ret[1:3,memfree2] .= -C2[:,uci2]
 		k = 3
-		# @show u1,v1
-		for i = 1:3
-			for j = 1:3
-				if 3(i-1)+j in order
-					k += 1
-					tpl1 = zero(q1)
-					tpl2 = zero(q2) 		
-					tpl1[3+3(i-1)+1:3+3i] .= [u2 v2 w2][:,j]
-					tpl2[3+3(j-1)+1:3+3j] .= [u1 v1 w1][:,i]
-					ret[k, memfree1] .= tpl1[uci1]
-					ret[k, memfree2] .= tpl2[uci2]
-				end
-			end
-		end
+		ret_rest = @view ret[k+1:end,:]
+		rot_jac!(ret_rest,order,q1,q2,X1,X2,memfree1,memfree2,uci1,uci2,)
 		ret
 	end
 	function inner_A(q,c)
         ret = zeros(eltype(q),nconstraints,nfree)
 		q1 = @view q[mem2sysfull[rbid1]]
 		q2 = @view q[mem2sysfull[rbid2]]
-		u1,v1,w1 = NCF.get_uvw(end1.rbsig.state.cache.funcs.nmcs,q1)
-		u2,v2,w2 = NCF.get_uvw(end2.rbsig.state.cache.funcs.nmcs,q2)
+		X1 = NCF.make_X(nmcs1,q1)
+		X2 = NCF.make_X(nmcs2,q2)
 		c1 = c[num2sys[mem2num[rbid1][pid1]]]
 		c2 = c[num2sys[mem2num[rbid2][pid2]]]
         ret[1:3,memfree1] .=  end1.rbsig.state.cache.funcs.C(c1)[:,uci1]
         ret[1:3,memfree2] .= -end2.rbsig.state.cache.funcs.C(c2)[:,uci2]
 		k = 3
-		for i = 1:3
-			for j = 1:3
-				if 3(i-1)+j in order
-					k += 1
-					tpl1 = zero(q1)
-					tpl2 = zero(q2) 		
-					tpl1[3+3(i-1)+1:3+3i] .= [u2 v2 w2][:,j]
-					tpl2[3+3(j-1)+1:3+3j] .= [u1 v1 w1][:,i]
-					ret[k, memfree1] .= tpl1[uci1]
-					ret[k, memfree2] .= tpl2[uci2]
-				end
-			end
-		end
+		ret_rest = @view ret[k+1:end,:]
+		rot_jac!(ret_rest,order,q1,q2,X1,X2,memfree1,memfree2,uci1,uci2,)
         ret
     end
 	inner_A

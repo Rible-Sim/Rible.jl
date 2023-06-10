@@ -736,10 +736,10 @@ with_theme(theme_pub;
     )
 end
 
-@show newbridge_tag_dyn.traj.t./(2π)
+@show newbridge_modes.traj.t./(2π)
 
-plot_traj!(newbridge_tag_dyn;showinit=true)
-newbridge_tag_dyn.traj.t
+plot_traj!(newbridge_modes;showinit=true)
+newbridge_modes.traj.t
 
 νs = [
     0.453,
