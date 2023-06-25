@@ -391,6 +391,28 @@ function make_A(cst::RevoluteJoint,indexed,numbered)
 	inner_A
 end
 
+function make_Φqᵀq()
+	mask
+	cv = vcat(
+		Y1,
+		Y2
+	)
+	ā1
+    Φqᵀq = [
+		begin
+			ret_raw = zeros(
+				Int,
+				(nld1+1)+(nld2+1),
+				(nld1+1)+(nld2+1),
+			)
+			ret_raw[(nld1+1)+1:nld2,(nld1+1)+id] = ā1
+			ret_raw[(nld1+1)+id,(nld1+1)+1:nld2] = ā1
+			SymmetricPacked(transpose(cv)*kron(ret_raw,I_int)*cv)
+		end
+		for id in mask
+	]
+end
+
 function rot_jac!(ret,order,q1,q2,X1,X2,memfree1,memfree2,uci1,uci2,)
 	k = 0
 	for i = 1:3
@@ -463,12 +485,12 @@ function PrismaticJoint(e2e)
 	q2 = NCF.rigidstate2naturalcoords(nmcs2,state2.ro,state2.R)
 	X1 = NCF.make_X(nmcs1,q1)
 	X2 = NCF.make_X(nmcs2,q2)
-	t1 = X1*frame.t1
-	t2 = X1*frame.t2
+	a1t1 = X1*frame.t1
+	a1t2 = X1*frame.t2
 	C1 = end1.rbsig.state.cache.Cps[pid1]
 	C2 = end2.rbsig.state.cache.Cps[pid2]
 	values = zeros(T,nΦ)
-	values[1:2] .= transpose([t1 t2])*(C1*q1.-C2*q2)
+	values[1:2] .= transpose([a1t1 a1t2])*(C1*q1.-C2*q2)
 	nΦ1 = NCF.get_nconstraints(nmcs1)
 	nΦ2 = NCF.get_nconstraints(nmcs2)
 	inprods = transpose(X2)*X1
@@ -496,9 +518,9 @@ function make_Φ(cst::PrismaticJoint,indexed,numbered)
 		X2 = NCF.make_X(nmcs2,q2)
 		C1 = end1.rbsig.state.cache.Cps[pid1]
 		C2 = end2.rbsig.state.cache.Cps[pid2]
-		t1 = X1*frame.t1
-		t2 = X1*frame.t2
-		ret[1:2] .= transpose([t1 t2])*(C1*q1.-C2*q2) .- values[1:2]
+		a1t1 = X1*frame.t1
+		a1t2 = X1*frame.t2
+		ret[1:2] .= transpose([a1t1 a1t2])*(C1*q1.-C2*q2) .- values[1:2]
 		inprods = transpose(X2)*X1
 		ret[3:5] .= inprods[order] .- values[3:5]
 		ret
@@ -509,13 +531,13 @@ function make_Φ(cst::PrismaticJoint,indexed,numbered)
 		q2 = @view q[mem2sysfull[rbid2]]
 		X1 = NCF.make_X(nmcs1,q1)
 		X2 = NCF.make_X(nmcs2,q2)
-		t1 = X1*frame.t1
-		t2 = X1*frame.t2
+		a1t1 = X1*frame.t1
+		a1t2 = X1*frame.t2
 		c1 = c[mem2sys[rbid1][pid1]]
 		c2 = c[mem2sys[rbid2][pid2]]
 		C1 = end1.rbsig.state.cache.funcs.C(c1)*q1
 		C2 = end2.rbsig.state.cache.funcs.C(c2)*q2
-		ret[1:2] .= transpose([t1 t2])*(C1*q1.-C2*q2) .- values[1:2]
+		ret[1:2] .= transpose([a1t1 a1t2])*(C1*q1.-C2*q2) .- values[1:2]
 		inprods = transpose(X2)*X1
 		ret[3:5] .= inprods[order] .- values[3:5]
 		ret
@@ -546,8 +568,8 @@ function make_A(cst::PrismaticJoint,indexed,numbered)
 		C2 = end2.rbsig.state.cache.Cps[pid2]
 		X1 = NCF.make_X(nmcs1,q1)
 		X2 = NCF.make_X(nmcs2,q2)
-		t1 = X1*frame.t1
-		t2 = X1*frame.t2
+		a1t1 = X1*frame.t1
+		a1t2 = X1*frame.t2
 		ret[1:2,memfree1] .= kron(
 				[
 					0 transpose(frame.t1); 
@@ -555,8 +577,8 @@ function make_A(cst::PrismaticJoint,indexed,numbered)
 				],
 				transpose(C1*q1.-C2*q2)
 			)[:,uci1]
-		ret[1:2,memfree1] .+= transpose([t1 t2])*C1[:,uci1]
-		ret[1:2,memfree2] .= -transpose([t1 t2])*C2[:,uci2]
+		ret[1:2,memfree1] .+= transpose([a1t1 a1t2])*C1[:,uci1]
+		ret[1:2,memfree2] .-= transpose([a1t1 a1t2])*C2[:,uci2]
 		k = 2
 		ret_rest = @view ret[k+1:end,:]
 		rot_jac!(ret_rest,order,q1,q2,X1,X2,memfree1,memfree2,uci1,uci2,)
@@ -568,8 +590,8 @@ function make_A(cst::PrismaticJoint,indexed,numbered)
 		q2 = @view q[mem2sysfull[rbid2]]
 		X1 = NCF.make_X(nmcs1,q1)
 		X2 = NCF.make_X(nmcs2,q2)
-		t1 = X1*frame.t1
-		t2 = X1*frame.t2
+		a1t1 = X1*frame.t1
+		a1t2 = X1*frame.t2
 		c1 = c[mem2sys[rbid1][pid1]]
 		c2 = c[mem2sys[rbid2][pid2]]
 		C1 = end1.rbsig.state.cache.funcs.C(c1)
@@ -581,8 +603,8 @@ function make_A(cst::PrismaticJoint,indexed,numbered)
 				],
 				transpose(C1*q1.-C2*q2)
 			)[:,uci1]
-		ret[1:2,memfree1] .+= transpose([t1 t2])*C1[:,uci1]
-		ret[1:2,memfree2] .= -transpose([t1 t2])*C2[:,uci2]
+		ret[1:2,memfree1] .+= transpose([a1t1 a1t2])*C1[:,uci1]
+		ret[1:2,memfree2] .-= transpose([a1t1 a1t2])*C2[:,uci2]
 		k = 2
 		ret_rest = @view ret[k+1:end,:]
 		rot_jac!(ret_rest,order,q1,q2,X1,X2,memfree1,memfree2,uci1,uci2,)
