@@ -12,6 +12,7 @@ using NLsolve
 import JuMP, COSMO, Clarabel
 using BlockArrays
 using BlockDiagonals
+using SymmetricFormats
 using Tullio
 using Quaternions
 using ForwardDiff

@@ -155,23 +155,38 @@ function index(rbs,sharing_input=Int[;;])
 	)
 end
 
-struct JointedMembers{JType}
+struct JointedMembers{JType,joint2sysexcstType}
     njoints::Int
 	nexconstraints::Int
     joints::JType
+    joint2sysexcst::joint2sysexcstType
 end
 
 function unjoin()
 	njoints = 0
 	joints = Int[]
 	nexconstraints = 0
-	JointedMembers(njoints,nexconstraints,joints)
+    joint2sysexcst = Vector{Int}[]
+	JointedMembers(njoints,nexconstraints,joints,joint2sysexcst)
 end
 
 function join(joints,indexed)
-	nexconstraints = mapreduce((joint)->joint.nconstraints,+,joints,init=0)
+	# nexconstraints = mapreduce((joint)->joint.nconstraints,+,joints,init=0)
     njoints = length(joints)
-    JointedMembers(njoints,nexconstraints,joints)
+    joint2sysexcst = Vector{Int}[]
+	nexcst_by_joint = zeros(Int,njoints)
+	foreach(joints) do joint
+		nexcst_by_joint[joint.id] = joint.nconstraints
+	end
+	nexconstraints = sum(nexcst_by_joint)
+	joint2sysexcst = Vector{Int}[]
+	ilast = 0
+	for jointid = 1:njoints
+		nexcst = nexcst_by_joint[jointid]
+		push!(joint2sysexcst,collect(ilast+1:ilast+nexcst))
+		ilast += nexcst
+	end
+    JointedMembers(njoints,nexconstraints,joints,joint2sysexcst)
 end
 
 function Base.isless(rb1::AbstractBody,rb2::AbstractBody)

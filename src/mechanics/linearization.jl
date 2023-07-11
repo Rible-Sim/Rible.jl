@@ -57,11 +57,12 @@ function find_full_pres_indices(lncs,q)
 end
 
 function ∂Aᵀλ∂q̌(tg::AbstractTensegrityStructure,λ)
-    (;nfree) = tg.connectivity.indexed
+    c = get_c(tg)
+    (;numbered,indexed,jointed) = tg.connectivity
+    (;nfree,ninconstraints,mem2sysfree,mem2sysincst) = indexed
+    (;njoints,nexconstraints,joints,joint2sysexcst) = jointed
     ret = zeros(eltype(λ),nfree,nfree)
     (;bodies,nconstraints) = tg
-    (;indexed,jointed) = tg.connectivity
-    (;ninconstraints,mem2sysfree,mem2sysincst) = indexed
     foreach(bodies) do rb
         rbid = rb.prop.id
         memfree = mem2sysfree[rbid]
@@ -70,6 +71,11 @@ function ∂Aᵀλ∂q̌(tg::AbstractTensegrityStructure,λ)
         if !isempty(memincst)
             ret[memfree,memfree] .+= rb.state.cache.funcs.∂Aᵀλ∂q(λ[memincst])#[:,free_idx]
         end
+    end
+    foreach(joints) do joint
+        jointexcst = joint2sysexcst[joint.id]
+        jointfree = get_jointed_free(joint,indexed)
+        ret[jointfree,jointfree] .+= make_∂Aᵀλ∂q(joint,numbered,c)(λ[jointexcst])
     end
     ret
 end

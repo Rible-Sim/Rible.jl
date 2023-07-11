@@ -19,7 +19,6 @@ end
 function ID(rbsig,pid)
 	ID(rbsig,pid,0)
 end
-	
 
 """
 点对点类。
@@ -46,7 +45,7 @@ struct EmptyConstraint{T} <: ExternalConstraints{T}
 	values::T
 end
 
-get_numbertype(cst::ExternalConstraints{T}) where T = T
+get_numbertype(cst::ExternalConstraints{<:AbstractArray{T}}) where T = T
 
 """
 空约束构造子。
@@ -155,6 +154,7 @@ end
 $(TYPEDEF)
 """
 struct PinJoint{valueType,e2eType} <: ExternalConstraints{valueType}
+	id::Int
 	nconstraints::Int
 	values::valueType
 	e2e::e2eType
@@ -164,12 +164,12 @@ end
 铰接约束构造子。
 $(TYPEDSIGNATURES)
 """
-function PinJoint(e2e)
+function PinJoint(id,e2e)
 	rb1 = e2e.end1.rbsig
     nΦ = get_ndim(rb1)
 	T = get_numbertype(rb1)
 	values = zeros(T,nΦ)
-	PinJoint(nΦ,values,e2e)
+	PinJoint(id,nΦ,values,e2e)
 end
 
 function make_Φ(cst::PinJoint,indexed,numbered)
@@ -238,6 +238,7 @@ end
 $(TYPEDEF)
 """
 struct RevoluteJoint{valueType,e2eType,maskType} <: ExternalConstraints{valueType}
+	id::Int
 	nconstraints::Int
 	values::valueType
 	e2e::e2eType
@@ -248,7 +249,7 @@ end
 铰接约束构造子。
 $(TYPEDSIGNATURES)
 """
-function RevoluteJoint(e2e)
+function RevoluteJoint(id,e2e)
 	(;end1,end2) = e2e
 	pid1 = end1.pid
 	pid2 = end2.pid
@@ -273,7 +274,7 @@ function RevoluteJoint(e2e)
 	inprods = transpose(X2)*a1
 	mask = 1:3 .!== argmax(abs.(inprods))
 	values[4:5] = inprods[mask]
-	RevoluteJoint(nΦ,values,e2e,mask)
+	RevoluteJoint(id,nΦ,values,e2e,mask)
 end
 
 function make_Φ(cst::RevoluteJoint,indexed,numbered)
@@ -286,11 +287,9 @@ function make_Φ(cst::RevoluteJoint,indexed,numbered)
 	pid1 = end1.pid
 	pid2 = end2.pid
 	aid1 = end1.aid
-	aid2 = end2.aid
 	C1 = end1.rbsig.state.cache.Cps[pid1]
 	C2 = end2.rbsig.state.cache.Cps[pid2]
 	ā1 = end1.rbsig.prop.ās[aid1]
-	# a2 = end2.rbsig.state.as[aid2]
 	function inner_Φ(q)
 		ret = zeros(eltype(q),nconstraints)
 		q1 = @view q[mem2sysfull[end1.rbsig.prop.id]]
@@ -391,26 +390,129 @@ function make_A(cst::RevoluteJoint,indexed,numbered)
 	inner_A
 end
 
-function make_Φqᵀq()
-	mask
-	cv = vcat(
-		Y1,
-		Y2
-	)
-	ā1
-    Φqᵀq = [
+function make_Φqᵀq(cst,numbered,c)
+	(;e2e,) = cst
+	(;mem2num,num2sys) = numbered
+	(;end1,end2) = e2e
+	rbid1 = end1.rbsig.prop.id
+	rbid2 = end2.rbsig.prop.id
+	pid1 = end1.pid
+	pid2 = end2.pid
+	aid1 = end1.aid
+	nld1 = NCF.get_nlocaldim(end1.rbsig.state.cache.funcs.nmcs)
+	nld2 = NCF.get_nlocaldim(end2.rbsig.state.cache.funcs.nmcs)
+	Y1 = NCF.get_conversion(end1.rbsig.state.cache.funcs.nmcs)
+	Y2 = NCF.get_conversion(end2.rbsig.state.cache.funcs.nmcs)
+	cv = BlockDiagonal([Y1,Y2])
+    ndim = NCF.get_ndim(end1.rbsig.state.cache.funcs.nmcs)
+	T = get_numbertype(cst)
+    I_Int = NCF.make_I(Int,ndim)
+	c1 = c[num2sys[mem2num[rbid1][pid1]]]
+	c2 = c[num2sys[mem2num[rbid2][pid2]]]
+	ā1 = end1.rbsig.prop.ās[aid1]
+	frame = SpatialFrame(ā1)
+	t̄1 = frame.t1
+	t̄2 = frame.t1
+	D̄ = hcat(ā1,t̄1,t̄2)
+	Φqᵀq_trans = [
 		begin
+			d̄ = D̄[:,id] 
 			ret_raw = zeros(
-				Int,
+				T,
 				(nld1+1)+(nld2+1),
 				(nld1+1)+(nld2+1),
 			)
-			ret_raw[(nld1+1)+1:nld2,(nld1+1)+id] = ā1
-			ret_raw[(nld1+1)+id,(nld1+1)+1:nld2] = ā1
-			SymmetricPacked(transpose(cv)*kron(ret_raw,I_int)*cv)
+			ret_raw[1,2:nld2+1] = ret_raw[2:nld2+1,1] = -d̄
+			ret_raw[2:nld2+1,2:nld2+1] = -c1*transpose(d̄)-d̄*transpose(c1)
+			ret_raw[(nld1+1)+1,2:nld2+1] = ret_raw[2:nld2+1,(nld1+1)+1] = d̄
+			ret_raw[(nld1+1)+2:end,2:nld2+1] = c2*transpose(d̄)
+			ret_raw[2:nld2+1,(nld1+1)+2:end] = d̄*transpose(c2)
+			transpose(cv)*kron(ret_raw,I_Int)*cv
 		end
-		for id in mask
+		for id in 1:3
 	]
+
+    Φqᵀq_rot = [
+		begin
+			ret_raw = zeros(
+				T,
+				(nld1+1)+(nld2+1),
+				(nld1+1)+(nld2+1),
+			)
+			ret_raw[(nld1+1)+1:(nld1+1)+nld2,(nld1+1)+id] = ā1
+			ret_raw[(nld1+1)+id,(nld1+1)+1:(nld1+1)+nld2] = ā1
+			transpose(cv)*kron(ret_raw,I_Int)*cv
+		end
+		for id in 1:3
+	]
+	
+    Φqᵀq_rot_fix = [
+		begin
+			ret_raw = zeros(
+				T,
+				(nld1+1)+(nld2+1),
+				(nld1+1)+(nld2+1),
+			)
+			ret_raw[       1+i,(nld1+1)+j] = 1
+			ret_raw[(nld1+1)+j,       1+j] = 1
+			transpose(cv)*kron(ret_raw,I_Int)*cv
+		end
+		for i = 1:3 for j = 1:3
+	]
+	if cst isa FixedJoint
+		Φqᵀq = vcat(zero.(Φqᵀq_trans),Φqᵀq_rot_fix[cst.order])
+	elseif cst isa RevoluteJoint
+		Φqᵀq = vcat(zero.(Φqᵀq_trans),Φqᵀq_rot[cst.mask])
+	elseif cst isa PrismaticJoint
+		Φqᵀq = vcat(Φqᵀq_trans[[2,3]],Φqᵀq_rot)
+	else
+		@error "Unknown Joint"
+	end
+	Φqᵀq
+end
+
+function get_jointed_free_idx(cst)
+	(;nconstraints,e2e,) = cst
+	(;end1,end2) = e2e
+	uci1 = end1.rbsig.state.cache.free_idx
+	uci2 = end2.rbsig.state.cache.free_idx
+	ncoords1 = NCF.get_ncoords(end1.rbsig.state.cache.funcs.nmcs)
+	# ncoords2 = NCF.get_ncoords(end2.rbsig.state.cache.nmcs)
+	uci = vcat(
+		uci1,
+		uci2 .+ ncoords1
+	)
+end
+
+function get_jointed_free(cst,indexed)
+	(;nconstraints,e2e,) = cst
+	(;mem2sysfree,mem2sysfull,nfree) = indexed
+	(;end1,end2) = e2e
+	rbid1 = end1.rbsig.prop.id
+	rbid2 = end2.rbsig.prop.id
+	mem2sysfree1 = mem2sysfree[rbid1]
+	mem2sysfree2 = mem2sysfree[rbid2]
+	cst2sysfree = vcat(
+		mem2sysfree1,
+		mem2sysfree2
+	)
+end
+
+function make_∂Aᵀλ∂q(cst,numbered,c)
+	(;nconstraints) = cst
+	uci = get_jointed_free_idx(cst)
+	Φqᵀq = make_Φqᵀq(cst,numbered,c)
+    function ∂Aᵀλ∂q(λ)
+        ret = [
+            begin
+                a = Φqᵀq[i][uci,uci] .* λ[i]
+                # display(a)
+                a 
+            end
+            for i = 1:nconstraints
+        ]
+        sum(ret)
+    end
 end
 
 function rot_jac!(ret,order,q1,q2,X1,X2,memfree1,memfree2,uci1,uci2,)
@@ -423,8 +525,8 @@ function rot_jac!(ret,order,q1,q2,X1,X2,memfree1,memfree2,uci1,uci2,)
 				tpl2 = zero(q2) 		
 				tpl1[3+3(i-1)+1:3+3i] .= X2[:,j]
 				tpl2[3+3(j-1)+1:3+3j] .= X1[:,i]
-				ret[k, memfree1] .= tpl1[uci1]
-				ret[k, memfree2] .= tpl2[uci2]
+				ret[k, memfree1] .= tpl1[uci1] #todo cv
+				ret[k, memfree2] .= tpl2[uci2] #todo cv
 			end
 		end
 	end
@@ -457,6 +559,7 @@ end
 $(TYPEDEF)
 """
 struct PrismaticJoint{valueType,e2eType,frameType,orderType} <: ExternalConstraints{valueType}
+	id::Int
 	nconstraints::Int
 	values::valueType
 	e2e::e2eType
@@ -468,7 +571,7 @@ end
 铰接约束构造子。
 $(TYPEDSIGNATURES)
 """
-function PrismaticJoint(e2e)
+function PrismaticJoint(id,e2e)
 	(;end1,end2) = e2e
     nΦ = 5
 	T = get_numbertype(end1.rbsig)
@@ -496,7 +599,7 @@ function PrismaticJoint(e2e)
 	inprods = transpose(X2)*X1
 	order = find_order(nmcs1,nmcs2,q1,q2,X1,X2,nΦ1,nΦ2)
 	values[3:5] .= inprods[order]
-	PrismaticJoint(nΦ,values,e2e,frame,order)
+	PrismaticJoint(id,nΦ,values,e2e,frame,order)
 end
 
 function make_Φ(cst::PrismaticJoint,indexed,numbered)
@@ -618,6 +721,7 @@ end
 $(TYPEDEF)
 """
 struct FixedJoint{valueType,e2eType,orderType} <: ExternalConstraints{valueType}
+	id::Int
 	nconstraints::Int
 	values::valueType
 	e2e::e2eType
@@ -628,7 +732,7 @@ end
 铰接约束构造子。
 $(TYPEDSIGNATURES)
 """
-function FixedJoint(e2e)
+function FixedJoint(id,e2e)
 	(;end1,end2) = e2e
 	pid1 = end1.pid
 	pid2 = end2.pid
@@ -652,7 +756,7 @@ function FixedJoint(e2e)
 	order = find_order(nmcs1,nmcs2,q1,q2,X1,X2,nΦ1,nΦ2)
 	inprods = transpose(X2)*X1
 	values[4:6] .= inprods[order]
-	FixedJoint(nΦ,values,e2e,order)
+	FixedJoint(id,nΦ,values,e2e,order)
 end
 
 function make_Φ(cst::FixedJoint,indexed,numbered)
@@ -750,6 +854,7 @@ end
 $(TYPEDEF)
 """
 struct LinearJoint{valueType} <: ExternalConstraints{valueType}
+	id::Int
 	nconstraints::Int
 	values::Vector{valueType}
 	A::Matrix{valueType}
@@ -761,7 +866,7 @@ $(TYPEDSIGNATURES)
 """
 function LinearJoint(A,values)
 	nΦ = size(A,1)
-	LinearJoint(nΦ,values,A)
+	LinearJoint(id,nΦ,values,A)
 end
 
 function make_Φ(cst::LinearJoint,indexed,numbered)
@@ -787,3 +892,20 @@ function make_A(cst::LinearJoint,indexed,numbered)
     end
 end
 
+#todo 
+# (joint_type == :Fixed)            && (return 0, 0) #rot order #linear trans
+# (joint_type == :Prismatic)        && (return 1, 0) #rot order
+# (joint_type == :Planar)           && (return 2, 0) #rot order
+# (joint_type == :FixedOrientation) && (return 3, 0) #rot order
+# (joint_type == :Revolute)         && (return 0, 1) #linear trans
+# (joint_type == :Cylindrical)      && (return 1, 1)
+# (joint_type == :PlanarAxis)       && (return 2, 1)
+# (joint_type == :FreeRevolute)     && (return 3, 1)
+# (joint_type == :Orbital)          && (return 0, 2) #linear trans
+# (joint_type == :PrismaticOrbital) && (return 1, 2)
+# (joint_type == :PlanarOrbital)    && (return 2, 2)
+# (joint_type == :FreeOrbital)      && (return 3, 2)
+# (joint_type == :Spherical)        && (return 0, 3) #linear trans
+# (joint_type == :CylindricalFree)  && (return 1, 3)
+# (joint_type == :PlanarFree)       && (return 2, 3)
+# (joint_type == :Floating)         && (return 3, 3)

@@ -267,8 +267,6 @@ end
 $(TYPEDSIGNATURES)
 """
 get_conversion(::LNCMP) = I
-get_conversion(::LNC1P2V) = I
-get_conversion(::LNC1P3V) = I
 function get_conversion(nmcs::Union{LNC2D2P,LNC3D2P})
     ndim = get_ndim(nmcs)
     kron(
@@ -277,6 +275,14 @@ function get_conversion(nmcs::Union{LNC2D2P,LNC3D2P})
         make_I(Int,ndim)
     )
 end
+
+get_conversion(::LNC1P2V) = kron(
+    [ 1 0 0;
+      0 1 0;
+      0 0 1],
+    I2_Int
+)
+
 get_conversion(::LNC2P1V) = kron(
     [ 1 0 0;
      -1 1 0;
@@ -289,6 +295,15 @@ get_conversion(::LNC3P) = kron(
      -1 0 1],
     I2_Int
 )
+
+get_conversion(::LNC1P3V) = kron(
+    [ 1 0 0 0;
+      0 1 0 0;
+      0 0 1 0;
+      0 0 0 1],
+    I3_Int
+)
+
 get_conversion(::LNC2P2V) = kron(
     [ 1 0 0 0;
      -1 1 0 0;

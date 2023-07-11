@@ -15,6 +15,8 @@ using FileIO, MeshIO
 using Meshing
 using Unitful, Match
 using LaTeXStrings
+using Cthulhu
+using JET
 using Printf
 using AbbreviatedStackTraces
 ENV["JULIA_STACKTRACE_ABBREVIATED"] = true
@@ -267,7 +269,7 @@ function parse_joints(T,urdf)
     ]
 end
 
-function link_to_rigidbody(i,link::TR.URDF.Link,
+function link_to_rigidbody(i,link::TR.URDF.Link, 
         ro = SVector(0.0,0.0,0.0),
         R = RotX(0.0),
         cT = TR.QBF.QC;
@@ -389,6 +391,7 @@ function parse_joints_links!(
         ci = collect(1:12),
         Φi = Int[]
     )
+    jointid = 0
     transformsdict = Dict([base_link => id_trans])
     bodiesdict = Dict{String,Any}([base_link => rb_base])
     jointcsts = []
@@ -437,16 +440,22 @@ function parse_joints_links!(
                                 1
                             )
                             push!(bodiesdict, child => rb_child)
+                            jointid += 1
                             if joint.type == "fixed"
                                 @warn "fixed joint: $(joint.name)"
                                 push!(bodiesdict[parent].prop.r̄ps,joint.origin.xyz)
                                 (;C,c) = bodiesdict[parent].state.cache.funcs
                                 push!(bodiesdict[parent].state.cache.Cps,C(c(joint.origin.xyz)))
+                                fixedaxis = [1.0,0,0]
+                                push!(bodiesdict[parent].prop.ās,fixedaxis)
+                                push!(bodiesdict[parent].state.as,bodiesdict[parent].state.R*fixedaxis)
                                 fixedjoint = TR.FixedJoint(
+                                    jointid,
                                     TR.End2End(
                                         ijoint,
                                         TR.ID(bodiesdict[parent],
-                                        length(bodiesdict[parent].prop.r̄ps)),
+                                        length(bodiesdict[parent].prop.r̄ps),
+                                        length(bodiesdict[parent].prop.ās)),
                                         TR.ID(bodiesdict[child],1),
                                     )
                                 )
@@ -458,6 +467,7 @@ function parse_joints_links!(
                                 push!(bodiesdict[parent].prop.ās,joint.mobility.axis)
                                 push!(bodiesdict[parent].state.as,bodiesdict[parent].state.R*joint.mobility.axis)
                                 revjoint = TR.RevoluteJoint(
+                                    jointid,
                                     TR.End2End(
                                         ijoint,
                                         TR.ID(bodiesdict[parent],
@@ -474,6 +484,7 @@ function parse_joints_links!(
                                 push!(bodiesdict[parent].prop.ās,joint.mobility.axis)
                                 push!(bodiesdict[parent].state.as,bodiesdict[parent].state.R*joint.mobility.axis)
                                 prmjoint = TR.PrismaticJoint(
+                                    jointid,
                                     TR.End2End(
                                         ijoint,
                                         TR.ID(bodiesdict[parent],
@@ -550,13 +561,23 @@ ridx
 mass_matrices = TR.build_MassMatrices(newbot)
 mass_matrices.M̌ |> size
 
+newbot.tg.nconstraints
+λ = rand(newbot.tg.nconstraints)
+TR.∂Aᵀλ∂q̌(newbot.tg,λ)
+@descend_code_warntype TR.∂Aᵀλ∂q̌(newbot.tg,λ)
+@report_opt TR.∂Aᵀλ∂q̌(newbot.tg,λ)
+Makie.inline!(false)
 plot_traj!(
     newbot;
     # AxisType=Axis3,
     showmesh=true,
     showpoints=true,
     showlabels=false,
-    showground=false
+    showground=false,    
+    sup! = (ax,tgob,sgi)->begin
+        # hidedecorations!(ax)
+        nothing
+    end
 )
 
 function dynfuncs(bot)
@@ -586,6 +607,8 @@ tspan = (0.0,1.1)
 prob = TR.SimProblem(newbot,dynfuncs)
 
 TR.solve!(prob,TR.Zhong06();tspan,dt,ftol=1e-10,maxiters=50,verbose=true,exception=true)
+TR.solve!(prob,TR.Alpha(0.7);tspan,dt,ftol=1e-10,verbose=true,exception=true)
+
 newbot.traj
 with_theme(theme_pub;
     figure_padding = (0,0,0,0),) do 
