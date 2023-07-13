@@ -707,8 +707,11 @@ function endpoints2mesh(
         n1=10,n2=2,
         color=:slategrey
     )
-	s = Meshes.Segment(Meshes.Point(p1),Meshes.Point(p2))
-	cyl_bar = Meshes.Cylinder(radius,s)
+	cyl_bar = Meshes.Cylinder(
+        Meshes.Point(p1),
+        Meshes.Point(p2),
+        radius
+    )
     cylsurf_bar = Meshes.boundary(cyl_bar)
     # Meshes.sample(cylsurf_bar,Meshes.RegularSampling(10,3))
 	cyl_bar_simple = Meshes.discretize(cylsurf_bar,Meshes.RegularDiscretization(n1,n2))

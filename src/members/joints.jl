@@ -35,6 +35,28 @@ struct End2End{end1Type<:ID,end2Type<:ID}
 	end2::end2Type
 end
 
+function find_order(nmcs1,nmcs2,q1,q2,X1,X2,nΦ1,nΦ2)
+	T = eltype(q1)
+	nq1 = length(q1)
+	nq2 = length(q2)
+	A = zeros(T,nΦ1+nΦ2+9,nq1+nq2)
+	A[    1:nΦ1,          1:nq1    ] = NCF.make_Φq(nmcs1,collect(1:nq1),collect(1:nΦ1))(q1)
+	A[nΦ1+1:nΦ1+nΦ2,  nq1+1:nq1+nq2] = NCF.make_Φq(nmcs2,collect(1:nq2),collect(1:nΦ2))(q2)
+	k = nΦ1+nΦ2	
+	A_rest = @view A[k+1:end,:]
+	rot_jac!(A_rest,collect(1:9),
+		q1,q2,
+		X1,X2,
+		collect(1:nq1),
+		collect(1:nq2),
+		collect(1:nq1),
+		collect(1:nq2),
+	)
+	_,pidx = rref_with_pivots!(Matrix(transpose(A)),min(size(A)...)*eps(real(float(one(eltype(A))))))
+	@assert length(pidx) >= 15
+	order = pidx[end-2:end] .- 12
+end
+
 """
 空约束类。
 $(TYPEDEF)
@@ -390,170 +412,6 @@ function make_A(cst::RevoluteJoint,indexed,numbered)
 	inner_A
 end
 
-function make_Φqᵀq(cst,numbered,c)
-	(;e2e,) = cst
-	(;mem2num,num2sys) = numbered
-	(;end1,end2) = e2e
-	rbid1 = end1.rbsig.prop.id
-	rbid2 = end2.rbsig.prop.id
-	pid1 = end1.pid
-	pid2 = end2.pid
-	aid1 = end1.aid
-	nld1 = NCF.get_nlocaldim(end1.rbsig.state.cache.funcs.nmcs)
-	nld2 = NCF.get_nlocaldim(end2.rbsig.state.cache.funcs.nmcs)
-	Y1 = NCF.get_conversion(end1.rbsig.state.cache.funcs.nmcs)
-	Y2 = NCF.get_conversion(end2.rbsig.state.cache.funcs.nmcs)
-	cv = BlockDiagonal([Y1,Y2])
-    ndim = NCF.get_ndim(end1.rbsig.state.cache.funcs.nmcs)
-	T = get_numbertype(cst)
-    I_Int = NCF.make_I(Int,ndim)
-	c1 = c[num2sys[mem2num[rbid1][pid1]]]
-	c2 = c[num2sys[mem2num[rbid2][pid2]]]
-	ā1 = end1.rbsig.prop.ās[aid1]
-	frame = SpatialFrame(ā1)
-	t̄1 = frame.t1
-	t̄2 = frame.t1
-	D̄ = hcat(ā1,t̄1,t̄2)
-	Φqᵀq_trans = [
-		begin
-			d̄ = D̄[:,id] 
-			ret_raw = zeros(
-				T,
-				(nld1+1)+(nld2+1),
-				(nld1+1)+(nld2+1),
-			)
-			ret_raw[1,2:nld2+1] = ret_raw[2:nld2+1,1] = -d̄
-			ret_raw[2:nld2+1,2:nld2+1] = -c1*transpose(d̄)-d̄*transpose(c1)
-			ret_raw[(nld1+1)+1,2:nld2+1] = ret_raw[2:nld2+1,(nld1+1)+1] = d̄
-			ret_raw[(nld1+1)+2:end,2:nld2+1] = c2*transpose(d̄)
-			ret_raw[2:nld2+1,(nld1+1)+2:end] = d̄*transpose(c2)
-			transpose(cv)*kron(ret_raw,I_Int)*cv
-		end
-		for id in 1:3
-	]
-
-    Φqᵀq_rot = [
-		begin
-			ret_raw = zeros(
-				T,
-				(nld1+1)+(nld2+1),
-				(nld1+1)+(nld2+1),
-			)
-			ret_raw[(nld1+1)+1:(nld1+1)+nld2,(nld1+1)+id] = ā1
-			ret_raw[(nld1+1)+id,(nld1+1)+1:(nld1+1)+nld2] = ā1
-			transpose(cv)*kron(ret_raw,I_Int)*cv
-		end
-		for id in 1:3
-	]
-	
-    Φqᵀq_rot_fix = [
-		begin
-			ret_raw = zeros(
-				T,
-				(nld1+1)+(nld2+1),
-				(nld1+1)+(nld2+1),
-			)
-			ret_raw[       1+i,(nld1+1)+j] = 1
-			ret_raw[(nld1+1)+j,       1+j] = 1
-			transpose(cv)*kron(ret_raw,I_Int)*cv
-		end
-		for i = 1:3 for j = 1:3
-	]
-	if cst isa FixedJoint
-		Φqᵀq = vcat(zero.(Φqᵀq_trans),Φqᵀq_rot_fix[cst.order])
-	elseif cst isa RevoluteJoint
-		Φqᵀq = vcat(zero.(Φqᵀq_trans),Φqᵀq_rot[cst.mask])
-	elseif cst isa PrismaticJoint
-		Φqᵀq = vcat(Φqᵀq_trans[[2,3]],Φqᵀq_rot)
-	else
-		@error "Unknown Joint"
-	end
-	Φqᵀq
-end
-
-function get_jointed_free_idx(cst)
-	(;nconstraints,e2e,) = cst
-	(;end1,end2) = e2e
-	uci1 = end1.rbsig.state.cache.free_idx
-	uci2 = end2.rbsig.state.cache.free_idx
-	ncoords1 = NCF.get_ncoords(end1.rbsig.state.cache.funcs.nmcs)
-	# ncoords2 = NCF.get_ncoords(end2.rbsig.state.cache.nmcs)
-	uci = vcat(
-		uci1,
-		uci2 .+ ncoords1
-	)
-end
-
-function get_jointed_free(cst,indexed)
-	(;nconstraints,e2e,) = cst
-	(;mem2sysfree,mem2sysfull,nfree) = indexed
-	(;end1,end2) = e2e
-	rbid1 = end1.rbsig.prop.id
-	rbid2 = end2.rbsig.prop.id
-	mem2sysfree1 = mem2sysfree[rbid1]
-	mem2sysfree2 = mem2sysfree[rbid2]
-	cst2sysfree = vcat(
-		mem2sysfree1,
-		mem2sysfree2
-	)
-end
-
-function make_∂Aᵀλ∂q(cst,numbered,c)
-	(;nconstraints) = cst
-	uci = get_jointed_free_idx(cst)
-	Φqᵀq = make_Φqᵀq(cst,numbered,c)
-    function ∂Aᵀλ∂q(λ)
-        ret = [
-            begin
-                a = Φqᵀq[i][uci,uci] .* λ[i]
-                # display(a)
-                a 
-            end
-            for i = 1:nconstraints
-        ]
-        sum(ret)
-    end
-end
-
-function rot_jac!(ret,order,q1,q2,X1,X2,memfree1,memfree2,uci1,uci2,)
-	k = 0
-	for i = 1:3
-		for j = 1:3
-			if 3(i-1)+j in order
-				k += 1
-				tpl1 = zero(q1)
-				tpl2 = zero(q2) 		
-				tpl1[3+3(i-1)+1:3+3i] .= X2[:,j]
-				tpl2[3+3(j-1)+1:3+3j] .= X1[:,i]
-				ret[k, memfree1] .= tpl1[uci1] #todo cv
-				ret[k, memfree2] .= tpl2[uci2] #todo cv
-			end
-		end
-	end
-end
-
-function find_order(nmcs1,nmcs2,q1,q2,X1,X2,nΦ1,nΦ2)
-	T = eltype(q1)
-	nq1 = length(q1)
-	nq2 = length(q2)
-	A = zeros(T,nΦ1+nΦ2+9,nq1+nq2)
-	A[    1:nΦ1,          1:nq1    ] = NCF.make_Φq(nmcs1,collect(1:nq1),collect(1:nΦ1))(q1)
-	A[nΦ1+1:nΦ1+nΦ2,  nq1+1:nq1+nq2] = NCF.make_Φq(nmcs2,collect(1:nq2),collect(1:nΦ2))(q2)
-	k = nΦ1+nΦ2	
-	A_rest = @view A[k+1:end,:]
-	rot_jac!(A_rest,collect(1:9),
-		q1,q2,
-		X1,X2,
-		collect(1:nq1),
-		collect(1:nq2),
-		collect(1:nq1),
-		collect(1:nq2),
-	)
-	_,pidx = rref_with_pivots!(Matrix(transpose(A)),min(size(A)...)*eps(real(float(one(eltype(A))))))
-	@assert length(pidx) >= 15
-	order = pidx[end-2:end] .- 12
-end
-
 """
 刚体铰接约束类。
 $(TYPEDEF)
@@ -847,6 +705,149 @@ function make_A(cst::FixedJoint,indexed,numbered)
         ret
     end
 	inner_A
+end
+
+
+function get_jointed_free_idx(cst)
+	(;nconstraints,e2e,) = cst
+	(;end1,end2) = e2e
+	uci1 = end1.rbsig.state.cache.free_idx
+	uci2 = end2.rbsig.state.cache.free_idx
+	ncoords1 = NCF.get_ncoords(end1.rbsig.state.cache.funcs.nmcs)
+	# ncoords2 = NCF.get_ncoords(end2.rbsig.state.cache.nmcs)
+	uci = vcat(
+		uci1,
+		uci2 .+ ncoords1
+	)
+end
+
+function get_jointed_free(cst,indexed)
+	(;nconstraints,e2e,) = cst
+	(;mem2sysfree,mem2sysfull,nfree) = indexed
+	(;end1,end2) = e2e
+	rbid1 = end1.rbsig.prop.id
+	rbid2 = end2.rbsig.prop.id
+	mem2sysfree1 = mem2sysfree[rbid1]
+	mem2sysfree2 = mem2sysfree[rbid2]
+	cst2sysfree = vcat(
+		mem2sysfree1,
+		mem2sysfree2
+	)
+end
+
+function make_Φqᵀq(cst,numbered,c)
+	(;e2e,) = cst
+	(;mem2num,num2sys) = numbered
+	(;end1,end2) = e2e
+	rbid1 = end1.rbsig.prop.id
+	rbid2 = end2.rbsig.prop.id
+	pid1 = end1.pid
+	pid2 = end2.pid
+	aid1 = end1.aid
+	nld1 = NCF.get_nlocaldim(end1.rbsig.state.cache.funcs.nmcs)
+	nld2 = NCF.get_nlocaldim(end2.rbsig.state.cache.funcs.nmcs)
+	Y1 = NCF.get_conversion(end1.rbsig.state.cache.funcs.nmcs)
+	Y2 = NCF.get_conversion(end2.rbsig.state.cache.funcs.nmcs)
+	cv = BlockDiagonal([Y1,Y2])
+    ndim = NCF.get_ndim(end1.rbsig.state.cache.funcs.nmcs)
+	T = get_numbertype(cst)
+    I_Int = NCF.make_I(Int,ndim)
+	c1 = c[num2sys[mem2num[rbid1][pid1]]]
+	c2 = c[num2sys[mem2num[rbid2][pid2]]]
+	ā1 = end1.rbsig.prop.ās[aid1]
+	frame = SpatialFrame(ā1)
+	t̄1 = frame.t1
+	t̄2 = frame.t1
+	D̄ = hcat(ā1,t̄1,t̄2)
+	Φqᵀq_trans = [
+		begin
+			d̄ = D̄[:,id] 
+			ret_raw = zeros(
+				T,
+				(nld1+1)+(nld2+1),
+				(nld1+1)+(nld2+1),
+			)
+			ret_raw[1,2:nld2+1] = ret_raw[2:nld2+1,1] = -d̄
+			ret_raw[2:nld2+1,2:nld2+1] = -c1*transpose(d̄)-d̄*transpose(c1)
+			ret_raw[(nld1+1)+1,2:nld2+1] = ret_raw[2:nld2+1,(nld1+1)+1] = d̄
+			ret_raw[(nld1+1)+2:end,2:nld2+1] = c2*transpose(d̄)
+			ret_raw[2:nld2+1,(nld1+1)+2:end] = d̄*transpose(c2)
+			transpose(cv)*kron(ret_raw,I_Int)*cv
+		end
+		for id in 1:3
+	]
+
+    Φqᵀq_rot = [
+		begin
+			ret_raw = zeros(
+				T,
+				(nld1+1)+(nld2+1),
+				(nld1+1)+(nld2+1),
+			)
+			ret_raw[(nld1+1)+1:(nld1+1)+nld2,(nld1+1)+id] = ā1
+			ret_raw[(nld1+1)+id,(nld1+1)+1:(nld1+1)+nld2] = ā1
+			transpose(cv)*kron(ret_raw,I_Int)*cv
+		end
+		for id in 1:3
+	]
+	
+    Φqᵀq_rot_fix = [
+		begin
+			ret_raw = zeros(
+				T,
+				(nld1+1)+(nld2+1),
+				(nld1+1)+(nld2+1),
+			)
+			ret_raw[       1+i,(nld1+1)+j] = 1
+			ret_raw[(nld1+1)+j,       1+j] = 1
+			transpose(cv)*kron(ret_raw,I_Int)*cv
+		end
+		for i = 1:3 for j = 1:3
+	]
+	if cst isa FixedJoint
+		Φqᵀq = vcat(zero.(Φqᵀq_trans),Φqᵀq_rot_fix[cst.order])
+	elseif cst isa RevoluteJoint
+		Φqᵀq = vcat(zero.(Φqᵀq_trans),Φqᵀq_rot[cst.mask])
+	elseif cst isa PrismaticJoint
+		Φqᵀq = vcat(Φqᵀq_trans[[2,3]],Φqᵀq_rot)
+	else
+		@error "Unknown Joint"
+	end
+	Φqᵀq
+end
+
+function make_∂Aᵀλ∂q(cst,numbered,c)
+	(;nconstraints) = cst
+	uci = get_jointed_free_idx(cst)
+	Φqᵀq = make_Φqᵀq(cst,numbered,c)
+    function ∂Aᵀλ∂q(λ)
+        ret = [
+            begin
+                a = Φqᵀq[i][uci,uci] .* λ[i]
+                # display(a)
+                a 
+            end
+            for i = 1:nconstraints
+        ]
+        sum(ret)
+    end
+end
+
+function rot_jac!(ret,order,q1,q2,X1,X2,memfree1,memfree2,uci1,uci2,)
+	k = 0
+	for i = 1:3
+		for j = 1:3
+			if 3(i-1)+j in order
+				k += 1
+				tpl1 = zero(q1)
+				tpl2 = zero(q2) 		
+				tpl1[3+3(i-1)+1:3+3i] .= X2[:,j]
+				tpl2[3+3(j-1)+1:3+3j] .= X1[:,i]
+				ret[k, memfree1] .= tpl1[uci1] #todo cv
+				ret[k, memfree2] .= tpl2[uci2] #todo cv
+			end
+		end
+	end
 end
 
 """

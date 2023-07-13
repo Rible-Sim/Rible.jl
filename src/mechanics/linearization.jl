@@ -181,6 +181,43 @@ function build_Ǩ(tg)
     build_Ǩ(tg,λ)
 end
 
+function build_Ǩm_Ǩg!(tg::TensegrityStructure,q,f,k)
+    (;ndim) = tg
+    (;numbered,indexed,tensioned) = tg.connectivity
+    (;nfull,nfree,syspres,sysfree,mem2sysfull) = indexed
+    (;connected) = tensioned
+    (;cables) = tg.tensiles
+    (;mem2num,num2sys) = numbered
+    update!(tg,q)
+    Jj = zeros(eltype(q),ndim,nfull)
+    retǨm = zeros(eltype(q),nfree,nfree)
+    retǨg = zeros(eltype(q),nfree,nfree)
+    foreach(connected) do scnt
+        j = scnt.id
+        rb1 = scnt.end1.rbsig
+        rb2 = scnt.end2.rbsig
+        ap1id = scnt.end1.pid
+        ap2id = scnt.end2.pid
+        C1 = rb1.state.cache.Cps[ap1id]
+        C2 = rb2.state.cache.Cps[ap2id]
+        mfull1 = mem2sysfull[rb1.prop.id]
+        mfull2 = mem2sysfull[rb2.prop.id]
+        cable = cables[j]
+        (;state) = cable
+        (;direction,length,tension) = state
+        s = 1/length
+        Jj .= 0
+        Jj[:,mfull2] .+= C2
+        Jj[:,mfull1] .-= C1
+        Uj = transpose(Jj)*Jj
+        Ǔj = @view Uj[sysfree,sysfree]
+        Ūjq = Uj[sysfree,:]*q
+        retǨm .+= k[j]*s^2*(Ūjq*transpose(Ūjq))
+        retǨg .+= f[j]/length*(Ǔj-s^2*Ūjq*transpose(Ūjq))
+    end
+    retǨm,retǨg
+end
+
 function make_Ǩm_Ǩg(tg,q0)
     (;ndim) = tg
     (;numbered,indexed,tensioned) = tg.connectivity
@@ -207,8 +244,6 @@ function make_Ǩm_Ǩg(tg,q0)
             c2 = c[num2sys[mem2num[rb2id][ap2id]]]
             C1 = rb1.state.cache.funcs.C(c1)
             C2 = rb2.state.cache.funcs.C(c2)
-            C1 = rb1.state.cache.Cps[ap1id]
-            C2 = rb2.state.cache.Cps[ap2id]
             mfull1 = mem2sysfull[rb1.prop.id]
             mfull2 = mem2sysfull[rb2.prop.id]
             Jj .= 0
@@ -219,6 +254,38 @@ function make_Ǩm_Ǩg(tg,q0)
             Ūjq = Uj[sysfree,:]*q
             retǨm .+= k[j]*s[j]^2*(Ūjq*transpose(Ūjq))
             retǨg .+= k[j]*(1-μ[j]*s[j])*(Ǔj-s[j]^2*Ūjq*transpose(Ūjq))
+        end
+        retǨm,retǨg
+    end
+    function inner_Ǩm_Ǩg(q̌)
+		q = Vector{eltype(q̌)}(undef,nfull)
+		q[syspres] .= q0[syspres]
+		q[sysfree] .= q̌
+        Jj = zeros(eltype(q̌),ndim,nfull)
+        retǨm = zeros(eltype(q̌),nfree,nfree)
+        retǨg = zeros(eltype(q̌),nfree,nfree)
+        foreach(connected) do scnt
+            j = scnt.id
+            rb1 = scnt.end1.rbsig
+            rb2 = scnt.end2.rbsig
+            ap1id = scnt.end1.pid
+            ap2id = scnt.end2.pid
+            C1 = rb1.state.cache.Cps[ap1id]
+            C2 = rb2.state.cache.Cps[ap2id]
+            mfull1 = mem2sysfull[rb1.prop.id]
+            mfull2 = mem2sysfull[rb2.prop.id]
+            cable = cables[j]
+            (;k,c,state,slack) = cable
+            (;direction,tension,length,lengthdot) = state
+            s = 1/length
+            Jj .= 0
+            Jj[:,mfull2] .+= C2
+            Jj[:,mfull1] .-= C1
+            Uj = transpose(Jj)*Jj
+            Ǔj = @view Uj[sysfree,sysfree]
+            Ūjq = Uj[sysfree,:]*q
+            retǨm .+= k*s^2*(Ūjq*transpose(Ūjq))
+            retǨg .+= tension/length*(Ǔj-s^2*Ūjq*transpose(Ūjq))
         end
         retǨm,retǨg
     end
@@ -293,7 +360,7 @@ function make_S(tg,q0)
     inner_S
 end
 
-# Out-of-place ∂Q̌∂q̌
+# Out-of-place ∂Q̌∂q̌ (dispatch)
 function build_∂Q̌∂q̌(tg)
     build_∂Q̌∂q̌(tg, tg.connectivity.tensioned)
 end
@@ -455,7 +522,7 @@ function build_∂Q̌∂q̌!(∂Q̌∂q̌,tg)
     return ∂Q̌∂q̌
 end
 
-# Out-of-place ∂Q̌∂q̌̇
+# Out-of-place ∂Q̌∂q̌̇ (dispatch)
 function build_∂Q̌∂q̌̇(tg)
     build_∂Q̌∂q̌̇(tg, tg.connectivity.tensioned)
 end
@@ -837,9 +904,9 @@ function check_stability(tg::TensegrityStructure,λ,Ň;verbose=false)
     Ň0 = Ň(q̌,c)
     𝒦0 = transpose(Ň0)*Ǩ0*Ň0
     eigen_result = eigen(𝒦0)
-    eigen_min = eigen_result.values[1]
-    if eigen_min<0
-        @warn "Instability detected! Minimum eigen value: $eigen_min"
+    nn = count(x -> x < 0, eigen_result.values)
+    if nn > 1
+        @warn "Instability detected! Number of negative eigenvalues: $nn"
         isstable = false
     else
         isstable = true

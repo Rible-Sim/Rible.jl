@@ -165,14 +165,13 @@ function quad(c=100.0;
 end
 
 function rigidbar(i,ri,rj;
-            ṙi,ṙj,
-            m = 0.05
-        )
-    movable = true
-    constrained = false
-    ci = Int[]
-    Φi = [1]
-
+        ṙi,ṙj,
+        m = 0.05,
+        movable = true,
+        constrained = false,
+        ci = Int[],
+        Φi = [1]
+    )
     ro = (ri + rj)/2
     ṙo = (ṙi + ṙj)/2
     u = rj - ri
@@ -283,7 +282,10 @@ function uni(c=100.0;
             1, p[end-1],p[end];
             ṙi = ṙo_ref,ṙj = ṙo_ref,
             m = mbar,
-            
+            movable = true,
+            constrained = true,
+            ci = collect(1:6),
+            Φi = Int[],            
         ),
         rigidbase(2, p)
     ]
@@ -295,11 +297,11 @@ function uni(c=100.0;
 
     original_restlens = zeros(ncables)
     original_restlens[1:3] .= 80e-3
-    original_restlens[4:6] .= 60e-3
+    original_restlens[4:6] .= 80e-3
 
     ks = zeros(ncables)
     ks[1:3] .= 1000.0
-    ks[4:6] .= 100.0
+    ks[4:6] .= 1000.0
 
     cables = [
         TR.Cable3D(i, original_restlens[i], ks[i], c;slack=false) for i = 1:ncables
