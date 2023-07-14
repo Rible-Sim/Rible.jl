@@ -13,7 +13,7 @@ $(TYPEDEF)
 ---
 $(TYPEDFIELDS)
 """
-struct RigidBodyProperty{N,M,T} <: AbstractRigidBodyProperty{N,T}
+struct RigidBodyProperty{N,T} <: AbstractRigidBodyProperty{N,T}
 	"Is movable?"
     movable::Bool
 	"Is constrained?"
@@ -31,7 +31,7 @@ struct RigidBodyProperty{N,M,T} <: AbstractRigidBodyProperty{N,T}
 	"Anchor points in local frame"
     r̄ps::Vector{SVector{N,T}}
 	"Axes in local frame"
-    ās::Vector{SVector{M,T}}
+    ās::Vector{SVector{N,T}}
 end
 
 """
@@ -54,7 +54,8 @@ function RigidBodyProperty(
     end
 	mtype = similar_type(inertia_input)
 	r̄type = SVector{size(inertia_input,1)}
-	ātype = SVector{2size(inertia_input,1)-3}
+	# ātype = SVector{2size(inertia_input,1)-3}	
+	ātype = SVector{size(inertia_input,1)}
 	return RigidBodyProperty(
 		movable,constrained,
 		id,type,
@@ -83,10 +84,10 @@ struct NonminimalCoordinatesCache{fT,MT,JT,VT,ArrayT}
     Cps::Vector{ArrayT}
 end
 
-function get_CoordinatesCache(prop::RigidBodyProperty{N,M,T},
+function get_CoordinatesCache(prop::RigidBodyProperty{N,T},
                                  lncs::NCF.LNC,
 								 pres_idx=Int[],
-								 Φ_mask=get_Φ_mask(lncs)) where {N,M,T}
+								 Φ_mask=get_Φ_mask(lncs)) where {N,T}
     (;mass,inertia,r̄g,r̄ps) = prop
 	nr̄ps = length(r̄ps)
 	free_idx = NCF.get_free_idx(lncs,pres_idx)
@@ -112,10 +113,10 @@ function get_CoordinatesCache(prop::RigidBodyProperty{N,M,T},
     NonminimalCoordinatesCache(pres_idx,free_idx,Φ_mask,nΦ,cf,mass_matrix,M⁻¹,∂Mq̇∂q,∂M⁻¹p∂q,Ṁq̇,∂T∂qᵀ,Co,Cg,Cps)
 end
 
-function get_CoordinatesCache(prop::RigidBodyProperty{N,M,T},
+function get_CoordinatesCache(prop::RigidBodyProperty{N,T},
 								qcs::QBF.QC,
 								pres_idx=Int[],
-								Φ_mask=get_Φ_mask(qcs)) where {N,M,T}
+								Φ_mask=get_Φ_mask(qcs)) where {N,T}
 	(;mass,inertia,r̄g,r̄ps) = prop
 	nr̄ps = length(r̄ps)
 	free_idx = deleteat!(collect(1:7),pres_idx)
@@ -167,9 +168,9 @@ mutable struct RigidBodyState{N,M,T,cacheType} <: AbstractRigidBodyState{N,T}
 	"Velocities of anchor points in global frame"
     ṙps::Vector{MVector{N,T}}
 	"Directions of axes in global frame"
-    as::Vector{MVector{M,T}}
+    as::Vector{MVector{N,T}}
 	"Angular velocities of axes in global frame"
-    ȧs::Vector{MVector{M,T}}
+    ȧs::Vector{MVector{N,T}}
 	"Resultant force"
     f::MVector{N,T}
 	"Resultant torque"
@@ -189,11 +190,11 @@ $(TYPEDSIGNATURES)
 `pres_idx`为约束坐标的索引。
 `Φ_mask`为约束方程的索引。
 """
-function RigidBodyState(prop::RigidBodyProperty{N,M,T},
+function RigidBodyState(prop::RigidBodyProperty{N,T},
                         lncs,
                         r_input,rotation_input,ṙ_input,ω_input,
                         pres_idx=Int[],
-						Φ_mask=get_Φ_mask(lncs)) where {N,M,T}
+						Φ_mask=get_Φ_mask(lncs)) where {N,T}
     (;r̄g,r̄ps,ās) = prop
 	nr̄ps = length(r̄ps)
 	nās = length(ās)
@@ -205,6 +206,7 @@ function RigidBodyState(prop::RigidBodyProperty{N,M,T},
 		rotation = Matrix(rotation_input)
 	end
 	R = MMatrix{N,N,T}(rotation)
+	M = 2N-3
 	ω = MVector{M}(ω_input)
     rg = MVector{N}(ro+R*r̄g)
     ṙg = MVector{N}(ṙo+ω×(rg-ro))
@@ -213,8 +215,8 @@ function RigidBodyState(prop::RigidBodyProperty{N,M,T},
 
     rps = MVector{N,T}[(ro+R*r̄ps[i])      for i in 1:nr̄ps]
     ṙps = MVector{N,T}[(ṙo+ω×(rps[i]-ro)) for i in 1:nr̄ps]
-	as  = MVector{M,T}[(R*ās[i])          for i in 1:nās]
-    ȧs  = MVector{M,T}[(ω×(as[i]))        for i in 1:nās]
+	as  = MVector{N,T}[(R*ās[i])          for i in 1:nās]
+    ȧs  = MVector{N,T}[(ω×(as[i]))        for i in 1:nās]
     fps = [@MVector zeros(T,N) for i in 1:nr̄ps]
     τps = [@MVector zeros(T,M) for i in 1:nās]
 
@@ -231,7 +233,7 @@ $(TYPEDFIELDS)
 """
 struct RigidBody{N,M,T,cacheType,meshType} <: AbstractRigidBody{N,T}
 	"刚体属性"
-    prop::RigidBodyProperty{N,M,T}
+    prop::RigidBodyProperty{N,T}
 	"刚体状态"
     state::RigidBodyState{N,M,T,cacheType}
 	"可视化网格"

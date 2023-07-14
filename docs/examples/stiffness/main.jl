@@ -55,6 +55,8 @@ include("../vis.jl"); includet("../vis.jl")
 include("../analysis.jl"); includet("../analysis.jl")
 include("../dyn.jl"); includet("../dyn.jl")
 include("../nonsmooth/def.jl"); includet("../nonsmooth/def.jl")
+
+include("examples.jl"); includet("examples.jl")
 figdir::String = ""
 if Sys.iswindows()
     figdir::String = raw"C:\Users\luo22\OneDrive\Papers\TensegrityStability\ES"
@@ -68,35 +70,39 @@ unibot = uni(0.0;
             e = 0.0,
 			z0 = 0.2
 )
-plot_traj!(unibot)
-TR.check_static_equilibrium_output_multipliers(unibot.tg)
+
+
+man1 = dualtri(1;θ=deg2rad(0))
+
+bot = man1
+plot_traj!(bot)
+
+TR.check_static_equilibrium_output_multipliers(bot.tg)
 
 function static_kinematic_determine(
     B,
     rtol::Real = min(size(B)...)*eps(real(float(one(eltype(B)))))
     )
     ndof,ncables = size(B)
-    D = svd(B;)
+    D = svd(B; full = true)
     (;U,V,S) = D
     tol =  rtol*S[1]
     rank_B = count(x -> x > tol, S)
     S_nonzero = S[begin:rank_B]
     dsi = ncables - rank_B
     dki = ndof - rank_B
-    @show dsi,dki
+    # @show ndof,ncables,rank_B,dsi,dki
     self_stress_states = V[:,rank_B+1:rank_B+dsi]
     stiffness_directions = U[:,rank_B+1:rank_B+dki]
     self_stress_states,stiffness_directions
 end
 
-unibot.tg
-
-q = TR.get_q(unibot.tg)
-q̌ = TR.get_q̌(unibot.tg)
-Ǎ = TR.make_A(unibot.tg)(q)
+q = TR.get_q(bot.tg)
+q̌ = TR.get_q̌(bot.tg)
+Ǎ = TR.make_A(bot.tg)(q)
 Ň = TR.nullspace(Ǎ)
-Q̃ = TR.build_Q̃(unibot.tg)
-L̂ = TR.build_L̂(unibot.tg)
+Q̃ = TR.build_Q̃(bot.tg)
+L̂ = TR.build_L̂(bot.tg)
 
 # Left hand side
 Q̃L̂ = Q̃*L̂
@@ -105,11 +111,13 @@ B = -Q̃L̂
 ℬ = transpose(Ň)*B
 
 s,d = static_kinematic_determine(ℬ)
-f = s[:,1]*100
+s
+d
+f = s[:,1]
 λ = inv(Ǎ*transpose(Ǎ))*Ǎ*B*f
-Ǩa = - TR.∂Aᵀλ∂q̌(unibot.tg,λ)
-k = TR.get_cables_stiffness(unibot.tg)
-Ǩm, Ǩg = TR.build_Ǩm_Ǩg!(unibot.tg,q,f,k)
+Ǩa = - TR.∂Aᵀλ∂q̌(bot.tg,λ)
+k = TR.get_cables_stiffness(bot.tg)
+Ǩm, Ǩg = TR.build_Ǩm_Ǩg!(bot.tg,q,f,k)
 𝒦m = transpose(Ň)*Ǩm*Ň
 𝒦g = transpose(Ň)*Ǩg*Ň
 𝒦a = transpose(Ň)*Ǩa*Ň
@@ -126,6 +134,7 @@ d'*𝒦a*d
 d'*𝒦*d
 
 eigen_result = eigen(𝒦)
+
 nn = count(x -> x < 0, eigen_result.values)
 if nn > 1
     @warn "Instability detected! Number of negative eigenvalues: $nn"

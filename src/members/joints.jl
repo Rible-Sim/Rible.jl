@@ -810,6 +810,8 @@ function make_Φqᵀq(cst,numbered,c)
 		Φqᵀq = vcat(zero.(Φqᵀq_trans),Φqᵀq_rot[cst.mask])
 	elseif cst isa PrismaticJoint
 		Φqᵀq = vcat(Φqᵀq_trans[[2,3]],Φqᵀq_rot)
+	elseif cst isa PinJoint
+		Φqᵀq = vcat(zero.(Φqᵀq_trans),zero.(Φqᵀq_rot))
 	else
 		@error "Unknown Joint"
 	end

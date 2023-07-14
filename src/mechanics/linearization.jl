@@ -72,10 +72,13 @@ function ∂Aᵀλ∂q̌(tg::AbstractTensegrityStructure,λ)
             ret[memfree,memfree] .+= rb.state.cache.funcs.∂Aᵀλ∂q(λ[memincst])#[:,free_idx]
         end
     end
-    foreach(joints) do joint
-        jointexcst = joint2sysexcst[joint.id]
-        jointfree = get_jointed_free(joint,indexed)
-        ret[jointfree,jointfree] .+= make_∂Aᵀλ∂q(joint,numbered,c)(λ[jointexcst])
+    #todo skip 2D for now
+    if get_ndim(tg) == 3
+        foreach(joints) do joint
+            jointexcst = joint2sysexcst[joint.id]
+            jointfree = get_jointed_free(joint,indexed)
+            ret[jointfree,jointfree] .+= make_∂Aᵀλ∂q(joint,numbered,c)(λ[jointexcst])
+        end
     end
     ret
 end
