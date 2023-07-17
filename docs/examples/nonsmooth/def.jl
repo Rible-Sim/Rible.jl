@@ -202,6 +202,10 @@ function rigidbar(i,ri,rj;
     
     lncs, _ = TR.NCF.NC3D2P(ri, rj, ro, R)
     ω = TR.NCF.find_ω(lncs,vcat(ri,rj),vcat(ṙi,ṙj))
+    if constrained
+        ci = collect(1:6)
+        Φi = Int[]
+    end
     state = TR.RigidBodyState(prop, lncs, ro, R, ṙo, ω, ci, Φi)
     # leg_mesh = load("400杆.STL")
     barmesh = endpoints2mesh(r̄p1,r̄p2;radius = norm(r̄p2-r̄p1)/40)
@@ -339,7 +343,8 @@ end
 
 function superball(c=0.0;
             μ = 0.9,
-            e = 0.0
+            e = 0.0,
+            constrained = false,
         )
     l = 1.7/2
     d = l/2    
@@ -366,7 +371,9 @@ function superball(c=0.0;
             p[2i  ];
             ṙi=ṗ[2i-1],
             ṙj=ṗ[2i  ], 
-            m = 5.0)
+            m = 5.0,
+            constrained = ifelse(i==1,true,false)
+            )
         for i = 1:6
     ]
     rigdibodies = TypeSortedCollection(rbs)

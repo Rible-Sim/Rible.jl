@@ -462,7 +462,7 @@ end
 
 function make_Φ(cst::PrismaticJoint,indexed,numbered)
 	(;nconstraints,values,e2e,frame,order) = cst
-	(;mem2sys) = numbered
+	(;num2sys,mem2num) = numbered
 	(;mem2sysfull) = indexed
 	(;end1,end2) = e2e
 	pid1 = end1.pid
@@ -494,8 +494,8 @@ function make_Φ(cst::PrismaticJoint,indexed,numbered)
 		X2 = NCF.make_X(nmcs2,q2)
 		a1t1 = X1*frame.t1
 		a1t2 = X1*frame.t2
-		c1 = c[mem2sys[rbid1][pid1]]
-		c2 = c[mem2sys[rbid2][pid2]]
+		c1 = c[num2sys[mem2num[rbid1]][pid1]]
+		c2 = c[num2sys[mem2num[rbid2]][pid2]]
 		C1 = end1.rbsig.state.cache.funcs.C(c1)*q1
 		C2 = end2.rbsig.state.cache.funcs.C(c2)*q2
 		ret[1:2] .= transpose([a1t1 a1t2])*(C1*q1.-C2*q2) .- values[1:2]
@@ -509,7 +509,7 @@ end
 function make_A(cst::PrismaticJoint,indexed,numbered)
 	(;nconstraints,e2e,frame,order) = cst
 	(;mem2sysfree,mem2sysfull,nfree) = indexed
-	(;mem2sys) = numbered
+	(;num2sys,mem2num) = numbered
 	(;end1,end2) = e2e
 	pid1 = end1.pid
 	pid2 = end2.pid
@@ -553,8 +553,8 @@ function make_A(cst::PrismaticJoint,indexed,numbered)
 		X2 = NCF.make_X(nmcs2,q2)
 		a1t1 = X1*frame.t1
 		a1t2 = X1*frame.t2
-		c1 = c[mem2sys[rbid1][pid1]]
-		c2 = c[mem2sys[rbid2][pid2]]
+		c1 = c[num2sys[mem2num[rbid1]][pid1]]
+		c2 = c[num2sys[mem2num[rbid2]][pid2]]
 		C1 = end1.rbsig.state.cache.funcs.C(c1)
 		C2 = end2.rbsig.state.cache.funcs.C(c2)
 		ret[1:2,memfree1] .= kron(
@@ -574,6 +574,166 @@ function make_A(cst::PrismaticJoint,indexed,numbered)
 	inner_A
 end
 
+"""
+刚体铰接约束类。
+$(TYPEDEF)
+"""
+struct CylindricalJoint{valueType,e2eType,frameType} <: ExternalConstraints{valueType}
+	id::Int
+	nconstraints::Int
+	values::valueType
+	e2e::e2eType
+	frame::frameType
+end
+
+"""
+铰接约束构造子。
+$(TYPEDSIGNATURES)
+"""
+function CylindricalJoint(id,e2e)
+	(;end1,end2) = e2e
+    nΦ = 4
+	T = get_numbertype(end1.rbsig)
+	pid1 = end1.pid
+	pid2 = end2.pid
+	nmcs1 = end1.rbsig.state.cache.funcs.nmcs
+	nmcs2 = end2.rbsig.state.cache.funcs.nmcs
+	state1 = end1.rbsig.state
+	state2 = end2.rbsig.state
+	aid1 = end1.aid
+	ā1 = end1.rbsig.prop.ās[aid1]
+	frame = SpatialFrame(ā1)
+	q1 = NCF.rigidstate2naturalcoords(nmcs1,state1.ro,state1.R)
+	q2 = NCF.rigidstate2naturalcoords(nmcs2,state2.ro,state2.R)
+	X1 = NCF.make_X(nmcs1,q1)
+	X2 = NCF.make_X(nmcs2,q2)
+	a1t1 = X1*frame.t1
+	a1t2 = X1*frame.t2
+	C1 = end1.rbsig.state.cache.Cps[pid1]
+	C2 = end2.rbsig.state.cache.Cps[pid2]
+	values = zeros(T,nΦ)
+	values[1:2] .= transpose([a1t1 a1t2])*(C1*q1.-C2*q2)
+	nΦ1 = NCF.get_nconstraints(nmcs1)
+	nΦ2 = NCF.get_nconstraints(nmcs2)
+	inprods = transpose(X2)*X1
+	order = find_order(nmcs1,nmcs2,q1,q2,X1,X2,nΦ1,nΦ2)
+	values[3:5] .= inprods[order]
+	CylindricalJoint(id,nΦ,values,e2e,frame,order)
+end
+
+function make_Φ(cst::CylindricalJoint,indexed,numbered)
+	(;nconstraints,values,e2e,frame,order) = cst
+	(;num2sys,mem2num) = numbered
+	(;mem2sysfull) = indexed
+	(;end1,end2) = e2e
+	pid1 = end1.pid
+	pid2 = end2.pid
+	nmcs1 = end1.rbsig.state.cache.funcs.nmcs
+	nmcs2 = end2.rbsig.state.cache.funcs.nmcs
+	rbid1 = end1.rbsig.prop.id
+	rbid2 = end2.rbsig.prop.id
+	function inner_Φ(q)
+		ret = zeros(eltype(q),nconstraints)
+		q1 = @view q[mem2sysfull[rbid1]]
+		q2 = @view q[mem2sysfull[rbid2]]
+		X1 = NCF.make_X(nmcs1,q1)
+		X2 = NCF.make_X(nmcs2,q2)
+		C1 = end1.rbsig.state.cache.Cps[pid1]
+		C2 = end2.rbsig.state.cache.Cps[pid2]
+		a1t1 = X1*frame.t1
+		a1t2 = X1*frame.t2
+		ret[1:2] .= transpose([a1t1 a1t2])*(C1*q1.-C2*q2) .- values[1:2]
+		inprods = transpose(X2)*X1
+		ret[3:5] .= inprods[order] .- values[3:5]
+		ret
+	end
+	function inner_Φ(q,d,c)
+		ret = zeros(eltype(q),nconstraints)
+		q1 = @view q[mem2sysfull[rbid1]]
+		q2 = @view q[mem2sysfull[rbid2]]
+		X1 = NCF.make_X(nmcs1,q1)
+		X2 = NCF.make_X(nmcs2,q2)
+		a1t1 = X1*frame.t1
+		a1t2 = X1*frame.t2
+		c1 = c[num2sys[mem2num[rbid1]][pid1]]
+		c2 = c[num2sys[mem2num[rbid2]][pid2]]
+		C1 = end1.rbsig.state.cache.funcs.C(c1)*q1
+		C2 = end2.rbsig.state.cache.funcs.C(c2)*q2
+		ret[1:2] .= transpose([a1t1 a1t2])*(C1*q1.-C2*q2) .- values[1:2]
+		inprods = transpose(X2)*X1
+		ret[3:5] .= inprods[order] .- values[3:5]
+		ret
+	end
+	inner_Φ
+end
+
+function make_A(cst::CylindricalJoint,indexed,numbered)
+	(;nconstraints,e2e,frame,order) = cst
+	(;mem2sysfree,mem2sysfull,nfree) = indexed
+	(;num2sys,mem2num) = numbered
+	(;end1,end2) = e2e
+	pid1 = end1.pid
+	pid2 = end2.pid
+	uci1 =  end1.rbsig.state.cache.free_idx
+	uci2 =  end2.rbsig.state.cache.free_idx
+	rbid1 = end1.rbsig.prop.id
+	rbid2 = end2.rbsig.prop.id
+	memfree1 = mem2sysfree[rbid1]
+	memfree2 = mem2sysfree[rbid2]
+	nmcs1 = end1.rbsig.state.cache.funcs.nmcs
+	nmcs2 = end2.rbsig.state.cache.funcs.nmcs
+	function inner_A(q)
+		ret = zeros(eltype(q),nconstraints,nfree)
+		q1 = @view q[mem2sysfull[rbid1]]
+		q2 = @view q[mem2sysfull[rbid2]]
+		C1 = end1.rbsig.state.cache.Cps[pid1]
+		C2 = end2.rbsig.state.cache.Cps[pid2]
+		X1 = NCF.make_X(nmcs1,q1)
+		X2 = NCF.make_X(nmcs2,q2)
+		a1t1 = X1*frame.t1
+		a1t2 = X1*frame.t2
+		ret[1:2,memfree1] .= kron(
+				[
+					0 transpose(frame.t1); 
+					0 transpose(frame.t2)
+				],
+				transpose(C1*q1.-C2*q2)
+			)[:,uci1]
+		ret[1:2,memfree1] .+= transpose([a1t1 a1t2])*C1[:,uci1]
+		ret[1:2,memfree2] .-= transpose([a1t1 a1t2])*C2[:,uci2]
+		k = 2
+		ret_rest = @view ret[k+1:end,:]
+		rot_jac!(ret_rest,order,q1,q2,X1,X2,memfree1,memfree2,uci1,uci2,)
+		ret
+	end
+	function inner_A(q,c)
+        ret = zeros(eltype(q),nconstraints,nfree)
+		q1 = @view q[mem2sysfull[rbid1]]
+		q2 = @view q[mem2sysfull[rbid2]]
+		X1 = NCF.make_X(nmcs1,q1)
+		X2 = NCF.make_X(nmcs2,q2)
+		a1t1 = X1*frame.t1
+		a1t2 = X1*frame.t2
+		c1 = c[num2sys[mem2num[rbid1]][pid1]]
+		c2 = c[num2sys[mem2num[rbid2]][pid2]]
+		C1 = end1.rbsig.state.cache.funcs.C(c1)
+		C2 = end2.rbsig.state.cache.funcs.C(c2)
+		ret[1:2,memfree1] .= kron(
+				[
+					0 transpose(frame.t1); 
+					0 transpose(frame.t2)
+				],
+				transpose(C1*q1.-C2*q2)
+			)[:,uci1]
+		ret[1:2,memfree1] .+= transpose([a1t1 a1t2])*C1[:,uci1]
+		ret[1:2,memfree2] .-= transpose([a1t1 a1t2])*C2[:,uci2]
+		k = 2
+		ret_rest = @view ret[k+1:end,:]
+		rot_jac!(ret_rest,order,q1,q2,X1,X2,memfree1,memfree2,uci1,uci2,)
+        ret
+    end
+	inner_A
+end
 """
 刚体铰接约束类。
 $(TYPEDEF)

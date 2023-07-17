@@ -45,6 +45,9 @@ import Meshes
 using Match
 using Cthulhu
 using COSMO
+using Polyhedra
+import CDDLib 
+lib = CDDLib.Library()
 using AbbreviatedStackTraces
 ENV["JULIA_STACKTRACE_ABBREVIATED"] = true
 ENV["JULIA_STACKTRACE_MINIMAL"] = true
@@ -55,12 +58,14 @@ include("../vis.jl"); includet("../vis.jl")
 include("../analysis.jl"); includet("../analysis.jl")
 include("../dyn.jl"); includet("../dyn.jl")
 include("../nonsmooth/def.jl"); includet("../nonsmooth/def.jl")
+include("../ES/def.jl"); includet("../ES/def.jl")
+include("../ES/def3d.jl"); includet("../ES/def3d.jl")
+
 
 include("examples.jl"); includet("examples.jl")
 figdir::String = ""
 if Sys.iswindows()
     figdir::String = raw"C:\Users\luo22\OneDrive\Papers\TensegrityStability\ES"
-    # figdir::String =raw"C:\Users\luo22\OneDrive\Papers\Ph.D.Thesis\dyn"
 elseif Sys.isapple()
     figdir::String = raw"."
 end
@@ -70,12 +75,25 @@ unibot = uni(0.0;
             e = 0.0,
 			z0 = 0.2
 )
+bot = unibot
 
+spine3dbot = spine3d(2;)
+bot = spine3dbot
 
-man1 = dualtri(1;θ=deg2rad(0))
+two = two_tri()
+bot = two
 
-bot = man1
-plot_traj!(bot)
+ballbot = superball(;constrained=true)
+bot = ballbot
+
+tbbot = Tbars()
+bot = tbbot
+
+plot_traj!(bot;showground=false)
+bot.tg.ndof
+
+Makie.inline!(false)
+GM.activate!();
 
 TR.check_static_equilibrium_output_multipliers(bot.tg)
 
@@ -92,7 +110,18 @@ function static_kinematic_determine(
     dsi = ncables - rank_B
     dki = ndof - rank_B
     # @show ndof,ncables,rank_B,dsi,dki
-    self_stress_states = V[:,rank_B+1:rank_B+dsi]
+    A = vcat(
+        B,
+        Matrix(-1I,ncables,ncables)
+    )
+
+    hr = hrep(A, zeros(ndof+ncables),  BitSet(1:ndof))
+    ph = polyhedron(hr, lib)
+    vr = vrep(ph)
+    @assert npoints(vr) == 1
+    @show nrays(vr)
+    self_stress_states = reduce(hcat,[ray.a for ray in rays(vr)])
+    # self_stress_states = V[:,rank_B+1:rank_B+dsi]
     stiffness_directions = U[:,rank_B+1:rank_B+dki]
     self_stress_states,stiffness_directions
 end
@@ -111,12 +140,17 @@ B = -Q̃L̂
 ℬ = transpose(Ň)*B
 
 s,d = static_kinematic_determine(ℬ)
-s
+s 
 d
+k = TR.get_cables_stiffness(bot.tg)
+l = TR.get_cables_len(bot.tg)
 f = s[:,1]
+# equivalent μ
+μ = l .- (f./k)
+
 λ = inv(Ǎ*transpose(Ǎ))*Ǎ*B*f
 Ǩa = - TR.∂Aᵀλ∂q̌(bot.tg,λ)
-k = TR.get_cables_stiffness(bot.tg)
+
 Ǩm, Ǩg = TR.build_Ǩm_Ǩg!(bot.tg,q,f,k)
 𝒦m = transpose(Ň)*Ǩm*Ň
 𝒦g = transpose(Ň)*Ǩg*Ň
@@ -125,24 +159,40 @@ Ǩm, Ǩg = TR.build_Ǩm_Ǩg!(bot.tg,q,f,k)
 eigen(𝒦m)
 #note geometric stiffness scaled with prestress level
 d'*𝒦m*d
-eigen(𝒦g)
 d'*𝒦g*d
-eigen(𝒦a)
 d'*𝒦a*d
 
+vals_𝒦g, vecs_𝒦g = eigen(𝒦g)
+
+rank(𝒦g .+ 𝒦a)
+
+issymmetric(𝒦a)
+
+𝒦a .- 𝒦a' .|> norm |> maximum
+
+vals_𝒦ga, vecs_𝒦ga = eigen(𝒦g .+ 𝒦a)
+
+vals_𝒦a, vecs_𝒦a = eigen(𝒦a)
+
+vals_𝒦ga
+
+eigen(𝒦a)
+
 𝒦 = 𝒦m .+ 𝒦g .+ 𝒦a
+
+𝒦 = 𝒦m .+ α.*(𝒦g .+ 𝒦a)
+
+d = eigvecs(𝒦g .+ 𝒦a)[:,1]
+
+d'*(𝒦g .+ 𝒦a)*d
+
+α = - 𝒦m ./(𝒦g .+ 𝒦a)
+
 d'*𝒦*d
 
 eigen_result = eigen(𝒦)
 
-nn = count(x -> x < 0, eigen_result.values)
-if nn > 1
-    @warn "Instability detected! Number of negative eigenvalues: $nn"
-    isstable = false
-else
-    isstable = true
-end
-isstable, Ň0, eigen_result
+
 
 
 

@@ -47,11 +47,16 @@ function build_2d_tri(id,ri,rj=nothing,rk=nothing;
 	end
 	# uci = collect(1:6)
 	b2 = b - b1
+	a1 = 0.5b; b1 = √(2b^2-a1^2)
+	a2 = 1.2b; b2 = √(2b^2-a2^2)
 	r̄g  = SVector{2}([ (b1+b)/3, h/3])
 	r̄p1 = SVector{2}([      0.0, 0.0])
-	r̄p2 = SVector{2}([        b, 0.0])
-	r̄p3 = SVector{2}([        b1,  h])
-	r̄ps = [r̄p1,r̄p2,r̄p3]
+	r̄p2 = SVector{2}([       -a1, b1 ])
+	r̄p3 = SVector{2}([        a1, b1 ])
+	r̄p4 = SVector{2}([       -a2, b2 ])
+	r̄p5 = SVector{2}([        a2, b2 ])
+	r̄ps = [r̄p1,r̄p2,r̄p3,r̄p4,r̄p5]
+	ās = [ SVector{2}([      1.0, 0.0])]
 	Īgx = (b*h^3)/36
 	Īgy = h*b*(b^2 - b*b1 + b1^2)/36
 	A = b*h/2
@@ -69,7 +74,7 @@ function build_2d_tri(id,ri,rj=nothing,rk=nothing;
 	@show norm(r̄g),m,Īg,tr(Īg)
 	@show r̄g,atan(r̄g[2],r̄g[1])
 	prop = TR.RigidBodyProperty(id,movable,m,Īg,
-				r̄g,r̄ps;constrained=constrained
+				r̄g,r̄ps,;constrained=constrained
 				)
 	ω = 0.0
 	ro = ri
@@ -126,45 +131,37 @@ function build_2d_ground(id)
 end
 
 function two_tri(;k=100.0,c=0.0,ratio=0.8)
-    n = 8
-
-	bps_raw = [zeros(2) for i = 1:11]
-	for i = 1:2
-		bps_raw[2i-1] .= [0.0,0.1*(i-1)]
-		bps_raw[2i  ] .= [0.1,0.1*(i-1)]
-	end
-	for i = 1:3
-		bps_raw[4+i] .= [0.05,0.05+0.1*(i-1)]
-	end
-	bps = SVector{2}.(bps_raw)
-	display(bps)
-	α_tri1 = -π/2
-	α_tri2 =  π/2
-	rb1 = build_2d_tri(1,bps[3],bps[1],bps[5];α=α_tri1,ci=collect(1:6),Φi=Int[])
-	rb2 = build_2d_tri(2,bps[2],bps[4],bps[5];α=α_tri2,ci=collect(5:6))
+	
+	ro = SVector(0.0,0.0)
+	α_tri1 = -π
+	α_tri2 =  0
+	rb1 = build_2d_tri(1,ro;α=α_tri1,ci=collect(1:6),Φi=Int[])
+	rb2 = build_2d_tri(2,ro;α=α_tri2,ci=collect(1:2))
 
 	rbs = TypeSortedCollection((rb1,rb2))
 	numberedpoints = TR.number(rbs)
 	matrix_sharing = [
-		5 5;
-		6 6;
+		1 1;
+		2 2;
 	]
 	indexedcoords = TR.index(rbs,matrix_sharing)
 	#
-	ncables = 2
+	ncables = 6
 	restlen1 = 0.05
-    restlens = [
-		restlen1,restlen1
-	]
+    restlens = fill(restlen1,ncables)
     ks = fill(k,ncables)
     cs = fill(c,ncables)
     cables = [TR.Cable2D(i,restlens[i],ks[i],cs[i];slack=true) for i = 1:ncables]
-    acs = [TR.ManualActuator(TR.SimpleRegistor(i,restlens[i])) for i = 1:ncables]
+    acs = [TR.ManualActuator(1,1:ncables,restlens,TR.Uncoupled())]
     tensiles = (cables = cables,)
     hub = (actuators = acs,)
 	cnt_matrix_cables = [
-		1 -2 0 0  0  0  0  0;
-	   -2  1 0 0  0  0  0  0;
+		3 -2 ;
+	   -2  3 ;
+	    5 -4 ;
+	   -4  5 ;
+		5 -2 ;
+	    4 -3 ;
 	]
 	connected = TR.connect(rbs,cnt_matrix_cables)
 	#
@@ -179,7 +176,6 @@ end
 
 function one_bar(k=0.0,c=0.0;ratio=0.8)
     n = 1
-
 
 	bps = SVector{2}.(
 		[

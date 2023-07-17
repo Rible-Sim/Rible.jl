@@ -275,6 +275,7 @@ function Connectivity(numbered,indexed,tensioned)
 	Connectivity(numbered,indexed,tensioned,unjoin())
 end
 
+
 function get_nconstraints(rbs::TypeSortedCollection)
 	ninconstraints = mapreduce(get_ninconstraints,+,rbs,init=0)
 end
@@ -513,6 +514,13 @@ function TensegrityStructure(bodies,tensiles,cnt::Connectivity,contacts=nothing)
     # check_jacobian_singularity(tg)
     tg
 end
+
+function TensegrityStructure(bodies,cnt::Connectivity,contacts=nothing)
+    tensiles = (cables = Int[],)
+    TensegrityStructure(bodies,tensiles,cnt)
+end
+
+
 
 """
 张拉整体机器人类。

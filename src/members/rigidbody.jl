@@ -43,7 +43,7 @@ function RigidBodyProperty(
 		mass::T,inertia_input,
 		r̄g::AbstractVector,
 		r̄ps=SVector{size(inertia_input,1),T}[],
-		ās=SVector{2size(inertia_input,1)-3,T}[];
+		ās=SVector{size(inertia_input,1),T}[];
 		constrained = false,
 		type = :generic
 	) where T
@@ -217,8 +217,8 @@ function RigidBodyState(prop::RigidBodyProperty{N,T},
     ṙps = MVector{N,T}[(ṙo+ω×(rps[i]-ro)) for i in 1:nr̄ps]
 	as  = MVector{N,T}[(R*ās[i])          for i in 1:nās]
     ȧs  = MVector{N,T}[(ω×(as[i]))        for i in 1:nās]
-    fps = [@MVector zeros(T,N) for i in 1:nr̄ps]
-    τps = [@MVector zeros(T,M) for i in 1:nās]
+    fps = MVector{N,T}[zeros(T,N) for i in 1:nr̄ps]
+    τps = MVector{M,T}[zeros(T,M) for i in 1:nās]
 
 	cache = get_CoordinatesCache(prop,lncs,pres_idx,Φ_mask)
 
