@@ -45,9 +45,8 @@ import Meshes
 using Match
 using Cthulhu
 using COSMO
-using Polyhedra
+import Polyhedra
 import CDDLib 
-lib = CDDLib.Library()
 using AbbreviatedStackTraces
 ENV["JULIA_STACKTRACE_ABBREVIATED"] = true
 ENV["JULIA_STACKTRACE_MINIMAL"] = true
@@ -89,13 +88,18 @@ bot = ballbot
 tbbot = Tbars()
 bot = tbbot
 
+TR.check_static_equilibrium_output_multipliers(bot.tg)
+
+TR.get_cables_tension(bot)
+cb1 = bot.tg.tensiles.cables[1]
+cb1.state.tension
+
+set_theme!(theme_pub;fontsize = 16 |> pt2px)
 plot_traj!(bot;showground=false)
 bot.tg.ndof
 
 Makie.inline!(false)
 GM.activate!();
-
-TR.check_static_equilibrium_output_multipliers(bot.tg)
 
 function static_kinematic_determine(
     B,
@@ -115,13 +119,14 @@ function static_kinematic_determine(
         Matrix(-1I,ncables,ncables)
     )
 
-    hr = hrep(A, zeros(ndof+ncables),  BitSet(1:ndof))
-    ph = polyhedron(hr, lib)
-    vr = vrep(ph)
-    @assert npoints(vr) == 1
-    @show nrays(vr)
-    self_stress_states = reduce(hcat,[ray.a for ray in rays(vr)])
-    # self_stress_states = V[:,rank_B+1:rank_B+dsi]
+    hr = Polyhedra.hrep(A, zeros(ndof+ncables),  BitSet(1:ndof))
+    ph = Polyhedra.polyhedron(hr, CDDLib.Library(:float))
+    vr = Polyhedra.vrep(ph)
+    @assert Polyhedra.npoints(vr) == 1
+    @show Polyhedra.nrays(vr),dsi
+    @assert Polyhedra.nrays(vr) == dsi
+    self_stress_states = reduce(hcat,[ray.a for ray in Polyhedra.rays(vr)])
+    # display(V[:,rank_B+1:rank_B+dsi])
     stiffness_directions = U[:,rank_B+1:rank_B+dki]
     self_stress_states,stiffness_directions
 end
@@ -144,7 +149,7 @@ s
 d
 k = TR.get_cables_stiffness(bot.tg)
 l = TR.get_cables_len(bot.tg)
-f = s[:,1]
+f = s[:,2]
 # equivalent μ
 μ = l .- (f./k)
 

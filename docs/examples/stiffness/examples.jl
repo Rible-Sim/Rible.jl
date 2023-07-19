@@ -214,18 +214,22 @@ function Tbars()
 					constrained
                     )
 
-		lncs, _, _ = TR.NCF.NC1P3V(ri, ro, R, ṙo, ω)
-
+		lncs, q, _ = TR.NCF.NC1P3V(ri, ro, R, ṙo, ω)
+		@show q[1:3]
+		@show q[4:6]
+		@show q[7:9]
+		@show q[10:12]
 		state = TR.RigidBodyState(prop, lncs, ri, R, ṙo, ω)
 
         TR.RigidBody(prop,state)
 	end
 	base = make_base(1)
 	slider1 = make_slider(2;ri = SVector(-a,0.0,0.0))
-	slider2 = make_slider(3;ri = SVo3,R=RotZ(π/2))
+	slider2 = make_slider(3;ri = SVo3,)
 	bar = make_3d_bar(
 		4,
-		SVector(-a,0.0,0.0),SVo3;
+		SVector(-a,0.0,0.0),
+		SVo3;
 	)
 	rbs = [base,slider1,slider2,bar]
 	rigdibodies = TypeSortedCollection(rbs)
@@ -239,17 +243,19 @@ function Tbars()
 		0 0 3 6;
 	]
     indexed = TR.index(rigdibodies,sm)
+	# indexed = TR.index(rigdibodies,)
 
-    ncables = 5
+    ncables = 3
 	original_restlens = zeros(ncables)
-	ks = zeros(ncables)
+	original_restlens = zeros(ncables)
+	ks = fill(100.0,ncables)
 	cs = zeros(ncables)
     ss = [TR.Cable3D(i, original_restlens[i],ks[i],cs[i];slack=false) for i = 1:ncables]
 	tensiles = (cables=ss,)
 
 	cm = [
-		1 -1  0 0;
-		2 -1  0 0;
+		# 1 -1  0 0;
+		# 2 -1  0 0;
 		3  0 -1 0;
 		4  0 -1 0;
 		5 -1  0 0;
@@ -258,13 +264,13 @@ function Tbars()
 	connected = TR.connect(rigdibodies, cm)
 	tensioned = @eponymtuple(connected,)
 
-	pj1 = TR.PrismaticJoint(1,TR.End2End(1,TR.ID(base,5,1),TR.ID(slider1,1,1)))
-	pj2 = TR.PrismaticJoint(2,TR.End2End(2,TR.ID(base,5,2),TR.ID(slider2,1,1)))
+	j1 = TR.PrismaticJoint(1,TR.End2End(1,TR.ID(base,5,1),TR.ID(slider1,1,1)))
+	j2 = TR.PrismaticJoint(2,TR.End2End(2,TR.ID(base,5,2),TR.ID(slider2,1,1)))
 
-	pjs = [
-		pj1,pj2
+	js = [
+		j1,j2
 	]
-	jointed = TR.join(pjs,indexed)
+	jointed = TR.join(js,indexed)
 	cnt = TR.Connectivity(numbered,indexed,tensioned,jointed)
     tg = TR.TensegrityStructure(rigdibodies,tensiles,cnt)
     TR.TensegrityRobot(tg,)

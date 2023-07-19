@@ -1,8 +1,6 @@
-# Rible
-Towards a differentiable simulator for **Ri**gid-flexi**ble** robots.
+# Rible 逸步
+Towards a physics-based, AI-powered simulator for computational design of **Ri**gid-flexi**ble** robots.
  
-逸步
-
 [![License: Anti 996](https://img.shields.io/badge/License-Anti%20996-blue.svg?style=flat-square)](https://github.com/996icu/996.ICU/blob/master/LICENSE)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg?style=flat-square)](https://www.gnu.org/licenses/gpl-3.0)
 

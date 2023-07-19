@@ -42,19 +42,20 @@ function find_order(nmcs1,nmcs2,q1,q2,X1,X2,nΦ1,nΦ2)
 	A = zeros(T,nΦ1+nΦ2+9,nq1+nq2)
 	A[    1:nΦ1,          1:nq1    ] = NCF.make_Φq(nmcs1,collect(1:nq1),collect(1:nΦ1))(q1)
 	A[nΦ1+1:nΦ1+nΦ2,  nq1+1:nq1+nq2] = NCF.make_Φq(nmcs2,collect(1:nq2),collect(1:nΦ2))(q2)
-	k = nΦ1+nΦ2	
+	k =     nΦ1+nΦ2	
 	A_rest = @view A[k+1:end,:]
 	rot_jac!(A_rest,collect(1:9),
 		q1,q2,
 		X1,X2,
 		collect(1:nq1),
-		collect(1:nq2),
+		collect(nq1+1:nq1+nq2),
 		collect(1:nq1),
 		collect(1:nq2),
 	)
 	_,pidx = rref_with_pivots!(Matrix(transpose(A)),min(size(A)...)*eps(real(float(one(eltype(A))))))
 	@assert length(pidx) >= 15
-	order = pidx[end-2:end] .- 12
+	order = pidx[k+1:k+3] .- 12
+	order
 end
 
 """
@@ -578,12 +579,13 @@ end
 刚体铰接约束类。
 $(TYPEDEF)
 """
-struct CylindricalJoint{valueType,e2eType,frameType} <: ExternalConstraints{valueType}
+struct CylindricalJoint{valueType,e2eType,frameType,maskType} <: ExternalConstraints{valueType}
 	id::Int
 	nconstraints::Int
 	values::valueType
 	e2e::e2eType
 	frame::frameType
+	mask::maskType
 end
 
 """
@@ -613,16 +615,15 @@ function CylindricalJoint(id,e2e)
 	C2 = end2.rbsig.state.cache.Cps[pid2]
 	values = zeros(T,nΦ)
 	values[1:2] .= transpose([a1t1 a1t2])*(C1*q1.-C2*q2)
-	nΦ1 = NCF.get_nconstraints(nmcs1)
-	nΦ2 = NCF.get_nconstraints(nmcs2)
-	inprods = transpose(X2)*X1
-	order = find_order(nmcs1,nmcs2,q1,q2,X1,X2,nΦ1,nΦ2)
-	values[3:5] .= inprods[order]
-	CylindricalJoint(id,nΦ,values,e2e,frame,order)
+	a1 = X1*ā1
+	inprods = transpose(X2)*a1
+	mask = 1:3 .!== argmax(abs.(inprods))
+	values[3:4] .= inprods[mask]
+	CylindricalJoint(id,nΦ,values,e2e,frame,mask)
 end
 
 function make_Φ(cst::CylindricalJoint,indexed,numbered)
-	(;nconstraints,values,e2e,frame,order) = cst
+	(;nconstraints,values,e2e,frame,mask) = cst
 	(;num2sys,mem2num) = numbered
 	(;mem2sysfull) = indexed
 	(;end1,end2) = e2e
@@ -643,8 +644,7 @@ function make_Φ(cst::CylindricalJoint,indexed,numbered)
 		a1t1 = X1*frame.t1
 		a1t2 = X1*frame.t2
 		ret[1:2] .= transpose([a1t1 a1t2])*(C1*q1.-C2*q2) .- values[1:2]
-		inprods = transpose(X2)*X1
-		ret[3:5] .= inprods[order] .- values[3:5]
+		ret[3:4] .= transpose(X2[:,mask])*a1 - values[4:5]
 		ret
 	end
 	function inner_Φ(q,d,c)
@@ -660,28 +660,31 @@ function make_Φ(cst::CylindricalJoint,indexed,numbered)
 		C1 = end1.rbsig.state.cache.funcs.C(c1)*q1
 		C2 = end2.rbsig.state.cache.funcs.C(c2)*q2
 		ret[1:2] .= transpose([a1t1 a1t2])*(C1*q1.-C2*q2) .- values[1:2]
-		inprods = transpose(X2)*X1
-		ret[3:5] .= inprods[order] .- values[3:5]
+		ret[3:4] .= transpose(X2[:,mask])*a1 - values[4:5]
 		ret
 	end
 	inner_Φ
 end
 
 function make_A(cst::CylindricalJoint,indexed,numbered)
-	(;nconstraints,e2e,frame,order) = cst
+	(;nconstraints,e2e,frame,mask) = cst
 	(;mem2sysfree,mem2sysfull,nfree) = indexed
 	(;num2sys,mem2num) = numbered
 	(;end1,end2) = e2e
 	pid1 = end1.pid
 	pid2 = end2.pid
+	aid1 = end1.aid
 	uci1 =  end1.rbsig.state.cache.free_idx
 	uci2 =  end2.rbsig.state.cache.free_idx
 	rbid1 = end1.rbsig.prop.id
 	rbid2 = end2.rbsig.prop.id
+	ā1 = end1.rbsig.prop.ās[aid1]
 	memfree1 = mem2sysfree[rbid1]
 	memfree2 = mem2sysfree[rbid2]
 	nmcs1 = end1.rbsig.state.cache.funcs.nmcs
 	nmcs2 = end2.rbsig.state.cache.funcs.nmcs
+	Y1 = NCF.get_conversion(nmcs1)
+	Y2 = NCF.get_conversion(nmcs2)
 	function inner_A(q)
 		ret = zeros(eltype(q),nconstraints,nfree)
 		q1 = @view q[mem2sysfull[rbid1]]
@@ -692,6 +695,7 @@ function make_A(cst::CylindricalJoint,indexed,numbered)
 		X2 = NCF.make_X(nmcs2,q2)
 		a1t1 = X1*frame.t1
 		a1t2 = X1*frame.t2
+		a1 = X1*ā1
 		ret[1:2,memfree1] .= kron(
 				[
 					0 transpose(frame.t1); 
@@ -701,9 +705,16 @@ function make_A(cst::CylindricalJoint,indexed,numbered)
 			)[:,uci1]
 		ret[1:2,memfree1] .+= transpose([a1t1 a1t2])*C1[:,uci1]
 		ret[1:2,memfree2] .-= transpose([a1t1 a1t2])*C2[:,uci2]
-		k = 2
-		ret_rest = @view ret[k+1:end,:]
-		rot_jac!(ret_rest,order,q1,q2,X1,X2,memfree1,memfree2,uci1,uci2,)
+		o3 = zero(a1)
+		ret[3:4,mem2sysfree[rbid1]] .= (transpose(
+			kron(vcat(0,ā1),X2)[:,mask])*Y1)[:,uci1]
+		ret[3:4,mem2sysfree[rbid2]] .= (transpose(
+			[
+				o3 o3 o3;
+				a1 o3 o3; 
+				o3 a1 o3;  
+				o3 o3 a1; 
+			][:,mask])*Y2)[:,uci2]
 		ret
 	end
 	function inner_A(q,c)
@@ -727,10 +738,18 @@ function make_A(cst::CylindricalJoint,indexed,numbered)
 			)[:,uci1]
 		ret[1:2,memfree1] .+= transpose([a1t1 a1t2])*C1[:,uci1]
 		ret[1:2,memfree2] .-= transpose([a1t1 a1t2])*C2[:,uci2]
-		k = 2
-		ret_rest = @view ret[k+1:end,:]
-		rot_jac!(ret_rest,order,q1,q2,X1,X2,memfree1,memfree2,uci1,uci2,)
-        ret
+		a1 = X1*ā1
+		o3 = zero(a1)
+		ret[3:4,mem2sysfree[rbid1]] .= (transpose(
+			kron(vcat(0,ā1),X2)[:,mask])*Y1)[:,uci1]
+		ret[3:4,mem2sysfree[rbid2]] .= (transpose(
+			[
+				o3 o3 o3;
+				a1 o3 o3; 
+				o3 a1 o3;  
+				o3 o3 a1; 
+			][:,mask])*Y2)[:,uci2]
+		ret
     end
 	inner_A
 end
@@ -970,6 +989,8 @@ function make_Φqᵀq(cst,numbered,c)
 		Φqᵀq = vcat(zero.(Φqᵀq_trans),Φqᵀq_rot[cst.mask])
 	elseif cst isa PrismaticJoint
 		Φqᵀq = vcat(Φqᵀq_trans[[2,3]],Φqᵀq_rot)
+	elseif cst isa CylindricalJoint
+		Φqᵀq = vcat(Φqᵀq_trans[[2,3]],Φqᵀq_rot[cst.mask])
 	elseif cst isa PinJoint
 		Φqᵀq = vcat(zero.(Φqᵀq_trans),zero.(Φqᵀq_rot))
 	else
