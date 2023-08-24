@@ -288,7 +288,7 @@ function plot_traj!(bot::TR.TensegrityRobot;
         this_time = Observable(traj.t[this_step])
         TR.goto_step!(bot,this_step;actuate)
         tgob = Observable(deepcopy(tg))
-        axtitle = lift(this_time) do tt
+        axtitle = Makie.lift(this_time) do tt
             titleformatfunc(sgi,tt)
         end
         if ndim == 2 && !showmesh
@@ -370,19 +370,19 @@ function plot_traj!(bot::TR.TensegrityRobot;
                 grid2 = sg[:,2] = GridLayout(;tellheight=false)
                 grid_info = grid2[1,1] = GridLayout(;tellheight=false)
                 dict_info = [
-                    "fig. height" => lift(string,ax.height),
-                    "fig. width" => lift(string,ax.width)
+                    "fig. height" => Makie.lift(string,ax.height),
+                    "fig. width" => Makie.lift(string,ax.width)
                 ]
                 if ndim == 3 && AxisType == Axis3
                     cam_info = [
-                        "azimuth" => lift(string,ax.azimuth),
-                        "elevation" => lift(string,ax.elevation)
+                        "azimuth" => Makie.lift(string,ax.azimuth),
+                        "elevation" => Makie.lift(string,ax.elevation)
                     ]
                     append!(dict_info,cam_info)
                 end
                 for (i,(infoname,infovalue)) in enumerate(dict_info)
                     Label(grid_info[i,1],
-                        lift(infovalue) do iv
+                        Makie.lift(infovalue) do iv
                             "$infoname = $iv"
                         end,
                         justification = :left,

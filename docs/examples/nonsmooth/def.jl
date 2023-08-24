@@ -344,12 +344,12 @@ end
 function superball(c=0.0;
             μ = 0.9,
             e = 0.0,
+            θ = atan(0.5,1),
             constrained = false,
         )
     l = 1.7/2
     d = l/2    
     z0 = l^2/(sqrt(5)*d) - 1e-7
-    θ = atan(0.5,1)
     p = Ref(RotY(θ)) .* SVector{3}.(
         [
             [ 0,  d,  l], [ 0,  d, -l],

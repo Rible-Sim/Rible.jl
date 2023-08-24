@@ -1169,7 +1169,7 @@ function get_d(tg)
         rbid = rb.prop.id
 		memincst = mem2sysincst[rbid]
 		if !isempty(memincst)
-        	d[memincst] .= NCF.get_deform(rb.state.cache.funcs.lncs)
+        	d[memincst] .= NCF.get_deform(rb.state.cache.funcs.nmcs)
 		end
     end
     foreach(jointed.joints) do joint
