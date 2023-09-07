@@ -52,7 +52,7 @@ function RigidBodyProperty(
     if !movable
         constrained = true
     end
-	mtype = similar_type(inertia_input)
+	mtype = StaticArrays.similar_type(inertia_input)
 	r̄type = SVector{size(inertia_input,1)}
 	# ātype = SVector{2size(inertia_input,1)-3}	
 	ātype = SVector{size(inertia_input,1)}
@@ -153,11 +153,11 @@ $(TYPEDFIELDS)
 mutable struct RigidBodyState{N,M,T,cacheType} <: AbstractRigidBodyState{N,T}
 	"Origin of local frame"
     ro::MVector{N,T}
-	"Rot. Matrix of local frame"
+	"Rotation Matrix of local frame"
     R::MMatrix{N,N,T}
 	"Translational velocity of local frame"
     ṙo::MVector{N,T}
-	"Angular velocity of local frame"
+	"Angular velocity of local frame (expressed in the global frame)"
     ω::MVector{M,T}
 	"Position of centroid in global frame"
     rg::MVector{N,T}

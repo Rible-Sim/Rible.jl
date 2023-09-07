@@ -593,7 +593,7 @@ function twotre3d(;
 	TR.TensegrityRobot(tg,hub)
 end
 
-function twoprism3d(;
+function prisms(;
 		κ = nothing,
 		r = 1.0,
 		r1 = 1.0,
@@ -602,7 +602,6 @@ function twoprism3d(;
 		α = 2π/m,
 		θ = 1.25α, 
 		n = 1,
-		outer = false,
 	)
 	# hh = 0.5
 	@assert θ>α
@@ -614,103 +613,176 @@ function twoprism3d(;
 	h = sqrt(b^2-c^2)
 	@show r,r1
 	bps = [
-		vcat(
-			[
-				[0,0,h]
-			],
-			[
-				[3r*cos(i*α),3r*sin(i*α),0.0]
-				for i = 1:m
-			]
-		) .|> SVector{3}
+		[
+			[r*cos(i*α),r*sin(i*α),j*2h]
+			for i = 1:m
+		] .|> SVector{3} |> CircularArray
+		for j = 0:n
+	]
+	midps = [
+		[
+			[r1*cos(i*α+θ),r1*sin(i*α+θ),j*2h-h]
+			for i = 1:m
+		] .|> SVector{3} |> CircularArray
+		for j = 1:n
 	]
 	# fig = Figure()
 	# ax = Axis3(fig[1,1])
 	# scatter!(ax,reduce(vcat,bps))
 	# scatter!(ax,reduce(vcat,midps))
 	# fig
-	plates = [
-		begin
-			if j == 1				
-				ci = collect(1:12)
-				Φi = Int[]
-			else
-				ci = Int[]
-				Φi = collect(1:6)
-			end
-			id = j
-			ro = SVector(0.0,0.0,(j-1)*2h)
-			ri = ro
-			R = RotX(((id-1)*π))
-			r̄ps_raw = bps[1] |> Array
-			# r̄ps_ext = [
-			# 	SVector(3r̄p[1],3r̄p[2],0.0)
-			# 	for r̄p in r̄ps_raw
-			# ]
-			r̄ps = vcat(r̄ps_raw,)
-			make_3d_tri(
-				id,
-				r̄ps,ro,
-				R,ri,;
-				# movable = true,
-				# constrained = false,
-				# ci = Int[],
-				# Φi = collect(1:6),
-				color = :slategrey,
-				loadmesh = true,
-			)
-		end
-		for j = 1:n+1
+	bars = [
+		vcat(
+			[
+				make_3d_bar(
+					2m*(j-1)+i,
+					bps[j][i],
+					midps[j][i]; ci = ifelse(j==1,[1,2,3],Int[])
+				) for i = 1:m
+			],
+			[
+				make_3d_bar(
+					2m*(j-1)+m+i,
+					midps[j][i-1],
+					bps[j+1][i-1];
+				) for i = 1:m
+			]
+		)
+		for j = 1:n
 	]
-	nb =  length(plates)
-	rbs = plates |> TypeSortedCollection
+	nb = length.(bars) |> sum
+	rbs = reduce(vcat,bars) |> TypeSortedCollection
 	numberedpoints = TR.number(rbs)
-	# indexedcoords = TR.index(rbs,sharing)
-	indexedcoords = TR.index(rbs,)
+	sharing_elas = ElasticArray{Int}(undef, nb, 0)
+	cm = CircularArray(collect(1:m))
+	for j = 1:n
+		is = 2m*(j-1)
+		for i = 1:m
+			for k = 1:3
+				row = zeros(Int,nb)
+				row[is+cm[i]  ]   = k+3
+				row[is+m+cm[i+1]] = k
+				append!(sharing_elas,row)		
+			end
+		end
+	end	
+	for j = 2:n
+		is = 2m*(j-2)+m
+		for i = 1:m
+			for k = 1:3
+				row = zeros(Int,nb)
+				row[is+cm[i]  ]   = k+3
+				row[is+m+cm[i+2]] = k
+				append!(sharing_elas,row)		
+			end
+		end
+	end
+	sharing = Matrix(sharing_elas')
+	# display(sharing)
+	indexedcoords = TR.index(rbs,sharing)
+	# indexedcoords = TR.index(rbs,)
 
 	connecting_elas = ElasticArray{Int}(undef, nb, 0)
-	# outer
-	ncables = m
-	row = zeros(Int,nb)
-	row[1] =   2
-	row[2] = -(3)
-	append!(connecting_elas,row)
-	row = zeros(Int,nb)
-	row[1] =   3
-	row[2] = -(2)
-	append!(connecting_elas,row)
-	row = zeros(Int,nb)
-	row[1] =   4
-	row[2] = -(4)
-	append!(connecting_elas,row)
+	for j = 1:n
+		is = 2m*(j-1)
+		# lower cross
+		for i = 1:m
+			row = zeros(Int,nb)
+			row[is+cm[i  ]] =  1
+			row[is+cm[i-1]] = -2
+			append!(connecting_elas,row)
+		end
+		# additional lower cross
+		# for i = 1:m
+		# 	row = zeros(Int,nb)
+		# 	row[is+cm[i  ]] =  1
+		# 	row[is+cm[i-2]] = -2
+		# 	append!(connecting_elas,row)
+		# end
+		# upper cross
+		for i = 1:m
+			row = zeros(Int,nb)
+			row[is+cm[i+1]] = -2
+			row[is+m+cm[i]] =  2
+			append!(connecting_elas,row)
+		end
+		# addtional upper cross
+		# for i = 1:m
+		# 	row = zeros(Int,nb)
+		# 	row[is+cm[i+1]] = -2
+		# 	row[is+m+cm[i+1]] =  2
+		# 	append!(connecting_elas,row)
+		# end
+		# mid
+		for i = 1:m
+			row = zeros(Int,nb)
+			row[is+cm[i  ]] =  2
+			row[is+cm[i+1]] = -2
+			append!(connecting_elas,row)
+		end
+		# # upper
+		# for i = 1:m
+		# 	row = zeros(Int,nb)
+		# 	row[is+m+cm[i  ]] =  2
+		# 	row[is+m+cm[i+1]] = -2
+		# 	append!(connecting_elas,row)
+		# end
+	end
+	ncables_prism = size(connecting_elas,2)
+	for j = 1:n
+		is = 0
+		for i = 1:m
+			row = zeros(Int,nb)
+			row[is+cm[i]] =    1
+			row[is+cm[i+1]] = -1
+			append!(connecting_elas,row)
+			row = zeros(Int,nb)
+			row[is+m+cm[i]] =    2
+			row[is+m+cm[i+1]] = -2
+			append!(connecting_elas,row)
+		end
+	end
+	ncables_prism += (n+1)*m
 	connecting = Matrix(connecting_elas')
-	display(connecting)
+	# display(connecting)
 	connected = TR.connect(rbs,connecting)
 
 	ncables = size(connecting,1)
-	# @assert ncables == ncables_prism + ncables
-	κ0 = 72e9*π*(3e-3)^2/1.0
-	@show κ0
+	# @assert ncables == ncables_prism + ncables_outer
 
-	cables = [TR.Cable3D(i,0.8*2h,1e3,0.0;slack=true) for i = 1:ncables]
-
+	mat_cable = filter(
+		row->row.name == "Nylon 66",
+		material_properties
+	)[1]
+	diameter = 1e-3Unitful.m
+	cable_length = 0.1Unitful.m
+	κ = (mat_cable.modulus_elas)*π*(diameter/2)^2/cable_length
+	# @show κ
+	@show uconvert(Unitful.N/Unitful.m,κ),ustrip(Unitful.N/Unitful.m,κ)
+	cables_prism = [TR.Cable3D(i,0.0,   ustrip(Unitful.N/Unitful.m,κ),0.0;slack=true) for i = 1:ncables_prism]
+	cables = cables_prism
 	acs = [
 		TR.ManualActuator(
-			2,
-			collect(1:ncables),
-			zeros(ncables)
+			1,
+			collect(1:ncables_prism),
+			zeros(ncables_prism)
 		),
 	]
 	tensiles = (cables = cables,)
 	hub = (actuators = acs,)
 
+	# csts = [
+	# 	TR.PinJoint(i+m*(j-1),TR.End2End(i,TR.ID(bars[j][m+cm[i]],2),TR.ID(plates[j+1],cm[i-1])))
+	# 	for j = 1:n for i = 1:m
+	# ]
+
 	# jointedmembers = TR.join(csts,indexedcoords)
+
 	cnt = TR.Connectivity(numberedpoints,indexedcoords,@eponymtuple(connected,),)
 
 	tg = TR.TensegrityStructure(rbs,tensiles,cnt)
-	TR.TensegrityRobot(tg,hub)
+	bot = TR.TensegrityRobot(tg,hub)
 end
-
 function embed3d(;
 		κ = nothing,
 		r = 1.0,
@@ -958,7 +1030,7 @@ function embed3d(;
 	hub = (actuators = acs,)
 	
 	csts = [
-		TR.PinJoint(TR.End2End(i,TR.ID(bars[j][m+cm[i]],2),TR.ID(plates[j+1],cm[i-1])))
+		TR.PinJoint(i+m*(j-1),TR.End2End(i,TR.ID(bars[j][m+cm[i]],2),TR.ID(plates[j+1],cm[i-1])))
 		 for j = 1:n for i = 1:m
 	]
 

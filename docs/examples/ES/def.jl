@@ -47,15 +47,16 @@ function build_2d_tri(id,ri,rj=nothing,rk=nothing;
 	end
 	# uci = collect(1:6)
 	b2 = b - b1
-	a1 = 0.5b; b1 = √(2b^2-a1^2)
+	a1 = 1.0b; b1 = √(2b^2-a1^2)
 	a2 = 1.2b; b2 = √(2b^2-a2^2)
 	r̄g  = SVector{2}([ (b1+b)/3, h/3])
 	r̄p1 = SVector{2}([      0.0, 0.0])
-	r̄p2 = SVector{2}([       -a1, b1 ])
-	r̄p3 = SVector{2}([        a1, b1 ])
-	r̄p4 = SVector{2}([       -a2, b2 ])
-	r̄p5 = SVector{2}([        a2, b2 ])
+	r̄p2 = SVector{2}([       -a1, b1])
+	r̄p3 = SVector{2}([        a1, b1])
+	r̄p4 = SVector{2}([      -3a2, b2])
+	r̄p5 = SVector{2}([       3a2, b2])
 	r̄ps = [r̄p1,r̄p2,r̄p3,r̄p4,r̄p5]
+	@show r̄ps
 	ās = [ SVector{2}([      1.0, 0.0])]
 	Īgx = (b*h^3)/36
 	Īgy = h*b*(b^2 - b*b1 + b1^2)/36
@@ -135,18 +136,25 @@ function two_tri(;k=100.0,c=0.0,ratio=0.8)
 	ro = SVector(0.0,0.0)
 	α_tri1 = -π
 	α_tri2 =  0
-	rb1 = build_2d_tri(1,ro;α=α_tri1,ci=collect(1:6),Φi=Int[])
-	rb2 = build_2d_tri(2,ro;α=α_tri2,ci=collect(1:2))
+	rb1 = build_2d_tri(1,ro;
+		α=α_tri1,
+		# ci=collect(1:6),
+		# Φi=Int[]
+	)
+	rb2 = build_2d_tri(2,ro;
+		α=α_tri2,
+		# ci=collect(1:2)
+	)
 
 	rbs = TypeSortedCollection((rb1,rb2))
 	numberedpoints = TR.number(rbs)
-	matrix_sharing = [
-		1 1;
-		2 2;
-	]
-	indexedcoords = TR.index(rbs,matrix_sharing)
+	# matrix_sharing = [
+	# 	1 1;
+	# 	2 2;
+	# ]
+	indexedcoords = TR.index(rbs,)
 	#
-	ncables = 6
+	ncables = 4
 	restlen1 = 0.05
     restlens = fill(restlen1,ncables)
     ks = fill(k,ncables)
@@ -158,17 +166,36 @@ function two_tri(;k=100.0,c=0.0,ratio=0.8)
 	cnt_matrix_cables = [
 		3 -2 ;
 	   -2  3 ;
-	    5 -4 ;
-	   -4  5 ;
-		5 -2 ;
-	    4 -3 ;
+	    5 -2 ;
+	   -4  3 ;
+		# 5 -2 ;
+	    # 4 -3 ;
 	]
 	connected = TR.connect(rbs,cnt_matrix_cables)
 	#
+	cst1 = TR.PinJoint(
+		1,
+		TR.End2End(
+			1,
+			TR.ID(rb1,1),
+			TR.ID(rb2,1)
+		)
+	)
 
-	# jointedmembers = TR.join((cst1,),indexedcoords)
+	cst2 = TR.LinearJoint(
+		2,
+		2,
+		zeros(2),
+		begin
+			A = zeros(2,12)
+			A[1:2,1:2] = Matrix(1I,2,2)
+			A
+		end
+	)
 
-    cnt = TR.Connectivity(numberedpoints,indexedcoords,@eponymtuple(connected,))
+	jointedmembers = TR.join((cst1,cst2),indexedcoords)
+
+    cnt = TR.Connectivity(numberedpoints,indexedcoords,@eponymtuple(connected,),jointedmembers)
 
     tg = TR.TensegrityStructure(rbs,tensiles,cnt)
     bot = TR.TensegrityRobot(tg,hub)

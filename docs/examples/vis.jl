@@ -97,9 +97,15 @@ theme_pub = Theme(;
     ),
     Mesh = (
         color = :slategrey,
-        transparency = true
+        transparency = false
+    ),
+    Poly = (
+        color = :slategrey,
+        transparency = false,
     )
 )
+
+set_theme!(theme_pub)
 
 function plot_rigid(rb::TR.AbstractRigidBody;
         AxisType = LScene,
@@ -560,7 +566,6 @@ function init_plot!(ax,tgob;
                     # color = :grey,
                     shading = true,
                     # strokewidth
-                    transparency = true
                 )
             end
         end
@@ -1031,4 +1036,127 @@ function plotsave_contact_persistent(bot,figname=nothing;
         savefig(fig,figname)
 		fig
 	end
+end
+
+macro myshow(exs...)
+    blk = Expr(:block)
+    for ex in exs
+        push!(blk.args, :(print($(sprint(Base.show_unquoted,ex)*" = "))))
+        push!(blk.args, :(show(stdout, "text/plain", begin value=$(esc(ex)) end)))
+        push!(blk.args, :(println()))
+    end
+    isempty(exs) || push!(blk.args, :value)
+    return blk
+end
+
+
+function plot_self_stress_states(
+        botinput,
+        S,
+        rtol = 1e-14
+        # Ň = build_Ň(bot.tg)
+    )
+    bot = deepcopy(botinput)
+    @myshow S
+    maxS = maximum(abs.(S))
+    Sbool = S.> maxS*rtol
+    S[.!Sbool] .= 0.0
+    ns = size(S,2)
+    with_theme(theme_pub;
+        ) do 
+        plot_traj!(
+            bot;
+            AxisType=Axis3,
+            gridsize=(1,ns), 
+            doslide=false,
+            showlabels=false,
+            showpoints=false,
+            showcables = false,
+            xlims = (-4e-2,4e-2),
+            ylims = (-4e-2,4e-2),
+            zlims = (-4e-2,4e-2),
+            showground = false,
+            sup! = (ax,tgob,sgi)-> begin
+            # cables
+                hidexyz(ax)
+                @myshow Sbool[:,sgi]
+                linesegs_cables = @lift begin
+                    get_linesegs_cables($tgob;)[Sbool[:,sgi]]
+                end
+                linesegments!(ax, 
+                    linesegs_cables, 
+                    color = :red, 
+                    # linewidth = cablewidth
+                    )
+                rcs_by_cables = @lift begin
+                    (;tensioned) = $tgob.connectivity
+                    ndim = TR.get_ndim($tgob)
+                    T = TR.get_numbertype($tgob)
+                    ret = Vector{MVector{ndim,T}}()
+                    mapreduce(
+                        (scnt)->
+                        [(
+                            scnt.end1.rbsig.state.rps[scnt.end1.pid].+
+                            scnt.end2.rbsig.state.rps[scnt.end2.pid]
+                        )./2],
+                        vcat,
+                        tensioned.connected
+                        ;init=ret
+                    )
+                end
+                # @show rcs_by_cables
+                Stext = [
+                        @sprintf "%4.2f"  S[i,sgi] 
+                        for i in axes(S,1)
+                        if Sbool[i,sgi]
+                    ]
+                @myshow Stext
+                text!(
+                    ax,
+                    Stext,
+                    position = rcs_by_cables[][Sbool[:,sgi]],
+                    fontsize = fontsize,
+                    color = :red,
+                    align = (:right, :top),
+                    offset = (-fontsize/2, 0)
+                )
+            end
+
+        )
+    end
+end
+
+
+function plot_kinematic_indeterminacy(
+        botinput,
+        D,
+        Ň,
+        # Ň = build_Ň(bot.tg)
+    )
+    bot = deepcopy(botinput)
+    nk = size(D,2)
+    δq̌ = [Ň*D[:,i] for i in axes(D,2)]
+    scaling=0.2
+    for i = 1:nk
+        push!(bot.traj,deepcopy(bot.traj[end]))
+        bot.traj.t[end] = i
+        δq̌i = δq̌[i]
+        ratio = norm(δq̌i)/norm(q̌)
+        bot.traj.q̌[end] .= q̌ .+ scaling.*δq̌i/ratio
+    end
+    plot_traj!(
+        bot;
+        AxisType=Axis3,
+        gridsize=(1,nk),        
+        atsteps=2:nk+1,
+        doslide=false,
+        showlabels=false,
+        showpoints=false,
+        # showcables = false,
+        showground = false,
+        # xlims = (-4e-2,4e-2),
+        # ylims = (-4e-2,4e-2),
+        # zlims = (-4e-2,4e-2),
+        showinit = true,
+    )
 end

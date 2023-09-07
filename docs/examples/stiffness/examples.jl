@@ -245,7 +245,7 @@ function Tbars()
     indexed = TR.index(rigdibodies,sm)
 	# indexed = TR.index(rigdibodies,)
 
-    ncables = 3
+    ncables = 5
 	original_restlens = zeros(ncables)
 	original_restlens = zeros(ncables)
 	ks = fill(100.0,ncables)
@@ -254,8 +254,8 @@ function Tbars()
 	tensiles = (cables=ss,)
 
 	cm = [
-		# 1 -1  0 0;
-		# 2 -1  0 0;
+		1 -1  0 0;
+		2 -1  0 0;
 		3  0 -1 0;
 		4  0 -1 0;
 		5 -1  0 0;
@@ -272,6 +272,134 @@ function Tbars()
 	]
 	jointed = TR.join(js,indexed)
 	cnt = TR.Connectivity(numbered,indexed,tensioned,jointed)
+    tg = TR.TensegrityStructure(rigdibodies,tensiles,cnt)
+    TR.TensegrityRobot(tg,)
+end
+
+function planar_parallel()
+	SVo3 = SVector{3}([0.0,0.0,0.0])
+	a = 1.0
+	b = 0.5
+	θ = 2π/3
+	function make_base(i)
+		movable = true
+		constrained = true
+        r̄g = SVo3
+        r̄p1 = SVector{3}([0.0, a,0.0])
+        r̄p2 = RotZ( θ)*r̄p1
+        r̄p3 = RotZ(-θ)*r̄p1
+        r̄ps = [r̄p1,r̄p2,r̄p3,]
+        ās = [
+			SVector{3}([1.0,0.0,0.0]),
+			# SVector{3}([0.0,1.0,0.0]),
+		]
+		m = 1.0
+		Ī = SMatrix{3,3}(Matrix(1.0I,3,3))
+		ci = collect(1:12)
+		Φi = Int[]	
+		R = RotZ(0.0)	
+		ω = SVo3
+		ri = SVo3
+		ro = ri
+		ṙo = zero(ro)
+
+		prop = TR.RigidBodyProperty(
+					i,movable,m,
+					Ī,
+                    r̄g,
+					r̄ps,
+                    ās;
+					constrained
+                    )
+
+		lncs, _, _ = TR.NCF.NC1P3V(ri, ro, R, ṙo, ω)
+
+		state = TR.RigidBodyState(prop, lncs, ri, R, ṙo, ω, ci, Φi)
+
+        TR.RigidBody(prop,state)
+    end
+	function make_platform(i;ri=SVo3,R=RotZ(0.0),)
+		movable = true
+		constrained = false
+        r̄g = SVo3
+        r̄p1 = SVector{3}([0.0, b,0.0])
+        r̄p2 = RotZ( θ)*r̄p1
+        r̄p3 = RotZ(-θ)*r̄p1
+        r̄ps = [r̄p1,r̄p2,r̄p3]
+        ās = [SVector{3}([1.0,0.0,0.0]),]
+		Ī = SMatrix{3,3}(Matrix(1.0I,3,3))
+		ω = SVo3
+		ro = ri
+		ṙo = zero(ro)
+		m = 1.0
+
+		prop = TR.RigidBodyProperty(
+					i,movable,m,
+					Ī,
+                    r̄g,
+					r̄ps,
+                    ās;
+					constrained
+                    )
+
+		lncs, q, _ = TR.NCF.NC1P3V(ri, ro, R, ṙo, ω)
+		state = TR.RigidBodyState(prop, lncs, ri, R, ṙo, ω)
+
+        TR.RigidBody(prop,state)
+	end
+	base = make_base(1)
+	platform = make_platform(2;ri = SVector(0.0,0.0,0.0))
+	# slider2 = make_platform(3;ri = SVo3,)
+	# bar = make_3d_bar(
+	# 	4,
+	# 	SVector(-a,0.0,0.0),
+	# 	SVo3;
+	# )
+	rbs = [base,platform]
+	rigdibodies = TypeSortedCollection(rbs)
+    numbered = TR.number(rigdibodies)
+	# sm = [
+	# 	0 1 0 1;
+	# 	0 2 0 2;
+	# 	0 3 0 3;
+	# 	0 0 1 4;
+	# 	0 0 2 5;
+	# 	0 0 3 6;
+	# ]
+    # indexed = TR.index(rigdibodies,sm)
+	indexed = TR.index(rigdibodies,)
+
+    ncables = 9
+	original_restlens = zeros(ncables)
+	original_restlens = zeros(ncables)
+	ks = fill(100.0,ncables)
+	cs = zeros(ncables)
+    ss = [TR.Cable3D(i, original_restlens[i],ks[i],cs[i];slack=false) for i = 1:ncables]
+	tensiles = (cables=ss,)
+
+	cm = [
+		1 -1 ;
+		2 -2 ;
+		3 -3 ;
+		1 -2 ;
+		1 -3 ;
+		2 -1 ;
+		2 -3 ;
+		3 -1 ;
+		3 -2 ;
+	]
+
+	connected = TR.connect(rigdibodies, cm)
+	tensioned = @eponymtuple(connected,)
+
+	# j1 = TR.PrismaticJoint(1,TR.End2End(1,TR.ID(base,5,1),TR.ID(slider1,1,1)))
+	# j2 = TR.PrismaticJoint(2,TR.End2End(2,TR.ID(base,5,2),TR.ID(slider2,1,1)))
+
+	# js = [
+	# 	j1,j2
+	# ]
+	# jointed = TR.join(js,indexed)
+	cnt = TR.Connectivity(numbered,indexed,tensioned,)
     tg = TR.TensegrityStructure(rigdibodies,tensiles,cnt)
     TR.TensegrityRobot(tg,)
 end

@@ -172,6 +172,55 @@ function make_A(cst::FixedBodyConstraint)
 	end
 end
 
+
+"""
+刚体通用线性约束类。
+$(TYPEDEF)
+"""
+struct LinearJoint{valueType} <: ExternalConstraints{valueType}
+	id::Int
+	nconstraints::Int
+	values::Vector{valueType}
+	A::Matrix{valueType}
+end
+
+"""
+铰接约束构造子。
+$(TYPEDSIGNATURES)
+"""
+function LinearJoint(A,values)
+	nΦ = size(A,1)
+	LinearJoint(id,nΦ,values,A)
+end
+
+function make_Φ(cst::LinearJoint,indexed,numbered)
+	(;mem2sysfull) = indexed
+	(;nconstraints,values,A) = cst
+	function _inner_Φ(q,d)
+		ret = zeros(eltype(q),nconstraints)
+		ret .= A*q .- d
+		ret
+	end
+	inner_Φ(q)   = _inner_Φ(q,values)
+	inner_Φ(q,d) = _inner_Φ(q,d)
+	inner_Φ
+end
+
+function make_A(cst::LinearJoint,indexed,numbered)
+	(;sysfree,nfree) = indexed
+	(;nconstraints,values,A) = cst
+	function _inner_A(q,c)
+		q̌ = @view q[sysfree]
+        ret = zeros(eltype(q̌),nconstraints,nfree)
+        ret .= A
+        ret
+    end
+	inner_A(q)   = _inner_A(q,0)
+	inner_A(q,c) = _inner_A(q,c)
+	inner_A
+end
+
+
 """
 刚体铰接约束类。
 $(TYPEDEF)
@@ -900,6 +949,10 @@ function get_jointed_free_idx(cst)
 	)
 end
 
+function get_jointed_free_idx(cst::LinearJoint)
+	uci = collect(1:size(cst.A,2))
+end
+
 function get_jointed_free(cst,indexed)
 	(;nconstraints,e2e,) = cst
 	(;mem2sysfree,mem2sysfull,nfree) = indexed
@@ -912,6 +965,10 @@ function get_jointed_free(cst,indexed)
 		mem2sysfree1,
 		mem2sysfree2
 	)
+end
+
+function get_jointed_free(cst::LinearJoint,indexed)
+	cst2sysfree = collect(1:indexed.nfree)
 end
 
 function make_Φqᵀq(cst,numbered,c)
@@ -1016,6 +1073,14 @@ function make_∂Aᵀλ∂q(cst,numbered,c)
     end
 end
 
+function make_∂Aᵀλ∂q(cst::LinearJoint,numbered,c)
+	(;nconstraints) = cst
+	uci = get_jointed_free_idx(cst)
+    function ∂Aᵀλ∂q(λ)
+		zeros(eltype(λ),length(uci),length(uci))
+    end
+end
+
 function rot_jac!(ret,order,q1,q2,X1,X2,memfree1,memfree2,uci1,uci2,)
 	k = 0
 	for i = 1:3
@@ -1031,49 +1096,6 @@ function rot_jac!(ret,order,q1,q2,X1,X2,memfree1,memfree2,uci1,uci2,)
 			end
 		end
 	end
-end
-
-"""
-刚体通用线性约束类。
-$(TYPEDEF)
-"""
-struct LinearJoint{valueType} <: ExternalConstraints{valueType}
-	id::Int
-	nconstraints::Int
-	values::Vector{valueType}
-	A::Matrix{valueType}
-end
-
-"""
-铰接约束构造子。
-$(TYPEDSIGNATURES)
-"""
-function LinearJoint(A,values)
-	nΦ = size(A,1)
-	LinearJoint(id,nΦ,values,A)
-end
-
-function make_Φ(cst::LinearJoint,indexed,numbered)
-	(;mem2sysfull) = indexed
-	(;nconstraints,values,A) = cst
-	function _inner_Φ(q,d)
-		ret = zeros(eltype(q),nconstraints)
-		ret .= A*q .- d
-		ret
-	end
-	inner_Φ(q)   = _inner_Φ(q,values)
-	inner_Φ(q,d) = _inner_Φ(q,d)
-	inner_Φ
-end
-
-function make_A(cst::LinearJoint,indexed,numbered)
-	(;mem2sysfree,nfull) = indexed
-	(;nconstraints,values,A) = cst
-	function inner_A(q)
-        ret = zeros(eltype(q),nconstraints,nfull)
-        ret .= A
-        ret
-    end
 end
 
 #todo 

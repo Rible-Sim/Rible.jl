@@ -200,7 +200,7 @@ function rigidbar(i,ri,rj;
         constrained = constrained,
     )
     
-    lncs, _ = TR.NCF.NC3D2P(ri, rj, ro, R)
+    lncs, _ = TR.NCF.NC3D1P1V(ri, u, ro, R)
     ω = TR.NCF.find_ω(lncs,vcat(ri,rj),vcat(ṙi,ṙj))
     if constrained
         ci = collect(1:6)
@@ -220,19 +220,23 @@ function uni(c=100.0;
             mbar = 0.05
         )
     lₛ = 80e-3
-    DE = 130.64e-3
+    DE = 160e-3
 
     p = OffsetArray(SVector{3}.(
         [
-            [√3*lₛ/2/3,0     ,0],
-            [       0,-lₛ/2  ,0],
-            [       0, lₛ/2  ,0],
-            [√3*lₛ/2  ,0,0],
-            [√3*lₛ/2  ,0,0],
-            [√3*lₛ/2/3,0, DE/2],
-            [√3*lₛ/2/3,0,-DE/2]
-        ].+Ref([0,0,z0])
-    ),0:6)
+            # [√3*lₛ/2/3,0      ,0],
+            # [        0,-lₛ/2  ,0],
+            # [        0, lₛ/2  ,0],
+            [  -lₛ/2,        0,0],
+            [     0, -√2*lₛ/2 ,0],
+            [   lₛ/2,       0 ,0],
+            [     0,  √2*lₛ/2 ,0],
+            [√3*lₛ/2        ,0,0],
+            [√3*lₛ/2        ,0,0],
+            [0,0,   DE/2],
+            [0,0,  -DE/2]
+        ]#.+Ref([0,0,z0])
+    ),0:7)
     # fig,ax,plt = scatter(p)
     # # ax.aspect = DataAspect()
     # fig
@@ -243,15 +247,15 @@ function uni(c=100.0;
         constrained = false
         ci = Int[]
         Φi = collect(1:6)
-        ri = p[0]
+        ri = zero(p[0])
         ro = ri
-        R = SMatrix{3,3}(Matrix(1.0I,3,3))
+        R = RotX(deg2rad(45))
         ṙo = ṙo_ref
         ω = [1.0,0,ωz]
         # ω = zeros(3)
         r̄g = SVector{3}(0.0,0.0,0.0)
-        # @show p
-        r̄ps = [p[i]-p[0] for i = 1:3]
+        @show p
+        r̄ps = [p[i]  for i = 0:3]
         m = inertia = 0.1
         Ī = SMatrix{3,3}(
             [
@@ -274,10 +278,16 @@ function uni(c=100.0;
         # trunk_mesh = load("身体.STL")
         long = 25
 
+        # b1 = endpoints2mesh(r̄ps[1],r̄ps[2];radius = norm(r̄ps[2]-r̄ps[1])/long)
+        # b2 = endpoints2mesh(r̄ps[2],r̄ps[3];radius = norm(r̄ps[3]-r̄ps[2])/long)
+        # b3 = endpoints2mesh(r̄ps[3],r̄ps[1];radius = norm(r̄ps[3]-r̄ps[1])/long)
+        
         b1 = endpoints2mesh(r̄ps[1],r̄ps[2];radius = norm(r̄ps[2]-r̄ps[1])/long)
         b2 = endpoints2mesh(r̄ps[2],r̄ps[3];radius = norm(r̄ps[3]-r̄ps[2])/long)
-        b3 = endpoints2mesh(r̄ps[3],r̄ps[1];radius = norm(r̄ps[3]-r̄ps[1])/long)
-        trimesh = GB.merge([b1,b2,b3])
+        b3 = endpoints2mesh(r̄ps[3],r̄ps[4];radius = norm(r̄ps[4]-r̄ps[3])/long)
+        b4 = endpoints2mesh(r̄ps[4],r̄ps[1];radius = norm(r̄ps[4]-r̄ps[1])/long)
+       
+        trimesh = GB.merge([b1,b2,b3,b4])
         TR.RigidBody(prop, state, trimesh)
     end
 
@@ -297,15 +307,15 @@ function uni(c=100.0;
     numberedpoints = TR.number(rigdibodies)
     indexedcoords = TR.index(rigdibodies)
     #
-    ncables = 6
+    ncables = 8
 
     original_restlens = zeros(ncables)
     original_restlens[1:3] .= 80e-3
     original_restlens[4:6] .= 80e-3
 
     ks = zeros(ncables)
-    ks[1:3] .= 1000.0
-    ks[4:6] .= 1000.0
+    ks .= 1000.0
+    # ks[4:6] .= 1000.0
 
     cables = [
         TR.Cable3D(i, original_restlens[i], ks[i], c;slack=false) for i = 1:ncables
@@ -322,10 +332,10 @@ function uni(c=100.0;
     # #
     matrix_cnt = zeros(Int,ncables,2)
     for j = 1:ncables
-        if j < 4
+        if j < 5
             matrix_cnt[j, 1:2] = [1, -j]
         else
-            matrix_cnt[j, 1:2] = [2, -(j-3)]
+            matrix_cnt[j, 1:2] = [2, -(j-4)]
         end
     end
     # display(matrix_cnt)
@@ -345,11 +355,12 @@ function superball(c=0.0;
             μ = 0.9,
             e = 0.0,
             θ = atan(0.5,1),
+            l = 1.7/2,
+            d = l/2,
+            z0 = l^2/(sqrt(5)*d) - 1e-7,
             constrained = false,
+            addconst = Float64[],
         )
-    l = 1.7/2
-    d = l/2    
-    z0 = l^2/(sqrt(5)*d) - 1e-7
     p = Ref(RotY(θ)) .* SVector{3}.(
         [
             [ 0,  d,  l], [ 0,  d, -l],
@@ -420,7 +431,25 @@ function superball(c=0.0;
     connected = TR.connect(rigdibodies, matrix_cnt)
     tensioned = @eponymtuple(connected,)
     #
-    cnt = TR.Connectivity(numberedpoints, indexedcoords, tensioned)
+    
+    if isempty(addconst)
+        cnt = TR.Connectivity(numberedpoints, indexedcoords, tensioned)
+    else
+        cst1 = TR.LinearJoint(
+            1,
+            1,
+            [0.0],
+            addconst
+        )
+        jointed = TR.join([cst1],indexedcoords)
+        cnt = TR.Connectivity(
+            numberedpoints, 
+            indexedcoords, 
+            tensioned,
+            jointed
+            )
+    end
+
     # #
 
 	contacts = [TR.Contact(i,μ,e) for i = 1:12]

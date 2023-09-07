@@ -333,7 +333,6 @@ function sup_spine2d!(ax,tgob,sgi)
     linesegments!(ax, bars, linewidth = 10)
 end
 
-
 function dualtri(ndof,onedir=[1.0,0.0];θ=0.0,k=400.0,c=0.0,restlen=0.16)
     nbodies = ndof + 1
     nbp = 2nbodies - ndof

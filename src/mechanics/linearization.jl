@@ -145,6 +145,20 @@ function linearize(tginput,λ,u,q,q̇=zero(q))
 end
 
 
+function make_intrinsic_nullspace(tg,q)
+    (;bodies,connectivity) = tg
+    (;indexed,) = connectivity
+    (;nfull,mem2sysfull,sysndof,mem2sysndof,) = indexed
+    ret = zeros(eltype(q),nfull,sysndof)
+    foreach(bodies) do rb
+        rbid = rb.prop.id
+        (;nmcs) = rb.state.cache.funcs
+        mem2full = mem2sysfull[rbid]
+        ret[mem2full,mem2sysndof[rbid]] = NCF.make_N(nmcs)(q[mem2full])
+    end
+    ret
+end
+
 function frequencyshift(M̂,Ĉ,K̂,α::Real)
     M̄ = M̂
     C̄ = 2α*M̂ + Ĉ
@@ -184,16 +198,47 @@ function build_Ǩ(tg)
     build_Ǩ(tg,λ)
 end
 
-function build_Ǩm_Ǩg!(tg::TensegrityStructure,q,f,k)
+function build_Ǩm!(tg::TensegrityStructure,q,k)
     (;ndim) = tg
-    (;numbered,indexed,tensioned) = tg.connectivity
-    (;nfull,nfree,syspres,sysfree,mem2sysfull) = indexed
+    (;indexed,tensioned) = tg.connectivity
+    (;nfull,nfree,sysfree,mem2sysfull) = indexed
     (;connected) = tensioned
     (;cables) = tg.tensiles
-    (;mem2num,num2sys) = numbered
     update!(tg,q)
     Jj = zeros(eltype(q),ndim,nfull)
     retǨm = zeros(eltype(q),nfree,nfree)
+    foreach(connected) do scnt
+        j = scnt.id
+        rb1 = scnt.end1.rbsig
+        rb2 = scnt.end2.rbsig
+        ap1id = scnt.end1.pid
+        ap2id = scnt.end2.pid
+        C1 = rb1.state.cache.Cps[ap1id]
+        C2 = rb2.state.cache.Cps[ap2id]
+        mfull1 = mem2sysfull[rb1.prop.id]
+        mfull2 = mem2sysfull[rb2.prop.id]
+        cable = cables[j]
+        (;state) = cable
+        (;length,) = state
+        s = 1/length
+        Jj .= 0
+        Jj[:,mfull2] .+= C2
+        Jj[:,mfull1] .-= C1
+        Uj = transpose(Jj)*Jj
+        Ūjq = Uj[sysfree,:]*q
+        retǨm .+= k[j]*s^2*(Ūjq*transpose(Ūjq))
+    end
+    retǨm
+end
+
+function build_Ǩg!(tg::TensegrityStructure,q,f)
+    (;ndim) = tg
+    (;indexed,tensioned) = tg.connectivity
+    (;nfull,nfree,sysfree,mem2sysfull) = indexed
+    (;connected) = tensioned
+    (;cables) = tg.tensiles
+    update!(tg,q)
+    Jj = zeros(eltype(q),ndim,nfull)
     retǨg = zeros(eltype(q),nfree,nfree)
     foreach(connected) do scnt
         j = scnt.id
@@ -207,7 +252,7 @@ function build_Ǩm_Ǩg!(tg::TensegrityStructure,q,f,k)
         mfull2 = mem2sysfull[rb2.prop.id]
         cable = cables[j]
         (;state) = cable
-        (;direction,length,tension) = state
+        (;length,) = state
         s = 1/length
         Jj .= 0
         Jj[:,mfull2] .+= C2
@@ -215,10 +260,9 @@ function build_Ǩm_Ǩg!(tg::TensegrityStructure,q,f,k)
         Uj = transpose(Jj)*Jj
         Ǔj = @view Uj[sysfree,sysfree]
         Ūjq = Uj[sysfree,:]*q
-        retǨm .+= k[j]*s^2*(Ūjq*transpose(Ūjq))
         retǨg .+= f[j]/length*(Ǔj-s^2*Ūjq*transpose(Ūjq))
     end
-    retǨm,retǨg
+    retǨg
 end
 
 function make_Ǩm_Ǩg(tg,q0)

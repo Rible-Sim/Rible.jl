@@ -61,23 +61,33 @@ struct IndexedMemberCoords{mem2sysType,sysType}
     syspres::sysType
 	ninconstraints::Int
 	mem2sysincst::mem2sysType
+    sysndof::Int
+    mem2sysndof::mem2sysType
 end
 
 function index_inconstraints(rbs)
 	ids,nmem = check_rbid_sanity(rbs)
 	nincst_by_mem = zeros(Int,nmem)
+    ndof_by_mem = zeros(Int,nmem)
 	foreach(rbs) do rb
 		nincst_by_mem[rb.prop.id] = rb.state.cache.nΦ
+		ndof_by_mem[rb.prop.id] = get_ndof(rb)
 	end
 	ninconstraints = sum(nincst_by_mem)
+    sysndof = sum(ndof_by_mem)
 	mem2sysincst = Vector{Int}[]
+	mem2sysndof = Vector{Int}[]
 	ilast = 0
+    jlast = 0
 	for rbid = 1:nmem
 		nincst = nincst_by_mem[rbid]
 		push!(mem2sysincst,collect(ilast+1:ilast+nincst))
 		ilast += nincst
+        ndof = ndof_by_mem[rbid]
+		push!(mem2sysndof,collect(jlast+1:jlast+ndof))
+        jlast += ndof 
 	end
-	ninconstraints,mem2sysincst
+	ninconstraints,mem2sysincst,sysndof,mem2sysndof
 end
 
 function index(rbs,sharing_input=Int[;;])
@@ -146,12 +156,13 @@ function index(rbs,sharing_input=Int[;;])
             push!(mem2syspres[rbid],presi)
         end
     end
-	ninconstraints,mem2sysincst = index_inconstraints(rbs)
+	ninconstraints,mem2sysincst,sysndof,mem2sysndof = index_inconstraints(rbs)
     IndexedMemberCoords(
 		length(sysfull),length(sysfree),length(syspres),nmem,
 		mem2sysfull,mem2sysfree,mem2syspres,
 		sysfree,syspres,
-		ninconstraints,mem2sysincst
+		ninconstraints,mem2sysincst,
+        sysndof,mem2sysndof
 	)
 end
 

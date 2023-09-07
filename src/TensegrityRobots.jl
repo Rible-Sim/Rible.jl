@@ -13,6 +13,9 @@ import JuMP, COSMO, Clarabel
 using BlockArrays
 using BlockDiagonals
 using SymmetricFormats
+using Polyhedra
+import CDDLib 
+lib = CDDLib.Library()
 using Tullio
 using Quaternions
 using ForwardDiff
@@ -61,6 +64,8 @@ include("mechanics/dynamic_relax.jl")
 include("mechanics/contact.jl")
 
 include("mechanics/linearization.jl")
+
+include("mechanics/stiffness.jl")
 
 include("mechanics/solvers.jl")
 

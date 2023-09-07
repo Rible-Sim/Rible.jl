@@ -163,6 +163,13 @@ struct LNC2D2P{T} <: LNC2D4C{T}
     invX̄::SArray{Tuple{1,2},T,2,2}
 end
 
+struct LNC2D1P1V{T} <: LNC2D4C{T}
+    r̄i::SArray{Tuple{2},T,1,2}
+    ū::SArray{Tuple{2},T,1,2}
+    X̄::SArray{Tuple{2,1},T,2,2}
+    invX̄::SArray{Tuple{1,2},T,2,2}
+end
+
 """
 坐标数目为6的三维局部自然坐标类，使用2个基本点。
 $(TYPEDEF)
@@ -173,6 +180,14 @@ struct LNC3D2P{T} <: LNC3D6C{T}
     X̄::SArray{Tuple{3,1},T,2,3}
     invX̄::SArray{Tuple{1,3},T,2,3}
 end
+
+struct LNC3D1P1V{T} <: LNC3D6C{T}
+    r̄i::SArray{Tuple{3},T,1,3}
+    ū::SArray{Tuple{3},T,1,3}
+    X̄::SArray{Tuple{3,1},T,2,3}
+    invX̄::SArray{Tuple{1,3},T,2,3}
+end
+
 
 """
 坐标数目为6的二维局部自然坐标类，使用1个基本点、2个基本向量。
@@ -267,6 +282,15 @@ end
 $(TYPEDSIGNATURES)
 """
 get_conversion(::LNCMP) = I
+function get_conversion(nmcs::Union{LNC2D1P1V,LNC3D1P1V})
+    ndim = get_ndim(nmcs)
+    kron(
+        [ 1 0;
+          0 1],
+        make_I(Int,ndim)
+    )
+end
+
 function get_conversion(nmcs::Union{LNC2D2P,LNC3D2P})
     ndim = get_ndim(nmcs)
     kron(
@@ -289,6 +313,7 @@ get_conversion(::LNC2P1V) = kron(
       0 0 1],
     I2_Int
 )
+
 get_conversion(::LNC3P) = kron(
     [ 1 0 0;
      -1 1 0;
@@ -382,9 +407,35 @@ end
 返回二维刚性直杆自然坐标类。
 $(TYPEDSIGNATURES)
 """
-function NC2D2P(ri::AbstractVector{T},rj::AbstractVector{T},
+function NC2D1P1V(ri::AbstractVector{T},u::AbstractVector{T},
                ro=SVector{2}(zeros(T,2)),R=SMatrix{2,2}(one(T)*I)
                ) where T
+    invR = transpose(R) # because this is a rotation matrix
+    r̄i = invR*(ri-ro) #
+    ū = invR*u
+    X̄ = ū
+    invX̄ = pinv(X̄)
+    nmcs = LNC2D2P(
+        SVector{2}(r̄i),
+        SVector{2}(ū),
+        SMatrix{2,1}(X̄),
+        SMatrix{1,2}(invX̄)
+    )
+    q = vcat(ri,u)
+    nmcs,q
+end
+function NC2D1P1V(ri,u,ro,θ::Number,ṙo,ω)
+    R = rotation_matrix(θ)
+    nmcs,q = NC2D1P1V(ri,u,ro,R)
+    ṙi = ṙo + ω×(ri-ro)
+    u̇ = ṙo + ω×u
+    q̇ = vcat(ṙi,u̇)
+    nmcs,SVector{4}(q),SVector{4}(q̇)
+end
+
+function NC2D2P(ri::AbstractVector{T},rj::AbstractVector{T},
+    ro=SVector{2}(zeros(T,2)),R=SMatrix{2,2}(one(T)*I)
+    ) where T
     invR = transpose(R) # because this is a rotation matrix
     r̄i = invR*(ri-ro) #
     r̄j = invR*(rj-ro) #
@@ -392,7 +443,7 @@ function NC2D2P(ri::AbstractVector{T},rj::AbstractVector{T},
     X̄ = ū
     invX̄ = pinv(X̄)
     nmcs = LNC2D2P(SVector{2}(r̄i),SVector{2}(r̄j),
-                                        SMatrix{2,1}(X̄),SMatrix{1,2}(invX̄))
+                                SMatrix{2,1}(X̄),SMatrix{1,2}(invX̄))
     q = vcat(ri,rj)
     nmcs,q
 end
@@ -409,9 +460,35 @@ end
 返回三维刚性直杆自然坐标类。
 $(TYPEDSIGNATURES)
 """
-function NC3D2P(ri::AbstractVector{T},rj::AbstractVector{T},
+function NC3D1P1V(ri::AbstractVector{T},u::AbstractVector{T},
                ro=SVector{3}(zeros(T,3)),R=SMatrix{3,3}(one(T)*I)
                ) where T
+    invR = transpose(R) # because this is a rotation matrix
+    r̄i = invR*(ri-ro) 
+    ū = invR*u
+    X̄ = ū
+    invX̄ = pinv(X̄)
+    nmcs = LNC3D1P1V(
+        SVector{3}(r̄i),
+        SVector{3}(ū),
+        SMatrix{3,1}(X̄),
+        SMatrix{1,3}(invX̄)
+    )
+    q = vcat(ri,u)
+    nmcs,q
+end
+
+function NC3D1P1V(ri,u,ro,R::AbstractMatrix,ṙo,ω)
+    nmcs,q = NC3D1P1V(ri,u,ro,R)
+    ṙi = ṙo + ω×(ri-ro)
+    u̇ = ṙo + ω×u
+    q̇ = vcat(ṙi,u̇)
+    nmcs,SVector{6}(q),SVector{6}(q̇)
+end
+
+function NC3D2P(ri::AbstractVector{T},rj::AbstractVector{T},
+    ro=SVector{3}(zeros(T,3)),R=SMatrix{3,3}(one(T)*I)
+    ) where T
     invR = transpose(R) # because this is a rotation matrix
     r̄i = invR*(ri-ro) #
     r̄j = invR*(rj-ro)
@@ -419,7 +496,7 @@ function NC3D2P(ri::AbstractVector{T},rj::AbstractVector{T},
     X̄ = ū
     invX̄ = pinv(X̄)
     nmcs = LNC3D2P(SVector{3}(r̄i),SVector{3}(r̄j),
-                                        SMatrix{3,1}(X̄),SMatrix{1,3}(invX̄))
+                                SMatrix{3,1}(X̄),SMatrix{1,3}(invX̄))
     q = vcat(ri,rj)
     nmcs,q
 end
@@ -713,8 +790,12 @@ end
 # $(TYPEDSIGNATURES)
 # """
 @inline @inbounds get_deform(ū) = sqrt(ū⋅ū)
+@inline @inbounds function get_deform(nmcs::Union{LNC2D1P1V,LNC3D1P1V})
+    (;ū) = nmcs
+    get_deform(ū)
+end
 @inline @inbounds function get_deform(nmcs::Union{LNC2D2P,LNC3D2P})
-    @unpack r̄i,r̄j = nmcs
+    (;r̄i,r̄j) = nmcs
     ū = r̄j-r̄i
     get_deform(ū)
 end
@@ -836,7 +917,11 @@ function make_Φ(nmcs::LNC2D6C,Φi,deforms)
         qstd = cv*q
         u = @view qstd[3:4]
         v = @view qstd[5:6]
-        all = [(u⋅u - d[1]^2)/2, (v⋅v - d[2]^2)/2, √2/2*(u⋅v - d[3])]
+        all = [
+            (u⋅u - d[1]^2), 
+            (v⋅v - d[2]^2), 
+            (u⋅v - d[3])
+        ]
         all[Φi]
     end
     make_inner_Φ(_inner_Φ,deforms)
@@ -854,7 +939,14 @@ function make_Φ(nmcs::LNC3D12C,Φi,deforms)
         u = @view qstd[4:6]
         v = @view qstd[7:9]
         w = @view qstd[10:12]
-        all = [u⋅u - d[1]^2, v⋅v - d[2]^2, w⋅w - d[3]^2, v⋅w - d[4], u⋅w - d[5], u⋅v - d[6]]
+        all = [
+            u⋅u - d[1]^2, 
+            v⋅v - d[2]^2, 
+            w⋅w - d[3]^2, 
+            v⋅w - d[4], 
+            u⋅w - d[5], 
+            u⋅v - d[6]
+        ]
         @view all[Φi]
     end
     make_inner_Φ(_inner_Φ,deforms)
@@ -900,10 +992,10 @@ function make_Φq(nmcs::LNC2D6C,uci,Φi)
         u = @view qstd[3:4]
         v = @view qstd[5:6]
         ret = zeros(eltype(q),3,6)
-        ret[1,3:4] = u
-        ret[2,5:6] = v
-        ret[3,3:4] = √2/2*v
-        ret[3,5:6] = √2/2*u
+        ret[1,3:4] = 2u
+        ret[2,5:6] = 2v
+        ret[3,3:4] =  v
+        ret[3,5:6] =  u
         @view (ret*cv)[Φi,uci]
     end
 end
@@ -936,6 +1028,74 @@ function make_Φq(nmcs::LNC3D12C,uci,Φi)
     end
 end
 
+"""
+Return nullspace matrix
+$(TYPEDSIGNATURES)
+"""
+function make_N(nmcs::LNC2D4C)
+    cv = get_conversion(nmcs)
+    O2 = zero(I2_Int)
+    @inline @inbounds function inner_N(q)
+        u,v = get_uv(nmcs,q)
+        o2 = zero(u)
+        ret = [
+            I2_Int  o2;
+            O2       v;
+        ]
+        inv(cv)*ret
+    end
+end
+
+function make_N(nmcs::LNC2D6C)
+    cv = get_conversion(nmcs)
+    O2 = zero(I2_Int)
+    @inline @inbounds function inner_N(q)
+        u,v = get_uv(nmcs,q)
+        o2 = zero(u)
+        ret = [
+            I2_Int    o2;
+            O2  -skew(u);
+            O2  -skew(v);
+        ]
+        inv(cv)*ret
+    end
+end
+
+function make_N(nmcs::LNC3D6C)
+    cv = get_conversion(nmcs)
+    O3 = zero(I3_Int)
+    @inline @inbounds function inner_N(q)
+        u,v,w = get_uvw(nmcs,q)
+        o3 = zero(u)
+        ret = [
+            I3_Int  o3 o3;
+            O3       v w;
+        ]
+        inv(cv)*ret
+    end
+end
+
+function make_N(nmcs::LNC3D12C)
+    cv = get_conversion(nmcs)
+    O3 = zero(I3_Int)
+    @inline @inbounds function inner_N(q)
+        u,v,w = get_uvw(nmcs,q)
+        # ret = [
+        #     I3_Int   O3;
+        #     O3 -skew(u);
+        #     O3 -skew(v);
+        #     O3 -skew(w);
+        # ]
+        o3 = zero(u)
+        ret = [
+            I3_Int    O3;
+            O3  o3  -w  v;
+            O3   w  o3 -u;
+            O3  -v   u o3;
+        ]
+        inv(cv)*ret
+    end
+end
 # Transformations
 """
 返回转换矩阵C。
@@ -1033,7 +1193,6 @@ function make_Φqᵀq(nmcs::LNC)
         end
         for id in idx
     ]
-
 end
 
 #todo use SymmetricPacked to the end
@@ -1128,8 +1287,8 @@ end
 
 
 # Mass matrices
-Ī2J̄(::LNC2D2P,Ī)  = Ī
-Ī2J̄(::LNC3D2P,Ī)  = Ī
+Ī2J̄(::LNC2D4C,Ī)  = Ī
+Ī2J̄(::LNC3D6C,Ī)  = Ī
 Ī2J̄(::LNC2D6C,Ī)  = Ī
 Ī2J̄(::LNC3D12C,Ī) = 1/2*tr(Ī)*I-Ī
 
@@ -1181,23 +1340,15 @@ function find_R(nmcs::LNC,q::AbstractVector)
     X = make_X(nmcs,q)
     (;invX̄) = nmcs
     ndim = get_ndim(nmcs)
-    if nmcs isa LNC3D2P
-        (;r̄i,r̄j) = nmcs
-        ū = r̄j - r̄i
-        v̄,w̄ = HouseholderOrthogonalization(ū)
-        ri = @view q[1:3]
-        rj = @view q[4:6]
-        u = rj -ri
-        v,w = HouseholderOrthogonalization(u)
+    if nmcs isa LNC3D6C
+        (;r̄i,X̄) = nmcs
+        ū,v̄,w̄ = get_uvw(nmcs,vcat(r̄i,vec(X̄)))
+        u,v,w = get_uvw(nmcs,q)
         R = SMatrix{ndim,ndim}([u;;v;;w]*inv([ū;;v̄;;w̄]))
-    elseif nmcs isa LNC2D2P
-        (;r̄i,r̄j) = nmcs
-        ū = r̄j - r̄i
-        v̄ = rotation_matrix(π/2)*ū
-        ri = @view q[1:2]
-        rj = @view q[3:4]
-        u = rj - ri
-        v = rotation_matrix(π/2)*u
+    elseif nmcs isa LNC2D4C
+        (;r̄i,X̄) = nmcs
+        ū,v̄ = get_uv(nmcs,vcat(r̄i,vec(X̄)))
+        u,v = get_uv(nmcs,q)
         R = SMatrix{ndim,ndim}([u;;v]*inv([ū;;v̄]))
     else
         R = SMatrix{ndim,ndim}(X*invX̄)
@@ -1230,7 +1381,7 @@ function find_ω(nmcs::LNC,q::AbstractVector,q̇::AbstractVector)
     end
 end
 
-function get_uvw(nmcs,q)
+function get_uvw(nmcs::LNC3D,q)
     if nmcs isa LNC1P3V
         u = @view q[4:6]
         v = @view q[7:9]
@@ -1256,11 +1407,19 @@ function get_uvw(nmcs,q)
         u = rj - ri
         v = rk - ri
         w = rl - ri
+    elseif nmcs isa LNC3D1P1V
+        u = @view q[4:6]
+        v,w = HouseholderOrthogonalization(u)
+    elseif nmcs isa LNC3D2P
+        ri = @view q[1:3]
+        rj = @view q[4:6]
+        u = rj -ri
+        v,w = HouseholderOrthogonalization(u)
     end
     SVector{3}(u),SVector{3}(v),SVector{3}(w)
 end
 
-function get_uv(nmcs,q)
+function get_uv(nmcs::LNC2D,q)
     if nmcs isa LNC1P2V
         u = @view q[3:4]
         v = @view q[5:6]
@@ -1275,6 +1434,14 @@ function get_uv(nmcs,q)
         rk = @view q[5:6]
         u = rj - ri
         v = rk - ri
+    elseif nmcs isa LNC2D2P
+        u = @view q[3:4]
+        v = rotation_matrix(π/2)*u
+    elseif nmcs isa LNC2D2P
+        ri = @view q[1:2]
+        rj = @view q[3:4]
+        u = rj - ri
+        v = rotation_matrix(π/2)*u
     end
     SVector{2}(u),SVector{2}(v)
 end
