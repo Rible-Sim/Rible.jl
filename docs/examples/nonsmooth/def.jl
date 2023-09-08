@@ -199,7 +199,14 @@ function rigidbar(i,ri,rj;
         r̄ps;
         constrained = constrained,
     )
-    
+    pretty_table(
+		SortedDict(
+			[
+				("id", i),
+				("bar length", b),
+			]
+		)
+	)
     lncs, _ = TR.NCF.NC3D1P1V(ri, u, ro, R)
     ω = TR.NCF.find_ω(lncs,vcat(ri,rj),vcat(ṙi,ṙj))
     if constrained
@@ -358,6 +365,7 @@ function superball(c=0.0;
             l = 1.7/2,
             d = l/2,
             z0 = l^2/(sqrt(5)*d) - 1e-7,
+            k = 4000.0,
             constrained = false,
             addconst = Float64[],
         )
@@ -396,8 +404,17 @@ function superball(c=0.0;
     original_restlens = zeros(ncables)
     original_restlens .= 0.996
     ks = zeros(ncables)
-    ks .= 4000.0
+    ks .= k
 
+    pretty_table(
+		SortedDict(
+			[
+				("stiffness", k),
+				("bar length", 2l),
+                ("bar distance", d)
+			]
+		)
+	)
     cables = [
         TR.Cable3D(i, original_restlens[i], ks[i], c;slack=false) for i = 1:ncables
     ]

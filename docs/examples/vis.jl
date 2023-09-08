@@ -1052,7 +1052,7 @@ end
 
 function plot_self_stress_states(
         botinput,
-        S,
+        S;
         rtol = 1e-14
         # Ň = build_Ň(bot.tg)
     )
@@ -1072,9 +1072,9 @@ function plot_self_stress_states(
             showlabels=false,
             showpoints=false,
             showcables = false,
-            xlims = (-4e-2,4e-2),
-            ylims = (-4e-2,4e-2),
-            zlims = (-4e-2,4e-2),
+            xlims = (-4e-1,4e-1),
+            ylims = (-4e-1,4e-1),
+            zlims = (-4e-1,4e-1),
             showground = false,
             sup! = (ax,tgob,sgi)-> begin
             # cables
@@ -1136,7 +1136,7 @@ function plot_kinematic_indeterminacy(
     bot = deepcopy(botinput)
     nk = size(D,2)
     δq̌ = [Ň*D[:,i] for i in axes(D,2)]
-    scaling=0.2
+    scaling=0.3
     for i = 1:nk
         push!(bot.traj,deepcopy(bot.traj[end]))
         bot.traj.t[end] = i
@@ -1156,7 +1156,8 @@ function plot_kinematic_indeterminacy(
         showground = false,
         # xlims = (-4e-2,4e-2),
         # ylims = (-4e-2,4e-2),
-        # zlims = (-4e-2,4e-2),
+        # zlims = (-4e-2,4e-2),        
+        slack_linestyle = :solid,
         showinit = true,
     )
 end

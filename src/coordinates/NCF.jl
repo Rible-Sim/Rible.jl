@@ -1071,6 +1071,7 @@ function make_N(nmcs::LNC3D6C)
             I3_Int  o3 o3;
             O3       v w;
         ]
+        @show u,v,w
         inv(cv)*ret
     end
 end
@@ -1414,6 +1415,7 @@ function get_uvw(nmcs::LNC3D,q)
         ri = @view q[1:3]
         rj = @view q[4:6]
         u = rj -ri
+        u ./= norm(u)
         v,w = HouseholderOrthogonalization(u)
     end
     SVector{3}(u),SVector{3}(v),SVector{3}(w)

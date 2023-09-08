@@ -19,10 +19,10 @@ function make_3d_bar(
 	R = SMatrix{3,3}(hcat(û,v̂,ŵ))
 
 	r̄g  = SVector{3}([ 0.0,0,0])
-	r̄p1 = SVector{3}([-bar_length/2,0,0])
-	r̄p2 = SVector{3}([ bar_length/2,0,0])
+	r̄p1 = SVector{3}([ 0.0,0,0])
+	r̄p2 = SVector{3}([ bar_length,0,0])
 	r̄ps = [r̄p1,r̄p2]
-	radius = norm(r̄p2-r̄p1)/120
+	radius = norm(r̄p2-r̄p1)/60
 	mat = filter(
 		row -> row.name == mat_name, 
 		material_properties
@@ -52,27 +52,29 @@ function make_3d_bar(
 			]
 		)
 	)
-
+	ās = [SVector(1.0,0.0,0.0)]
 	prop = TR.RigidBodyProperty(
 		id,
 		movable,
 		mass,
 		Īg,
 		r̄g,
-		r̄ps;
+		r̄ps,
+		ās,;
 		constrained=constrained
 	)
 	# @show prop.inertia
 	ro = (ri+rj)./2
 	ṙo = zero(ro)
 	ω = zero(ro)
-	nmcs,q0,q̇0 = TR.NCF.NC3D2P(ri,rj,ro,R,ṙo,ω)
+	nmcs,q0,q̇0 = TR.NCF.NC3D1P1V(ri,û,ri,R,ṙo,ω)
+	@myshow id,û
 	# @show ri,rj,q0
 	# cf = TR.NCF.CoordinateFunctions(nmcs,q0,ci,uci)
 	# @show typeof(nmcs)
-	state = TR.RigidBodyState(prop,nmcs,ro,R,ṙo,ω,ci)
+	state = TR.RigidBodyState(prop,nmcs,ri,R,ṙo,ω,ci)
 	# @show radius
-    barmesh = endpoints2mesh(r̄p1,r̄p2;radius,color=:darkred)
+    barmesh = endpoints2mesh(r̄p1,r̄p2;radius,)
 	rb = TR.RigidBody(prop,state,barmesh)
 	# @show rb.state.cache.M
 	rb
@@ -253,10 +255,15 @@ function make_3d_plate(
 			]
 		)
 	)
+	
+	ās = [SVector(1.0,0.0,0.0)]
 	prop = TR.RigidBodyProperty(
 		id,
 		movable,mass,Īg,
-		r̄g,r̄ps;
+		r̄g,
+		r̄ps,
+		ās,
+		;
 		constrained=constrained
 	)
 	ṙo = zero(ro)
@@ -630,14 +637,16 @@ function prisms(;
 	# ax = Axis3(fig[1,1])
 	# scatter!(ax,reduce(vcat,bps))
 	# scatter!(ax,reduce(vcat,midps))
-	# fig
+	# fig	
+
 	bars = [
 		vcat(
 			[
 				make_3d_bar(
 					2m*(j-1)+i,
 					bps[j][i],
-					midps[j][i]; ci = ifelse(j==1,[1,2,3],Int[])
+					midps[j][i]; 
+					#ci = ifelse(j==1,[1,2,3],Int[])
 				) for i = 1:m
 			],
 			[
@@ -650,8 +659,36 @@ function prisms(;
 		)
 		for j = 1:n
 	]
-	nb = length.(bars) |> sum
-	rbs = reduce(vcat,bars) |> TypeSortedCollection
+	nbars = length.(bars) |> sum
+	nb = nbars + 1
+	
+	ro = SVector(0.0,0.0,0.0)
+	r̄ps_raw = bps[1] |> Array
+	r̄ps = vcat(r̄ps_raw,)
+	# r̄ps_ext = [
+	# 	SVector(3r̄p[1],3r̄p[2],0.0)
+	# 	for r̄p in r̄ps_raw
+	# ]
+	# r̄ps = vcat(r̄ps_raw,r̄ps_ext)
+	plate = make_3d_plate(
+		nb,
+		r̄ps,
+		ro,
+		RotZ(0.0),
+		ro;
+		radius=r,
+		movable = true,
+		m=3,
+		height=1e-2,
+		ci = collect(1:12),
+		Φi = Int[],
+		loadmesh = false,
+		meshvisible = true,
+	)
+	rbs = vcat(
+		reduce(vcat,bars),
+		plate
+	 ) |> TypeSortedCollection
 	numberedpoints = TR.number(rbs)
 	sharing_elas = ElasticArray{Int}(undef, nb, 0)
 	cm = CircularArray(collect(1:m))
@@ -679,8 +716,8 @@ function prisms(;
 	end
 	sharing = Matrix(sharing_elas')
 	# display(sharing)
-	indexedcoords = TR.index(rbs,sharing)
-	# indexedcoords = TR.index(rbs,)
+	# indexedcoords = TR.index(rbs,sharing)
+	indexedcoords = TR.index(rbs,)
 
 	connecting_elas = ElasticArray{Int}(undef, nb, 0)
 	for j = 1:n
@@ -732,17 +769,19 @@ function prisms(;
 	for j = 1:n
 		is = 0
 		for i = 1:m
-			row = zeros(Int,nb)
-			row[is+cm[i]] =    1
-			row[is+cm[i+1]] = -1
-			append!(connecting_elas,row)
+			if j > 1
+				row = zeros(Int,nb)
+				row[is+cm[i]] =    1
+				row[is+cm[i+1]] = -1
+				append!(connecting_elas,row)
+			end
 			row = zeros(Int,nb)
 			row[is+m+cm[i]] =    2
 			row[is+m+cm[i+1]] = -2
 			append!(connecting_elas,row)
 		end
 	end
-	ncables_prism += (n+1)*m
+	ncables_prism += (n)*m
 	connecting = Matrix(connecting_elas')
 	# display(connecting)
 	connected = TR.connect(rbs,connecting)
@@ -771,14 +810,40 @@ function prisms(;
 	tensiles = (cables = cables,)
 	hub = (actuators = acs,)
 
-	# csts = [
-	# 	TR.PinJoint(i+m*(j-1),TR.End2End(i,TR.ID(bars[j][m+cm[i]],2),TR.ID(plates[j+1],cm[i-1])))
-	# 	for j = 1:n for i = 1:m
-	# ]
+	
+	csts_bar2plate = [
+		TR.PinJoint(
+			i,
+			TR.End2End(
+				i,
+				TR.ID(plate,i,1),
+				TR.ID(bars[1][cm[i]],1,1),
+			)
+		)
+		for i = 1:m
+	]
 
-	# jointedmembers = TR.join(csts,indexedcoords)
+	csts_bar2bar = [
+		TR.PinJoint(
+			m+i+m*(j-1),
+			TR.End2End(
+				m+i+m*(j-1),
+				TR.ID(bars[j][m+cm[i+1]],1,1),
+				TR.ID(bars[j][cm[i]]    ,2,1)
+			)
+		)
+		for j = 1:n for i = 1:m
+	]
 
-	cnt = TR.Connectivity(numberedpoints,indexedcoords,@eponymtuple(connected,),)
+	csts = vcat(
+		csts_bar2plate,
+		csts_bar2bar,
+		
+	)
+	
+	jointedmembers = TR.join(csts,indexedcoords)
+
+	cnt = TR.Connectivity(numberedpoints,indexedcoords,@eponymtuple(connected,),jointedmembers)
 
 	tg = TR.TensegrityStructure(rbs,tensiles,cnt)
 	bot = TR.TensegrityRobot(tg,hub)

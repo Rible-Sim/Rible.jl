@@ -17,7 +17,7 @@ struct ID{sigType,pidType,aidType}
 end
 
 function ID(rbsig,pid)
-	ID(rbsig,pid,0)
+	ID(rbsig,pid,1)
 end
 
 """
@@ -990,6 +990,8 @@ function make_Φqᵀq(cst,numbered,c)
     I_Int = NCF.make_I(Int,ndim)
 	c1 = c[num2sys[mem2num[rbid1][pid1]]]
 	c2 = c[num2sys[mem2num[rbid2][pid2]]]
+	@show end1.rbsig.prop.id
+	@show end1.rbsig.prop.ās
 	ā1 = end1.rbsig.prop.ās[aid1]
 	frame = SpatialFrame(ā1)
 	t̄1 = frame.t1
@@ -1070,6 +1072,14 @@ function make_∂Aᵀλ∂q(cst,numbered,c)
             for i = 1:nconstraints
         ]
         sum(ret)
+    end
+end
+
+function make_∂Aᵀλ∂q(cst::PinJoint,numbered,c)
+	(;nconstraints) = cst
+	uci = get_jointed_free_idx(cst)
+    function ∂Aᵀλ∂q(λ)
+		zeros(eltype(λ),length(uci),length(uci))
     end
 end
 
