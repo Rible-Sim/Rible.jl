@@ -81,8 +81,8 @@ function optimize_maximum_stiffness(mat𝒦ps,vec𝒦m,vecI,A,b,nx)
 
     custom_settings = COSMO.Settings(
         verbose = true, 
-        eps_abs = 1e-7, 
-        eps_rel = 1e-7
+        eps_abs = 1e-10, 
+        eps_rel = 1e-10
     )
 
     COSMO.assemble!(
@@ -96,7 +96,7 @@ function optimize_maximum_stiffness(mat𝒦ps,vec𝒦m,vecI,A,b,nx)
     COSMO.optimize!(model)
 end
 
-function optimize_minimum_stiffness(mat𝒦ps,vec𝒦m,vecI,A,b,nx,)
+function optimize_minimum_stiffness(mat𝒦ps,vec𝒦m,vecI,A,b,nx,x_0)
 
     model = COSMO.Model()
 
@@ -136,7 +136,7 @@ function optimize_minimum_stiffness(mat𝒦ps,vec𝒦m,vecI,A,b,nx,)
         constraints,
         settings = custom_settings
     )
-    # COSMO.warm_start_primal!(model, x_0)
+    COSMO.warm_start_primal!(model, x_0)
     COSMO.optimize!(model)
 end
 

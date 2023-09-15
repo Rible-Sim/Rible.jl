@@ -1333,6 +1333,17 @@ function get_cables_tension(tg::TensegrityStructure)
 end
 
 """
+Set cables' tension
+$(TYPEDSIGNATURES)
+"""
+function set_cables_tension!(tg::TensegrityStructure,fs)
+    for (s,f) in zip(tg.tensiles.cables,fs)
+        s.state.tension = f
+    end
+end
+
+
+"""
 返回系统绳索力密度。
 $(TYPEDSIGNATURES)
 """

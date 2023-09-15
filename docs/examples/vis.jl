@@ -300,7 +300,7 @@ function plot_traj!(bot::TR.TensegrityRobot;
         if ndim == 2 && !showmesh
             # showinfo = false
             showground = false
-            ax = Axis(sg[1,1],title=axtitle)
+            ax = Axis(sg[1,1],)
             ax.aspect = DataAspect()
             xlims!(ax,xmin,xmax)
             ylims!(ax,ymin,ymax)
@@ -475,6 +475,7 @@ function init_plot!(ax,tgob;
         isref=false,
         showlabels=true,
         showpoints=true,
+        showarrows=true,
         showmesh=true,
         showwire=false,
         showcables=true,
@@ -579,7 +580,7 @@ function init_plot!(ax,tgob;
         rps_by_rbs = [
             @lift begin
                 rbs = TR.get_rigidbodies($tgob)
-                rbs[rbid].state.rps
+                rbs[rbid].state.rps .|> Makie.Point
             end
             for rbid = 1:nbodies
         ]
@@ -607,6 +608,27 @@ function init_plot!(ax,tgob;
                     color = :darkred,
                     align = (:left, :top),
                     offset = (20(rand()-0.5), 20(rand()-0.5))
+                )
+            end
+        end
+        as_by_rbs = [
+            @lift begin
+                rbs = TR.get_rigidbodies($tgob)
+                rbs[rbid].state.as .|> Makie.Point
+            end
+            for rbid = 1:nbodies
+        ]
+        if showarrows
+            for (rps,as) in zip(rps_by_rbs,as_by_rbs)
+                arrows!(ax,rps,as;
+                    normalize = true, 
+                    lengthscale = 0.0004fontsize,
+                    linewidth = 0.0002fontsize,
+                    arrowsize = Vec3f(
+                        0.0004fontsize,
+                        0.0004fontsize, 
+                        0.0006fontsize,
+                    )
                 )
             end
         end
@@ -694,11 +716,11 @@ function build_mesh(rb::TR.AbstractRigidBody;update=true,color=nothing)
     # GB.Mesh(GB.meta(coloredpoints,normals=nls),fac)
 end
 
-function make_patch(;trans=[0.0,0,0],rot=RotX(0.0),color=:slategrey)
+function make_patch(;trans=[0.0,0,0],rot=RotX(0.0),scale=1,color=:slategrey)
     parsedcolor = parse(Makie.ColorTypes.RGB{Float32},color)
     function patch(mesh)
         ct = Translation(trans) ∘ LinearMap(rot)
-        updated_pos = ct.(mesh.position)
+        updated_pos = ct.(mesh.position).*scale
         fac = GB.faces(mesh)
         nls = GB.normals(updated_pos,fac)
         colors = fill(parsedcolor,length(updated_pos))
@@ -1121,7 +1143,6 @@ function plot_self_stress_states(
                     offset = (-fontsize/2, 0)
                 )
             end
-
         )
     end
 end

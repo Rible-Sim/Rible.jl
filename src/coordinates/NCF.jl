@@ -1054,8 +1054,8 @@ function make_N(nmcs::LNC2D6C)
         o2 = zero(u)
         ret = [
             I2_Int    o2;
-            O2  -skew(u);
-            O2  -skew(v);
+            O2         v;
+            O2        -u;
         ]
         inv(cv)*ret
     end
@@ -1069,9 +1069,8 @@ function make_N(nmcs::LNC3D6C)
         o3 = zero(u)
         ret = [
             I3_Int  o3 o3;
-            O3       v w;
+            O3      -w v;
         ]
-        @show u,v,w
         inv(cv)*ret
     end
 end

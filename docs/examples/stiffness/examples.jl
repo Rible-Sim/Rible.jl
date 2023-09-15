@@ -162,7 +162,9 @@ function Tbars()
         r̄p3 = SVector{3}([0.0, b,0.0])
         r̄p4 = SVector{3}([0.0,-b,0.0])
         r̄p5 = SVo3
-        r̄ps = [r̄p1,r̄p2,r̄p3,r̄p4,r̄p5,]
+        r̄p6 = SVector{3}([-2a,0.0,0.0])
+        r̄p7 = SVector{3}([  a,0.0,0.0])
+        r̄ps = [r̄p1,r̄p2,r̄p3,r̄p4,r̄p5,r̄p6,r̄p7]
         ās = [
 			SVector{3}([1.0,0.0,0.0]),
 			SVector{3}([0.0,1.0,0.0]),
@@ -234,18 +236,18 @@ function Tbars()
 	rbs = [base,slider1,slider2,bar]
 	rigdibodies = TypeSortedCollection(rbs)
     numbered = TR.number(rigdibodies)
-	sm = [
-		0 1 0 1;
-		0 2 0 2;
-		0 3 0 3;
-		0 0 1 4;
-		0 0 2 5;
-		0 0 3 6;
-	]
-    indexed = TR.index(rigdibodies,sm)
-	# indexed = TR.index(rigdibodies,)
+	# sm = [
+	# 	0 1 0 1;
+	# 	0 2 0 2;
+	# 	0 3 0 3;
+	# 	0 0 1 4;
+	# 	0 0 2 5;
+	# 	0 0 3 6;
+	# ]
+    # indexed = TR.index(rigdibodies,sm)
+	indexed = TR.index(rigdibodies,)
 
-    ncables = 5
+    ncables = 4
 	original_restlens = zeros(ncables)
 	original_restlens = zeros(ncables)
 	ks = fill(100.0,ncables)
@@ -254,11 +256,12 @@ function Tbars()
 	tensiles = (cables=ss,)
 
 	cm = [
-		1 -1  0 0;
-		2 -1  0 0;
-		3  0 -1 0;
-		4  0 -1 0;
-		5 -1  0 0;
+		1 -1  0  0;
+		2 -1  0  0;
+		# 3  0 -1  0;
+		# 4  0 -1  0;
+		6  0  0 -1;
+		7  0  0 -1;
 	]
 
 	connected = TR.connect(rigdibodies, cm)
@@ -267,9 +270,15 @@ function Tbars()
 	j1 = TR.PrismaticJoint(1,TR.End2End(1,TR.ID(base,5,1),TR.ID(slider1,1,1)))
 	j2 = TR.PrismaticJoint(2,TR.End2End(2,TR.ID(base,5,2),TR.ID(slider2,1,1)))
 
+	j3 = TR.PinJoint(3,TR.End2End(3,TR.ID(bar,1,1),TR.ID(slider1,1,1)))
+	j4 = TR.PinJoint(4,TR.End2End(4,TR.ID(bar,2,1),TR.ID(slider2,1,1)))
+
+
 	js = [
-		j1,j2
+		j1,j2,
+		j3,j4
 	]
+
 	jointed = TR.join(js,indexed)
 	cnt = TR.Connectivity(numbered,indexed,tensioned,jointed)
     tg = TR.TensegrityStructure(rigdibodies,tensiles,cnt)
