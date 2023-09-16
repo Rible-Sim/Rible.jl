@@ -720,7 +720,7 @@ function make_patch(;trans=[0.0,0,0],rot=RotX(0.0),scale=1,color=:slategrey)
     parsedcolor = parse(Makie.ColorTypes.RGB{Float32},color)
     function patch(mesh)
         ct = Translation(trans) ∘ LinearMap(rot)
-        updated_pos = ct.(mesh.position).*scale
+        updated_pos = ct.(mesh.position.*scale)
         fac = GB.faces(mesh)
         nls = GB.normals(updated_pos,fac)
         colors = fill(parsedcolor,length(updated_pos))

@@ -192,7 +192,7 @@ function rigidbar(i,ri,rj;
         0       0 0
     ])
     r̄ps = [r̄p1,r̄p2,r̄p3]
-    ās = [SVector(0,1.0,0),SVector(0,0,1.0),SVector(0,1.0,0)]
+    ās = [SVector(1.0,0,0),SVector(1.0,0,0),SVector(1.0,0,0)]
     prop = TR.RigidBodyProperty(
         i,
         movable,
@@ -235,18 +235,17 @@ function uni(c=100.0;
     )
     lₛ = 80e-3
     DE = 130.64e-3
-
-    p = OffsetArray(SVector{3}.(
-    [
-        [√3*lₛ/2/3,0     ,0],
-        [       0,-lₛ/2  ,0],
-        [       0, lₛ/2  ,0],
-        [√3*lₛ/2  ,0,0],
-        [√3*lₛ/2  ,0,0],
-        [√3*lₛ/2/3,0, DE/2],
-        [√3*lₛ/2/3,0,-DE/2]
-    ].+Ref([0,0,z0])
-    ),0:6)
+    θ = 2π/3
+    p = SVector{3}.(
+        [   
+            [0,0,0.0],
+            lₛ/2 .*[cos(0θ), sin(0θ),0],
+            lₛ/2 .*[cos(1θ), sin(1θ),0],
+            lₛ/2 .*[cos(2θ), sin(2θ),0],
+            [0,0,-DE/2],
+            [0,0, DE/2]
+        ]
+    )
     # fig,ax,plt = scatter(p)
     # # ax.aspect = DataAspect()
     # fig
@@ -256,7 +255,7 @@ function uni(c=100.0;
         constrained = true
         ci = collect(1:12)
         Φi = Int[]
-        ri = p[0]
+        ri = p[1]
         ro = ri
         R = SMatrix{3,3}(Matrix(1.0I,3,3))
         ṙo = ṙo_ref
@@ -264,8 +263,8 @@ function uni(c=100.0;
         # ω = zeros(3)
         r̄g = SVector{3}(0.0,0.0,0.0)
         # @show p
-        r̄ps = [p[i]-p[0] for i = 1:3]        
-        ās = [SVector(0,0,1.0) for i = 1:3]
+        r̄ps = p[[2,3,4,1]]
+        ās = [SVector(0,0,1.0) for i = 1:4]
         m = inertia = 0.1
         Ī = SMatrix{3,3}(
             [
@@ -297,8 +296,11 @@ function uni(c=100.0;
     end
 
     rb1 = rigidbar(
-        1, p[end-1],p[end];
-        ṙi = ṙo_ref,ṙj = ṙo_ref,
+        1, 
+        RotX(0.0)*p[end-1],
+        RotX(0.0)*p[end];
+        ṙi = ṙo_ref,
+        ṙj = ṙo_ref,
         m = mbar,
         movable = true,
         constrained = false,
@@ -350,13 +352,22 @@ function uni(c=100.0;
     connected = TR.connect(rigdibodies, matrix_cnt)
     tensioned = @eponymtuple(connected,)
     
-    uj = TR.UniversalJoint(1,
+    # uj = TR.UniversalJoint(1,
+    #     TR.End2End(
+    #         1,
+    #         TR.ID(rb2,4,4),
+    #         TR.ID(rb1,3,3),
+    #     )
+    # )
+
+    uj = TR.PrismaticUniversalJoint(1,
         TR.End2End(
             1,
-            TR.ID(rb2,3,3),
+            TR.ID(rb2,4,4),
             TR.ID(rb1,3,3),
         )
     )
+
 
     jointed = TR.join([uj],indexedcoords)
 

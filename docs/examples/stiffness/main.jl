@@ -8,6 +8,7 @@ using ElasticArrays
 using TypeSortedCollections
 using TypedTables
 using Rotations
+using Tullio
 # import GeometricalPredicates as GP
 using CoordinateTransformations
 using OffsetArrays
@@ -1610,7 +1611,7 @@ tbbot = Tbars()
 bot = tbbot
 @myshow bot.tg.ndof
 
-plot_traj!(bot;showground=false)
+plot_traj!(bot;showarrows = false, showground=false)
 
 TR.check_static_equilibrium_output_multipliers(bot.tg)
 
@@ -1923,18 +1924,15 @@ end
 
 #-- begin uni bot
 unibot = uni(0.0;
-        μ = 0.9,
-        e = 0.0,
-        z0 = 0.2,
-        isbody = true,
+    μ = 0.9,
+    e = 0.0,
+    z0 = 0.2,
+    isbody = true,
 )
 bot = unibot
 plot_traj!(bot;showground=false)
 
 @myshow bot.tg.ndof
-
-plot_rigid(TR.get_rigidbodies(bot)[2])
-
 
 TR.check_static_equilibrium_output_multipliers(bot.tg)
 
@@ -1943,10 +1941,8 @@ q̌ = TR.get_q̌(bot.tg)
 Ǎ = TR.make_A(bot.tg)(q)
 Ň_ = TR.nullspace(Ǎ)
 Ň = TR.modified_gram_schmidt(Ň_)
-Ň = Ň_
-# N = TR.make_intrinsic_nullspace(bot.tg,q)
 
-Ň = build_Ň(bot.tg)
+# Ň = build_Ň(bot.tg)
 
 rank(Ň)
 
@@ -1966,26 +1962,269 @@ S
 D
 ns = size(S,2)
 nk = size(D,2)
-δq̌ = [Ň*D[:,i] for i in axes(D,2)]
-scaling=0.1
-botvis = deepcopy(bot)
-for i = 1:nk
-    push!(botvis.traj,deepcopy(botvis.traj[end]))
-    botvis.traj.t[end] = i
-    δq̌i = δq̌[i]
-    ratio = norm(δq̌i)/norm(q̌)
-    botvis.traj.q̌[end] .= q̌ .+ scaling.*δq̌i/ratio
-end
-
-plot_traj!(botvis;showground=false)
 
 k = TR.get_cables_stiffness(bot.tg)
 l = TR.get_cables_len(bot.tg)
 
-f =  sum(S,dims=2)
+ᾱ = [1,1,1]
+f =  S*ᾱ
 
-# equivalent μ
-# μ = l .- (f./k)
+
+GM.activate!();with_theme(theme_pub;
+        resolution = (0.95tw,0.24tw),
+        figure_padding = (2fontsize,0,0,0),
+        fontsize = 6.5 |> pt2px,
+        Axis3 = (
+            azimuth = 3.8255306333269843,
+            elevation = 0.2026990816987241
+        )
+    ) do 
+    maxS = maximum(abs.(S))
+    rtol = 1e-10
+    Sbool = S.> maxS*rtol
+    S[.!Sbool] .= 0.0
+    fig = Figure()
+    gd1 = fig[1,1] = GridLayout()
+    gd2 = fig[1,2:ns+1] = GridLayout()
+    botmm = deepcopy(bot)
+    plot_traj!(
+        bot;
+        fig = gd1,
+        AxisType=Axis3,
+        doslide=false,
+        showlabels=false,
+        showpoints=false,
+        # showcables = false,
+        xlims = (-0.5e-1,0.5e-1),
+        ylims = (-0.5e-1,0.5e-1),
+        zlims = (-1e-2,3.0e-1),
+        showground = false,
+        titleformatfunc = (sgi,tt)-> begin
+            rich(
+                    rich("($(alphabet[sgi])) ", font=:bold),
+                    "Initial"
+                )
+        end,
+        sup! = (ax,tgob,sgi)->begin
+            hidex(ax)
+            hidey(ax)
+            # xlims!(ax,-1.0e0,1.2e0)
+            # ylims!(ax,-1.2e0,1.0e0)
+        end,
+    )
+    plot_traj!(
+        bot;
+        fig = gd2,
+        AxisType=Axis3,
+        gridsize=(1,ns), 
+        doslide=false,
+        showlabels=false,
+        showpoints=false,
+        showcables = false,
+        xlims = (-0.5e-1,0.5e-1),
+        ylims = (-0.5e-1,0.5e-1),
+        zlims = (-1e-2,3.0e-1),
+        showground = false,
+        showinit = true,
+        titleformatfunc = (sgi,tt)-> begin
+            rich(
+                    # rich("($(alphabet[sgi+1])) ", font=:bold),
+                    "Self-stress State $sgi"
+                )
+        end,
+        sup! = (ax,tgob,sgi)-> begin
+            # cables
+            ax.azimuth = 4.73553063332698
+            ax.elevation = 0.18269908169872395
+            # azimuth = 4.665530633326984
+            # elevation = 0.16269908169872424
+            hidexyz(ax)
+            @myshow Sbool[:,sgi]
+            linesegs_cables = @lift begin
+                get_linesegs_cables($tgob;)[Sbool[:,sgi]]
+            end
+            linesegments!(ax, 
+                linesegs_cables, 
+                color = :red, 
+                # linewidth = cablewidth
+                )
+            rcs_by_cables = @lift begin
+                (;tensioned) = $tgob.connectivity
+                ndim = TR.get_ndim($tgob)
+                T = TR.get_numbertype($tgob)
+                ret = Vector{MVector{ndim,T}}()
+                mapreduce(
+                    (scnt)->
+                    [(
+                        scnt.end1.rbsig.state.rps[scnt.end1.pid].+
+                        scnt.end2.rbsig.state.rps[scnt.end2.pid]
+                    )./2],
+                    vcat,
+                    tensioned.connected
+                    ;init=ret
+                )
+            end
+            # @show rcs_by_cables
+            Stext = [
+                    @sprintf "%4.2f"  S[i,sgi] 
+                    for i in axes(S,1)
+                    if Sbool[i,sgi]
+                ]
+            @myshow Stext
+            # scatter!(
+            #     ax,
+            #     rcs_by_cables[][Sbool[:,sgi]],
+            #     marker = :rect, 
+            #     markersize = 12 |> pt2px, 
+            #     color = :white
+            # )
+            text!(
+                ax,
+                Stext,
+                position = rcs_by_cables[][Sbool[:,sgi]],
+                fontsize = 5 |> pt2px,
+                color = :red,
+                align = (:center, :center),
+                # offset = (-fontsize/2, 0)
+            )
+        end
+    )
+    # savefig(fig,"tower")
+    fig
+end
+
+λ = -inv(Ǎ*transpose(Ǎ))*Ǎ*Bᵀ*f
+# @show f,λ
+Ǩa = TR.∂Aᵀλ∂q̌(bot.tg,λ)
+𝒦a = transpose(Ň)*Ǩa*Ň |> Symmetric 
+vals_𝒦a,vecs_𝒦a = eigen(𝒦a)
+@myshow sort(vals_𝒦a)
+@myshow 𝒦a[1:5,1:5]
+# @show count((x)->x<0,D_𝒦a)
+# @show count((x)->x==0,D_𝒦a)
+
+Ǩm = TR.build_Ǩm!(bot.tg,q,k)
+𝒦m = transpose(Ň)*Ǩm*Ň |> Symmetric
+vals_𝒦m,vecs_𝒦m = eigen(𝒦m)
+
+vec𝒦m = vec(𝒦m)
+vecI = vec(Matrix(1.0I,size(𝒦m)))
+
+struct𝒦p = [
+    begin
+        s = S[:,i]        
+        # s = S\f
+        # @show s
+        λ = inv(Ǎ*transpose(Ǎ))*Ǎ*Bᵀ*s
+        # @show f,λ
+        Ǩa = - TR.∂Aᵀλ∂q̌(bot.tg,λ)
+        𝒦a = transpose(Ň)*Ǩa*Ň
+
+        Ǩg = TR.build_Ǩg!(bot.tg,q,s)
+        𝒦g = transpose(Ň)*Ǩg*Ň
+
+        𝒦p = 𝒦a .+ 𝒦g
+        @eponymtuple(𝒦m, 𝒦p, 𝒦a)
+    end
+    for i = 1:ns
+] |> StructArray
+
+𝒦p = sum(struct𝒦p.𝒦p)
+vals_𝒦p,vecs_𝒦p = eigen(𝒦p)
+
+𝒦 = 𝒦m .+ 𝒦p
+vals_𝒦,vecs_𝒦 = eigen(𝒦)
+
+vec𝒦ps = vec.(struct𝒦p.𝒦p) 
+
+mat𝒦ps = reduce(hcat,vec𝒦ps)
+
+A = hcat(
+    -Matrix(1.0I,ns,ns),
+    ᾱ,
+    zero(ᾱ)
+)
+b = zeros(ns)
+nx = ns+2
+result_max = TR.optimize_maximum_stiffness(mat𝒦ps,vec𝒦m,vecI,A,b,nx)
+σ_max = result_max.x[end-1]
+ρ_max = result_max.x[end]
+
+𝒦_max = 𝒦m + σ_max*reshape(mat𝒦ps*ᾱ,size(𝒦m))
+vals_𝒦_max, vecs_𝒦_max = eigen(𝒦_max)
+
+vals, vecs = eigen(𝒦_max - ρ_max*I)
+@myshow vals
+
+result_min = TR.optimize_minimum_stiffness(mat𝒦ps,vec𝒦m,vecI,
+    hcat(
+        -Matrix(1.0I,ns,ns),
+        ᾱ,
+    ),
+    zeros(ns),
+    ns+1,
+    result_max.x[1:end-1]
+)
+σ_min = result_min.x[end]
+
+𝒦_min = 𝒦m + σ_min*reshape(mat𝒦ps*ᾱ,size(𝒦m))
+vals_𝒦_min, vecs_𝒦_min = eigen(𝒦_min)
+ρ_min = vals_𝒦_min[1]
+
+σs = LinRange(-500,500,100)
+Vals =  [
+    begin
+        𝒦 = 𝒦m + σ*reshape(mat𝒦ps*ᾱ,size(𝒦m))
+        vals_𝒦, vecs_𝒦 = eigen(𝒦)
+        vals_𝒦
+    end
+    for σ in σs
+] |> VectorOfArray
+
+with_theme(theme_pub;
+        resolution = (0.35tw,0.2tw),
+        figure_padding = (0,fontsize,0,fontsize),
+    ) do 
+    fig = Figure()
+    ax1 = Axis(fig[1,1],
+        xlabel = L"\sigma",
+        ylabel = L"\rho_{\mathrm{1}}"
+    )
+    lines!(ax1,σs,Vals[1,:],)
+    # scatter!(
+    #     ax1,
+    #     [σ_max,σ_min],
+    #     [ρ_max,ρ_min]
+    # )
+    # text!(ax1,
+    #     [σ_max], [ρ_max], 
+    #     text = [L"\sigma_{\mathrm{max}}"],
+    #     align = (:center,:bottom),
+    #     offset = (0, fontsize/4)
+    # )
+    # text!(ax1,
+    #     [σ_min], [ρ_min], 
+    #     text = [L"\sigma_{\mathrm{min}}"],
+    #     align = (:right,:center),
+    #     offset = (-fontsize/2, 0)
+    # )
+    
+    # ax2 = Axis(fig[1,2],
+    #     xlabel = L"\sigma",
+    #     ylabel = L"\rho"
+    # )
+    for i in 1:3
+        lines!(ax1,σs,Vals[i,:],label=latexstring("\\rho_$i"))
+    end
+    # Legend(
+    #     fig[1,3],
+    #     ax2
+    # )
+    # xlims!(ax2,0,1700)
+    # ylims!(ax2,-20,400)
+    # savefig(fig,"tower_curve")
+    fig
+end
 
 λ = -inv(Ǎ*transpose(Ǎ))*Ǎ*Bᵀ*f
 # @show f,λ

@@ -5,6 +5,7 @@ function make_3d_bar(
 		m = 0.080,
 		radius = 0.03,
 		mat_name = "Teak",
+		loadmesh = false,
 	)
 	# @show id,ri,rj
 	movable = true
@@ -73,7 +74,11 @@ function make_3d_bar(
 	# @show typeof(nmcs)
 	state = TR.RigidBodyState(prop,nmcs,ri,R,ṙo,ω,ci)
 	# @show radius
-    barmesh = endpoints2mesh(r̄p1,r̄p2;radius,)
+	if loadmesh
+		barmesh = load("装配体3.STL") |> make_patch(;trans=[0,0,0.025],scale=1/500)
+	else
+		barmesh = endpoints2mesh(r̄p1,r̄p2;radius,)
+	end
 	rb = TR.RigidBody(prop,state,barmesh)
 	# @show rb.state.cache.M
 	rb

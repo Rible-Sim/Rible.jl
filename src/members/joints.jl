@@ -35,18 +35,18 @@ struct End2End{end1Type<:ID,end2Type<:ID}
     end2::end2Type
 end
 
-function find_order(nmcs1,nmcs2,q1,q2,X1,X2,nΦ1,nΦ2)
-    T = eltype(q1)
-    nq1 = length(q1)
-    nq2 = length(q2)
+function find_order(nmcs_hen,nmcs_egg,q_hen,q_egg,X_hen,X_egg,nΦ1,nΦ2)
+    T = eltype(q_hen)
+    nq1 = length(q_hen)
+    nq2 = length(q_egg)
     A = zeros(T,nΦ1+nΦ2+9,nq1+nq2)
-    A[    1:nΦ1,          1:nq1    ] = NCF.make_Φq(nmcs1,collect(1:nq1),collect(1:nΦ1))(q1)
-    A[nΦ1+1:nΦ1+nΦ2,  nq1+1:nq1+nq2] = NCF.make_Φq(nmcs2,collect(1:nq2),collect(1:nΦ2))(q2)
+    A[    1:nΦ1,          1:nq1    ] = NCF.make_Φq(nmcs_hen,collect(1:nq1),collect(1:nΦ1))(q_hen)
+    A[nΦ1+1:nΦ1+nΦ2,  nq1+1:nq1+nq2] = NCF.make_Φq(nmcs_egg,collect(1:nq2),collect(1:nΦ2))(q_egg)
     k =     nΦ1+nΦ2    
     A_rest = @view A[k+1:end,:]
     rot_jac!(A_rest,collect(1:9),
-        q1,q2,
-        X1,X2,
+        q_hen,q_egg,
+        X_hen,X_egg,
         collect(1:nq1),
         collect(nq1+1:nq1+nq2),
         collect(1:nq1),
@@ -237,7 +237,7 @@ end
 $(TYPEDSIGNATURES)
 """
 function PinJoint(id,e2e)
-    rb1 = e2e.end1.rbsig
+    rb1 = e2e.hen.rbsig
     nΦ = get_ndim(rb1)
     T = get_numbertype(rb1)
     values = zeros(T,nΦ)
@@ -248,28 +248,27 @@ function make_Φ(cst::PinJoint,indexed,numbered)
     (;nconstraints,values,e2e) = cst
     (;mem2num,num2sys) = numbered
     (;mem2sysfull) = indexed
-    (;end1,end2) = e2e
-    pid1 = end1.pid
-    pid2 = end2.pid
-    C1 = end1.rbsig.state.cache.Cps[pid1]
-    C2 = end2.rbsig.state.cache.Cps[pid2]
+    hen = e2e.end1
+    egg = e2e.end2
+    C_hen = hen.rbsig.state.cache.Cps[hen.pid]
+    C_egg = egg.rbsig.state.cache.Cps[egg.pid]
     function inner_Φ(q)
         ret = zeros(eltype(q),nconstraints)
-        q1 = @view q[mem2sysfull[end1.rbsig.prop.id]]
-        q2 = @view q[mem2sysfull[end2.rbsig.prop.id]]
-        ret .= C1*q1.-C2*q2
+        q_hen = @view q[mem2sysfull[hen.rbsig.prop.id]]
+        q_egg = @view q[mem2sysfull[egg.rbsig.prop.id]]
+        ret .= C_hen*q_hen.-C_egg*q_egg
         ret
     end
     function inner_Φ(q,d,c)
         ret = zeros(eltype(q),nconstraints)
-        rbid1 = end1.rbsig.prop.id
-        rbid2 = end2.rbsig.prop.id
-        q1 = @view q[mem2sysfull[rbid1]]
-        q2 = @view q[mem2sysfull[rbid2]]
-        c1 = c[num2sys[mem2num[rbid1][pid1]]]
-        c2 = c[num2sys[mem2num[rbid2][pid2]]]
-        ret .= end1.rbsig.state.cache.funcs.C(c1)*q1 .-
-               end2.rbsig.state.cache.funcs.C(c2)*q2
+        id_hen = hen.rbsig.prop.id
+        id_egg = egg.rbsig.prop.id
+        q_hen = @view q[mem2sysfull[id_hen]]
+        q_egg = @view q[mem2sysfull[id_egg]]
+        c_hen = c[num2sys[mem2num[id_hen][hen.pid]]]
+        c_egg = c[num2sys[mem2num[id_egg][egg.pid]]]
+        ret .= hen.rbsig.state.cache.funcs.C(c_hen)*q_hen .-
+               egg.rbsig.state.cache.funcs.C(c_egg)*q_egg
         ret
     end
     inner_Φ
@@ -279,27 +278,26 @@ function make_A(cst::PinJoint,indexed,numbered)
     (;nconstraints,values,e2e) = cst
     (;mem2sysfree,nfree) = indexed
     (;mem2num,num2sys) = numbered
-    (;end1,end2) = e2e
-    pid1 = end1.pid
-    pid2 = end2.pid
-    C1 = end1.rbsig.state.cache.Cps[pid1]
-    C2 = end2.rbsig.state.cache.Cps[pid2]
-    uci1 =  end1.rbsig.state.cache.free_idx
-    uci2 =  end2.rbsig.state.cache.free_idx
+    hen = e2e.end1
+    egg = e2e.end2
+    C_hen = hen.rbsig.state.cache.Cps[hen.pid]
+    C_egg = egg.rbsig.state.cache.Cps[egg.pid]
+    uci_hen =  hen.rbsig.state.cache.free_idx
+    uci_egg =  egg.rbsig.state.cache.free_idx
     function inner_A(q)
         ret = zeros(eltype(q),nconstraints,nfree)
-        ret[:,mem2sysfree[end1.rbsig.prop.id]] =  C1[:,uci1]
-        ret[:,mem2sysfree[end2.rbsig.prop.id]] = -C2[:,uci2]
+        ret[:,mem2sysfree[hen.rbsig.prop.id]] =  C_hen[:,uci_hen]
+        ret[:,mem2sysfree[egg.rbsig.prop.id]] = -C_egg[:,uci_egg]
         ret
     end
     function inner_A(q,c)
         ret = zeros(eltype(q),nconstraints,nfree)
-        rbid1 = end1.rbsig.prop.id
-        rbid2 = end2.rbsig.prop.id
-        c1 = c[num2sys[mem2num[rbid1][pid1]]]
-        c2 = c[num2sys[mem2num[rbid2][pid2]]]
-        ret[:,mem2sysfree[end1.rbsig.prop.id]] =  end1.rbsig.state.cache.funcs.C(c1)[:,uci1]
-        ret[:,mem2sysfree[end2.rbsig.prop.id]] = -end2.rbsig.state.cache.funcs.C(c2)[:,uci2]
+        id_hen = hen.rbsig.prop.id
+        id_egg = egg.rbsig.prop.id
+        c_hen = c[num2sys[mem2num[id_hen][hen.pid]]]
+        c_egg = c[num2sys[mem2num[id_egg][egg.pid]]]
+        ret[:,mem2sysfree[hen.rbsig.prop.id]] =  hen.rbsig.state.cache.funcs.C(c_hen)[:,uci_hen]
+        ret[:,mem2sysfree[egg.rbsig.prop.id]] = -egg.rbsig.state.cache.funcs.C(c_egg)[:,uci_egg]
         ret
     end
     inner_A
@@ -322,28 +320,26 @@ end
 $(TYPEDSIGNATURES)
 """
 function RevoluteJoint(id,e2e)
-    (;end1,end2) = e2e
-    pid1 = end1.pid
-    pid2 = end2.pid
-    rb1 = end1.rbsig
+    hen = e2e.end1
+    egg = e2e.end2
+    rb1 = hen.rbsig
     nΦ = 5
     T = get_numbertype(rb1)
-    nmcs1 = end1.rbsig.state.cache.funcs.nmcs
-    nmcs2 = end2.rbsig.state.cache.funcs.nmcs
-    state1 = end1.rbsig.state
-    state2 = end2.rbsig.state
-    aid1 = end1.aid
-    ā1 = end1.rbsig.prop.ās[aid1]
-    q1,_ = NCF.rigidstate2naturalcoords(nmcs1,state1.ro,state1.R,state1.ṙo,state1.ω)
-    q2,_ = NCF.rigidstate2naturalcoords(nmcs2,state2.ro,state2.R,state2.ṙo,state2.ω)
-    C1 = end1.rbsig.state.cache.Cps[pid1]
-    C2 = end2.rbsig.state.cache.Cps[pid2]
+    nmcs_hen = hen.rbsig.state.cache.funcs.nmcs
+    nmcs_egg = egg.rbsig.state.cache.funcs.nmcs
+    state_hen = hen.rbsig.state
+    state_egg = egg.rbsig.state
+    ā_hen = hen.rbsig.prop.ās[hen.aid]
+    q_hen,_ = NCF.rigidstate2naturalcoords(nmcs_hen,state_hen.ro,state_hen.R,state_hen.ṙo,state_hen.ω)
+    q_egg,_ = NCF.rigidstate2naturalcoords(nmcs_egg,state_egg.ro,state_egg.R,state_egg.ṙo,state_egg.ω)
+    C_hen = hen.rbsig.state.cache.Cps[hen.pid]
+    C_egg = egg.rbsig.state.cache.Cps[egg.pid]
     values = zeros(T,nΦ)
-    values[1:3] .= C1*q1 .- C2*q2
-    X1 = NCF.make_X(nmcs1,q1)
-    X2 = NCF.make_X(nmcs2,q2)
-    a1 = X1*ā1
-    inprods = transpose(X2)*a1
+    values[1:3] .= C_hen*q_hen .- C_egg*q_egg
+    X_hen = NCF.make_X(nmcs_hen,q_hen)
+    X_egg = NCF.make_X(nmcs_egg,q_egg)
+    a_hen = X_hen*ā_hen
+    inprods = transpose(X_egg)*a_hen
     mask = 1:3 .!== argmax(abs.(inprods))
     values[4:5] = inprods[mask]
     RevoluteJoint(id,nΦ,values,e2e,mask)
@@ -353,41 +349,42 @@ function make_Φ(cst::RevoluteJoint,indexed,numbered)
     (;nconstraints,values,e2e,mask) = cst
     (;mem2num,num2sys) = numbered
     (;mem2sysfull) = indexed
-    (;end1,end2) = e2e
-    nmcs1 = end1.rbsig.state.cache.funcs.nmcs
-    nmcs2 = end2.rbsig.state.cache.funcs.nmcs
-    pid1 = end1.pid
-    pid2 = end2.pid
-    aid1 = end1.aid
-    C1 = end1.rbsig.state.cache.Cps[pid1]
-    C2 = end2.rbsig.state.cache.Cps[pid2]
-    ā1 = end1.rbsig.prop.ās[aid1]
+    hen = e2e.end1
+    egg = e2e.end2
+    nmcs_hen = hen.rbsig.state.cache.funcs.nmcs
+    nmcs_egg = egg.rbsig.state.cache.funcs.nmcs
+
+
+    
+    C_hen = hen.rbsig.state.cache.Cps[hen.pid]
+    C_egg = egg.rbsig.state.cache.Cps[egg.pid]
+    ā_hen = hen.rbsig.prop.ās[hen.aid]
     function inner_Φ(q)
         ret = zeros(eltype(q),nconstraints)
-        q1 = @view q[mem2sysfull[end1.rbsig.prop.id]]
-        q2 = @view q[mem2sysfull[end2.rbsig.prop.id]]
-        X1 = NCF.make_X(nmcs1,q1)
-        X2 = NCF.make_X(nmcs2,q2)
-        a1 = X1*ā1
-        ret[1:3] .= C1*q1.-C2*q2 - values[1:3]
-        ret[4:5] = transpose(X2[:,mask])*a1 - values[4:5]
+        q_hen = @view q[mem2sysfull[hen.rbsig.prop.id]]
+        q_egg = @view q[mem2sysfull[egg.rbsig.prop.id]]
+        X_hen = NCF.make_X(nmcs_hen,q_hen)
+        X_egg = NCF.make_X(nmcs_egg,q_egg)
+        a_hen = X_hen*ā_hen
+        ret[1:3] .= C_hen*q_hen.-C_egg*q_egg - values[1:3]
+        ret[4:5] = transpose(X_egg[:,mask])*a_hen - values[4:5]
         ret
     end
     function inner_Φ(q,d,c)
         ret = zeros(eltype(q),nconstraints)
-        rbid1 = end1.rbsig.prop.id
-        rbid2 = end2.rbsig.prop.id
-        q1 = @view q[mem2sysfull[rbid1]]
-        q2 = @view q[mem2sysfull[rbid2]]
-        X1 = NCF.make_X(nmcs1,q1)
-        X2 = NCF.make_X(nmcs2,q2)
-        a1 = X1*ā1
-        c1 = c[num2sys[mem2num[rbid1][pid1]]]
-        c2 = c[num2sys[mem2num[rbid2][pid2]]]
-        ret[1:3] .= end1.rbsig.state.cache.funcs.C(c1)*q1 .-
-                    end2.rbsig.state.cache.funcs.C(c2)*q2
-        ret[1:3] .= C1*q1.-C2*q2 .- values[1:3]
-        ret[4:5] = transpose(X2[:,mask])*a1 - values[4:5]
+        id_hen = hen.rbsig.prop.id
+        id_egg = egg.rbsig.prop.id
+        q_hen = @view q[mem2sysfull[id_hen]]
+        q_egg = @view q[mem2sysfull[id_egg]]
+        X_hen = NCF.make_X(nmcs_hen,q_hen)
+        X_egg = NCF.make_X(nmcs_egg,q_egg)
+        a_hen = X_hen*ā_hen
+        c_hen = c[num2sys[mem2num[id_hen][hen.pid]]]
+        c_egg = c[num2sys[mem2num[id_egg][egg.pid]]]
+        ret[1:3] .= hen.rbsig.state.cache.funcs.C(c_hen)*q_hen .-
+                    egg.rbsig.state.cache.funcs.C(c_egg)*q_egg
+        ret[1:3] .= C_hen*q_hen.-C_egg*q_egg .- values[1:3]
+        ret[4:5] = transpose(X_egg[:,mask])*a_hen - values[4:5]
         ret
     end
     inner_Φ
@@ -397,81 +394,369 @@ function make_A(cst::RevoluteJoint,indexed,numbered)
     (;nconstraints,e2e,mask) = cst
     (;mem2sysfree,mem2sysfull,nfree) = indexed
     (;mem2num,num2sys) = numbered
-    (;end1,end2) = e2e
-    nmcs1 = end1.rbsig.state.cache.funcs.nmcs
-    nmcs2 = end2.rbsig.state.cache.funcs.nmcs
-    pid1 = end1.pid
-    aid1 = end1.aid
-    pid2 = end2.pid
-    C1 = end1.rbsig.state.cache.Cps[pid1]
-    C2 = end2.rbsig.state.cache.Cps[pid2]
-    uci1 =  end1.rbsig.state.cache.free_idx
-    uci2 =  end2.rbsig.state.cache.free_idx
-    ā1 = end1.rbsig.prop.ās[aid1]
-    Y1 = NCF.get_conversion(end1.rbsig.state.cache.funcs.nmcs)
-    Y2 = NCF.get_conversion(end2.rbsig.state.cache.funcs.nmcs)
+    hen = e2e.end1
+    egg = e2e.end2
+    id_hen = hen.rbsig.prop.id
+    id_egg = egg.rbsig.prop.id
+    free_hen = mem2sysfree[id_hen]
+    free_egg = mem2sysfree[id_egg]
+    nmcs_hen = hen.rbsig.state.cache.funcs.nmcs
+    nmcs_egg = egg.rbsig.state.cache.funcs.nmcs
+
+    
+
+    C_hen = hen.rbsig.state.cache.Cps[hen.pid]
+    C_egg = egg.rbsig.state.cache.Cps[egg.pid]
+    uci_hen =  hen.rbsig.state.cache.free_idx
+    uci_egg =  egg.rbsig.state.cache.free_idx
+    ā_hen = hen.rbsig.prop.ās[hen.aid]
+    Y_hen = NCF.get_conversion(hen.rbsig.state.cache.funcs.nmcs)
+    Y_egg = NCF.get_conversion(egg.rbsig.state.cache.funcs.nmcs)
     function inner_A(q)
         ret = zeros(eltype(q),nconstraints,nfree)
-        rbid1 = end1.rbsig.prop.id
-        rbid2 = end2.rbsig.prop.id
-        q1 = @view q[mem2sysfull[rbid1]]
-        q2 = @view q[mem2sysfull[rbid2]]
-        X1 = NCF.make_X(nmcs1,q1)
-        X2 = NCF.make_X(nmcs2,q2)
-        a1 = X1*ā1
-        ret[1:3,mem2sysfree[rbid1]] .=  C1[:,uci1]
-        ret[1:3,mem2sysfree[rbid2]] .= -C2[:,uci2]
-        o3 = zero(a1)
-        ret[4:5,mem2sysfree[rbid1]] .= (transpose(
-            kron(vcat(0,ā1),X2)[:,mask])*Y1)[:,uci1]
-        ret[4:5,mem2sysfree[rbid2]] .= (transpose(
+        q_hen = @view q[mem2sysfull[id_hen]]
+        q_egg = @view q[mem2sysfull[id_egg]]
+        X_hen = NCF.make_X(nmcs_hen,q_hen)
+        X_egg = NCF.make_X(nmcs_egg,q_egg)
+        a_hen = X_hen*ā_hen
+        ret[1:3,free_hen] .=  C_hen[:,uci_hen]
+        ret[1:3,free_egg] .= -C_egg[:,uci_egg]
+        o3 = zero(a_hen)
+        ret[4:5,free_hen] .= (transpose(
+            kron(vcat(0,ā_hen),X_egg)[:,mask])*Y_hen)[:,uci_hen]
+        ret[4:5,free_egg] .= (transpose(
             [
                 o3 o3 o3;
-                a1 o3 o3; 
-                o3 a1 o3;  
-                o3 o3 a1; 
-            ][:,mask])*Y2)[:,uci2]
+                a_hen o3 o3; 
+                o3 a_hen o3;  
+                o3 o3 a_hen; 
+            ][:,mask])*Y_egg)[:,uci_egg]
         ret
     end
     function inner_A(q,c)
         T = eltype(q)
         ret = zeros(eltype(q),nconstraints,nfree)
-        rbid1 = end1.rbsig.prop.id
-        rbid2 = end2.rbsig.prop.id
-        q1 = @view q[mem2sysfull[rbid1]]
-        q2 = @view q[mem2sysfull[rbid2]]
-        X1 = NCF.make_X(nmcs1,q1)
-        X2 = NCF.make_X(nmcs2,q2)
-        a1 = X1*ā1
-        c1 = c[num2sys[mem2num[rbid1][pid1]]]
-        c2 = c[num2sys[mem2num[rbid2][pid2]]]
-        ret[1:3,mem2sysfree[rbid1]] .=  end1.rbsig.state.cache.funcs.C(c1)[:,uci1]
-        ret[1:3,mem2sysfree[rbid2]] .= -end2.rbsig.state.cache.funcs.C(c2)[:,uci2]
-        o3 = zero(a1)
-        ret[4:5,mem2sysfree[rbid1]] .= (transpose(
-            kron(vcat(0,ā1),X2)[:,mask])*Y1)[:,uci1]
-        ret[4:5,mem2sysfree[rbid2]] .= (transpose(
+        q_hen = @view q[mem2sysfull[id_hen]]
+        q_egg = @view q[mem2sysfull[id_egg]]
+        X_hen = NCF.make_X(nmcs_hen,q_hen)
+        X_egg = NCF.make_X(nmcs_egg,q_egg)
+        a_hen = X_hen*ā_hen
+        c_hen = c[num2sys[mem2num[id_hen][hen.pid]]]
+        c_egg = c[num2sys[mem2num[id_egg][egg.pid]]]
+        ret[1:3,free_hen] .=  hen.rbsig.state.cache.funcs.C(c_hen)[:,uci_hen]
+        ret[1:3,free_egg] .= -egg.rbsig.state.cache.funcs.C(c_egg)[:,uci_egg]
+        o3 = zero(a_hen)
+        ret[4:5,free_hen] .= (transpose(
+            kron(vcat(0,ā_hen),X_egg)[:,mask])*Y_hen)[:,uci_hen]
+        ret[4:5,free_egg] .= (transpose(
             [
                 o3 o3 o3;
-                a1 o3 o3;
-                o3 a1 o3;  
-                o3 o3 a1;
-            ][:,mask])*Y2)[:,uci2]
+                a_hen o3 o3;
+                o3 a_hen o3;  
+                o3 o3 a_hen;
+            ][:,mask])*Y_egg)[:,uci_egg]
         ret
     end
     inner_A
 end
 
+
 """
 刚体铰接约束类。
 $(TYPEDEF)
 """
-struct PrismaticJoint{valueType,e2eType,frameType,orderType} <: ExternalConstraints{valueType}
+struct FloatingRevoluteJoint{valueType,e2eType,maskType} <: ExternalConstraints{valueType}
     id::Int
     nconstraints::Int
     values::valueType
     e2e::e2eType
-    frame::frameType
+    mask::maskType
+end
+
+"""
+铰接约束构造子。
+$(TYPEDSIGNATURES)
+"""
+function FloatingRevoluteJoint(id,e2e)
+    hen = e2e.end1
+    egg = e2e.end2
+    rb1 = hen.rbsig
+    nΦ = 2
+    T = get_numbertype(rb1)
+    nmcs_hen = hen.rbsig.state.cache.funcs.nmcs
+    nmcs_egg = egg.rbsig.state.cache.funcs.nmcs
+    state_hen = hen.rbsig.state
+    state_egg = egg.rbsig.state
+    
+    ā_hen = hen.rbsig.prop.ās[hen.aid]
+    q_hen,_ = NCF.rigidstate2naturalcoords(nmcs_hen,state_hen.ro,state_hen.R,state_hen.ṙo,state_hen.ω)
+    q_egg,_ = NCF.rigidstate2naturalcoords(nmcs_egg,state_egg.ro,state_egg.R,state_egg.ṙo,state_egg.ω)
+    values = zeros(T,nΦ)
+    X_hen = NCF.make_X(nmcs_hen,q_hen)
+    X_egg = NCF.make_X(nmcs_egg,q_egg)
+    a_hen = X_hen*ā_hen
+    inprods = transpose(X_egg)*a_hen
+    mask = 1:3 .!== argmax(abs.(inprods))
+    values[1:2] = inprods[mask]
+    FloatingRevoluteJoint(id,nΦ,values,e2e,mask)
+end
+
+function make_Φ(cst::FloatingRevoluteJoint,indexed,numbered)
+    (;nconstraints,values,e2e,mask) = cst
+    (;mem2num,num2sys) = numbered
+    (;mem2sysfull) = indexed
+    hen = e2e.end1
+    egg = e2e.end2
+    nmcs_hen = hen.rbsig.state.cache.funcs.nmcs
+    nmcs_egg = egg.rbsig.state.cache.funcs.nmcs
+    
+    ā_hen = hen.rbsig.prop.ās[hen.aid]
+    function inner_Φ(q)
+        ret = zeros(eltype(q),nconstraints)
+        q_hen = @view q[mem2sysfull[hen.rbsig.prop.id]]
+        q_egg = @view q[mem2sysfull[egg.rbsig.prop.id]]
+        X_hen = NCF.make_X(nmcs_hen,q_hen)
+        X_egg = NCF.make_X(nmcs_egg,q_egg)
+        a_hen = X_hen*ā_hen
+        ret[1:2] = transpose(X_egg[:,mask])*a_hen - values[1:2]
+        ret
+    end
+    function inner_Φ(q,d,c)
+        ret = zeros(eltype(q),nconstraints)
+        id_hen = hen.rbsig.prop.id
+        id_egg = egg.rbsig.prop.id
+        q_hen = @view q[mem2sysfull[id_hen]]
+        q_egg = @view q[mem2sysfull[id_egg]]
+        X_hen = NCF.make_X(nmcs_hen,q_hen)
+        X_egg = NCF.make_X(nmcs_egg,q_egg)
+        a_hen = X_hen*ā_hen
+        ret[1:2] = transpose(X_egg[:,mask])*a_hen - values[1:2]
+        ret
+    end
+    inner_Φ
+end
+
+function make_A(cst::FloatingRevoluteJoint,indexed,numbered)
+    (;nconstraints,e2e,mask) = cst
+    (;mem2sysfree,mem2sysfull,nfree) = indexed
+    (;mem2num,num2sys) = numbered
+    hen = e2e.end1
+    egg = e2e.end2
+    id_hen = hen.rbsig.prop.id
+    id_egg = egg.rbsig.prop.id
+    free_hen = mem2sysfree[id_hen]
+    free_egg = mem2sysfree[id_egg]
+    nmcs_hen = hen.rbsig.state.cache.funcs.nmcs
+    nmcs_egg = egg.rbsig.state.cache.funcs.nmcs
+    
+    uci_hen =  hen.rbsig.state.cache.free_idx
+    uci_egg =  egg.rbsig.state.cache.free_idx
+    ā_hen = hen.rbsig.prop.ās[hen.aid]
+    Y_hen = NCF.get_conversion(hen.rbsig.state.cache.funcs.nmcs)
+    Y_egg = NCF.get_conversion(egg.rbsig.state.cache.funcs.nmcs)
+    function inner_A(q)
+        ret = zeros(eltype(q),nconstraints,nfree)
+        q_hen = @view q[mem2sysfull[id_hen]]
+        q_egg = @view q[mem2sysfull[id_egg]]
+        X_hen = NCF.make_X(nmcs_hen,q_hen)
+        X_egg = NCF.make_X(nmcs_egg,q_egg)
+        a_hen = X_hen*ā_hen
+        o3 = zero(a_hen)
+        ret[1:2,free_hen] .= (transpose(
+            kron(vcat(0,ā_hen),X_egg)[:,mask])*Y_hen)[:,uci_hen]
+        ret[1:2,free_egg] .= (transpose(
+            [
+                o3 o3 o3;
+                a_hen o3 o3; 
+                o3 a_hen o3;  
+                o3 o3 a_hen; 
+            ][:,mask])*Y_egg)[:,uci_egg]
+        ret
+    end
+    function inner_A(q,c)
+        T = eltype(q)
+        ret = zeros(eltype(q),nconstraints,nfree)
+        q_hen = @view q[mem2sysfull[id_hen]]
+        q_egg = @view q[mem2sysfull[id_egg]]
+        X_hen = NCF.make_X(nmcs_hen,q_hen)
+        X_egg = NCF.make_X(nmcs_egg,q_egg)
+        a_hen = X_hen*ā_hen
+        o3 = zero(a_hen)
+        ret[1:2,free_hen] .= (transpose(
+            kron(vcat(0,ā_hen),X_egg)[:,mask])*Y_hen)[:,uci_hen]
+        ret[1:2,free_egg] .= (transpose(
+            [
+                o3 o3 o3;
+                a_hen o3 o3;
+                o3 a_hen o3;  
+                o3 o3 a_hen;
+            ][:,mask])*Y_egg)[:,uci_egg]
+        ret
+    end
+    inner_A
+end
+
+
+"""
+刚体铰接约束类。
+$(TYPEDEF)
+"""
+struct PrismaticSphericalJoint{valueType,e2eType,axesType,orderType} <: ExternalConstraints{valueType}
+    id::Int
+    nconstraints::Int
+    values::valueType
+    e2e::e2eType
+    axes::axesType
+    order::orderType
+end
+
+"""
+铰接约束构造子。
+$(TYPEDSIGNATURES)
+"""
+function PrismaticSphericalJoint(id,e2e)
+    hen = e2e.end1
+    egg = e2e.end2
+    nΦ = 2
+    T = get_numbertype(hen.rbsig)
+
+
+    nmcs_hen = hen.rbsig.state.cache.funcs.nmcs
+    nmcs_egg = egg.rbsig.state.cache.funcs.nmcs
+    state_hen = hen.rbsig.state
+    state_egg = egg.rbsig.state
+    
+    ā_hen = hen.rbsig.prop.ās[hen.aid]
+    axes = SpatialFrame(ā_hen)
+    q_hen = NCF.rigidstate2naturalcoords(nmcs_hen,state_hen.ro,state_hen.R)
+    q_egg = NCF.rigidstate2naturalcoords(nmcs_egg,state_egg.ro,state_egg.R)
+    X_hen = NCF.make_X(nmcs_hen,q_hen)
+    a1t1 = X_hen*axes.t1
+    a1t2 = X_hen*axes.t2
+    C_hen = hen.rbsig.state.cache.Cps[hen.pid]
+    C_egg = egg.rbsig.state.cache.Cps[egg.pid]
+    values = zeros(T,nΦ)
+    values[1:2] .= transpose([a1t1 a1t2])*(C_hen*q_hen.-C_egg*q_egg)
+    PrismaticSphericalJoint(id,nΦ,values,e2e,axes,order)
+end
+
+function make_Φ(cst::PrismaticSphericalJoint,indexed,numbered)
+    (;nconstraints,values,e2e,axes,order) = cst
+    (;num2sys,mem2num) = numbered
+    (;mem2sysfull) = indexed
+    hen = e2e.end1
+    egg = e2e.end2
+
+
+    nmcs_hen = hen.rbsig.state.cache.funcs.nmcs
+    nmcs_egg = egg.rbsig.state.cache.funcs.nmcs
+    id_hen = hen.rbsig.prop.id
+    id_egg = egg.rbsig.prop.id
+    function inner_Φ(q)
+        ret = zeros(eltype(q),nconstraints)
+        q_hen = @view q[mem2sysfull[id_hen]]
+        q_egg = @view q[mem2sysfull[id_egg]]
+        X_hen = NCF.make_X(nmcs_hen,q_hen)
+        X_egg = NCF.make_X(nmcs_egg,q_egg)
+        C_hen = hen.rbsig.state.cache.Cps[hen.pid]
+        C_egg = egg.rbsig.state.cache.Cps[egg.pid]
+        a1t1 = X_hen*axes.t1
+        a1t2 = X_hen*axes.t2
+        ret[1:2] .= transpose([a1t1 a1t2])*(C_hen*q_hen.-C_egg*q_egg) .- values[1:2]
+        ret
+    end
+    function inner_Φ(q,d,c)
+        ret = zeros(eltype(q),nconstraints)
+        q_hen = @view q[mem2sysfull[id_hen]]
+        q_egg = @view q[mem2sysfull[id_egg]]
+        X_hen = NCF.make_X(nmcs_hen,q_hen)
+        X_egg = NCF.make_X(nmcs_egg,q_egg)
+        a1t1 = X_hen*axes.t1
+        a1t2 = X_hen*axes.t2
+        c_hen = c[num2sys[mem2num[id_hen]][hen.pid]]
+        c_egg = c[num2sys[mem2num[id_egg]][egg.pid]]
+        C_hen = hen.rbsig.state.cache.funcs.C(c_hen)*q_hen
+        C_egg = egg.rbsig.state.cache.funcs.C(c_egg)*q_egg
+        ret[1:2] .= transpose([a1t1 a1t2])*(C_hen*q_hen.-C_egg*q_egg) .- values[1:2]
+        ret
+    end
+    inner_Φ
+end
+
+function make_A(cst::PrismaticSphericalJoint,indexed,numbered)
+    (;nconstraints,e2e,axes,order) = cst
+    (;mem2sysfree,mem2sysfull,nfree) = indexed
+    (;num2sys,mem2num) = numbered
+    hen = e2e.end1
+    egg = e2e.end2
+
+
+    uci_hen =  hen.rbsig.state.cache.free_idx
+    uci_egg =  egg.rbsig.state.cache.free_idx
+    id_hen = hen.rbsig.prop.id
+    id_egg = egg.rbsig.prop.id
+    free_hen = mem2sysfree[id_hen]
+    free_egg = mem2sysfree[id_egg]
+    nmcs_hen = hen.rbsig.state.cache.funcs.nmcs
+    nmcs_egg = egg.rbsig.state.cache.funcs.nmcs
+    function inner_A(q)
+        ret = zeros(eltype(q),nconstraints,nfree)
+        q_hen = @view q[mem2sysfull[id_hen]]
+        q_egg = @view q[mem2sysfull[id_egg]]
+        C_hen = hen.rbsig.state.cache.Cps[hen.pid]
+        C_egg = egg.rbsig.state.cache.Cps[egg.pid]
+        X_hen = NCF.make_X(nmcs_hen,q_hen)
+        X_egg = NCF.make_X(nmcs_egg,q_egg)
+        a1t1 = X_hen*axes.t1
+        a1t2 = X_hen*axes.t2
+        ret[1:2,free_hen] .= kron(
+                [
+                    0 transpose(axes.t1); 
+                    0 transpose(axes.t2)
+                ],
+                transpose(C_hen*q_hen.-C_egg*q_egg)
+            )[:,uci_hen]
+        ret[1:2,free_hen] .+= transpose([a1t1 a1t2])*C_hen[:,uci_hen]
+        ret[1:2,free_egg] .-= transpose([a1t1 a1t2])*C_egg[:,uci_egg]
+        ret
+    end
+    function inner_A(q,c)
+        ret = zeros(eltype(q),nconstraints,nfree)
+        q_hen = @view q[mem2sysfull[id_hen]]
+        q_egg = @view q[mem2sysfull[id_egg]]
+        X_hen = NCF.make_X(nmcs_hen,q_hen)
+        X_egg = NCF.make_X(nmcs_egg,q_egg)
+        a1t1 = X_hen*axes.t1
+        a1t2 = X_hen*axes.t2
+        c_hen = c[num2sys[mem2num[id_hen]][hen.pid]]
+        c_egg = c[num2sys[mem2num[id_egg]][egg.pid]]
+        C_hen = hen.rbsig.state.cache.funcs.C(c_hen)
+        C_egg = egg.rbsig.state.cache.funcs.C(c_egg)
+        ret[1:2,free_hen] .= kron(
+                [
+                    0 transpose(axes.t1); 
+                    0 transpose(axes.t2)
+                ],
+                transpose(C_hen*q_hen.-C_egg*q_egg)
+            )[:,uci_hen]
+        ret[1:2,free_hen] .+= transpose([a1t1 a1t2])*C_hen[:,uci_hen]
+        ret[1:2,free_egg] .-= transpose([a1t1 a1t2])*C_egg[:,uci_egg]
+        ret
+    end
+    inner_A
+end
+
+
+"""
+刚体铰接约束类。
+$(TYPEDEF)
+"""
+struct PrismaticJoint{valueType,e2eType,axesType,orderType} <: ExternalConstraints{valueType}
+    id::Int
+    nconstraints::Int
+    values::valueType
+    e2e::e2eType
+    axes::axesType
     order::orderType
 end
 
@@ -480,76 +765,73 @@ end
 $(TYPEDSIGNATURES)
 """
 function PrismaticJoint(id,e2e)
-    (;end1,end2) = e2e
+    hen = e2e.end1
+    egg = e2e.end2
     nΦ = 5
-    T = get_numbertype(end1.rbsig)
-    pid1 = end1.pid
-    pid2 = end2.pid
-    nmcs1 = end1.rbsig.state.cache.funcs.nmcs
-    nmcs2 = end2.rbsig.state.cache.funcs.nmcs
-    state1 = end1.rbsig.state
-    state2 = end2.rbsig.state
-    aid1 = end1.aid
-    ā1 = end1.rbsig.prop.ās[aid1]
-    frame = SpatialFrame(ā1)
-    q1 = NCF.rigidstate2naturalcoords(nmcs1,state1.ro,state1.R)
-    q2 = NCF.rigidstate2naturalcoords(nmcs2,state2.ro,state2.R)
-    X1 = NCF.make_X(nmcs1,q1)
-    X2 = NCF.make_X(nmcs2,q2)
-    a1t1 = X1*frame.t1
-    a1t2 = X1*frame.t2
-    C1 = end1.rbsig.state.cache.Cps[pid1]
-    C2 = end2.rbsig.state.cache.Cps[pid2]
+    T = get_numbertype(hen.rbsig)
+    nmcs_hen = hen.rbsig.state.cache.funcs.nmcs
+    nmcs_egg = egg.rbsig.state.cache.funcs.nmcs
+    state_hen = hen.rbsig.state
+    state_egg = egg.rbsig.state
+    ā_hen = hen.rbsig.prop.ās[hen.aid]
+    axes = SpatialFrame(ā_hen)
+    q_hen = NCF.rigidstate2naturalcoords(nmcs_hen,state_hen.ro,state_hen.R)
+    q_egg = NCF.rigidstate2naturalcoords(nmcs_egg,state_egg.ro,state_egg.R)
+    X_hen = NCF.make_X(nmcs_hen,q_hen)
+    X_egg = NCF.make_X(nmcs_egg,q_egg)
+    a1t1 = X_hen*axes.t1
+    a1t2 = X_hen*axes.t2
+    C_hen = hen.rbsig.state.cache.Cps[hen.pid]
+    C_egg = egg.rbsig.state.cache.Cps[egg.pid]
     values = zeros(T,nΦ)
-    values[1:2] .= transpose([a1t1 a1t2])*(C1*q1.-C2*q2)
-    nΦ1 = NCF.get_nconstraints(nmcs1)
-    nΦ2 = NCF.get_nconstraints(nmcs2)
-    inprods = transpose(X2)*X1
-    order = find_order(nmcs1,nmcs2,q1,q2,X1,X2,nΦ1,nΦ2)
+    values[1:2] .= transpose([a1t1 a1t2])*(C_hen*q_hen.-C_egg*q_egg)
+    nΦ1 = NCF.get_nconstraints(nmcs_hen)
+    nΦ2 = NCF.get_nconstraints(nmcs_egg)
+    inprods = transpose(X_egg)*X_hen
+    order = find_order(nmcs_hen,nmcs_egg,q_hen,q_egg,X_hen,X_egg,nΦ1,nΦ2)
     values[3:5] .= inprods[order]
-    PrismaticJoint(id,nΦ,values,e2e,frame,order)
+    PrismaticJoint(id,nΦ,values,e2e,axes,order)
 end
 
 function make_Φ(cst::PrismaticJoint,indexed,numbered)
-    (;nconstraints,values,e2e,frame,order) = cst
+    (;nconstraints,values,e2e,axes,order) = cst
     (;num2sys,mem2num) = numbered
     (;mem2sysfull) = indexed
-    (;end1,end2) = e2e
-    pid1 = end1.pid
-    pid2 = end2.pid
-    nmcs1 = end1.rbsig.state.cache.funcs.nmcs
-    nmcs2 = end2.rbsig.state.cache.funcs.nmcs
-    rbid1 = end1.rbsig.prop.id
-    rbid2 = end2.rbsig.prop.id
+    hen = e2e.end1
+    egg = e2e.end2
+    nmcs_hen = hen.rbsig.state.cache.funcs.nmcs
+    nmcs_egg = egg.rbsig.state.cache.funcs.nmcs
+    id_hen = hen.rbsig.prop.id
+    id_egg = egg.rbsig.prop.id
     function inner_Φ(q)
         ret = zeros(eltype(q),nconstraints)
-        q1 = @view q[mem2sysfull[rbid1]]
-        q2 = @view q[mem2sysfull[rbid2]]
-        X1 = NCF.make_X(nmcs1,q1)
-        X2 = NCF.make_X(nmcs2,q2)
-        C1 = end1.rbsig.state.cache.Cps[pid1]
-        C2 = end2.rbsig.state.cache.Cps[pid2]
-        a1t1 = X1*frame.t1
-        a1t2 = X1*frame.t2
-        ret[1:2] .= transpose([a1t1 a1t2])*(C1*q1.-C2*q2) .- values[1:2]
-        inprods = transpose(X2)*X1
+        q_hen = @view q[mem2sysfull[id_hen]]
+        q_egg = @view q[mem2sysfull[id_egg]]
+        X_hen = NCF.make_X(nmcs_hen,q_hen)
+        X_egg = NCF.make_X(nmcs_egg,q_egg)
+        C_hen = hen.rbsig.state.cache.Cps[hen.pid]
+        C_egg = egg.rbsig.state.cache.Cps[egg.pid]
+        a1t1 = X_hen*axes.t1
+        a1t2 = X_hen*axes.t2
+        ret[1:2] .= transpose([a1t1 a1t2])*(C_hen*q_hen.-C_egg*q_egg) .- values[1:2]
+        inprods = transpose(X_egg)*X_hen
         ret[3:5] .= inprods[order] .- values[3:5]
         ret
     end
     function inner_Φ(q,d,c)
         ret = zeros(eltype(q),nconstraints)
-        q1 = @view q[mem2sysfull[rbid1]]
-        q2 = @view q[mem2sysfull[rbid2]]
-        X1 = NCF.make_X(nmcs1,q1)
-        X2 = NCF.make_X(nmcs2,q2)
-        a1t1 = X1*frame.t1
-        a1t2 = X1*frame.t2
-        c1 = c[num2sys[mem2num[rbid1]][pid1]]
-        c2 = c[num2sys[mem2num[rbid2]][pid2]]
-        C1 = end1.rbsig.state.cache.funcs.C(c1)*q1
-        C2 = end2.rbsig.state.cache.funcs.C(c2)*q2
-        ret[1:2] .= transpose([a1t1 a1t2])*(C1*q1.-C2*q2) .- values[1:2]
-        inprods = transpose(X2)*X1
+        q_hen = @view q[mem2sysfull[id_hen]]
+        q_egg = @view q[mem2sysfull[id_egg]]
+        X_hen = NCF.make_X(nmcs_hen,q_hen)
+        X_egg = NCF.make_X(nmcs_egg,q_egg)
+        a1t1 = X_hen*axes.t1
+        a1t2 = X_hen*axes.t2
+        c_hen = c[num2sys[mem2num[id_hen]][hen.pid]]
+        c_egg = c[num2sys[mem2num[id_egg]][egg.pid]]
+        C_hen = hen.rbsig.state.cache.funcs.C(c_hen)*q_hen
+        C_egg = egg.rbsig.state.cache.funcs.C(c_egg)*q_egg
+        ret[1:2] .= transpose([a1t1 a1t2])*(C_hen*q_hen.-C_egg*q_egg) .- values[1:2]
+        inprods = transpose(X_egg)*X_hen
         ret[3:5] .= inprods[order] .- values[3:5]
         ret
     end
@@ -557,68 +839,525 @@ function make_Φ(cst::PrismaticJoint,indexed,numbered)
 end
 
 function make_A(cst::PrismaticJoint,indexed,numbered)
-    (;nconstraints,e2e,frame,order) = cst
+    (;nconstraints,e2e,axes,order) = cst
     (;mem2sysfree,mem2sysfull,nfree) = indexed
     (;num2sys,mem2num) = numbered
-    (;end1,end2) = e2e
-    pid1 = end1.pid
-    pid2 = end2.pid
-    uci1 =  end1.rbsig.state.cache.free_idx
-    uci2 =  end2.rbsig.state.cache.free_idx
-    rbid1 = end1.rbsig.prop.id
-    rbid2 = end2.rbsig.prop.id
-    memfree1 = mem2sysfree[rbid1]
-    memfree2 = mem2sysfree[rbid2]
-    nmcs1 = end1.rbsig.state.cache.funcs.nmcs
-    nmcs2 = end2.rbsig.state.cache.funcs.nmcs
+    hen = e2e.end1
+    egg = e2e.end2
+    uci_hen =  hen.rbsig.state.cache.free_idx
+    uci_egg =  egg.rbsig.state.cache.free_idx
+    id_hen = hen.rbsig.prop.id
+    id_egg = egg.rbsig.prop.id
+    free_hen = mem2sysfree[id_hen]
+    free_egg = mem2sysfree[id_egg]
+    nmcs_hen = hen.rbsig.state.cache.funcs.nmcs
+    nmcs_egg = egg.rbsig.state.cache.funcs.nmcs
     function inner_A(q)
         ret = zeros(eltype(q),nconstraints,nfree)
-        q1 = @view q[mem2sysfull[rbid1]]
-        q2 = @view q[mem2sysfull[rbid2]]
-        C1 = end1.rbsig.state.cache.Cps[pid1]
-        C2 = end2.rbsig.state.cache.Cps[pid2]
-        X1 = NCF.make_X(nmcs1,q1)
-        X2 = NCF.make_X(nmcs2,q2)
-        a1t1 = X1*frame.t1
-        a1t2 = X1*frame.t2
-        ret[1:2,memfree1] .= kron(
+        q_hen = @view q[mem2sysfull[id_hen]]
+        q_egg = @view q[mem2sysfull[id_egg]]
+        C_hen = hen.rbsig.state.cache.Cps[hen.pid]
+        C_egg = egg.rbsig.state.cache.Cps[egg.pid]
+        X_hen = NCF.make_X(nmcs_hen,q_hen)
+        X_egg = NCF.make_X(nmcs_egg,q_egg)
+        a1t1 = X_hen*axes.t1
+        a1t2 = X_hen*axes.t2
+        ret[1:2,free_hen] .= kron(
                 [
-                    0 transpose(frame.t1); 
-                    0 transpose(frame.t2)
+                    0 transpose(axes.t1); 
+                    0 transpose(axes.t2)
                 ],
-                transpose(C1*q1.-C2*q2)
-            )[:,uci1]
-        ret[1:2,memfree1] .+= transpose([a1t1 a1t2])*C1[:,uci1]
-        ret[1:2,memfree2] .-= transpose([a1t1 a1t2])*C2[:,uci2]
+                transpose(C_hen*q_hen.-C_egg*q_egg)
+            )[:,uci_hen]
+        ret[1:2,free_hen] .+= transpose([a1t1 a1t2])*C_hen[:,uci_hen]
+        ret[1:2,free_egg] .-= transpose([a1t1 a1t2])*C_egg[:,uci_egg]
         k = 2
         ret_rest = @view ret[k+1:end,:]
-        rot_jac!(ret_rest,order,q1,q2,X1,X2,memfree1,memfree2,uci1,uci2,)
+        rot_jac!(ret_rest,order,q_hen,q_egg,X_hen,X_egg,free_hen,free_egg,uci_hen,uci_egg,)
         ret
     end
     function inner_A(q,c)
         ret = zeros(eltype(q),nconstraints,nfree)
-        q1 = @view q[mem2sysfull[rbid1]]
-        q2 = @view q[mem2sysfull[rbid2]]
-        X1 = NCF.make_X(nmcs1,q1)
-        X2 = NCF.make_X(nmcs2,q2)
-        a1t1 = X1*frame.t1
-        a1t2 = X1*frame.t2
-        c1 = c[num2sys[mem2num[rbid1]][pid1]]
-        c2 = c[num2sys[mem2num[rbid2]][pid2]]
-        C1 = end1.rbsig.state.cache.funcs.C(c1)
-        C2 = end2.rbsig.state.cache.funcs.C(c2)
-        ret[1:2,memfree1] .= kron(
+        q_hen = @view q[mem2sysfull[id_hen]]
+        q_egg = @view q[mem2sysfull[id_egg]]
+        X_hen = NCF.make_X(nmcs_hen,q_hen)
+        X_egg = NCF.make_X(nmcs_egg,q_egg)
+        a1t1 = X_hen*axes.t1
+        a1t2 = X_hen*axes.t2
+        c_hen = c[num2sys[mem2num[id_hen]][hen.pid]]
+        c_egg = c[num2sys[mem2num[id_egg]][egg.pid]]
+        C_hen = hen.rbsig.state.cache.funcs.C(c_hen)
+        C_egg = egg.rbsig.state.cache.funcs.C(c_egg)
+        ret[1:2,free_hen] .= kron(
                 [
-                    0 transpose(frame.t1); 
-                    0 transpose(frame.t2)
+                    0 transpose(axes.t1); 
+                    0 transpose(axes.t2)
                 ],
-                transpose(C1*q1.-C2*q2)
-            )[:,uci1]
-        ret[1:2,memfree1] .+= transpose([a1t1 a1t2])*C1[:,uci1]
-        ret[1:2,memfree2] .-= transpose([a1t1 a1t2])*C2[:,uci2]
+                transpose(C_hen*q_hen.-C_egg*q_egg)
+            )[:,uci_hen]
+        ret[1:2,free_hen] .+= transpose([a1t1 a1t2])*C_hen[:,uci_hen]
+        ret[1:2,free_egg] .-= transpose([a1t1 a1t2])*C_egg[:,uci_egg]
         k = 2
         ret_rest = @view ret[k+1:end,:]
-        rot_jac!(ret_rest,order,q1,q2,X1,X2,memfree1,memfree2,uci1,uci2,)
+        rot_jac!(ret_rest,order,q_hen,q_egg,X_hen,X_egg,free_hen,free_egg,uci_hen,uci_egg,)
+        ret
+    end
+    inner_A
+end
+
+
+"""
+刚体铰接约束类。
+$(TYPEDEF)
+"""
+struct PlanarSphericalJoint{valueType,e2eType,axesType,orderType} <: ExternalConstraints{valueType}
+    id::Int
+    nconstraints::Int
+    values::valueType
+    e2e::e2eType
+    axes::axesType
+    order::orderType
+end
+
+"""
+铰接约束构造子。
+$(TYPEDSIGNATURES)
+"""
+function PlanarSphericalJoint(id,e2e)
+    hen = e2e.end1
+    egg = e2e.end2
+    nΦ = 1
+    T = get_numbertype(hen.rbsig)
+    nmcs_hen = hen.rbsig.state.cache.funcs.nmcs
+    nmcs_egg = egg.rbsig.state.cache.funcs.nmcs
+    state_hen = hen.rbsig.state
+    state_egg = egg.rbsig.state
+    ā_hen = hen.rbsig.prop.ās[hen.aid]
+    axes = SpatialFrame(ā_hen)
+    q_hen = NCF.rigidstate2naturalcoords(nmcs_hen,state_hen.ro,state_hen.R)
+    q_egg = NCF.rigidstate2naturalcoords(nmcs_egg,state_egg.ro,state_egg.R)
+    X_hen = NCF.make_X(nmcs_hen,q_hen)
+    X_egg = NCF.make_X(nmcs_egg,q_egg)
+    a_hen = X_hen*ā_hen
+    C_hen = hen.rbsig.state.cache.Cps[hen.pid]
+    C_egg = egg.rbsig.state.cache.Cps[egg.pid]
+    values = zeros(T,nΦ)
+    values[1] = transpose(a_hen)*(C_hen*q_hen.-C_egg*q_egg)
+    PlanarSphericalJoint(id,nΦ,values,e2e,axes,order)
+end
+
+function make_Φ(cst::PlanarSphericalJoint,indexed,numbered)
+    (;nconstraints,values,e2e,axes,order) = cst
+    (;num2sys,mem2num) = numbered
+    (;mem2sysfull) = indexed
+    hen = e2e.end1
+    egg = e2e.end2
+    nmcs_hen = hen.rbsig.state.cache.funcs.nmcs
+    nmcs_egg = egg.rbsig.state.cache.funcs.nmcs
+    id_hen = hen.rbsig.prop.id
+    id_egg = egg.rbsig.prop.id
+    ā_hen = hen.rbsig.prop.ās[hen.aid]
+    function inner_Φ(q)
+        ret = zeros(eltype(q),nconstraints)
+        q_hen = @view q[mem2sysfull[id_hen]]
+        q_egg = @view q[mem2sysfull[id_egg]]
+        X_hen = NCF.make_X(nmcs_hen,q_hen)
+        X_egg = NCF.make_X(nmcs_egg,q_egg)
+        a_hen = X_hen*ā_hen
+        C_hen = hen.rbsig.state.cache.Cps[hen.pid]
+        C_egg = egg.rbsig.state.cache.Cps[egg.pid]
+        ret[1] = transpose(a_hen)*(C_hen*q_hen.-C_egg*q_egg) .- values[1]
+        ret
+    end
+    function inner_Φ(q,d,c)
+        ret = zeros(eltype(q),nconstraints)
+        q_hen = @view q[mem2sysfull[id_hen]]
+        q_egg = @view q[mem2sysfull[id_egg]]
+        X_hen = NCF.make_X(nmcs_hen,q_hen)
+        X_egg = NCF.make_X(nmcs_egg,q_egg)
+        a_hen = X_hen*ā_hen
+        c_hen = c[num2sys[mem2num[id_hen]][hen.pid]]
+        c_egg = c[num2sys[mem2num[id_egg]][egg.pid]]
+        C_hen = hen.rbsig.state.cache.funcs.C(c_hen)*q_hen
+        C_egg = egg.rbsig.state.cache.funcs.C(c_egg)*q_egg
+        ret[1] = transpose(a_hen)*(C_hen*q_hen.-C_egg*q_egg) .- values[1]
+        ret
+    end
+    inner_Φ
+end
+
+function make_A(cst::PlanarSphericalJoint,indexed,numbered)
+    (;nconstraints,e2e,axes,order) = cst
+    (;mem2sysfree,mem2sysfull,nfree) = indexed
+    (;num2sys,mem2num) = numbered
+    hen = e2e.end1
+    egg = e2e.end2
+    uci_hen =  hen.rbsig.state.cache.free_idx
+    uci_egg =  egg.rbsig.state.cache.free_idx
+    id_hen = hen.rbsig.prop.id
+    id_egg = egg.rbsig.prop.id
+    ā_hen = hen.rbsig.prop.ās[hen.aid]
+    free_hen = mem2sysfree[id_hen]
+    free_egg = mem2sysfree[id_egg]
+    nmcs_hen = hen.rbsig.state.cache.funcs.nmcs
+    nmcs_egg = egg.rbsig.state.cache.funcs.nmcs
+    function inner_A(q)
+        ret = zeros(eltype(q),nconstraints,nfree)
+        q_hen = @view q[mem2sysfull[id_hen]]
+        q_egg = @view q[mem2sysfull[id_egg]]
+        C_hen = hen.rbsig.state.cache.Cps[hen.pid]
+        C_egg = egg.rbsig.state.cache.Cps[egg.pid]
+        X_hen = NCF.make_X(nmcs_hen,q_hen)
+        X_egg = NCF.make_X(nmcs_egg,q_egg)
+        a_hen = X_hen*ā_hen
+        ret[1,free_hen] .= kron(
+                [
+                    0 transpose(ā_hen); 
+                ],
+                transpose(C_hen*q_hen.-C_egg*q_egg)
+            )[:,uci_hen]
+        ret[1,free_hen] .+= transpose(a_hen)*C_hen[:,uci_hen]
+        ret[1,free_egg] .-= transpose(a_hen)*C_egg[:,uci_egg]
+        ret
+    end
+    function inner_A(q,c)
+        ret = zeros(eltype(q),nconstraints,nfree)
+        q_hen = @view q[mem2sysfull[id_hen]]
+        q_egg = @view q[mem2sysfull[id_egg]]
+        X_hen = NCF.make_X(nmcs_hen,q_hen)
+        X_egg = NCF.make_X(nmcs_egg,q_egg)
+        a_hen = X_hen*ā_hen
+        c_hen = c[num2sys[mem2num[id_hen]][hen.pid]]
+        c_egg = c[num2sys[mem2num[id_egg]][egg.pid]]
+        C_hen = hen.rbsig.state.cache.funcs.C(c_hen)
+        C_egg = egg.rbsig.state.cache.funcs.C(c_egg)
+        ret[1,free_hen] .= kron(
+                [
+                    0 transpose(ā_hen); 
+                ],
+                transpose(C_hen*q_hen.-C_egg*q_egg)
+            )[:,uci_hen]
+        ret[1,free_hen] .+= transpose(a_hen)*C_hen[:,uci_hen]
+        ret[1,free_egg] .-= transpose(a_hen)*C_egg[:,uci_egg]
+        ret
+    end
+    inner_A
+end
+
+
+"""
+刚体铰接约束类。
+$(TYPEDEF)
+"""
+struct PlanarJoint{valueType,e2eType,axesType,orderType} <: ExternalConstraints{valueType}
+    id::Int
+    nconstraints::Int
+    values::valueType
+    e2e::e2eType
+    axes::axesType
+    order::orderType
+end
+
+"""
+铰接约束构造子。
+$(TYPEDSIGNATURES)
+"""
+function PlanarJoint(id,e2e)
+    hen = e2e.end1
+    egg = e2e.end2
+    nΦ = 4
+    T = get_numbertype(hen.rbsig)
+    nmcs_hen = hen.rbsig.state.cache.funcs.nmcs
+    nmcs_egg = egg.rbsig.state.cache.funcs.nmcs
+    state_hen = hen.rbsig.state
+    state_egg = egg.rbsig.state
+    ā_hen = hen.rbsig.prop.ās[hen.aid]
+    axes = SpatialFrame(ā_hen)
+    q_hen = NCF.rigidstate2naturalcoords(nmcs_hen,state_hen.ro,state_hen.R)
+    q_egg = NCF.rigidstate2naturalcoords(nmcs_egg,state_egg.ro,state_egg.R)
+    X_hen = NCF.make_X(nmcs_hen,q_hen)
+    X_egg = NCF.make_X(nmcs_egg,q_egg)
+    a_hen = X_hen*ā_hen
+    C_hen = hen.rbsig.state.cache.Cps[hen.pid]
+    C_egg = egg.rbsig.state.cache.Cps[egg.pid]
+    values = zeros(T,nΦ)
+    values[1] = transpose(a_hen)*(C_hen*q_hen.-C_egg*q_egg)
+    nΦ1 = NCF.get_nconstraints(nmcs_hen)
+    nΦ2 = NCF.get_nconstraints(nmcs_egg)
+    inprods = transpose(X_egg)*X_hen
+    order = find_order(nmcs_hen,nmcs_egg,q_hen,q_egg,X_hen,X_egg,nΦ1,nΦ2)
+    values[2:4] .= inprods[order]
+    PlanarJoint(id,nΦ,values,e2e,axes,order)
+end
+
+function make_Φ(cst::PlanarJoint,indexed,numbered)
+    (;nconstraints,values,e2e,axes,order) = cst
+    (;num2sys,mem2num) = numbered
+    (;mem2sysfull) = indexed
+    hen = e2e.end1
+    egg = e2e.end2
+    nmcs_hen = hen.rbsig.state.cache.funcs.nmcs
+    nmcs_egg = egg.rbsig.state.cache.funcs.nmcs
+    id_hen = hen.rbsig.prop.id
+    id_egg = egg.rbsig.prop.id
+    ā_hen = hen.rbsig.prop.ās[hen.aid]
+    function inner_Φ(q)
+        ret = zeros(eltype(q),nconstraints)
+        q_hen = @view q[mem2sysfull[id_hen]]
+        q_egg = @view q[mem2sysfull[id_egg]]
+        X_hen = NCF.make_X(nmcs_hen,q_hen)
+        X_egg = NCF.make_X(nmcs_egg,q_egg)
+        a_hen = X_hen*ā_hen
+        C_hen = hen.rbsig.state.cache.Cps[hen.pid]
+        C_egg = egg.rbsig.state.cache.Cps[egg.pid]
+        ret[1] = transpose(a_hen)*(C_hen*q_hen.-C_egg*q_egg) .- values[1]
+        inprods = transpose(X_egg)*X_hen
+        ret[2:4] .= inprods[order] .- values[2:4]
+        ret
+    end
+    function inner_Φ(q,d,c)
+        ret = zeros(eltype(q),nconstraints)
+        q_hen = @view q[mem2sysfull[id_hen]]
+        q_egg = @view q[mem2sysfull[id_egg]]
+        X_hen = NCF.make_X(nmcs_hen,q_hen)
+        X_egg = NCF.make_X(nmcs_egg,q_egg)
+        a_hen = X_hen*ā_hen
+        c_hen = c[num2sys[mem2num[id_hen]][hen.pid]]
+        c_egg = c[num2sys[mem2num[id_egg]][egg.pid]]
+        C_hen = hen.rbsig.state.cache.funcs.C(c_hen)*q_hen
+        C_egg = egg.rbsig.state.cache.funcs.C(c_egg)*q_egg
+        ret[1] = transpose(a_hen)*(C_hen*q_hen.-C_egg*q_egg) .- values[1]
+        inprods = transpose(X_egg)*X_hen
+        ret[2:4] .= inprods[order] .- values[2:4]
+        ret
+    end
+    inner_Φ
+end
+
+function make_A(cst::PlanarJoint,indexed,numbered)
+    (;nconstraints,e2e,axes,order) = cst
+    (;mem2sysfree,mem2sysfull,nfree) = indexed
+    (;num2sys,mem2num) = numbered
+    hen = e2e.end1
+    egg = e2e.end2
+    uci_hen =  hen.rbsig.state.cache.free_idx
+    uci_egg =  egg.rbsig.state.cache.free_idx
+    id_hen = hen.rbsig.prop.id
+    id_egg = egg.rbsig.prop.id
+    ā_hen = hen.rbsig.prop.ās[hen.aid]
+    free_hen = mem2sysfree[id_hen]
+    free_egg = mem2sysfree[id_egg]
+    nmcs_hen = hen.rbsig.state.cache.funcs.nmcs
+    nmcs_egg = egg.rbsig.state.cache.funcs.nmcs
+    function inner_A(q)
+        ret = zeros(eltype(q),nconstraints,nfree)
+        q_hen = @view q[mem2sysfull[id_hen]]
+        q_egg = @view q[mem2sysfull[id_egg]]
+        C_hen = hen.rbsig.state.cache.Cps[hen.pid]
+        C_egg = egg.rbsig.state.cache.Cps[egg.pid]
+        X_hen = NCF.make_X(nmcs_hen,q_hen)
+        X_egg = NCF.make_X(nmcs_egg,q_egg)
+        a_hen = X_hen*ā_hen
+        ret[1,free_hen] .= kron(
+                [
+                    0 transpose(ā_hen); 
+                ],
+                transpose(C_hen*q_hen.-C_egg*q_egg)
+            )[:,uci_hen]
+        ret[1,free_hen] .+= transpose(a_hen)*C_hen[:,uci_hen]
+        ret[1,free_egg] .-= transpose(a_hen)*C_egg[:,uci_egg]
+        k = 1
+        ret_rest = @view ret[k+1:end,:]
+        rot_jac!(ret_rest,order,q_hen,q_egg,X_hen,X_egg,free_hen,free_egg,uci_hen,uci_egg,)
+        ret
+    end
+    function inner_A(q,c)
+        ret = zeros(eltype(q),nconstraints,nfree)
+        q_hen = @view q[mem2sysfull[id_hen]]
+        q_egg = @view q[mem2sysfull[id_egg]]
+        X_hen = NCF.make_X(nmcs_hen,q_hen)
+        X_egg = NCF.make_X(nmcs_egg,q_egg)
+        a_hen = X_hen*ā_hen
+        c_hen = c[num2sys[mem2num[id_hen]][hen.pid]]
+        c_egg = c[num2sys[mem2num[id_egg]][egg.pid]]
+        C_hen = hen.rbsig.state.cache.funcs.C(c_hen)
+        C_egg = egg.rbsig.state.cache.funcs.C(c_egg)
+        ret[1,free_hen] .= kron(
+                [
+                    0 transpose(ā_hen); 
+                ],
+                transpose(C_hen*q_hen.-C_egg*q_egg)
+            )[:,uci_hen]
+        ret[1,free_hen] .+= transpose(a_hen)*C_hen[:,uci_hen]
+        ret[1,free_egg] .-= transpose(a_hen)*C_egg[:,uci_egg]
+        k = 1
+        ret_rest = @view ret[k+1:end,:]
+        rot_jac!(ret_rest,order,q_hen,q_egg,X_hen,X_egg,free_hen,free_egg,uci_hen,uci_egg,)
+        ret
+    end
+    inner_A
+end
+
+
+"""
+刚体铰接约束类。
+$(TYPEDEF)
+"""
+struct PlanarRevoluteJoint{valueType,e2eType,axesType,maskType} <: ExternalConstraints{valueType}
+    id::Int
+    nconstraints::Int
+    values::valueType
+    e2e::e2eType
+    axes::axesType
+    mask::maskType
+end
+
+"""
+铰接约束构造子。
+$(TYPEDSIGNATURES)
+"""
+function PlanarRevoluteJoint(id,e2e)
+    hen = e2e.end1
+    egg = e2e.end2
+    nΦ = 3
+    T = get_numbertype(hen.rbsig)
+    nmcs_hen = hen.rbsig.state.cache.funcs.nmcs
+    nmcs_egg = egg.rbsig.state.cache.funcs.nmcs
+    state_hen = hen.rbsig.state
+    state_egg = egg.rbsig.state
+    ā_hen = hen.rbsig.prop.ās[hen.aid]
+    axes = SpatialFrame(ā_hen)
+    q_hen = NCF.rigidstate2naturalcoords(nmcs_hen,state_hen.ro,state_hen.R)
+    q_egg = NCF.rigidstate2naturalcoords(nmcs_egg,state_egg.ro,state_egg.R)
+    X_hen = NCF.make_X(nmcs_hen,q_hen)
+    X_egg = NCF.make_X(nmcs_egg,q_egg)
+    a_hen = X_hen*ā_hen
+    C_hen = hen.rbsig.state.cache.Cps[hen.pid]
+    C_egg = egg.rbsig.state.cache.Cps[egg.pid]
+    values = zeros(T,nΦ)
+    values[1] = transpose(a_hen)*(C_hen*q_hen.-C_egg*q_egg)
+    inprods = transpose(X_egg)*a_hen
+    mask = 1:3 .!== argmax(abs.(inprods))
+    values[2:3] = inprods[mask]
+    PlanarRevoluteJoint(id,nΦ,values,e2e,axes,mask)
+end
+
+function make_Φ(cst::PlanarRevoluteJoint,indexed,numbered)
+    (;nconstraints,values,e2e,axes,mask) = cst
+    (;num2sys,mem2num) = numbered
+    (;mem2sysfull) = indexed
+    hen = e2e.end1
+    egg = e2e.end2
+    nmcs_hen = hen.rbsig.state.cache.funcs.nmcs
+    nmcs_egg = egg.rbsig.state.cache.funcs.nmcs
+    id_hen = hen.rbsig.prop.id
+    id_egg = egg.rbsig.prop.id
+    ā_hen = hen.rbsig.prop.ās[hen.aid]
+    function inner_Φ(q)
+        ret = zeros(eltype(q),nconstraints)
+        q_hen = @view q[mem2sysfull[id_hen]]
+        q_egg = @view q[mem2sysfull[id_egg]]
+        X_hen = NCF.make_X(nmcs_hen,q_hen)
+        X_egg = NCF.make_X(nmcs_egg,q_egg)
+        a_hen = X_hen*ā_hen
+        C_hen = hen.rbsig.state.cache.Cps[hen.pid]
+        C_egg = egg.rbsig.state.cache.Cps[egg.pid]
+        ret[1] = transpose(a_hen)*(C_hen*q_hen.-C_egg*q_egg) .- values[1]
+        ret[2:3] = transpose(X_egg[:,mask])*a_hen - values[2:3]
+        ret
+    end
+    function inner_Φ(q,d,c)
+        ret = zeros(eltype(q),nconstraints)
+        q_hen = @view q[mem2sysfull[id_hen]]
+        q_egg = @view q[mem2sysfull[id_egg]]
+        X_hen = NCF.make_X(nmcs_hen,q_hen)
+        X_egg = NCF.make_X(nmcs_egg,q_egg)
+        a_hen = X_hen*ā_hen
+        c_hen = c[num2sys[mem2num[id_hen]][hen.pid]]
+        c_egg = c[num2sys[mem2num[id_egg]][egg.pid]]
+        C_hen = hen.rbsig.state.cache.funcs.C(c_hen)*q_hen
+        C_egg = egg.rbsig.state.cache.funcs.C(c_egg)*q_egg
+        ret[1] = transpose(a_hen)*(C_hen*q_hen.-C_egg*q_egg) .- values[1]
+        ret[2:3] = transpose(X_egg[:,mask])*a_hen - values[2:3]
+        ret
+    end
+    inner_Φ
+end
+
+function make_A(cst::PlanarRevoluteJoint,indexed,numbered)
+    (;nconstraints,e2e,axes,order) = cst
+    (;mem2sysfree,mem2sysfull,nfree) = indexed
+    (;num2sys,mem2num) = numbered
+    hen = e2e.end1
+    egg = e2e.end2
+    uci_hen =  hen.rbsig.state.cache.free_idx
+    uci_egg =  egg.rbsig.state.cache.free_idx
+    id_hen = hen.rbsig.prop.id
+    id_egg = egg.rbsig.prop.id
+    ā_hen = hen.rbsig.prop.ās[hen.aid]
+    free_hen = mem2sysfree[id_hen]
+    free_egg = mem2sysfree[id_egg]
+    nmcs_hen = hen.rbsig.state.cache.funcs.nmcs
+    nmcs_egg = egg.rbsig.state.cache.funcs.nmcs
+    function inner_A(q)
+        ret = zeros(eltype(q),nconstraints,nfree)
+        q_hen = @view q[mem2sysfull[id_hen]]
+        q_egg = @view q[mem2sysfull[id_egg]]
+        C_hen = hen.rbsig.state.cache.Cps[hen.pid]
+        C_egg = egg.rbsig.state.cache.Cps[egg.pid]
+        X_hen = NCF.make_X(nmcs_hen,q_hen)
+        X_egg = NCF.make_X(nmcs_egg,q_egg)
+        a_hen = X_hen*ā_hen
+        ret[1,free_hen] .= kron(
+                [
+                    0 transpose(ā_hen); 
+                ],
+                transpose(C_hen*q_hen.-C_egg*q_egg)
+            )[:,uci_hen]
+        ret[1,free_hen] .+= transpose(a_hen)*C_hen[:,uci_hen]
+        ret[1,free_egg] .-= transpose(a_hen)*C_egg[:,uci_egg]
+        o3 = zero(a_hen)
+        ret[2:3,free_hen] .= (transpose(
+            kron(vcat(0,ā_hen),X_egg)[:,mask])*Y_hen)[:,uci_hen]
+        ret[2:3,free_egg] .= (transpose(
+            [
+                o3 o3 o3;
+                a_hen o3 o3; 
+                o3 a_hen o3;  
+                o3 o3 a_hen; 
+            ][:,mask])*Y_egg)[:,uci_egg]
+        ret
+        ret
+    end
+    function inner_A(q,c)
+        ret = zeros(eltype(q),nconstraints,nfree)
+        q_hen = @view q[mem2sysfull[id_hen]]
+        q_egg = @view q[mem2sysfull[id_egg]]
+        X_hen = NCF.make_X(nmcs_hen,q_hen)
+        X_egg = NCF.make_X(nmcs_egg,q_egg)
+        a_hen = X_hen*ā_hen
+        c_hen = c[num2sys[mem2num[id_hen]][hen.pid]]
+        c_egg = c[num2sys[mem2num[id_egg]][egg.pid]]
+        C_hen = hen.rbsig.state.cache.funcs.C(c_hen)
+        C_egg = egg.rbsig.state.cache.funcs.C(c_egg)
+        ret[1,free_hen] .= kron(
+                [
+                    0 transpose(ā_hen); 
+                ],
+                transpose(C_hen*q_hen.-C_egg*q_egg)
+            )[:,uci_hen]
+        ret[1,free_hen] .+= transpose(a_hen)*C_hen[:,uci_hen]
+        ret[1,free_egg] .-= transpose(a_hen)*C_egg[:,uci_egg]
+        o3 = zero(a_hen)
+        ret[2:3,free_hen] .= (transpose(
+            kron(vcat(0,ā_hen),X_egg)[:,mask])*Y_hen)[:,uci_hen]
+        ret[2:3,free_egg] .= (transpose(
+            [
+                o3 o3 o3;
+                a_hen o3 o3;
+                o3 a_hen o3;  
+                o3 o3 a_hen;
+            ][:,mask])*Y_egg)[:,uci_egg]
         ret
     end
     inner_A
@@ -628,12 +1367,12 @@ end
 刚体铰接约束类。
 $(TYPEDEF)
 """
-struct CylindricalJoint{valueType,e2eType,frameType,maskType} <: ExternalConstraints{valueType}
+struct CylindricalJoint{valueType,e2eType,axesType,maskType} <: ExternalConstraints{valueType}
     id::Int
     nconstraints::Int
     values::valueType
     e2e::e2eType
-    frame::frameType
+    axes::axesType
     mask::maskType
 end
 
@@ -642,162 +1381,157 @@ end
 $(TYPEDSIGNATURES)
 """
 function CylindricalJoint(id,e2e)
-    (;end1,end2) = e2e
+    hen = e2e.end1
+    egg = e2e.end2
     nΦ = 4
-    T = get_numbertype(end1.rbsig)
-    pid1 = end1.pid
-    pid2 = end2.pid
-    nmcs1 = end1.rbsig.state.cache.funcs.nmcs
-    nmcs2 = end2.rbsig.state.cache.funcs.nmcs
-    state1 = end1.rbsig.state
-    state2 = end2.rbsig.state
-    aid1 = end1.aid
-    ā1 = end1.rbsig.prop.ās[aid1]
-    frame = SpatialFrame(ā1)
-    q1 = NCF.rigidstate2naturalcoords(nmcs1,state1.ro,state1.R)
-    q2 = NCF.rigidstate2naturalcoords(nmcs2,state2.ro,state2.R)
-    X1 = NCF.make_X(nmcs1,q1)
-    X2 = NCF.make_X(nmcs2,q2)
-    a1t1 = X1*frame.t1
-    a1t2 = X1*frame.t2
-    C1 = end1.rbsig.state.cache.Cps[pid1]
-    C2 = end2.rbsig.state.cache.Cps[pid2]
+    T = get_numbertype(hen.rbsig)
+    nmcs_hen = hen.rbsig.state.cache.funcs.nmcs
+    nmcs_egg = egg.rbsig.state.cache.funcs.nmcs
+    state_hen = hen.rbsig.state
+    state_egg = egg.rbsig.state
+    ā_hen = hen.rbsig.prop.ās[hen.aid]
+    axes = SpatialFrame(ā_hen)
+    q_hen = NCF.rigidstate2naturalcoords(nmcs_hen,state_hen.ro,state_hen.R)
+    q_egg = NCF.rigidstate2naturalcoords(nmcs_egg,state_egg.ro,state_egg.R)
+    X_hen = NCF.make_X(nmcs_hen,q_hen)
+    X_egg = NCF.make_X(nmcs_egg,q_egg)
+    a1t1 = X_hen*axes.t1
+    a1t2 = X_hen*axes.t2
+    C_hen = hen.rbsig.state.cache.Cps[hen.pid]
+    C_egg = egg.rbsig.state.cache.Cps[egg.pid]
     values = zeros(T,nΦ)    
-    values[1:2] .= transpose([a1t1 a1t2])*(C1*q1.-C2*q2)
-    a1 = X1*ā1
-    inprods = transpose(X2)*a1
+    values[1:2] .= transpose([a1t1 a1t2])*(C_hen*q_hen.-C_egg*q_egg)
+    a_hen = X_hen*ā_hen
+    inprods = transpose(X_egg)*a_hen
     mask = 1:3 .!== argmax(abs.(inprods))
     values[3:4] .= inprods[mask]
-    CylindricalJoint(id,nΦ,values,e2e,frame,mask)
+    CylindricalJoint(id,nΦ,values,e2e,axes,mask)
 end
 
 function make_Φ(cst::CylindricalJoint,indexed,numbered)
-    (;nconstraints,values,e2e,frame,mask) = cst
+    (;nconstraints,values,e2e,axes,mask) = cst
     (;num2sys,mem2num) = numbered
     (;mem2sysfull) = indexed
-    (;end1,end2) = e2e
-    pid1 = end1.pid
-    pid2 = end2.pid
-    nmcs1 = end1.rbsig.state.cache.funcs.nmcs
-    nmcs2 = end2.rbsig.state.cache.funcs.nmcs
-    rbid1 = end1.rbsig.prop.id
-    rbid2 = end2.rbsig.prop.id
+    hen = e2e.end1
+    egg = e2e.end2
+    nmcs_hen = hen.rbsig.state.cache.funcs.nmcs
+    nmcs_egg = egg.rbsig.state.cache.funcs.nmcs
+    id_hen = hen.rbsig.prop.id
+    id_egg = egg.rbsig.prop.id
     function inner_Φ(q)
         ret = zeros(eltype(q),nconstraints)
-        q1 = @view q[mem2sysfull[rbid1]]
-        q2 = @view q[mem2sysfull[rbid2]]
-        X1 = NCF.make_X(nmcs1,q1)
-        X2 = NCF.make_X(nmcs2,q2)
-        C1 = end1.rbsig.state.cache.Cps[pid1]
-        C2 = end2.rbsig.state.cache.Cps[pid2]
-        a1t1 = X1*frame.t1
-        a1t2 = X1*frame.t2
-        ret[1:2] .= transpose([a1t1 a1t2])*(C1*q1.-C2*q2) .- values[1:2]
-        ret[3:4] .= transpose(X2[:,mask])*a1 - values[4:5]
+        q_hen = @view q[mem2sysfull[id_hen]]
+        q_egg = @view q[mem2sysfull[id_egg]]
+        X_hen = NCF.make_X(nmcs_hen,q_hen)
+        X_egg = NCF.make_X(nmcs_egg,q_egg)
+        C_hen = hen.rbsig.state.cache.Cps[hen.pid]
+        C_egg = egg.rbsig.state.cache.Cps[egg.pid]
+        a1t1 = X_hen*axes.t1
+        a1t2 = X_hen*axes.t2
+        ret[1:2] .= transpose([a1t1 a1t2])*(C_hen*q_hen.-C_egg*q_egg) .- values[1:2]
+        ret[3:4] .= transpose(X_egg[:,mask])*a_hen - values[4:5]
         ret
     end
     function inner_Φ(q,d,c)
         ret = zeros(eltype(q),nconstraints)
-        q1 = @view q[mem2sysfull[rbid1]]
-        q2 = @view q[mem2sysfull[rbid2]]
-        X1 = NCF.make_X(nmcs1,q1)
-        X2 = NCF.make_X(nmcs2,q2)
-        a1t1 = X1*frame.t1
-        a1t2 = X1*frame.t2
-        c1 = c[num2sys[mem2num[rbid1]][pid1]]
-        c2 = c[num2sys[mem2num[rbid2]][pid2]]
-        C1 = end1.rbsig.state.cache.funcs.C(c1)*q1
-        C2 = end2.rbsig.state.cache.funcs.C(c2)*q2
-        ret[1:2] .= transpose([a1t1 a1t2])*(C1*q1.-C2*q2) .- values[1:2]
-        ret[3:4] .= transpose(X2[:,mask])*a1 - values[4:5]
+        q_hen = @view q[mem2sysfull[id_hen]]
+        q_egg = @view q[mem2sysfull[id_egg]]
+        X_hen = NCF.make_X(nmcs_hen,q_hen)
+        X_egg = NCF.make_X(nmcs_egg,q_egg)
+        a1t1 = X_hen*axes.t1
+        a1t2 = X_hen*axes.t2
+        c_hen = c[num2sys[mem2num[id_hen]][hen.pid]]
+        c_egg = c[num2sys[mem2num[id_egg]][egg.pid]]
+        C_hen = hen.rbsig.state.cache.funcs.C(c_hen)*q_hen
+        C_egg = egg.rbsig.state.cache.funcs.C(c_egg)*q_egg
+        ret[1:2] .= transpose([a1t1 a1t2])*(C_hen*q_hen.-C_egg*q_egg) .- values[1:2]
+        ret[3:4] .= transpose(X_egg[:,mask])*a_hen - values[4:5]
         ret
     end
     inner_Φ
 end
 
 function make_A(cst::CylindricalJoint,indexed,numbered)
-    (;nconstraints,e2e,frame,mask) = cst
+    (;nconstraints,e2e,axes,mask) = cst
     (;mem2sysfree,mem2sysfull,nfree) = indexed
     (;num2sys,mem2num) = numbered
-    (;end1,end2) = e2e
-    pid1 = end1.pid
-    pid2 = end2.pid
-    aid1 = end1.aid
-    uci1 =  end1.rbsig.state.cache.free_idx
-    uci2 =  end2.rbsig.state.cache.free_idx
-    rbid1 = end1.rbsig.prop.id
-    rbid2 = end2.rbsig.prop.id
-    ā1 = end1.rbsig.prop.ās[aid1]
-    memfree1 = mem2sysfree[rbid1]
-    memfree2 = mem2sysfree[rbid2]
-    nmcs1 = end1.rbsig.state.cache.funcs.nmcs
-    nmcs2 = end2.rbsig.state.cache.funcs.nmcs
-    Y1 = NCF.get_conversion(nmcs1)
-    Y2 = NCF.get_conversion(nmcs2)
+    hen = e2e.end1
+    egg = e2e.end2
+    uci_hen =  hen.rbsig.state.cache.free_idx
+    uci_egg =  egg.rbsig.state.cache.free_idx
+    id_hen = hen.rbsig.prop.id
+    id_egg = egg.rbsig.prop.id
+    ā_hen = hen.rbsig.prop.ās[hen.aid]
+    free_hen = mem2sysfree[id_hen]
+    free_egg = mem2sysfree[id_egg]
+    nmcs_hen = hen.rbsig.state.cache.funcs.nmcs
+    nmcs_egg = egg.rbsig.state.cache.funcs.nmcs
+    Y_hen = NCF.get_conversion(nmcs_hen)
+    Y_egg = NCF.get_conversion(nmcs_egg)
     function inner_A(q)
         ret = zeros(eltype(q),nconstraints,nfree)
-        q1 = @view q[mem2sysfull[rbid1]]
-        q2 = @view q[mem2sysfull[rbid2]]
-        C1 = end1.rbsig.state.cache.Cps[pid1]
-        C2 = end2.rbsig.state.cache.Cps[pid2]
-        X1 = NCF.make_X(nmcs1,q1)
-        X2 = NCF.make_X(nmcs2,q2)
-        a1t1 = X1*frame.t1
-        a1t2 = X1*frame.t2
-        a1 = X1*ā1
-        ret[1:2,memfree1] .= kron(
+        q_hen = @view q[mem2sysfull[id_hen]]
+        q_egg = @view q[mem2sysfull[id_egg]]
+        C_hen = hen.rbsig.state.cache.Cps[hen.pid]
+        C_egg = egg.rbsig.state.cache.Cps[egg.pid]
+        X_hen = NCF.make_X(nmcs_hen,q_hen)
+        X_egg = NCF.make_X(nmcs_egg,q_egg)
+        a1t1 = X_hen*axes.t1
+        a1t2 = X_hen*axes.t2
+        a_hen = X_hen*ā_hen
+        ret[1:2,free_hen] .= kron(
                 [
-                    0 transpose(frame.t1); 
-                    0 transpose(frame.t2)
+                    0 transpose(axes.t1); 
+                    0 transpose(axes.t2)
                 ],
-                transpose(C1*q1.-C2*q2)
-            )[:,uci1]
-        ret[1:2,memfree1] .+= transpose([a1t1 a1t2])*C1[:,uci1]
-        ret[1:2,memfree2] .-= transpose([a1t1 a1t2])*C2[:,uci2]
-        o3 = zero(a1)
-        ret[3:4,mem2sysfree[rbid1]] .= (transpose(
-            kron(vcat(0,ā1),X2)[:,mask])*Y1)[:,uci1]
-        ret[3:4,mem2sysfree[rbid2]] .= (transpose(
+                transpose(C_hen*q_hen.-C_egg*q_egg)
+            )[:,uci_hen]
+        ret[1:2,free_hen] .+= transpose([a1t1 a1t2])*C_hen[:,uci_hen]
+        ret[1:2,free_egg] .-= transpose([a1t1 a1t2])*C_egg[:,uci_egg]
+        o3 = zero(a_hen)
+        ret[3:4,mem2sysfree[id_hen]] .= (transpose(
+            kron(vcat(0,ā_hen),X_egg)[:,mask])*Y_hen)[:,uci_hen]
+        ret[3:4,mem2sysfree[id_egg]] .= (transpose(
             [
                 o3 o3 o3;
-                a1 o3 o3; 
-                o3 a1 o3;  
-                o3 o3 a1; 
-            ][:,mask])*Y2)[:,uci2]
+                a_hen o3 o3; 
+                o3 a_hen o3;  
+                o3 o3 a_hen; 
+            ][:,mask])*Y_egg)[:,uci_egg]
         ret
     end
     function inner_A(q,c)
         ret = zeros(eltype(q),nconstraints,nfree)
-        q1 = @view q[mem2sysfull[rbid1]]
-        q2 = @view q[mem2sysfull[rbid2]]
-        X1 = NCF.make_X(nmcs1,q1)
-        X2 = NCF.make_X(nmcs2,q2)
-        a1t1 = X1*frame.t1
-        a1t2 = X1*frame.t2
-        c1 = c[num2sys[mem2num[rbid1]][pid1]]
-        c2 = c[num2sys[mem2num[rbid2]][pid2]]
-        C1 = end1.rbsig.state.cache.funcs.C(c1)
-        C2 = end2.rbsig.state.cache.funcs.C(c2)
-        ret[1:2,memfree1] .= kron(
+        q_hen = @view q[mem2sysfull[id_hen]]
+        q_egg = @view q[mem2sysfull[id_egg]]
+        X_hen = NCF.make_X(nmcs_hen,q_hen)
+        X_egg = NCF.make_X(nmcs_egg,q_egg)
+        a1t1 = X_hen*axes.t1
+        a1t2 = X_hen*axes.t2
+        c_hen = c[num2sys[mem2num[id_hen]][hen.pid]]
+        c_egg = c[num2sys[mem2num[id_egg]][egg.pid]]
+        C_hen = hen.rbsig.state.cache.funcs.C(c_hen)
+        C_egg = egg.rbsig.state.cache.funcs.C(c_egg)
+        ret[1:2,free_hen] .= kron(
                 [
-                    0 transpose(frame.t1); 
-                    0 transpose(frame.t2)
+                    0 transpose(axes.t1); 
+                    0 transpose(axes.t2)
                 ],
-                transpose(C1*q1.-C2*q2)
-            )[:,uci1]
-        ret[1:2,memfree1] .+= transpose([a1t1 a1t2])*C1[:,uci1]
-        ret[1:2,memfree2] .-= transpose([a1t1 a1t2])*C2[:,uci2]
-        a1 = X1*ā1
-        o3 = zero(a1)
-        ret[3:4,mem2sysfree[rbid1]] .= (transpose(
-            kron(vcat(0,ā1),X2)[:,mask])*Y1)[:,uci1]
-        ret[3:4,mem2sysfree[rbid2]] .= (transpose(
+                transpose(C_hen*q_hen.-C_egg*q_egg)
+            )[:,uci_hen]
+        ret[1:2,free_hen] .+= transpose([a1t1 a1t2])*C_hen[:,uci_hen]
+        ret[1:2,free_egg] .-= transpose([a1t1 a1t2])*C_egg[:,uci_egg]
+        a_hen = X_hen*ā_hen
+        o3 = zero(a_hen)
+        ret[3:4,mem2sysfree[id_hen]] .= (transpose(
+            kron(vcat(0,ā_hen),X_egg)[:,mask])*Y_hen)[:,uci_hen]
+        ret[3:4,mem2sysfree[id_egg]] .= (transpose(
             [
                 o3 o3 o3;
-                a1 o3 o3; 
-                o3 a1 o3;  
-                o3 o3 a1; 
-            ][:,mask])*Y2)[:,uci2]
+                a_hen o3 o3; 
+                o3 a_hen o3;  
+                o3 o3 a_hen; 
+            ][:,mask])*Y_egg)[:,uci_egg]
         ret
     end
     inner_A
@@ -807,10 +1541,13 @@ end
 刚体铰接约束类。
 $(TYPEDEF)
 """
-struct UniversalJoint{valueType,e2eType} <: ExternalConstraints{valueType}
+struct UniversalJoint{valueType,axesType,e2eType} <: ExternalConstraints{valueType}
     id::Int
     nconstraints::Int
     values::valueType
+    axes_trl_hen::axesType
+    axes_rot_hen::axesType
+    axes_rot_egg::axesType
     e2e::e2eType
 end
 
@@ -819,152 +1556,766 @@ end
 $(TYPEDSIGNATURES)
 """
 function UniversalJoint(id,e2e)
-    (;end1,end2) = e2e
+    hen = e2e.end1
+    egg = e2e.end2
     nΦ = 4
-    T = get_numbertype(end1.rbsig)
-    pid1 = end1.pid
-    pid2 = end2.pid
-    nmcs1 = end1.rbsig.state.cache.funcs.nmcs
-    nmcs2 = end2.rbsig.state.cache.funcs.nmcs
-    state1 = end1.rbsig.state
-    state2 = end2.rbsig.state
-    aid1 = end1.aid
-    aid2 = end2.aid
-    ā1 = end1.rbsig.prop.ās[aid1]
-    ā2 = end2.rbsig.prop.ās[aid2]
-    q1 = NCF.rigidstate2naturalcoords(nmcs1,state1.ro,state1.R)
-    q2 = NCF.rigidstate2naturalcoords(nmcs2,state2.ro,state2.R)
-    X1 = NCF.make_X(nmcs1,q1)
-    X2 = NCF.make_X(nmcs2,q2)
-    C1 = end1.rbsig.state.cache.Cps[pid1]
-    C2 = end2.rbsig.state.cache.Cps[pid2]
+    T = get_numbertype(hen.rbsig)
+    nmcs_hen = hen.rbsig.state.cache.funcs.nmcs
+    nmcs_egg = egg.rbsig.state.cache.funcs.nmcs
+    state_hen = hen.rbsig.state
+    state_egg = egg.rbsig.state
+    q_hen = NCF.rigidstate2naturalcoords(nmcs_hen,state_hen.ro,state_hen.R)
+    q_egg = NCF.rigidstate2naturalcoords(nmcs_egg,state_egg.ro,state_egg.R)
+    X_hen = NCF.make_X(nmcs_hen,q_hen)
+    X_egg = NCF.make_X(nmcs_egg,q_egg)
+    C_hen = hen.rbsig.state.cache.Cps[hen.pid]
+    C_egg = egg.rbsig.state.cache.Cps[egg.pid]
+    # rotate of egg
+    ā_egg = egg.rbsig.prop.ās[egg.aid]
+    axes_rot_egg = Axes(ā_egg)
+    rot_hen_n = X_egg*axes_rot_egg.t1
+    rot_egg_t2 = X_egg*axes_rot_egg.t2
+    rot_hen_n = inv(X_hen)*rot_hen_n
+    axes_rot_hen = Axes(rot_hen_n)
+    # constraint values
     values = zeros(T,nΦ)
-    values[1:3] .= C1*q1.-C2*q2
-    a1 = X1*ā1
-    a2 = X2*ā2
-    values[4] = a2'*a1
-    UniversalJoint(id,nΦ,values,e2e)
+    values[1:3] .= C_hen*q_hen.-C_egg*q_egg
+    values[4] = rot_hen_n'*rot_egg_t2
+    UniversalJoint(id,nΦ,values,axes_rot_hen,axes_rot_hen,axes_rot_egg,e2e)
 end
 
 function make_Φ(cst::UniversalJoint,indexed,numbered)
     (;nconstraints,values,e2e) = cst
     (;num2sys,mem2num) = numbered
     (;mem2sysfull) = indexed
-    (;end1,end2) = e2e
-    pid1 = end1.pid
-    pid2 = end2.pid
-    nmcs1 = end1.rbsig.state.cache.funcs.nmcs
-    nmcs2 = end2.rbsig.state.cache.funcs.nmcs
-    rbid1 = end1.rbsig.prop.id
-    rbid2 = end2.rbsig.prop.id
-    aid1 = end1.aid
-    aid2 = end2.aid
-    ā1 = end1.rbsig.prop.ās[aid1]
-    ā2 = end2.rbsig.prop.ās[aid2]
+    hen = e2e.end1
+    egg = e2e.end2
+    nmcs_hen = hen.rbsig.state.cache.funcs.nmcs
+    nmcs_egg = egg.rbsig.state.cache.funcs.nmcs
+    id_hen = hen.rbsig.prop.id
+    id_egg = egg.rbsig.prop.id
     function inner_Φ(q)
         ret = zeros(eltype(q),nconstraints)
-        q1 = @view q[mem2sysfull[rbid1]]
-        q2 = @view q[mem2sysfull[rbid2]]
-        X1 = NCF.make_X(nmcs1,q1)
-        X2 = NCF.make_X(nmcs2,q2)
-        a1 = X1*ā1
-        a2 = X2*ā2
-        C1 = end1.rbsig.state.cache.Cps[pid1]
-        C2 = end2.rbsig.state.cache.Cps[pid2]
-        ret[1:3] .= (C1*q1.-C2*q2) .- values[1:3]
-        ret[4] = a2'*a1 - values[4]
+        q_hen = @view q[mem2sysfull[id_hen]]
+        q_egg = @view q[mem2sysfull[id_egg]]
+        X_hen = NCF.make_X(nmcs_hen,q_hen)
+        X_egg = NCF.make_X(nmcs_egg,q_egg)
+        C_hen = hen.rbsig.state.cache.Cps[hen.pid]
+        C_egg = egg.rbsig.state.cache.Cps[egg.pid]
+        # rotate of egg
+        rot_hen_n = X_hen*axes_rot_hen.n
+        rot_egg_t2 = X_egg*axes_rot_egg.t2
+        ret[1:3] .= (C_hen*q_hen.-C_egg*q_egg) .- values[1:3]
+        ret[4] = rot_hen_n'*rot_egg_t2 - values[4]
         ret
     end
     function inner_Φ(q,d,c)
         ret = zeros(eltype(q),nconstraints)
-        q1 = @view q[mem2sysfull[rbid1]]
-        q2 = @view q[mem2sysfull[rbid2]]
-        X1 = NCF.make_X(nmcs1,q1)
-        X2 = NCF.make_X(nmcs2,q2)
-        a1 = X1*ā1
-        a2 = X2*ā2
-        c1 = c[num2sys[mem2num[rbid1]][pid1]]
-        c2 = c[num2sys[mem2num[rbid2]][pid2]]
-        C1 = end1.rbsig.state.cache.funcs.C(c1)*q1
-        C2 = end2.rbsig.state.cache.funcs.C(c2)*q2
-        ret[1:3] .= C1*q1.-C2*q2 .- values[1:3]
-        ret[4] = a2'*a1 - values[4]
+        q_hen = @view q[mem2sysfull[id_hen]]
+        q_egg = @view q[mem2sysfull[id_egg]]
+        X_hen = NCF.make_X(nmcs_hen,q_hen)
+        X_egg = NCF.make_X(nmcs_egg,q_egg)
+        c_hen = c[num2sys[mem2num[id_hen]][hen.pid]]
+        c_egg = c[num2sys[mem2num[id_egg]][egg.pid]]
+        C_hen = hen.rbsig.state.cache.funcs.C(c_hen)*q_hen
+        C_egg = egg.rbsig.state.cache.funcs.C(c_egg)*q_egg
+        # rotate of egg
+        rot_hen_n = X_hen*axes_rot_hen.n
+        rot_egg_t2 = X_egg*axes_rot_egg.t2
+        ret[1:3] .= C_hen*q_hen.-C_egg*q_egg .- values[1:3]
+        ret[4] = rot_hen_n'*rot_egg_t2 - values[4]
         ret
     end
     inner_Φ
 end
 
 function make_A(cst::UniversalJoint,indexed,numbered)
-    (;nconstraints,e2e) = cst
+    (;nconstraints,axes_rot_hen,axes_rot_egg,e2e) = cst
     (;mem2sysfree,mem2sysfull,nfree) = indexed
     (;num2sys,mem2num) = numbered
-    (;end1,end2) = e2e
-    pid1 = end1.pid
-    pid2 = end2.pid
-    aid1 = end1.aid
-    aid2 = end2.aid
-    uci1 =  end1.rbsig.state.cache.free_idx
-    uci2 =  end2.rbsig.state.cache.free_idx
-    rbid1 = end1.rbsig.prop.id
-    rbid2 = end2.rbsig.prop.id
-    ā1 = end1.rbsig.prop.ās[aid1]
-    ā2 = end2.rbsig.prop.ās[aid2]
-    memfree1 = mem2sysfree[rbid1]
-    memfree2 = mem2sysfree[rbid2]
-    nmcs1 = end1.rbsig.state.cache.funcs.nmcs
-    nmcs2 = end2.rbsig.state.cache.funcs.nmcs
-    Y1 = NCF.get_conversion(nmcs1)
-    Y2 = NCF.get_conversion(nmcs2)
+    hen = e2e.end1
+    egg = e2e.end2
+    uci_hen =  hen.rbsig.state.cache.free_idx
+    uci_egg =  egg.rbsig.state.cache.free_idx
+    id_hen = hen.rbsig.prop.id
+    id_egg = egg.rbsig.prop.id
+    free_hen = mem2sysfree[id_hen]
+    free_egg = mem2sysfree[id_egg]
+    nmcs_hen = hen.rbsig.state.cache.funcs.nmcs
+    nmcs_egg = egg.rbsig.state.cache.funcs.nmcs
+    Y_hen = NCF.get_conversion(nmcs_hen)
+    Y_egg = NCF.get_conversion(nmcs_egg)
     function inner_A(q)
         ret = zeros(eltype(q),nconstraints,nfree)
-        q1 = @view q[mem2sysfull[rbid1]]
-        q2 = @view q[mem2sysfull[rbid2]]
-        C1 = end1.rbsig.state.cache.Cps[pid1]
-        C2 = end2.rbsig.state.cache.Cps[pid2]
-        X1 = NCF.make_X(nmcs1,q1)
-        X2 = NCF.make_X(nmcs2,q2)
-        a1 = X1*ā1
-        a2 = X2*ā2
-        ret[1:3,memfree1] .=  C1[:,uci1]
-        ret[1:3,memfree2] .= -C2[:,uci2]
-        ret[4,mem2sysfree[rbid1]] = (
+        q_hen = @view q[mem2sysfull[id_hen]]
+        q_egg = @view q[mem2sysfull[id_egg]]
+        X_hen = NCF.make_X(nmcs_hen,q_hen)
+        X_egg = NCF.make_X(nmcs_egg,q_egg)
+        C_hen = hen.rbsig.state.cache.Cps[hen.pid]
+        C_egg = egg.rbsig.state.cache.Cps[egg.pid]
+        # rotate of egg
+        rot_hen_n = X_hen*axes_rot_hen.n
+        rot_egg_t2 = X_egg*axes_rot_egg.t2
+        ret[1:3,free_hen] .=  C_hen[:,uci_hen]
+        ret[1:3,free_egg] .= -C_egg[:,uci_egg]
+        ret[4,free_hen] = (
                 transpose(
-                    kron(vcat(0,ā1),a2)
-                )*Y1
-            )[:,uci1]
-        ret[4,mem2sysfree[rbid2]] = (
+                    kron(vcat(0,axes_rot_hen.n),rot_egg_t2)
+                )*Y_hen
+            )[:,uci_hen]
+        ret[4,free_egg] = (
                 transpose(
-                    kron(vcat(0,ā2),a1)
-                )*Y2
-            )[:,uci2]
+                    kron(vcat(0,axes_rot_egg.t2),rot_hen_n)
+                )*Y_egg
+            )[:,uci_egg]
         ret
     end
     function inner_A(q,c)
         ret = zeros(eltype(q),nconstraints,nfree)
-        q1 = @view q[mem2sysfull[rbid1]]
-        q2 = @view q[mem2sysfull[rbid2]]
-        X1 = NCF.make_X(nmcs1,q1)
-        X2 = NCF.make_X(nmcs2,q2)
-        c1 = c[num2sys[mem2num[rbid1][pid1]]]
-        c2 = c[num2sys[mem2num[rbid2][pid2]]]
-        ret[1:3,memfree1] .=  end1.rbsig.state.cache.funcs.C(c1)[:,uci1]
-        ret[1:3,memfree2] .= -end2.rbsig.state.cache.funcs.C(c2)[:,uci2]
-        a1 = X1*ā1
-        a2 = X2*ā2
-        ret[4,mem2sysfree[rbid1]] = (
+        q_hen = @view q[mem2sysfull[id_hen]]
+        q_egg = @view q[mem2sysfull[id_egg]]
+        X_hen = NCF.make_X(nmcs_hen,q_hen)
+        X_egg = NCF.make_X(nmcs_egg,q_egg)
+        c_hen = c[num2sys[mem2num[id_hen][hen.pid]]]
+        c_egg = c[num2sys[mem2num[id_egg][egg.pid]]]
+        # rotate of egg
+        rot_hen_n = X_hen*axes_rot_hen.n
+        rot_egg_t2 = X_egg*axes_rot_egg.t2
+        ret[1:3,free_hen] .=  hen.rbsig.state.cache.funcs.C(c_hen)[:,uci_hen]
+        ret[1:3,free_egg] .= -egg.rbsig.state.cache.funcs.C(c_egg)[:,uci_egg]
+        ret[4,free_hen] = (
                 transpose(
-                    kron(vcat(0,ā1),a2)
-                )*Y1
-            )[:,uci1]
-        ret[4,mem2sysfree[rbid2]] = (
+                    kron(vcat(0,axes_rot_hen.n),rot_egg_t2)
+                )*Y_hen
+            )[:,uci_hen]
+        ret[4,free_egg] = (
                 transpose(
-                    kron(vcat(0,ā2),a1)
-                )*Y2
-            )[:,uci2]
+                    kron(vcat(0,axes_rot_egg.t2),rot_hen_n)
+                )*Y_egg
+            )[:,uci_egg]
         ret
     end
     inner_A
 end
+
+
+"""
+刚体铰接约束类。
+$(TYPEDEF)
+"""
+struct PrismaticUniversalJoint{valueType,e2eType,axesType} <: ExternalConstraints{valueType}
+    id::Int
+    nconstraints::Int
+    values::valueType
+    axes_trl_hen::axesType
+    axes_rot_hen::axesType
+    axes_rot_egg::axesType
+    e2e::e2eType
+end
+
+"""
+铰接约束构造子。
+$(TYPEDSIGNATURES)
+"""
+function PrismaticUniversalJoint(id,e2e)
+    hen = e2e.end1
+    egg = e2e.end2
+    nΦ = 3
+    T = get_numbertype(hen.rbsig)
+    nmcs_hen = hen.rbsig.state.cache.funcs.nmcs
+    nmcs_egg = egg.rbsig.state.cache.funcs.nmcs
+    state_hen = hen.rbsig.state
+    state_egg = egg.rbsig.state
+    q_hen = NCF.rigidstate2naturalcoords(nmcs_hen,state_hen.ro,state_hen.R)
+    q_egg = NCF.rigidstate2naturalcoords(nmcs_egg,state_egg.ro,state_egg.R)
+    X_hen = NCF.make_X(nmcs_hen,q_hen)
+    X_egg = NCF.make_X(nmcs_egg,q_egg)
+    C_hen = hen.rbsig.state.cache.Cps[hen.pid]
+    C_egg = egg.rbsig.state.cache.Cps[egg.pid]
+    # translate on hen
+    ā_hen = hen.rbsig.prop.ās[hen.aid]
+    axes_trl_hen = Axes(ā_hen)
+    trl_hen_t1 = X_hen*axes_trl_hen.t1
+    trl_hen_t2 = X_hen*axes_trl_hen.t2
+    # rotate of egg
+    ā_egg = egg.rbsig.prop.ās[egg.aid]
+    axes_rot_egg = Axes(ā_egg)
+    rot_hen_n = X_egg*axes_rot_egg.t1
+    rot_egg_t2 = X_egg*axes_rot_egg.t2
+    rot_hen_n = inv(X_hen)*rot_hen_n
+    axes_rot_hen = Axes(rot_hen_n)
+    # constraint values
+    values = zeros(T,nΦ)
+    values[1:2] .= transpose([trl_hen_t1 trl_hen_t2])*(C_hen*q_hen.-C_egg*q_egg)
+    values[3] = rot_hen_n'*rot_egg_t2
+    PrismaticUniversalJoint(id,nΦ,values,axes_trl_hen,axes_rot_hen,axes_rot_egg,e2e)
+end
+
+function make_Φ(cst::PrismaticUniversalJoint,indexed,numbered)
+    (;nconstraints,values,axes_trl_hen,axes_rot_hen,axes_rot_egg,e2e) = cst
+    (;num2sys,mem2num) = numbered
+    (;mem2sysfull) = indexed
+    hen = e2e.end1
+    egg = e2e.end2
+    nmcs_hen = hen.rbsig.state.cache.funcs.nmcs
+    nmcs_egg = egg.rbsig.state.cache.funcs.nmcs
+    id_hen = hen.rbsig.prop.id
+    id_egg = egg.rbsig.prop.id
+    function inner_Φ(q)
+        ret = zeros(eltype(q),nconstraints)
+        q_hen = @view q[mem2sysfull[id_hen]]
+        q_egg = @view q[mem2sysfull[id_egg]]
+        X_hen = NCF.make_X(nmcs_hen,q_hen)
+        X_egg = NCF.make_X(nmcs_egg,q_egg)
+        C_hen = hen.rbsig.state.cache.Cps[hen.pid]
+        C_egg = egg.rbsig.state.cache.Cps[egg.pid]
+        # translate on hen
+        trl_hen_t1 = X_hen*axes_trl_hen.t1
+        trl_hen_t2 = X_hen*axes_trl_hen.t2
+        # rotate of egg
+        rot_hen_n = X_hen*axes_rot_hen.n
+        rot_egg_t2 = X_egg*axes_rot_egg.t2
+        # constraint values
+        ret[1:2] .= transpose([trl_hen_t1 trl_hen_t2])*(C_hen*q_hen.-C_egg*q_egg) .- values[1:2]
+        ret[3] = rot_hen_n'*rot_egg_t2 - values[3]
+        ret
+    end
+    function inner_Φ(q,d,c)
+        ret = zeros(eltype(q),nconstraints)
+        q_hen = @view q[mem2sysfull[id_hen]]
+        q_egg = @view q[mem2sysfull[id_egg]]
+        X_hen = NCF.make_X(nmcs_hen,q_hen)
+        X_egg = NCF.make_X(nmcs_egg,q_egg)
+        c_hen = c[num2sys[mem2num[id_hen]][hen.pid]]
+        c_egg = c[num2sys[mem2num[id_egg]][egg.pid]]
+        C_hen = hen.rbsig.state.cache.funcs.C(c_hen)*q_hen
+        C_egg = egg.rbsig.state.cache.funcs.C(c_egg)*q_egg
+        # translate on hen
+        trl_hen_t1 = X_hen*axes_trl_hen.t1
+        trl_hen_t2 = X_hen*axes_trl_hen.t2
+        # rotate of egg
+        rot_hen_n = X_hen*axes_rot_hen.n
+        rot_egg_t2 = X_egg*axes_rot_egg.t2
+        # constraint values
+        ret[1:2] .= transpose([trl_hen_t1 trl_hen_t2])*(C_hen*q_hen.-C_egg*q_egg) .- values[1:2]
+        ret[3] = rot_hen_n'*rot_egg_t2 - values[3]
+        ret
+    end
+    inner_Φ
+end
+
+function make_A(cst::PrismaticUniversalJoint,indexed,numbered)
+    (;nconstraints,axes_trl_hen,axes_rot_hen,axes_rot_egg,e2e) = cst
+    (;mem2sysfree,mem2sysfull,nfree) = indexed
+    (;num2sys,mem2num) = numbered
+    hen = e2e.end1
+    egg = e2e.end2
+    uci_hen =  hen.rbsig.state.cache.free_idx
+    uci_egg =  egg.rbsig.state.cache.free_idx
+    id_hen = hen.rbsig.prop.id
+    id_egg = egg.rbsig.prop.id
+    free_hen = mem2sysfree[id_hen]
+    free_egg = mem2sysfree[id_egg]
+    nmcs_hen = hen.rbsig.state.cache.funcs.nmcs
+    nmcs_egg = egg.rbsig.state.cache.funcs.nmcs
+    Y_hen = NCF.get_conversion(nmcs_hen)
+    Y_egg = NCF.get_conversion(nmcs_egg)
+    function inner_A(q)
+        ret = zeros(eltype(q),nconstraints,nfree)
+        q_hen = @view q[mem2sysfull[id_hen]]
+        q_egg = @view q[mem2sysfull[id_egg]]
+        X_hen = NCF.make_X(nmcs_hen,q_hen)
+        X_egg = NCF.make_X(nmcs_egg,q_egg)
+        C_hen = hen.rbsig.state.cache.Cps[hen.pid]
+        C_egg = egg.rbsig.state.cache.Cps[egg.pid]
+        # translate on hen
+        trl_hen_t1 = X_hen*axes_trl_hen.t1
+        trl_hen_t2 = X_hen*axes_trl_hen.t2
+        # rotate of egg
+        rot_hen_n = X_hen*axes_rot_hen.n
+        rot_egg_t2 = X_egg*axes_rot_egg.t2
+        # jacobian
+        ret[1:2,free_hen] .= kron(
+                [
+                    0 transpose(trl_hen_t1); 
+                    0 transpose(trl_hen_t2)
+                ],
+                transpose(C_hen*q_hen.-C_egg*q_egg)
+            )[:,uci_hen]
+        ret[1:2,free_hen] .+= transpose([trl_hen_t1 trl_hen_t2])*C_hen[:,uci_hen]
+        ret[1:2,free_egg] .-= transpose([trl_hen_t1 trl_hen_t2])*C_egg[:,uci_egg]
+        ret[3,free_hen] = (
+                transpose(
+                    kron(vcat(0,axes_rot_hen.n),rot_egg_t2)
+                )*Y_hen
+            )[:,uci_hen]
+        ret[3,free_egg] = (
+                transpose(
+                    kron(vcat(0,axes_rot_egg.t2),rot_hen_n)
+                )*Y_egg
+            )[:,uci_egg]
+        ret
+    end
+    function inner_A(q,c)
+        ret = zeros(eltype(q),nconstraints,nfree)
+        q_hen = @view q[mem2sysfull[id_hen]]
+        q_egg = @view q[mem2sysfull[id_egg]]
+        X_hen = NCF.make_X(nmcs_hen,q_hen)
+        X_egg = NCF.make_X(nmcs_egg,q_egg)
+        c_hen = c[num2sys[mem2num[id_hen][hen.pid]]]
+        c_egg = c[num2sys[mem2num[id_egg][egg.pid]]]
+        C_hen = hen.rbsig.state.cache.funcs.C(c_hen)
+        C_egg = egg.rbsig.state.cache.funcs.C(c_egg)
+        # translate on hen
+        trl_hen_t1 = X_hen*axes_trl_hen.t1
+        trl_hen_t2 = X_hen*axes_trl_hen.t2
+        # rotate of egg
+        rot_hen_n = X_hen*axes_rot_hen.n
+        rot_egg_t2 = X_egg*axes_rot_egg.t2
+        # jacobian
+        ret[1:2,free_hen] .= kron(
+                [
+                    0 transpose(trl_hen_t1); 
+                    0 transpose(trl_hen_t2)
+                ],
+                transpose(C_hen*q_hen.-C_egg*q_egg)
+            )[:,uci_hen]
+        ret[1:2,free_hen] .+= transpose([trl_hen_t1 trl_hen_t2])*C_hen[:,uci_hen]
+        ret[1:2,free_egg] .-= transpose([trl_hen_t1 trl_hen_t2])*C_egg[:,uci_egg]
+        ret[3,free_hen] = (
+                transpose(
+                    kron(vcat(0,axes_rot_hen.n),rot_egg_t2)
+                )*Y_hen
+            )[:,uci_hen]
+        ret[3,free_egg] = (
+                transpose(
+                    kron(vcat(0,axes_rot_egg.t2),rot_hen_n)
+                )*Y_egg
+            )[:,uci_egg]
+        ret
+    end
+    inner_A
+end
+
+"""
+刚体铰接约束类。
+$(TYPEDEF)
+"""
+struct PlanarUniversalJoint{valueType,e2eType,axesType} <: ExternalConstraints{valueType}
+    id::Int
+    nconstraints::Int
+    values::valueType
+    axes::axesType
+    e2e::e2eType
+end
+
+"""
+铰接约束构造子。
+$(TYPEDSIGNATURES)
+"""
+function PlanarUniversalJoint(id,e2e)
+    hen = e2e.end1
+    egg = e2e.end2
+    nΦ = 2
+    T = get_numbertype(hen.rbsig)
+    nmcs_hen = hen.rbsig.state.cache.funcs.nmcs
+    nmcs_egg = egg.rbsig.state.cache.funcs.nmcs
+    state_hen = hen.rbsig.state
+    state_egg = egg.rbsig.state
+    ā_hen = hen.rbsig.prop.ās[hen.aid]
+    ā_egg = egg.rbsig.prop.ās[egg.aid]
+    q_hen = NCF.rigidstate2naturalcoords(nmcs_hen,state_hen.ro,state_hen.R)
+    q_egg = NCF.rigidstate2naturalcoords(nmcs_egg,state_egg.ro,state_egg.R)
+    X_hen = NCF.make_X(nmcs_hen,q_hen)
+    X_egg = NCF.make_X(nmcs_egg,q_egg)
+    C_hen = hen.rbsig.state.cache.Cps[hen.pid]
+    C_egg = egg.rbsig.state.cache.Cps[egg.pid]
+    values = zeros(T,nΦ)
+    values[1] = transpose(a_hen)*(C_hen*q_hen.-C_egg*q_egg)
+    a_hen = X_hen*ā_hen
+    a_egg = X_egg*ā_egg
+    values[2] = a_egg'*a_hen
+    PlanarUniversalJoint(id,nΦ,values,e2e)
+end
+
+function make_Φ(cst::PlanarUniversalJoint,indexed,numbered)
+    (;nconstraints,values,e2e) = cst
+    (;num2sys,mem2num) = numbered
+    (;mem2sysfull) = indexed
+    hen = e2e.end1
+    egg = e2e.end2
+    nmcs_hen = hen.rbsig.state.cache.funcs.nmcs
+    nmcs_egg = egg.rbsig.state.cache.funcs.nmcs
+    id_hen = hen.rbsig.prop.id
+    id_egg = egg.rbsig.prop.id
+    ā_hen = hen.rbsig.prop.ās[hen.aid]
+    ā_egg = egg.rbsig.prop.ās[egg.aid]
+    function inner_Φ(q)
+        ret = zeros(eltype(q),nconstraints)
+        q_hen = @view q[mem2sysfull[id_hen]]
+        q_egg = @view q[mem2sysfull[id_egg]]
+        X_hen = NCF.make_X(nmcs_hen,q_hen)
+        X_egg = NCF.make_X(nmcs_egg,q_egg)
+        a_hen = X_hen*ā_hen
+        a_egg = X_egg*ā_egg
+        C_hen = hen.rbsig.state.cache.Cps[hen.pid]
+        C_egg = egg.rbsig.state.cache.Cps[egg.pid]
+        ret[1] = transpose(a_hen)*(C_hen*q_hen.-C_egg*q_egg) .- values[1]
+        ret[2] = a_egg'*a_hen - values[2]
+        ret
+    end
+    function inner_Φ(q,d,c)
+        ret = zeros(eltype(q),nconstraints)
+        q_hen = @view q[mem2sysfull[id_hen]]
+        q_egg = @view q[mem2sysfull[id_egg]]
+        X_hen = NCF.make_X(nmcs_hen,q_hen)
+        X_egg = NCF.make_X(nmcs_egg,q_egg)
+        a_hen = X_hen*ā_hen
+        a_egg = X_egg*ā_egg
+        c_hen = c[num2sys[mem2num[id_hen]][hen.pid]]
+        c_egg = c[num2sys[mem2num[id_egg]][egg.pid]]
+        C_hen = hen.rbsig.state.cache.funcs.C(c_hen)*q_hen
+        C_egg = egg.rbsig.state.cache.funcs.C(c_egg)*q_egg
+        ret[1] = transpose(a_hen)*(C_hen*q_hen.-C_egg*q_egg) .- values[1]
+        ret[2] = a_egg'*a_hen - values[2]
+        ret
+    end
+    inner_Φ
+end
+
+function make_A(cst::PlanarUniversalJoint,indexed,numbered)
+    (;nconstraints,e2e) = cst
+    (;mem2sysfree,mem2sysfull,nfree) = indexed
+    (;num2sys,mem2num) = numbered
+    hen = e2e.end1
+    egg = e2e.end2
+    uci_hen =  hen.rbsig.state.cache.free_idx
+    uci_egg =  egg.rbsig.state.cache.free_idx
+    id_hen = hen.rbsig.prop.id
+    id_egg = egg.rbsig.prop.id
+    ā_hen = hen.rbsig.prop.ās[hen.aid]
+    ā_egg = egg.rbsig.prop.ās[egg.aid]
+    free_hen = mem2sysfree[id_hen]
+    free_egg = mem2sysfree[id_egg]
+    nmcs_hen = hen.rbsig.state.cache.funcs.nmcs
+    nmcs_egg = egg.rbsig.state.cache.funcs.nmcs
+    Y_hen = NCF.get_conversion(nmcs_hen)
+    Y_egg = NCF.get_conversion(nmcs_egg)
+    function inner_A(q)
+        ret = zeros(eltype(q),nconstraints,nfree)
+        q_hen = @view q[mem2sysfull[id_hen]]
+        q_egg = @view q[mem2sysfull[id_egg]]
+        C_hen = hen.rbsig.state.cache.Cps[hen.pid]
+        C_egg = egg.rbsig.state.cache.Cps[egg.pid]
+        X_hen = NCF.make_X(nmcs_hen,q_hen)
+        X_egg = NCF.make_X(nmcs_egg,q_egg)
+        a_hen = X_hen*ā_hen
+        a_egg = X_egg*ā_egg
+        ret[1,free_hen] .= kron(
+                [
+                    0 transpose(ā_hen); 
+                ],
+                transpose(C_hen*q_hen.-C_egg*q_egg)
+            )[:,uci_hen]
+        ret[1,free_hen] .+= transpose(a_hen)*C_hen[:,uci_hen]
+        ret[1,free_egg] .-= transpose(a_hen)*C_egg[:,uci_egg]
+        ret[2,free_hen] = (
+                transpose(
+                    kron(vcat(0,ā_hen),a_egg)
+                )*Y_hen
+            )[:,uci_hen]
+        ret[2,free_egg] = (
+                transpose(
+                    kron(vcat(0,ā_egg),a_hen)
+                )*Y_egg
+            )[:,uci_egg]
+        ret
+    end
+    function inner_A(q,c)
+        ret = zeros(eltype(q),nconstraints,nfree)
+        q_hen = @view q[mem2sysfull[id_hen]]
+        q_egg = @view q[mem2sysfull[id_egg]]
+        X_hen = NCF.make_X(nmcs_hen,q_hen)
+        X_egg = NCF.make_X(nmcs_egg,q_egg)
+        a1t1 = X_hen*axes.t1
+        a1t2 = X_hen*axes.t2
+        c_hen = c[num2sys[mem2num[id_hen][hen.pid]]]
+        c_egg = c[num2sys[mem2num[id_egg][egg.pid]]]
+        C_hen = hen.rbsig.state.cache.funcs.C(c_hen)
+        C_egg = egg.rbsig.state.cache.funcs.C(c_egg)
+        ret[1,free_hen] .= kron(
+                [
+                    0 transpose(ā_hen); 
+                ],
+                transpose(C_hen*q_hen.-C_egg*q_egg)
+            )[:,uci_hen]
+        ret[1,free_hen] .+= transpose(a_hen)*C_hen[:,uci_hen]
+        ret[1,free_egg] .-= transpose(a_hen)*C_egg[:,uci_egg]
+        a_hen = X_hen*ā_hen
+        a_egg = X_egg*ā_egg
+        ret[2,mem2sysfree[id_hen]] = (
+                transpose(
+                    kron(vcat(0,ā_hen),a_egg)
+                )*Y_hen
+            )[:,uci_hen]
+        ret[2,mem2sysfree[id_egg]] = (
+                transpose(
+                    kron(vcat(0,ā_egg),a_hen)
+                )*Y_egg
+            )[:,uci_egg]
+        ret
+    end
+    inner_A
+end
+
+
+"""
+刚体铰接约束类。
+$(TYPEDEF)
+"""
+struct FloatingUniversalJoint{valueType,e2eType,axesType} <: ExternalConstraints{valueType}
+    id::Int
+    nconstraints::Int
+    values::valueType
+    axes::axesType
+    e2e::e2eType
+end
+
+"""
+铰接约束构造子。
+$(TYPEDSIGNATURES)
+"""
+function FloatingUniversalJoint(id,e2e)
+    hen = e2e.end1
+    egg = e2e.end2
+    nΦ = 1
+    T = get_numbertype(hen.rbsig)
+    nmcs_hen = hen.rbsig.state.cache.funcs.nmcs
+    nmcs_egg = egg.rbsig.state.cache.funcs.nmcs
+    state_hen = hen.rbsig.state
+    state_egg = egg.rbsig.state
+    ā_hen = hen.rbsig.prop.ās[hen.aid]
+    ā_egg = egg.rbsig.prop.ās[egg.aid]
+    q_hen = NCF.rigidstate2naturalcoords(nmcs_hen,state_hen.ro,state_hen.R)
+    q_egg = NCF.rigidstate2naturalcoords(nmcs_egg,state_egg.ro,state_egg.R)
+    X_hen = NCF.make_X(nmcs_hen,q_hen)
+    X_egg = NCF.make_X(nmcs_egg,q_egg)
+    values = zeros(T,nΦ)
+    a_hen = X_hen*ā_hen
+    a_egg = X_egg*ā_egg
+    values[1] = a_egg'*a_hen
+    FloatingUniversalJoint(id,nΦ,values,e2e)
+end
+
+function make_Φ(cst::FloatingUniversalJoint,indexed,numbered)
+    (;nconstraints,values,e2e) = cst
+    (;num2sys,mem2num) = numbered
+    (;mem2sysfull) = indexed
+    hen = e2e.end1
+    egg = e2e.end2
+    nmcs_hen = hen.rbsig.state.cache.funcs.nmcs
+    nmcs_egg = egg.rbsig.state.cache.funcs.nmcs
+    id_hen = hen.rbsig.prop.id
+    id_egg = egg.rbsig.prop.id
+    ā_hen = hen.rbsig.prop.ās[hen.aid]
+    ā_egg = egg.rbsig.prop.ās[egg.aid]
+    function inner_Φ(q)
+        ret = zeros(eltype(q),nconstraints)
+        q_hen = @view q[mem2sysfull[id_hen]]
+        q_egg = @view q[mem2sysfull[id_egg]]
+        X_hen = NCF.make_X(nmcs_hen,q_hen)
+        X_egg = NCF.make_X(nmcs_egg,q_egg)
+        a_hen = X_hen*ā_hen
+        a_egg = X_egg*ā_egg
+        ret[1] = a_egg'*a_hen - values[1]
+        ret
+    end
+    function inner_Φ(q,d,c)
+        ret = zeros(eltype(q),nconstraints)
+        q_hen = @view q[mem2sysfull[id_hen]]
+        q_egg = @view q[mem2sysfull[id_egg]]
+        X_hen = NCF.make_X(nmcs_hen,q_hen)
+        X_egg = NCF.make_X(nmcs_egg,q_egg)
+        a_hen = X_hen*ā_hen
+        a_egg = X_egg*ā_egg
+        ret[1] = a_egg'*a_hen - values[1]
+        ret
+    end
+    inner_Φ
+end
+
+function make_A(cst::FloatingUniversalJoint,indexed,numbered)
+    (;nconstraints,e2e) = cst
+    (;mem2sysfree,mem2sysfull,nfree) = indexed
+    (;num2sys,mem2num) = numbered
+    hen = e2e.end1
+    egg = e2e.end2
+    uci_hen =  hen.rbsig.state.cache.free_idx
+    uci_egg =  egg.rbsig.state.cache.free_idx
+    id_hen = hen.rbsig.prop.id
+    id_egg = egg.rbsig.prop.id
+    ā_hen = hen.rbsig.prop.ās[hen.aid]
+    ā_egg = egg.rbsig.prop.ās[egg.aid]
+    free_hen = mem2sysfree[id_hen]
+    free_egg = mem2sysfree[id_egg]
+    nmcs_hen = hen.rbsig.state.cache.funcs.nmcs
+    nmcs_egg = egg.rbsig.state.cache.funcs.nmcs
+    Y_hen = NCF.get_conversion(nmcs_hen)
+    Y_egg = NCF.get_conversion(nmcs_egg)
+    function inner_A(q)
+        ret = zeros(eltype(q),nconstraints,nfree)
+        q_hen = @view q[mem2sysfull[id_hen]]
+        q_egg = @view q[mem2sysfull[id_egg]]
+        X_hen = NCF.make_X(nmcs_hen,q_hen)
+        X_egg = NCF.make_X(nmcs_egg,q_egg)
+        a_hen = X_hen*ā_hen
+        a_egg = X_egg*ā_egg
+        ret[1,free_hen] = (
+                transpose(
+                    kron(vcat(0,ā_hen),a_egg)
+                )*Y_hen
+            )[:,uci_hen]
+        ret[1,free_egg] = (
+                transpose(
+                    kron(vcat(0,ā_egg),a_hen)
+                )*Y_egg
+            )[:,uci_egg]
+        ret
+    end
+    function inner_A(q,c)
+        ret = zeros(eltype(q),nconstraints,nfree)
+        q_hen = @view q[mem2sysfull[id_hen]]
+        q_egg = @view q[mem2sysfull[id_egg]]
+        X_hen = NCF.make_X(nmcs_hen,q_hen)
+        X_egg = NCF.make_X(nmcs_egg,q_egg)
+        a_hen = X_hen*ā_hen
+        a_egg = X_egg*ā_egg
+        ret[1,mem2sysfree[id_hen]] = (
+                transpose(
+                    kron(vcat(0,ā_hen),a_egg)
+                )*Y_hen
+            )[:,uci_hen]
+        ret[1,mem2sysfree[id_egg]] = (
+                transpose(
+                    kron(vcat(0,ā_egg),a_hen)
+                )*Y_egg
+            )[:,uci_egg]
+        ret
+    end
+    inner_A
+end
+
+"""
+刚体铰接约束类。
+$(TYPEDEF)
+"""
+struct FloatingJoint{valueType,e2eType,orderType} <: ExternalConstraints{valueType}
+    id::Int
+    nconstraints::Int
+    values::valueType
+    e2e::e2eType
+    order::orderType
+end
+
+"""
+铰接约束构造子。
+$(TYPEDSIGNATURES)
+"""
+function FloatingJoint(id,e2e)
+    hen = e2e.end1
+    egg = e2e.end2
+    rb1 = hen.rbsig
+    nΦ = 3
+    T = get_numbertype(rb1)
+    nmcs_hen = hen.rbsig.state.cache.funcs.nmcs
+    nmcs_egg = egg.rbsig.state.cache.funcs.nmcs
+    state_hen = hen.rbsig.state
+    state_egg = egg.rbsig.state
+    q_hen = NCF.rigidstate2naturalcoords(nmcs_hen,state_hen.ro,state_hen.R)
+    q_egg = NCF.rigidstate2naturalcoords(nmcs_egg,state_egg.ro,state_egg.R)
+    X_hen = NCF.make_X(nmcs_hen,q_hen)
+    X_egg = NCF.make_X(nmcs_egg,q_egg)
+    values = zeros(T,nΦ)
+    nΦ1 = NCF.get_nconstraints(nmcs_hen)
+    nΦ2 = NCF.get_nconstraints(nmcs_egg)
+    order = find_order(nmcs_hen,nmcs_egg,q_hen,q_egg,X_hen,X_egg,nΦ1,nΦ2)
+    inprods = transpose(X_egg)*X_hen
+    values[1:3] .= inprods[order]
+    FloatingJoint(id,nΦ,values,e2e,order)
+end
+
+function make_Φ(cst::FloatingJoint,indexed,numbered)
+    (;nconstraints,values,e2e,order) = cst
+    (;mem2num,num2sys) = numbered
+    (;mem2sysfull) = indexed
+    hen = e2e.end1
+    egg = e2e.end2
+    nmcs_hen = hen.rbsig.state.cache.funcs.nmcs
+    nmcs_egg = egg.rbsig.state.cache.funcs.nmcs
+    function inner_Φ(q)
+        ret = zeros(eltype(q),nconstraints)
+        q_hen = @view q[mem2sysfull[hen.rbsig.prop.id]]
+        q_egg = @view q[mem2sysfull[egg.rbsig.prop.id]]
+        X_hen = NCF.make_X(nmcs_hen,q_hen)
+        X_egg = NCF.make_X(nmcs_egg,q_egg)
+        inprods = transpose(X_egg)*X_hen
+        ret[1:3] .= inprods[order] .- values[1:3]
+        ret
+    end
+    function inner_Φ(q,d,c)
+        ret = zeros(eltype(q),nconstraints)
+        id_hen = hen.rbsig.prop.id
+        id_egg = egg.rbsig.prop.id
+        q_hen = @view q[mem2sysfull[id_hen]]
+        q_egg = @view q[mem2sysfull[id_egg]]
+        X_hen = NCF.make_X(nmcs_hen,q_hen)
+        X_egg = NCF.make_X(nmcs_egg,q_egg)
+        inprods = transpose(X_egg)*X_hen
+        ret[1:3] .= inprods[order] .- values[1:3]
+        ret
+    end
+    inner_Φ
+end
+
+function make_A(cst::FloatingJoint,indexed,numbered)
+    (;nconstraints,e2e,order) = cst
+    (;mem2sysfree,mem2sysfull,nfree) = indexed
+    (;mem2num,num2sys) = numbered
+    hen = e2e.end1
+    egg = e2e.end2
+    nmcs_hen = hen.rbsig.state.cache.funcs.nmcs
+    nmcs_egg = egg.rbsig.state.cache.funcs.nmcs
+    uci_hen =  hen.rbsig.state.cache.free_idx
+    uci_egg =  egg.rbsig.state.cache.free_idx
+    id_hen = hen.rbsig.prop.id
+    id_egg = egg.rbsig.prop.id
+    free_hen = mem2sysfree[id_hen]
+    free_egg = mem2sysfree[id_egg]
+    function inner_A(q)
+        ret = zeros(eltype(q),nconstraints,nfree)
+        q_hen = @view q[mem2sysfull[id_hen]]
+        q_egg = @view q[mem2sysfull[id_egg]]
+        X_hen = NCF.make_X(nmcs_hen,q_hen)
+        X_egg = NCF.make_X(nmcs_egg,q_egg)
+        k = 0
+        ret_rest = @view ret[k+1:end,:]
+        rot_jac!(ret_rest,order,q_hen,q_egg,X_hen,X_egg,free_hen,free_egg,uci_hen,uci_egg,)
+        ret
+    end
+    function inner_A(q,c)
+        ret = zeros(eltype(q),nconstraints,nfree)
+        q_hen = @view q[mem2sysfull[id_hen]]
+        q_egg = @view q[mem2sysfull[id_egg]]
+        X_hen = NCF.make_X(nmcs_hen,q_hen)
+        X_egg = NCF.make_X(nmcs_egg,q_egg)
+        k = 0
+        ret_rest = @view ret[k+1:end,:]
+        rot_jac!(ret_rest,order,q_hen,q_egg,X_hen,X_egg,free_hen,free_egg,uci_hen,uci_egg,)
+        ret
+    end
+    inner_A
+end
+
 """
 刚体铰接约束类。
 $(TYPEDEF)
@@ -982,28 +2333,27 @@ end
 $(TYPEDSIGNATURES)
 """
 function FixedJoint(id,e2e)
-    (;end1,end2) = e2e
-    pid1 = end1.pid
-    pid2 = end2.pid
-    rb1 = end1.rbsig
+    hen = e2e.end1
+    egg = e2e.end2
+    rb1 = hen.rbsig
     nΦ = 6
     T = get_numbertype(rb1)
-    nmcs1 = end1.rbsig.state.cache.funcs.nmcs
-    nmcs2 = end2.rbsig.state.cache.funcs.nmcs
-    state1 = end1.rbsig.state
-    state2 = end2.rbsig.state
-    q1 = NCF.rigidstate2naturalcoords(nmcs1,state1.ro,state1.R)
-    q2 = NCF.rigidstate2naturalcoords(nmcs2,state2.ro,state2.R)
-    X1 = NCF.make_X(nmcs1,q1)
-    X2 = NCF.make_X(nmcs2,q2)
-    C1 = end1.rbsig.state.cache.Cps[pid1]
-    C2 = end2.rbsig.state.cache.Cps[pid2]
+    nmcs_hen = hen.rbsig.state.cache.funcs.nmcs
+    nmcs_egg = egg.rbsig.state.cache.funcs.nmcs
+    state_hen = hen.rbsig.state
+    state_egg = egg.rbsig.state
+    q_hen = NCF.rigidstate2naturalcoords(nmcs_hen,state_hen.ro,state_hen.R)
+    q_egg = NCF.rigidstate2naturalcoords(nmcs_egg,state_egg.ro,state_egg.R)
+    X_hen = NCF.make_X(nmcs_hen,q_hen)
+    X_egg = NCF.make_X(nmcs_egg,q_egg)
+    C_hen = hen.rbsig.state.cache.Cps[hen.pid]
+    C_egg = egg.rbsig.state.cache.Cps[egg.pid]
     values = zeros(T,nΦ)
-    values[1:3] .= C1*q1.-C2*q2
-    nΦ1 = NCF.get_nconstraints(nmcs1)
-    nΦ2 = NCF.get_nconstraints(nmcs2)
-    order = find_order(nmcs1,nmcs2,q1,q2,X1,X2,nΦ1,nΦ2)
-    inprods = transpose(X2)*X1
+    values[1:3] .= C_hen*q_hen.-C_egg*q_egg
+    nΦ1 = NCF.get_nconstraints(nmcs_hen)
+    nΦ2 = NCF.get_nconstraints(nmcs_egg)
+    order = find_order(nmcs_hen,nmcs_egg,q_hen,q_egg,X_hen,X_egg,nΦ1,nΦ2)
+    inprods = transpose(X_egg)*X_hen
     values[4:6] .= inprods[order]
     FixedJoint(id,nΦ,values,e2e,order)
 end
@@ -1012,38 +2362,37 @@ function make_Φ(cst::FixedJoint,indexed,numbered)
     (;nconstraints,values,e2e,order) = cst
     (;mem2num,num2sys) = numbered
     (;mem2sysfull) = indexed
-    (;end1,end2) = e2e
-    nmcs1 = end1.rbsig.state.cache.funcs.nmcs
-    nmcs2 = end2.rbsig.state.cache.funcs.nmcs
-    pid1 = end1.pid
-    pid2 = end2.pid
-    C1 = end1.rbsig.state.cache.Cps[pid1]
-    C2 = end2.rbsig.state.cache.Cps[pid2]
+    hen = e2e.end1
+    egg = e2e.end2
+    nmcs_hen = hen.rbsig.state.cache.funcs.nmcs
+    nmcs_egg = egg.rbsig.state.cache.funcs.nmcs
+    C_hen = hen.rbsig.state.cache.Cps[hen.pid]
+    C_egg = egg.rbsig.state.cache.Cps[egg.pid]
     function inner_Φ(q)
         ret = zeros(eltype(q),nconstraints)
-        q1 = @view q[mem2sysfull[end1.rbsig.prop.id]]
-        q2 = @view q[mem2sysfull[end2.rbsig.prop.id]]
-        ret[1:3] .= C1*q1.-C2*q2 .- values[1:3]
-        X1 = NCF.make_X(nmcs1,q1)
-        X2 = NCF.make_X(nmcs2,q2)
-        inprods = transpose(X2)*X1
+        q_hen = @view q[mem2sysfull[hen.rbsig.prop.id]]
+        q_egg = @view q[mem2sysfull[egg.rbsig.prop.id]]
+        ret[1:3] .= C_hen*q_hen.-C_egg*q_egg .- values[1:3]
+        X_hen = NCF.make_X(nmcs_hen,q_hen)
+        X_egg = NCF.make_X(nmcs_egg,q_egg)
+        inprods = transpose(X_egg)*X_hen
         ret[4:6] .= inprods[order] .- values[4:6]
         ret
     end
     function inner_Φ(q,d,c)
         ret = zeros(eltype(q),nconstraints)
-        rbid1 = end1.rbsig.prop.id
-        rbid2 = end2.rbsig.prop.id
-        q1 = @view q[mem2sysfull[rbid1]]
-        q2 = @view q[mem2sysfull[rbid2]]
-        X1 = NCF.make_X(nmcs1,q1)
-        X2 = NCF.make_X(nmcs2,q2)
-        c1 = c[num2sys[mem2num[rbid1][pid1]]]
-        c2 = c[num2sys[mem2num[rbid2][pid2]]]
-        C1 = end1.rbsig.state.cache.funcs.C(c1)*q1
-        C2 = end2.rbsig.state.cache.funcs.C(c2)*q2
-        ret[1:3] .= C1*q1.-C2*q2 .- values[1:3]
-        inprods = transpose(X2)*X1
+        id_hen = hen.rbsig.prop.id
+        id_egg = egg.rbsig.prop.id
+        q_hen = @view q[mem2sysfull[id_hen]]
+        q_egg = @view q[mem2sysfull[id_egg]]
+        X_hen = NCF.make_X(nmcs_hen,q_hen)
+        X_egg = NCF.make_X(nmcs_egg,q_egg)
+        c_hen = c[num2sys[mem2num[id_hen][hen.pid]]]
+        c_egg = c[num2sys[mem2num[id_egg][egg.pid]]]
+        C_hen = hen.rbsig.state.cache.funcs.C(c_hen)*q_hen
+        C_egg = egg.rbsig.state.cache.funcs.C(c_egg)*q_egg
+        ret[1:3] .= C_hen*q_hen.-C_egg*q_egg .- values[1:3]
+        inprods = transpose(X_egg)*X_hen
         ret[4:6] .= inprods[order] .- values[4:6]
         ret
     end
@@ -1054,45 +2403,44 @@ function make_A(cst::FixedJoint,indexed,numbered)
     (;nconstraints,e2e,order) = cst
     (;mem2sysfree,mem2sysfull,nfree) = indexed
     (;mem2num,num2sys) = numbered
-    (;end1,end2) = e2e
-    nmcs1 = end1.rbsig.state.cache.funcs.nmcs
-    nmcs2 = end2.rbsig.state.cache.funcs.nmcs
-    pid1 = end1.pid
-    pid2 = end2.pid
-    C1 = end1.rbsig.state.cache.Cps[pid1]
-    C2 = end2.rbsig.state.cache.Cps[pid2]
-    uci1 =  end1.rbsig.state.cache.free_idx
-    uci2 =  end2.rbsig.state.cache.free_idx
-    rbid1 = end1.rbsig.prop.id
-    rbid2 = end2.rbsig.prop.id
-    memfree1 = mem2sysfree[rbid1]
-    memfree2 = mem2sysfree[rbid2]
+    hen = e2e.end1
+    egg = e2e.end2
+    nmcs_hen = hen.rbsig.state.cache.funcs.nmcs
+    nmcs_egg = egg.rbsig.state.cache.funcs.nmcs
+    C_hen = hen.rbsig.state.cache.Cps[hen.pid]
+    C_egg = egg.rbsig.state.cache.Cps[egg.pid]
+    uci_hen =  hen.rbsig.state.cache.free_idx
+    uci_egg =  egg.rbsig.state.cache.free_idx
+    id_hen = hen.rbsig.prop.id
+    id_egg = egg.rbsig.prop.id
+    free_hen = mem2sysfree[id_hen]
+    free_egg = mem2sysfree[id_egg]
     function inner_A(q)
         ret = zeros(eltype(q),nconstraints,nfree)
-        q1 = @view q[mem2sysfull[rbid1]]
-        q2 = @view q[mem2sysfull[rbid2]]
-        X1 = NCF.make_X(nmcs1,q1)
-        X2 = NCF.make_X(nmcs2,q2)
-        ret[1:3,memfree1] .=  C1[:,uci1]
-        ret[1:3,memfree2] .= -C2[:,uci2]
+        q_hen = @view q[mem2sysfull[id_hen]]
+        q_egg = @view q[mem2sysfull[id_egg]]
+        X_hen = NCF.make_X(nmcs_hen,q_hen)
+        X_egg = NCF.make_X(nmcs_egg,q_egg)
+        ret[1:3,free_hen] .=  C_hen[:,uci_hen]
+        ret[1:3,free_egg] .= -C_egg[:,uci_egg]
         k = 3
         ret_rest = @view ret[k+1:end,:]
-        rot_jac!(ret_rest,order,q1,q2,X1,X2,memfree1,memfree2,uci1,uci2,)
+        rot_jac!(ret_rest,order,q_hen,q_egg,X_hen,X_egg,free_hen,free_egg,uci_hen,uci_egg,)
         ret
     end
     function inner_A(q,c)
         ret = zeros(eltype(q),nconstraints,nfree)
-        q1 = @view q[mem2sysfull[rbid1]]
-        q2 = @view q[mem2sysfull[rbid2]]
-        X1 = NCF.make_X(nmcs1,q1)
-        X2 = NCF.make_X(nmcs2,q2)
-        c1 = c[num2sys[mem2num[rbid1][pid1]]]
-        c2 = c[num2sys[mem2num[rbid2][pid2]]]
-        ret[1:3,memfree1] .=  end1.rbsig.state.cache.funcs.C(c1)[:,uci1]
-        ret[1:3,memfree2] .= -end2.rbsig.state.cache.funcs.C(c2)[:,uci2]
+        q_hen = @view q[mem2sysfull[id_hen]]
+        q_egg = @view q[mem2sysfull[id_egg]]
+        X_hen = NCF.make_X(nmcs_hen,q_hen)
+        X_egg = NCF.make_X(nmcs_egg,q_egg)
+        c_hen = c[num2sys[mem2num[id_hen][hen.pid]]]
+        c_egg = c[num2sys[mem2num[id_egg][egg.pid]]]
+        ret[1:3,free_hen] .=  hen.rbsig.state.cache.funcs.C(c_hen)[:,uci_hen]
+        ret[1:3,free_egg] .= -egg.rbsig.state.cache.funcs.C(c_egg)[:,uci_egg]
         k = 3
         ret_rest = @view ret[k+1:end,:]
-        rot_jac!(ret_rest,order,q1,q2,X1,X2,memfree1,memfree2,uci1,uci2,)
+        rot_jac!(ret_rest,order,q_hen,q_egg,X_hen,X_egg,free_hen,free_egg,uci_hen,uci_egg,)
         ret
     end
     inner_A
@@ -1100,14 +2448,15 @@ end
 
 function get_jointed_free_idx(cst)
     (;nconstraints,e2e,) = cst
-    (;end1,end2) = e2e
-    uci1 = end1.rbsig.state.cache.free_idx
-    uci2 = end2.rbsig.state.cache.free_idx
-    ncoords1 = NCF.get_ncoords(end1.rbsig.state.cache.funcs.nmcs)
-    # ncoords2 = NCF.get_ncoords(end2.rbsig.state.cache.nmcs)
+    hen = e2e.end1
+    egg = e2e.end2
+    uci_hen = hen.rbsig.state.cache.free_idx
+    uci_egg = egg.rbsig.state.cache.free_idx
+    ncoords1 = NCF.get_ncoords(hen.rbsig.state.cache.funcs.nmcs)
+    # ncoords2 = NCF.get_ncoords(egg.rbsig.state.cache.nmcs)
     uci = vcat(
-        uci1,
-        uci2 .+ ncoords1
+        uci_hen,
+        uci_egg .+ ncoords1
     )
 end
 
@@ -1118,11 +2467,12 @@ end
 function get_jointed_free(cst,indexed)
     (;nconstraints,e2e,) = cst
     (;mem2sysfree,mem2sysfull,nfree) = indexed
-    (;end1,end2) = e2e
-    rbid1 = end1.rbsig.prop.id
-    rbid2 = end2.rbsig.prop.id
-    mem2sysfree1 = mem2sysfree[rbid1]
-    mem2sysfree2 = mem2sysfree[rbid2]
+    hen = e2e.end1
+    egg = e2e.end2
+    id_hen = hen.rbsig.prop.id
+    id_egg = egg.rbsig.prop.id
+    mem2sysfree1 = mem2sysfree[id_hen]
+    mem2sysfree2 = mem2sysfree[id_egg]
     cst2sysfree = vcat(
         mem2sysfree1,
         mem2sysfree2
@@ -1134,99 +2484,90 @@ function get_jointed_free(cst::LinearJoint,indexed)
 end
 
 function make_Φqᵀq(cst,numbered,c)
-    (;e2e,) = cst
+    (;axes_trl_hen,axes_rot_hen,axes_rot_egg,e2e,) = cst
     (;mem2num,num2sys) = numbered
-    (;end1,end2) = e2e
-    rbid1 = end1.rbsig.prop.id
-    rbid2 = end2.rbsig.prop.id
-    pid1 = end1.pid
-    pid2 = end2.pid
-    aid1 = end1.aid
-    nld1 = NCF.get_nlocaldim(end1.rbsig.state.cache.funcs.nmcs)
-    nld2 = NCF.get_nlocaldim(end2.rbsig.state.cache.funcs.nmcs)
-    Y1 = NCF.get_conversion(end1.rbsig.state.cache.funcs.nmcs)
-    Y2 = NCF.get_conversion(end2.rbsig.state.cache.funcs.nmcs)
-    cv = BlockDiagonal([Y1,Y2])
-    ndim = NCF.get_ndim(end1.rbsig.state.cache.funcs.nmcs)
+    hen = e2e.end1
+    egg = e2e.end2
+    id_hen = hen.rbsig.prop.id
+    id_egg = egg.rbsig.prop.id
+    nld_hen = NCF.get_nlocaldim(hen.rbsig.state.cache.funcs.nmcs)
+    nld_egg = NCF.get_nlocaldim(egg.rbsig.state.cache.funcs.nmcs)
+    Y_hen = NCF.get_conversion(hen.rbsig.state.cache.funcs.nmcs)
+    Y_egg = NCF.get_conversion(egg.rbsig.state.cache.funcs.nmcs)
+    cv = BlockDiagonal([Y_hen,Y_egg])
+    ndim = NCF.get_ndim(hen.rbsig.state.cache.funcs.nmcs)
     T = get_numbertype(cst)
     I_Int = NCF.make_I(Int,ndim)
-    c1 = c[num2sys[mem2num[rbid1][pid1]]]
-    c2 = c[num2sys[mem2num[rbid2][pid2]]]
-    ā1 = end1.rbsig.prop.ās[aid1]
-    ā2 = end2.rbsig.prop.ās[aid2]
-    frame = SpatialFrame(ā1)
-    t̄1 = frame.t1
-    t̄2 = frame.t1
-    D̄ = hcat(ā1,t̄1,t̄2)
-    Φqᵀq_trans = [
-        begin
-            d̄ = D̄[:,id] 
-            ret_raw = zeros(
-                T,
-                (nld1+1)+(nld2+1),
-                (nld1+1)+(nld2+1),
-            )
-            ret_raw[1,2:nld2+1] = ret_raw[2:nld2+1,1] = -d̄
-            ret_raw[2:nld2+1,2:nld2+1] = -c1*transpose(d̄)-d̄*transpose(c1)
-            ret_raw[(nld1+1)+1,2:nld2+1] = ret_raw[2:nld2+1,(nld1+1)+1] = d̄
-            ret_raw[(nld1+1)+2:end,2:nld2+1] = c2*transpose(d̄)
-            ret_raw[2:nld2+1,(nld1+1)+2:end] = d̄*transpose(c2)
-            transpose(cv)*kron(ret_raw,I_Int)*cv
-        end
-        for id in 1:3
-    ]
+    c_hen = c[num2sys[mem2num[id_hen][hen.pid]]]
+    c_egg = c[num2sys[mem2num[id_egg][egg.pid]]]
+    ā_hen = axes_rot_hen.n
+    ā_egg = axes_rot_egg.t2
+    D̄ = axes_trl_hen.X
 
-    Φqᵀq_rot_ā1 = [
+    # Φqᵀq_first = 0
+
+    Φqᵀq_second = 
         begin
             ret_raw = zeros(
                 T,
-                (nld1+1)+(nld2+1),
-                (nld1+1)+(nld2+1),
+                (1+nld_hen)+(1+nld_egg),
+                (1+nld_hen)+(1+nld_egg),
             )
-            ret_raw[(nld1+1)+1:(nld1+1)+nld2,(nld1+1)+id] = ā1
-            ret_raw[(nld1+1)+id,(nld1+1)+1:(nld1+1)+nld2] = ā1
+            ret_raw[2:1+nld_hen,(1+nld_hen)+1+id] = ā_hen*ā_egg'
+            ret_raw[(1+nld_hen)+1+id,2:1+nld_hen] = ā_egg*ā_hen'
             transpose(cv)*kron(ret_raw,I_Int)*cv
         end
-        for id in 1:3
-    ]
     
-	Φqᵀq_rot_ā2 = [
+    Φqᵀq_third = 
         begin
             ret_raw = zeros(
                 T,
-                (nld1+1)+(nld2+1),
-                (nld1+1)+(nld2+1),
+                (1+nld_hen)+(1+nld_egg),
+                (1+nld_hen)+(1+nld_egg),
             )
-            ret_raw[(nld1+1)+1:(nld1+1)+nld2,(nld1+1)+id] = ā2
-            ret_raw[(nld1+1)+id,(nld1+1)+1:(nld1+1)+nld2] = ā2
+            ret_raw[1,2:1+nld_hen] = -d̄
+            ret_raw[2:1+nld_hen,1] = -d̄
+            ret_raw[2:1+nld_hen,2:1+nld_hen] = -c_hen*d̄'-d̄*c_hen'
+            ret_raw[(1+nld_hen)+1,2:1+nld_egg] = d̄
+            ret_raw[2:1+nld_egg,(1+nld_hen)+1] = d̄
+            ret_raw[(1+nld_hen)+2:end,2:1+nld_egg] = c_egg*d̄'
+            ret_raw[2:1+nld_egg,(1+nld_hen)+2:end] = d̄*c_egg'
             transpose(cv)*kron(ret_raw,I_Int)*cv
         end
-        for id in 1:3
-    ]
-    
+
     Φqᵀq_rot_fix = [
         begin
             ret_raw = zeros(
                 T,
-                (nld1+1)+(nld2+1),
-                (nld1+1)+(nld2+1),
+                (1+nld_hen)+(1+nld_egg),
+                (1+nld_hen)+(1+nld_egg),
             )
-            ret_raw[       1+i,(nld1+1)+j] = 1
-            ret_raw[(nld1+1)+j,       1+j] = 1
+            ret_raw[       1+i,(1+nld_hen)+j] = 1
+            ret_raw[(1+nld_hen)+j,       1+j] = 1
             transpose(cv)*kron(ret_raw,I_Int)*cv
         end
         for i = 1:3 for j = 1:3
     ]
+
     if cst isa FixedJoint
         Φqᵀq = vcat(zero.(Φqᵀq_trans),Φqᵀq_rot_fix[cst.order])
     elseif cst isa RevoluteJoint
-        Φqᵀq = vcat(zero.(Φqᵀq_trans),Φqᵀq_rot_ā1[cst.mask])
+        Φqᵀq = vcat(zero.(Φqᵀq_trans),Φqᵀq_rot_ā_hen[cst.mask])
     elseif cst isa PrismaticJoint
-        Φqᵀq = vcat(Φqᵀq_trans[[2,3]],Φqᵀq_rot_ā1)
+        Φqᵀq = vcat(Φqᵀq_trans[[2,3]],Φqᵀq_rot_ā_hen)
     elseif cst isa CylindricalJoint
-        Φqᵀq = vcat(Φqᵀq_trans[[2,3]],Φqᵀq_rot_ā1[cst.mask])
+        Φqᵀq = vcat(Φqᵀq_trans[[2,3]],Φqᵀq_rot_ā_hen[cst.mask])
     elseif cst isa UniversalJoint
-        Φqᵀq = vcat(zero.(Φqᵀq_trans),Φqᵀq_rot_ā1*ā2.+Φqᵀq_rot_ā2*ā1)
+        Φqᵀq = vcat(zero.(Φqᵀq_trans),Φqᵀq_rot_ā_hen*ā_egg.+Φqᵀq_rot_ā_egg*ā_hen)
+    elseif cst isa PrismaticUniversalJoint
+        Φqᵀq_rot = sum(
+                Φqᵀq_rot_ā_hen[i]*ā_egg[i].+Φqᵀq_rot_ā_egg[i]*ā_hen[i]
+                for i = 1:3
+        )
+        Φqᵀq = vcat(
+            Φqᵀq_trans[[2,3]],
+            [Φqᵀq_rot]
+        )
     elseif cst isa PinJoint
         Φqᵀq = vcat(zero.(Φqᵀq_trans),zero.(Φqᵀq_rot_ā1))
     else
@@ -1268,37 +2609,42 @@ function make_∂Aᵀλ∂q(cst::LinearJoint,numbered,c)
     end
 end
 
-function rot_jac!(ret,order,q1,q2,X1,X2,memfree1,memfree2,uci1,uci2,)
+function rot_jac!(ret,order,q_hen,q_egg,X_hen,X_egg,free_hen,free_egg,uci_hen,uci_egg,)
     k = 0
     for i = 1:3
         for j = 1:3
             if 3(i-1)+j in order
                 k += 1
-                tpl1 = zero(q1)
-                tpl2 = zero(q2)         
-                tpl1[3+3(i-1)+1:3+3i] .= X2[:,j]
-                tpl2[3+3(j-1)+1:3+3j] .= X1[:,i]
-                ret[k, memfree1] .= tpl1[uci1] #todo cv
-                ret[k, memfree2] .= tpl2[uci2] #todo cv
+                tpl1 = zero(q_hen)
+                tpl2 = zero(q_egg)         
+                tpl1[3+3(i-1)+1:3+3i] .= X_egg[:,j]
+                tpl2[3+3(j-1)+1:3+3j] .= X_hen[:,i]
+                ret[k, free_hen] .= tpl1[uci_hen] #todo cv
+                ret[k, free_egg] .= tpl2[uci_egg] #todo cv
             end
         end
     end
 end
 
 #todo 
-# (joint_type == :Fixed)            && (return 0, 0) #rot order #linear trans
-# (joint_type == :Prismatic)        && (return 1, 0) #rot order
-# (joint_type == :Planar)           && (return 2, 0) #rot order
-# (joint_type == :FixedOrientation) && (return 3, 0) #rot order
-# (joint_type == :Revolute)         && (return 0, 1) #linear trans
-# (joint_type == :Cylindrical)      && (return 1, 1)
-# (joint_type == :PlanarAxis)       && (return 2, 1)
-# (joint_type == :FreeRevolute)     && (return 3, 1)
-# (joint_type == :Orbital)          && (return 0, 2) #linear trans
-# (joint_type == :PrismaticOrbital) && (return 1, 2)
-# (joint_type == :PlanarOrbital)    && (return 2, 2)
-# (joint_type == :FreeOrbital)      && (return 3, 2)
-# (joint_type == :Spherical)        && (return 0, 3) #linear trans
-# (joint_type == :CylindricalFree)  && (return 1, 3)
-# (joint_type == :PlanarFree)       && (return 2, 3)
-# (joint_type == :Floating)         && (return 3, 3)
+#done (joint_type == :FloatingSpherical) && (return 3, 3) #dof=6, ncsts=0, 
+#todo (joint_type == :OrbitalSpherical)  && (return 2, 3) #dof=5, ncsts=1, 
+#done (joint_type == :PlanarSpherical)   && (return 2, 3) #dof=5, ncsts=1, 
+#done (joint_type == :PrismaticSpherical)&& (return 1, 3) #dof=4, ncsts=2, 
+#done (joint_type == :Spherical)         && (return 0, 3) #dof=3, ncsts=3,  linear trans
+#done (joint_type == :FloatingUniversal) && (return 3, 2) #dof=5, ncsts=1, 
+#todo (joint_type == :OrbitalUniversal)  && (return 2, 2) #dof=4, ncsts=2,
+#done (joint_type == :PlanarUniversal)   && (return 2, 2) #dof=4, ncsts=2, 
+#done (joint_type == :PrismaticUniversal)&& (return 1, 2) #dof=3, ncsts=3, 
+#done (joint_type == :Universal)         && (return 0, 2) #dof=2, ncsts=4,  linear trans
+#done (joint_type == :FloatingRevolute)  && (return 3, 1) #dof=4, ncsts=2, 
+#todo (joint_type == :OrbitalRevolute)   && (return 2, 1) #dof=3, ncsts=3, 
+#done (joint_type == :PlanarRevolute)    && (return 2, 1) #dof=3, ncsts=3, 
+#done (joint_type == :Cylindrical)       && (return 1, 1) #dof=2, ncsts=4, 
+#done (joint_type == :Revolute)          && (return 0, 1) #dof=1, ncsts=5,  linear trans
+#done (joint_type == :Floating)          && (return 3, 0) #dof=3, ncsts=3,  rot order
+#todo (joint_type == :Orbital)           && (return 2, 0) #dof=2, ncsts=4,  rot order
+#done (joint_type == :Planar)            && (return 2, 0) #dof=2, ncsts=4,  rot order
+#done (joint_type == :Prismatic)         && (return 1, 0) #dof=1, ncsts=5,  rot order
+#done (joint_type == :Fixed)             && (return 0, 0) #dof=0, ncsts=6,  rot order #linear trans
+
