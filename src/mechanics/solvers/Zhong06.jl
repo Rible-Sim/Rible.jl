@@ -140,6 +140,7 @@ function solve!(intor::Integrator,cache::Zhong06Cache;
                     iteration_break = iteration-1
                     break
                 end                
+                # FiniteDiff.finite_difference_jacobian!(initial_Jac,Res_stepk!,initial_x,Val{:central})
                 Jac_stepk!(initial_Jac,initial_x)
                 initial_x .+= -initial_Jac\initial_Res
             end

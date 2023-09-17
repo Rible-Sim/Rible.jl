@@ -114,20 +114,19 @@ function optimize_minimum_stiffness(mat𝒦ps,vec𝒦m,vecI,A,b,nx,x_0)
         b, 
         COSMO.ZeroSet
     )
-
-    # constraint3 = COSMO.Constraint(
-    #     Matrix(1.0I,nx,nx)[:,size(mat𝒦ps,2)+1]', 
-    #     [-σmax], 
-    #     COSMO.Nonnegatives
-    # )
-
+    
     constraints = [constraint1,constraint2,]
 
     custom_settings = COSMO.Settings(
         verbose = true, 
         eps_abs = 1e-10, 
         eps_rel = 1e-10,
-        max_iter = 50000,
+        max_iter = 5000,
+        rho = 1e-2,
+        # sigma = 1e-3,
+        # adaptive_rho = false,
+        # alpha = 1.0,
+        # scaling = 0,
     )
 
     COSMO.assemble!(
@@ -139,6 +138,52 @@ function optimize_minimum_stiffness(mat𝒦ps,vec𝒦m,vecI,A,b,nx,x_0)
     )
     COSMO.warm_start_primal!(model, x_0)
     COSMO.optimize!(model)
+end
+
+function optimize_minimum_stiffness_Clarabel(mat𝒦ps,vec𝒦m,vecI,Aeq,beq,nx,x_0)
+
+    solver = Clarabel.Solver()
+
+    A = sparse(
+        [
+            hcat(
+                mat𝒦ps,zero(vecI)
+            );
+            Aeq; 
+        ]
+    )
+    b = [
+        vec𝒦m;
+        beq;
+    ]
+
+    # Clarabel.jl cone specification
+    cones = [
+        Clarabel.PSDTriangleConeT(3),
+        Clarabel.ZeroConeT(length(beq)), 
+    ]
+
+    settings = Clarabel.Settings(
+        verbose = true, 
+        time_limit = 5,
+        tol_gap_abs = 1e-12, #absolute duality gap tolerance
+        tol_gap_rel = 1e-12, #relative duality gap tolerance
+        tol_feas = 1e-12, #feasibility check tolerance (primal and dual)
+        tol_infeas_abs = 1e-12, #absolute infeasibility tolerance (primal and dual)
+        tol_infeas_rel = 1e-12, #relative infeasibility tolerance (primal and dual)
+    )
+
+    Clarabel.setup!(
+        solver, 
+        sparse(zeros(nx,nx)), 
+        -Matrix(1.0I,nx,nx)[:,end],
+        A, 
+        b,
+        cones, 
+        settings
+    )
+
+    solution = Clarabel.solve!(solver)
 end
 
 # function super_stability(bot)

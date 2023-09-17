@@ -26,13 +26,15 @@ function Base.getproperty(a::Axes{3}, p::Symbol)
 end
 
 
-function Axes(normal)
+function Axes(normal::AbstractVector)
+    Axes(get_orthonormal_basis(normal))
+end
+
+function get_orthonormal_axes(normal::AbstractVector)
     normal /= norm(normal)
     t1,t2 = NCF.HouseholderOrthogonalization(normal)
-    Axes(
-        SMatrix{3,3}(
-            [normal t1 t2]
-        )
+    SMatrix{3,3}(
+        [normal t1 t2]
     )
 end
 

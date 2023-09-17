@@ -50,6 +50,7 @@ import Meshes
 using Match
 using Cthulhu
 using COSMO
+import Clarabel
 using Polyhedra
 import CDDLib 
 lib = CDDLib.Library()
@@ -1927,9 +1928,18 @@ unibot = uni(0.0;
     μ = 0.9,
     e = 0.0,
     z0 = 0.2,
+    # Rbar = RotXY(π/5,π/5.5),
+    Rbar = RotX(0.0),
     isbody = true,
 )
 bot = unibot
+plot_traj!(bot;showground=false)
+
+dt = 1e-3
+tspan = (0.0,5.0)
+prob = TR.SimProblem(bot,dynfuncs)
+TR.solve!(prob,TR.Zhong06();tspan,dt,ftol=1e-10,maxiters=50,verbose=true,exception=true)
+
 plot_traj!(bot;showground=false)
 
 @myshow bot.tg.ndof
@@ -1964,11 +1974,10 @@ ns = size(S,2)
 nk = size(D,2)
 
 k = TR.get_cables_stiffness(bot.tg)
-l = TR.get_cables_len(bot.tg)
+# l = TR.get_cables_len(bot.tg)
 
 ᾱ = [1,1,1]
 f =  S*ᾱ
-
 
 GM.activate!();with_theme(theme_pub;
         resolution = (0.95tw,0.24tw),
@@ -2099,9 +2108,7 @@ Ǩa = TR.∂Aᵀλ∂q̌(bot.tg,λ)
 𝒦a = transpose(Ň)*Ǩa*Ň |> Symmetric 
 vals_𝒦a,vecs_𝒦a = eigen(𝒦a)
 @myshow sort(vals_𝒦a)
-@myshow 𝒦a[1:5,1:5]
-# @show count((x)->x<0,D_𝒦a)
-# @show count((x)->x==0,D_𝒦a)
+@myshow 𝒦a[1:3,1:3]
 
 Ǩm = TR.build_Ǩm!(bot.tg,q,k)
 𝒦m = transpose(Ň)*Ǩm*Ň |> Symmetric
@@ -2109,6 +2116,9 @@ vals_𝒦m,vecs_𝒦m = eigen(𝒦m)
 
 vec𝒦m = vec(𝒦m)
 vecI = vec(Matrix(1.0I,size(𝒦m)))
+
+vectri𝒦m = SymmetricPacked(𝒦m).tri
+vectriI = SymmetricPacked(Matrix(1.0I,size(𝒦m))).tri
 
 struct𝒦p = [
     begin
@@ -2135,9 +2145,14 @@ vals_𝒦p,vecs_𝒦p = eigen(𝒦p)
 𝒦 = 𝒦m .+ 𝒦p
 vals_𝒦,vecs_𝒦 = eigen(𝒦)
 
-vec𝒦ps = vec.(struct𝒦p.𝒦p) 
-
+vec𝒦ps = vec.(struct𝒦p.𝒦p)
 mat𝒦ps = reduce(hcat,vec𝒦ps)
+
+vectri𝒦ps = [
+    SymmetricPacked(𝒦p).tri
+    for 𝒦p in struct𝒦p.𝒦p
+]
+mattri𝒦ps = reduce(hcat,vectri𝒦ps)
 
 A = hcat(
     -Matrix(1.0I,ns,ns),
@@ -2167,6 +2182,19 @@ result_min = TR.optimize_minimum_stiffness(mat𝒦ps,vec𝒦m,vecI,
 )
 σ_min = result_min.x[end]
 
+
+result_min = TR.optimize_minimum_stiffness_Clarabel(mattri𝒦ps,vectri𝒦m,vectriI,
+    hcat(
+        -Matrix(1.0I,ns,ns),
+        ᾱ,
+    ),
+    zeros(ns),
+    ns+1,
+    result_max.x[1:end-1]
+)
+@myshow result_min.status == Clarabel.SOLVED
+σ_min = result_min.x[end]
+
 𝒦_min = 𝒦m + σ_min*reshape(mat𝒦ps*ᾱ,size(𝒦m))
 vals_𝒦_min, vecs_𝒦_min = eigen(𝒦_min)
 ρ_min = vals_𝒦_min[1]
@@ -2191,31 +2219,31 @@ with_theme(theme_pub;
         ylabel = L"\rho_{\mathrm{1}}"
     )
     lines!(ax1,σs,Vals[1,:],)
-    # scatter!(
-    #     ax1,
-    #     [σ_max,σ_min],
-    #     [ρ_max,ρ_min]
-    # )
-    # text!(ax1,
-    #     [σ_max], [ρ_max], 
-    #     text = [L"\sigma_{\mathrm{max}}"],
-    #     align = (:center,:bottom),
-    #     offset = (0, fontsize/4)
-    # )
-    # text!(ax1,
-    #     [σ_min], [ρ_min], 
-    #     text = [L"\sigma_{\mathrm{min}}"],
-    #     align = (:right,:center),
-    #     offset = (-fontsize/2, 0)
-    # )
+    scatter!(
+        ax1,
+        [σ_max,σ_min],
+        [ρ_max,ρ_min]
+    )
+    text!(ax1,
+        [σ_max], [ρ_max], 
+        text = [L"\sigma_{\mathrm{max}}"],
+        align = (:center,:bottom),
+        offset = (0, fontsize/4)
+    )
+    text!(ax1,
+        [σ_min], [ρ_min], 
+        text = [L"\sigma_{\mathrm{min}}"],
+        align = (:right,:center),
+        offset = (-fontsize/2, 0)
+    )
     
     # ax2 = Axis(fig[1,2],
     #     xlabel = L"\sigma",
     #     ylabel = L"\rho"
     # )
-    for i in 1:3
-        lines!(ax1,σs,Vals[i,:],label=latexstring("\\rho_$i"))
-    end
+    # for i in 1:3
+    #     lines!(ax1,σs,Vals[i,:],label=latexstring("\\rho_$i"))
+    # end
     # Legend(
     #     fig[1,3],
     #     ax2

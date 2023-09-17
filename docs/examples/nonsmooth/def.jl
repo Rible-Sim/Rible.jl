@@ -187,9 +187,9 @@ function rigidbar(i,ri,rj;
     r̄p3 = SVector{3}(   0,0.0,0.0)
     inertia = m*b^2/12
     Ī = SMatrix{3,3}([
-        inertia 0 0;
-        0       0 0;
-        0       0 0
+        inertia 0          0;
+        0       inertia    0;
+        0       0     inertia
     ])
     r̄ps = [r̄p1,r̄p2,r̄p3]
     ās = [SVector(1.0,0,0),SVector(1.0,0,0),SVector(1.0,0,0)]
@@ -231,6 +231,7 @@ function uni(c=100.0;
         z0 = 0.2,
         ωz = 5.0,
         mbar = 0.05,
+        Rbar = RotZ(0.0),
         isbody = false,
     )
     lₛ = 80e-3
@@ -297,8 +298,8 @@ function uni(c=100.0;
 
     rb1 = rigidbar(
         1, 
-        RotX(0.0)*p[end-1],
-        RotX(0.0)*p[end];
+        Rbar*p[end-1],
+        Rbar*p[end];
         ṙi = ṙo_ref,
         ṙj = ṙo_ref,
         m = mbar,
@@ -306,6 +307,7 @@ function uni(c=100.0;
         constrained = false,
         ci = Int[],
         Φi = collect(1:6),
+        # Φi = [1],
         isbody,
     )
     rb2 = rigidbase(2, p)
@@ -324,7 +326,7 @@ function uni(c=100.0;
     original_restlens[4:6] .= 80e-3
 
     ks = zeros(ncables)
-    ks[1:3] .= 1000.0
+    ks[1:3] .= 500.0
     ks[4:6] .= 1000.0
 
     cables = [
@@ -352,6 +354,14 @@ function uni(c=100.0;
     connected = TR.connect(rigdibodies, matrix_cnt)
     tensioned = @eponymtuple(connected,)
     
+    # uj = TR.PinJoint(1,
+    #     TR.End2End(
+    #         1,
+    #         TR.ID(rb2,4,4),
+    #         TR.ID(rb1,3,3),
+    #     )
+    # )
+
     # uj = TR.UniversalJoint(1,
     #     TR.End2End(
     #         1,
@@ -363,11 +373,10 @@ function uni(c=100.0;
     uj = TR.PrismaticUniversalJoint(1,
         TR.End2End(
             1,
-            TR.ID(rb2,4,4),
             TR.ID(rb1,3,3),
+            TR.ID(rb2,4,4),
         )
     )
-
 
     jointed = TR.join([uj],indexedcoords)
 

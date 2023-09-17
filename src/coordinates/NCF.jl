@@ -1331,7 +1331,12 @@ function make_X(nmcs::LNC,q::AbstractVector)
     Y = get_conversion(nmcs)
     qstd = Y*q
     ndim = get_ndim(nmcs)
-    reshape(qstd[ndim+1:end],ndim,:)
+    X = reshape(qstd[ndim+1:end],ndim,:)
+    if (nmcs isa LNC2D6C) || (nmcs isa LNC3D6C)
+        return SMatrix{ndim,1}(X)
+    else
+        return SMatrix{ndim,ndim}(X)
+    end
 end
 
 find_R(q::AbstractVector, nmcs::LNC) = find_R(nmcs,q)
