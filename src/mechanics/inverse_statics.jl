@@ -47,13 +47,13 @@ function build_D(tg)
 
     foreach(string2ap) do scnt
         id = scnt.id
-        mvrbid1 = findfirst((x)->x==scnt.end1.rbsig.prop.id, mvbodyindex)
+        mvrbid1 = findfirst((x)->x==scnt.hen.rbsig.prop.id, mvbodyindex)
         if mvrbid1 != nothing
-            D_raw[iss[mvrbid1]+scnt.end1.pid,id] = 1
+            D_raw[iss[mvrbid1]+scnt.hen.pid,id] = 1
         end
-        mvrbid2 = findfirst((x)->x==scnt.end2.rbsig.prop.id, mvbodyindex)
+        mvrbid2 = findfirst((x)->x==scnt.egg.rbsig.prop.id, mvbodyindex)
         if mvrbid2 != nothing
-            D_raw[iss[mvrbid2]+scnt.end2.pid,id] = -1
+            D_raw[iss[mvrbid2]+scnt.egg.pid,id] = -1
         end
     end
     D .= kron(D_raw,Matrix(1I,ndim,ndim))
@@ -71,11 +71,11 @@ function build_Q̃(tg)
 
     foreach(connected) do cc
         j = cc.id
-        (;end1,end2) = cc
-        rb1 = end1.rbsig
-        rb2 = end2.rbsig
-        C1 = rb1.state.cache.Cps[end1.pid]
-        C2 = rb2.state.cache.Cps[end2.pid]
+        (;hen,egg) = cc
+        rb1 = hen.rbsig
+        rb2 = egg.rbsig
+        C1 = rb1.state.cache.Cps[hen.pid]
+        C2 = rb2.state.cache.Cps[egg.pid]
         uci1 = rb1.state.cache.free_idx
         uci2 = rb2.state.cache.free_idx
         m2sf1 = mem2sysfree[rb1.prop.id]
@@ -242,12 +242,12 @@ function make_Q̌(tg,q0)
         foreach(connected) do scnt
             j = scnt.id
             (;k) = cables[j]
-            rb1 = scnt.end1.rbsig
-            rb2 = scnt.end2.rbsig
+            rb1 = scnt.hen.rbsig
+            rb2 = scnt.egg.rbsig
             rb1id = rb1.prop.id
             rb2id = rb2.prop.id
-            ap1id = scnt.end1.pid
-            ap2id = scnt.end2.pid
+            ap1id = scnt.hen.pid
+            ap2id = scnt.egg.pid
             C1 = rb1.state.cache.Cps[ap1id]
             C2 = rb2.state.cache.Cps[ap2id]
             mfull1 = mem2sysfull[rb1.prop.id]
@@ -268,12 +268,12 @@ function make_Q̌(tg,q0)
         Jj = zeros(eltype(q̌),ndim,nfull)
         foreach(connected) do scnt
             j = scnt.id
-            rb1 = scnt.end1.rbsig
-            rb2 = scnt.end2.rbsig
+            rb1 = scnt.hen.rbsig
+            rb2 = scnt.egg.rbsig
             rb1id = rb1.prop.id
             rb2id = rb2.prop.id
-            ap1id = scnt.end1.pid
-            ap2id = scnt.end2.pid
+            ap1id = scnt.hen.pid
+            ap2id = scnt.egg.pid
             c1 = c[num2sys[mem2num[rb1id][ap1id]]]
             c2 = c[num2sys[mem2num[rb2id][ap2id]]]
             C1 = rb1.state.cache.funcs.C(c1)
@@ -294,12 +294,12 @@ function make_Q̌(tg,q0)
     #     ret = zeros(eltype(γ),nfullcoords)
     #     foreach(string2ap) do scnt
     #         j = scnt.id
-    #         rb1 = scnt.end1.rbsig
-    #         rb2 = scnt.end2.rbsig
+    #         rb1 = scnt.hen.rbsig
+    #         rb2 = scnt.egg.rbsig
     #         rb1id = rb1.prop.id
     #         rb2id = rb2.prop.id
-    #         ap1id = scnt.end1.pid
-    #         ap2id = scnt.end2.pid
+    #         ap1id = scnt.hen.pid
+    #         ap2id = scnt.egg.pid
     #         is1 = (apnb[rb1id][ap1id]-1)*ndim
     #         is2 = (apnb[rb2id][ap2id]-1)*ndim
     #         c1 = c[is1+1:is1+ndim]

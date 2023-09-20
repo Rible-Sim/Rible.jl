@@ -149,21 +149,22 @@ function dualtri(ndof,;onedir=[1.0,0.0],θ=0.0,k=400.0,c=0.0,restlen=0.16)
     TR.TensegrityRobot(tg,hub)
 end
 
-function Tbars()
+function Tbars(;θ = 0)
     SVo3 = SVector{3}([0.0,0.0,0.0])
     a = 1.0
     b = 1.0
+    c = 0.05
     function make_base(i)
         movable = true
         constrained = true
         r̄g = SVo3
-        r̄p1 = SVector{3}([ -a, b,0.0])
-        r̄p2 = SVector{3}([ -a,-b,0.0])
-        r̄p3 = SVector{3}([0.0, b,0.0])
-        r̄p4 = SVector{3}([0.0,-b,0.0])
+        r̄p1 = SVector{3}([ -a, b,c])
+        r̄p2 = SVector{3}([ -a,-b,c])
+        r̄p3 = SVector{3}([0.0, b,c])
+        r̄p4 = SVector{3}([0.0,-b,c])
         r̄p5 = SVo3
-        r̄p6 = SVector{3}([-2a,0.0,0.0])
-        r̄p7 = SVector{3}([  a,0.0,0.0])
+        r̄p6 = SVector{3}([-2a,0.0,c])
+        r̄p7 = SVector{3}([  a,0.0,c])
         r̄ps = [r̄p1,r̄p2,r̄p3,r̄p4,r̄p5,r̄p6,r̄p7]
         ās = [
             SVector{3}([1.0,0.0,0.0]),
@@ -194,7 +195,8 @@ function Tbars()
         basemesh = load("装配体1.STL") |> make_patch(;
             # trans=[-1.0,0,0],
             rot = RotZ(π),
-            scale=1/500
+            scale=1/500,
+            color = :silver,
         )
         TR.RigidBody(prop,state,basemesh)
     end
@@ -202,7 +204,7 @@ function Tbars()
         movable = true
         constrained = false
         r̄g = SVo3
-        r̄p1 = SVo3
+        r̄p1 = SVector(0.0,0.0,c)
         r̄ps = [r̄p1,]
         ās = [SVector{3}([1.0,0.0,0.0]),]
         Ī = SMatrix{3,3}(Matrix(1.0I,3,3))
@@ -212,13 +214,13 @@ function Tbars()
         m = 1.0
 
         prop = TR.RigidBodyProperty(
-                    i,movable,m,
-                    Ī,
-                    r̄g,
-                    r̄ps,
-                    ās;
-                    constrained
-                    )
+            i,movable,m,
+            Ī,
+            r̄g,
+            r̄ps,
+            ās;
+            constrained
+        )
 
         lncs, q, _ = TR.NCF.NC1P3V(ri, ro, R, ṙo, ω)
         @show q[1:3]
@@ -228,19 +230,27 @@ function Tbars()
         state = TR.RigidBodyState(prop, lncs, ri, R, ṙo, ω)
         slidermesh = load("装配体2.2.STL") |> make_patch(;
             # trans=[-1.0,0,0],
-            rot = RotY(π),
+            rot = begin
+                if i == 2
+                    RotYZ(π,π/2)
+                else
+                    RotY(π)
+                end
+            end,
             scale=1/500,
-			color=:mediumpurple4
+            color=:mediumpurple4
         )
         TR.RigidBody(prop,state,slidermesh)
     end
     base = make_base(1)
-    slider1 = make_slider(2;ri = SVector(-a,0.0,0.0))
-    slider2 = make_slider(3;ri = SVo3,)
+    p1 = SVector(-b*cos(θ),0.0,0.0)
+    p2 = SVector(0,b*sin(θ),0)
+    slider1 = make_slider(2;ri = p1)
+    slider2 = make_slider(3;ri = p2,)
     bar = make_3d_bar(
         4,
-        SVector(-a,0.0,0.0),
-        SVo3;
+        p1,
+        p2;
 		loadmesh = true,
     )
     rbs = [base,slider1,slider2,bar]
@@ -261,6 +271,7 @@ function Tbars()
     original_restlens = zeros(ncables)
     original_restlens = zeros(ncables)
     ks = fill(100.0,ncables)
+    ks[2] = 400.0
     cs = zeros(ncables)
     ss = [TR.Cable3D(i, original_restlens[i],ks[i],cs[i];slack=false) for i = 1:ncables]
     tensiles = (cables=ss,)
@@ -270,8 +281,8 @@ function Tbars()
         2 -1  0  0;
         # 3  0 -1  0;
         # 4  0 -1  0;
-        6  0  0 -1;
-        7  0  0 -1;
+        6 -1  0  0;
+        7 -1  0  0;
     ]
 
     connected = TR.connect(rigdibodies, cm)

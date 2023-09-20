@@ -49,8 +49,8 @@ function get_cables(tg)
     ret = Vector{Pair{Point{ndim,T},Point{ndim,T}}}()
     mapreduce(
         (scnt)->
-        Point(scnt.end1.rbsig.state.rps[scnt.end1.pid]) =>
-        Point(scnt.end2.rbsig.state.rps[scnt.end2.pid]),
+        Point(scnt.hen.rbsig.state.rps[scnt.hen.pid]) =>
+        Point(scnt.egg.rbsig.state.rps[scnt.egg.pid]),
         vcat,
         tensioned.connected
         ;init=ret

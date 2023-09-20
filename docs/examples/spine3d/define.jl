@@ -77,11 +77,11 @@ function spine3d(n;c=0.0)
         [
         vcat(
             [
-            (id=8(i-1)+j,end1=TR.ID(rbs[i],j),end2=TR.ID(rbs[i+1],j))
+            (id=8(i-1)+j,hen=TR.ID(rbs[i],j),egg=TR.ID(rbs[i+1],j))
             for j = 1:4
             ],
             [
-            (id=8(i-1)+4+a,end1=TR.ID(rbs[i],jk.j),end2=TR.ID(rbs[i+1],jk.k))
+            (id=8(i-1)+4+a,hen=TR.ID(rbs[i],jk.j),egg=TR.ID(rbs[i+1],jk.k))
             for (a,jk) in enumerate(asslist)
             ]
         )

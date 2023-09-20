@@ -589,10 +589,10 @@ function update_tensiles!(tg, @eponymargs(connected,))
     (;cables) = tg.tensiles
     foreach(connected) do scnt
         scable = cables[scnt.id]
-        state1 = scnt.end1.rbsig.state
-        state2 = scnt.end2.rbsig.state
-        pid1 = scnt.end1.pid
-        pid2 = scnt.end2.pid
+        state1 = scnt.hen.rbsig.state
+        state2 = scnt.egg.rbsig.state
+        pid1 = scnt.hen.pid
+        pid2 = scnt.egg.pid
         p1 = state1.rps[pid1]
         ṗ1 = state1.ṙps[pid1]
         f1 = state1.fps[pid1]
@@ -621,10 +621,10 @@ function update_tensiles!(tg, @eponymargs(clustered,))
         for (segid, seg) in enumerate(clustercable.segs)
             (;state, k, c, original_restlen, prestress) = seg
             (;restlen) = state
-            state1 = scnt[segid].end1.rbsig.state
-            state2 = scnt[segid].end2.rbsig.state
-            pid1 = scnt[segid].end1.pid
-            pid2 = scnt[segid].end2.pid
+            state1 = scnt[segid].hen.rbsig.state
+            state2 = scnt[segid].egg.rbsig.state
+            pid1 = scnt[segid].hen.pid
+            pid2 = scnt[segid].egg.pid
             p1 = state1.rps[pid1]
             ṗ1 = state1.ṙps[pid1]
             f1 = state1.fps[pid1]
@@ -901,7 +901,7 @@ function make_Φ(tg::AbstractTensegrityStructure,q0::AbstractVector)
         is = Ref(ninconstraints)
         foreach(jointed.joints) do joint
             nc = joint.nconstraints
-            ret[is[]+1:is[]+nc] .= make_Φ(joint,indexed,numbered)(q,d[is[]+1:is[]+nc],c)
+            ret[is[]+1:is[]+nc] .= make_Φ(joint,tg)(q,d[is[]+1:is[]+nc],c)
             is[] += nc
         end
         ret
@@ -938,7 +938,7 @@ function make_Φ(tg::AbstractTensegrityStructure)
         end
 		foreach(jointed.joints) do joint
             nc = joint.nconstraints
-            ret[is[]+1:is[]+nc] .= make_Φ(joint,indexed,numbered)(q)
+            ret[is[]+1:is[]+nc] .= make_Φ(joint,tg)(q)
             is[] += nc
         end
         ret
@@ -970,7 +970,7 @@ function make_A(tg::AbstractTensegrityStructure,q0::AbstractVector)
         is = Ref(ninconstraints)
         foreach(jointed.joints) do joint
             nc = joint.nconstraints
-            ret[is[]+1:is[]+nc,:] .= make_A(joint,indexed,numbered)(q,c)
+            ret[is[]+1:is[]+nc,:] .= make_A(joint,tg)(q,c)
             is[] += nc
         end
         ret
@@ -1002,7 +1002,7 @@ function make_A(tg::AbstractTensegrityStructure)
         end
         foreach(jointed.joints) do joint
             nc = joint.nconstraints
-            ret[is[]+1:is[]+nc,:] .= make_A(joint,indexed,numbered)(q)
+            ret[is[]+1:is[]+nc,:] .= make_A(joint,tg)(q)
             is[] += nc
         end
         ret

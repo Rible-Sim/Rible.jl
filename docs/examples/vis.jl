@@ -517,8 +517,8 @@ function init_plot!(ax,tgob;
             mapreduce(
                 (scnt)->
                 [(
-                    scnt.end1.rbsig.state.rps[scnt.end1.pid].+
-                    scnt.end2.rbsig.state.rps[scnt.end2.pid]
+                    scnt.hen.rbsig.state.rps[scnt.hen.pid].+
+                    scnt.egg.rbsig.state.rps[scnt.egg.pid]
                 )./2],
                 vcat,
                 tensioned.connected
@@ -674,8 +674,8 @@ function get_linesegs_cables(tg;slackonly=false,noslackonly=false)
 	linesegs_cables = Vector{Tuple{Point{ndim,T},Point{ndim,T}}}()
 	foreach(connected) do scnt
 		scable = cables[scnt.id]
-		ret = (Point(scnt.end1.rbsig.state.rps[scnt.end1.pid]),
-				Point(scnt.end2.rbsig.state.rps[scnt.end2.pid]))
+		ret = (Point(scnt.hen.rbsig.state.rps[scnt.hen.pid]),
+				Point(scnt.egg.rbsig.state.rps[scnt.egg.pid]))
         slacking = scable.state.tension <= 0
         if (slackonly && slacking) ||
            (noslackonly && !slacking) ||
@@ -1118,8 +1118,8 @@ function plot_self_stress_states(
                     mapreduce(
                         (scnt)->
                         [(
-                            scnt.end1.rbsig.state.rps[scnt.end1.pid].+
-                            scnt.end2.rbsig.state.rps[scnt.end2.pid]
+                            scnt.hen.rbsig.state.rps[scnt.hen.pid].+
+                            scnt.egg.rbsig.state.rps[scnt.egg.pid]
                         )./2],
                         vcat,
                         tensioned.connected

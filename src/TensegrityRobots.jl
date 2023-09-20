@@ -55,6 +55,8 @@ include("robots/clustertensegrity.jl")
 
 include("control/control.jl")
 
+include("mechanics/constraints.jl")
+
 include("mechanics/inverse_statics.jl")
 
 include("mechanics/forward_statics.jl")

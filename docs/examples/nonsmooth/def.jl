@@ -172,6 +172,7 @@ function rigidbar(i,ri,rj;
         ci = Int[],
         Φi = [1],
         isbody = false,
+        loadmesh = true,
     )
     ro = (ri + rj)/2
     ṙo = (ṙi + ṙj)/2
@@ -221,7 +222,14 @@ function rigidbar(i,ri,rj;
     end
     state = TR.RigidBodyState(prop, lncs, ro, R, ṙo, ω, ci, Φi)
     # leg_mesh = load("400杆.STL")
-    barmesh = endpoints2mesh(r̄p1,r̄p2;radius = norm(r̄p2-r̄p1)/40)
+    if loadmesh
+        barmesh = load("BZ.STL") |> make_patch(;
+            scale=1/1000,
+            rot = RotY(π/2),
+        )
+    else
+        barmesh = endpoints2mesh(r̄p1,r̄p2;radius = norm(r̄p2-r̄p1)/40)
+    end
     rb = TR.RigidBody(prop, state, barmesh)
 end
 
@@ -234,15 +242,15 @@ function uni(c=100.0;
         Rbar = RotZ(0.0),
         isbody = false,
     )
-    lₛ = 80e-3
-    DE = 130.64e-3
+    lₛ = 0.104
+    DE = 0.415
     θ = 2π/3
     p = SVector{3}.(
         [   
             [0,0,0.0],
-            lₛ/2 .*[cos(0θ), sin(0θ),0],
-            lₛ/2 .*[cos(1θ), sin(1θ),0],
-            lₛ/2 .*[cos(2θ), sin(2θ),0],
+            lₛ .*[cos(0θ), sin(0θ),0],
+            lₛ .*[cos(1θ), sin(1θ),0],
+            lₛ .*[cos(2θ), sin(2θ),0],
             [0,0,-DE/2],
             [0,0, DE/2]
         ]
@@ -286,13 +294,17 @@ function uni(c=100.0;
         )
         lncs, _ = TR.NCF.NC1P3V(ri, ro, R, ṙo, ω)
         state = TR.RigidBodyState(prop, lncs, ri, R, ṙo, ω, ci, Φi)
-        # trunk_mesh = load("身体.STL")
-        long = 25
+        trimesh = load("BASE.STL") |> make_patch(;
+            scale=1/1000,
+            trans = [0,0,0.005],
+            rot = RotZ(π/2),
+        )
+        # long = 25
 
-        b1 = endpoints2mesh(r̄ps[1],r̄ps[2];radius = norm(r̄ps[2]-r̄ps[1])/long)
-        b2 = endpoints2mesh(r̄ps[2],r̄ps[3];radius = norm(r̄ps[3]-r̄ps[2])/long)
-        b3 = endpoints2mesh(r̄ps[3],r̄ps[1];radius = norm(r̄ps[3]-r̄ps[1])/long)
-        trimesh = GB.merge([b1,b2,b3])
+        # b1 = endpoints2mesh(r̄ps[1],r̄ps[2];radius = norm(r̄ps[2]-r̄ps[1])/long)
+        # b2 = endpoints2mesh(r̄ps[2],r̄ps[3];radius = norm(r̄ps[3]-r̄ps[2])/long)
+        # b3 = endpoints2mesh(r̄ps[3],r̄ps[1];radius = norm(r̄ps[3]-r̄ps[1])/long)
+        # trimesh = GB.merge([b1,b2,b3])
         TR.RigidBody(prop, state, trimesh)
     end
 
@@ -326,7 +338,7 @@ function uni(c=100.0;
     original_restlens[4:6] .= 80e-3
 
     ks = zeros(ncables)
-    ks[1:3] .= 500.0
+    ks[1:3] .= 900.0
     ks[4:6] .= 1000.0
 
     cables = [
@@ -370,11 +382,11 @@ function uni(c=100.0;
     #     )
     # )
 
-    uj = TR.PrismaticUniversalJoint(1,
+    uj = TR.UniversalPrismaticJoint(1,
         TR.End2End(
             1,
-            TR.ID(rb1,3,3),
             TR.ID(rb2,4,4),
+            TR.ID(rb1,3,3),
         )
     )
 
@@ -398,6 +410,7 @@ function superball(c=0.0;
             k = 4000.0,
             constrained = false,
             addconst = Float64[],
+            loadmesh = true,
         )
     p = Ref(RotY(θ)) .* SVector{3}.(
         [
@@ -421,7 +434,11 @@ function superball(c=0.0;
             ṙi=ṗ[2i-1],
             ṙj=ṗ[2i  ], 
             m = 5.0,
-            constrained = ifelse(i==1,true,false)
+            constrained = ifelse(i==1,true,false),
+            ci = ifelse(i==1,collect(1:6),Int[]),
+            Φi = ifelse(i==1,Int[],[1]),
+            loadmesh,
+            isbody =false,
             )
         for i = 1:6
     ]
@@ -432,7 +449,7 @@ function superball(c=0.0;
     ncables = 24
 
     original_restlens = zeros(ncables)
-    original_restlens .= 0.996
+    original_restlens .= 1.199744871391589
     ks = zeros(ncables)
     ks .= k
 

@@ -84,10 +84,7 @@ th = 622 |> pt2px
 function build_Ň(tg)
     (;sysfree,mem2sysndof) = tg.connectivity.indexed
     q = TR.get_q(bot.tg)
-    Nin = TR.
-    
-    .(tg,q)
-    Nin[
+    Nin = TR.make_intrinsic_nullspace(tg,q)[
         sysfree,
         reduce(vcat,mem2sysndof[2:end])
     ]
@@ -100,20 +97,10 @@ ballbot = superball(;
     l = 2.0/2,
     d = 2.0/2/2,
     z0 = 2.0/2,
-    constrained=true
+    constrained=true,
+    loadmesh = false,
 )
 bot = ballbot
-rb1 = TR.get_rigidbodies(bot)[1]
-
-# ballbot = superball(;
-#     θ = 0.0,
-#     l = 2.0/2,
-#     d = 2.0/2/2,
-#     z0 = 2.0/2,
-#     constrained=true,
-#     addconst = reshape(δq̌,1,:)
-# )
-# bot = ballbot
 
 TR.check_static_equilibrium_output_multipliers(bot.tg)
 
@@ -145,6 +132,8 @@ Ň = build_Ň(bot.tg)
 Q̃ = TR.build_Q̃(bot.tg)
 L̂ = TR.build_L̂(bot.tg)
 
+rank(Ň)
+Ǎ*Ň |> norm
 # Left hand side
 Q̃L̂ = Q̃*L̂
 
@@ -159,14 +148,11 @@ ns = size(S,2)
 nk = size(D,2)
 k = TR.get_cables_stiffness(bot.tg)
 l = TR.get_cables_len(bot.tg)
-
-f = S[:,1]# + S[:,2] + S[:,3] + S[:,4]
-
+# μ = l .- (100.0./k)
+# f = S[:,1]# + S[:,2] + S[:,3] + S[:,4]
 # equivalent μ
-# μ = l .- (f./k)
-
 λ = -inv(Ǎ*transpose(Ǎ))*Ǎ*Bᵀ*f
-# @show f,λ
+@myshow verify_lambda(bot.tg),λ
 Ǩa = TR.∂Aᵀλ∂q̌(bot.tg,λ)
 𝒦a = transpose(Ň)*Ǩa*Ň |> Symmetric 
 vals_𝒦a,vecs_𝒦a = eigen(𝒦a)
@@ -215,7 +201,6 @@ v'*𝒦*v
 
 vm[:,1] = v
 orthovm = TR.modified_gram_schmidt(vm)
-
 
 with_theme(theme_pub;
     resolution = (0.3tw,0.3tw),
@@ -271,7 +256,6 @@ with_theme(theme_pub;
         figname="superball"
     )
 end
-
 
 Ňv = Ň*nullspace(v')
 
@@ -329,7 +313,7 @@ result_min = TR.optimize_minimum_stiffness(matr𝒦ps,vecr𝒦m,vecI,
     ),
     [0.0],
     ns+1,
-    # result.x
+    result_max.x[1:end-1]
 )
 σ_min = result_min.x[end]
 
@@ -609,8 +593,8 @@ GM.activate!();with_theme(theme_pub;
                 mapreduce(
                     (scnt)->
                     [(
-                        scnt.end1.rbsig.state.rps[scnt.end1.pid].+
-                        scnt.end2.rbsig.state.rps[scnt.end2.pid]
+                        scnt.hen.rbsig.state.rps[scnt.hen.pid].+
+                        scnt.egg.rbsig.state.rps[scnt.egg.pid]
                     )./2],
                     vcat,
                     tensioned.connected
@@ -983,8 +967,8 @@ GM.activate!();with_theme(theme_pub;
                 mapreduce(
                     (scnt)->
                     [(
-                        scnt.end1.rbsig.state.rps[scnt.end1.pid].+
-                        scnt.end2.rbsig.state.rps[scnt.end2.pid]
+                        scnt.hen.rbsig.state.rps[scnt.hen.pid].+
+                        scnt.egg.rbsig.state.rps[scnt.egg.pid]
                     )./2],
                     vcat,
                     tensioned.connected
@@ -1437,8 +1421,8 @@ GM.activate!();with_theme(theme_pub;
                 mapreduce(
                     (scnt)->
                     [(
-                        scnt.end1.rbsig.state.rps[scnt.end1.pid].+
-                        scnt.end2.rbsig.state.rps[scnt.end2.pid]
+                        scnt.hen.rbsig.state.rps[scnt.hen.pid].+
+                        scnt.egg.rbsig.state.rps[scnt.egg.pid]
                     )./2],
                     vcat,
                     tensioned.connected
@@ -1608,11 +1592,16 @@ end
 #-- end tower
 
 #-- T bars
-tbbot = Tbars()
+tbbot = Tbars(;θ=π/4)
 bot = tbbot
 @myshow bot.tg.ndof
 
 plot_traj!(bot;showarrows = false, showground=false)
+
+dt = 1e-3
+tspan = (0.0,5.0)
+prob = TR.SimProblem(bot,dynfuncs)
+TR.solve!(prob,TR.Zhong06();tspan,dt,ftol=1e-10,maxiters=50,verbose=true,exception=true)
 
 TR.check_static_equilibrium_output_multipliers(bot.tg)
 
@@ -1659,7 +1648,8 @@ Ň = TR.modified_gram_schmidt(Ň_)
 
 Ň = make_Ň(bot.tg)
 
-# todo construct null space
+# done construct null space 
+#note only work in θ = 0
 rank(Ň)
 
 Ǎ*Ň |> norm
@@ -1686,7 +1676,7 @@ l = TR.get_cables_len(bot.tg)
 struct𝒦 = [
     begin
         s = S[:,i]        
-        Ǩm = TR.build_Ǩm!(bot.tg,q,100*s)
+        Ǩm = TR.build_Ǩm!(bot.tg,q,s)
         𝒦m = transpose(Ň)*Ǩm*Ň 
         # s = S\f
         # @show s
@@ -1705,7 +1695,6 @@ struct𝒦 = [
     end
     for i = 1:ns
 ] |> StructArray
-
 
 mat𝒦ms = reduce(hcat,struct𝒦.𝒦m)
 mat𝒦gs = reduce(hcat,struct𝒦.𝒦g)
@@ -1727,7 +1716,7 @@ GM.activate!();with_theme(theme_pub;
     fig = Figure()
     gd0 = fig[1,1] = GridLayout(;tellheight=false)
     gd1 = fig[1,2] = GridLayout(;tellheight=false)
-    gd2 = fig[1,3:4] = GridLayout(;tellheight=false)
+    gd2 = fig[1,3:5] = GridLayout(;tellheight=false)
     rowsize!(gd0,1,Fixed(0.15tw))
     rowsize!(gd1,1,Fixed(0.15tw))
     plot_traj!(
@@ -1784,7 +1773,7 @@ GM.activate!();with_theme(theme_pub;
         bot,
         fig = gd2,
         AxisType=Axis3,
-        gridsize = (2,2),
+        gridsize = (1,3),
         showpoints = false,
         showlabels = false,
         showground = false,
@@ -1824,8 +1813,8 @@ GM.activate!();with_theme(theme_pub;
                 mapreduce(
                     (scnt)->
                     [(
-                        scnt.end1.rbsig.state.rps[scnt.end1.pid].+
-                        scnt.end2.rbsig.state.rps[scnt.end2.pid]
+                        scnt.hen.rbsig.state.rps[scnt.hen.pid].+
+                        scnt.egg.rbsig.state.rps[scnt.egg.pid]
                     )./2],
                     vcat,
                     tensioned.connected
@@ -1929,7 +1918,8 @@ unibot = uni(0.0;
     e = 0.0,
     z0 = 0.2,
     # Rbar = RotXY(π/5,π/5.5),
-    Rbar = RotX(0.0),
+    Rbar = RotXY(π/20,π/32),
+    # Rbar = RotX(0.0),
     isbody = true,
 )
 bot = unibot
@@ -1938,7 +1928,7 @@ plot_traj!(bot;showground=false)
 dt = 1e-3
 tspan = (0.0,5.0)
 prob = TR.SimProblem(bot,dynfuncs)
-TR.solve!(prob,TR.Zhong06();tspan,dt,ftol=1e-10,maxiters=50,verbose=true,exception=true)
+TR.solve!(prob,TR.Zhong06();tspan,dt,ftol=1e-7,maxiters=50,verbose=true,exception=false)
 
 plot_traj!(bot;showground=false)
 
@@ -1976,7 +1966,7 @@ nk = size(D,2)
 k = TR.get_cables_stiffness(bot.tg)
 # l = TR.get_cables_len(bot.tg)
 
-ᾱ = [1,1,1]
+ᾱ = ones(ns)
 f =  S*ᾱ
 
 GM.activate!();with_theme(theme_pub;
@@ -2065,8 +2055,8 @@ GM.activate!();with_theme(theme_pub;
                 mapreduce(
                     (scnt)->
                     [(
-                        scnt.end1.rbsig.state.rps[scnt.end1.pid].+
-                        scnt.end2.rbsig.state.rps[scnt.end2.pid]
+                        scnt.hen.rbsig.state.rps[scnt.hen.pid].+
+                        scnt.egg.rbsig.state.rps[scnt.egg.pid]
                     )./2],
                     vcat,
                     tensioned.connected
@@ -2178,28 +2168,28 @@ result_min = TR.optimize_minimum_stiffness(mat𝒦ps,vec𝒦m,vecI,
     ),
     zeros(ns),
     ns+1,
-    result_max.x[1:end-1]
+    # result_max.x[1:end-1]
+    zeros(ns+1)
 )
 σ_min = result_min.x[end]
 
-
-result_min = TR.optimize_minimum_stiffness_Clarabel(mattri𝒦ps,vectri𝒦m,vectriI,
-    hcat(
-        -Matrix(1.0I,ns,ns),
-        ᾱ,
-    ),
-    zeros(ns),
-    ns+1,
-    result_max.x[1:end-1]
-)
-@myshow result_min.status == Clarabel.SOLVED
-σ_min = result_min.x[end]
+# result_min = TR.optimize_minimum_stiffness_Clarabel(mattri𝒦ps,vectri𝒦m,vectriI,
+#     hcat(
+#         -Matrix(1.0I,ns,ns),
+#         ᾱ,
+#     ),
+#     zeros(ns),
+#     ns+1,
+#     result_max.x[1:end-1]
+# )
+# @myshow result_min.status == Clarabel.SOLVED
+# σ_min = result_min.x[end]
 
 𝒦_min = 𝒦m + σ_min*reshape(mat𝒦ps*ᾱ,size(𝒦m))
 vals_𝒦_min, vecs_𝒦_min = eigen(𝒦_min)
 ρ_min = vals_𝒦_min[1]
 
-σs = LinRange(-500,500,100)
+σs = LinRange(-1e3,1e3,100)
 Vals =  [
     begin
         𝒦 = 𝒦m + σ*reshape(mat𝒦ps*ᾱ,size(𝒦m))

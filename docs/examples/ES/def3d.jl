@@ -75,7 +75,11 @@ function make_3d_bar(
 	state = TR.RigidBodyState(prop,nmcs,ri,R,ṙo,ω,ci)
 	# @show radius
 	if loadmesh
-		barmesh = load("装配体3.STL") |> make_patch(;trans=[0,0,0.025],scale=1/500)
+		barmesh = load("装配体3.STL") |> make_patch(;
+			trans=[0,0,0.025],
+			scale=1/500,
+			color=:palegreen3,
+		)
 	else
 		barmesh = endpoints2mesh(r̄p1,r̄p2;radius,)
 	end
@@ -1252,8 +1256,8 @@ function plot_compose_tower3d(bot0,bot1;
 	# foreach(bot0.tg.connectivity.tensioned) do scnt
 	# 	push!(bot0_rcs_by_cables,
 	# 		(
-	# 			scnt.end1.rbsig.state.rps[scnt.end1.pid].+
-	# 			scnt.end2.rbsig.state.rps[scnt.end2.pid]
+	# 			scnt.hen.rbsig.state.rps[scnt.hen.pid].+
+	# 			scnt.egg.rbsig.state.rps[scnt.egg.pid]
 	# 		)./2
 	# 	)
 	# end

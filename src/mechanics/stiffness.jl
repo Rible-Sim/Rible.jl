@@ -114,19 +114,20 @@ function optimize_minimum_stiffness(mat𝒦ps,vec𝒦m,vecI,A,b,nx,x_0)
         b, 
         COSMO.ZeroSet
     )
-    
+
     constraints = [constraint1,constraint2,]
 
     custom_settings = COSMO.Settings(
         verbose = true, 
-        eps_abs = 1e-10, 
-        eps_rel = 1e-10,
+        eps_abs = 1e-3, 
+        # eps_rel = 1e-10,
         max_iter = 5000,
-        rho = 1e-2,
+        rho = 1e-6,
         # sigma = 1e-3,
         # adaptive_rho = false,
-        # alpha = 1.0,
+        alpha = 0.5,
         # scaling = 0,
+        # accelerator = COSMO.EmptyAccelerator
     )
 
     COSMO.assemble!(
