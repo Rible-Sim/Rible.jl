@@ -1293,7 +1293,7 @@ function make_X(nmcs::LNC,q::AbstractVector)
     qstd = Y*q
     ndim = get_ndim(nmcs)
     X = reshape(qstd[ndim+1:end],ndim,:)
-    if (nmcs isa LNC2D6C) || (nmcs isa LNC3D6C)
+    if (nmcs isa LNC2D4C) || (nmcs isa LNC3D6C)
         return find_R(nmcs,q)
     else
         return SMatrix{ndim,ndim}(X)

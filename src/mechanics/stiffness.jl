@@ -77,7 +77,13 @@ function optimize_maximum_stiffness(mat𝒦ps,vec𝒦m,vecI,A,b,nx)
         COSMO.ZeroSet
     )
 
-    constraints = [constraint1,constraint2]
+    constraint3 = COSMO.Constraint(
+        Matrix(1.0I,nx,nx)[:,end-1] |> Diagonal, 
+        zeros(nx), 
+        COSMO.Nonnegatives
+    )
+
+    constraints = [constraint1,constraint2,constraint3]
 
     custom_settings = COSMO.Settings(
         verbose = true, 
@@ -96,7 +102,7 @@ function optimize_maximum_stiffness(mat𝒦ps,vec𝒦m,vecI,A,b,nx)
     COSMO.optimize!(model)
 end
 
-function optimize_minimum_stiffness(mat𝒦ps,vec𝒦m,vecI,A,b,nx,x_0)
+function optimize_zero_stiffness(mat𝒦ps,vec𝒦m,vecI,A,b,nx,x_0)
 
     model = COSMO.Model()
 
@@ -115,7 +121,7 @@ function optimize_minimum_stiffness(mat𝒦ps,vec𝒦m,vecI,A,b,nx,x_0)
         COSMO.ZeroSet
     )
 
-    constraints = [constraint1,constraint2,]
+    constraints = [constraint1,constraint2]
 
     custom_settings = COSMO.Settings(
         verbose = true, 
@@ -141,7 +147,7 @@ function optimize_minimum_stiffness(mat𝒦ps,vec𝒦m,vecI,A,b,nx,x_0)
     COSMO.optimize!(model)
 end
 
-function optimize_minimum_stiffness_Clarabel(mat𝒦ps,vec𝒦m,vecI,Aeq,beq,nx,x_0)
+function optimize_zero_stiffness_Clarabel(mat𝒦ps,vec𝒦m,vecI,Aeq,beq,nx,x_0)
 
     solver = Clarabel.Solver()
 

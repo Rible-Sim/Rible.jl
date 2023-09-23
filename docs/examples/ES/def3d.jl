@@ -3,7 +3,7 @@ function make_3d_bar(
 		ri,rj;
 		ci = Int[],
 		m = 0.080,
-		radius = 0.03,
+		radius_ratio = 1/30,
 		mat_name = "Teak",
 		loadmesh = false,
 	)
@@ -15,7 +15,8 @@ function make_3d_bar(
 		constrained = true
 	end
 	u = rj - ri
-	bar_length = norm(u)
+	bar_length = norm(u)	
+	radius = bar_length*radius_ratio
 	û = u./bar_length
 	v̂,ŵ = TR.NCF.HouseholderOrthogonalization(û)
 	R = SMatrix{3,3}(hcat(û,v̂,ŵ))
@@ -73,7 +74,6 @@ function make_3d_bar(
 	# cf = TR.NCF.CoordinateFunctions(nmcs,q0,ci,uci)
 	# @show typeof(nmcs)
 	state = TR.RigidBodyState(prop,nmcs,ri,R,ṙo,ω,ci)
-	# @show radius
 	if loadmesh
 		barmesh = load("装配体3.STL") |> make_patch(;
 			trans=[0,0,0.025],
@@ -124,11 +124,15 @@ function make_3d_tri(
 	end
 	# @show m,diag(Īg),r̄g
 
+	ās = [
+		SVector(1.0,0,0)
+		for i = axes(r̄ps)
+	]
 	prop = TR.RigidBodyProperty(
 		id,
 		movable,
 		mass,Īg,
-		r̄g,r̄ps;
+		r̄g,r̄ps,ās;
 		constrained=constrained
 	)
 	ṙo = zero(ro)
@@ -654,7 +658,8 @@ function prisms(;
 					2m*(j-1)+i,
 					bps[j][i],
 					midps[j][i]; 
-					#ci = ifelse(j==1,[1,2,3],Int[])
+					#ci = ifelse(j==1,[1,2,3],Int[]),
+					radius_ratio = 1/60,
 				) for i = 1:m
 			],
 			[
@@ -662,6 +667,7 @@ function prisms(;
 					2m*(j-1)+m+i,
 					midps[j][i-1],
 					bps[j+1][i-1];
+					radius_ratio = 1/60,
 				) for i = 1:m
 			]
 		)
@@ -2072,7 +2078,7 @@ function tower(;k=nothing)
 		2,
 		P[end],
 		P[end-1],;		
-		radius = 0.04,
+		radius_ratio = 1/40,
 		ci = Int[]
 	)
 

@@ -73,13 +73,15 @@ figdir::String = ""
 if Sys.iswindows()
     figdir::String = raw"C:\Users\luo22\OneDrive\Papers\TensegrityStability"
 elseif Sys.isapple()
-    figdir::String = raw"."
+    figdir::String = raw"/Users/jacob/Library/CloudStorage/OneDrive-SharedLibraries-onedrive/Papers/TensegrityStability"
 end
 
 fontsize = 8 |> pt2px
 tw = 468 |> pt2px
 th = 622 |> pt2px
+#-- preamble end
 
+#--- superball
 # for use with Class-1 and the 1st rigid fixed
 function build_Ň(tg)
     (;sysfree,mem2sysndof) = tg.connectivity.indexed
@@ -89,14 +91,12 @@ function build_Ň(tg)
         reduce(vcat,mem2sysndof[2:end])
     ]
 end
-#-- preamble end
-
-#--- superball
 ballbot = superball(;
     θ = 0.0,
     l = 2.0/2,
     d = 2.0/2/2,
     z0 = 2.0/2,
+    # k = 1.00,
     constrained=true,
     loadmesh = false,
 )
@@ -193,8 +193,12 @@ vals_𝒦m,vecs_𝒦m = eigen(𝒦m)
 sort(vals_𝒦m)
 vm = vecs_𝒦m[:,1:nk]
 
+vals_𝒦p,vecs_𝒦p = eigen(𝒦p)
+sort(vals_𝒦p)
+
 vals_𝒦,vecs_𝒦 = eigen(𝒦)
 sort(vals_𝒦)
+
 
 v = vecs_𝒦[:,1]
 v'*𝒦*v
@@ -262,11 +266,21 @@ Ňv = Ň*nullspace(v')
 Ǩm = TR.build_Ǩm!(bot.tg,q,k) 
 r𝒦m = transpose(Ňv)*(Ǩm)*Ňv |> Symmetric 
 # vecr𝒦m = SymmetricPacked(r𝒦m).tri
+rd = nullspace(r𝒦m)
 vecr𝒦m = vec(r𝒦m)
 
 # vecI = SymmetricPacked(Matrix(1.0I,size(r𝒦m))).tri
 vecI = vec(Matrix(1.0I,size(r𝒦m)))
 r𝒦m |> issymmetric
+
+r𝒦g = transpose(Ňv)*(Ǩg)*Ňv |> Symmetric 
+r𝒦a = transpose(Ňv)*(Ǩa)*Ňv |> Symmetric 
+r𝒦p = r𝒦g .+ r𝒦a
+vals_r𝒦p,vecs_r𝒦p = eigen(r𝒦p)
+@myshow sort(vals_𝒦p)
+
+vals_rd𝒦pd,vecs_rd𝒦pd = eigen(rd'*r𝒦p*rd)
+@myshow sort(vals_rd𝒦pd)
 
 vecr𝒦ps = [
     begin
@@ -306,7 +320,7 @@ vals_r𝒦_max, vecs_r𝒦_max = eigen(r𝒦_max)
 vals, vecs = eigen(r𝒦_max - ρ_max*I)
 @myshow vals
 
-result_min = TR.optimize_minimum_stiffness(matr𝒦ps,vecr𝒦m,vecI,
+result_zero = TR.optimize_zero_stiffness(matr𝒦ps,vecr𝒦m,vecI,
     hcat(
         -Matrix(1.0I,ns,ns),
         ᾱ,
@@ -315,14 +329,14 @@ result_min = TR.optimize_minimum_stiffness(matr𝒦ps,vecr𝒦m,vecI,
     ns+1,
     result_max.x[1:end-1]
 )
-σ_min = result_min.x[end]
+σ_zero = result_zero.x[end]
 
-r𝒦_min = r𝒦m + σ_min*reshape(matr𝒦ps*ᾱ,size(r𝒦m))
-vals_r𝒦_min, vecs_r𝒦_min = eigen(r𝒦_min)
-ρ_min = vals_r𝒦_min[1]
+r𝒦_zero = r𝒦m + σ_zero*reshape(matr𝒦ps*ᾱ,size(r𝒦m))
+vals_r𝒦_zero, vecs_r𝒦_zero = eigen(r𝒦_zero)
+ρ_zero = vals_r𝒦_zero[1]
 maxminmodes = hcat(
     vecs_r𝒦_max[:,1],
-    vecs_r𝒦_min[:,1:3],
+    vecs_r𝒦_zero[:,1:3],
 )
 
 with_theme(theme_pub;
@@ -378,17 +392,18 @@ with_theme(theme_pub;
     )
 end
 
-
-σs = 0:100:5200
+ 
+σs = LinRange(0,5500,100)
 rρs =  [
     begin
         r𝒦 = r𝒦m + σ*reshape(matr𝒦ps*ᾱ,size(r𝒦m))
         vals_r𝒦, vecs_r𝒦 = eigen(r𝒦)
-        vals_r𝒦[begin]
+        vals_r𝒦
     end
     for σ in σs
-]
+] |> VectorOfArray
 
+size(rρs,1)
 ρs =  [
     begin
         𝒦 = 𝒦m + σ*reshape(mat𝒦ps*ᾱ,size(𝒦m))
@@ -405,23 +420,26 @@ with_theme(theme_pub;
     fig = Figure()
     ax = Axis(fig[1,1],
         xlabel = L"\sigma",
-        ylabel = L"\rho_{\mathrm{1}}"
+        ylabel = L"\rho_{(\mathrm{1})}"
     )
-    lines!(ax,σs,rρs,)
+    lines!(ax,σs,rρs[1,:],)
     xlims!(ax,0,5500)
     ylims!(ax,-400,600)
+    # for i = axes(rρs,1)
+    #     lines!(ax,σs,rρs[i,:],)
+    # end
     scatter!(
         ax,
-        [σ_max,σ_min],
-        [ρ_max,ρ_min]
+        [σ_max,σ_zero],
+        [ρ_max,ρ_zero]
     )
     text!([σ_max], [ρ_max], 
-        text = [L"\sigma_{\mathrm{max}}"],
+        text = [L"\rho_{(1),\mathrm{max}}"],
         align = (:center,:bottom),
         offset = (0, fontsize/4)
     )
-    text!([σ_min], [ρ_min], 
-        text = [L"\sigma_{\mathrm{min}}"],
+    text!([σ_zero], [ρ_zero], 
+        text = [L"\sigma_{\mathrm{max}}"],
         align = (:right,:center),
         offset = (-fontsize/2, 0)
     )
@@ -627,7 +645,7 @@ GM.activate!();with_theme(theme_pub;
         end
     )
     δq̌ = [Ň*D[:,i] for i in axes(D,2)]
-    scaling=0.3
+    scaling=0.1
     for i = 1:nk
         push!(botmm.traj,deepcopy(botmm.traj[end]))
         botmm.traj.t[end] = i
@@ -718,6 +736,8 @@ vec𝒦ps = [
 
         𝒦pi = transpose(Ň)*(Ǩgi.+Ǩai)*Ň |> Symmetric 
         # vec𝒦pi = SymmetricPacked(𝒦pi).tri
+        vals_Kpi, _ = eigen(𝒦pi)
+        @myshow vals_Kpi
         vec𝒦pi = vec(𝒦pi)
     end
     for i = 1:ns
@@ -742,23 +762,24 @@ vals_𝒦_max, vecs_𝒦_max = eigen(𝒦_max)
 vals, vecs = eigen(𝒦_max - ρ_max*I)
 @myshow vals
 
-result_min = TR.optimize_minimum_stiffness(mat𝒦ps,vec𝒦m,vecI,
+
+result_zero = TR.optimize_zero_stiffness(mat𝒦ps,vec𝒦m,vecI,
     hcat(
         -Matrix(1.0I,ns,ns),
         ᾱ,
     ),
     [0.0,0.0],
     ns+1,
-    # result.x
+    result_max.x[begin:end-1]
 )
-σ_min = result_min.x[end]
+σ_zero = result_zero.x[end]
 
-𝒦_min = 𝒦m + σ_min*reshape(mat𝒦ps*ᾱ,size(𝒦m))
-vals_𝒦_min, vecs_𝒦_min = eigen(𝒦_min)
-ρ_min = vals_𝒦_min[1]
+𝒦_zero = 𝒦m + σ_zero*reshape(mat𝒦ps*ᾱ,size(𝒦m))
+vals_𝒦_zero, vecs_𝒦_zero = eigen(𝒦_zero)
+ρ_zero = vals_𝒦_zero[1]
 maxminmodes = hcat(
     vecs_𝒦_max[:,1],
-    vecs_𝒦_min[:,1:3],
+    vecs_𝒦_zero[:,1:3],
 )
 
 σs = 0:1:1600
@@ -773,30 +794,30 @@ Vals =  [
 
 with_theme(theme_pub;
         resolution = (0.6tw,0.2tw),
-        figure_padding = (0,fontsize,0,fontsize),
+        figure_padding = (0,fontsize,0,0),
     ) do 
     fig = Figure()
     ax1 = Axis(fig[1,1],
         xlabel = L"\sigma",
-        ylabel = L"\rho_{\mathrm{1}}"
+        ylabel = L"\rho_{(\mathrm{1})}"
     )
     lines!(ax1,σs,Vals[1,:],)
-    xlims!(ax1,0,1700)
+    xlims!(ax1,0,1650)
     ylims!(ax1,-20,60)
     scatter!(
         ax1,
-        [σ_max,σ_min],
-        [ρ_max,ρ_min]
+        [σ_max,σ_zero],
+        [ρ_max,ρ_zero]
     )
     text!(ax1,
         [σ_max], [ρ_max], 
-        text = [L"\sigma_{\mathrm{max}}"],
+        text = [L"\rho_{(1),\mathrm{max}}"],
         align = (:center,:bottom),
         offset = (0, fontsize/4)
     )
     text!(ax1,
-        [σ_min], [ρ_min], 
-        text = [L"\sigma_{\mathrm{min}}"],
+        [σ_zero], [ρ_zero], 
+        text = [L"\sigma_{\mathrm{max}}"],
         align = (:right,:center),
         offset = (-fontsize/2, 0)
     )
@@ -806,17 +827,126 @@ with_theme(theme_pub;
         ylabel = L"\rho"
     )
     for i in 1:6
-        lines!(ax2,σs,Vals[i,:],label=latexstring("\\rho_$i"))
+        lines!(ax2,σs,Vals[i,:],label=latexstring("\\rho_{($i)}"))
     end
-    Legend(
-        fig[1,3],
-        ax2
-    )
-    xlims!(ax2,0,1700)
+    for ilabel = 1:2
+        Label(fig.layout[1, ilabel, TopLeft()],
+            rich("($(alphabet[ilabel])) ", font = "CMU Serif Bold"),
+            # padding = (70, 0, 0, 80),
+            halign = :left,
+            valign = :top,
+            # halign = :right
+        )
+    end
+    Legend(fig[1,3],ax2)
+    xlims!(ax2,0,1650)
     ylims!(ax2,-20,400)
     savefig(fig,"prism_curve")
     fig
 end
+
+σ̄ = [0,1]
+b = [500.0,0]
+# optimize ᾱ
+A = hcat(
+    -Matrix(1.0I,ns,ns),
+    σ̄,
+    zero(ᾱ)
+)
+
+nx = ns+2
+result_max_α = TR.optimize_maximum_stiffness(mat𝒦ps,vec𝒦m,vecI,A,b,nx)
+σ_max_α = result_max_α.x[end-1]
+ρ_max_α = result_max_α.x[end]
+
+𝒦_max_α = 𝒦m + reshape(mat𝒦ps*(σ_max_α*σ̄+b),size(𝒦m))
+vals_𝒦_max_α, vecs_𝒦_max_α = eigen(𝒦_max_α)
+
+vals, vecs = eigen(𝒦_max_α - ρ_max_α*I)
+@myshow vals
+
+result_zero_α = TR.optimize_zero_stiffness(mat𝒦ps,vec𝒦m,vecI,
+    hcat(
+        -Matrix(1.0I,ns,ns),
+        σ̄,
+    ),
+    b,
+    ns+1,
+    result_max_α.x[begin:end-1]
+)
+σ_zero_α = result_zero_α.x[end]
+
+𝒦_zero_α = 𝒦m + reshape(mat𝒦ps*(σ_zero_α*σ̄ + b),size(𝒦m))
+vals_𝒦_zero_α, vecs_𝒦_zero_α = eigen(𝒦_zero_α)
+ρ_zero_α = vals_𝒦_zero_α[1]
+maxminmodes = hcat(
+    vecs_𝒦_max[:,1],
+    vecs_𝒦_zero[:,1:3],
+)
+
+σs = 0:1:1700
+Vals_α =  [
+    begin
+        𝒦 = 𝒦m + reshape(mat𝒦ps*(σ.*σ̄ + b),size(𝒦m))
+        vals_𝒦, vecs_𝒦 = eigen(𝒦)
+        vals_𝒦
+    end
+    for σ in σs
+] |> VectorOfArray
+
+with_theme(theme_pub;
+        resolution = (0.6tw,0.2tw),
+        figure_padding = (0,fontsize,0,0),
+    ) do 
+    fig = Figure()
+    ax1 = Axis(fig[1,1],
+        xlabel = L"\bar{\alpha}_1",
+        ylabel = L"\rho_{(\mathrm{1})}"
+    )
+    lines!(ax1,σs,Vals_α[1,:],)
+    xlims!(ax1,0,1700)
+    ylims!(ax1,-20,60)
+    scatter!(
+        ax1,
+        [σ_max_α,σ_zero_α],
+        [ρ_max_α,ρ_zero_α]
+    )
+    text!(ax1,
+        [σ_max_α], [ρ_max_α], 
+        text = [L"\rho_{(1),\mathrm{max}}"],
+        align = (:center,:bottom),
+        offset = (0, fontsize/4)
+    )
+    text!(ax1,
+        [σ_zero_α], [ρ_zero_α], 
+        text = [L"\sigma_{\mathrm{max}}"],
+        align = (:right,:center),
+        offset = (-fontsize/2, 0)
+    )
+    
+    ax2 = Axis(fig[1,2],
+        xlabel = L"\bar{\alpha}_1",
+        ylabel = L"\rho"
+    )
+    for i in 1:6
+        lines!(ax2,σs,Vals_α[i,:],label=latexstring("\\rho_{($i)}"))
+    end
+    for ilabel = 1:2
+        Label(fig.layout[1, ilabel, TopLeft()],
+            rich("($(alphabet[ilabel])) ", font = "CMU Serif Bold"),
+            # padding = (70, 0, 0, 80),
+            halign = :left,
+            valign = :top,
+            # halign = :right
+        )
+    end
+    Legend(fig[1,3],ax2)
+    xlims!(ax2,0,1700)
+    ylims!(ax2,-20,400)
+    savefig(fig,"prism_curve_alpha")
+    fig
+end
+
 
 
 #-- prism end
@@ -1037,7 +1167,7 @@ mat𝒦ms = reduce(hcat,struct𝒦.𝒦m)
 ᾱs = [
    [1.0,0,0,0],
    [0,1.0,0,0],
-# #    [0,0,1.0,0],
+   [0,0,1.0,0],
    [0,0,0,1.0],
    10 .*[0, 0.114892, 0, 0.0748331]
 ]
@@ -1058,25 +1188,25 @@ Vals =  [
 ] |> VectorOfArray
 
 GM.activate!();with_theme(theme_pub;
-        resolution = (0.6tw,0.2tw),
+        resolution = (0.5tw,0.2tw),
         figure_padding = (0,fontsize,0,fontsize),
     ) do 
     fig = Figure()
     ax1 = Axis(fig[1,1],
         xlabel = L"\sigma",
-        ylabel = L"\rho_{\mathrm{1}}"
+        ylabel = L"\rho_{(\mathrm{1})}"
     )
-    for i in 1:3
+    for i in [1,2,4]
         lines!(ax1,σs,Vals[i,:],label=("Self-stress State $i"))
     end
-    lines!(ax1,σs,Vals[4,:],label=("Combined Self-stress State 2 & 3"))
+    lines!(ax1,σs,Vals[5,:],label=("A weighted self-stress state"))
 
     xlims!(ax1,0,10)
     ylims!(ax1,-0,6)
     # scatter!(
     #     ax1,
-    #     [σ_max,σ_min],
-    #     [ρ_max,ρ_min]
+    #     [σ_max,σ_zero],
+    #     [ρ_max,ρ_zero]
     # )
     
     # ax2 = Axis(fig[1,2],
@@ -1199,7 +1329,7 @@ vals_𝒦_max, vecs_𝒦_max = eigen(𝒦_max)
 vals, vecs = eigen(𝒦_max - ρ_max*I)
 @myshow vals
 
-result_min = TR.optimize_minimum_stiffness(mat𝒦ps,vec𝒦m,vecI,
+result_zero = TR.optimize_zero_stiffness(mat𝒦ps,vec𝒦m,vecI,
     hcat(
         -Matrix(1.0I,ns,ns),
         ᾱ,
@@ -1208,11 +1338,11 @@ result_min = TR.optimize_minimum_stiffness(mat𝒦ps,vec𝒦m,vecI,
     ns+1,
     # result.x
 )
-σ_min = result_min.x[end]
+σ_zero = result_zero.x[end]
 
-𝒦_min = 𝒦m + σ_min*reshape(mat𝒦ps*ᾱ,size(𝒦m))
-vals_𝒦_min, vecs_𝒦_min = eigen(𝒦_min)
-ρ_min = vals_𝒦_min[1]
+𝒦_zero = 𝒦m + σ_zero*reshape(mat𝒦ps*ᾱ,size(𝒦m))
+vals_𝒦_zero, vecs_𝒦_zero = eigen(𝒦_zero)
+ρ_zero = vals_𝒦_zero[1]
 
 σs = LinRange(0,0.3,100)
 Vals =  [
@@ -1225,31 +1355,31 @@ Vals =  [
 ] |> VectorOfArray
 
 with_theme(theme_pub;
-        resolution = (0.6tw,0.2tw),
+        resolution = (0.5tw,0.2tw),
         figure_padding = (0,fontsize,0,fontsize),
     ) do 
     fig = Figure()
     ax1 = Axis(fig[1,1],
         xlabel = L"\sigma",
-        ylabel = L"\rho_{\mathrm{1}}"
+        ylabel = L"\rho_{(\mathrm{1})}"
     )
     lines!(ax1,σs,Vals[1,:],)
     # xlims!(ax1,0,1700)
     # ylims!(ax1,-20,60)
     scatter!(
         ax1,
-        [σ_max,σ_min],
-        [ρ_max,ρ_min]
+        [σ_max,σ_zero],
+        [ρ_max,ρ_zero]
     )
     text!(ax1,
         [σ_max], [ρ_max], 
-        text = [L"\sigma_{\mathrm{max}}"],
+        text = [L"\rho_{(1),\mathrm{max}}"],
         align = (:center,:bottom),
         offset = (0, fontsize/4)
     )
     text!(ax1,
-        [σ_min], [ρ_min], 
-        text = [L"\sigma_{\mathrm{min}}"],
+        [σ_zero], [ρ_zero], 
+        text = [L"\sigma_{\mathrm{max}}"],
         align = (:right,:center),
         offset = (-fontsize/2, 0)
     )
@@ -1335,7 +1465,7 @@ l = TR.get_cables_len(bot.tg)
 
 isis = [8,14,24]
 GM.activate!();with_theme(theme_pub;
-        resolution = (0.95tw,0.24tw),
+        resolution = (0.95tw,0.2tw),
         figure_padding = (2fontsize,0,0,0),
         fontsize = 6.5 |> pt2px,
         Axis3 = (
@@ -1392,7 +1522,7 @@ GM.activate!();with_theme(theme_pub;
         showinit = true,
         titleformatfunc = (sgi,tt)-> begin
             rich(
-                    # rich("($(alphabet[sgi+1])) ", font=:bold),
+                    rich("($(alphabet[sgi+1])) ", font=:bold),
                     "Self-stress State $sgi"
                 )
         end,
@@ -1459,7 +1589,7 @@ GM.activate!();with_theme(theme_pub;
 end
 
 ᾱ = zeros(ns)
-ᾱ[isis] .= 1.0
+ᾱ[isis] .= [1,1,1]
 f = S*ᾱ
 
 # equivalent μ
@@ -1492,12 +1622,18 @@ vec𝒦ps = [
         Ǩgi = TR.build_Ǩg!(bot.tg,q,si)
 
         𝒦pi = transpose(Ň)*(Ǩgi.+Ǩai)*Ň |> Symmetric 
+        vals_𝒦pi, _ = eigen(𝒦pi)
+        @myshow i,vals_𝒦pi
         vec𝒦pi = vec(𝒦pi)
     end
     for i = 1:ns
 ]
 
 mat𝒦ps = reduce(hcat,vec𝒦ps)
+
+𝒦p = reshape(mat𝒦ps*ᾱ,size(𝒦m))
+vals_𝒦p, vecs_𝒦p = eigen(𝒦p)
+ρ = vals_𝒦[1]
 
 A = hcat(
     -Matrix(1.0I,ns,ns),
@@ -1516,7 +1652,7 @@ vals_𝒦_max, vecs_𝒦_max = eigen(𝒦_max)
 vals, vecs = eigen(𝒦_max - ρ_max*I)
 @myshow vals
 
-result_min = TR.optimize_minimum_stiffness(mat𝒦ps,vec𝒦m,vecI,
+result_zero = TR.optimize_zero_stiffness(mat𝒦ps,vec𝒦m,vecI,
     hcat(
         -Matrix(1.0I,ns,ns),
         ᾱ,
@@ -1525,13 +1661,13 @@ result_min = TR.optimize_minimum_stiffness(mat𝒦ps,vec𝒦m,vecI,
     ns+1,
     result_max.x[1:end-1]
 )
-σ_min = result_min.x[end]
+σ_zero = result_zero.x[end]
 
-𝒦_min = 𝒦m + σ_min*reshape(mat𝒦ps*ᾱ,size(𝒦m))
-vals_𝒦_min, vecs_𝒦_min = eigen(𝒦_min)
-ρ_min = vals_𝒦_min[1]
+𝒦_zero = 𝒦m + σ_zero*reshape(mat𝒦ps*ᾱ,size(𝒦m))
+vals_𝒦_zero, vecs_𝒦_zero = eigen(𝒦_zero)
+ρ_zero = vals_𝒦_zero[1]
 
-σs = LinRange(-50,100,100)
+σs = LinRange(-70,100,100)
 Vals =  [
     begin
         𝒦 = 𝒦m + σ*reshape(mat𝒦ps*ᾱ,size(𝒦m))
@@ -1541,6 +1677,18 @@ Vals =  [
     for σ in σs
 ] |> VectorOfArray
 
+Vals_alpha3 =  [
+    begin
+        ᾱ = zeros(ns)
+        ᾱ[isis] .= [1,1,ᾱ3]
+        𝒦 = 𝒦m + reshape(mat𝒦ps*ᾱ,size(𝒦m))
+        vals_𝒦, vecs_𝒦 = eigen(𝒦)
+        vals_𝒦
+    end
+    for ᾱ3 = LinRange(1,10000,100)
+] |> VectorOfArray
+
+
 with_theme(theme_pub;
         resolution = (0.35tw,0.2tw),
         figure_padding = (0,fontsize,0,fontsize),
@@ -1548,60 +1696,138 @@ with_theme(theme_pub;
     fig = Figure()
     ax1 = Axis(fig[1,1],
         xlabel = L"\sigma",
-        ylabel = L"\rho_{\mathrm{1}}"
+        ylabel = L"\rho"
     )
-    lines!(ax1,σs,Vals[1,:],)
-    ylims!(ax1,-30,140)
-    xlims!(ax1,-50,100)
+    lines!(ax1,σs,Vals[1,:],label=L"\rho_1,\rho_2")
+    lines!(ax1,σs,Vals[3,:],label=L"\rho_3")
+    lines!(ax1,σs,Vals[4,:],label=L"\rho_4,\rho_5")
+    ylims!(ax1,-50,800)
+    xlims!(ax1,-70,100)
     scatter!(
         ax1,
-        [σ_max,σ_min],
-        [ρ_max,ρ_min]
+        [σ_max,σ_zero],
+        [ρ_max,ρ_zero]
     )
     text!(ax1,
         [σ_max], [ρ_max], 
-        text = [L"\sigma_{\mathrm{max}}"],
+        text = [L"\rho_{(1),\mathrm{max}}"],
         align = (:center,:bottom),
         offset = (0, fontsize/4)
     )
     text!(ax1,
-        [σ_min], [ρ_min], 
-        text = [L"\sigma_{\mathrm{min}}"],
+        [σ_zero], [ρ_zero], 
+        text = [L"\sigma_{\mathrm{max}}"],
         align = (:right,:center),
         offset = (-fontsize/2, 0)
     )
-    
+    Legend(
+        fig[1,2],
+        ax1
+    )
     # ax2 = Axis(fig[1,2],
-    #     xlabel = L"\sigma",
+    #     xlabel = L"\bar{\alpha}_3",
     #     ylabel = L"\rho"
     # )
-    # for i in 1:5
-    #     lines!(ax2,σs,Vals[i,:],label=latexstring("\\rho_$i"))
+    # lines!(ax2,LinRange(1,10000,100),Vals_alpha3[1,:],label=L"\rho_1,\rho_2")
+    # lines!(ax2,LinRange(1,10000,100),Vals_alpha3[3,:],label=L"\rho_3")
+    # lines!(ax2,LinRange(1,10000,100),Vals_alpha3[4,:],label=L"\rho_4,\rho_5")
+
+    # xlims!(ax2,0,10000)
+    # ylims!(ax2,0,1000)
+    # for ilabel = 1:2
+    #     Label(fig[1,ilabel,TopLeft()],
+    #         rich("($(alphabet[ilabel])) ", font = "CMU Serif Bold"),
+    #         # padding = (70, 0, 0, 80),
+    #         halign = :left,
+    #         valign = :top,
+    #         # halign = :right
+    #     )
     # end
-    # Legend(
-    #     fig[1,3],
-    #     ax2
-    # )
-    # xlims!(ax2,0,1700)
-    # ylims!(ax2,-20,400)
     savefig(fig,"tower_curve")
     fig
 end
-
-
 #-- end tower
 
 #-- T bars
 tbbot = Tbars(;θ=π/4)
 bot = tbbot
 @myshow bot.tg.ndof
-
-plot_traj!(bot;showarrows = false, showground=false)
-
 dt = 1e-3
 tspan = (0.0,5.0)
 prob = TR.SimProblem(bot,dynfuncs)
 TR.solve!(prob,TR.Zhong06();tspan,dt,ftol=1e-10,maxiters=50,verbose=true,exception=true)
+
+plot_traj!(bot;showarrows = false, showground=false)
+
+#todo slider with no hook
+GM.activate!();with_theme(theme_pub;
+        resolution = (0.95tw,0.25tw),
+        figure_padding = (0,0,fontsize/2,0),
+        Axis3 = (
+            azimuth = -1.8701322643948965,
+            elevation = 0.6128666392948965,
+            perspectiveness = 0.3,
+        )
+    ) do 
+    fig = Figure()
+    gd0 = fig[1,1] = GridLayout(;tellheight=false)
+    gd1 = fig[1,2] = GridLayout(;tellheight=false)
+    # rowsize!(gd0,1,Fixed(0.15tw))
+    # rowsize!(gd1,1,Fixed(0.15tw))
+    bot0 = Tbars(;θ=0)
+    plot_traj!(
+        bot0,
+        fig = gd0,
+        AxisType = Axis3,
+        showpoints = false,
+        showlabels = false,
+        showground = false,
+        doslide = false,
+        # showinfo = true,
+        xlims = (-2.2,1.2),
+        ylims = (-1.2,1.2),
+        zlims = (0,0.06),
+        titleformatfunc = (sgi,tt)-> begin
+            rich(
+                rich("($(alphabet[sgi])) ", font=:bold),
+                "Initial"
+            )
+        end,
+        sup! = (ax,tgob,sgi)-> begin
+            # cables
+            hidez(ax)
+        end
+    )
+    bot1 = Tbars(;θ=π/4)
+    plot_traj!(
+        bot1,
+        fig = gd1,
+        AxisType = Axis3,
+        showpoints = false,
+        showlabels = false,
+        showground = false,
+        doslide = false,
+        xlims = (-2.2,1.2),
+        ylims = (-1.2,1.2),
+        zlims = (0,0.06),
+        titleformatfunc = (sgi,tt)-> begin
+            rich(
+                rich("($(alphabet[sgi+1])) ", font=:bold),
+                "Movement"
+            )
+        end,
+        sup! = (ax,tgob,sgi)-> begin
+            # cables
+            hidez(ax)
+        end
+    )
+    savefig(fig,"Tbars")
+    DataInspector(fig)
+    fig
+end
+
+tbbot = Tbars(;θ=0.0)
+bot = tbbot
 
 TR.check_static_equilibrium_output_multipliers(bot.tg)
 
@@ -1702,8 +1928,8 @@ mat𝒦as = reduce(hcat,struct𝒦.𝒦a)
 mat𝒦ps = reduce(hcat,struct𝒦.𝒦p)
 
 GM.activate!();with_theme(theme_pub;
-        resolution = (1tw,0.32tw),
-        figure_padding = (fontsize,fontsize,0,0),
+        resolution = (0.95tw,0.18tw),
+        figure_padding = (0,0,0,0),
         Axis3 = (
             azimuth = -π/2-1e-10,
             elevation = π/2,
@@ -1714,77 +1940,24 @@ GM.activate!();with_theme(theme_pub;
     Sbool = S.> maxS*rtol
     S[.!Sbool] .= 0.0
     fig = Figure()
-    gd0 = fig[1,1] = GridLayout(;tellheight=false)
-    gd1 = fig[1,2] = GridLayout(;tellheight=false)
-    gd2 = fig[1,3:5] = GridLayout(;tellheight=false)
-    rowsize!(gd0,1,Fixed(0.15tw))
-    rowsize!(gd1,1,Fixed(0.15tw))
+    gd = fig[1,1:4] = GridLayout(;tellheight=false)
+    bot0 = Tbars(;θ=0)
     plot_traj!(
-        bot,
-        fig = gd0,
-        AxisType = Axis3,
-        showpoints = false,
-        showlabels = false,
-        showground = false,
-        doslide = false,
-        xlims = (-2.5,1.5),
-        ylims = (-1.5,1.5),
-        titleformatfunc = (sgi,tt)-> begin
-            rich(
-                rich("($(alphabet[sgi])) ", font=:bold),
-                "Inital"
-            )
-        end,
-        sup! = (ax,tgob,sgi)-> begin
-            # cables
-            hidez(ax)
-        end
-    )
-    botmm = deepcopy(bot)
-    δq̌ = Ň*[1.0]
-    scaling=0.2
-    push!(botmm.traj,deepcopy(botmm.traj[end]))
-    botmm.traj.t[end] = 1
-    ratio = norm(δq̌)/norm(q̌)
-    botmm.traj.q̌[end] .= q̌ .+ scaling.*δq̌/ratio
-    plot_traj!(
-        botmm,
-        fig = gd1,
-        AxisType = Axis3,
-        atsteps=[2],
-        showpoints = false,
-        showlabels = false,
-        showground = false,
-        doslide = false,
-        xlims = (-2.5,1.5),
-        ylims = (-1.5,1.5),
-        titleformatfunc = (sgi,tt)-> begin
-            rich(
-                rich("($(alphabet[sgi+1])) ", font=:bold),
-                "Mode 1"
-            )
-        end,
-        sup! = (ax,tgob,sgi)-> begin
-            # cables
-            hidez(ax)
-        end
-    )
-    plot_traj!(
-        bot,
-        fig = gd2,
+        bot0,
+        fig = gd,
         AxisType=Axis3,
-        gridsize = (1,3),
+        gridsize = (1,4),
         showpoints = false,
         showlabels = false,
         showground = false,
         doslide = false,
         showcables = false,
-        xlims = (-2.5,1.5),
-        ylims = (-1.5,1.5),
+        xlims = (-2.2,1.2),
+        ylims = (-1.2,1.2),
         rowgap=0,
         titleformatfunc = (sgi,tt)-> begin
             rich(
-                    rich("($(alphabet[sgi+2])) ", font=:bold),
+                    rich("($(alphabet[sgi])) ", font=:bold),
                     [
                         "Self-stress State 1",
                         "Self-stress State 2",
@@ -1846,15 +2019,16 @@ GM.activate!();with_theme(theme_pub;
             )
         end
     )
-    savefig(fig,"Tbars")
+    savefig(fig,"Tbars_states")
     DataInspector(fig)
     fig
 end
 
 ᾱs = [
-   [1.0,1.0,1.0,0],
-   [1.0,1.0,0,1.0],
-   [1.0,1.0,1.0,1.0],
+   [1,0,0,0],
+   [0,1,0,0],
+   [0,0,1,0],
+   [0,0,0,1],
 ]
 
 @myshow mat𝒦ps
@@ -1873,24 +2047,24 @@ Vals =  [
 ] |> VectorOfArray
 
 GM.activate!();with_theme(theme_pub;
-        resolution = (0.55tw,0.2tw),
+        resolution = (0.45tw,0.2tw),
         figure_padding = (0,fontsize,0,fontsize),
     ) do 
     fig = Figure()
     ax1 = Axis(fig[1,1],
         xlabel = L"\sigma",
-        ylabel = L"\rho_{\mathrm{1}}"
+        ylabel = L"\rho_{(\mathrm{1})}"
     )
-    for i in 1:3
-        lines!(ax1,σs,Vals[i,:],label=("Combined Self-stress State $i"))
-    end
+    lines!(ax1,σs,Vals[1,:],label=("Self-stress State 1 and 2"))
+    lines!(ax1,σs,Vals[3,:],label=("Self-stress State 3"))
+    lines!(ax1,σs,Vals[4,:],label=("Self-stress State 4"))
     xlims!(ax1,0,10)
 
     # ylims!(ax1,-0,6)
     # scatter!(
     #     ax1,
-    #     [σ_max,σ_min],
-    #     [ρ_max,ρ_min]
+    #     [σ_max,σ_zero],
+    #     [ρ_max,ρ_zero]
     # )
     
     # ax2 = Axis(fig[1,2],
@@ -2161,7 +2335,7 @@ vals_𝒦_max, vecs_𝒦_max = eigen(𝒦_max)
 vals, vecs = eigen(𝒦_max - ρ_max*I)
 @myshow vals
 
-result_min = TR.optimize_minimum_stiffness(mat𝒦ps,vec𝒦m,vecI,
+result_zero = TR.optimize_zero_stiffness(mat𝒦ps,vec𝒦m,vecI,
     hcat(
         -Matrix(1.0I,ns,ns),
         ᾱ,
@@ -2171,9 +2345,9 @@ result_min = TR.optimize_minimum_stiffness(mat𝒦ps,vec𝒦m,vecI,
     # result_max.x[1:end-1]
     zeros(ns+1)
 )
-σ_min = result_min.x[end]
+σ_zero = result_zero.x[end]
 
-# result_min = TR.optimize_minimum_stiffness_Clarabel(mattri𝒦ps,vectri𝒦m,vectriI,
+# result_zero = TR.optimize_zero_stiffness_Clarabel(mattri𝒦ps,vectri𝒦m,vectriI,
 #     hcat(
 #         -Matrix(1.0I,ns,ns),
 #         ᾱ,
@@ -2182,12 +2356,12 @@ result_min = TR.optimize_minimum_stiffness(mat𝒦ps,vec𝒦m,vecI,
 #     ns+1,
 #     result_max.x[1:end-1]
 # )
-# @myshow result_min.status == Clarabel.SOLVED
-# σ_min = result_min.x[end]
+# @myshow result_zero.status == Clarabel.SOLVED
+# σ_zero = result_zero.x[end]
 
-𝒦_min = 𝒦m + σ_min*reshape(mat𝒦ps*ᾱ,size(𝒦m))
-vals_𝒦_min, vecs_𝒦_min = eigen(𝒦_min)
-ρ_min = vals_𝒦_min[1]
+𝒦_zero = 𝒦m + σ_zero*reshape(mat𝒦ps*ᾱ,size(𝒦m))
+vals_𝒦_zero, vecs_𝒦_zero = eigen(𝒦_zero)
+ρ_zero = vals_𝒦_zero[1]
 
 σs = LinRange(-1e3,1e3,100)
 Vals =  [
@@ -2206,23 +2380,23 @@ with_theme(theme_pub;
     fig = Figure()
     ax1 = Axis(fig[1,1],
         xlabel = L"\sigma",
-        ylabel = L"\rho_{\mathrm{1}}"
+        ylabel = L"\rho_{(\mathrm{1})}"
     )
     lines!(ax1,σs,Vals[1,:],)
     scatter!(
         ax1,
-        [σ_max,σ_min],
-        [ρ_max,ρ_min]
+        [σ_max,σ_zero],
+        [ρ_max,ρ_zero]
     )
     text!(ax1,
         [σ_max], [ρ_max], 
-        text = [L"\sigma_{\mathrm{max}}"],
+        text = [L"\rho_{(1),\mathrm{max}}"],
         align = (:center,:bottom),
         offset = (0, fontsize/4)
     )
     text!(ax1,
-        [σ_min], [ρ_min], 
-        text = [L"\sigma_{\mathrm{min}}"],
+        [σ_zero], [ρ_zero], 
+        text = [L"\sigma_{\mathrm{max}}"],
         align = (:right,:center),
         offset = (-fontsize/2, 0)
     )
