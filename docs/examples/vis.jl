@@ -75,6 +75,7 @@ theme_pub = Theme(;
             :diamond,:hexagon,
             :star8,:star5
         ],
+        markercolor = [:red, :blue],
     ),
     Axis = (
         # titlefont = "CMU Serif Bold",
@@ -150,19 +151,6 @@ function plot_rigid(rb::TR.AbstractRigidBody;
             mesh!(ax,build_mesh(rb))
         end
     end
-    fig
-end
-
-function plot_tg!(tg::TR.TensegrityStructure)
-    ndim = TR.get_ndim(tg)
-    fig = Figure(resolution=(1280,720))
-    if ndim == 2
-        ax = Axis(fig[1,1], aspect=:data)
-    else
-        ax = Axis3(fig[1,1], aspect=:data)
-    end
-    tgob = Observable(deepcopy(tg))
-    init_plot!(ax,tgob)
     fig
 end
 
@@ -279,7 +267,6 @@ function plot_traj!(bot::TR.TensegrityRobot;
             b
         end
     end
-
     # @warn "Overwriting `atsteps`"
     # @warn "Ignoring `attimes`"
     rowgap!(grid1,rowgap)
@@ -328,18 +315,18 @@ function plot_traj!(bot::TR.TensegrityRobot;
             mesh!(ax,groundmesh;color = :snow)
         end
         if showinit
-            # init_plot!(ax,deepcopy(tgob);showmesh,showwire,isref=true,showpoints,kargs...)
-            # println("Showing init")
-            # sup!(ax,tgobini,sgi)
             init_plot!(ax,tgobini;
                 showmesh,showwire,
                 isref=true,
                 showcables=false,
-                showpoints,kargs...)
+                showpoints,
+                kargs...
+            )
         end
         sup!(ax,tgob,sgi)
         init_plot!(ax,tgob;
-            showlabels,showmesh,showwire,fontsize,showpoints,
+            showlabels,showmesh,
+            showwire,fontsize,showpoints,
             kargs...
         )
         if showtitle    
@@ -480,6 +467,8 @@ function init_plot!(ax,tgob;
         showwire=false,
         showcables=true,
         fontsize=10,
+        visual=true,
+        pointcolor=:black,
         slack_linestyle = :dash,
         cablecolor=:deepskyblue,
         cablelabelcolor=:darkgreen,
@@ -539,7 +528,7 @@ function init_plot!(ax,tgob;
     end
 
     rbsob = @lift begin
-        TR.get_rigidbodies($tgob;visual=true)
+        TR.get_rigidbodies($tgob;visual)
     end
     nb = length(rbsob[])
     if showmesh || showwire
@@ -585,9 +574,9 @@ function init_plot!(ax,tgob;
             for rbid = 1:nbodies
         ]
         if showpoints
-            scatter!(ax,rg_by_rbs; )
+            scatter!(ax,rg_by_rbs;)
             for (rbid,rps) in enumerate(rps_by_rbs)
-                scatter!(ax,rps)
+                scatter!(ax,rps;color=pointcolor)
             end
         end
         if showlabels
@@ -717,7 +706,7 @@ function build_mesh(rb::TR.AbstractRigidBody;update=true,color=nothing)
 end
 
 function make_patch(;trans=[0.0,0,0],rot=RotX(0.0),scale=1,color=:slategrey)
-    parsedcolor = parse(Makie.ColorTypes.RGB{Float32},color)
+    parsedcolor = parse(Makie.ColorTypes.RGBA{Float32},color)
     function patch(mesh)
         ct = Translation(trans) ∘ LinearMap(rot)
         updated_pos = ct.(mesh.position.*scale)

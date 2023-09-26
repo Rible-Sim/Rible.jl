@@ -120,7 +120,10 @@ function make_zhongccp_ns_stepk(nq,nλ,na,qₖ₋₁,vₖ₋₁,pₖ₋₁,tₖ�
 end
 
 function solve!(intor::Integrator,solvercache::ZhongCCPCache;
-                dt,ftol=1e-14,xtol=ftol,verbose=false,maxiters=50,
+                dt,
+                ftol=1e-14,xtol=ftol,
+                verbose=false,verbose_contact=false,
+                maxiters=50,
                 progress=true,exception=true)
     (;prob,controller,tspan,restart,totalstep) = intor
     (;bot,dynfuncs) = prob
@@ -224,11 +227,11 @@ function solve!(intor::Integrator,solvercache::ZhongCCPCache;
                 else
                     Nmax = 50
                 end
-                𝚲ₖini = 2 .*abs.(𝚲ₖ)
+                𝚲ₖini = repeat([0.1,0,0],na)
                 𝚲ₖini[begin+1:3:end] .= 0.0
                 𝚲ₖini[begin+2:3:end] .= 0.0
-                yₖ .= 𝐍*𝚲ₖ + 𝐫
-                yₖini = 2 .*abs.(yₖ)
+                yₖini = 𝐍*𝚲ₖ + 𝐫
+                yₖini .= abs.(yₖini)
                 yₖini[begin+1:3:end] .= 0.0
                 yₖini[begin+2:3:end] .= 0.0
                 # @show 𝚲ₖini[begin:3:end], yₖini[begin:3:end]
@@ -268,7 +271,7 @@ function solve!(intor::Integrator,solvercache::ZhongCCPCache;
         end
 
         #---------Time Step k finisher-----------
-        if verbose
+        if verbose || (na > 0 && verbose_contact)
             dg_step = ceil(Int,log10(totalstep))+1
             dg_dt = max(1,-floor(Int,log10(dt)))
             wd_t = ceil(Int,log10(traj.t[end]))+dg_dt+1+1

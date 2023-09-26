@@ -7,43 +7,55 @@ using DocStringExtensions
 using SymmetricFormats
 
 export get_nconstraints, get_ncoords, get_ndof, get_nlocaldim
+
 """
-所有局部自然坐标抽象超类。
+local natural coordinates abstract type 。
 """
 abstract type LNC{T} end
+
 """
-所有二维局部自然坐标抽象超类。
+2D local natural coordinates abstract type 。
 """
 abstract type LNC2D{T} <: LNC{T} end
+
 """
-所有三维局部自然坐标抽象超类。
+3D local natural coordinates abstract type 。
 """
 abstract type LNC3D{T} <: LNC{T} end
+
 """
-所有坐标数目为4的二维局部自然坐标抽象超类，用于刚性直杆。
+2 coordinates 2D local natural coordinates abstract type for point mass。
+"""
+abstract type LNC2D2C{T} <: LNC2D{T} end
+
+"""
+4 coordinates 2D local natural coordinates abstract type for rigid bars。
 """
 abstract type LNC2D4C{T} <: LNC2D{T} end
+
 """
-所有坐标数目为6的二维局部自然坐标抽象超类，用于任意形状刚体。
+6 coordinates 2D local natural coordinates abstract type , for rigid bodies。
 """
 abstract type LNC2D6C{T} <: LNC2D{T} end
+
 """
-所有坐标数目为6的三维局部自然坐标抽象超类，用于刚性直杆。
+3 coordinates 3D local natural coordinates abstract type for point mass。
+"""
+abstract type LNC3D3C{T} <: LNC3D{T} end
+
+"""
+6 coordinates 3D local natural coordinates abstract type for rigid bars。
 """
 abstract type LNC3D6C{T} <: LNC3D{T} end
+
 """
-所有坐标数目为12的三维局部自然坐标抽象超类，用于任意形状刚体。
+12 coordinates 3D local natural coordinates abstract type , for rigid bodies。
 """
 abstract type LNC3D12C{T} <: LNC3D{T} end
 
 """
-二维或三维局部自然坐标类，用于任意一列点。
-$(TYPEDEF)
+Data local natural coordinates。
 """
-struct LNC1P{N,T} <: LNC{T}
-    r̄i::SArray{Tuple{N},T,1,N}
-end
-
 struct LNCData{N,M,T,L}
     r̄i::SArray{Tuple{N},T,1,N}
     X̄::SArray{Tuple{N,M},T,2,L}
@@ -59,45 +71,45 @@ const I2_Int = make_I(Int,2)
 const I3_Int = make_I(Int,3)
 
 """
-返回空间维数。
+Return 空间dimension。
 $(TYPEDSIGNATURES)
 """
-get_ndim(::LNC1P{N}) where N = N
 get_ndim(nmcs::LNC) = get_ndim(nmcs.data)
 get_ndim(::LNCData{N,M,T,L}) where {N,M,T,L} = N
 
 """
-返回自然坐标所构成的坐标系的维数。
+Return natural coodinates 所构成的坐标系的dimension。
 $(TYPEDSIGNATURES)
 """
-get_nlocaldim(::LNC1P) = 0
 get_nlocaldim(nmcs::LNC) = get_nlocaldim(nmcs.data)
 get_nlocaldim(::LNCData{N,M,T,L}) where {N,M,T,L} = M
+
 """
-返回坐标个数。
+Return 坐标个数。
 $(TYPEDSIGNATURES)
 """
-get_ncoords(::LNC1P{N}) where N = N
 get_ncoords(nmcs::LNC) = get_ncoords(nmcs.data)
 get_ncoords(::LNCData{N,M,T,L}) where {N,M,T,L} = N+L
 
 """
-返回约束方程个数。
+Return 约束方程个数。
 $(TYPEDSIGNATURES)
 """
+get_nconstraints(::LNC2D2C) = 0
+get_nconstraints(::LNC3D3C) = 0
 get_nconstraints(::LNC2D4C) = 1
 get_nconstraints(::LNC2D6C) = 3
 get_nconstraints(::LNC3D6C) = 1
 get_nconstraints(::LNC3D12C) = 6
-get_nconstraints(::LNC1P) = 0
+
 """
-返回自由度数。
+Return 自由度数。
 $(TYPEDSIGNATURES)
 """
 get_ndof(nmcs::LNC) =  get_ncoords(nmcs) - get_nconstraints(nmcs)
 
 # """
-# 返回外积结果。
+# Return 外积结果。
 # $(TYPEDSIGNATURES)
 # """
 @inline @inbounds function LinearAlgebra.cross(a::Number,b::AbstractVector)
@@ -114,7 +126,7 @@ end
 end
 
 """
-返回旋转矩阵。
+Return 旋转矩阵。
 $(TYPEDSIGNATURES)
 """
 rotation_matrix(θ) = @SMatrix [cos(θ) -sin(θ); sin(θ) cos(θ)]
@@ -137,7 +149,7 @@ rotation_matrix(θ) = @SMatrix [cos(θ) -sin(θ); sin(θ) cos(θ)]
 end
 
 """
-返回斜对称矩阵。
+Return 斜对称矩阵。
 $(TYPEDSIGNATURES)
 """
 function skew(w)
@@ -184,8 +196,21 @@ function Base.getproperty(nmcs::LNC,p::Symbol)
     end
 end
 
+
 """
-坐标数目为4的二维局部自然坐标类，使用2个基本点。
+2D or 3D local natural coordinates ，用于任意一列点。
+$(TYPEDEF)
+"""
+struct LNC3D1P{T} <: LNC3D3C{T}
+    data::LNCData{3,0,T,0}
+end
+
+struct LNC2D1P{T} <: LNC2D2C{T}
+    data::LNCData{2,0,T,0}
+end
+
+"""
+4 coordinates 2D local natural coordinates ，使用2个基本点。
 $(TYPEDEF)
 """
 struct LNC2D2P{T} <: LNC2D4C{T}
@@ -197,7 +222,7 @@ struct LNC2D1P1V{T} <: LNC2D4C{T}
 end
 
 """
-坐标数目为6的三维局部自然坐标类，使用2个基本点。
+6 coordinates 3D local natural coordinates ，使用2个基本点。
 $(TYPEDEF)
 """
 struct LNC3D2P{T} <: LNC3D6C{T}
@@ -210,7 +235,7 @@ end
 
 
 """
-坐标数目为6的二维局部自然坐标类，使用1个基本点、2个基本向量。
+6 coordinates 2D local natural coordinates ，使用1个基本点、2个基本向量。
 $(TYPEDEF)
 """
 struct LNC1P2V{T} <: LNC2D6C{T}
@@ -218,7 +243,7 @@ struct LNC1P2V{T} <: LNC2D6C{T}
 end
 
 """
-坐标数目为6的二维局部自然坐标类，使用2个基本点、1个基本向量。
+6 coordinates 2D local natural coordinates ，使用2个基本点、1个基本向量。
 $(TYPEDEF)
 """
 struct LNC2P1V{T} <: LNC2D6C{T}
@@ -226,7 +251,7 @@ struct LNC2P1V{T} <: LNC2D6C{T}
 end
 
 """
-坐标数目为6的二维局部自然坐标类，使用3个基本点。
+6 coordinates 2D local natural coordinates ，使用3个基本点。
 $(TYPEDEF)
 """
 struct LNC3P{T} <: LNC2D6C{T}
@@ -234,7 +259,7 @@ struct LNC3P{T} <: LNC2D6C{T}
 end
 
 """
-坐标数目为12的三维局部自然坐标类，使用1个基本点、3个基本向量。
+12 coordinates 3D local natural coordinates ，使用1个基本点、3个基本向量。
 $(TYPEDEF)
 """
 struct LNC1P3V{T} <: LNC3D12C{T}
@@ -242,7 +267,7 @@ struct LNC1P3V{T} <: LNC3D12C{T}
 end
 
 """
-坐标数目为12的三维局部自然坐标类，使用2个基本点、2个基本向量。
+12 coordinates 3D local natural coordinates ，使用2个基本点、2个基本向量。
 $(TYPEDEF)
 """
 struct LNC2P2V{T} <: LNC3D12C{T}
@@ -250,7 +275,7 @@ struct LNC2P2V{T} <: LNC3D12C{T}
 end
 
 """
-坐标数目为12的三维局部自然坐标类，使用3个基本点、1个基本向量。
+12 coordinates 3D local natural coordinates ，使用3个基本点、1个基本向量。
 $(TYPEDEF)
 """
 struct LNC3P1V{T} <: LNC3D12C{T}
@@ -258,7 +283,7 @@ struct LNC3P1V{T} <: LNC3D12C{T}
 end
 
 """
-坐标数目为12的三维局部自然坐标类，使用4个基本点。
+12 coordinates 3D local natural coordinates ，使用4个基本点。
 $(TYPEDEF)
 """
 struct LNC4P{T} <: LNC3D12C{T}
@@ -269,6 +294,14 @@ end
 ！！！！！！！！！
 $(TYPEDSIGNATURES)
 """
+
+function get_conversion(nmcs::Union{LNC2D1P,LNC3D1P})
+    ndim = get_ndim(nmcs)
+    kron(
+        [ 1;],
+        make_I(Int,ndim)
+    )
+end
 
 function get_conversion(nmcs::Union{LNC2D1P1V,LNC3D1P1V})
     ndim = get_ndim(nmcs)
@@ -342,9 +375,17 @@ get_conversion(::LNC4P) = kron(
 )
 
 """
-返回刚体自然坐标
+Return rigid body natural coodinates 
 $(TYPEDSIGNATURES)
 """
+function rigidstate2naturalcoords(nmcs::Union{LNC2D2C,LNC3D3C},ro,R)
+    ro
+end
+
+function rigidstate2naturalcoords(nmcs::Union{LNC2D2C,LNC3D3C},ro,R,ṙo,ω)
+    ro,ṙo
+end
+
 function rigidstate2naturalcoords(nmcs,ro,R)
     (;r̄i,X̄) = nmcs
     ri = ro + R*r̄i
@@ -369,9 +410,35 @@ function rigidstate2naturalcoords(nmcs,ro,R,ṙo,ω)
     q,q̇
 end
 
+"""
+Return 2D rigid bar natural coodinates 。
+$(TYPEDSIGNATURES)
+"""
+function NC3D1P(ri::AbstractVector{T}) where T
+    r̄i = @SVector zeros(T,3)
+    nmcs = LNC3D1P(
+        LNCData(
+            SVector{3}(r̄i),
+            SMatrix{3,0,T}()
+        )
+    )
+    nmcs,ri
+end
+
+function NC2D1P(ri::AbstractVector{T}) where T
+    r̄i = @SVector zeros(T,2)
+    nmcs = LNC2D1P(
+        LNCData(
+            SVector{2}(r̄i),
+            SMatrix{2,0,T}()
+        )
+    )
+    nmcs,ri
+end
+
 
 """
-返回二维刚性直杆自然坐标类。
+Return 2D rigid bar natural coodinates 。
 $(TYPEDSIGNATURES)
 """
 function NC2D1P1V(ri::AbstractVector{T},u::AbstractVector{T},
@@ -428,7 +495,7 @@ function NC2D2P(ri,rj,ro,θ::Number,ṙo,ω)
 end
 
 """
-返回三维刚性直杆自然坐标类。
+Return 3D rigid bar natural coodinates 。
 $(TYPEDSIGNATURES)
 """
 function NC3D1P1V(ri::AbstractVector{T},u::AbstractVector{T},
@@ -483,7 +550,7 @@ function NC3D2P(ri,rj,ro,R::AbstractMatrix,ṙo,ω)
 end
 
 """
-返回二维任意形状刚体自然坐标类，使用1个基本点、2个基本向量。
+Return 2D rigid bodies natural coodinates ，使用1个基本点、2个基本向量。
 $(TYPEDSIGNATURES)
 """
 function NC1P2V(ri::AbstractVector{T},
@@ -519,7 +586,7 @@ function NC1P2V(ri,ro,θ,ṙo,ω)
 end
 
 """
-返回二维任意形状刚体自然坐标类，使用2个基本点、1个基本向量。
+Return 2D rigid bodies natural coodinates ，使用2个基本点、1个基本向量。
 $(TYPEDSIGNATURES)
 """
 function NC2P1V(ri::AbstractVector{T},rj::AbstractVector{T},
@@ -552,7 +619,7 @@ function NC2P1V(ri,rj,ro,θ,ṙo,ω)
 end
 
 """
-返回二维任意形状刚体自然坐标类，使用3个基本点。
+Return 2D rigid bodies natural coodinates ，使用3个基本点。
 $(TYPEDSIGNATURES)
 """
 function NC3P(ri::AbstractVector{T},rj::AbstractVector{T},rk::AbstractVector{T},
@@ -585,7 +652,7 @@ end
 
 ## 3D Rigid body
 """
-返回三维任意形状刚体自然坐标类，使用1个基本点、3个基本向量。
+Return 3D rigid bodies natural coodinates ，使用1个基本点、3个基本向量。
 $(TYPEDSIGNATURES)
 """
 function NC1P3V(ri::AbstractVector{T},
@@ -653,7 +720,7 @@ function NC1P3V(ri,u,v,w,ro,R,ṙo,ω)
 end
 
 """
-返回三维任意形状刚体自然坐标类，使用2个基本点、2个基本向量。
+Return 3D rigid bodies natural coodinates ，使用2个基本点、2个基本向量。
 $(TYPEDSIGNATURES)
 """
 function NC2P2V(ri::AbstractVector{T},rj::AbstractVector{T},
@@ -721,7 +788,7 @@ function NC2P2V(ri,rj,v,w,ro,R,ṙo,ω)
 end
 
 """
-返回三维任意形状刚体自然坐标类，使用3个基本点、1个基本向量。
+Return 3D rigid bodies natural coodinates ，使用3个基本点、1个基本向量。
 $(TYPEDSIGNATURES)
 """
 function NC3P1V(ri::AbstractVector{T},rj::AbstractVector{T},
@@ -760,7 +827,7 @@ function NC3P1V(ri,rj,rk,ro,R,ṙo,ω)
 end
 
 """
-返回三维任意形状刚体自然坐标类，使用4个基本点。
+Return 3D rigid bodies natural coodinates ，使用4个基本点。
 $(TYPEDSIGNATURES)
 """
 function NC4P(ri::AbstractVector{T},rj::AbstractVector{T},
@@ -797,14 +864,21 @@ function NC4P(ri,rj,rk,rl,ro,R,ṙo,ω)
 end
 
 # """
-# 返回二维或三维局部自然坐标类的变形量，用于刚性直杆。
+# Return 2D or 3D local natural coordinates 的变形量for rigid bars。
 # $(TYPEDSIGNATURES)
 # """
-@inline @inbounds get_deform(ū) = sqrt(ū⋅ū)
+@inline @inbounds get_deform(ū::AbstractVector) = sqrt(ū⋅ū)
+
+@inline @inbounds function get_deform(nmcs::Union{LNC2D1P,LNC3D1P})
+    (;r̄i) = nmcs
+    get_deform(r̄i)
+end
+
 @inline @inbounds function get_deform(nmcs::Union{LNC2D1P1V,LNC3D1P1V})
     (;ū) = nmcs
     get_deform(ū)
 end
+
 @inline @inbounds function get_deform(nmcs::Union{LNC2D2P,LNC3D2P})
     (;r̄i,r̄j) = nmcs
     ū = r̄j-r̄i
@@ -812,7 +886,7 @@ end
 end
 
 # """
-# 返回二维自然坐标类的变形量，用于任意形状刚体。
+# Return 2D natural coodinates 的变形量, for rigid bodies。
 # $(TYPEDSIGNATURES)
 # """
 @inline @inbounds function get_deform(ū,v̄)
@@ -835,7 +909,7 @@ end
 end
 
 # """
-# 返回三维自然坐标类的变形量，用于任意形状刚体。
+# Return 3D natural coodinates 的变形量, for rigid bodies。
 # $(TYPEDSIGNATURES)
 # """
 @inline @inbounds function get_deform(ū,v̄,w̄)
@@ -873,7 +947,7 @@ end
 # Intrinsic Constraints
 ## Intrinsic Constraints: Dispatch
 """
-返回二维或三维内部约束，用于Dispatch。
+Return 2D or 3D intrinsic constraint(s) ，用于Dispatch。
 $(TYPEDSIGNATURES)
 """
 function make_Φ(nmcs::LNC,Φi)
@@ -892,7 +966,18 @@ function make_inner_Φ(func,deforms)
 end
 
 """
-返回二维或三维内部约束，用于刚性直杆。
+Return 2D or 3D intrinsic constraint(s) for point mass。
+$(TYPEDSIGNATURES)
+"""
+function make_Φ(nmcs::Union{LNC2D2C,LNC3D3C},Φi,deforms)
+    @inline @inbounds function _inner_Φ(q,d)
+        nothing
+    end
+    make_inner_Φ(_inner_Φ,deforms)
+end
+
+"""
+Return 2D or 3D intrinsic constraint(s) for rigid bars。
 $(TYPEDSIGNATURES)
 """
 function make_Φ(nmcs::Union{LNC2D4C,LNC3D6C},Φi,deforms)
@@ -906,8 +991,9 @@ function make_Φ(nmcs::Union{LNC2D4C,LNC3D6C},Φi,deforms)
     end
     make_inner_Φ(_inner_Φ,deforms)
 end
+
 """
-返回二维内部约束，用于任意形状刚体。
+Return 2D intrinsic constraint(s) , for rigid bodies。
 $(TYPEDSIGNATURES)
 """
 function make_Φ(nmcs::LNC2D6C,Φi,deforms)
@@ -928,7 +1014,7 @@ end
 
 
 """
-返回三维内部约束，用于任意形状刚体。
+Return 3D intrinsic constraint(s) , for rigid bodies。
 $(TYPEDSIGNATURES)
 """
 function make_Φ(nmcs::LNC3D12C,Φi,deforms)
@@ -953,8 +1039,19 @@ end
 
 ## Jacobians
 
+
 """
-返回二维或三维雅可比矩阵，用于刚性直杆。
+Return 2D or 3D Jacobian matrix for rigid bars。
+$(TYPEDSIGNATURES)
+"""
+function make_Φq(nmcs::Union{LNC2D2C,LNC3D3C},uci,Φi)
+    @inline @inbounds function inner_Φq(q)
+        nothing
+    end
+end
+
+"""
+Return 2D or 3D Jacobian matrix for rigid bars。
 $(TYPEDSIGNATURES)
 """
 function make_Φq(nmcs::Union{LNC2D4C,LNC3D6C},uci,Φi)
@@ -970,7 +1067,7 @@ function make_Φq(nmcs::Union{LNC2D4C,LNC3D6C},uci,Φi)
 end
 
 """
-返回二维雅可比矩阵，用于任意形状刚体。
+Return 2D Jacobian matrix , for rigid bodies。
 $(TYPEDSIGNATURES)
 """
 function make_Φq(nmcs::LNC2D6C,uci,Φi)
@@ -988,7 +1085,7 @@ function make_Φq(nmcs::LNC2D6C,uci,Φi)
     end
 end
 """
-返回三维雅可比矩阵，用于任意形状刚体。
+Return 3D Jacobian matrix , for rigid bodies。
 $(TYPEDSIGNATURES)
 """
 function make_Φq(nmcs::LNC3D12C,uci,Φi)
@@ -1086,7 +1183,7 @@ function make_N(nmcs::LNC3D12C)
 end
 # Transformations
 """
-返回转换矩阵C。
+Return 转换矩阵C。
 $(TYPEDSIGNATURES)
 """
 function make_c(nmcs)
@@ -1095,6 +1192,7 @@ function make_c(nmcs)
         invX̄*(r̄-r̄i)
     end
 end
+
 function make_C(nmcs::LNC)
     function C(c)
         ndim = get_ndim(nmcs)
@@ -1107,7 +1205,7 @@ end
 
 # CoordinateFunctions
 """
-封装有函数的自然坐标类。
+封装有函数的natural coodinates 。
 $(TYPEDEF)
 """
 struct CoordinateFunctions{nmcsType,
@@ -1122,7 +1220,6 @@ struct CoordinateFunctions{nmcsType,
     ∂Aᵀλ∂q::∂Aᵀλ∂qT
     ∂Aq̇∂q::∂Aq̇∂qT
 end
-
 
 get_idx(nmcs::Union{LNC2D4C,LNC3D6C}) = [
     [CartesianIndex(2,2),CartesianIndex(2,2)],
@@ -1163,6 +1260,12 @@ function make_Φqᵀq(nmcs::LNC)
 end
 
 #todo use SymmetricPacked to the end
+function make_∂Aᵀλ∂q(nmcs::Union{LNC2D2C,LNC3D3C},uci,Φi)
+    function ∂Aᵀλ∂q(λ)
+        nothing
+    end
+end
+
 function make_∂Aᵀλ∂q(nmcs::LNC,uci,Φi)
     Φqᵀq = make_Φqᵀq(nmcs)
     function ∂Aᵀλ∂q(λ)
@@ -1175,6 +1278,12 @@ function make_∂Aᵀλ∂q(nmcs::LNC,uci,Φi)
             for (i,j) in enumerate(Φi)
         ]
         sum(ret)
+    end
+end
+
+function make_∂Aq̇∂q(nmcs::Union{LNC2D2C,LNC3D3C},uci,Φi)
+    function ∂Aq̇∂q(q̇)
+        nothing
     end
 end
 
@@ -1194,7 +1303,7 @@ function make_∂Aq̇∂q(nmcs::LNC,uci,Φi)
     end
 end
 """
-返回∂Aᵀλ∂q的前向自动微分结果。
+Return ∂Aᵀλ∂q的前向自动微分结果。
 $(TYPEDSIGNATURES)
 """
 function make_∂Aᵀλ∂q_forwarddiff(Φq,nq,nuc)
@@ -1210,7 +1319,7 @@ end
 
 
 """
-返回∂Aq̇∂q的前向自动微分结果。
+Return ∂Aq̇∂q的前向自动微分结果。
 $(TYPEDSIGNATURES)
 """
 function make_∂Aq̇∂q_forwarddiff(Φq,nq,nλ)
@@ -1225,7 +1334,7 @@ function make_∂Aq̇∂q_forwarddiff(Φq,nq,nλ)
 end
 
 """
-返回未约束的自然坐标编号。
+Return 未约束的natural coodinates 编号。
 $(TYPEDSIGNATURES)
 """
 function get_free_idx(nmcs::LNC,pres_idx)
@@ -1233,7 +1342,7 @@ function get_free_idx(nmcs::LNC,pres_idx)
 end
 
 """
-封装有函数的自然坐标类构造子。
+封装有函数的natural coodinates 构造子。
 $(TYPEDSIGNATURES)
 """
 function CoordinateFunctions(nmcs,uci,Φi)
@@ -1253,9 +1362,7 @@ end
 
 
 # Mass matrices
-Ī2J̄(::LNC2D4C,Ī)  = Ī
-Ī2J̄(::LNC3D6C,Ī)  = Ī
-Ī2J̄(::LNC2D6C,Ī)  = Ī
+Ī2J̄(::Union{LNC2D2C,LNC3D3C,LNC2D6C,LNC3D6C},Ī)  = Ī
 Ī2J̄(::LNC3D12C,Ī) = 1/2*tr(Ī)*I-Ī
 
 function Īg2az(nmcs,m,Īg,r̄g)
@@ -1293,7 +1400,9 @@ function make_X(nmcs::LNC,q::AbstractVector)
     qstd = Y*q
     ndim = get_ndim(nmcs)
     X = reshape(qstd[ndim+1:end],ndim,:)
-    if (nmcs isa LNC2D4C) || (nmcs isa LNC3D6C)
+    if (nmcs isa LNC2D2C) || (nmcs isa LNC3D3C)
+        return X
+    elseif  (nmcs isa LNC2D4C) || (nmcs isa LNC3D6C)
         return find_R(nmcs,q)
     else
         return SMatrix{ndim,ndim}(X)

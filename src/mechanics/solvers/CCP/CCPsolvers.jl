@@ -234,6 +234,9 @@ function IPM!(output,nu,nΛ,Λ,y,N,r;ftol=1e-14,Nmax=50)
         yp = y .+ αp.*Δyp
         μp = transpose(yp)*Λp/nΛ
         σ = (μp/μ)^3
+        if σ == NaN || μ == 0
+            break
+        end
         τ = σ*μp
         # @show "Prediction",αpmax,αp,τ,σ,μ,μp
         # @show Δxp

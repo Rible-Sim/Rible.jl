@@ -161,8 +161,12 @@ function make_zhongccp_ns_stepk(
 end
 
 function solve!(intor::Integrator,solvercache::ZhongQCCPCache;
-                dt,ftol=1e-14,xtol=ftol,verbose=false,maxiters=50,
-                progress=true,exception=true)
+        dt,
+        ftol=1e-14,xtol=ftol,maxiters=50,
+        verbose=false, verbose_contact=false,
+        progress=true,
+        exception=true,
+    )
     (;prob,totalstep) = intor
     (;bot,dynfuncs) = prob
     (;traj,contacts_traj) = bot
@@ -227,12 +231,8 @@ function solve!(intor::Integrator,solvercache::ZhongQCCPCache;
         isconverged = false
         normRes = typemax(T)
         iteration_break = 0
-        x[      1:nq]          .= qₖ
-        x[   nq+1:nq+nλ]       .= 0.0
-        isconverged = false
         nΛ = 3na
         𝚲ₘ = zeros(T,nΛ)
-        𝚲ₘ .= repeat([0.1,0,0],na)
         𝚲ʳₖ = copy(𝚲ₘ)
         Δ𝚲ₖ = copy(𝚲ₘ)
         𝐁 = zeros(T,nx,nΛ)
@@ -249,47 +249,72 @@ function solve!(intor::Integrator,solvercache::ZhongQCCPCache;
             F!,Jac_F!,get_directions_and_positions_active,get_∂Dq̇∂q_active,get_∂DᵀΛ∂q_active,
             cache,dt,scalingΛ,persistent_indices
         )
-
-        for iteration = 1:maxiters
-            # @show iteration,D,ηs,es,gaps
-            ns_stepk!(Res,Jac,𝐁,𝐛,𝐜ᵀ,𝐍,𝐫,x,𝚲ₘ,Dₖ₋₁,ŕₖ₋₁,H,filtered_gaps,es,timestep,iteration)
-            normRes = norm(Res)
-            if na == 0
-                if normRes < ftol
-                    isconverged = true
-                    iteration_break = iteration-1
-                    break
+        restart_count = 0
+        𝚲_guess = 10.0
+        while restart_count < 10
+            x[      1:nq]          .= qₖ
+            x[   nq+1:nq+nλ]       .= 0.0
+            𝚲ₘ .= repeat([𝚲_guess,0,0],na)
+            𝚲ʳₖ .= 0.0
+            Nmax = 50
+            for iteration = 1:maxiters
+                # @show iteration,D,ηs,es,gaps
+                ns_stepk!(Res,Jac,𝐁,𝐛,𝐜ᵀ,𝐍,𝐫,x,𝚲ₘ,Dₖ₋₁,ŕₖ₋₁,H,filtered_gaps,es,timestep,iteration)
+                if na == 0
+                    normRes = norm(Res)
+                    if normRes < ftol
+                        isconverged = true
+                        iteration_break = iteration-1
+                        break
+                    end
+                    Δx .= -Jac\Res
+                    x .+= Δx
+                else # na!=0
+                    if timestep == 308 
+                        @show timestep,iteration,normRes,norm(Res),𝚲ₘ
+                        # # 𝚲ₘini = repeat([1.0,0,0],na)
+                        # 𝚲ₘini = deepcopy(𝚲ʳₖ)
+                        Nmax = 1000
+                    end
+                    # else
+                    # end
+                    𝚲ₘini = repeat([𝚲_guess,0,0],na)
+                    𝚲ₘini[begin+1:3:end] .= 0.0
+                    𝚲ₘini[begin+2:3:end] .= 0.0
+                    # yini = deepcopy(𝚲ₘini)
+                    yini = 𝐍*𝚲ₘ + 𝐫
+                    yini .= abs.(yini)
+                    yini[begin+1:3:end] .= 0.0
+                    yini[begin+2:3:end] .= 0.0
+                    IPM!(𝚲ₘ,na,nΛ,𝚲ₘini,yini,𝐍,𝐫;ftol=1e-14,Nmax)
+                    Δ𝚲ₖ .= 𝚲ₘ - 𝚲ʳₖ
+                    minusRes𝚲 = -Res + 𝐁*(Δ𝚲ₖ)
+                    normRes = norm(minusRes𝚲)
+                    if  normRes < ftol
+                        isconverged = true
+                        iteration_break = iteration-1
+                        break
+                    elseif normRes > 1e10
+                        # force restart
+                        iteration_break = iteration-1
+                        isconverged = false
+                        break
+                    elseif iteration == maxiters
+                        iteration_break = iteration-1
+                        isconverged = false
+                    end
+                    Δx .= Jac\minusRes𝚲
+                    𝚲ʳₖ .= 𝚲ₘ
+                    x .+= Δx
+                    # @show timestep, iteration, normRes, norm(Δx), norm(Δ𝚲ₖ),persistent_indices
                 end
-                Δx .= -Jac\Res
-                x .+= Δx
-            else # na!=0
-                if iteration < 4
-                    Nmax = 50
-                else
-                    Nmax = 50
-                end
-                𝚲ₘini = deepcopy(𝚲ₘ)
-                𝚲ₘini[begin+1:3:end] .= 0.0
-                𝚲ₘini[begin+2:3:end] .= 0.0
-                𝚲ₘini .*= 2
-                yini = deepcopy(𝚲ₘini)
-                IPM!(𝚲ₘ,na,nΛ,𝚲ₘini,yini,𝐍,𝐫;ftol=1e-14,Nmax)
-                Δ𝚲ₖ .= 𝚲ₘ - 𝚲ʳₖ
-                minusRes𝚲 = -Res + 𝐁*(Δ𝚲ₖ)
-                normRes = norm(minusRes𝚲)
-                if  normRes < ftol
-                    isconverged = true
-                    iteration_break = iteration-1
-                    # @show iteration,𝚲ₘ
-                    break
-                elseif iteration == maxiters
-                    @show iteration,𝚲ₘ
-                end
-                Δx .= Jac\minusRes𝚲
-                𝚲ʳₖ .= 𝚲ₘ
-                x .+= Δx
-                # @show timestep, iteration, normRes, norm(Δx), norm(Δ𝚲ₖ),persistent_indices
             end
+            if isconverged
+                break
+            end
+            restart_count += 1
+            𝚲_guess /= 10
+            # @warn "restarting step: $timestep, count: $restart_count, 𝚲_guess = $𝚲_guess"
         end
         qₖ .= x[      1:nq]
         λₘ .= x[   nq+1:nq+nλ]
@@ -314,7 +339,7 @@ function solve!(intor::Integrator,solvercache::ZhongQCCPCache;
 
         #---------Time Step k finisher-----------
         pₖ₋₁, pₖ = pₖ, pₖ₋₁
-        if verbose
+        if verbose || (na>0 && verbose_contact)
             dg_step = ceil(Int,log10(totalstep))+1
             dg_dt = max(1,-floor(Int,log10(dt)))
             wd_t = ceil(Int,log10(traj.t[end]))+dg_dt+1+1

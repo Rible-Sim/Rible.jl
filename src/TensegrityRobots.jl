@@ -23,6 +23,8 @@ using FiniteDiff
 using RowEchelon
 using HomotopyContinuation
 using DynamicPolynomials
+using Graphs
+using MetaGraphsNext
 using TypeSortedCollections
 using EzXML
 using ProgressMeter, Printf
