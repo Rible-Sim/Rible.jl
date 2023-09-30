@@ -58,7 +58,7 @@ function get_cables(tg)
 end
 
 function get_bars_and_cables(tg)
-    rbs = TR.get_rigidbodies(tg)
+    rbs = TR.get_bodies(tg)
     bars = Observable(
                 reduce(
                     vcat,[
@@ -86,7 +86,7 @@ end
 function update_scene!(tg,bars,cables,q)
     cnt = tg.connectivity
     TR.update_rigids!(tg,q)
-    rbs = TR.get_rigidbodies(tg)
+    rbs = TR.get_bodies(tg)
     bars[] = reduce(
         vcat,[
             get_bars(rb)

@@ -164,7 +164,8 @@ function quad(c=100.0;
     bot = TR.TensegrityRobot(tg, hub)
 end
 
-function rigidbar(i,ri,rj;
+function rigidbar(i,
+        ri,rj;
         ṙi,ṙj,
         m = 0.05,
         movable = true,
@@ -177,6 +178,7 @@ function rigidbar(i,ri,rj;
     ro = (ri + rj)/2
     ṙo = (ṙi + ṙj)/2
     u = rj - ri
+    u̇ = ṙj - ṙi
     u /= norm(u)
     v,w = Meshes.householderbasis(u)
     R = SMatrix{3,3}(hcat(u,v,w))
@@ -218,12 +220,13 @@ function rigidbar(i,ri,rj;
         ω = zero(ṙo)
     else
         lncs, _ = TR.NCF.NC3D1P1V(ri, u, ro, R)
-        ω = TR.NCF.find_ω(lncs,vcat(ri,rj),vcat(ṙi,ṙj))
+        ω = TR.NCF.find_ω(lncs,vcat(ri,u),vcat(ṙi,u̇))
+        # @show ω, ṙi, u̇
     end
     state = TR.RigidBodyState(prop, lncs, ro, R, ṙo, ω, ci, Φi)
     # leg_mesh = load("400杆.STL")
     if loadmesh
-        barmesh = load("BZ.STL") |> make_patch(;
+        barmesh = load(joinpath(assetdir,"BZ.STL")) |> make_patch(;
             scale=1/1000,
             rot = RotY(π/2),
         )
@@ -401,18 +404,22 @@ function uni(c=100.0;
 end
 
 function superball(c=0.0;
+            ṙo = SVector(0.0,0.0,0),
+            ω = SVector(0.0,0.0,0.0),
             μ = 0.9,
             e = 0.0,
-            θ = atan(0.5,1),
             l = 1.7/2,
             d = l/2,
             z0 = l^2/(sqrt(5)*d) - 1e-7,
+            θ = atan(0.5,1),
+            R = RotY(θ),
+            ro = SVector(0,0,z0),
             k = 4000.0,
-            constrained = false,
+            constrained = true,
             addconst = Float64[],
             loadmesh = true,
         )
-    p = Ref(RotY(θ)) .* SVector{3}.(
+    p = Ref(R) .* SVector{3}.(
         [
             [ 0,  d,  l], [ 0,  d, -l],
             [ 0, -d, -l], [ 0, -d,  l],
@@ -421,10 +428,10 @@ function superball(c=0.0;
             [ l,  0,  d], [-l,  0,  d],
             [-l,  0, -d], [ l,  0, -d],
         ]
-    ).+Ref([0,0,z0])
+    ).+Ref(ro)
     # p |> display
     ṗ = [
-        SVector(5.0,1.0,0) + SVector(0.0,0.0,0.0)×r
+        ṙo + ω×(r-ro)
         for r in p
     ]
     rbs = [
@@ -434,9 +441,9 @@ function superball(c=0.0;
             ṙi=ṗ[2i-1],
             ṙj=ṗ[2i  ], 
             m = 5.0,
-            constrained = ifelse(i==1,true,false),
-            ci = ifelse(i==1,collect(1:6),Int[]),
-            Φi = ifelse(i==1,Int[],[1]),
+            constrained = ifelse(i==1 && constrained,true,false),
+            ci = ifelse(i==1 && constrained,collect(1:6),Int[]),
+            Φi = ifelse(i==1 && constrained,Int[],[1]),
             loadmesh,
             isbody =false,
             )
@@ -450,6 +457,7 @@ function superball(c=0.0;
 
     original_restlens = zeros(ncables)
     original_restlens .= 1.199744871391589
+    original_restlens .= 0.996
     ks = zeros(ncables)
     ks .= k
 

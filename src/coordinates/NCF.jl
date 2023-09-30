@@ -1403,7 +1403,8 @@ function make_X(nmcs::LNC,q::AbstractVector)
     if (nmcs isa LNC2D2C) || (nmcs isa LNC3D3C)
         return X
     elseif  (nmcs isa LNC2D4C) || (nmcs isa LNC3D6C)
-        return find_R(nmcs,q)
+        # return find_R(nmcs,q)
+        return SMatrix{ndim,1}(X)
     else
         return SMatrix{ndim,ndim}(X)
     end
@@ -1413,16 +1414,16 @@ find_R(q::AbstractVector, nmcs::LNC) = find_R(nmcs,q)
 function find_R(nmcs::LNC,q::AbstractVector)
     (;invX̄) = nmcs
     ndim = get_ndim(nmcs)
-    if nmcs isa LNC3D6C
-        (;r̄i,X̄) = nmcs
-        ū,v̄,w̄ = get_uvw(nmcs,vcat(r̄i,vec(X̄)))
-        u,v,w = get_uvw(nmcs,q)
-        R = SMatrix{ndim,ndim}([u;;v;;w]*inv([ū;;v̄;;w̄]))
-    elseif nmcs isa LNC2D4C
+    if nmcs isa LNC2D4C
         (;r̄i,X̄) = nmcs
         ū,v̄ = get_uv(nmcs,vcat(r̄i,vec(X̄)))
         u,v = get_uv(nmcs,q)
         R = SMatrix{ndim,ndim}([u;;v]*inv([ū;;v̄]))
+    elseif nmcs isa LNC3D6C
+        (;r̄i,X̄) = nmcs
+        ū,v̄,w̄ = get_uvw(nmcs,vcat(r̄i,vec(X̄)))
+        u,v,w = get_uvw(nmcs,q)
+        R = SMatrix{ndim,ndim}([u;;v;;w]*inv([ū;;v̄;;w̄]))
     else
         X = make_X(nmcs,q)
         R = SMatrix{ndim,ndim}(X*invX̄)
@@ -1436,7 +1437,6 @@ function find_ω(nmcs::LNC,q::AbstractVector,q̇::AbstractVector)
     Ẋ = make_X(nmcs,q̇)
     X = make_X(nmcs,q)
     ndim = get_ndim(nmcs)
-    # @show Ẋ,X
     if ndim == 2
         u = X[:,1]
         u̇ = Ẋ[:,1]

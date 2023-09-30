@@ -208,49 +208,71 @@ function solve!(intor::Integrator,solvercache::ZhongCCPCache;
         𝐫 = zeros(T,nΛ)
         scalingΛ = dt
         ns_stepk! = make_zhongccp_ns_stepk(nq,nλ,na,qₖ₋₁,q̇ₖ₋₁,pₖ₋₁,tₖ₋₁,pₖ,q̇ₖ,dynfuncs,cache,invM,dt,scalingΛ,persistent_indices)
-
-        for iteration = 1:maxiters
-            # @show iteration,D,ηs,es,gaps
-            ns_stepk!(Res,Jac,𝐁,𝐛,𝐜ᵀ,𝐍,𝐫,x,𝚲ₖ,D,Dₘ,Dₖ,H,filtered_gaps,es,timestep,iteration)
-            normRes = norm(Res)
-            if na == 0
-                if normRes < ftol
-                    isconverged = true
-                    iteration_break = iteration-1
-                    break
+        
+        restart_count = 0
+        𝚲_guess = 0.1
+        while restart_count < 10
+            𝚲ₖ .= repeat([𝚲_guess,0,0],na)
+            x[      1:nq]          .= qₖ
+            x[   nq+1:nq+nλ]       .= 0.0
+            𝚲ʳₖ .= 0.0
+            Nmax = 50
+            for iteration = 1:maxiters
+                # @show iteration,D,ηs,es,gaps
+                ns_stepk!(Res,Jac,𝐁,𝐛,𝐜ᵀ,𝐍,𝐫,x,𝚲ₖ,D,Dₘ,Dₖ,H,filtered_gaps,es,timestep,iteration)
+                normRes = norm(Res)
+                if na == 0
+                    if normRes < ftol
+                        isconverged = true
+                        iteration_break = iteration-1
+                        break
+                    end
+                    Δx .= -Jac\Res
+                    x .+= Δx
+                else # na!=0
+                    if iteration < 4
+                        Nmax = 50
+                    else
+                        Nmax = 50
+                    end
+                    𝚲ₖini = repeat([𝚲_guess,0,0],na)
+                    𝚲ₖini[begin+1:3:end] .= 0.0
+                    𝚲ₖini[begin+2:3:end] .= 0.0
+                    yₖini = 𝐍*𝚲ₖ + 𝐫
+                    yₖini .= abs.(yₖini)
+                    yₖini[begin+1:3:end] .= 0.0
+                    yₖini[begin+2:3:end] .= 0.0
+                    # @show 𝚲ₖini[begin:3:end], yₖini[begin:3:end]
+                    # yini = repeat([0.1,0,0],na)
+                    IPM!(𝚲ₖ,na,nΛ,𝚲ₖini,yₖini,𝐍,𝐫;ftol=1e-14,Nmax)                    
+                    Δ𝚲ₖ .= 𝚲ₖ - 𝚲ʳₖ
+                    minusRes𝚲 = -Res + 𝐁*(Δ𝚲ₖ)
+                    normRes = norm(minusRes𝚲)
+                    if  normRes < ftol
+                        isconverged = true
+                        iteration_break = iteration-1
+                        break
+                    elseif normRes > 1e10
+                        # force restart
+                        iteration_break = iteration-1
+                        isconverged = false
+                        break
+                    elseif iteration == maxiters
+                        iteration_break = iteration-1
+                        isconverged = false
+                    end
+                    Δx .= Jac\minusRes𝚲
+                    𝚲ʳₖ .= 𝚲ₖ
+                    x .+= Δx
+                    # @show timestep, iteration, normRes, norm(Δx), norm(Δ𝚲ₖ),persistent_indices
                 end
-                Δx .= -Jac\Res
-                x .+= Δx
-            else # na!=0
-                if iteration < 4
-                    Nmax = 50
-                else
-                    Nmax = 50
-                end
-                𝚲ₖini = repeat([0.1,0,0],na)
-                𝚲ₖini[begin+1:3:end] .= 0.0
-                𝚲ₖini[begin+2:3:end] .= 0.0
-                yₖini = 𝐍*𝚲ₖ + 𝐫
-                yₖini .= abs.(yₖini)
-                yₖini[begin+1:3:end] .= 0.0
-                yₖini[begin+2:3:end] .= 0.0
-                # @show 𝚲ₖini[begin:3:end], yₖini[begin:3:end]
-                # yini = repeat([0.1,0,0],na)
-                IPM!(𝚲ₖ,na,nΛ,𝚲ₖini,yₖini,𝐍,𝐫;ftol=1e-14,Nmax)
-                
-                Δ𝚲ₖ .= 𝚲ₖ - 𝚲ʳₖ
-                minusRes𝚲 = -Res + 𝐁*(Δ𝚲ₖ)
-                normRes = norm(minusRes𝚲)
-                if  normRes < ftol
-                    isconverged = true
-                    iteration_break = iteration-1
-                    break
-                end
-                Δx .= Jac\minusRes𝚲
-                𝚲ʳₖ .= 𝚲ₖ
-                x .+= Δx
-                # @show timestep, iteration, normRes, norm(Δx), norm(Δ𝚲ₖ),persistent_indices
             end
+            if isconverged
+                break
+            end
+            restart_count += 1
+            𝚲_guess /= 10
+            # @warn "restarting step: $timestep, count: $restart_count, 𝚲_guess = $𝚲_guess"
         end
         qₖ .= x[      1:nq]
         λₘ .= x[   nq+1:nq+nλ]

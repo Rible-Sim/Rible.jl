@@ -17,10 +17,15 @@ using Interpolations
 using EponymTuples
 using CircularArrays
 using TypeSortedCollections
+using DataStructures
+using PrettyTables
 using Printf
 using CoordinateTransformations
 using Meshing
+using ForwardDiff
+using BenchmarkTools
 using Test
+using IterTools
 using Unitful
 using Match
 using FileIO
@@ -103,7 +108,7 @@ function pm_contact_dynfuncs(bot;θ=0.0)
         TR.build_∂Q̌∂q̌̇!(∂F∂q̌̇,tg)
     end
 
-    rbs = TR.get_rigidbodies(tg)
+    rbs = TR.get_bodies(tg)
 
     a = tan(θ)
     n = [-a,0,1]
@@ -531,7 +536,7 @@ function make_top(ro = [0.0,0.0,0.0],
     push!(r̄ps,[0,0,-h])
     if loadmesh
         topmesh = load(
-            joinpath(dirname(pathof(TR)),"../assets","Toupise2.STL")
+            joinpath(assetdir,"Toupise2.STL")
         ) |> make_patch(;
             scale=1/1000,
             color,
@@ -575,112 +580,112 @@ function make_top(ro = [0.0,0.0,0.0],
 end
 
 function top_contact_dynfuncs(bot)
- (;tg) = bot
- function F!(F,q,q̇,t)
-     TR.clear_forces!(tg)
-     TR.update_rigids!(tg,q,q̇)
-     TR.update_tensiles!(tg)
-     TR.apply_gravity!(tg)
-     F .= TR.generate_forces!(tg)
- end
- function Jac_F!(∂F∂q̌,∂F∂q̌̇,q,q̇,t)
-     ∂F∂q̌ .= 0
-     ∂F∂q̌̇ .= 0
-     TR.clear_forces!(tg)
-     TR.update_rigids!(tg,q,q̇)
-     TR.update_tensiles!(tg)
-     TR.build_∂Q̌∂q̌!(∂F∂q̌,tg)
-     TR.build_∂Q̌∂q̌̇!(∂F∂q̌̇,tg)
- end
+    (;tg) = bot
+    function F!(F,q,q̇,t)
+        TR.clear_forces!(tg)
+        TR.update_rigids!(tg,q,q̇)
+        TR.update_tensiles!(tg)
+        TR.apply_gravity!(tg)
+        F .= TR.generate_forces!(tg)
+    end
+    function Jac_F!(∂F∂q̌,∂F∂q̌̇,q,q̇,t)
+        ∂F∂q̌ .= 0
+        ∂F∂q̌̇ .= 0
+        TR.clear_forces!(tg)
+        TR.update_rigids!(tg,q,q̇)
+        TR.update_tensiles!(tg)
+        TR.build_∂Q̌∂q̌!(∂F∂q̌,tg)
+        TR.build_∂Q̌∂q̌̇!(∂F∂q̌̇,tg)
+    end
 
- rbs = TR.get_rigidbodies(tg)
- rb1 = rbs[1]
- 
- function prepare_contacts!(contacts,q)
-     TR.update_rigids!(tg,q)
-     rb = rbs[1]
-     for (cid,pid) in enumerate([5])
-         gap = rb.state.rps[pid][3] 
-         TR.activate!(contacts[cid],gap)
-     end
-     active_contacts = filter(contacts) do c
-         c.state.active
-     end
-     na = length(active_contacts)
-     inv_μ_vec = ones(eltype(q),3na)
-     n = [0,0,1.0]
-     for (i,ac) in enumerate(active_contacts)
-         (;id,state) = ac
-         state.frame = TR.SpatialFrame(n)
-         inv_μ_vec[3(i-1)+1] = 1/ac.μ
-     end
-     es = [ac.e for ac in active_contacts]
-     gaps = [ac.state.gap for ac in active_contacts]
-     H = Diagonal(inv_μ_vec)
-     active_contacts, gaps, H, es
- end
+    rbs = TR.get_bodies(tg)
+    rb1 = rbs[1]
 
- function get_directions_and_positions(active_contacts,q)
-     na = length(active_contacts)
-     TR.update_rigids!(tg,q)
-     D = Matrix{eltype(q)}(undef,3na,length(q))
-     ŕ = Vector{eltype(q)}(undef,3na)
-     for (i,ac) in enumerate(active_contacts)
-         (;id,state) = ac
-         (;n,t1,t2) = state.frame
-         C = rb1.state.cache.Cps[id]
-         CT = C*TR.build_T(tg,1)
-         dm = hcat(n,t1,t2) |> transpose
-         D[3(i-1)+1:3(i-1)+3,:] = dm*CT
-         ŕ[3(i-1)+1:3(i-1)+3] = dm*rb1.state.rps[id]
-     end
-     D,ŕ
- end
+    function prepare_contacts!(contacts,q)
+        TR.update_rigids!(tg,q)
+        rb = rbs[1]
+        for (cid,pid) in enumerate([5])
+            gap = rb.state.rps[pid][3] 
+            TR.activate!(contacts[cid],gap)
+        end
+        active_contacts = filter(contacts) do c
+            c.state.active
+        end
+        na = length(active_contacts)
+        inv_μ_vec = ones(eltype(q),3na)
+        n = [0,0,1.0]
+        for (i,ac) in enumerate(active_contacts)
+            (;id,state) = ac
+            state.frame = TR.SpatialFrame(n)
+            inv_μ_vec[3(i-1)+1] = 1/ac.μ
+        end
+        es = [ac.e for ac in active_contacts]
+        gaps = [ac.state.gap for ac in active_contacts]
+        H = Diagonal(inv_μ_vec)
+        active_contacts, gaps, H, es
+    end
 
- function get_∂Dq̇∂q(active_contacts,q,q̇)
-     na = length(active_contacts)
-     TR.update_rigids!(tg,q)
-     T = eltype(q)
-     nq = length(q)
-     ∂Dq̇∂q = zeros(T,3na,nq)
-     for (i,ac) in enumerate(active_contacts)
-         (;id,state) = ac
-         (;n,t1,t2) = state.frame
-         r̄p = rb1.prop.r̄ps[id]
-         if rb1.state.cache.funcs.nmcs isa TR.QBF.QC
-             ∂Cẋ∂x = TR.QBF.make_∂Cẋ∂x(r̄p)
-             TI = TR.build_T(tg,1)
-             ∂Cq̇∂q = ∂Cẋ∂x(TI*q,TI*q̇)*TI
-             ∂Dq̇∂q[3(i-1)+1,:] = transpose(n)*∂Cq̇∂q
-             ∂Dq̇∂q[3(i-1)+2,:] = transpose(t1)*∂Cq̇∂q
-             ∂Dq̇∂q[3(i-1)+3,:] = transpose(t2)*∂Cq̇∂q
-         end
-     end
-     ∂Dq̇∂q
- end
+    function get_directions_and_positions(active_contacts,q)
+        na = length(active_contacts)
+        TR.update_rigids!(tg,q)
+        D = Matrix{eltype(q)}(undef,3na,length(q))
+        ŕ = Vector{eltype(q)}(undef,3na)
+        for (i,ac) in enumerate(active_contacts)
+            (;id,state) = ac
+            (;n,t1,t2) = state.frame
+            C = rb1.state.cache.Cps[id]
+            CT = C*TR.build_T(tg,1)
+            dm = hcat(n,t1,t2) |> transpose
+            D[3(i-1)+1:3(i-1)+3,:] = dm*CT
+            ŕ[3(i-1)+1:3(i-1)+3] = dm*rb1.state.rps[id]
+        end
+        D,ŕ
+    end
 
- function get_∂DᵀΛ∂q(active_contacts,q,Λ)
-     na = length(active_contacts)
-     TR.update_rigids!(tg,q)
-     T = eltype(q)
-     nq = length(q)
-     ∂DᵀΛ∂q = zeros(T,nq,nq)
-     for (i,ac) in enumerate(active_contacts)
-         (;id,state) = ac
-         (;n,t1,t2) = state.frame
-         r̄p = rb1.prop.r̄ps[id]
-         if rb1.state.cache.funcs.nmcs isa TR.QBF.QC
-             ∂Cᵀf∂x = TR.QBF.make_∂Cᵀf∂x(r̄p)
-             TI = TR.build_T(tg,1)
-             Λi = @view Λ[3(i-1)+1:3(i-1)+3]
-             fi = hcat(n,t1,t2)*Λi
-             ∂DᵀΛ∂q .+= transpose(TI)*∂Cᵀf∂x(TI*q,fi)*TI
-         end
-     end
-     ∂DᵀΛ∂q
- end
+    function get_∂Dq̇∂q(active_contacts,q,q̇)
+        na = length(active_contacts)
+        TR.update_rigids!(tg,q)
+        T = eltype(q)
+        nq = length(q)
+        ∂Dq̇∂q = zeros(T,3na,nq)
+        for (i,ac) in enumerate(active_contacts)
+            (;id,state) = ac
+            (;n,t1,t2) = state.frame
+            r̄p = rb1.prop.r̄ps[id]
+            if rb1.state.cache.funcs.nmcs isa TR.QBF.QC
+                ∂Cẋ∂x = TR.QBF.make_∂Cẋ∂x(r̄p)
+                TI = TR.build_T(tg,1)
+                ∂Cq̇∂q = ∂Cẋ∂x(TI*q,TI*q̇)*TI
+                ∂Dq̇∂q[3(i-1)+1,:] = transpose(n)*∂Cq̇∂q
+                ∂Dq̇∂q[3(i-1)+2,:] = transpose(t1)*∂Cq̇∂q
+                ∂Dq̇∂q[3(i-1)+3,:] = transpose(t2)*∂Cq̇∂q
+            end
+        end
+        ∂Dq̇∂q
+    end
 
- @eponymtuple(F!,Jac_F!,prepare_contacts!,get_directions_and_positions,get_∂Dq̇∂q,get_∂DᵀΛ∂q)
+    function get_∂DᵀΛ∂q(active_contacts,q,Λ)
+        na = length(active_contacts)
+        TR.update_rigids!(tg,q)
+        T = eltype(q)
+        nq = length(q)
+        ∂DᵀΛ∂q = zeros(T,nq,nq)
+        for (i,ac) in enumerate(active_contacts)
+            (;id,state) = ac
+            (;n,t1,t2) = state.frame
+            r̄p = rb1.prop.r̄ps[id]
+            if rb1.state.cache.funcs.nmcs isa TR.QBF.QC
+                ∂Cᵀf∂x = TR.QBF.make_∂Cᵀf∂x(r̄p)
+                TI = TR.build_T(tg,1)
+                Λi = @view Λ[3(i-1)+1:3(i-1)+3]
+                fi = hcat(n,t1,t2)*Λi
+                ∂DᵀΛ∂q .+= transpose(TI)*∂Cᵀf∂x(TI*q,fi)*TI
+            end
+        end
+        ∂DᵀΛ∂q
+    end
+
+    @eponymtuple(F!,Jac_F!,prepare_contacts!,get_directions_and_positions,get_∂Dq̇∂q,get_∂DᵀΛ∂q)
 end
 
 ro = [0,0,0.5]
@@ -804,12 +809,13 @@ GM.activate!();with_theme(theme_pub;
     fig
 end
 
+#note subsequent iteration slow convergence 
+#note initial guess can not improve it?
 TR.solve!(
     TR.SimProblem(topq,top_contact_dynfuncs),
     TR.ZhongQCCP();
-    tspan,dt=h,ftol=1e-12,maxiters=1000,exception=false,verbose_contact=true
+    tspan,dt=h,ftol=1e-12,maxiters=2000,exception=false,verbose_contact=true
 )
-
 
 plot_traj!(
     topq;
@@ -829,9 +835,10 @@ TR.solve!(
 plot_traj!(
     topn;
     showinfo=false,
-    rigidcolor=:white,
+    # rigidcolor=:white,
     showwire=true,
-    figsize=(0.6tw,0.6tw)
+    showarrows=false,
+    # figsize=(0.6tw,0.6tw)
 )
 
 c1_topq = get_trajectory!(topq,1,5)
@@ -892,8 +899,13 @@ CM.activate!(); plotsave_contact_persistent(top,"spinningtop_contact_persistent"
 
 # Dare you try tspan = (0.0,15.0)
 
-R = RotX(π/24)
-μs = [0.02,0.01,0.004]
+R = RotX(0.0)
+μs = [
+    # 0.04,
+    0.01,
+    #0.004
+]
+ro = [0,0,0.5]
 tops_e0 = [
     begin
         top = make_top(ro,R,ṙo,Ω,TR.NCF.LNC; μ, e = 0.0)
@@ -907,24 +919,232 @@ tops_e0 = [
     for μ in μs
 ]
 
-plot_traj!(tops_e0[1],
-    showarrows=false,
-)
+GM.activate!();with_theme(theme_pub;
+        resolution = (1.0tw,0.32tw),
+        figure_padding = (0,fontsize,0,0),
+        Axis3 = (
+            azimuth = 5.1155306333269825,
+            elevation = 0.1426990816987241,
+            protrusions = 0.0,
+        ),
+        Poly = (
+            cycle = [:patchcolor=>:color],
+            transparency = true,
+        )
+    ) do
+    bot = tops_e0[1]
+    stepstart = 309
+    t = bot.traj.t[stepstart:end]
+    rp5 = get_trajectory!(bot,1,5)
+    vp5 = get_velocity!(bot,1,5)[stepstart:end]
+    me = TR.mechanical_energy!(bot)[stepstart:end]
+    steps = 1:100:1800
+    cg = cgrad(:winter, length(steps), categorical = true)
+    fig = Figure()
+    gd1 = fig[1,1] = GridLayout()
+    gd2 = fig[1,2] = GridLayout()
+    gd3 = fig[1,3] = GridLayout(;tellheight=false)
+    plot_traj!(
+        bot;
+        AxisType=Axis3,
+        fig = gd1,
+        doslide = false,
+        showinfo=false,
+        # rigidcolor=:white,
+        showwire=false,
+        showpoints=false,
+        showlabels=false,
+        showarrows=false,
+        showmesh=false,
+        showtitle=false,
+        xlims = (-0.1,1.6),
+        ylims = (-0.1,0.2),
+        zlims = (-1e-6,0.6),
+        sup! = (ax,tgob,sgi) -> begin
+            hidey(ax)
+            ax.xlabeloffset = 0.0
+            for (istep,step) in enumerate(steps)
+                suptg = make_top(
+                    ro,R,ṙo,Ω,
+                    TR.NCF.LNC;
+                    μ,e,loadmesh=true,
+                    color=cg[istep],
+                ).tg
+                suptg.state.system.q .= bot.traj.q[step]
+                TR.update!(suptg)
+                init_plot!(ax,Observable(suptg);
+                    showlabels=false,
+                    showarrows=false,
+                    showpoints=false,
+                )
+            end
+            lines!(ax,rp5)
+        end
+    )
+    ax2 = Axis(gd1[2,1],
+        xlabel = L"x~(\mathrm{m})",
+        ylabel = L"y~(\mathrm{m})",
+    )
+    lines!(ax2,rp5[1:2,:])
+    ylims!(ax2,-0.003,0.003)
+    ax3 = Axis(gd2[1,1],
+        xlabel = tlabel,
+        ylabel = L"z~(\mathrm{m})",
+    )
+    mo_rp5=10
+    scaling = 10.0^(-mo_rp5)
+    Label(gd2[1,1,Top()],latexstring("\\times 10^{-$(mo_rp5)}"))
+    lines!(ax3,t,(rp5[3,stepstart:end].-rp5[3,stepstart])./scaling)
+    hidex(ax3)
+    ax4 = Axis(gd2[2,1],
+        xlabel = tlabel,
+        ylabel = L"\alpha-\pi~(\mathrm{Rad})",
+    )
+    mo_α=8
+    scaling = 10.0^(-mo_α)
+    Label(gd2[2,1,Top()],latexstring("\\times 10^{-$(mo_α)}"))
+    contacts_traj_voa = VectorOfArray(bot.contacts_traj)[:,stepstart:end]
+    c1s = contacts_traj_voa[1,:]
+    idx_per = findall((x)->doespersist(x;Λtol=0),c1s) #∩ idx_sli
+    α_per = map(c1s[idx_per]) do c
+        get_contact_angle(c;Λtol=0)
+    end
+    lines!(ax4,t[idx_per],(α_per.-π)./scaling;)
+    ax5 = Axis(gd3[2,1],
+        xlabel = tlabel,
+        ylabel = "Energy (J)",
+    )
+    lines!(ax5,t,me.E, label="E")
+    lines!(ax5,t,me.T, label="T")
+    lines!(ax5,t,me.V.+6, label="V")
+    Legend(gd3[1,1],ax5,orientation=:horizontal)
+    # axislegend(ax5,position=:rt)
+    xlims!(ax3,0.309,2.1)
+    xlims!(ax4,0.309,2.1)
+    xlims!(ax5,0.309,2.1)
+    
+    Label(
+        gd1[1,1,TopLeft()],
+        rich("($(alphabet[1]))",font=:bold),
+        justification = :right,
+        padding = (5fontsize,0,0,0),
+    )
+    Label(
+        gd1[2,1,TopLeft()],
+        rich("($(alphabet[2]))",font=:bold),
+        justification = :right,
+        padding = (fontsize,0,0,0)
+    )
+    Label(
+        gd2[1,1,TopLeft()],
+        rich("($(alphabet[3]))",font=:bold)
+    )
+    Label(
+        gd2[2,1,TopLeft()],
+        rich("($(alphabet[4]))",font=:bold)
+    )
+    Label(
+        gd3[2,1,TopLeft()],
+        rich("($(alphabet[5]))",font=:bold)
+    )
+    colsize!(fig.layout,1,Fixed(0.40tw))
+    colgap!(fig.layout,1,3fontsize)
+    rowsize!(gd1,2,Fixed(0.05tw))
+    rowgap!(gd1,0)
+    rowsize!(gd3,2,0.1tw)
+    savefig(fig,"spinningtop_sliding")
+    fig
+end
 
-δα = map(tops[6].contacts_traj) do c
-     get_contact_angle(c[1])
- end |> skipmissing |> collect |> scatter
-θ = map(tops[8].contacts_traj) do c
-     get_friction_direction(c[1])
- end |> skipmissing |> collect |> scatter
+function plotsave_friction_direction_error(bot,figname=nothing;
+        resolution = (0.9tw,0.4tw),
+        mo = 8,
+        mo_α = mo,
+        vtol=1e-5,
+        Λtol=1e-5,
+    )
+    with_theme(theme_pub;
+        resolution
+    ) do
+    fig = Figure()
+    ax1 = Axis(fig[1,1],
+                xlabel=tlabel,
+                ylabel=L"\delta\alpha~(\mathrm{Rad})",
+                # title=latexstring("$x=$(xs[1])")
+        )
+    ax2 = Axis(fig[1,2],
+                xlabel=tlabel,
+                ylabel=L"\delta\theta~(\mathrm{Rad})",
+                # title=latexstring("$x=$(xs[1])")
+        )
+    # ax3 = Axis(fig[1,2],
+    #         xlabel=L"\delta\theta~(\mathrm{Rad})",
+    #         title=latexstring("$x=$(xs[1])"),
+    #         xtickformat = values -> [latexstring("10^{$(value)}") for value in values]
+            # xscale = Makie.log10,
+            # xticks = [-1e-7, -1e-8, -1e-9, 0, 1e-9, 1e-8, 1e-7],
+            # limits = ((1e-14, 1e-7), nothing),
+    # )
+    # Label(fig[1,1,TopLeft()],"($(alphabet[2botid-1]))")
+    # Label(fig[1,2,TopLeft()],"($(alphabet[2botid]))")
+    tstart = 309
+    t = bot.traj.t[tstart:end]
+    contacts_traj_voa = VectorOfArray(bot.contacts_traj)[:,tstart:end]
+    c1s = contacts_traj_voa[1,:]
+    # idx_sli = findall(c1s) do c
+    #     issliding(c;vtol)
+    # end
+    idx_imp = findall((x)->isimpact(x;Λtol),c1s) #∩ idx_sli
+    δα_imp = map(c1s[idx_imp]) do c
+        get_contact_angle(c;Λtol)
+    end
+    idx_per = findall((x)->doespersist(x;Λtol=0),c1s) #∩ idx_sli
+    # @show idx_per[begin]
+    δα_per = map(c1s[idx_per]) do c
+        get_contact_angle(c;Λtol)
+    end
+    rp5 = get_trajectory!(bot,1,5,tstart:length(bot.traj))
+    scaling = 10.0^(-mo_α)
+    # Label(fig[1,1,Top()],latexstring("\\times 10^{-$(mo_α)}"))
+    markersize = fontsize
+    lines!(ax1,δα_per.-π;)
+    lines!(ax2,t[idx_per],rp5[3,idx_per].-rp5[3,begin])
+    # xlims!(ax2,0.65,2)
+    # scatter!(ax2,idx_per,ones(length(idx_per)))
+    # scatter!(ax2,idx_imp,ones(length(idx_imp)))
+    # rp5[3,idx_per])
+    # # scatter!(ax1,t[idx_imp],δα_imp./scaling;
+    # #             marker=:xcross, markersize)
+    # ylims!(ax1,-1.0,1.0)
 
-# GM.activate!(); plotsave_friction_direction(tops[1:4])
-GM.activate!(); plotsave_friction_direction(tops[5:7],"e",es[1:3])
-CM.activate!(); plotsave_friction_direction(tops[5:7],"e",es[1:3],"friction_direction_mu01")
+    # @myshow δα_per
 
-GM.activate!(); plotsave_friction_direction(tops_e0,"\\mu",μs)
-CM.activate!(); plotsave_friction_direction(tops_e0,"\\mu",μs,"friction_direction_e00")
+    # θ_imp = map(c1s[idx_imp]) do c
+    #         get_friction_direction(c)
+    #     end
+    # θ_per = map(c1s[idx_per]) do c
+    #         get_friction_direction(c)
+    #     end
+    scaling = 10.0^(-mo)
+    # Label(fig[1,2,Top()],latexstring("\\times 10^{-$(mo)}"))
+    # scatter!(ax2,t[idx_per],(θ_per.-π/4)./scaling, label="Persistent";
+    #             marker=:diamond, markersize)
+    # # scatter!(ax2,t[idx_imp],(θ_imp.-π/4)./scaling, label="Impact";
+    # #             marker=:xcross, markersize)
+    # xlims!(ax2,extrema(t)...)
+    # ylims!(ax2,-1.0,1.0)
+    # hist!(ax3,collect(log10.(abs.(skipmissing(δα_per))));normalization  = :pdf)
+    # hidex(ax3)
+    # Legend(fig[1,:],ax3;
+    #     orientation=:horizontal
+    # )
+    rowgap!(fig.layout,fontsize/2)
+    savefig(fig,figname)
+    fig
+    end
+end
 
+GM.activate!(); plotsave_friction_direction_error(tops_e0[1];vtol=1e-7)
 # contact point trajectory
 
 function plotsave_point_traj_vel(bots,figname=nothing)
@@ -1001,7 +1221,6 @@ function plotsave_point_traj_vel(bots,figname=nothing)
         fig
     end
 end
-
 
 GM.activate!(); plotsave_point_traj_vel(tops_e0)
 CM.activate!(); plotsave_point_traj_vel(tops_e0,"contact_point_traj_vel")
@@ -1283,7 +1502,7 @@ function bar_contact_dynfuncs(bot)
      TR.build_∂Q̌∂q̌̇!(∂F∂q̌̇,tg)
  end
 
- rbs = TR.get_rigidbodies(tg)
+ rbs = TR.get_bodies(tg)
  function prepare_contacts!(contacts, q)
      TR.update_rigids!(tg,q)
      rb = rbs[1]
@@ -1396,20 +1615,18 @@ Q = TR.ANCF.make_Q(ancs)
 M = TR.ANCF.build_M(ancs)
 G = TR.ANCF.build_G(ancs) 
 
-
-∂Q∂e |> issymmetric
-
-@btime ForwardDiff.jacobian!($out,$Q,$e)
-ne = length(e)
-eT = eltype(e)
-out = zeros(eT,ne)
-∂Q∂e_forwarddiff!(out,ancs,0.5L,e)
+# ne = length(e)
+# eT = eltype(e)
+# out = zeros(eT,ne)
+# ∂Q∂e_forwarddiff!(out,ancs,0.5L,e)
+# @btime ForwardDiff.jacobian!($out,$Q,$e)
+# ∂Q∂e |> issymmetric
 
 cablemesh = sample(ancs,e,1000)
 
 mesh(cablemesh,transparency=false)
 
-function make_cube(id,r̄ijkl,ro,R,ri,rj=nothing,rk=nothing,rl=nothing;
+function make_hammer(id,r̄ijkl,ro,R,ri,rj=nothing,rk=nothing,rl=nothing;
         movable = true,
         constrained = false,
         pres_idx = Int[],
@@ -1420,12 +1637,12 @@ function make_cube(id,r̄ijkl,ro,R,ri,rj=nothing,rk=nothing,rl=nothing;
     Īg = SMatrix{3,3}(
         Matrix(Diagonal([1.0E-03,1.0E-03,1.0E-03]))
     )
-    ū = (r̄ijkl[2] - r̄ijkl[1])
-    v̄ = (r̄ijkl[3] - r̄ijkl[1])
-    w̄ = (r̄ijkl[4] - r̄ijkl[1])
-    r̄g = r̄ijkl[1] .+ ū./2 .+ v̄./2 .+ w̄./2
-    r̄ps = deepcopy(r̄ijkl)
-    push!(r̄ps,r̄ijkl[1] .+ ū .+ v̄ .+ w̄)
+    r̄g = SVector(-0.20,0,0)
+    # r̄ps = deepcopy(r̄ijkl)
+    r̄ps = [
+        zero(r̄g),
+        SVector(-0.40,0,0)
+    ]
     @show m,diag(Īg),r̄g
     prop = TR.RigidBodyProperty(id,movable,m,Īg,
                 r̄g,r̄ps;constrained=constrained
@@ -1443,14 +1660,13 @@ function make_cube(id,r̄ijkl,ro,R,ri,rj=nothing,rk=nothing,rl=nothing;
     end
     # cf = TR.NCF.CoordinateFunctions(lncs,q0,pres_idx,free_idx)
     # @show typeof(lncs)
-    
-    box = Meshes.Box(
-        Meshes.Point3(r̄ps[1]),
-        Meshes.Point3(r̄ps[5])
-    ) |> Meshes.boundary
-    trimesh = Meshes.discretize(box,) |> simple2mesh
+       # trimesh = Meshes.discretize(box,) |> simple2mesh
+    meteormesh = load(joinpath(assetdir,"流星锤.STL")) |> make_patch(;
+        scale = 1/400,
+        trans = [-0.20,0,0],
+    )
     state = TR.RigidBodyState(prop,lncs,ro,R,ṙo,ω,pres_idx,Φ_mask)
-    rb = TR.RigidBody(prop,state,trimesh)
+    rb = TR.RigidBody(prop,state,meteormesh)
 end
 
 function cable_ancf(pres_idx, 𝐞, L = 1.0) 
@@ -1471,7 +1687,7 @@ function cable_ancf(pres_idx, 𝐞, L = 1.0)
         :cable,
         mass,
         r̄g,
-        length(r̄ps),
+        # length(r̄ps),
         r̄ps
     )
     # cache = TR.get_CoordinatesCache(prop,ancs,𝐞)
@@ -1479,16 +1695,17 @@ function cable_ancf(pres_idx, 𝐞, L = 1.0)
     fb = TR.FlexibleBody(prop,state)
 end
 
-function make_flexcable(
+function make_flexcable(;
         ri  = [ 0.0, 0.0, 1.5],
         rix = [ 0.0, 0.0,-1.0],
         rj  = [-0.5*√3, 0.0, 0.5-1e-2],
-        rjx = [ 0.0,-1.0, 0.0];
+        rjx = [ 0.0,-1.0, 0.0],
         doDR=false,
         μ = 0.5,
         e = 0.9,
         L = 1.0,
         nx = 2,
+        R = RotY(deg2rad(-60))
     )
     if doDR
         fb_pres_idx = [7,8,9]
@@ -1509,8 +1726,15 @@ function make_flexcable(
             [0,0,1],
         ]
     )
-    R = RotX(0.0)
-    rb = make_cube(nx+1,r̄ijkl,rj,R,rj;pres_idx=rb_pres_idx,constrained=ifelse(!isempty(rb_pres_idx),true,false))
+    rb = make_hammer(
+        nx+1,
+        r̄ijkl,
+        rj,
+        R,
+        rj;
+        pres_idx=rb_pres_idx,
+        constrained=ifelse(!isempty(rb_pres_idx),true,false)
+    )
     fbs = TypeSortedCollection(vcat(subfbs,rb))
     # fbs = TypeSortedCollection([fb1,])
     numberedpoints = TR.number(fbs)
@@ -1525,29 +1749,33 @@ function make_flexcable(
     tensiles = (cables = ss,)
     connected = TR.connect(fbs,)
     tensioned = @eponymtuple(connected,)
-    cst1 = TR.FixedIndicesConstraint([1,2,3],ri)
+    cst1 = TR.FixedIndicesConstraint(1,[1,2,3],ri)
     jointed = TR.join((cst1,),indexedcoords)
     cnt = TR.Connectivity(numberedpoints,indexedcoords,tensioned,jointed)
-    contacts = [TR.Contact(i,μ,e) for i = [5]]
+    contacts = [TR.Contact(i,μ,e) for i = [2]]
     tg = TR.TensegrityStructure(fbs,tensiles,cnt,contacts)
     bot = TR.TensegrityRobot(tg)
 end
 
 flexcable_DR = make_flexcable(;L=1.5,nx=5,doDR=true)
-flexcable = make_flexcable(;L=1.5,nx=5)
-
 TR.GDR!(flexcable_DR;β=1e-3,maxiters=1e5)
+flexcable = make_flexcable(;μ=0.05,L=1.5,nx=5)
+
+flexcable_DR.traj.q[end][end-8:end] .= flexcable.traj.q[end][end-8:end]
 
 TR.set_new_initial!(flexcable,flexcable_DR.traj.q[end],flexcable_DR.traj.q̇[end])
 
-plot_traj!(flexcable,)
+with_theme(theme_pub;
+        Poly= (
+            transparency = true,
+        ) 
+    ) do 
+    plot_traj!(flexcable;
+    )
+end
 
-flexcable[1].state.cache.pres_idx
-
-flexcable.tg.connectivity.indexed.mem2sysincst
-
-θ = -30 |> deg2rad
-inclined_plane = TR.Plane([-tan(θ),0,1],[0,0,-0.1*√3])
+θ = -45 |> deg2rad
+inclined_plane = TR.Plane(RotXY(deg2rad(-5),deg2rad(30))*[0,0,1.0],[-1.066025,0,0.143599])
 
 function flexcable_contact_dynfuncs(bot,ground_plane)
     (;tg) = bot
@@ -1567,14 +1795,14 @@ function flexcable_contact_dynfuncs(bot,ground_plane)
         TR.build_∂Q̌∂q̌!(∂F∂q̌,tg)
         # TR.build_∂Q̌∂q̌̇!(∂F∂q̌̇,tg)
     end
-
-    rbs = TR.get_rigidbodies(tg)
+    pid = 2
+    rbs = TR.get_bodies(tg)
     rblast = rbs[end]
     nb = length(rbs)
     (;n) = ground_plane
     function prepare_contacts!(contacts,q)
         TR.update_rigids!(tg,q)
-        for (pres_idxd,pid) in enumerate([5])
+        for (pres_idxd,pid) in enumerate([pid])
             # gap = rblast.state.rps[pid][3] 
             gap = TR.signed_distance(
                 rblast.state.rps[pid],
@@ -1639,7 +1867,7 @@ function flexcable_contact_dynfuncs(bot,ground_plane)
         end
         ∂Dq̇∂q
     end
-
+    
     function get_∂DᵀΛ∂q(active_contacts,q,Λ)
         na = length(active_contacts)
         TR.update_rigids!(tg,q)
@@ -1660,71 +1888,268 @@ function flexcable_contact_dynfuncs(bot,ground_plane)
         end
         ∂DᵀΛ∂q
     end
-
     # @eponymtuple(F!,Jac_F!)
     @eponymtuple(F!,Jac_F!,prepare_contacts!,get_directions_and_positions,get_∂Dq̇∂q,get_∂DᵀΛ∂q)
+end
+
+# sliding and avg err 
+tspan = (0.0,1.0)
+h = 1e-3
+TR.solve!(
+    TR.SimProblem(flexcable,(x)->flexcable_contact_dynfuncs(x,inclined_plane)),
+    TR.Zhong06();
+    tspan,dt=h,ftol=1e-14,maxiters=50,exception=true,verbose=false
+)
+
+TR.solve!(
+    TR.SimProblem(flexcable,(x)->flexcable_contact_dynfuncs(x,inclined_plane)),
+    TR.ZhongCCP();
+    tspan,dt=h,ftol=1e-14,maxiters=50,exception=false,verbose=false
+)
+
+plotsave_contact_persistent(flexcable)
+
+rp2 = get_trajectory!(flexcable,6,2)
+lines(rp2[3,:])
+
+ME = TR.mechanical_energy!(flexcable)
+lines((ME.E.-ME.E[begin])./ME.E[begin])
+
+contacts_traj_voa = VectorOfArray(flexcable.contacts_traj)
+csa = StructArray(contacts_traj_voa[1,1:5])
+
+    
+#dt
+# dts = [1e-1,3e-2,1e-2,3e-3,1e-3,1e-4]
+dts = [1e-2,5e-3,2e-3,1e-3,5e-4,2e-4,1e-5]
+flexcables_dt = [
+    begin
+        flexcable = make_flexcable(;μ=0.05, L=1.5,nx=5)
+        TR.set_new_initial!(flexcable,flexcable_DR.traj.q[end],flexcable_DR.traj.q̇[end])
+        TR.solve!(TR.SimProblem(flexcable,(x)->flexcable_contact_dynfuncs(x,inclined_plane)),
+                TR.ZhongCCP();
+                tspan=(0.0,0.4),dt,ftol=1e-14,maxiters=50,exception=false)
+    end
+    for dt in dts
+]
+
+
+plotsave_contact_persistent(flexcables_dt[2])
+
+flexcables_dt[3].tg |> viz
+
+GM.activate!(); plotsave_error(flexcables_dt,dts,bid=6,pid=2,di=2)
+
+_, err_avg = get_err_avg(flexcables_dt;bid=6,pid=2,di=2)
+
+with_theme(theme_pub;
+        resolution = (0.9tw,0.45tw),
+        figure_padding = (0,fontsize,0,0),
+        Axis3=(
+            azimuth = 7.595530633326987,
+            elevation = 0.14269908169872403
+        )
+    ) do
+    bot = flexcable
+    bots = flexcables_dt
+    rp2 = get_trajectory!(bot,6,2)
+    fig = Figure()
+    gd2 = fig[1,2] = GridLayout()
+    gd3 = fig[2,2] = GridLayout()
+    gd1 = fig[:,1] = GridLayout()
+    steps = 1:150:length(bot.traj)
+    cg = cgrad(:winter, length(steps), categorical = true, rev = true)
+    plot_traj!(
+        bot;
+        AxisType=Axis3,
+        fig = gd1,
+        # dorecord=true,
+        showtitle=false,
+        showpoints=false,
+        showlabels=false,
+        showarrows=false,
+        showmesh=true,
+        xlims=(-1.2,1.0),
+        ylims=(-0.5,0.5),
+        zlims=(-0.4,1.8),
+        doslide=false,
+        showinfo=false,
+        ground=inclined_plane,
+        # figname="cable.mp4",
+        sup! = (ax,_,_) -> begin
+            for (i,step) in enumerate(steps)
+                TR.goto_step!(bot,step)
+                tgvis = deepcopy(bot.tg)
+                viz!(ax,tgvis;meshcolor=cg[i])
+            end
+            lines!(ax,rp2[:,1:505],color=:red)
+            lines!(ax,rp2[:,506:end],color=:blue)
+            handlemesh = load(joinpath(TR.assetpath(),"把柄.STL")) |> make_patch(;
+                scale = 1/400,
+                trans = [ 0.0, 0.0, 1.55],
+                rot = RotY(-π/2)
+            )
+            mesh!(ax,handlemesh)
+        end
+    )
+    ax2 = Axis(gd2[1,1],
+        xlabel = L"x~(\mathrm{m})",
+        ylabel = L"y~(\mathrm{m})",
+        aspect = DataAspect()
+    )
+    lines!(ax2,get_trajectory!(bots[1],6,2)[1:2,:],label = L"h=10^{-2}")
+    lines!(ax2,get_trajectory!(bots[7],6,2)[1:2,:],label = L"h=10^{-5}")
+    axislegend(ax2)
+    ax3 = Axis(gd3[1,1])
+    plot_convergence_order!(ax3,dts[begin:end-1],err_avg;show_orders=true)
+    Legend(gd3[1,2],ax3)
+    colsize!(fig.layout,1,0.45tw)
+    rowgap!(fig.layout,0)
+    Label(
+        gd1[1,1,TopLeft()],"($(alphabet[1]))",font = :bold,
+        padding = (0,0,0,0),
+        justification = :right,
+        lineheight = 1.0,
+        halign = :center,
+        valign = :bottom,        
+    )
+    Label(
+        gd2[1,1,TopLeft()],"($(alphabet[2]))",font = :bold
+    )
+    Label(
+        gd3[1,1,TopLeft()],"($(alphabet[3]))",font = :bold
+    )
+    savefig(fig,"meteor_sliding")
+    fig
+end
+
+# swing
+flexcable_DR = make_flexcable(;
+        ri  = [ 0.0, 0.0, 1.5],
+        rix = [ 0.0, 0.0,-1.0],
+        rj  = [-0.6*√3, 0.0, 1.2],
+        rjx = [ 0.0,-1.0, 0.0],
+        L=1.2,nx=5,doDR=true
+)
+TR.GDR!(flexcable_DR;β=1e-3,maxiters=1e5)
+flexcable = make_flexcable(;
+    ri  = [ 0.0, 0.0, 1.5],
+    rix = [ 0.0, 0.0,-1.0],
+    rj  = [-0.6*√3, 0.0, 1.2],
+    rjx = [ 0.0,-1.0, 0.0],
+    μ=0.05,L=1.2,nx=5,R=RotY(-π/2)
+)
+flexcable_DR.traj.q[end][end-8:end] .= flexcable.traj.q[end][end-8:end]
+
+TR.set_new_initial!(flexcable,flexcable_DR.traj.q[end],flexcable_DR.traj.q̇[end])
+
+
+inclined_plane = TR.Plane(RotXY(deg2rad(0),deg2rad(-90))*[0,0,1.0],[0.5,0,0])
+
+with_theme(theme_pub;
+        Poly= (
+            transparency = true,
+        ) 
+    ) do 
+    plot_traj!(flexcable;
+    )
 end
 
 tspan = (0.0,2.0)
 h = 1e-4
 TR.solve!(
     TR.SimProblem(flexcable,(x)->flexcable_contact_dynfuncs(x,inclined_plane)),
-    TR.Zhong06();
-    tspan,dt=h,ftol=1e-14,maxiters=50,exception=true,verbose=false)
-
-TR.solve!(
-    TR.SimProblem(flexcable,(x)->flexcable_contact_dynfuncs(x,inclined_plane)),
     TR.ZhongCCP();
-    tspan,dt=h,ftol=1e-14,maxiters=50,exception=false,verbose=false)
+    tspan,dt=h,ftol=1e-14,maxiters=50,exception=true,verbose=false
+)
 
-with_theme(theme_pub;
-        Axis3=(
-            azimuth = 7.925530633326988,
-            elevation = 0.11269908169872402
-        )
-    ) do
-    plot_traj!(
-    flexcable;
-    AxisType=Axis3,
-    # dorecord=true,
-    showpoints=false,
-    zlims=[-0.5,1.51],
-    doslide=true,
-    showinfo=false,
-    ground=inclined_plane,
-    # figname="cable.mp4",
-    )
-end
-
-plot_traj!(flexcable)
-
-ME = TR.mechanical_energy!(flexcable)
-lines(ME.E)
-
-contacts_traj_voa = VectorOfArray(flexcable.contacts_traj)
-csa = StructArray(contacts_traj_voa[1,1:5])
+me = TR.mechanical_energy!(flexcable)
 
 plotsave_contact_persistent(flexcable)
-    
-#dt
-# dts = [1e-1,3e-2,1e-2,3e-3,1e-3,1e-4]
-dts = [1e-2,3e-3,1e-3,3e-4,1e-4,3e-5,1e-5,1e-6]
-flexcables_dt = [
-    begin
-        flexcable = make_flexcable(;L=1.5,nx=5)
-        TR.set_new_initial!(flexcable,flexcable_DR.traj.q[end],flexcable_DR.traj.q̇[end])
-        TR.solve!(TR.SimProblem(flexcable,(x)->flexcable_contact_dynfuncs(x,inclined_plane)),
-                TR.Zhong06();
-                tspan=(0.0,1e-1),dt,ftol=1e-14,maxiters=50,exception=false)
-    end
-    for dt in dts
-]
 
-rp2 = get_trajectory!(flexcables_dt[begin],1,2)
-lines(rp2[2,:])
-GM.activate!(); plotsave_error(flexcables_dt,dts,bid=6,pid=1,di=1)
+with_theme(theme_pub;
+        resolution = (0.9tw,0.45tw),
+        figure_padding = (0,fontsize,0,0),
+        Axis3=(
+            azimuth = 8.125530633326981,
+            elevation = 0.18269908169872404
+        )
+    ) do
+    bot = flexcable
+    (;t) = bot.traj
+    rp2 = get_trajectory!(bot,6,2)
+    fig = Figure()
+    gd2 = fig[1,2] = GridLayout()
+    gd3 = fig[2,2] = GridLayout()
+    gd1 = fig[:,1] = GridLayout()
+    steps = 10000:2000:length(bot.traj)
+    cg = cgrad(:winter, length(steps), categorical = true, rev = true)
+    plot_traj!(
+        bot;
+        AxisType=Axis3,
+        fig = gd1,
+        # dorecord=true,
+        showtitle=false,
+        showpoints=false,
+        showlabels=false,
+        showarrows=false,
+        showcables=false,
+        showmesh=false,
+        showwire=false,
+        xlims=(-1.2,1.0),
+        ylims=(-0.5,0.5),
+        zlims=(-0.4,1.8),
+        doslide=false,
+        showinfo=true,
+        ground=inclined_plane,
+        sup! = (ax,_,_) -> begin
+            for (i,step) in enumerate(steps)
+                TR.goto_step!(bot,step)
+                tgvis = deepcopy(bot.tg)
+                viz!(ax,tgvis;meshcolor=cg[i])
+            end
+            lines!(ax,rp2,color=:blue)
+            handlemesh = load(joinpath(TR.assetpath(),"把柄.STL")) |> make_patch(;
+                scale = 1/400,
+                trans = [ 0.0, 0.0, 1.55],
+                rot = RotY(-π/2)
+            )
+            mesh!(ax,handlemesh)
+        end
+    )
+    ax2 = Axis(gd2[1,1],
+        xlabel = tlabel,
+        ylabel = L"\dot{x}~(\mathrm{m})",
+        # aspect = DataAspect()
+    )
+    vlines!(ax2,[0.7366])
+    lines!(ax2,t,get_velocity!(bot,6,2)[1,:],color=:red)
+    # axislegend(ax2)
+    ax3 = Axis(gd3[1,1],
+        xlabel = tlabel,
+        ylabel = "Energy (J)"
+    )
+    lines!(ax3,t,me.E,label="E")
+    lines!(ax3,t,me.T,label="T")
+    lines!(ax3,t,me.V,label="V")
+    vlines!(ax3,[0.7366])
+    Legend(gd3[1,2],ax3)
+    # colsize!(fig.layout,1,0.45tw)
+    # rowgap!(fig.layout,0)
+    Label(
+        gd1[1,1,TopLeft()],"($(alphabet[1]))",font = :bold,
+    )
+    Label(
+        gd2[1,1,TopLeft()],"($(alphabet[2]))",font = :bold
+    )
+    Label(
+        gd3[1,1,TopLeft()],"($(alphabet[3]))",font = :bold
+    )
+    savefig(fig,"meteor_swing")
+    fig
+end
 
-flexcables_dt[end].traj.t
+
 #-- metero end
 
 #----------- unibot ---------------
@@ -2038,11 +2463,22 @@ GM.activate!(); plot_traj!(unibot_z0)
 #-- uni bot end ---
 
 #-------- SUPERBall ---------
+
+l = 1.7/2
+d = l/2
 ballbot = superball(
     0.0;
-    μ = 0.5,
-    e = 0.5
+    ṙo = SVector(2.0,1.0,0),
+    ω = SVector(0.0,0.0,0.0),
+    μ = 0.05,
+    e = 0.0,
+    l,d,
+    z0 = l^2/(sqrt(5)*d) - 1e-3,
+    constrained = false,
+    loadmesh = false,
 )
+
+plot_traj!(ballbot)
 
 GM.activate!(); with_theme(theme_pub;
         Scatter = (markersize = fontsize,)	
@@ -2138,48 +2574,6 @@ function ball_dynfuncs(bot)
     @eponymtuple(F!,Jac_F!,prepare_contacts!,get_directions_and_positions)
 end
 
-tspan = (0.0,2.0)
-h = 1e-3
-
-prob = TR.SimProblem(ballbot,ball_dynfuncs)
-
-TR.solve!(prob,TR.ZhongCCP();tspan,dt=h,ftol=1e-14,maxiters=50,exception=false)
-
-plot_traj!(ballbot)
-
-GM.activate!(); 
-with_theme(theme_pub;
-        figure_padding = (0,1.5fontsize,fontsize,fontsize),
-    ) do
-    plot_traj!(ballbot;
-        AxisType = Axis3,
-        xlims = [-1,10],
-        ylims = [-1,3],
-        zlims = [-1e-3,2.4],
-        figsize = (1.0tw,0.6tw),
-        gridsize = (3,2),
-        attimes = [0,0.491,1.029,1.479,2.207,3.112],
-        doslide = false,
-        showinfo = false,
-        showpoints = false,
-        showlabels = false,
-        sup! = (ax,_,_) -> begin
-            ax.azimuth = 4.865530633326983
-            ax.elevation = 0.2926990816987241
-            ax.zlabeloffset = 2fontsize
-        end,
-        # figname = "ballbot"
-    )
-end
-
-me = TR.mechanical_energy!(ballbot)
-me.E |> lines
-
-
-GM.activate!(); plotsave_energy(ballbot)
-CM.activate!(); plotsave_energy(ballbot,"ballbot_energy")
-
-
 function plotsave_contactpoints(bot,figname=nothing)
     contacts_traj_voa = VectorOfArray(bot.contacts_traj)
     (;t) = bot.traj
@@ -2217,7 +2611,110 @@ function plotsave_contactpoints(bot,figname=nothing)
     end
 end
 
+
+# testing
+tspan = (0.0,5.0)
+h = 5e-3
+prob = TR.SimProblem(ballbot,ball_dynfuncs)
+TR.solve!(prob,TR.ZhongCCP();tspan,dt=h,ftol=1e-10,maxiters=100,exception=false)
+
 GM.activate!(); plotsave_contactpoints(ballbot)
+
+plot_traj!(ballbot;)
+
+me = TR.mechanical_energy!(ballbot)
+me.E |> lines
+
+step_start = time2step(1.6,ballbot.traj.t)
+step_stop = time2step(2.5,ballbot.traj.t)
+r2p1 = get_trajectory!(ballbot,2,1)
+r1p2 = get_trajectory!(ballbot,1,2)
+r6p2 = get_trajectory!(ballbot,6,2)
+lines(r2p1[step_start:step_stop])
+lines(r1p2[step_start:step_stop])
+lines(r6p2[step_start:step_stop])
+
+
+dts = [1e-2,3e-3,1e-3,3e-4,1e-4,1e-5]
+superballs_dt = [
+    begin
+        ballbot_dt = deepcopy(ballbot)
+        TR.set_new_initial!(ballbot_dt,ballbot.traj.q[step_start],ballbot.traj.q̇[step_start])
+        prob = TR.SimProblem(ballbot_dt,ball_dynfuncs)
+        TR.solve!(prob,
+            TR.ZhongCCP();
+            tspan=(0.0,0.9),dt,ftol=1e-10,
+            maxiters=500,exception=false
+        )
+    end
+    for dt in dts
+]
+GM.activate!(); plotsave_error(superballs_dt,dts,bid=5,pid=1)
+
+
+_,err_avg = get_err_avg(superballs_dt;bid=2,pid=1,di=1)
+
+GM.activate!(); with_theme(theme_pub;
+        figure_padding = (0,0.5fontsize,0,0),
+        resolution = (1.0tw,0.45tw),
+        Axis3 = (
+            azimuth = 4.825530633326982,
+            elevation = 0.6726990816987243
+        )
+    ) do
+    fig = Figure()
+    gd2 = fig[1,2] = GridLayout()
+    gd3 = fig[2,2] = GridLayout()
+    gd1 = fig[:,1] = GridLayout()
+    steps = 1:200:1000    
+    cg = cgrad(:winter, length(steps), categorical = true, rev = true)
+    r1p2 = get_trajectory!(ballbot,1,2)
+    r6p2 = get_trajectory!(ballbot,6,2)
+    r2p1 = get_trajectory!(ballbot,2,1)
+    me = TR.mechanical_energy!(ballbot,)
+    plot_traj!(ballbot;
+        AxisType = Axis3,
+        fig = gd1,
+        xlims = [-1,6],
+        ylims = [-1,3],
+        zlims = [-1e-3,2.4],
+        doslide = false,
+        showinfo = true,
+        showpoints = false,
+        showlabels = false,
+        showtitle = false,
+        sup! = (ax,_,_) -> begin
+            for (i,step) in enumerate(steps)
+                TR.goto_step!(ballbot,step)
+                tgvis = deepcopy(ballbot.tg)
+                viz!(ax,tgvis;meshcolor = cg[i])
+            end
+            lines!(ax,r2p1)
+        end
+        # figname = "ballbot"
+    )
+    ax2 = Axis(gd2[1,1])
+    lines!(ax2,me.E,label="E")
+    lines!(ax2,me.T,label="T")
+    lines!(ax2,me.V,label="V")
+    Legend(gd2[1,2],ax2,orientation=:horizontal,tellheight=false)
+    ax3 = Axis(gd3[1,1])
+    plot_convergence_order!(ax3,dts[begin:end-1],err_avg;show_orders=true)
+    Legend(gd3[1,2],ax3)
+    Label(
+        gd1[1,1,TopLeft()],"($(alphabet[1]))",font=:bold
+    )
+    Label(
+        gd2[1,1,TopLeft()],"($(alphabet[2]))",font=:bold
+    )
+    Label(
+        gd3[1,1,TopLeft()],"($(alphabet[3]))",font=:bold
+    )
+    colsize!(fig.layout,1,0.55tw)
+    savefig(fig,"ballbot_sliding")
+    fig
+end
+
 CM.activate!(); plotsave_contactpoints(ballbot,"ballbot_contactpoints")
 
 function plotsave_velocity_restitution(bots,showlegend,
@@ -2282,6 +2779,136 @@ CM.activate!(); plotsave_velocity_restitution(
     cps = [2,3,6,12],
 )
 
+# rolling
+ballbot = superball(
+    0.0;
+    ṙo = SVector(7.0,2.0,-7.0),
+    ω = SVector(0.0,0.0,0.0),
+    μ = 0.9,
+    e = 0.9,
+    l,d,
+    z0 = l^2/(sqrt(5)*d) + 2.0,
+    constrained = false,
+    loadmesh = false,
+)
+
+# test rolling
+tspan = (0.0,5.0)
+h = 5e-3
+prob = TR.SimProblem(ballbot,ball_dynfuncs)
+TR.solve!(prob,TR.ZhongCCP();tspan,dt=h,ftol=1e-13,maxiters=200,exception=false)
+
+GM.activate!(); plotsave_contactpoints(ballbot)
+
+plot_traj!(ballbot)
+
+GM.activate!(); with_theme(theme_pub;
+        figure_padding = (0,0.5fontsize,0,0),
+        resolution = (1.0tw,0.40tw),
+        Axis3 = (
+            azimuth = 4.7955306333269805,
+            elevation = 0.03269908169872391
+        )
+    ) do
+    fig = Figure()
+    bot = ballbot
+    (;t) = bot.traj
+    gd1 = fig[1,1] = GridLayout()
+    gd23 = fig[2,1] = GridLayout()
+    gd2 = gd23[1,1] = GridLayout()
+    gd3 = gd23[1,2] = GridLayout()
+    imptimes = [0.25,0.29,0.295,0.33]
+    impstep = time2step(imptimes[1],bot.traj.t)
+    steps = vcat(1,impstep,collect(impstep:100:length(t)))
+    cg = cgrad(:winter, length(steps), categorical = true, rev = true)
+    step_start = time2step(0.1,bot.traj.t)
+    step_stop = time2step(0.35,bot.traj.t)
+    v2p1 = get_velocity!(bot,2,1,step_start:step_stop)
+    v1p2 = get_velocity!(bot,1,2,step_start:step_stop)
+    v6p2 = get_velocity!(bot,6,2,step_start:step_stop)
+    r2p1 = get_trajectory!(bot,2,1)
+    me = TR.mechanical_energy!(bot,)
+    plot_traj!(bot;
+        AxisType = Axis3,
+        fig = gd1,
+        xlims = [-1,20],
+        ylims = [-1,8],
+        zlims = [-1e-3,3.0],
+        doslide = false,
+        showinfo = true,
+        showpoints = false,
+        showlabels = false,
+        showtitle = false,
+        sup! = (ax,_,_) -> begin
+            for (i,step) in enumerate(steps)
+                TR.goto_step!(bot,step)
+                tgvis = deepcopy(bot.tg)
+                viz!(ax,tgvis;meshcolor = cg[i])
+            end
+            hidey(ax)
+            lines!(ax,r2p1)
+        end
+        # figname = "bot"
+    )
+    ax31 = Axis(gd2[1,1],
+        xlabel = tlabel,
+        ylabel = L"\dot{z}~(\mathrm{m/s})",
+        limits = (t[step_start]+0.06,t[step_stop],-11.6,11.6)
+    )
+    vlines!(ax31,imptimes[1:2])
+    lines!(ax31,t[step_start:step_stop],v2p1[3,:])
+    ax32 = Axis(gd2[1,2],
+        xlabel = tlabel,
+        ylabel = L"\dot{z}~(\mathrm{m/s})",
+        limits = (t[step_start]+0.06,t[step_stop],-11.6,11.6)
+    )
+    vlines!(ax32,imptimes[1:2])
+    lines!(ax32,t[step_start:step_stop],v1p2[3,:])
+    ax33 = Axis(gd2[1,3],
+        xlabel = tlabel,
+        ylabel = L"\dot{z}~(\mathrm{m/s})",
+        limits = (t[step_start]+0.06,t[step_stop],-11.6,11.6)
+    )
+    vlines!(ax33,imptimes[[1,3,4]])
+    lines!(ax33,t[step_start:step_stop],v6p2[3,:])
+    ax2 = Axis(gd3[1,1],
+        xlabel = tlabel,
+        ylabel = "Energy (J)",
+    )
+    lines!(ax2,t,me.E,label="E")
+    lines!(ax2,t,me.T,label="T")
+    lines!(ax2,t,me.V,label="V")
+    xlims!(ax2,extrema(t)...)
+    
+    # (gd2[1,2],ax3)
+    Legend(gd3[1,2],
+        ax2;
+        # position=:rt,
+        # orientation=:horizontal,
+        tellheight=false
+    )
+
+    Label(
+        gd1[1,1,TopLeft()],"($(alphabet[1]))",font=:bold
+    )
+    Label(
+        gd2[1,1,TopLeft()],"($(alphabet[2]))",font=:bold
+    )
+    Label(
+        gd2[1,2,TopLeft()],"($(alphabet[3]))",font=:bold
+    )
+    Label(
+        gd2[1,3,TopLeft()],"($(alphabet[4]))",font=:bold
+    )
+    Label(
+        gd3[1,1,TopLeft()],"($(alphabet[5]))",font=:bold
+    )
+    colsize!(gd23,1,0.55tw)
+    rowsize!(fig.layout,1,0.17tw)
+    savefig(fig,"ballbot_rolling")
+    fig
+end
+
 
 c6= VectorOfArray(ballbot.contacts_traj)[6,:]
 c6_1 = c6[4163]
@@ -2308,20 +2935,6 @@ CM.activate!(); plotsave_friction_direction(
         vtol=1e-7,
 )
 
-dts = [1e-2,3e-3,1e-3,3e-4,1e-4,1e-5]
-superballs_dt = [
-    begin
-        prob = 
-        TR.solve!(TR.SimProblem(superball(0.0;μ = 0.5,e = 0.5),
-            ball_dynfuncs),
-            TR.ZhongCCP();
-            tspan=(0.0,0.12),dt,ftol=1e-14,
-            maxiters=50,exception=false
-        )
-    end
-    for dt in dts
-]
-GM.activate!(); plotsave_error(superballs_dt,dts,bid=5,pid=1)
 
 #----------- quadruped ---------------
 quadbot = quad(10.0)

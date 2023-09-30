@@ -387,7 +387,7 @@ function plot_tower2d!(ax,
     ndim = TR.get_ndim(tg)
     T = TR.get_numbertype(tg)
 
-	rbs = TR.get_rigidbodies(tg)
+	rbs = TR.get_bodies(tg)
 	linesegs_bars = Vector{Tuple{Point{ndim,T},Point{ndim,T}}}()
 	linesegs_tris =  Vector{Tuple{Point{ndim,T},Point{ndim,T}}}()
 	ploys_tris = Vector{Vector{Point{ndim,T}}}()

@@ -89,7 +89,7 @@ function dynfuncs(bot)
         TR.build_∂Q̌∂q̌̇!(∂F∂q̌̇,tg)
     end
 
-	rbs = TR.get_rigidbodies(tg)
+	rbs = TR.get_bodies(tg)
 	rb1 = rbs[1]
 	function prepare_contacts!(contacts, q)
 		TR.update_rigids!(tg,q)

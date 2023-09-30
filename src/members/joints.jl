@@ -115,6 +115,48 @@ function make_A(cst::FixedBodyConstraint)
     end
 end
 
+"""
+刚体坐标固定约束类，适用于单个坐标。
+$(TYPEDEF)
+"""
+struct FixedIndicesConstraint{T} <: ExternalConstraints{T}
+    id::Int64
+    nconstraints::Int64
+    indices::Vector{Int64}
+    values::T
+end
+
+"""
+刚体坐标固定约束构造子。
+$(TYPEDSIGNATURES)
+"""
+function FixedIndicesConstraint(id,indices,values)
+    FixedIndicesConstraint(id,length(indices),indices,values)
+end
+
+function make_Φ(cst::FixedIndicesConstraint,tg)
+    @unpack indices, values = cst
+    @inline @inbounds inner_Φ(q)   = q[indices]-values
+    @inline @inbounds inner_Φ(q,d) = q[indices]-d
+    inner_Φ
+end
+
+function make_A(cst::FixedIndicesConstraint,tg)
+    (;indexed,numbered) = tg.connectivity
+    nΦ = cst.nconstraints
+    indices = cst.indices
+    (;sysfree,nfree) = indexed
+    @inline @inbounds function inner_A(q)
+        nq = length(q)
+        ret = zeros(eltype(q),nΦ,nq)
+        for (iΦ,i) in enumerate(indices)
+            ret[iΦ,i] = 1
+        end
+        ret[:,sysfree]
+    end
+end
+
+
 
 """
 刚体通用线性约束类。

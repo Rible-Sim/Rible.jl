@@ -61,7 +61,7 @@ function compute_evs(bot,μs,Ň)
 			# A = TR.make_A(tg,ini.q)
 			# Ň(ini.q̌)
 			# A(ini.q̌)*Ň(ini.q̌)
-			rb2 = TR.get_rigidbodies(tg)[2]
+			rb2 = TR.get_bodies(tg)[2]
 			ka = [
 				transpose(rb2.state.rps[i]-rb2.state.ro)*rb2.state.fps[i]
 				for i in eachindex(rb2.prop.r̄ps)

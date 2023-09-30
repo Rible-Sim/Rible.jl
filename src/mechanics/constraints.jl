@@ -423,3 +423,15 @@ function make_∂Aᵀλ∂q(cst::LinearJoint,tg)
         zeros(eltype(λ),length(uci),length(uci))
     end
 end
+
+
+function get_jointed_free(cst::FixedIndicesConstraint,indexed)
+    cst2sysfree = collect(1:indexed.nfree)
+end
+
+function make_∂Aᵀλ∂q(cst::FixedIndicesConstraint,tg)
+    (;nfree) = tg.connectivity.indexed
+    function ∂Aᵀλ∂q(λ)
+        zeros(eltype(λ),nfree,nfree)
+    end
+end

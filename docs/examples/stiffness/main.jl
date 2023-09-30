@@ -462,7 +462,7 @@ prism1 = prisms(;
     r,b,m,α,θ,n = 1,
 )
 bot = prism1
-rb1 = TR.get_rigidbodies(bot)[1]
+rb1 = TR.get_bodies(bot)[1]
 plot_rigid(rb1) 
 plot_traj!(bot;showground=false)
 TR.check_static_equilibrium_output_multipliers(bot.tg)
@@ -2422,7 +2422,7 @@ end
 # @show f,λ
 using Symbolics
 @variables λ[1:6]
-rb2 = TR.get_rigidbodies(bot.tg)[2]
+rb2 = TR.get_bodies(bot.tg)[2]
 rb2.state.cache.funcs.∂Aᵀλ∂q(λ)#[:,free_idx]
 
 Ǎ*Ǎ'

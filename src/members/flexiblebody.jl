@@ -123,11 +123,17 @@ function FlexibleBodyState(prop::FlexibleBodyProperty{N,T},
     FlexibleBodyState(rg,ṙg,rps,ṙps,f,fps,cache)
 end
 
-struct FlexibleBody{N,T,cacheType} <: AbstractFlexibleBody{N,T}
+struct FlexibleBody{N,T,cacheType,meshType} <: AbstractFlexibleBody{N,T}
 	"Properties of a flexible body"
     prop::FlexibleBodyProperty{N,T}
 	"State of a flexible body"
     state::FlexibleBodyState{N,T,cacheType}
+    "Mesh"
+    mesh::meshType
+end
+
+function FlexibleBody(prop,state)
+    FlexibleBody(prop,state,nothing)
 end
 
 function update_rigid!(
@@ -247,7 +253,7 @@ function subdivide(fb::FlexibleBody,nx=1,ny=1,nz=1)
                 :cable,
                 mass,
                 r̄g,
-                length(r̄ps),
+                # length(r̄ps),
                 r̄ps
             )
             if i == 1

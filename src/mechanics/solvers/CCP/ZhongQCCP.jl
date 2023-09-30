@@ -252,9 +252,9 @@ function solve!(intor::Integrator,solvercache::ZhongQCCPCache;
         restart_count = 0
         𝚲_guess = 10.0
         while restart_count < 10
+            𝚲ₘ .= repeat([𝚲_guess,0,0],na)
             x[      1:nq]          .= qₖ
             x[   nq+1:nq+nλ]       .= 0.0
-            𝚲ₘ .= repeat([𝚲_guess,0,0],na)
             𝚲ʳₖ .= 0.0
             Nmax = 50
             for iteration = 1:maxiters
