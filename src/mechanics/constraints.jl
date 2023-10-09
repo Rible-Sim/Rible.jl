@@ -17,8 +17,8 @@ function make_Φ(cst::PrototypeJoint,tg::TensegrityStructure)
         ret = zeros(eltype(q),nconstraints)
         q_hen = @view q[mem2sysfull[id_hen]]
         q_egg = @view q[mem2sysfull[id_egg]]
-        X_hen = NCF.make_X(nmcs_hen,q_hen)
-        X_egg = NCF.make_X(nmcs_egg,q_egg)
+        R_hen = NCF.find_R(nmcs_hen,q_hen)
+        R_egg = NCF.find_R(nmcs_egg,q_egg)
         # translate
         c_hen = c[num2sys[mem2num[id_hen]][hen.pid]]
         c_egg = c[num2sys[mem2num[id_egg]][egg.pid]]
@@ -27,18 +27,18 @@ function make_Φ(cst::PrototypeJoint,tg::TensegrityStructure)
         # @show C_egg,q_egg
         r_hen2egg = C_egg*q_egg .- C_hen*q_hen
         # translate on hen
-        trl_hen_n = X_hen*axes_trl_hen.n
-        trl_hen_t1 = X_hen*axes_trl_hen.t1
-        trl_hen_t2 = X_hen*axes_trl_hen.t2
+        trl_hen_n = R_hen*axes_trl_hen.n
+        trl_hen_t1 = R_hen*axes_trl_hen.t1
+        trl_hen_t2 = R_hen*axes_trl_hen.t2
         # translate on egg
-        trl_egg_n = X_egg*axes_trl_egg.n
-        trl_egg_t1 = X_egg*axes_trl_egg.t1
-        trl_egg_t2 = X_egg*axes_trl_egg.t2
+        trl_egg_n = R_egg*axes_trl_egg.n
+        trl_egg_t1 = R_egg*axes_trl_egg.t1
+        trl_egg_t2 = R_egg*axes_trl_egg.t2
         # rotate of egg
-        rot_hen_t1 = X_hen*axes_rot_hen.t1
-        rot_hen_t2 = X_hen*axes_rot_hen.t2
-        rot_egg_n = X_egg*axes_rot_egg.n
-        rot_egg_t2 = X_egg*axes_rot_egg.t2
+        rot_hen_t1 = R_hen*axes_rot_hen.t1
+        rot_hen_t2 = R_hen*axes_rot_hen.t2
+        rot_egg_n = R_egg*axes_rot_egg.n
+        rot_egg_t2 = R_egg*axes_rot_egg.t2
         # first    
         Φ_1st = r_hen2egg
         # second
@@ -105,8 +105,8 @@ function make_A(cst::PrototypeJoint,tg::TensegrityStructure)
         ret = zeros(eltype(q),nconstraints,nfree)
         q_hen = @view q[mem2sysfull[id_hen]]
         q_egg = @view q[mem2sysfull[id_egg]]
-        X_hen = NCF.make_X(nmcs_hen,q_hen)
-        X_egg = NCF.make_X(nmcs_egg,q_egg)
+        R_hen = NCF.find_R(nmcs_hen,q_hen)
+        R_egg = NCF.find_R(nmcs_egg,q_egg)
         # translate 
         c_hen = c[num2sys[mem2num[id_hen][hen.pid]]]
         c_egg = c[num2sys[mem2num[id_egg][egg.pid]]]
@@ -114,20 +114,20 @@ function make_A(cst::PrototypeJoint,tg::TensegrityStructure)
         C_egg = egg.rbsig.state.cache.funcs.C(c_egg)
         r_hen2egg = C_egg*q_egg .- C_hen*q_hen
         # translate on hen
-        trl_hen_n = X_hen*axes_trl_hen.n
-        trl_hen_t1 = X_hen*axes_trl_hen.t1
-        trl_hen_t2 = X_hen*axes_trl_hen.t2
+        trl_hen_n = R_hen*axes_trl_hen.n
+        trl_hen_t1 = R_hen*axes_trl_hen.t1
+        trl_hen_t2 = R_hen*axes_trl_hen.t2
         trl_hen = [trl_hen_n trl_hen_t1 trl_hen_t2]
         # translate on egg
-        trl_egg_n = X_egg*axes_trl_egg.n
-        trl_egg_t1 = X_egg*axes_trl_egg.t1
-        trl_egg_t2 = X_egg*axes_trl_egg.t2
+        trl_egg_n = R_egg*axes_trl_egg.n
+        trl_egg_t1 = R_egg*axes_trl_egg.t1
+        trl_egg_t2 = R_egg*axes_trl_egg.t2
         trl_egg = [trl_egg_n trl_egg_t1 trl_egg_t2]
         # rotate of egg
-        rot_hen_t1 = X_hen*axes_rot_hen.t1
-        rot_hen_t2 = X_hen*axes_rot_hen.t2
-        rot_egg_n = X_egg*axes_rot_egg.n
-        rot_egg_t2 = X_egg*axes_rot_egg.t2
+        rot_hen_t1 = R_hen*axes_rot_hen.t1
+        rot_hen_t2 = R_hen*axes_rot_hen.t2
+        rot_egg_n = R_egg*axes_rot_egg.n
+        rot_egg_t2 = R_egg*axes_rot_egg.t2
         # jac
         o3 = zeros(eltype(q),3)
         # jac first

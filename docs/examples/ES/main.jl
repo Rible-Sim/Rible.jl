@@ -2275,3 +2275,35 @@ TR.set_restlen!(newst_folded.tg,μ_folded)
 TR.update!(newst_folded.tg)
 TR.get_cables_tension(newst_folded.tg) |> extrema
 
+#-- three 3-prism
+prism3 = prism_modules(;n=1)
+
+with_theme(theme_pub;
+    Poly = (
+        transparency=true,
+    )
+    ) do
+    plot_traj!(prism3;
+        showlabels=false,
+        show_cable_labels=true,
+        show_node_labels=false,
+        showground=false,
+    )
+end
+TR.get_cables_len(prism3)
+TR.check_static_equilibrium_output_multipliers(prism3.tg)
+ω²,δq̌ = TR.undamped_eigen(prism3.tg)
+sqrt.(ω²[7:end])./(2π)
+
+# bar
+A = ((5e-3)^2-(4e-3)^2)*π
+ρ = 1800.0
+b = 1.01
+m = A*b*ρ
+
+# cable 
+A = (0.32e-3)^2*π
+ρ = 1435
+l = 0.64
+m = A*l*ρ
+

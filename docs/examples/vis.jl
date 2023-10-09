@@ -27,6 +27,15 @@ tenmarkers::Vector{Symbol} = [
 tlabel::LaTeXString = L"t~(\mathrm{s})"
 
 
+function match_figsize(figsize)
+    @match figsize begin
+        :UHD => (3840,2160)
+        :FHD => (1920,1080)
+        :HD  => (1280,720)
+        fs::Tuple => fs
+    end
+end
+
 macro myshow(exs...)
     blk = Expr(:block)
     for ex in exs
@@ -122,14 +131,6 @@ theme_pub = Theme(;
 set_theme!(theme_pub)
 
 
-function match_figsize(figsize)
-    @match figsize begin
-        :UHD => (3840,2160)
-        :FHD => (1920,1080)
-        :HD  => (1280,720)
-        fs::Tuple => fs
-    end
-end
 
 function time2step(at,t)
     atstep = findfirst((x)->x>=at, t)
@@ -180,6 +181,7 @@ function plot_traj!(bot::TR.TensegrityRobot;
         actuate=false,
         figname=nothing,
         showinit=false,
+        auto=false,
         titleformatfunc = (sgi,tt)-> begin
             rich(
                 rich("($(alphabet[sgi])) ", font=:bold),
@@ -383,11 +385,13 @@ function plot_traj!(bot::TR.TensegrityRobot;
                     this_time[] = traj.t[this_step]
                     TR.analyse_slack(tg,true)
                     tgob[] = tg
-                    if AxisType <: LScene
-                        center!(ax.scene)
-                    elseif AxisType <: Axis3
-                        autolimits!(ax)
-                    end 
+                    if auto
+                        if AxisType <: LScene
+                            center!(ax.scene)
+                        elseif AxisType <: Axis3
+                            autolimits!(ax)
+                        end
+                    end
                 end
             end
         end
@@ -472,7 +476,7 @@ function Makie.plot!(viz::Viz{Tuple{S}};
                 position = nodes_ob,
                 color = :darkred,
                 align = (:left, :top),
-                offset = (20(rand()-0.5), 20(rand()-0.5))
+                offset = (0,2fontsize*(rand()-0.5))
             )
         end
     end
@@ -533,7 +537,7 @@ function Makie.plot!(viz::Viz{Tuple{Vector{S}}};
     ]
 
     ids_ob = @lift [
-        "c$(cab.id))"
+        "c$(cab.id)"
          for cab in $cables_ob
     ]
     # slackonly=false,
@@ -551,7 +555,7 @@ function Makie.plot!(viz::Viz{Tuple{Vector{S}}};
         linestyle = slack_linestyle
     )
     # show cable labels
-    if show_cable_labels
+    if viz.show_cable_labels[]
         text!(viz,
             ids_ob,
             position = point_mid_ob,

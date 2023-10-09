@@ -536,7 +536,7 @@ function make_top(ro = [0.0,0.0,0.0],
     push!(r̄ps,[0,0,-h])
     if loadmesh
         topmesh = load(
-            joinpath(assetdir,"Toupise2.STL")
+            TR.assetpath("Toupise2.STL")
         ) |> make_patch(;
             scale=1/1000,
             color,
@@ -703,6 +703,33 @@ tspan = (0.0,2.0)
 h = 1e-4
 
 topq = make_top(ro,R,ṙo,Ω;μ,e,loadmesh=true)
+#note subsequent iteration slow convergence 
+#note initial guess can not improve it?
+TR.solve!(
+    TR.SimProblem(topq,top_contact_dynfuncs),
+    TR.ZhongQCCP();
+    tspan,dt=h,ftol=1e-12,maxiters=2000,exception=false,verbose_contact=true
+)
+
+
+topn = make_top(ro,R,ṙo,Ω,TR.NCF.LNC;μ,e,loadmesh=true)
+TR.solve!(
+    TR.SimProblem(topn,top_contact_dynfuncs),
+    TR.ZhongCCP();
+    tspan = (0.0,2.0),
+    dt=1e-4,
+    ftol=1e-14,
+    maxiters=50,exception=false,verbose=false
+)
+
+plot_traj!(
+    topn;
+    showinfo=false,
+    # rigidcolor=:white,
+    showwire=false,
+    showarrows=false,
+    # figsize=(0.6tw,0.6tw)
+)
 
 GM.activate!();with_theme(theme_pub;
         resolution = (1.0tw,0.3tw),
@@ -717,13 +744,17 @@ GM.activate!();with_theme(theme_pub;
             transparency = true,
         )
     ) do
-    bot = topq
+    bot = topn
     (;t) = bot.traj
     rp5 = get_trajectory!(bot,1,5)
     vp5 = get_velocity!(bot,1,5)
     me = TR.mechanical_energy!(bot)
     steps = 1:1000:18000
-    cg = cgrad(:winter, length(steps), categorical = true)
+    nstep = length(steps)
+    alphas = fill(0.1,nstep)
+    alphas[1:3] = [1,0.4,0.2]
+    alphas[end] = [1,0]
+    cg = cgrad(:winter, nstep, categorical = true)
     fig = Figure()
     gd1 = fig[1,1] = GridLayout()
     gd2 = fig[1,2] = GridLayout()
@@ -740,6 +771,7 @@ GM.activate!();with_theme(theme_pub;
         showpoints=false,
         showlabels=false,
         showarrows=false,
+        showcables=false,
         showmesh=false,
         showtitle=false,
         xlims = (-0.1,1.0),
@@ -748,17 +780,15 @@ GM.activate!();with_theme(theme_pub;
         sup! = (ax,tgob,sgi) -> begin
             hidey(ax)
             for (istep,step) in enumerate(steps)
-                suptg = make_top(
-                    ro,R,ṙo,Ω;
-                    μ,e,loadmesh=true,
-                    color=cg[istep],
-                ).tg
+                suptg = deepcopy(bot.tg)
                 suptg.state.system.q .= bot.traj.q[step]
                 TR.update!(suptg)
-                init_plot!(ax,Observable(suptg);
+                (;r,b,g) = cg[istep]
+                viz!(ax,Observable(suptg);
                     showlabels=false,
                     showarrows=false,
                     showpoints=false,
+                    meshcolor=Makie.RGBA(r,b,g,alphas[istep])
                 )
             end
             lines!(ax,rp5)
@@ -805,17 +835,51 @@ GM.activate!();with_theme(theme_pub;
         gd2[1,2,TopLeft()],
         rich("($(alphabet[4]))",font=:bold)
     )
-    savefig(fig,"spinningtop_drop")
+    # savefig(fig,"spinningtop_drop")
     fig
 end
 
-#note subsequent iteration slow convergence 
-#note initial guess can not improve it?
+
+topn_longtime = deepcopy(topn)
+TR.set_new_initial!(topn_longtime,topn.traj.q[end],topn.traj.q̇[end])
 TR.solve!(
-    TR.SimProblem(topq,top_contact_dynfuncs),
-    TR.ZhongQCCP();
-    tspan,dt=h,ftol=1e-12,maxiters=2000,exception=false,verbose_contact=true
+    TR.SimProblem(topn_longtime,top_contact_dynfuncs),
+    TR.ZhongCCP();
+    tspan = (0.0,500.0),
+    dt=2e-3,
+    ftol=1e-14,
+    maxiters=100,exception=false,verbose=false
 )
+
+me = TR.mechanical_energy!(topn_longtime)
+rp5 = get_trajectory!(topn_longtime,1,5)
+# vp5 = get_velocity!(topn,1,5)
+with_theme(theme_pub;
+        resolution = (0.7tw,0.2tw),
+        figure_padding = (0,fontsize,0,fontsize/2)
+    ) do
+    (;t) = topn_longtime.traj
+    fig = Figure()
+    ax1 = Axis(fig[1,1];xlabel=tlabel, ylabel="Rel. Err.")
+    ax2 = Axis(fig[1,2];xlabel=tlabel, ylabel="Abs. Err. (m)")
+    skipstep = 500
+    startstep = time2step(1.0,t)
+    lines!(ax1,
+        t[startstep:skipstep:end],
+        (me.E[startstep:skipstep:end].-me.E[startstep])./me.E[startstep]
+    )
+    ylims!(ax1,-1e-4,1e-4)
+    xlims!(ax1,extrema(t)...)
+    lines!(ax2,
+        t[startstep:skipstep:end],
+        rp5[3,startstep:skipstep:end].-rp5[3,startstep],
+    )
+    xlims!(ax2,extrema(t)...)
+    savefig(fig,"spinningtop_longtime")
+    fig
+    
+end
+
 
 plot_traj!(
     topq;
@@ -825,21 +889,6 @@ plot_traj!(
     showarrows=false,
 )
 
-topn = make_top(ro,R,ṙo,Ω,TR.NCF.LNC;μ,e)
-TR.solve!(
-    TR.SimProblem(topn,top_contact_dynfuncs),
-    TR.ZhongCCP();
-    tspan,dt=h,ftol=1e-14,maxiters=50,exception=false,verbose=false
-)
-
-plot_traj!(
-    topn;
-    showinfo=false,
-    # rigidcolor=:white,
-    showwire=true,
-    showarrows=false,
-    # figsize=(0.6tw,0.6tw)
-)
 
 c1_topq = get_trajectory!(topq,1,5)
 c1_topn = get_trajectory!(topn,1,5)
@@ -1639,11 +1688,21 @@ function make_hammer(id,r̄ijkl,ro,R,ri,rj=nothing,rk=nothing,rl=nothing;
     )
     r̄g = SVector(-0.20,0,0)
     # r̄ps = deepcopy(r̄ijkl)
-    r̄ps = [
-        zero(r̄g),
-        SVector(-0.40,0,0)
-    ]
-    @show m,diag(Īg),r̄g
+    r̄ps = vcat(
+        [
+            SVector(0.22*cos(i*π/2),0.0,0.22*sin(i*π/2)) + r̄g
+            for i = -2:1
+        ],
+        [
+            RotY( π/4)*SVector(0.0,0.22*cos(i*π/3),0.22*sin(i*π/3)) + r̄g
+            for i = 1:6
+        ],
+        [
+            RotY(-π/4)*SVector(0.0,0.22*cos(i*π/3),0.22*sin(i*π/3)) + r̄g
+            for i = [1,2,4,5]
+        ]
+    )
+    @show m,diag(Īg),r̄g,length(r̄ps)
     prop = TR.RigidBodyProperty(id,movable,m,Īg,
                 r̄g,r̄ps;constrained=constrained
                 )
@@ -1661,7 +1720,7 @@ function make_hammer(id,r̄ijkl,ro,R,ri,rj=nothing,rk=nothing,rl=nothing;
     # cf = TR.NCF.CoordinateFunctions(lncs,q0,pres_idx,free_idx)
     # @show typeof(lncs)
        # trimesh = Meshes.discretize(box,) |> simple2mesh
-    meteormesh = load(joinpath(assetdir,"流星锤.STL")) |> make_patch(;
+    meteormesh = load(joinpath(TR.assetpath("流星锤.STL"))) |> make_patch(;
         scale = 1/400,
         trans = [-0.20,0,0],
     )
@@ -1752,30 +1811,38 @@ function make_flexcable(;
     cst1 = TR.FixedIndicesConstraint(1,[1,2,3],ri)
     jointed = TR.join((cst1,),indexedcoords)
     cnt = TR.Connectivity(numberedpoints,indexedcoords,tensioned,jointed)
-    contacts = [TR.Contact(i,μ,e) for i = [2]]
+    contacts = [TR.Contact(i,μ,e) for i = 1:14]
     tg = TR.TensegrityStructure(fbs,tensiles,cnt,contacts)
     bot = TR.TensegrityRobot(tg)
 end
 
-flexcable_DR = make_flexcable(;L=1.5,nx=5,doDR=true)
+
+R = RotXY(deg2rad(-10),deg2rad(50))
+inclined_plane = TR.Plane(R*[0,0,1.0],[-1.187764,-0.04688,0.225])
+
+
+flexcable_DR = make_flexcable(;R = R*RotY(-π/2),L=1.5,nx=5,doDR=true)
 TR.GDR!(flexcable_DR;β=1e-3,maxiters=1e5)
-flexcable = make_flexcable(;μ=0.05,L=1.5,nx=5)
+flexcable = make_flexcable(;R = R*RotY(-π/2),μ=0.05,L=1.5,nx=5)
 
 flexcable_DR.traj.q[end][end-8:end] .= flexcable.traj.q[end][end-8:end]
 
 TR.set_new_initial!(flexcable,flexcable_DR.traj.q[end],flexcable_DR.traj.q̇[end])
+
 
 with_theme(theme_pub;
         Poly= (
             transparency = true,
         ) 
     ) do 
-    plot_traj!(flexcable;
+    plot_traj!(
+        flexcable;
+        ground=inclined_plane,
+        xlims=(-1.2,1.0),
+        ylims=(-0.5,0.5),
+        zlims=(-0.4,1.8),
     )
 end
-
-θ = -45 |> deg2rad
-inclined_plane = TR.Plane(RotXY(deg2rad(-5),deg2rad(30))*[0,0,1.0],[-1.066025,0,0.143599])
 
 function flexcable_contact_dynfuncs(bot,ground_plane)
     (;tg) = bot
@@ -1795,21 +1862,23 @@ function flexcable_contact_dynfuncs(bot,ground_plane)
         TR.build_∂Q̌∂q̌!(∂F∂q̌,tg)
         # TR.build_∂Q̌∂q̌̇!(∂F∂q̌̇,tg)
     end
-    pid = 2
+    pids = collect(1:14)
     rbs = TR.get_bodies(tg)
     rblast = rbs[end]
     nb = length(rbs)
     (;n) = ground_plane
     function prepare_contacts!(contacts,q)
         TR.update_rigids!(tg,q)
-        for (pres_idxd,pid) in enumerate([pid])
-            # gap = rblast.state.rps[pid][3] 
-            gap = TR.signed_distance(
+        
+        gaps = [
+            TR.signed_distance(
                 rblast.state.rps[pid],
                 inclined_plane
             )
-            TR.activate!(contacts[pres_idxd],gap)
-        end
+            for pid in pids
+        ]
+        deepest_gap, active_pid = findmin(gaps)
+        TR.activate!(contacts[active_pid],deepest_gap)
         active_contacts = filter(contacts) do c
             c.state.active
         end
@@ -1909,11 +1978,11 @@ TR.solve!(
 
 plotsave_contact_persistent(flexcable)
 
-rp2 = get_trajectory!(flexcable,6,2)
+rp2 = get_trajectory!(flexcable,6,1)
 lines(rp2[3,:])
 
-ME = TR.mechanical_energy!(flexcable)
-lines((ME.E.-ME.E[begin])./ME.E[begin])
+me = TR.mechanical_energy!(flexcable)
+lines((me.E.-me.E[begin])./me.E[begin])
 
 contacts_traj_voa = VectorOfArray(flexcable.contacts_traj)
 csa = StructArray(contacts_traj_voa[1,1:5])
@@ -2055,7 +2124,7 @@ with_theme(theme_pub;
     )
 end
 
-tspan = (0.0,2.0)
+tspan = (0.0,0.801)
 h = 1e-4
 TR.solve!(
     TR.SimProblem(flexcable,(x)->flexcable_contact_dynfuncs(x,inclined_plane)),
@@ -2064,15 +2133,19 @@ TR.solve!(
 )
 
 me = TR.mechanical_energy!(flexcable)
+lines((me.E.-me.E[begin])./me.E[begin])
 
 plotsave_contact_persistent(flexcable)
 
 with_theme(theme_pub;
-        resolution = (0.9tw,0.45tw),
+        resolution = (0.85tw,0.5tw),
         figure_padding = (0,fontsize,0,0),
         Axis3=(
             azimuth = 8.125530633326981,
             elevation = 0.18269908169872404
+        ),
+        Poly=(
+            transparency=true,
         )
     ) do
     bot = flexcable
@@ -2082,7 +2155,8 @@ with_theme(theme_pub;
     gd2 = fig[1,2] = GridLayout()
     gd3 = fig[2,2] = GridLayout()
     gd1 = fig[:,1] = GridLayout()
-    steps = 10000:2000:length(bot.traj)
+    steps = 1:1000:8001
+    alphas = [1, 0.2, 0.2, 0.1, 0.1, 0.1, 0.2, 0.2, 1]
     cg = cgrad(:winter, length(steps), categorical = true, rev = true)
     plot_traj!(
         bot;
@@ -2096,17 +2170,18 @@ with_theme(theme_pub;
         showcables=false,
         showmesh=false,
         showwire=false,
-        xlims=(-1.2,1.0),
+        xlims=(-1.2,0.51),
         ylims=(-0.5,0.5),
-        zlims=(-0.4,1.8),
+        zlims=(-0.1,1.8),
         doslide=false,
-        showinfo=true,
+        showinfo=false,
         ground=inclined_plane,
         sup! = (ax,_,_) -> begin
             for (i,step) in enumerate(steps)
                 TR.goto_step!(bot,step)
                 tgvis = deepcopy(bot.tg)
-                viz!(ax,tgvis;meshcolor=cg[i])
+                (;r,g,b) = cg[i]
+                viz!(ax,tgvis;meshcolor=Makie.RGBA(r,g,b,alphas[i]))
             end
             lines!(ax,rp2,color=:blue)
             handlemesh = load(joinpath(TR.assetpath(),"把柄.STL")) |> make_patch(;
@@ -2122,19 +2197,23 @@ with_theme(theme_pub;
         ylabel = L"\dot{x}~(\mathrm{m})",
         # aspect = DataAspect()
     )
-    vlines!(ax2,[0.7366])
+    vlines!(ax2,[0.67725];linestyle=:dash)
     lines!(ax2,t,get_velocity!(bot,6,2)[1,:],color=:red)
+    ylims!(ax2,-6,6)
+    xlims!(ax2,extrema(t)...)
     # axislegend(ax2)
     ax3 = Axis(gd3[1,1],
         xlabel = tlabel,
         ylabel = "Energy (J)"
     )
+    vlines!(ax3,[0.67725];linestyle=:dash)
     lines!(ax3,t,me.E,label="E")
     lines!(ax3,t,me.T,label="T")
     lines!(ax3,t,me.V,label="V")
-    vlines!(ax3,[0.7366])
-    Legend(gd3[1,2],ax3)
-    # colsize!(fig.layout,1,0.45tw)
+    # Legend(gd3[1,2],ax3)
+    xlims!(ax3,extrema(t)...)
+    axislegend(ax3,position=:lc)
+    colsize!(fig.layout,1,0.45tw)
     # rowgap!(fig.layout,0)
     Label(
         gd1[1,1,TopLeft()],"($(alphabet[1]))",font = :bold,
@@ -2148,7 +2227,6 @@ with_theme(theme_pub;
     savefig(fig,"meteor_swing")
     fig
 end
-
 
 #-- metero end
 

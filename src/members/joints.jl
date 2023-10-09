@@ -241,32 +241,32 @@ function PrototypeJoint(id,e2e,joint_type::Symbol)
     state_egg = egg.rbsig.state
     q_hen = NCF.rigidstate2naturalcoords(nmcs_hen,state_hen.ro,state_hen.R)
     q_egg = NCF.rigidstate2naturalcoords(nmcs_egg,state_egg.ro,state_egg.R)
-    X_hen = NCF.make_X(nmcs_hen,q_hen)
-    X_egg = NCF.make_X(nmcs_egg,q_egg)
+    R_hen = NCF.find_R(nmcs_hen,q_hen)
+    R_egg = NCF.find_R(nmcs_egg,q_egg)
     # translate     
     C_hen = hen.rbsig.state.cache.Cps[hen.pid]
     C_egg = egg.rbsig.state.cache.Cps[egg.pid]
     r_hen2egg = C_egg*q_egg .- C_hen*q_hen
     # translate on hen
-    axes_trl_hen = Axes(inv(X_hen)*get_orthonormal_axes(X_hen*hen.rbsig.prop.ās[hen.rotid])) 
-    trl_hen_n = X_hen*axes_trl_hen.n
-    trl_hen_t1 = X_hen*axes_trl_hen.t1
-    trl_hen_t2 = X_hen*axes_trl_hen.t2
+    axes_trl_hen = Axes(inv(R_hen)*get_orthonormal_axes(R_hen*hen.rbsig.prop.ās[hen.rotid])) 
+    trl_hen_n = R_hen*axes_trl_hen.n
+    trl_hen_t1 = R_hen*axes_trl_hen.t1
+    trl_hen_t2 = R_hen*axes_trl_hen.t2
     # translate on egg
-    axes_trl_egg = Axes(inv(X_egg)*get_orthonormal_axes(X_egg*egg.rbsig.prop.ās[egg.trlid])) 
-    trl_egg_n = X_egg*axes_trl_egg.n
-    trl_egg_t1 = X_egg*axes_trl_egg.t1
-    trl_egg_t2 = X_egg*axes_trl_egg.t2
+    axes_trl_egg = Axes(inv(R_egg)*get_orthonormal_axes(R_egg*egg.rbsig.prop.ās[egg.trlid])) 
+    trl_egg_n = R_egg*axes_trl_egg.n
+    trl_egg_t1 = R_egg*axes_trl_egg.t1
+    trl_egg_t2 = R_egg*axes_trl_egg.t2
     # rotate of egg
-    axes_rot_glb = get_orthonormal_axes(X_egg*egg.rbsig.prop.ās[egg.rotid])
-    axes_rot_egg = Axes(inv(X_egg)*axes_rot_glb)
-    axes_rot_hen = Axes(inv(X_hen)*axes_rot_glb)
-    rot_egg_n = X_egg*axes_rot_egg.n
-    rot_egg_t1 = X_egg*axes_rot_egg.t1
-    rot_egg_t2 = X_egg*axes_rot_egg.t2
-    rot_hen_n = X_hen*axes_rot_hen.n
-    rot_hen_t1 = X_hen*axes_rot_hen.t1
-    rot_hen_t2 = X_hen*axes_rot_hen.t2
+    axes_rot_glb = get_orthonormal_axes(R_egg*egg.rbsig.prop.ās[egg.rotid])
+    axes_rot_egg = Axes(inv(R_egg)*axes_rot_glb)
+    axes_rot_hen = Axes(inv(R_hen)*axes_rot_glb)
+    rot_egg_n = R_egg*axes_rot_egg.n
+    rot_egg_t1 = R_egg*axes_rot_egg.t1
+    rot_egg_t2 = R_egg*axes_rot_egg.t2
+    rot_hen_n = R_hen*axes_rot_hen.n
+    rot_hen_t1 = R_hen*axes_rot_hen.t1
+    rot_hen_t2 = R_hen*axes_rot_hen.t2
     # first    
     Φ_1st = r_hen2egg
     # second
