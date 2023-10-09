@@ -211,7 +211,7 @@ function plot_traj!(bot::TR.TensegrityRobot;
         (a::Nothing,b::Nothing) => [
                 1 for sgi in eachindex(subgrids)
             ]
-    	(a,b::Nothing) => [
+        (a,b::Nothing) => [
                 time2step(a[sgi],traj.t)
                 for sgi in eachindex(subgrids)
             ]
@@ -455,7 +455,6 @@ function Makie.plot!(viz::Viz{Tuple{S}};
     nodes_ob = @lift $body_ob.state.rps .|> Makie.Point
     # arrows_ob = @lift body_ob.state.as .|> Makie.Point
     id  = @lift $body_ob.prop.id
-    meshes_ob = @lift build_mesh($body_ob,color=viz.meshcolor[])
     if viz.show_mass_centers[]
         scatter!(viz,mass_center_ob;)
         if viz.show_mass_center_labels[]
@@ -482,6 +481,7 @@ function Makie.plot!(viz::Viz{Tuple{S}};
     end
     # body mesh
     if viz.showmesh[] || viz.showwire[]
+        meshes_ob = @lift build_mesh($body_ob,color=viz.meshcolor[])
         if viz.showwire[]
             strokewidth = linewidth
         else
@@ -616,6 +616,7 @@ function Makie.plot!(viz::Viz{Tuple{S}};
                 show_nodes,
                 show_node_labels,
                 meshcolor = viz.meshcolor[],
+                pointcolor = viz.pointcolor[],
                 showmesh = viz.showmesh[],
                 # showwire = viz.showwire[],
             )
@@ -649,23 +650,23 @@ function get3Dstate(rb)
 end
 
 function get_linesegs_cables(tg;slackonly=false,noslackonly=false)
-	(;connected) = tg.connectivity.tensioned
-	(;cables) = tg.tensiles
-	ndim = TR.get_ndim(tg)
-	T = TR.get_numbertype(tg)
-	linesegs_cables = Vector{Tuple{Point{ndim,T},Point{ndim,T}}}()
-	foreach(connected) do scnt
-		scable = cables[scnt.id]
-		ret = (Point(scnt.hen.rbsig.state.rps[scnt.hen.pid]),
-				Point(scnt.egg.rbsig.state.rps[scnt.egg.pid]))
+    (;connected) = tg.connectivity.tensioned
+    (;cables) = tg.tensiles
+    ndim = TR.get_ndim(tg)
+    T = TR.get_numbertype(tg)
+    linesegs_cables = Vector{Tuple{Point{ndim,T},Point{ndim,T}}}()
+    foreach(connected) do scnt
+        scable = cables[scnt.id]
+        ret = (Point(scnt.hen.rbsig.state.rps[scnt.hen.pid]),
+                Point(scnt.egg.rbsig.state.rps[scnt.egg.pid]))
         slacking = scable.state.tension <= 0
         if (slackonly && slacking) ||
            (noslackonly && !slacking) ||
            (!slackonly && !noslackonly)
-			push!(linesegs_cables,ret)
-		end
-	end
-	linesegs_cables
+            push!(linesegs_cables,ret)
+        end
+    end
+    linesegs_cables
 end
 
 function build_mesh(rb::TR.AbstractRigidBody;update=true,color=nothing)
@@ -716,14 +717,14 @@ function endpoints2mesh(
         n1=10,n2=2,
         color=:slategrey
     )
-	cyl_bar = Meshes.Cylinder(
+    cyl_bar = Meshes.Cylinder(
         Meshes.Point(p1),
         Meshes.Point(p2),
         radius
     )
     cylsurf_bar = Meshes.boundary(cyl_bar)
     # Meshes.sample(cylsurf_bar,Meshes.RegularSampling(10,3))
-	cyl_bar_simple = Meshes.discretize(cylsurf_bar,Meshes.RegularDiscretization(n1,n2))
+    cyl_bar_simple = Meshes.discretize(cylsurf_bar,Meshes.RegularDiscretization(n1,n2))
     simple2mesh(cyl_bar_simple,color)
 end
 
@@ -823,25 +824,25 @@ function parse_Adams_frequency(url)
 end
 
 function simple2mesh(sp,color=:slategrey)
-	dim   = Meshes.embeddim(sp)
-	nvert = Meshes.nvertices(sp)
-	nelem = Meshes.nelements(sp)
-	verts = Meshes.vertices(sp)
-	topo  = Meshes.topology(sp)
-	elems = Meshes.elements(topo)
+    dim   = Meshes.embeddim(sp)
+    nvert = Meshes.nvertices(sp)
+    nelem = Meshes.nelements(sp)
+    verts = Meshes.vertices(sp)
+    topo  = Meshes.topology(sp)
+    elems = Meshes.elements(topo)
 
-	# coordinates of vertices
-	coords = Meshes.coordinates.(verts)
-	# fan triangulation (assume convexity)
-	tris4elem = map(elems) do elem
-	  I = Meshes.indices(elem)
-	  [[I[1], I[i], I[i+1]] for i in 2:length(I)-1]
-	end
+    # coordinates of vertices
+    coords = Meshes.coordinates.(verts)
+    # fan triangulation (assume convexity)
+    tris4elem = map(elems) do elem
+      I = Meshes.indices(elem)
+      [[I[1], I[i], I[i+1]] for i in 2:length(I)-1]
+    end
 
-	# flatten vector of triangles
-	tris = [tri for tris in tris4elem for tri in tris]
-	points  = GB.Point.(coords)
-	faces  = GB.TriangleFace{UInt64}.(tris)
+    # flatten vector of triangles
+    tris = [tri for tris in tris4elem for tri in tris]
+    points  = GB.Point.(coords)
+    faces  = GB.TriangleFace{UInt64}.(tris)
     nls = GB.normals(points,faces)
     parsedcolor = parse(Makie.ColorTypes.RGB{Float32},color)
     colors = fill(parsedcolor,length(points))
@@ -849,46 +850,46 @@ function simple2mesh(sp,color=:slategrey)
 end
 
 function plotsave_energy(bot,figname=nothing)
-	(;traj) = bot
-	(;t) = traj
-	tmin,tmax = t[begin], t[end]
-	titles = [
-		"机械能",
-		"动能",
-		"势能"
-	]
-	with_theme(theme_pub; resolution = (0.9tw,0.6tw)) do
-		ME = TR.mechanical_energy!(bot;gravity=true)
-		fig = Figure()
-		axs = [
-			begin
-				ax = Axis(
-					fig[i,1],
-					xlabel=L"t~\mathrm{(s)}",
-					ylabel="Energy (J)",
-					title=titles[i]
-				)
-				xlims!(ax,tmin,tmax)
-				# ylims!(ax,,)
-				if i !== 3
-					ax.xlabelvisible = false
-					ax.xticklabelsvisible = false
-				end
-				Label(fig[i,1,TopLeft()], "($(alphabet[i]))")
-				ax
-			end
-			for i = 1:3
-		]
+    (;traj) = bot
+    (;t) = traj
+    tmin,tmax = t[begin], t[end]
+    titles = [
+        "机械能",
+        "动能",
+        "势能"
+    ]
+    with_theme(theme_pub; resolution = (0.9tw,0.6tw)) do
+        ME = TR.mechanical_energy!(bot;gravity=true)
+        fig = Figure()
+        axs = [
+            begin
+                ax = Axis(
+                    fig[i,1],
+                    xlabel=L"t~\mathrm{(s)}",
+                    ylabel="Energy (J)",
+                    title=titles[i]
+                )
+                xlims!(ax,tmin,tmax)
+                # ylims!(ax,,)
+                if i !== 3
+                    ax.xlabelvisible = false
+                    ax.xticklabelsvisible = false
+                end
+                Label(fig[i,1,TopLeft()], "($(alphabet[i]))")
+                ax
+            end
+            for i = 1:3
+        ]
 
-		lines!(axs[1], t, ME.E)
-		lines!(axs[2], t, ME.T)
-		lines!(axs[3], t, ME.V)
+        lines!(axs[1], t, ME.E)
+        lines!(axs[2], t, ME.T)
+        lines!(axs[3], t, ME.V)
 
 
-		savefig(fig,figname)
+        savefig(fig,figname)
 
-		fig
-	end
+        fig
+    end
 end
 
 function plotsave_friction_direction(bots,x,xs,figname=nothing;
@@ -898,79 +899,79 @@ function plotsave_friction_direction(bots,x,xs,figname=nothing;
         vtol=1e-5,
         cid = 1,
     )
-	with_theme(theme_pub;
+    with_theme(theme_pub;
         resolution
-	) do
-		fig = Figure()
-		for (botid,bot) in enumerate(bots)
-			ax1 = Axis(fig[botid,1],
-						xlabel=tlabel,
-						ylabel=L"\delta\alpha~(\mathrm{Rad})",
-						title=latexstring("$x=$(xs[botid])")
-				)
-			ax2 = Axis(fig[botid,2],
-						xlabel=tlabel,
-						ylabel=L"\delta\theta~(\mathrm{Rad})",
-						title=latexstring("$x=$(xs[botid])")
-				)
-			Label(fig[botid,1,TopLeft()],"($(alphabet[2botid-1]))")
-			Label(fig[botid,2,TopLeft()],"($(alphabet[2botid]))")
-			(;t) = bot.traj
-			contacts_traj_voa = VectorOfArray(bot.contacts_traj)
+    ) do
+        fig = Figure()
+        for (botid,bot) in enumerate(bots)
+            ax1 = Axis(fig[botid,1],
+                        xlabel=tlabel,
+                        ylabel=L"\delta\alpha~(\mathrm{Rad})",
+                        title=latexstring("$x=$(xs[botid])")
+                )
+            ax2 = Axis(fig[botid,2],
+                        xlabel=tlabel,
+                        ylabel=L"\delta\theta~(\mathrm{Rad})",
+                        title=latexstring("$x=$(xs[botid])")
+                )
+            Label(fig[botid,1,TopLeft()],"($(alphabet[2botid-1]))")
+            Label(fig[botid,2,TopLeft()],"($(alphabet[2botid]))")
+            (;t) = bot.traj
+            contacts_traj_voa = VectorOfArray(bot.contacts_traj)
             if eltype(xs) <: Int
-			    c1s = contacts_traj_voa[xs[botid],:]
+                c1s = contacts_traj_voa[xs[botid],:]
             else
                 c1s = contacts_traj_voa[cid,:]
             end
-			idx_sli = findall(c1s) do c
-						issliding(c;vtol)
-					end
-			idx_imp = findall(isimpact,c1s) ∩ idx_sli
-			δα_imp = map(c1s[idx_imp]) do c
-						get_contact_angle(c)
-					end
-			idx_per = findall(doespersist,c1s) ∩ idx_sli
+            idx_sli = findall(c1s) do c
+                        issliding(c;vtol)
+                    end
+            idx_imp = findall(isimpact,c1s) ∩ idx_sli
+            δα_imp = map(c1s[idx_imp]) do c
+                        get_contact_angle(c)
+                    end
+            idx_per = findall(doespersist,c1s) ∩ idx_sli
             # @show idx_per[begin]
-			δα_per = map(c1s[idx_per]) do c
-						get_contact_angle(c)
-					end
-			scaling = 10.0^(-mo_α)
-			Label(fig[botid,1,Top()],latexstring("\\times 10^{-$(mo_α)}"))
-			markersize = fontsize
-			scatter!(ax1,t[idx_per],δα_per./scaling;
-						marker=:diamond, markersize)
-			scatter!(ax1,t[idx_imp],δα_imp./scaling;
-						marker=:xcross, markersize)
-			ylims!(ax1,-1.0,1.0)
-			xlims!(ax1,extrema(t)...)
+            δα_per = map(c1s[idx_per]) do c
+                        get_contact_angle(c)
+                    end
+            scaling = 10.0^(-mo_α)
+            Label(fig[botid,1,Top()],latexstring("\\times 10^{-$(mo_α)}"))
+            markersize = fontsize
+            scatter!(ax1,t[idx_per],δα_per./scaling;
+                        marker=:diamond, markersize)
+            scatter!(ax1,t[idx_imp],δα_imp./scaling;
+                        marker=:xcross, markersize)
+            ylims!(ax1,-1.0,1.0)
+            xlims!(ax1,extrema(t)...)
 
-			θ_imp = map(c1s[idx_imp]) do c
-					get_friction_direction(c)
-				end
-			θ_per = map(c1s[idx_per]) do c
-					get_friction_direction(c)
-				end
-			scaling = 10.0^(-mo)
-			Label(fig[botid,2,Top()],latexstring("\\times 10^{-$(mo)}"))
-			scatter!(ax2,t[idx_per],(θ_per.-π/4)./scaling, label="Persistent";
-						marker=:diamond, markersize)
-			scatter!(ax2,t[idx_imp],(θ_imp.-π/4)./scaling, label="Impact";
-						marker=:xcross, markersize)
-			xlims!(ax2,extrema(t)...)
-			ylims!(ax2,-1.0,1.0)
-			if botid !== length(bots)
-				hidex(ax1)
-				hidex(ax2)
-			else
-				Legend(fig[length(bots)+1,:],ax2;
-					orientation=:horizontal
-				)
-			end
-		end
-		rowgap!(fig.layout,fontsize/2)
-		savefig(fig,figname)
-		fig
-	end
+            θ_imp = map(c1s[idx_imp]) do c
+                    get_friction_direction(c)
+                end
+            θ_per = map(c1s[idx_per]) do c
+                    get_friction_direction(c)
+                end
+            scaling = 10.0^(-mo)
+            Label(fig[botid,2,Top()],latexstring("\\times 10^{-$(mo)}"))
+            scatter!(ax2,t[idx_per],(θ_per.-π/4)./scaling, label="Persistent";
+                        marker=:diamond, markersize)
+            scatter!(ax2,t[idx_imp],(θ_imp.-π/4)./scaling, label="Impact";
+                        marker=:xcross, markersize)
+            xlims!(ax2,extrema(t)...)
+            ylims!(ax2,-1.0,1.0)
+            if botid !== length(bots)
+                hidex(ax1)
+                hidex(ax2)
+            else
+                Legend(fig[length(bots)+1,:],ax2;
+                    orientation=:horizontal
+                )
+            end
+        end
+        rowgap!(fig.layout,fontsize/2)
+        savefig(fig,figname)
+        fig
+    end
 end
 
 function get_err_avg(bots;bid=1,pid=1,di=1)
@@ -1042,25 +1043,25 @@ function plotsave_contact_persistent(bot,figname=nothing;
     cid=1,
     tol = 1e-7 # rule out false active
     )
-	with_theme(theme_pub;) do
-		contacts_traj_voa = VectorOfArray(bot.contacts_traj)
-		c1_traj = contacts_traj_voa[cid,:]
-		# steps = 1:length(c1_traj)
-		active_nonpersist = findall(c1_traj) do c
-			c.state.active && !c.state.persistent && norm(c.state.Λ) > tol
-		end
-		active_persist = findall(c1_traj) do c
-			c.state.active && c.state.persistent && norm(c.state.Λ) > tol
-		end
-        @myshow active_persist
-		fig = Figure()
-		ax = Axis(fig[1,1], xlabel = "Step", ylabel = "Contact Type")
-		scatter!(ax,active_nonpersist,one.(active_nonpersist),label="Impact")
-		scatter!(ax,active_persist,zero.(active_persist),label="Persistent")
-		axislegend(ax)
+    with_theme(theme_pub;) do
+        contacts_traj_voa = VectorOfArray(bot.contacts_traj)
+        c1_traj = contacts_traj_voa[cid,:]
+        # steps = 1:length(c1_traj)
+        active_nonpersist = findall(c1_traj) do c
+            c.state.active && !c.state.persistent && norm(c.state.Λ) > tol
+        end
+        active_persist = findall(c1_traj) do c
+            c.state.active && c.state.persistent && norm(c.state.Λ) > tol
+        end
+        # @myshow active_persist
+        fig = Figure()
+        ax = Axis(fig[1,1], xlabel = "Step", ylabel = "Contact Type")
+        scatter!(ax,active_nonpersist,one.(active_nonpersist),label="Impact")
+        scatter!(ax,active_persist,zero.(active_persist),label="Persistent")
+        axislegend(ax)
         savefig(fig,figname)
-		fig
-	end
+        fig
+    end
 end
 
 function plot_self_stress_states(

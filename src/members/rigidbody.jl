@@ -333,14 +333,14 @@ function update_transformations!(
     (;Cg,Cps) = cache
     L = QBF.Lmat(q[4:7])
     for (Cp,r̄p) in zip(Cps,r̄ps)
-        # for i = 1:3 
-        # 	Cp[i,i] = 1
-        # end
+        for i = 1:3 
+        	Cp[i,i] = 1
+        end
         Cp[1:3,4:7] .= -2R*NCF.skew(r̄p)*L
     end 
-    # for i = 1:3 
-    # 	Cg[i,i] = 1
-    # end
+    for i = 1:3 
+    	Cg[i,i] = 1
+    end
     Cg[1:3,4:7] .= -2R*NCF.skew(r̄g)*L
 end
 

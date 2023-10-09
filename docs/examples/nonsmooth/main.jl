@@ -169,12 +169,19 @@ pms_hp = [
         pm = new_pointmass(;
                 e,μ=0.1,ṙo = [v0,0,0]
             )
-        TR.solve!(TR.SimProblem(pm,pm_contact_dynfuncs),TR.ZhongCCP();tspan,dt=h,ftol=1e-14,maxiters=50,exception=false)
+        TR.solve!(
+            TR.SimProblem(pm,pm_contact_dynfuncs),
+            TR.ZhongCCP();
+            tspan,dt=h,
+            ftol=1e-14,
+            maxiters=50,
+            exception=false
+        )
     end
     for v0 in v0s for e in es
 ]
 
-CM.activate!();with_theme(theme_pub;
+GM.activate!();with_theme(theme_pub;
             resolution = (0.8tw,0.2tw),
             figure_padding = (0,fontsize,0,0),
             Axis3 = (
@@ -202,14 +209,15 @@ CM.activate!();with_theme(theme_pub;
         AxisType = Axis3,
         fig = gd,
         # gridsize=(1,4),
-        showinfo =false,
-        showmesh=false,
         xlims=(-1e-3,1.0),
         ylims=(-0.4,0.4),
         zlims=(-1e-3,1.0),
+        showinfo =false,
+        showmesh=false,
+        showwire=false,
         showlabels=false,
+        showcables=false,
         showpoints=false,
-        figsize=(0.9tw,0.25tw),
         showtitle=false,
         sup! = (ax,tgob,sgi) -> begin
             hidey(ax)
@@ -217,8 +225,12 @@ CM.activate!();with_theme(theme_pub;
                 suptg = deepcopy(bot.tg)
                 suptg.state.system.q .= bot.traj.q[step]
                 TR.update!(suptg)
-                init_plot!(ax,Observable(suptg);
+                viz!(ax,Observable(suptg);
                     showlabels=false,
+                    showmesh=false,
+                    showcables=false,
+                    showwire=false,
+                    showpoints=true,
                     pointcolor=cg[istep]
                 )
             end
@@ -255,77 +267,77 @@ CM.activate!();with_theme(theme_pub;
 end
 
 function plotsave_pointmass_xz_energy(bots,figname=nothing)
-with_theme(theme_pub;
-        resolution = (0.9tw,0.45tw),
-    ) do
-    fig = Figure()
-    grids = [GridLayout(fig[i,j]) for i in 1:length(bots), j = 1:2]
-    for (botid,bot) in enumerate(bots)
-        (;t) = bot.traj
-        ax1 = Axis(grids[botid,1][1,1], xlabel = tlabel, ylabel = "Coords. (m)")
-        rp1 = get_trajectory!(bot,1,1)
-        lines!(ax1,t,rp1[3,:],label=L"z")
-        lines!(ax1,t,rp1[1,:],label=L"x")
-        if botid == 2
-            axislegend(ax1,position=:ct,orientation=:horizontal)
+    with_theme(theme_pub;
+            resolution = (0.9tw,0.45tw),
+        ) do
+        fig = Figure()
+        grids = [GridLayout(fig[i,j]) for i in 1:length(bots), j = 1:2]
+        for (botid,bot) in enumerate(bots)
+            (;t) = bot.traj
+            ax1 = Axis(grids[botid,1][1,1], xlabel = tlabel, ylabel = "Coords. (m)")
+            rp1 = get_trajectory!(bot,1,1)
+            lines!(ax1,t,rp1[3,:],label=L"z")
+            lines!(ax1,t,rp1[1,:],label=L"x")
+            if botid == 2
+                axislegend(ax1,position=:ct,orientation=:horizontal)
+            end
+            xlims!(ax1,t[begin],t[end])
+            Label(grids[botid,1][1,1,TopLeft()], "($(alphabet[2botid-1]))")
+            ax2 = Axis(grids[botid,2][1,1], xlabel = tlabel, ylabel = L"\mathrm{Energy}~(\mathrm{J})")
+            me = TR.mechanical_energy!(bot)
+            lines!(ax2,t,me.E)
+            xlims!(ax2,t[begin],t[end])
+            ylims!(ax2,-1,11)
+            if botid !== 4
+                hidex(ax1); hidex(ax2)
+            end
+            Label(grids[botid,2][1,1,TopLeft()], "($(alphabet[2botid]))")
         end
-        xlims!(ax1,t[begin],t[end])
-        Label(grids[botid,1][1,1,TopLeft()], "($(alphabet[2botid-1]))")
-        ax2 = Axis(grids[botid,2][1,1], xlabel = tlabel, ylabel = L"\mathrm{Energy}~(\mathrm{J})")
-        me = TR.mechanical_energy!(bot)
-        lines!(ax2,t,me.E)
-        xlims!(ax2,t[begin],t[end])
-        ylims!(ax2,-1,11)
-        if botid !== 4
-            hidex(ax1); hidex(ax2)
-        end
-        Label(grids[botid,2][1,1,TopLeft()], "($(alphabet[2botid]))")
+        savefig(fig,figname)
+        fig
     end
-    savefig(fig,figname)
-    fig
 end
-end
-GM.activate!(); plotsave_pointmass_xz_energy(reshape(pms_hp,3,2)[:,2])
+GM.activate!(); plotsave_pointmass_xz_energy(reshape(pms_hp,1,1)[:,2])
 CM.activate!(); plotsave_pointmass_xz_energy(reshape(pms_hp,3,2)[:,2],"pointmass_xz_energy")
 
 function plotsave_pointmass_velocity_restitution(bots,figname=nothing)
-with_theme(theme_pub;
-        resolution = (0.9tw,0.6tw),
-    ) do
-    fig = Figure()
-    grids = [GridLayout(fig[i,j]) for i in 1:length(bots), j = 1:2]
-    ymids = es
-    xtickmaxs = [4,5,1]
-    for (botid,bot) in enumerate(bots)
-        (;t) = bot.traj
-        ax1 = Axis(grids[botid,1][1,1], xlabel = tlabel, ylabel = L"v~(\mathrm{m/s})")
-        ṙp1 = get_velocity!(bot,1,1)
-        lines!(ax1,t,ṙp1[3,:])
-        xlims!(ax1,t[begin],t[end])
-        ylims!(ax1,-6,6)
-        Label(grids[botid,1][1,1,TopLeft()], "($(alphabet[2botid-1]))")
-        ax2 = Axis(grids[botid,2][1,1], xlabel = "Count", ylabel = L"e")
-        vz = ṙp1[3,:]
-        pos_pks_raw, _ = findmaxima(vz)
-        pos_pks, _ = peakproms(pos_pks_raw,vz,minprom=0.2)
-        neg_pks_raw, _ = findminima(vz)
-        neg_pks, _ = peakproms(neg_pks_raw,vz,minprom=0.2)
-        if (botid == length(bots))
-            pos_pks = neg_pks.+1
-        elseif length(neg_pks) > length(pos_pks)
-            pop!(neg_pks)
+    with_theme(theme_pub;
+            resolution = (0.9tw,0.6tw),
+        ) do
+        fig = Figure()
+        grids = [GridLayout(fig[i,j]) for i in 1:length(bots), j = 1:2]
+        ymids = es
+        xtickmaxs = [4,5,1]
+        for (botid,bot) in enumerate(bots)
+            (;t) = bot.traj
+            ax1 = Axis(grids[botid,1][1,1], xlabel = tlabel, ylabel = L"v~(\mathrm{m/s})")
+            ṙp1 = get_velocity!(bot,1,1)
+            lines!(ax1,t,ṙp1[3,:])
+            xlims!(ax1,t[begin],t[end])
+            ylims!(ax1,-6,6)
+            Label(grids[botid,1][1,1,TopLeft()], "($(alphabet[2botid-1]))")
+            ax2 = Axis(grids[botid,2][1,1], xlabel = "Count", ylabel = L"e")
+            vz = ṙp1[3,:]
+            pos_pks_raw, _ = findmaxima(vz)
+            pos_pks, _ = peakproms(pos_pks_raw,vz,minprom=0.2)
+            neg_pks_raw, _ = findminima(vz)
+            neg_pks, _ = peakproms(neg_pks_raw,vz,minprom=0.2)
+            if (botid == length(bots))
+                pos_pks = neg_pks.+1
+            elseif length(neg_pks) > length(pos_pks)
+                pop!(neg_pks)
+            end
+            ratios = -vz[pos_pks]./vz[neg_pks]
+            scatter!(ax2,ratios)
+            ylims!(ax2,ymids[botid]-0.08,ymids[botid]+0.08)
+            # ax2.yticks = [0,0.3,0.7,1.0]
+            ax2.xticks = collect(1:xtickmaxs[botid])
+            Label(grids[botid,2][1,1,TopLeft()], "($(alphabet[2botid]))")
         end
-        ratios = -vz[pos_pks]./vz[neg_pks]
-        scatter!(ax2,ratios)
-        ylims!(ax2,ymids[botid]-0.08,ymids[botid]+0.08)
-        # ax2.yticks = [0,0.3,0.7,1.0]
-        ax2.xticks = collect(1:xtickmaxs[botid])
-        Label(grids[botid,2][1,1,TopLeft()], "($(alphabet[2botid]))")
+        rowgap!(fig.layout,0)
+        savefig(fig,figname)
+        fig
     end
-    rowgap!(fig.layout,0)
-    savefig(fig,figname)
-    fig
-end
 end
 
 GM.activate!(); plotsave_pointmass_velocity_restitution(reshape(pms_hp,3,2)[:,1])
@@ -339,15 +351,29 @@ ro = [0.0,0,-1e-7]
 ṙo = [2.0cos(θ),0,2.0sin(θ)]
 # ṙo = [0,-2.0,0]
 
+# analytical
+g = 9.81
+μ=0.3
+vo = norm(ṙo)
+a = -μ*g*cos(θ)-g*sin(θ)
+# μ*g*cos(θ)-g*sin(θ)
+tf = -vo/a
+d(t) -> vo*t+1/2*a*t^2
 tspan = (0.0,0.6)
-pm = new_pointmass(;e=0.0, μ=0.3, ro, ṙo)
+pm = new_pointmass(;e=0.0, μ, ro, ṙo)
 
 prob = TR.SimProblem(pm,(x)->pm_contact_dynfuncs(x;θ))
 TR.solve!(prob,TR.ZhongCCP();tspan,dt=1e-3,ftol=1e-14,maxiters=50,exception=false)
 
-CM.activate!(); with_theme(theme_pub;
+rp1 = get_trajectory!(pm,1,1)
+ṙp1 = get_velocity!(pm,1,1)
+dp1 = rp1.u .|> norm
+vl1 = [u ⋅ normalize(ṙo) for u in ṙp1]
+# overshoot!
+scatterlines(vl1)
+GM.activate!(); with_theme(theme_pub;
         # fontsize = 6 |> pt2px,
-        resolution = (0.9tw,0.2tw),
+        resolution = (1tw,0.2tw),
         figure_padding = (fontsize,fontsize,0,0),
         Axis3 = (
             azimuth = 4.575530633326984,
@@ -367,39 +393,46 @@ CM.activate!(); with_theme(theme_pub;
     Label(gd1[1,1,TopLeft()], 
         rich("($(alphabet[1]))",font=:bold)
     )
-    colsize!(fig.layout,2,Fixed(0.45tw))
+    colsize!(fig.layout,2,Fixed(0.55tw))
     colgap!(fig.layout,fontsize/2)
     plot_traj!(bot;
         doslide=false,
-        showmesh=false,
         AxisType=Axis3,
         fig = gd1,
         xlims=(-8e-3,0.5),
         ylims=(-0.1,0.1),
         zlims=(-8e-3,0.2),
+        showinfo =false,
+        showmesh=false,
+        showwire=false,
         showlabels=false,
-        showpoints = false,
+        showcables=false,
+        showpoints=false,
+        showtitle=false,
         ground=inclined_plane,
-        showtitle = false,
         sup! = (ax,tgob,sgi) -> begin
             hidey(ax)
             for (istep,step) in enumerate(steps)
                 suptg = deepcopy(bot.tg)
                 suptg.state.system.q .= bot.traj.q[step]
                 TR.update!(suptg)
-                init_plot!(ax,Observable(suptg);
+                viz!(ax,Observable(suptg);
                     showlabels=false,
+                    showmesh=false,
+                    showcables=false,
+                    showwire=false,
+                    showpoints=true,
                     pointcolor=cg[istep]
                 )
             end
         end,
         # figname="pointmass_sliding"
     )
-    ax1 = Axis(gd2[1,1], xlabel = tlabel, ylabel = L"d (\mathrm{m})")
+    ax1 = Axis(gd2[1,1], xlabel = tlabel, ylabel = "disp. (m)")
     Label(gd2[1,1,TopLeft()], 
         rich("($(alphabet[2]))",font=:bold)
     )
-    ax2 = Axis(gd2[1,2], xlabel = tlabel, ylabel = L"\dot{d} (\mathrm{m/s})")
+    ax2 = Axis(gd2[1,2], xlabel = tlabel, ylabel = "disp. (m)")
     Label(gd2[1,2,TopLeft()], 
         rich("($(alphabet[3]))",font=:bold)
     )
@@ -407,24 +440,30 @@ CM.activate!(); with_theme(theme_pub;
     ṙp1 = get_velocity!(bot,1,1)
     dp1 = rp1.u .|> norm
     vl1 = ṙp1.u .|> norm
-    steps = axes(bot.traj,1)
-    at = 0.3716
-    stopstep = time2step(at,t)
-    lines!(ax1,t[steps],dp1[steps])
-    lines!(ax2,t[steps],vl1[steps])
+    @myshow findmax(dp1)
+    stopstep = time2step(tf,t)
+    lines!(ax1,t,dp1)
     xlims!(ax1,0,0.6)
-    xlims!(ax2,0,0.6)
+    scatterlines!(ax2,t[1:stopstep],(t) -> vo*t+1/2*a*t^2,color=:red,label="Analytic")
+    scatterlines!(ax2,t[stopstep:end],(t) -> vo*tf+1/2*a*tf^2,color=:red)
+    scatter!(ax2,t,dp1,color=:blue,marker=:diamond,label="NMSI")
+    # lines!(ax2,t,vl1)
+    axislegend(ax2;position=:rt,orientation=:horizontal,)
+    xlims!(ax2,0.369,0.389)
+    ylims!(ax2,3.7161e-1,3.7164e-1)
     vlines!(ax1,t[stopstep])
     vlines!(ax2,t[stopstep])
-    text!(ax1,latexstring("t=$at"), 
-                position = (at+0.02, 0.19),
-                align = (:left, :center)
+    text!(ax1,latexstring("t_s=0.372(s)"), 
+        position = (tf+0.02, 0.19),
+        fontsize = 6 |> pt2px,
+        align = (:left, :center)
     )
-    text!(ax2,latexstring("t=$at"), 
-                position = (at+0.02, 1.0),
-                align = (:left, :center)
+    text!(ax2,latexstring("t_s=0.372(s)"), 
+        position = (tf+0.02, 1.0),
+        fontsize = 6 |> pt2px,
+        align = (:left, :center)
     )
-    @show extrema(dp1[steps]), extrema(vl1[steps])
+    @show extrema(dp1), extrema(vl1)
     savefig(fig,"pointmass_sliding")
     fig
 end
@@ -463,36 +502,36 @@ end
 
 # contact_friction
 function plotsave_pointmass_energy_friction(bot,figname=nothing)
-with_theme(theme_pub;
-    resolution = (0.9tw,0.3tw)
-) do
-    (;t) = bot.traj
-    fig = Figure()
-    ax1 = Axis(fig[1,1], xlabel = tlabel, ylabel = "Energy (J)")
-    Label(fig[1,1,TopLeft()], "($(alphabet[1]))")
-    ax2 = Axis(fig[1,2], xlabel = tlabel, ylabel = L"\lambda~(\mathrm{N})")
-    Label(fig[1,2,TopLeft()], "($(alphabet[2]))")
-    me = TR.mechanical_energy!(bot)
-    (;T,V,E) = me
-    lines!(ax1,t,me.T, label="Kinetic")
-    lines!(ax1,t,me.V, label="Potential")
-    lines!(ax1,t,me.E, label="Total")
-    xlims!(ax1,extrema(t)...)
-    axislegend(ax1)
+    with_theme(theme_pub;
+        resolution = (0.9tw,0.3tw)
+    ) do
+        (;t) = bot.traj
+        fig = Figure()
+        ax1 = Axis(fig[1,1], xlabel = tlabel, ylabel = "Energy (J)")
+        Label(fig[1,1,TopLeft()], "($(alphabet[1]))")
+        ax2 = Axis(fig[1,2], xlabel = tlabel, ylabel = L"\lambda~(\mathrm{N})")
+        Label(fig[1,2,TopLeft()], "($(alphabet[2]))")
+        me = TR.mechanical_energy!(bot)
+        (;T,V,E) = me
+        lines!(ax1,t,me.T, label="Kinetic")
+        lines!(ax1,t,me.V, label="Potential")
+        lines!(ax1,t,me.E, label="Total")
+        xlims!(ax1,extrema(t)...)
+        axislegend(ax1)
 
-    c1_traj = VectorOfArray(bot.contacts_traj)[1,5:end]
-    Λn = [2c.state.Λ[1]./c.μ for c in c1_traj]
-    Λt = [2c.state.Λ[3] for c in c1_traj]
-    th = t[5:end]
-    lines!(ax2,th,Λn,label=L"\lambda_{n}")
-    lines!(ax2,(th[2:2:end]+th[1:2:end-1])./2,(Λt[2:2:end]+Λt[1:2:end-1])./2,label=L"\lambda_{t}")
-    # lines!(ax2, th, Λt ,label=L"\lambda_{t}")
-    @show Λn[end], Λt[begin], Λt[end]
-    axislegend(ax2,position=:rc)
-    xlims!(ax2,extrema(t)...)
-    savefig(fig,figname)
-    fig
-end
+        c1_traj = VectorOfArray(bot.contacts_traj)[1,5:end]
+        Λn = [2c.state.Λ[1]./c.μ for c in c1_traj]
+        Λt = [2c.state.Λ[3] for c in c1_traj]
+        th = t[5:end]
+        lines!(ax2,th,Λn,label=L"\lambda_{n}")
+        lines!(ax2,(th[2:2:end]+th[1:2:end-1])./2,(Λt[2:2:end]+Λt[1:2:end-1])./2,label=L"\lambda_{t}")
+        # lines!(ax2, th, Λt ,label=L"\lambda_{t}")
+        @show Λn[end], Λt[begin], Λt[end]
+        axislegend(ax2,position=:rc)
+        xlims!(ax2,extrema(t)...)
+        savefig(fig,figname)
+        fig
+    end
 end
 GM.activate!(); plotsave_pointmass_energy_friction(pm)
 CM.activate!(); plotsave_pointmass_energy_friction(pm,"pointmass_energy_friction")
@@ -691,7 +730,7 @@ end
 ro = [0,0,0.5]
 R = RotX(0.0)
 ṙo = [1.0,0.0,0.0]
-Ω = [0.0,0.0,200.0]
+Ω = [0.0,0.0,100.0]
 # R = rand(RotMatrix3)
 # ṙo = rand(3)
 # Ω = rand(3)
@@ -699,7 +738,7 @@ ṙo = [1.0,0.0,0.0]
 # tspan = (0.0,1.0)
 μ = 0.95
 e = 0.5
-tspan = (0.0,2.0)
+tspan = (0.0,1.8)
 h = 1e-4
 
 topq = make_top(ro,R,ṙo,Ω;μ,e,loadmesh=true)
@@ -708,16 +747,28 @@ topq = make_top(ro,R,ṙo,Ω;μ,e,loadmesh=true)
 TR.solve!(
     TR.SimProblem(topq,top_contact_dynfuncs),
     TR.ZhongQCCP();
-    tspan,dt=h,ftol=1e-12,maxiters=2000,exception=false,verbose_contact=true
+    tspan = (0.0,10.0),
+    dt=2e-3,
+    ftol=1e-10,maxiters=50,exception=false,verbose_contact=true
 )
+me = TR.mechanical_energy!(topq)
+rp5 = get_trajectory!(topq,1,5)
 
+
+plot_traj!(
+    topq;
+    showinfo=false,
+    # rigidcolor=:white,
+    showwire=true,
+    showarrows=false,
+)
 
 topn = make_top(ro,R,ṙo,Ω,TR.NCF.LNC;μ,e,loadmesh=true)
 TR.solve!(
     TR.SimProblem(topn,top_contact_dynfuncs),
     TR.ZhongCCP();
-    tspan = (0.0,2.0),
-    dt=1e-4,
+    tspan,
+    dt=h,
     ftol=1e-14,
     maxiters=50,exception=false,verbose=false
 )
@@ -744,16 +795,16 @@ GM.activate!();with_theme(theme_pub;
             transparency = true,
         )
     ) do
-    bot = topn
+    bot = topq
     (;t) = bot.traj
     rp5 = get_trajectory!(bot,1,5)
     vp5 = get_velocity!(bot,1,5)
     me = TR.mechanical_energy!(bot)
-    steps = 1:1000:18000
+    steps = 1:1000:15000
     nstep = length(steps)
     alphas = fill(0.1,nstep)
     alphas[1:3] = [1,0.4,0.2]
-    alphas[end] = [1,0]
+    alphas[end] = 1
     cg = cgrad(:winter, nstep, categorical = true)
     fig = Figure()
     gd1 = fig[1,1] = GridLayout()
@@ -796,7 +847,7 @@ GM.activate!();with_theme(theme_pub;
     )
     ax1 = Axis(gd2[1,1],
         xlabel = tlabel,
-        ylabel = L"\acute{v}_{n} (\mathrm{m/s})",
+        ylabel = L"\acute{v}_{n}~(\mathrm{m/s})",
     )
     lines!(ax1,t,vp5[3,:])
     ax2 = Axis(gd2[1:2,2],
@@ -809,13 +860,13 @@ GM.activate!();with_theme(theme_pub;
     axislegend(ax2,position=:rt)
     ax3 = Axis(gd2[2,1],
         xlabel = tlabel,
-        ylabel = L"\acute{v}_{tb} (\mathrm{m/s})",
+        ylabel = L"\acute{v}_{tb}~(\mathrm{m/s})",
     )
     lines!(ax3,t,[norm(vp5[2:3,i]) for i = 1:length(t)])
     hidex(ax1)
-    xlims!(ax1,0,1.2)
-    xlims!(ax2,0,1.2)
-    xlims!(ax3,0,1.2)
+    xlims!(ax1,0,1.8)
+    xlims!(ax2,0,1.8)
+    xlims!(ax3,0,1.8)
     Label(
         fig[1,1,TopLeft()],
         rich("($(alphabet[1]))",font=:bold),
@@ -839,6 +890,19 @@ GM.activate!();with_theme(theme_pub;
     fig
 end
 
+topq_longtime = deepcopy(topq)
+TR.set_new_initial!(topq_longtime,topq.traj.q[end],topq.traj.q̇[end])
+TR.solve!(
+    TR.SimProblem(topq_longtime,top_contact_dynfuncs),
+    TR.ZhongQCCP();
+    tspan = (0.0,10.0),
+    dt=2e-3,
+    ftol=1e-14,
+    maxiters=100,exception=false,verbose=false
+)
+me = TR.mechanical_energy!(topq_longtime)
+rp5 = get_trajectory!(topq_longtime,1,5)
+
 
 topn_longtime = deepcopy(topn)
 TR.set_new_initial!(topn_longtime,topn.traj.q[end],topn.traj.q̇[end])
@@ -850,7 +914,7 @@ TR.solve!(
     ftol=1e-14,
     maxiters=100,exception=false,verbose=false
 )
-
+plotsave_contact_persistent(topn_longtime)
 me = TR.mechanical_energy!(topn_longtime)
 rp5 = get_trajectory!(topn_longtime,1,5)
 # vp5 = get_velocity!(topn,1,5)
@@ -858,36 +922,33 @@ with_theme(theme_pub;
         resolution = (0.7tw,0.2tw),
         figure_padding = (0,fontsize,0,fontsize/2)
     ) do
-    (;t) = topn_longtime.traj
+    # bot = topn_longtime
+    bot = topq_longtime
+    (;t) = bot.traj
     fig = Figure()
     ax1 = Axis(fig[1,1];xlabel=tlabel, ylabel="Rel. Err.")
     ax2 = Axis(fig[1,2];xlabel=tlabel, ylabel="Abs. Err. (m)")
     skipstep = 500
-    startstep = time2step(1.0,t)
+    startstep = time2step(12.1,t)
     lines!(ax1,
         t[startstep:skipstep:end],
         (me.E[startstep:skipstep:end].-me.E[startstep])./me.E[startstep]
     )
     ylims!(ax1,-1e-4,1e-4)
     xlims!(ax1,extrema(t)...)
+    @myshow rp5[3,startstep]
     lines!(ax2,
         t[startstep:skipstep:end],
-        rp5[3,startstep:skipstep:end].-rp5[3,startstep],
+        (-rp5[3,startstep:skipstep:end]).-(-rp5[3,startstep]),
     )
     xlims!(ax2,extrema(t)...)
-    savefig(fig,"spinningtop_longtime")
-    fig
-    
+    Label(fig[1,1,TopLeft()], rich("($(alphabet[1]))",font=:bold))
+    Label(fig[1,2,TopLeft()], rich("($(alphabet[2]))",font=:bold))
+    # savefig(fig,"spinningtop_longtime")
+    fig    
 end
 
 
-plot_traj!(
-    topq;
-    showinfo=false,
-    # rigidcolor=:white,
-    showwire=true,
-    showarrows=false,
-)
 
 
 c1_topq = get_trajectory!(topq,1,5)
@@ -950,18 +1011,16 @@ CM.activate!(); plotsave_contact_persistent(top,"spinningtop_contact_persistent"
 
 R = RotX(0.0)
 μs = [
-    # 0.04,
     0.01,
-    #0.004
 ]
 ro = [0,0,0.5]
 tops_e0 = [
     begin
-        top = make_top(ro,R,ṙo,Ω,TR.NCF.LNC; μ, e = 0.0)
+        top = make_top(ro,R,ṙo,Ω,TR.NCF.LNC; μ, e = 0.0,loadmesh=true)
         TR.solve!(
             TR.SimProblem(top,top_contact_dynfuncs),
             TR.ZhongCCP();
-            tspan=(0.0,2.1),
+            tspan=(0.0,2.0),
             dt=1e-3,ftol=1e-14,maxiters=50,exception=false,verbose_contact=false
         )
     end
@@ -988,7 +1047,11 @@ GM.activate!();with_theme(theme_pub;
     vp5 = get_velocity!(bot,1,5)[stepstart:end]
     me = TR.mechanical_energy!(bot)[stepstart:end]
     steps = 1:100:1800
-    cg = cgrad(:winter, length(steps), categorical = true)
+    nstep = length(steps)
+    alphas = fill(0.1,nstep)
+    alphas[1:3] = [1,0.4,0.2]
+    alphas[end] = 1
+    cg = cgrad(:winter, nstep, categorical = true)
     fig = Figure()
     gd1 = fig[1,1] = GridLayout()
     gd2 = fig[1,2] = GridLayout()
@@ -1004,6 +1067,7 @@ GM.activate!();with_theme(theme_pub;
         showpoints=false,
         showlabels=false,
         showarrows=false,
+        showcables=false,
         showmesh=false,
         showtitle=false,
         xlims = (-0.1,1.6),
@@ -1013,18 +1077,15 @@ GM.activate!();with_theme(theme_pub;
             hidey(ax)
             ax.xlabeloffset = 0.0
             for (istep,step) in enumerate(steps)
-                suptg = make_top(
-                    ro,R,ṙo,Ω,
-                    TR.NCF.LNC;
-                    μ,e,loadmesh=true,
-                    color=cg[istep],
-                ).tg
+                suptg = deepcopy(bot.tg)
                 suptg.state.system.q .= bot.traj.q[step]
                 TR.update!(suptg)
-                init_plot!(ax,Observable(suptg);
+                (;r,g,b) = cg[istep]
+                viz!(ax,Observable(suptg);
                     showlabels=false,
                     showarrows=false,
                     showpoints=false,
+                    meshcolor=Makie.RGBA(r,g,b,alphas[istep])
                 )
             end
             lines!(ax,rp5)
@@ -1038,12 +1099,13 @@ GM.activate!();with_theme(theme_pub;
     ylims!(ax2,-0.003,0.003)
     ax3 = Axis(gd2[1,1],
         xlabel = tlabel,
-        ylabel = L"z~(\mathrm{m})",
+        ylabel = "Abs. Err. (m)",
     )
     mo_rp5=10
     scaling = 10.0^(-mo_rp5)
     Label(gd2[1,1,Top()],latexstring("\\times 10^{-$(mo_rp5)}"))
-    lines!(ax3,t,(rp5[3,stepstart:end].-rp5[3,stepstart])./scaling)
+    @myshow -rp5[3,stepstart]
+    lines!(ax3,t,((-rp5[3,stepstart:end]).-(-rp5[3,stepstart]))./scaling)
     hidex(ax3)
     ax4 = Axis(gd2[2,1],
         xlabel = tlabel,
@@ -1068,10 +1130,9 @@ GM.activate!();with_theme(theme_pub;
     lines!(ax5,t,me.V.+6, label="V")
     Legend(gd3[1,1],ax5,orientation=:horizontal)
     # axislegend(ax5,position=:rt)
-    xlims!(ax3,0.309,2.1)
-    xlims!(ax4,0.309,2.1)
-    xlims!(ax5,0.309,2.1)
-    
+    xlims!(ax3,0.309,2.0)
+    xlims!(ax4,0.309,2.0)
+    xlims!(ax5,0.309,2.0)
     Label(
         gd1[1,1,TopLeft()],
         rich("($(alphabet[1]))",font=:bold),

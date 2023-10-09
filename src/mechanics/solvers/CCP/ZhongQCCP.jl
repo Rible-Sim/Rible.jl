@@ -36,11 +36,11 @@ function generate_cache(::ZhongQCCP,intor;dt,kargs...)
     ZhongQCCPCache(cache)
 end
 
-function Momentum_k(qₖ₋₁,pₖ₋₁,qₖ,λₘ,Mₘ,A,Λₘ,Dₖ₋₁,Dₖ,scalingΛ,h)
+function Momentum_k(qₖ₋₁,pₖ₋₁,qₖ,λₘ,Mₘ,A,Λₘ,Dₖ₋₁,Dₖ,H,scalingΛ,h)
     pₖ = -pₖ₋₁ .+ 
         2/h.*Mₘ*(qₖ.-qₖ₋₁) .+ 
         scalingΛ/h.*(transpose(A(qₖ))-transpose(A(qₖ₋₁)))*λₘ .+
-        scalingΛ/h.*(transpose(Dₖ)-transpose(Dₖ₋₁))*Λₘ
+        scalingΛ/h.*(transpose(Dₖ)-transpose(Dₖ₋₁))*H*Λₘ
 end
 
 function make_zhongccp_ns_stepk(
@@ -77,7 +77,7 @@ function make_zhongccp_ns_stepk(
         Aₖ₋₁ = A(qₖ₋₁)
         Aₖ   = A(qₖ)
 
-        𝐫𝐞𝐬[   1:n1] .= Mₘ*(qₖ.-qₖ₋₁) .- 
+        𝐫𝐞𝐬[   1:n1] .= h.*Mₘ*vₘ .- 
                         h.*pₖ₋₁ .-
                         (h^2)/2 .*Fₘ .-
                         scalingΛ .*transpose(Aₖ₋₁)*λₘ .-
@@ -91,21 +91,21 @@ function make_zhongccp_ns_stepk(
         
         if na != 0
             Dₖ,ŕₖ = get_directions_and_positions(qₖ)
-            pₖ .= Momentum_k(qₖ₋₁,pₖ₋₁,qₖ,λₘ,Mₘ,A,𝚲ₘ,Dₖ₋₁,Dₖ,scalingΛ,h)
+            pₖ .= Momentum_k(qₖ₋₁,pₖ₋₁,qₖ,λₘ,Mₘ,A,𝚲ₘ,Dₖ₋₁,Dₖ,H,scalingΛ,h)
             M⁻¹!(M⁻¹ₖ,qₖ) 
             vₖ .= M⁻¹ₖ*pₖ
-            M⁻¹!(M⁻¹ₘ,qₘ)    
-            Jac_M⁻¹!(∂M⁻¹ₖpₖ∂qₖ,qₖ,vₖ)
+            M⁻¹!(M⁻¹ₘ,qₘ)
+            Jac_M⁻¹!(∂M⁻¹ₖpₖ∂qₖ,qₖ,pₖ)
             ∂Aᵀₖλₘ∂qₖ = ∂Aᵀλ∂q(qₖ,λₘ)
             ∂DᵀₖHΛₘ∂qₖ = get_∂DᵀΛ∂q(qₖ,H*𝚲ₘ)
             ∂Mₘq̇ₘ∂qₘ = zero(∂Mₘqₖ∂qₘ)
             Jac_M!(∂Mₘq̇ₘ∂qₘ,qₘ,q̇ₘ)
             ∂pₖ∂qₖ = 2/h.*Mₘ + 
                     ∂Mₘq̇ₘ∂qₘ .+
-                    1/(h).*∂Aᵀₖλₘ∂qₖ .+ 
-                    1/(h).*∂DᵀₖHΛₘ∂qₖ
+                    scalingΛ/(h).*∂Aᵀₖλₘ∂qₖ .+ 
+                    scalingΛ/(h).*∂DᵀₖHΛₘ∂qₖ
             ∂vₖ∂qₖ = M⁻¹ₖ*∂pₖ∂qₖ .+ ∂M⁻¹ₖpₖ∂qₖ
-            ∂vₖ∂λₘ = M⁻¹ₘ*transpose(Aₖ-Aₖ₋₁)/(h)
+            ∂vₖ∂λₘ = M⁻¹ₘ*scalingΛ*transpose(Aₖ-Aₖ₋₁)/(h)
             𝐁 .= 0
             𝐁[  1:n1,   1:nΛ] .= scalingΛ .*transpose(Dₖ₋₁)*H
             ∂Dₖvₖ∂qₖ = get_∂Dq̇∂q(qₖ,vₖ)
@@ -320,11 +320,12 @@ function solve!(intor::Integrator,solvercache::ZhongQCCPCache;
         λₘ .= x[   nq+1:nq+nλ]
         qₖ₋½ .= (qₖ.+qₖ₋₁)./2
         M!(M,qₖ₋½)
-        pₖ .= Momentum_k(qₖ₋₁,pₖ₋₁,qₖ,λₘ,M,A,𝚲ₘ,Dₖ₋₁,Dₖ,scalingΛ,dt)
+        Dₖ,_ = get_directions_and_positions(active_contacts,qₖ)
+        pₖ .= Momentum_k(qₖ₋₁,pₖ₋₁,qₖ,λₘ,M,A,𝚲ₘ,Dₖ₋₁,Dₖ,H,scalingΛ,dt)
         M⁻¹!(M⁻¹,qₖ)
         q̇ₖ .= M⁻¹*pₖ
         if na != 0
-            update_contacts!(active_contacts,(ŕₖ.-ŕₖ₋₁)./dt.+Dₖ*q̇ₖ,𝚲ₘ./scalingΛ)
+            update_contacts!(active_contacts,Dₖ*q̇ₖ,𝚲ₘ./scalingΛ)
         end
         if !isconverged
             @warn "Newton max iterations $maxiters, at timestep=$timestep, normRes=$(normRes)"
