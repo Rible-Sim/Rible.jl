@@ -974,10 +974,15 @@ function plotsave_friction_direction(bots,x,xs,figname=nothing;
     end
 end
 
-function get_err_avg(bots;bid=1,pid=1,di=1)
+function get_err_avg(bots;bid=1,pid=1,di=1,field=:traj)
     nbots = length(bots)
     lastbot = bots[nbots]
-    lastbot_traj = get_trajectory!(lastbot,bid,pid)
+    if field == :traj
+        get! = get_trajectory!
+    elseif field == :vel
+        get! = get_velocity!
+    end
+    lastbot_traj = get!(lastbot,bid,pid)
     lastbot_t = lastbot.traj.t
     lastbot_dt = lastbot_t[begin+1]-lastbot_t[begin]
     lastbot_traj_itp = begin 
@@ -994,7 +999,7 @@ function get_err_avg(bots;bid=1,pid=1,di=1)
     err_avg = [
         begin
             (;t) = bot.traj
-            bot_traj_di = get_trajectory!(
+            bot_traj_di = get!(
                 bots[i],bid,pid
             )[di,begin:end-1]
             ref_traj_di = lastbot_traj_itp(
@@ -1014,19 +1019,18 @@ function plot_convergence_order!(ax,dts,err_avg;show_orders=true)
         err_avg;
         marker=:rect,
         color=:red,
-        label="Error of NMSI"
+        label="NMSI"
     )
     
 
     if show_orders
         o2 = err_avg[1] .*(dts./dts[1]).^2
-        lines!(ax,dts,o2,label="2nd-Order")
+        lines!(ax,dts,o2,label=L"\mathcal{O}(h^2)")
         o1 = err_avg[1] .*(dts./dts[1])
-        lines!(ax,dts,o1,label="1st-Order")
+        lines!(ax,dts,o1,label=L"\mathcal{O}(h)")
     end
 
     ax.xlabel = L"h~(\mathrm{s})"
-    ax.ylabel = "Avg. Err."
     ax.yscale = Makie.log10
     ax.yminorticksvisible = true 
     ax.yminorgridvisible = true 
