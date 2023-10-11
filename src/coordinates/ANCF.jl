@@ -8,31 +8,31 @@ import FastGaussQuadrature as FGQ
 using QuadGK
 
 """
-所有Absolute Nodal Coordinates abstract type。
+Absolute Nodal Coordinates abstract type。
 """
 abstract type ANC{T} end
 """
-所有 two-dimensionalAbsolute Nodal Coordinates abstract type。
+ two-dimensional Absolute Nodal Coordinates abstract type。
 """
 abstract type ANC2D{T} <: ANC{T} end
 """
-所有 three-dimensionalAbsolute Nodal Coordinates abstract type。
+ three-dimensional Absolute Nodal Coordinates abstract type。
 """
 abstract type ANC3D{T} <: ANC{T} end
 """
-所有坐标数目为4的 two-dimensionalAbsolute Nodal Coordinates abstract type，用于刚性直杆。
+ two-dimensional Absolute Nodal Coordinates abstract type。
 """
 abstract type ANC2D4C{T} <: ANC2D{T} end
 """
-所有坐标数目为6的 two-dimensionalAbsolute Nodal Coordinates abstract type，用于任意形状刚体。
+ two-dimensional Absolute Nodal Coordinates abstract type。
 """
 abstract type ANC2D6C{T} <: ANC2D{T} end
 """
-所有坐标数目为6的 three-dimensionalAbsolute Nodal Coordinates abstract type，用于刚性直杆。
+ three-dimensional Absolute Nodal Coordinates abstract type。
 """
 abstract type ANC3D6C{T} <: ANC3D{T} end
 """
-所有坐标数目为12的 three-dimensionalAbsolute Nodal Coordinates abstract type，用于 three-dimensional绳索（Low Order Cable）。
+ three-dimensional Absolute Nodal Coordinates abstract type，  three-dimensional （Low Order Cable）。
 """
 abstract type ANC3D12C{T} <: ANC3D{T} end
 
@@ -42,13 +42,13 @@ const I2 = make_I(Bool,2)
 const I3 = make_I(Bool,3)
 
 """
-返回空间维数。
+Return 空间维数。
 $(TYPEDSIGNATURES)
 """
 get_ndim(::ANC2D) = 2
 get_ndim(::ANC3D) = 3
 """
-返回Absolute Nodal Coordinates所构成的坐标系的维数。
+Return Absolute Nodal Coordinates所构成的坐标系的维数。
 $(TYPEDSIGNATURES)
 """
 get_nlocaldim(::ANC2D4C) = 1
@@ -56,7 +56,7 @@ get_nlocaldim(::ANC2D6C) = 2
 get_nlocaldim(::ANC3D6C) = 1
 get_nlocaldim(::ANC3D12C) = 1
 """
-返回坐标个数。
+Return 坐标个数。
 $(TYPEDSIGNATURES)
 """
 get_ncoords(::ANC2D4C) = 4
@@ -64,7 +64,7 @@ get_ncoords(::ANC2D6C) = 6
 get_ncoords(::ANC3D6C) = 6
 get_ncoords(::ANC3D12C) = 12
 """
-返回约束方程个数。
+Return 约束方程个数。
 $(TYPEDSIGNATURES)
 """
 get_nconstraints(::ANC2D4C) = 0
@@ -72,14 +72,14 @@ get_nconstraints(::ANC2D6C) = 0
 get_nconstraints(::ANC3D6C) = 0
 get_nconstraints(::ANC3D12C) = 0
 """
-返回自由度数。
+Return 自由度数。
 $(TYPEDSIGNATURES)
 """
 get_ndof(ancs::ANC) =  get_ncoords(ancs) - get_nconstraints(ancs)
 
 
 """
-坐标数目为12的 three-dimensionalAbsolute Nodal Coordinates类，使用1个基本点、3个基本向量。
+坐标数目为12的 three-dimensional Absolute Nodal Coordinates类，使用1个基本点、3个基本向量。
 $(TYPEDEF)
 """
 struct ANC3DRURU{T,ρT} <: ANC3D12C{T}
@@ -376,7 +376,7 @@ end
 
 
 """
-返回未约束的Absolute Nodal Coordinates编号。
+Return 未约束的Absolute Nodal Coordinates编号。
 $(TYPEDSIGNATURES)
 """
 function get_unconstrained_indices(ancs::ANC,pres_idx)

@@ -4,7 +4,7 @@ function make_3d_bar(
         ci = Int[],
         m = 0.080,
         radius_ratio = 1/30,
-        mat_name = "Teak",
+        mat_name = nothing, #"Teak",
         loadmesh = false,
     )
     # @show id,ri,rj
@@ -25,14 +25,18 @@ function make_3d_bar(
     r̄p1 = SVector{3}([          0.0,0,0])
     r̄p2 = SVector{3}([ bar_length,  0,0])
     r̄ps = [r̄p1,r̄p2]
-    mat = filter(
-        row -> row.name == mat_name, 
-        material_properties
-    )[1]
-    density = mat.density |> ustrip
-    sec_area = π*radius^2
-    density_per_unit_len = density*sec_area
-    mass = density_per_unit_len*bar_length
+    if mat_name isa Nothing
+        mass = m
+    else
+        mat = filter(
+            row -> row.name == mat_name, 
+            material_properties
+        )[1]
+        density = mat.density |> ustrip
+        sec_area = π*radius^2
+        density_per_unit_len = density*sec_area
+        mass = density_per_unit_len*bar_length
+    end
     bar_inertia_exp = :(1/12*$mass*$bar_length^2)
     Īg = SMatrix{3,3}(
         [	
@@ -46,7 +50,7 @@ function make_3d_bar(
             [
                 ("id", id),
                 ("radius", radius),
-                ("density", density),
+                # ("density", density),
                 ("bar length", bar_length),
                 ("mass", mass),
                 ("inertia", Īg),
@@ -727,7 +731,7 @@ function prisms(;
     # for j = 1:n
     #     is = 2m*(j-1)
     #     for i = 1:m
-    #         for k = 1:3
+    #         for k = 1:p
     #             row = zeros(Int,nb)
     #             row[is+cm[i]  ]   = k+3
     #             row[is+m+cm[i+1]] = k
@@ -738,7 +742,7 @@ function prisms(;
     # for j = 2:n
     #     is = 2m*(j-2)+m
     #     for i = 1:m
-    #         for k = 1:3
+    #         for k = 1:p
     #             row = zeros(Int,nb)
     #             row[is+cm[i]  ]   = k+3
     #             row[is+m+cm[i+2]] = k
@@ -882,6 +886,7 @@ function prism_modules(;
         h = 0.35,
         n = 1,
         θ = 2π/3,
+        p = 3,
     )
     d, l = divrem(n,2)
     bps = [
@@ -905,6 +910,12 @@ function prism_modules(;
     ys = [0,-√3*r/2,√3*r/2]
     xs = [0,-3r/2,-3r/2]
 
+    
+    # bar
+    A_bar = ((5e-3)^2-(4e-3)^2)*π
+    ρ_bar = 1800.0
+    b_bar = 1.01
+    m_bar = A_bar*b_bar*ρ_bar
     bars = [
         begin
             ks = m*n*(k-1)
@@ -916,6 +927,7 @@ function prism_modules(;
                         bps[j  ][i] + SVector(xs[k],ys[k],0),
                         bps[j+1][i] + SVector(xs[k],ys[k],0); 
                         #ci = ifelse(j==1,[1,2,3],Int[]),
+                        m = m_bar,
                         radius_ratio = 1/60,
                     ) for i = 1:m
                 ]
@@ -925,12 +937,13 @@ function prism_modules(;
                         ks+js+i,
                         bps[j  ][i-1] + SVector(xs[k],ys[k],0),
                         bps[j+1][i-1] + SVector(xs[k],ys[k],0);
+                        m = m_bar,
                         radius_ratio = 1/60,
                     ) for i = 1:m
                 ]
             end
         end
-        for j = 1:n, k = 1:3
+        for j = 1:n, k = 1:p
     ]
     
     nbars = length.(bars) |> sum
@@ -946,7 +959,7 @@ function prism_modules(;
     # for j = 1:n
     #     is = 2m*(j-1)
     #     for i = 1:m
-    #         for k = 1:3
+    #         for k = 1:p
     #             row = zeros(Int,nb)
     #             row[is+cm[i]  ]   = k+3
     #             row[is+m+cm[i+1]] = k
@@ -957,7 +970,7 @@ function prism_modules(;
     # for j = 2:n
     #     is = 2m*(j-2)+m
     #     for i = 1:m
-    #         for k = 1:3
+    #         for k = 1:p
     #             row = zeros(Int,nb)
     #             row[is+cm[i]  ]   = k+3
     #             row[is+m+cm[i+2]] = k
@@ -971,8 +984,24 @@ function prism_modules(;
     indexedcoords = TR.index(rbs,)
         
     @myshow nb
+    
+    mat_cable = filter(
+        row->row.name == "Kevlar",
+        material_properties
+    )[1]
+    radius = 0.32e-3Unitful.m
+    cable_hor_length = 0.5463Unitful.m
+    cable_dia_length = 0.6488017339680894Unitful.m
+    κ_hor = ustrip(Unitful.N/Unitful.m,(mat_cable.modulus_elas)*π*(radius)^2/cable_hor_length)
+    κ_dia = ustrip(Unitful.N/Unitful.m,(mat_cable.modulus_elas)*π*(radius)^2/cable_dia_length)
+    @myshow κ_hor, κ_dia
+    cable_hor_restlength = ustrip(Unitful.m,cable_hor_length)-17/κ_hor
+    cable_dia_restlength = ustrip(Unitful.m,cable_dia_length)-17*1.1876290206261921/κ_dia
+    # @show uconvert(Unitful.N/Unitful.m,κ),ustrip(Unitful.N/Unitful.m,κ)
+    κs = typeof(κ_hor)[]
+    μs = typeof(cable_hor_restlength)[]
     connecting_elas = ElasticArray{Int}(undef, nb, 0)
-    for k = 1:3
+    for k = 1:p
         # # lower
         ks = m*n*(k-1)
         idx = collect(1:m)
@@ -986,6 +1015,8 @@ function prism_modules(;
             row[ks+cm[i  ]] =  1
             row[ks+cm[i+1]] = -1
             append!(connecting_elas,row)
+            push!(κs,κ_hor)
+            push!(μs,cable_hor_restlength)
         end
 
         for j = 0:n-1
@@ -998,6 +1029,8 @@ function prism_modules(;
                     row[ks+is+cm[i  ]] =  1
                     row[ks+is+cm[i-1]] = -2
                     append!(connecting_elas,row)
+                    push!(κs,κ_dia)
+                    push!(μs,cable_dia_restlength)
                 end
             else
                 for i = idx
@@ -1005,6 +1038,8 @@ function prism_modules(;
                     row[ks+is+cm[i+1]] = -2
                     row[ks+is+cm[i  ]] =  1
                     append!(connecting_elas,row)
+                    push!(κs,κ_dia)
+                    push!(μs,cable_dia_restlength)
                 end
             end
 
@@ -1014,6 +1049,8 @@ function prism_modules(;
                 row[ks+is+cm[i-2]] =  2
                 row[ks+is+cm[i-1]] = -2
                 append!(connecting_elas,row)
+                push!(κs,κ_hor)
+                push!(μs,cable_hor_restlength)
             end
         end
     end
@@ -1025,16 +1062,15 @@ function prism_modules(;
     ncables = size(connecting,1)
     # @assert ncables == ncables_prism + ncables_outer
 
-    mat_cable = filter(
-        row->row.name == "Nylon 66",
-        material_properties
-    )[1]
-    diameter = 1e-3Unitful.m
-    cable_length = 0.1Unitful.m
-    κ = (mat_cable.modulus_elas)*π*(diameter/2)^2/cable_length
-    # @show κ
-    @show uconvert(Unitful.N/Unitful.m,κ),ustrip(Unitful.N/Unitful.m,κ)
-    cables_prism = [TR.Cable3D(i,0.0,   ustrip(Unitful.N/Unitful.m,κ),0.0;slack=true) for i = 1:ncables_prism]
+    cables_prism = [
+        TR.Cable3D(
+        i,
+        μs[i], #restlength  
+        κs[i],
+        0.0; #damping
+        slack=true) 
+        for i = 1:ncables_prism
+    ]
     cables = cables_prism
     acs = [
         TR.ManualActuator(
@@ -1058,56 +1094,58 @@ function prism_modules(;
     #     )
     #     for j = 1:d for i = 1:m
     # ]
-    csts_bar2bar = [
-        # one to two
-        TR.PinJoint(1,TR.End2End(1,
-                TR.ID(bars[    1][cm[4]],1),
-                TR.ID(bars[n+1][cm[8]],1)
-        )),
-        TR.PinJoint(2,TR.End2End(2,
-                TR.ID(bars[    1][cm[5]],1),
-                TR.ID(bars[n+1][cm[7]],1)
-        )),
-        TR.PinJoint(3,TR.End2End(3,
-                TR.ID(bars[    1][cm[3]],2),
-                TR.ID(bars[n+1][cm[11]],2)
-        )),
-        TR.PinJoint(4,TR.End2End(4,
-                TR.ID(bars[    1][cm[2]],2),
-                TR.ID(bars[n+1][cm[12]],2)
-        )),
-        # one to three
-        TR.PinJoint(5,TR.End2End(5,
-                TR.ID(bars[     1][cm[ 3]],1),
-                TR.ID(bars[2n+1][cm[13]],1)
-        )),
-        TR.PinJoint(6,TR.End2End(6,
-                TR.ID(bars[     1][cm[ 4]],1),
-                TR.ID(bars[2n+1][cm[18]],1)
-        )),
-        TR.PinJoint(7,TR.End2End(7,
-                TR.ID(bars[     1][cm[ 1]],2),
-                TR.ID(bars[2n+1][cm[17]],2)
-        )),
-        TR.PinJoint(8,TR.End2End(8,
-                TR.ID(bars[     1][cm[ 2]],2),
-                TR.ID(bars[2n+1][cm[16]],2)
-        )),
-        # two to three
-        TR.PinJoint(9,TR.End2End(9,
-                TR.ID(bars[ n+1][cm[ 9]],1),
-                TR.ID(bars[2n+1][cm[17]],1)
-        )),
-        TR.PinJoint(10,TR.End2End(10,
-                TR.ID(bars[ n+1][cm[ 7]],2),
-                TR.ID(bars[2n+1][cm[15]],2)
-        )),
-    ]
+    if p == 3
+        csts_bar2bar = [
+            # one to two
+            TR.PinJoint(1,TR.End2End(1,
+                    TR.ID(bars[    1][cm[4]],1),
+                    TR.ID(bars[n+1][cm[8]],1)
+            )),
+            TR.PinJoint(2,TR.End2End(2,
+                    TR.ID(bars[    1][cm[5]],1),
+                    TR.ID(bars[n+1][cm[7]],1)
+            )),
+            TR.PinJoint(3,TR.End2End(3,
+                    TR.ID(bars[    1][cm[3]],2),
+                    TR.ID(bars[n+1][cm[11]],2)
+            )),
+            TR.PinJoint(4,TR.End2End(4,
+                    TR.ID(bars[    1][cm[2]],2),
+                    TR.ID(bars[n+1][cm[12]],2)
+            )),
+            # one to three
+            TR.PinJoint(5,TR.End2End(5,
+                    TR.ID(bars[     1][cm[ 3]],1),
+                    TR.ID(bars[2n+1][cm[13]],1)
+            )),
+            TR.PinJoint(6,TR.End2End(6,
+                    TR.ID(bars[     1][cm[ 4]],1),
+                    TR.ID(bars[2n+1][cm[18]],1)
+            )),
+            TR.PinJoint(7,TR.End2End(7,
+                    TR.ID(bars[     1][cm[ 1]],2),
+                    TR.ID(bars[2n+1][cm[17]],2)
+            )),
+            TR.PinJoint(8,TR.End2End(8,
+                    TR.ID(bars[     1][cm[ 2]],2),
+                    TR.ID(bars[2n+1][cm[16]],2)
+            )),
+            # two to three
+            TR.PinJoint(9,TR.End2End(9,
+                    TR.ID(bars[ n+1][cm[ 9]],1),
+                    TR.ID(bars[2n+1][cm[17]],1)
+            )),
+            TR.PinJoint(10,TR.End2End(10,
+                    TR.ID(bars[ n+1][cm[ 7]],2),
+                    TR.ID(bars[2n+1][cm[15]],2)
+            )),
+        ]
+        csts = csts_bar2bar
 
-
-    csts = csts_bar2bar
-
-    jointedmembers = TR.join(csts,indexedcoords)
+        jointedmembers = TR.join(csts,indexedcoords)
+    else
+        jointedmembers = TR.unjoin()
+    end
 
     cnt = TR.Connectivity(numberedpoints,indexedcoords,@eponymtuple(connected,),jointedmembers)
 
@@ -1219,7 +1257,7 @@ function embed3d(;
     for j = 1:n
         is = 2m*(j-1)
         for i = 1:m
-            for k = 1:3
+            for k = 1:p
                 row = zeros(Int,nb)
                 row[is+cm[i]  ]   = k+3
                 row[is+m+cm[i+1]] = k
@@ -1230,7 +1268,7 @@ function embed3d(;
     for j = 2:n
         is = 2m*(j-2)+m
         for i = 1:m
-            for k = 1:3
+            for k = 1:p
                 row = zeros(Int,nb)
                 row[is+cm[i]  ]   = k+3
                 row[is+m+cm[i+2]] = k

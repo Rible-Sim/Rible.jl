@@ -31,6 +31,7 @@ using Match
 using FileIO
 using Cthulhu
 using JET
+using TypedTables
 using Revise
 using AbbreviatedStackTraces
 import TensegrityRobots as TR
@@ -40,6 +41,7 @@ include("def.jl"); includet("def.jl")
 # includet("plotting.jl")
 include("../analysis.jl"); includet("../analysis.jl")
 include("../vis.jl"); includet("../vis.jl")
+include("../dyn.jl"); includet("../dyn.jl")
 figdir::String = ""
 if Sys.iswindows()
     figdir::String = raw"C:\Users\luo22\OneDrive\Papers\FrictionalContact\CMAME"
@@ -911,14 +913,17 @@ TR.set_new_initial!(topn_longtime,topn.traj.q[end],topn.traj.q̇[end])
 TR.solve!(
     TR.SimProblem(topn_longtime,top_contact_dynfuncs),
     TR.ZhongCCP();
-    tspan = (0.0,500.0),
+    tspan = (0.0,50.0),
     dt=2e-3,
     ftol=1e-14,
     maxiters=100,exception=false,verbose=false
 )
 plotsave_contact_persistent(topn_longtime)
 me = TR.mechanical_energy!(topn_longtime)
+lines(me.E)
 rp5 = get_trajectory!(topn_longtime,1,5)
+lines(rp5)
+plot_traj!(topn_longtime)
 # vp5 = get_velocity!(topn,1,5)
 with_theme(theme_pub;
         resolution = (0.7tw,0.2tw),
@@ -1273,16 +1278,31 @@ plotsave_contact_persistent(tops_e0[1],tol=0)
 #dt
 
 dts = [1e-2,5e-3,3e-3,2e-3,1e-3,5e-4,3e-4,2e-4,1e-4,1e-5]
+dts = [1e-2,5e-3,3e-3,2e-3,1e-3,1e-4]
 tops_dt = [
  begin
     top = deepcopy(tops_e0[1])
      TR.solve!(TR.SimProblem(top,top_contact_dynfuncs),
              TR.ZhongCCP();
-             tspan=(0.0,0.1),dt,ftol=1e-14,maxiters=50,exception=false)
+             tspan=(0.0,0.1),dt,ftol=1e-14,maxiters=50,exception=true)
  end
  for dt in dts
 ]
-
+GM.activate!();plot_traj!(tops_dt[end])
+tops_dt[end].traj.q[666]
+tops_dt[end].traj.q[667]
+ep = get_trajectory!(tops_dt[end],1,1)
+ep[666]
+ep[667]
+me = TR.mechanical_energy!(tops_dt[end])
+lines(me.E)
+fig = Figure()
+ax = Axis3(fig[1,1])
+for top in tops_dt
+    lines!(ax,get_trajectory!(top,1,1),label="$(top.traj.t[2])")
+end
+Legend(fig[1,2],ax)
+fig
 _,traj_err_avg = get_err_avg(tops_dt;bid=1,pid=1,di=1,field=:traj)
 _,vel_err_avg = get_err_avg(tops_dt;bid=1,pid=1,di=1,field=:vel)
 CM.activate!();with_theme(theme_pub;
@@ -1300,7 +1320,7 @@ CM.activate!();with_theme(theme_pub;
     Legend(fig[1,3],ax2)
     Label(fig[1,1,TopLeft()],"($(alphabet[1]))",font=:bold)
     Label(fig[1,2,TopLeft()],"($(alphabet[2]))",font=:bold)
-    savefig(fig,"spinningtop_order")
+    # savefig(fig,"spinningtop_order")
     fig
 end
     
@@ -1768,9 +1788,9 @@ function make_hammer(id,r̄ijkl,ro,R,ri,rj=nothing,rk=nothing,rl=nothing;
     m = 4.58794901
     Īg = SMatrix{3,3}(
         Matrix(Diagonal([
+            0.00522676,
             0.00512073,
             0.00512073,
-            0.00522676
             ])
         )
     )
@@ -1817,9 +1837,18 @@ function make_hammer(id,r̄ijkl,ro,R,ri,rj=nothing,rk=nothing,rl=nothing;
 end
 
 function cable_ancf(pres_idx, 𝐞, L = 1.0) 
-    radius = 0.01
+    radius = 2.0e-3
     # ancs = TR.ANCF.ANC3DRURU(8.96e3;E=110e6,L,radius)
-    ancs = TR.ANCF.ANC3DRURU(1.15e3;E=3.3e6,L,radius)
+    # mat_cable = filter(
+    #     row->row.name == "Nylon 66",
+    #     material_properties
+    # )[1]
+    # ρ = ustrip(Unitful.kg/Unitful.m^3,mat_cable.density)
+    # E = ustrip(Unitful.Pa,mat_cable.modulus_elas)
+    ρ = 1.03e3
+    E = 0.2e9
+    @myshow ρ, E
+    ancs = TR.ANCF.ANC3DRURU(ρ;E,L,radius)
     mass = TR.ANCF.build_mass(ancs)
     @show mass
     T = typeof(L)
@@ -2020,6 +2049,7 @@ function flexcable_contact_dynfuncs(bot,ground_plane)
     # @eponymtuple(F!,Jac_F!)
     @eponymtuple(F!,Jac_F!,prepare_contacts!,get_directions_and_positions,get_∂Dq̇∂q,get_∂DᵀΛ∂q)
 end
+
 # don't bother
 R = RotXY(deg2rad(0),deg2rad(-0))
 inclined_plane = TR.Plane(R*[0,0,1.0],[0,-0.0,-0.0])
@@ -2031,7 +2061,7 @@ flexcable_DR = make_flexcable(;
         rjx = [ 0.0,-1.0, 0.0],
         L=1.2,nx=5,doDR=true
 )
-TR.GDR!(flexcable_DR;β=1e-3,maxiters=1e5)
+TR.GDR!(flexcable_DR;β=2e-4,maxiters=2e5,verbose=false)
 flexcable = make_flexcable(;
     ri  = [ 0.0, 0.0, 1.5],
     rix = [ 0.0, 0.0,-1.0],
@@ -2205,17 +2235,17 @@ flexcable_DR = make_flexcable(;
         rjx = [ 0.0,-1.0, 0.0],
         L=1.2,nx=5,doDR=true
 )
-TR.GDR!(flexcable_DR;β=1e-3,maxiters=1e5)
+TR.GDR!(flexcable_DR;β=2e-4,maxiters=2e5,verbose=true)
 flexcable = make_flexcable(;
     ri  = [ 0.0, 0.0, 1.5],
     rix = [ 0.0, 0.0,-1.0],
     rj  = [-0.6*√3, 0.0, 1.2],
     rjx = [ 0.0,-1.0, 0.0],
-    e = 0.95,
+    e = 0.5,
     μ = 0.9,
     L=1.2,nx=5,R=RotY(-π/2)
 )
-flexcable_DR.traj.q[end][end-8:end] .= flexcable.traj.q[end][end-8:end]
+# flexcable_DR.traj.q[end][end-8:end] .= flexcable.traj.q[end][end-8:end]
 
 TR.set_new_initial!(flexcable,flexcable_DR.traj.q[end],flexcable_DR.traj.q̇[end])
 
@@ -2241,9 +2271,13 @@ TR.solve!(
 )
 
 me = TR.mechanical_energy!(flexcable)
-lines((me.E.-me.E[begin])./me.E[begin])
+lines(flexcable.traj.t,(me.E.-me.E[begin])./me.E[begin])
+rp2 = get_trajectory!(flexcable,6,2)
+vp2 = get_velocity!(flexcable,6,2)
+pnvp2 = [plane_normal'*v for v in vp2 ]
+lines(pnvp2)
 
-plotsave_contact_persistent(flexcable)
+plotsave_contact_persistent(flexcable,tol=0)
 
 with_theme(theme_pub;
         resolution = (0.95tw,0.5tw),
@@ -2258,9 +2292,6 @@ with_theme(theme_pub;
     ) do
     bot = flexcable
     (;t) = bot.traj
-    rp2 = get_trajectory!(bot,6,2)
-    vp2 = get_velocity!(bot,6,2)
-    pnvp2 = [plane_normal'*v for v in vp2 ]
     fig = Figure()
     gd2 = fig[1,2] = GridLayout()
     gd3 = fig[2,2] = GridLayout()
@@ -2307,14 +2338,20 @@ with_theme(theme_pub;
         ylabel = L"\acute{v}_n~(\mathrm{m/s})",
         # aspect = DataAspect()
     )
-    impact_time = 0.5975
+    impact_time = 0.5984
     step_before_impact = time2step(impact_time,t)
+    @myshow step_before_impact
     vminus, vplus = pnvp2[step_before_impact:step_before_impact+1]
     @myshow vminus, vplus, vplus/(-vminus)
     vlines!(ax2,[impact_time];linestyle=:dash)
     lines!(ax2,t,pnvp2,color=:red)
-    ylims!(ax2,-6,6)
+    ylims!(ax2,-7,7)
     xlims!(ax2,extrema(t)...)
+    poly!(ax2,Point2f.([[0.45,-7],[0.45,7],[0.75,7],[0.75,-7]]),
+        color=Makie.RGBAf(0,0,0,0),
+        strokecolor=:black,
+        strokewidth=1,
+        )
     ax22 = Axis(gd2[1,2],
         xlabel = tlabel,
         ylabel = L"\acute{v}_n~(\mathrm{m/s})",
@@ -2322,7 +2359,7 @@ with_theme(theme_pub;
     )
     vlines!(ax22,[impact_time];linestyle=:dash)
     lines!(ax22,t,pnvp2,color=:red)
-    ylims!(ax22,-6,6)
+    ylims!(ax22,-7,7)
     xlims!(ax22,0.45,0.75)
     # axislegend(ax2)
     ax3 = Axis(gd3[1,1],

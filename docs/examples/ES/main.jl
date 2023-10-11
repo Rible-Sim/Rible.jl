@@ -2276,7 +2276,8 @@ TR.update!(newst_folded.tg)
 TR.get_cables_tension(newst_folded.tg) |> extrema
 
 #-- three 3-prism
-prism3 = prism_modules(;n=1)
+prism3 = prism_modules(;n=1,p=3)
+bot = prism3
 
 with_theme(theme_pub;
     Poly = (
@@ -2290,9 +2291,33 @@ with_theme(theme_pub;
         showground=false,
     )
 end
-TR.get_cables_len(prism3)
-TR.check_static_equilibrium_output_multipliers(prism3.tg)
-ω²,δq̌ = TR.undamped_eigen(prism3.tg)
+k = TR.get_cables_stiffness(bot.tg)
+l = TR.get_cables_len(bot.tg)
+f = TR.get_cables_tension(bot)
+q = TR.get_q(bot.tg)
+q̌ = TR.get_q̌(bot.tg)
+Ǎ = TR.make_A(bot.tg)(q)
+# Ň_ = TR.nullspace(Ǎ)
+# Ň = modified_gram_schmidt(Ň_)
+Ň = TR.make_intrinsic_nullspace(bot.tg,q)
+Q̃ = TR.build_Q̃(bot.tg)
+L̂ = TR.build_L̂(bot.tg)
+
+rank(Ň)
+Ǎ*Ň |> norm
+# Left hand side
+Q̃L̂ = Q̃*L̂
+
+Bᵀ = -Q̃L̂
+ℬᵀ = transpose(Ň)*Bᵀ
+
+S,D = TR.static_kinematic_determine(ℬᵀ)
+ns = size(S,2)
+nk = size(D,2)
+
+_,multipliers=  TR.check_static_equilibrium_output_multipliers(bot.tg)
+multipliers
+ω²,δq̌ = TR.undamped_eigen(bot.tg)
 sqrt.(ω²[7:end])./(2π)
 
 # bar
@@ -2304,6 +2329,13 @@ m = A*b*ρ
 # cable 
 A = (0.32e-3)^2*π
 ρ = 1435
-l = 0.64
-m = A*l*ρ
+E = 131e9
+# cable diagonal
+l = 0.6489
+# cable horizontal
+l = 0.5464
 
+k = E*A/l
+17/k
+
+m = A*l*ρ

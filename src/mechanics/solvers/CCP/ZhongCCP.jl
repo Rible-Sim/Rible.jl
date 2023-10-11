@@ -26,11 +26,11 @@ function generate_cache(::ZhongCCP,intor;dt,kargs...)
     ZhongCCPCache(cache)
 end
 
-function Momentum_k(qₖ₋₁,pₖ₋₁,qₖ,λₘ,Mₘ,A,h)
-    pₖ = -pₖ₋₁ .+ 2/h.*Mₘ*(qₖ.-qₖ₋₁) .+ 1/(h).*(transpose(A(qₖ))-transpose(A(qₖ₋₁)))*λₘ
+function Momentum_k(qₖ₋₁,pₖ₋₁,qₖ,λₘ,Mₘ,A,scaling,h)
+    pₖ = -pₖ₋₁ .+ 2/h.*Mₘ*(qₖ.-qₖ₋₁) .+ scaling/(h).*(transpose(A(qₖ))-transpose(A(qₖ₋₁)))*λₘ
 end
 
-function make_zhongccp_ns_stepk(nq,nλ,na,qₖ₋₁,vₖ₋₁,pₖ₋₁,tₖ₋₁,pₖ,vₖ,dynfuncs,cache,invM,h,scalingΛ,persistent_indices)
+function make_zhongccp_ns_stepk(nq,nλ,na,qₖ₋₁,vₖ₋₁,pₖ₋₁,tₖ₋₁,pₖ,vₖ,dynfuncs,cache,invM,h,scaling,persistent_indices)
     F!,Jac_F!,_ = dynfuncs
     (;M,Φ,A,∂Aᵀλ∂q) = cache
 
@@ -56,31 +56,28 @@ function make_zhongccp_ns_stepk(nq,nλ,na,qₖ₋₁,vₖ₋₁,pₖ₋₁,tₖ�
         Aₖ₋₁ = A(qₖ₋₁)
         Aₖ   = A(qₖ)
 
-        ∂vₘ∂qₖ = 1/h*I
-
-        ∂vₖ∂qₖ = 2/h*I + 1/(h).*invM*(∂Aᵀλ∂q(qₖ,λₘ))
-        ∂vₖ∂λₘ = invM*transpose(Aₖ-Aₖ₋₁)/(h)
-
-
         𝐫𝐞𝐬[   1:n1] .= -h.*pₖ₋₁ .+ M*(qₖ.-qₖ₋₁) .-
-                        scalingΛ .*transpose(D)*H*𝚲ₖ .-
-                        transpose(Aₖ₋₁)*λₘ .-
+                        scaling.*transpose(D)*H*𝚲ₖ .-
+                        scaling.*transpose(Aₖ₋₁)*λₘ .-
                         (h^2)/2 .*Fₘ
 
-        𝐫𝐞𝐬[n1+1:n2] .= Φ(qₖ)
+        𝐫𝐞𝐬[n1+1:n2] .= scaling.*Φ(qₖ)
         
         𝐉 .= 0.0
         𝐉[   1:n1,   1:n1] .=  M .-h^2/2 .*(1/2 .*∂F∂q .+ 1/h.*∂F∂q̇)
-        𝐉[   1:n1,n1+1:n2] .= -transpose(Aₖ₋₁)
+        𝐉[   1:n1,n1+1:n2] .= -scaling.*transpose(Aₖ₋₁)
 
-        𝐉[n1+1:n2,   1:n1] .=  Aₖ
+        𝐉[n1+1:n2,   1:n1] .=  scaling.*Aₖ
 
         𝐁 .= 0
-        𝐁[   1:n1,1:nΛ] .= scalingΛ .*transpose(D)*H
+        𝐁[   1:n1,1:nΛ] .= scaling.*transpose(D)*H
 
         
-        pₖ .= Momentum_k(qₖ₋₁,pₖ₋₁,qₖ,λₘ,M,A,h)
+        pₖ .= Momentum_k(qₖ₋₁,pₖ₋₁,qₖ,λₘ,M,A,scaling,h)
         vₖ .= invM*pₖ        
+        ∂vₘ∂qₖ = 1/h*I
+        ∂vₖ∂qₖ = 2/h*I + 1/(h).*invM*(∂Aᵀλ∂q(qₖ,λₘ))
+        ∂vₖ∂λₘ = scaling.*invM*transpose(Aₖ-Aₖ₋₁)/(h)
         if na != 0
             v́⁺ = Dₘ*vₘ .+ Dₖ*vₖ
             ∂v́⁺∂qₖ = Dₘ*∂vₘ∂qₖ .+ Dₖ*∂vₖ∂qₖ
@@ -107,8 +104,8 @@ function make_zhongccp_ns_stepk(nq,nλ,na,qₖ₋₁,vₖ₋₁,pₖ₋₁,tₖ�
 
 
             𝐜ᵀinv𝐉 = 𝐜ᵀ*inv(𝐉)
-            𝐍 .= 𝐜ᵀinv𝐉*𝐁
-            𝐫 .= (v́⁺ + 𝐛) - 𝐜ᵀinv𝐉*(𝐫𝐞𝐬 + 𝐁*𝚲ₖ)
+            𝐍 .= scaling.*𝐜ᵀinv𝐉*𝐁
+            𝐫 .= scaling.*(v́⁺ + 𝐛) .- scaling.*𝐜ᵀinv𝐉*(𝐫𝐞𝐬 + 𝐁*𝚲ₖ)
         end
         # debug
         # @show norm(D*vₖ + 𝐛), norm(𝐫𝐞𝐬)
@@ -150,7 +147,7 @@ function solve!(intor::Integrator,solvercache::ZhongCCPCache;
     Res = zero(Δx)
     Jac = zeros(T,nx,nx)
     mr = norm(M,Inf)
-    scaling = mr
+    scaling = 1
 
     iteration = 0
     prog = Progress(totalstep; dt=1.0, enabled=progress)
@@ -184,8 +181,8 @@ function solve!(intor::Integrator,solvercache::ZhongCCPCache;
         filtered_gaps = zero(gaps)
         if (na !== 0) && !isempty(persistent_indices)
             epi = reduce(vcat,[collect(3(i-1)+1:3i) for i in persistent_indices])
-            Dₘ[epi,:] .= D[epi,:]
-            Dₖ[epi,:] .= 0
+            # Dₘ[epi,:] .= D[epi,:]
+            # Dₖ[epi,:] .= 0
             # filtered_gaps[persistent_indices] = gaps[persistent_indices]
         end
         isconverged = false
@@ -206,8 +203,7 @@ function solve!(intor::Integrator,solvercache::ZhongCCPCache;
         𝐜ᵀ = zeros(T,nΛ,nx)
         𝐍 = zeros(T,nΛ,nΛ)
         𝐫 = zeros(T,nΛ)
-        scalingΛ = dt
-        ns_stepk! = make_zhongccp_ns_stepk(nq,nλ,na,qₖ₋₁,q̇ₖ₋₁,pₖ₋₁,tₖ₋₁,pₖ,q̇ₖ,dynfuncs,cache,invM,dt,scalingΛ,persistent_indices)
+        ns_stepk! = make_zhongccp_ns_stepk(nq,nλ,na,qₖ₋₁,q̇ₖ₋₁,pₖ₋₁,tₖ₋₁,pₖ,q̇ₖ,dynfuncs,cache,invM,dt,scaling,persistent_indices)
         
         restart_count = 0
         𝚲_guess = 0.1
@@ -276,10 +272,10 @@ function solve!(intor::Integrator,solvercache::ZhongCCPCache;
         end
         qₖ .= x[      1:nq]
         λₘ .= x[   nq+1:nq+nλ]
-        pₖ .= Momentum_k(qₖ₋₁,pₖ₋₁,qₖ,λₘ,M,A,dt)
+        pₖ .= Momentum_k(qₖ₋₁,pₖ₋₁,qₖ,λₘ,M,A,scaling,dt)
         q̇ₖ .= invM*pₖ
         if na != 0
-            update_contacts!(active_contacts,Dₘ*(qₖ.-qₖ₋₁).+Dₖ*q̇ₖ,𝚲ₖ./scalingΛ)
+            update_contacts!(active_contacts,Dₘ*(qₖ.-qₖ₋₁).+Dₖ*q̇ₖ,𝚲ₖ./(dt^2))
         end
         if !isconverged
             @warn "Newton max iterations $maxiters, at timestep=$timestep, normRes=$(normRes)"

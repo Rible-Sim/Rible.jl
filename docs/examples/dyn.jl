@@ -16,6 +16,7 @@ material_properties = Table(
         (name = "Glasses",          density = 4100u"kg/m^3",     modulus_elas = 70u"GPa"),
         # (name = "HDPE", density = 2.0u"GPa"),
         # (name = "LDPE", density = 2.0u"GPa"),
+        (name = "Kevlar",           density = 1435u"kg/m^3",     modulus_elas = 131u"GPa"),
         (name = "Nylon 66",         density = 1150u"kg/m^3",     modulus_elas = 3.3u"GPa"),
         (name = "Oak",              density =  650u"kg/m^3",     modulus_elas =  12u"GPa"),
         (name = "Teak",             density =  630u"kg/m^3",     modulus_elas =  12u"GPa"),

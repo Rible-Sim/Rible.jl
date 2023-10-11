@@ -296,8 +296,8 @@ function PrototypeJoint(id,e2e,joint_type::Symbol)
         Φ_1st[mask_1st],
         Φ_2nd[mask_2nd], # rotate
     )
-    @show joint_info
-    @show values
+    # @show joint_info
+    # @show values
     PrototypeJoint(
         id,e2e,
         ncsts,ndof,
