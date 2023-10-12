@@ -57,20 +57,20 @@ function make_zhongccp_ns_stepk(nq,nλ,na,qₖ₋₁,vₖ₋₁,pₖ₋₁,tₖ�
         Aₖ   = A(qₖ)
 
         𝐫𝐞𝐬[   1:n1] .= -h.*pₖ₋₁ .+ M*(qₖ.-qₖ₋₁) .-
-                        scaling.*transpose(D)*H*𝚲ₖ .-
-                        scaling.*transpose(Aₖ₋₁)*λₘ .-
+                        h.*scaling.*transpose(D)*H*𝚲ₖ .-
+                           scaling.*transpose(Aₖ₋₁)*λₘ .-
                         (h^2)/2 .*Fₘ
 
-        𝐫𝐞𝐬[n1+1:n2] .= scaling.*Φ(qₖ)
+        𝐫𝐞𝐬[n1+1:n2] .= -scaling.*Φ(qₖ)
         
         𝐉 .= 0.0
         𝐉[   1:n1,   1:n1] .=  M .-h^2/2 .*(1/2 .*∂F∂q .+ 1/h.*∂F∂q̇)
         𝐉[   1:n1,n1+1:n2] .= -scaling.*transpose(Aₖ₋₁)
 
-        𝐉[n1+1:n2,   1:n1] .=  scaling.*Aₖ
+        𝐉[n1+1:n2,   1:n1] .=  -scaling.*Aₖ
 
         𝐁 .= 0
-        𝐁[   1:n1,1:nΛ] .= scaling.*transpose(D)*H
+        𝐁[   1:n1,1:nΛ] .= h.*scaling.*transpose(D)*H
 
         
         pₖ .= Momentum_k(qₖ₋₁,pₖ₋₁,qₖ,λₘ,M,A,scaling,h)
@@ -102,10 +102,9 @@ function make_zhongccp_ns_stepk(nq,nλ,na,qₖ₋₁,vₖ₋₁,pₖ₋₁,tₖ�
                 𝐜ᵀ[is+1:is+3,n1+1:n2] .= Dⁱₖ*∂vₖ∂λₘ
             end
 
-
             𝐜ᵀinv𝐉 = 𝐜ᵀ*inv(𝐉)
-            𝐍 .= scaling.*𝐜ᵀinv𝐉*𝐁
-            𝐫 .= scaling.*(v́⁺ + 𝐛) .- scaling.*𝐜ᵀinv𝐉*(𝐫𝐞𝐬 + 𝐁*𝚲ₖ)
+            𝐍 .= 𝐜ᵀinv𝐉*𝐁
+            𝐫 .= (v́⁺ + 𝐛) .-𝐜ᵀinv𝐉*(𝐫𝐞𝐬 + 𝐁*𝚲ₖ)
         end
         # debug
         # @show norm(D*vₖ + 𝐛), norm(𝐫𝐞𝐬)
@@ -147,7 +146,7 @@ function solve!(intor::Integrator,solvercache::ZhongCCPCache;
     Res = zero(Δx)
     Jac = zeros(T,nx,nx)
     mr = norm(M,Inf)
-    scaling = 1
+    scaling = mr
 
     iteration = 0
     prog = Progress(totalstep; dt=1.0, enabled=progress)
@@ -181,8 +180,8 @@ function solve!(intor::Integrator,solvercache::ZhongCCPCache;
         filtered_gaps = zero(gaps)
         if (na !== 0) && !isempty(persistent_indices)
             epi = reduce(vcat,[collect(3(i-1)+1:3i) for i in persistent_indices])
-            # Dₘ[epi,:] .= D[epi,:]
-            # Dₖ[epi,:] .= 0
+            Dₘ[epi,:] .= D[epi,:]
+            Dₖ[epi,:] .= 0
             # filtered_gaps[persistent_indices] = gaps[persistent_indices]
         end
         isconverged = false
@@ -274,9 +273,11 @@ function solve!(intor::Integrator,solvercache::ZhongCCPCache;
         λₘ .= x[   nq+1:nq+nλ]
         pₖ .= Momentum_k(qₖ₋₁,pₖ₋₁,qₖ,λₘ,M,A,scaling,dt)
         q̇ₖ .= invM*pₖ
+
         if na != 0
-            update_contacts!(active_contacts,Dₘ*(qₖ.-qₖ₋₁).+Dₖ*q̇ₖ,𝚲ₖ./(dt^2))
+            update_contacts!(active_contacts,Dₘ*(qₖ.-qₖ₋₁).+Dₖ*q̇ₖ,2*𝚲ₖ./(scaling*dt))
         end
+
         if !isconverged
             @warn "Newton max iterations $maxiters, at timestep=$timestep, normRes=$(normRes)"
             if exception

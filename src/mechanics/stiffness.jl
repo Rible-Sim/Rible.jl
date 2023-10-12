@@ -88,7 +88,8 @@ function optimize_maximum_stiffness(mat𝒦ps,vec𝒦m,vecI,A,b,nx)
     custom_settings = COSMO.Settings(
         verbose = true, 
         eps_abs = 1e-10, 
-        eps_rel = 1e-10
+        eps_rel = 1e-10,
+        max_iter = Int(1e5)
     )
 
     COSMO.assemble!(
@@ -127,7 +128,7 @@ function optimize_zero_stiffness(mat𝒦ps,vec𝒦m,vecI,A,b,nx,x_0)
         verbose = true, 
         eps_abs = 1e-3, 
         # eps_rel = 1e-10,
-        max_iter = 5000,
+        max_iter = 50000,
         rho = 1e-6,
         # sigma = 1e-3,
         # adaptive_rho = false,

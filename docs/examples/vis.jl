@@ -282,6 +282,7 @@ function plot_traj!(bot::TR.TensegrityRobot;
                 showwire,
                 showlabels,
                 showpoints,
+                showcables,
                 kargs...
             )
         end
@@ -435,7 +436,7 @@ end
         showarrows=false,
         showmesh=true,
         showwire=false,
-        showcables=false,
+        showcables=true,
         pointcolor=:black,
         slack_linestyle = :dash,
         cablecolor=:deepskyblue,
@@ -499,14 +500,6 @@ function Makie.plot!(viz::Viz{Tuple{S}};
 end
 
 function Makie.plot!(viz::Viz{Tuple{Vector{S}}};
-        isref=false,
-        pointcolor=:black,
-        cablecolor=:deepskyblue,
-        cablewidth=2,
-        slack_linestyle=:dash,
-        refcolor=:lightgrey,
-        show_cable_labels=false,
-        cablelabelcolor=:darkgreen
     ) where S <: TR.Cable
     cables_ob = viz[:tg]
     point_mid_ob = @lift [
@@ -544,22 +537,22 @@ function Makie.plot!(viz::Viz{Tuple{Vector{S}}};
     # noslackonly=true
     linesegments!(
         viz, noslackseg_ob, 
-        color = cablecolor, 
-        linewidth = cablewidth, 
+        color = viz.cablecolor[], 
+        linewidth = viz.cablewidth[], 
         linestyle = :solid
     )
     linesegments!(
         viz, slackseg_ob, 
-        color = cablecolor, 
-        linewidth = cablewidth, 
-        linestyle = slack_linestyle
+        color = viz.cablecolor[], 
+        linewidth = viz.cablewidth[], 
+        linestyle = viz.slack_linestyle[]
     )
     # show cable labels
     if viz.show_cable_labels[]
         text!(viz,
             ids_ob,
             position = point_mid_ob,
-            color = cablelabelcolor,
+            color = viz.cablelabelcolor[],
             align = (:left, :top),
             offset = (-5, -10)
         )
@@ -572,8 +565,13 @@ function Makie.plot!(viz::Viz{Tuple{S}};
     if viz.isref[]
         showlabels = false
         cablecolor=
-        cablelabelcolor=
-        rigidlabelcolor=refcolor
+        cablelabelcolor=viz.refcolor[]
+        meshcolor=viz.refcolor[]
+        viz.showcables[] = false
+    else
+        meshcolor=viz.meshcolor[]
+        cablecolor = viz.cablecolor[]
+        cablelabelcolor = viz.cablelabelcolor[]
     end
     if viz.showlabels[]
         show_cable_labels = 
@@ -593,10 +591,10 @@ function Makie.plot!(viz::Viz{Tuple{S}};
     tgob = viz[:tg]
     (;tensiles,nbodies) = tgob[]
     ncables = length(tensiles.cables)
-    if ncables > 0
+    if ncables > 0 && viz.showcables[]
         cables_ob = @lift $tgob.tensiles.cables
         viz!(viz,cables_ob;
-            cablecolor = viz.cablecolor[],
+            cablecolor,
             cablewidth = viz.cablewidth[],
             cablelabelcolor = viz.cablelabelcolor[],
             slack_linestyle = viz.slack_linestyle[],
@@ -615,7 +613,7 @@ function Makie.plot!(viz::Viz{Tuple{S}};
                 show_mass_center_labels,
                 show_nodes,
                 show_node_labels,
-                meshcolor = viz.meshcolor[],
+                meshcolor,
                 pointcolor = viz.pointcolor[],
                 showmesh = viz.showmesh[],
                 # showwire = viz.showwire[],

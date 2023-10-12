@@ -360,7 +360,7 @@ vo = norm(ṙo)
 a = -μ*g*cos(θ)-g*sin(θ)
 # μ*g*cos(θ)-g*sin(θ)
 tf = -vo/a
-d(t) -> vo*t+1/2*a*t^2
+# d(t) -> vo*t+1/2*a*t^2
 tspan = (0.0,0.6)
 pm = new_pointmass(;e=0.0, μ, ro, ṙo)
 
@@ -501,7 +501,6 @@ for (i,c) in enumerate(contacts_traj_voa[1,:])
 check_Coulomb(i,c)
 end
 
-
 # contact_friction
 function plotsave_pointmass_energy_friction(bot,figname=nothing)
     with_theme(theme_pub;
@@ -522,15 +521,17 @@ function plotsave_pointmass_energy_friction(bot,figname=nothing)
         axislegend(ax1)
 
         c1_traj = VectorOfArray(bot.contacts_traj)[1,5:end]
-        Λn = [2c.state.Λ[1]./c.μ for c in c1_traj]
-        Λt = [2c.state.Λ[3] for c in c1_traj]
+        Λn = [c.state.Λ[1]./c.μ for c in c1_traj]
+        Λt = [c.state.Λ[2:3] |> norm for c in c1_traj]
+        Λt_mid = (Λt[2:2:end]+Λt[1:2:end-1])./2
         th = t[5:end]
         lines!(ax2,th,Λn,label=L"\lambda_{n}")
-        lines!(ax2,(th[2:2:end]+th[1:2:end-1])./2,(Λt[2:2:end]+Λt[1:2:end-1])./2,label=L"\lambda_{t}")
+        lines!(ax2,(th[2:2:end]+th[1:2:end-1])./2,Λt_mid,label=L"\lambda_{t}")
         # lines!(ax2, th, Λt ,label=L"\lambda_{t}")
-        @show Λn[end], Λt[begin], Λt[end]
+        @show Λn[end], Λt_mid[begin], Λt_mid[end]
         axislegend(ax2,position=:rc)
         xlims!(ax2,extrema(t)...)
+        ylims!(ax2,-5,10)
         savefig(fig,figname)
         fig
     end
@@ -1278,7 +1279,6 @@ plotsave_contact_persistent(tops_e0[1],tol=0)
 #dt
 
 dts = [1e-2,5e-3,3e-3,2e-3,1e-3,5e-4,3e-4,2e-4,1e-4,1e-5]
-dts = [1e-2,5e-3,3e-3,2e-3,1e-3,1e-4]
 tops_dt = [
  begin
     top = deepcopy(tops_e0[1])
@@ -1288,13 +1288,8 @@ tops_dt = [
  end
  for dt in dts
 ]
-GM.activate!();plot_traj!(tops_dt[end])
-tops_dt[end].traj.q[666]
-tops_dt[end].traj.q[667]
-ep = get_trajectory!(tops_dt[end],1,1)
-ep[666]
-ep[667]
-me = TR.mechanical_energy!(tops_dt[end])
+
+me = TR.mechanical_energy!(bot)
 lines(me.E)
 fig = Figure()
 ax = Axis3(fig[1,1])
@@ -1305,7 +1300,7 @@ Legend(fig[1,2],ax)
 fig
 _,traj_err_avg = get_err_avg(tops_dt;bid=1,pid=1,di=1,field=:traj)
 _,vel_err_avg = get_err_avg(tops_dt;bid=1,pid=1,di=1,field=:vel)
-CM.activate!();with_theme(theme_pub;
+GM.activate!();with_theme(theme_pub;
         resolution = (0.7tw,0.2tw),
         figure_padding = (0,fontsize/2,0,0)
     ) do 
@@ -2711,7 +2706,7 @@ d = l/2
 ballbot = superball(
     0.0;
     ṙo = SVector(2.0,1.0,0),
-    ω = SVector(0.0,0.0,0.0),
+    ω = SVector(0.0,0.0,1.0),
     μ = 0.05,
     e = 0.0,
     l,d,
@@ -2856,9 +2851,9 @@ end
 
 # testing
 tspan = (0.0,5.0)
-h = 5e-3
+h = 1e-2
 prob = TR.SimProblem(ballbot,ball_dynfuncs)
-TR.solve!(prob,TR.ZhongCCP();tspan,dt=h,ftol=1e-10,maxiters=100,exception=false)
+@time TR.solve!(prob,TR.ZhongCCP();tspan,dt=h,ftol=1e-12,maxiters=100,exception=false)
 
 GM.activate!(); plotsave_contactpoints(ballbot)
 
@@ -2872,26 +2867,25 @@ step_stop = time2step(2.5,ballbot.traj.t)
 r2p1 = get_trajectory!(ballbot,2,1)
 r1p2 = get_trajectory!(ballbot,1,2)
 r6p2 = get_trajectory!(ballbot,6,2)
-lines(r2p1[step_start:step_stop])
-lines(r1p2[step_start:step_stop])
-lines(r6p2[step_start:step_stop])
+lines(r2p1)
+lines(r1p2)
+lines(r6p2)
 
 
 dts = [1e-2,3e-3,1e-3,3e-4,1e-4,1e-5]
 superballs_dt = [
     begin
         ballbot_dt = deepcopy(ballbot)
-        TR.set_new_initial!(ballbot_dt,ballbot.traj.q[step_start],ballbot.traj.q̇[step_start])
+        # TR.set_new_initial!(ballbot_dt,ballbot.traj.q[step_start],ballbot.traj.q̇[step_start])
         prob = TR.SimProblem(ballbot_dt,ball_dynfuncs)
         TR.solve!(prob,
             TR.ZhongCCP();
-            tspan=(0.0,0.9),dt,ftol=1e-10,
+            tspan=(0.0,0.1),dt,ftol=1e-12,
             maxiters=500,exception=false
         )
     end
     for dt in dts
 ]
-GM.activate!(); plotsave_error(superballs_dt,dts,bid=5,pid=1)
 
 
 _,err_avg = get_err_avg(superballs_dt;bid=2,pid=1,di=1)
@@ -2908,7 +2902,11 @@ GM.activate!(); with_theme(theme_pub;
     gd2 = fig[1,2] = GridLayout()
     gd3 = fig[2,2] = GridLayout()
     gd1 = fig[:,1] = GridLayout()
-    steps = 1:200:1000    
+    steps = 1:100:501    
+    nstep = length(steps)
+    alphas = fill(0.15,nstep)
+    alphas[1:3] = [1,0.2,0.2]
+    alphas[end] = 1
     cg = cgrad(:winter, length(steps), categorical = true, rev = true)
     r1p2 = get_trajectory!(ballbot,1,2)
     r6p2 = get_trajectory!(ballbot,6,2)
@@ -2925,22 +2923,30 @@ GM.activate!(); with_theme(theme_pub;
         showpoints = false,
         showlabels = false,
         showtitle = false,
+        showcables = false,
+        showmesh = false,
+        showwire = false,
         sup! = (ax,_,_) -> begin
             for (i,step) in enumerate(steps)
                 TR.goto_step!(ballbot,step)
                 tgvis = deepcopy(ballbot.tg)
-                viz!(ax,tgvis;meshcolor = cg[i])
+                (;r,g,b) = cg[i]
+                db = Makie.parse(Makie.RGBA,"deepskyblue")
+                viz!(ax,tgvis;
+                showcables=true,
+                cablecolor=Makie.RGBAf(db.r,db.g,db.b,Makie.N0f8(alphas[i])),
+                meshcolor = Makie.RGBAf(r,g,b,alphas[i]))
             end
             lines!(ax,r2p1)
         end
         # figname = "ballbot"
     )
-    ax2 = Axis(gd2[1,1])
+    ax2 = Axis(gd2[1,1],xlabel=tlabel,ylabel = "Energy (J)")
     lines!(ax2,me.E,label="E")
     lines!(ax2,me.T,label="T")
     lines!(ax2,me.V,label="V")
-    Legend(gd2[1,2],ax2,orientation=:horizontal,tellheight=false)
-    ax3 = Axis(gd3[1,1])
+    Legend(gd2[1,2],ax2,)
+    ax3 = Axis(gd3[1,1],ylabel="Traj. Err.")
     plot_convergence_order!(ax3,dts[begin:end-1],err_avg;show_orders=true)
     Legend(gd3[1,2],ax3)
     Label(
@@ -2953,6 +2959,7 @@ GM.activate!(); with_theme(theme_pub;
         gd3[1,1,TopLeft()],"($(alphabet[3]))",font=:bold
     )
     colsize!(fig.layout,1,0.55tw)
+    colgap!(fig.layout,2fontsize)
     savefig(fig,"ballbot_sliding")
     fig
 end
@@ -3027,7 +3034,7 @@ ballbot = superball(
     ṙo = SVector(7.0,2.0,-7.0),
     ω = SVector(0.0,0.0,0.0),
     μ = 0.9,
-    e = 0.9,
+    e = 0.8,
     l,d,
     z0 = l^2/(sqrt(5)*d) + 2.0,
     constrained = false,
@@ -3036,19 +3043,19 @@ ballbot = superball(
 
 # test rolling
 tspan = (0.0,5.0)
-h = 5e-3
+h = 1e-2
 prob = TR.SimProblem(ballbot,ball_dynfuncs)
-TR.solve!(prob,TR.ZhongCCP();tspan,dt=h,ftol=1e-13,maxiters=200,exception=false)
+@time TR.solve!(prob,TR.ZhongCCP();tspan,dt=h,ftol=1e-12,maxiters=200,exception=false)
 
 GM.activate!(); plotsave_contactpoints(ballbot)
 
-plot_traj!(ballbot)
+plot_traj!(ballbot;auto=true)
 
 GM.activate!(); with_theme(theme_pub;
         figure_padding = (0,0.5fontsize,0,0),
         resolution = (1.0tw,0.40tw),
         Axis3 = (
-            azimuth = 4.7955306333269805,
+            azimuth = 4.7855306333269805,
             elevation = 0.03269908169872391
         )
     ) do
@@ -3059,10 +3066,14 @@ GM.activate!(); with_theme(theme_pub;
     gd23 = fig[2,1] = GridLayout()
     gd2 = gd23[1,1] = GridLayout()
     gd3 = gd23[1,2] = GridLayout()
-    imptimes = [0.25,0.29,0.295,0.33]
+    imptimes = [0.25,0.29,0.30,0.34]
     impstep = time2step(imptimes[1],bot.traj.t)
-    steps = vcat(1,impstep,collect(impstep:100:length(t)))
-    cg = cgrad(:winter, length(steps), categorical = true, rev = true)
+    steps = vcat(1,impstep,collect(impstep:50:length(t)))
+    nstep = length(steps)
+    alphas = fill(0.15,nstep)
+    alphas[1:3] = [1,0.2,0.2]
+    alphas[end] = 1
+    cg = cgrad(:winter, nstep, categorical = true, rev = true)
     step_start = time2step(0.1,bot.traj.t)
     step_stop = time2step(0.35,bot.traj.t)
     v2p1 = get_velocity!(bot,2,1,step_start:step_stop)
@@ -3080,12 +3091,20 @@ GM.activate!(); with_theme(theme_pub;
         showinfo = true,
         showpoints = false,
         showlabels = false,
+        showmesh = false,
+        showwire = false,
         showtitle = false,
+        showcables  = false,
         sup! = (ax,_,_) -> begin
             for (i,step) in enumerate(steps)
                 TR.goto_step!(bot,step)
                 tgvis = deepcopy(bot.tg)
-                viz!(ax,tgvis;meshcolor = cg[i])
+                (;r,g,b) = cg[i]
+                db = Makie.parse(Makie.RGBA,"deepskyblue")
+                viz!(ax,tgvis;
+                showcables=true,
+                cablecolor=Makie.RGBAf(db.r,db.g,db.b,Makie.N0f8(alphas[i])),
+                meshcolor = Makie.RGBAf(r,g,b,alphas[i]))
             end
             hidey(ax)
             lines!(ax,r2p1)
@@ -3097,21 +3116,21 @@ GM.activate!(); with_theme(theme_pub;
         ylabel = L"\dot{z}~(\mathrm{m/s})",
         limits = (t[step_start]+0.06,t[step_stop],-11.6,11.6)
     )
-    vlines!(ax31,imptimes[1:2])
+    vlines!(ax31,imptimes[1:2],linestyle=:dash)
     lines!(ax31,t[step_start:step_stop],v2p1[3,:])
     ax32 = Axis(gd2[1,2],
         xlabel = tlabel,
         ylabel = L"\dot{z}~(\mathrm{m/s})",
         limits = (t[step_start]+0.06,t[step_stop],-11.6,11.6)
     )
-    vlines!(ax32,imptimes[1:2])
+    vlines!(ax32,imptimes[1:2],linestyle=:dash)
     lines!(ax32,t[step_start:step_stop],v1p2[3,:])
     ax33 = Axis(gd2[1,3],
         xlabel = tlabel,
         ylabel = L"\dot{z}~(\mathrm{m/s})",
         limits = (t[step_start]+0.06,t[step_stop],-11.6,11.6)
     )
-    vlines!(ax33,imptimes[[1,3,4]])
+    vlines!(ax33,imptimes[[1,3,4]],linestyle=:dash)
     lines!(ax33,t[step_start:step_stop],v6p2[3,:])
     ax2 = Axis(gd3[1,1],
         xlabel = tlabel,
