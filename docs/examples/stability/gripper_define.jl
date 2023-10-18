@@ -186,7 +186,7 @@ function sup_ggriper!(ax,tgob,sgi;
 	revert_y = [1  0;
 				0 -1]
 	bars = @lift begin
-		rbs = TR.get_rigidbodies($tgob)
+		rbs = TR.get_bodies($tgob)
 		ndim = TR.get_ndim($tgob)
         T = TR.get_numbertype($tgob)
         ret = Vector{Pair{Point{ndim,T},Point{ndim,T}}}()
@@ -332,7 +332,6 @@ function sup_spine2d!(ax,tgob,sgi)
 	end
     linesegments!(ax, bars, linewidth = 10)
 end
-
 
 function dualtri(ndof,onedir=[1.0,0.0];θ=0.0,k=400.0,c=0.0,restlen=0.16)
     nbodies = ndof + 1
@@ -514,7 +513,7 @@ function get_angle(v,w)
 end
 
 function get_angles(tg)
-    rbs = TR.get_rigidbodies(tg)
+    rbs = TR.get_bodies(tg)
     angles = zeros(tg.nrigids-1)
     for (rbid,rb) in enumerate(rbs)
         if rbid > 1

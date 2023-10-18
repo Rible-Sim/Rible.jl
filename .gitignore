@@ -10,4 +10,4 @@ result/
 *.eps
 *.agx
 *.csv
-/.DS_Store
+.DS_Store

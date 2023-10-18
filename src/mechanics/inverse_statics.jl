@@ -16,49 +16,6 @@ function build_Ci(rb)
     ])
 end
 
-function build_C(tgstruct)
-    nbodycoords = get_nbodycoords(tgstruct)
-    rbs = tgstruct.rigidbodies
-    @unpack nmvbodies,mvbodyindex,ndim = tgstruct
-    block_size1 = repeat([nbodycoords],nmvbodies)
-    block_size2 = [rb.prop.naps*ndim for rb in tgstruct.rigidbodies[mvbodyindex]]
-    block_size1,block_size2
-    T = get_numbertype(tgstruct)
-    C = BlockArray{T}(undef,block_size1,block_size2)
-    C .= 0
-    for (mvrbid,rbid) in enumerate(mvbodyindex)
-        C[Block(mvrbid,mvrbid)] = build_Ci(rbs[rbid])
-    end
-    C
-end
-
-function build_D(tg)
-    @unpack ncables,nmvpoints,ndim,mvbodyindex = tg
-    @unpack body2q,string2ap = tg.connectivity
-    D = spzeros(Int,nmvpoints*ndim,ncables*ndim)
-    D_raw = spzeros(Int,nmvpoints,ncables)
-    iss = [0]
-
-    foreach(tg.rigidbodies) do rb
-        if rb.prop.id in tg.mvbodyindex
-            push!(iss,iss[end]+rb.prop.naps)
-        end
-    end
-
-    foreach(string2ap) do scnt
-        id = scnt.id
-        mvrbid1 = findfirst((x)->x==scnt.end1.rbsig.prop.id, mvbodyindex)
-        if mvrbid1 != nothing
-            D_raw[iss[mvrbid1]+scnt.end1.pid,id] = 1
-        end
-        mvrbid2 = findfirst((x)->x==scnt.end2.rbsig.prop.id, mvbodyindex)
-        if mvrbid2 != nothing
-            D_raw[iss[mvrbid2]+scnt.end2.pid,id] = -1
-        end
-    end
-    D .= kron(D_raw,Matrix(1I,ndim,ndim))
-end
-
 function build_Q̃(tg)
     (;tensioned,indexed) = tg.connectivity
     (;connected) = tensioned
@@ -71,11 +28,11 @@ function build_Q̃(tg)
 
     foreach(connected) do cc
         j = cc.id
-        (;end1,end2) = cc
-        rb1 = end1.rbsig
-        rb2 = end2.rbsig
-        C1 = rb1.state.cache.Cps[end1.pid]
-        C2 = rb2.state.cache.Cps[end2.pid]
+        (;hen,egg) = cc
+        rb1 = hen.rbsig
+        rb2 = egg.rbsig
+        C1 = rb1.state.cache.Cps[hen.pid]
+        C2 = rb2.state.cache.Cps[egg.pid]
         uci1 = rb1.state.cache.free_idx
         uci2 = rb2.state.cache.free_idx
         m2sf1 = mem2sysfree[rb1.prop.id]
@@ -86,14 +43,6 @@ function build_Q̃(tg)
     Q̃
 end
 
-function fvector(tgstruct)
-    @unpack ndim, ncables, cables = tgstruct
-    ret = zeros(get_numbertype(tgstruct),ndim*ncables)
-    for (i,stri) in enumerate(cables)
-        ret[(i-1)*ndim+1:i*ndim] = stri.state.tension*stri.state.direction
-    end
-    ret
-end
 
 function iksolve(prob;ftol=1e-14)
     @unpack funcs,q0,u0,λ0,nq,nu,nλ = prob
@@ -173,33 +122,12 @@ function build_Γ(tg)
     end
 end
 
-
-function build_W(tgstruct)
-    q = get_q(tgstruct)
-    A = make_A(tgstruct)
-    Aq = A(q)
-    W = transpose(Aq)*inv(Aq*transpose(Aq))*Aq
-end
-
 function build_Ǧ(tginput;factor=1.0)
     tg = deepcopy(tginput)
     clear_forces!(tg)
     apply_gravity!(tg;factor)
     Ǧ = generate_forces!(tg)
 end
-
-# Not ready
-# function build_Ji(tg::AbstractTensegrityStructure,i)
-#     rbs = tg.rigidbodies
-#     cnt = tg.connectivity
-#     (;tensioned) = cnt.connectivity
-#     ap = tensioned[1][i]
-#     C1 = rbs[ap[1].rbid].state.cache.Cp[ap[1].apid]
-#     C2 = rbs[ap[2].rbid].state.cache.Cp[ap[2].apid]
-#     T1 = build_Ti(tg,ap[1].rbid)
-#     T2 = build_Ti(tg,ap[2].rbid)
-#     Ji = C2*T2-C1*T1
-# end
 
 function make_U(tg)
     (;ndim) = tg
@@ -242,12 +170,12 @@ function make_Q̌(tg,q0)
         foreach(connected) do scnt
             j = scnt.id
             (;k) = cables[j]
-            rb1 = scnt.end1.rbsig
-            rb2 = scnt.end2.rbsig
+            rb1 = scnt.hen.rbsig
+            rb2 = scnt.egg.rbsig
             rb1id = rb1.prop.id
             rb2id = rb2.prop.id
-            ap1id = scnt.end1.pid
-            ap2id = scnt.end2.pid
+            ap1id = scnt.hen.pid
+            ap2id = scnt.egg.pid
             C1 = rb1.state.cache.Cps[ap1id]
             C2 = rb2.state.cache.Cps[ap2id]
             mfull1 = mem2sysfull[rb1.prop.id]
@@ -268,12 +196,12 @@ function make_Q̌(tg,q0)
         Jj = zeros(eltype(q̌),ndim,nfull)
         foreach(connected) do scnt
             j = scnt.id
-            rb1 = scnt.end1.rbsig
-            rb2 = scnt.end2.rbsig
+            rb1 = scnt.hen.rbsig
+            rb2 = scnt.egg.rbsig
             rb1id = rb1.prop.id
             rb2id = rb2.prop.id
-            ap1id = scnt.end1.pid
-            ap2id = scnt.end2.pid
+            ap1id = scnt.hen.pid
+            ap2id = scnt.egg.pid
             c1 = c[num2sys[mem2num[rb1id][ap1id]]]
             c2 = c[num2sys[mem2num[rb2id][ap2id]]]
             C1 = rb1.state.cache.funcs.C(c1)
@@ -294,12 +222,12 @@ function make_Q̌(tg,q0)
     #     ret = zeros(eltype(γ),nfullcoords)
     #     foreach(string2ap) do scnt
     #         j = scnt.id
-    #         rb1 = scnt.end1.rbsig
-    #         rb2 = scnt.end2.rbsig
+    #         rb1 = scnt.hen.rbsig
+    #         rb2 = scnt.egg.rbsig
     #         rb1id = rb1.prop.id
     #         rb2id = rb2.prop.id
-    #         ap1id = scnt.end1.pid
-    #         ap2id = scnt.end2.pid
+    #         ap1id = scnt.hen.pid
+    #         ap2id = scnt.egg.pid
     #         is1 = (apnb[rb1id][ap1id]-1)*ndim
     #         is2 = (apnb[rb2id][ap2id]-1)*ndim
     #         c1 = c[is1+1:is1+ndim]
@@ -317,24 +245,6 @@ function make_Q̌(tg,q0)
     # inner_Q̌
 end
 
-function compensate_gravity_funcs(tgstruct)
-
-    A = make_A(tgstruct)
-
-    Q̃=build_Q̃(tgstruct)
-
-    function F!(F,u)
-        clear_forces!(tgstruct)
-        actuate!(tgstruct,u)
-        update_cables_apply_forces!(tgstruct)
-        apply_gravity!(tgstruct)
-        F .= 0
-        #F .= Q̃*fvector(tgstruct)
-        assemble_forces!(F,tgstruct)
-    end
-
-    A,F!
-end
 
 function check_inverse_sanity(B)
     n1,n2 = size(B)

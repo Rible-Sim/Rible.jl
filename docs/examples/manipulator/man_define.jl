@@ -238,7 +238,7 @@ end
 
 function get_angles(bot)
     (;tg) = bot
-    rbs = TR.get_rigidbodies(tg)
+    rbs = TR.get_bodies(tg)
     angles = zeros(tg.nrigids-1)
     for (rbid,rb) in enumerate(rbs)
         if rbid > 1

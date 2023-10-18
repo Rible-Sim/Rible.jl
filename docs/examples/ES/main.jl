@@ -368,7 +368,7 @@ GM.activate!(); with_theme(
         )
     ) do 
     fig = Figure()
-    rbs = TR.get_rigidbodies(newsim_fixed)  
+    rbs = TR.get_bodies(newsim_fixed)  
     rb = rbs[2]
     gd1 = fig[1,1] = GridLayout(;tellheight = false,)
     ax = Axis3(gd1[1,1];
@@ -1753,7 +1753,7 @@ function plot_tower3d_vis_nodpl(bots,figname=nothing)
                 zlims = (-0.001,0.5),
                 titleformatfunc = (sgi,tt) -> "",
                 sup! = (ax,tgob,sgi) -> begin
-                    rbs = TR.get_rigidbodies(tgob[])
+                    rbs = TR.get_bodies(tgob[])
                     for rbid in 7:10
                         # for rbid in [10]
                         if rbid in 7:8
@@ -2059,7 +2059,7 @@ function plot_tower3d_vis(bot0,bot1,figname=nothing)
                 zlims = (-0.001,0.5),
                 titleformatfunc = (sgi,tt) -> "",
                 sup! = (ax,tgob,sgi) -> begin
-                    rbs = TR.get_rigidbodies(tgob[])
+                    rbs = TR.get_bodies(tgob[])
                     # for rbid in 7:10
                     for rbid in [10]
                         if rbid in 7:8
@@ -2275,3 +2275,336 @@ TR.set_restlen!(newst_folded.tg,μ_folded)
 TR.update!(newst_folded.tg)
 TR.get_cables_tension(newst_folded.tg) |> extrema
 
+#-- three 3-prism
+prism3 = prism_modules(;n=1,p=1)
+bot = prism3
+
+with_theme(theme_pub;
+    Poly = (
+        transparency=true,
+    )
+    ) do
+    plot_traj!(prism3;
+        showlabels=false,
+        show_cable_labels=true,
+        show_node_labels=false,
+        showground=false,
+    )
+end
+_,λ=  TR.check_static_equilibrium_output_multipliers(bot.tg)
+λ
+k = TR.get_cables_stiffness(bot.tg)
+l = TR.get_cables_len(bot.tg)
+f = TR.get_cables_tension(bot)
+q = TR.get_q(bot.tg)
+q̌ = TR.get_q̌(bot.tg)
+Ǎ = TR.make_A(bot.tg)(q)
+# Ň_ = TR.nullspace(Ǎ)
+# Ň = TR.modified_gram_schmidt(Ň_)
+Ň = TR.make_intrinsic_nullspace(bot.tg,q)
+Q̃ = TR.build_Q̃(bot.tg)
+L̂ = TR.build_L̂(bot.tg)
+M̌ = TR.build_M̌(bot.tg)
+Ǩ = TR.build_Ǩ(bot.tg,λ)
+ℳ = transpose(Ň)*M̌*Ň
+𝒦 = transpose(Ň)*Ǩ*Ň
+# @show ℳ, 𝒦
+# ω²,_ = TR.undamped_eigen(bot.tg;)
+ω²,Ξ = eigen(Symmetric(𝒦),Symmetric(ℳ))
+ω²[1:6] .= 0
+ω = sqrt.(ω²)
+frq = ω./(2π)
+M = transpose(Ξ)*ℳ*Ξ
+M[findall((x)->abs(x)<1e-14,M)] .= 0.0
+f_input = range(1.0,30.0;step=0.1)
+function Hd(f)
+    [
+        ξ[3]*ξ[3]/(-(2π*f)^2+ω[i]^2)
+        for (i,ξ) in enumerate(eachcol(Ξ))
+    ] |> sum
+end
+
+function Hv(f)
+    im*(2π*f)*Hd(f) |> abs
+end
+
+function Ha(f)
+    -(2π*f)*Hd(f)
+end
+    
+fig = Figure()
+ax1 = Axis(fig[1,1];
+    xlabel="Mode",
+    ylabel="Frequency (Hz)",
+)
+barplot!(ax1,frq[1:18];width=0.1)
+ax2 = Axis(fig[1,2];
+    xscale=log10,
+    xlabel="Frequency (Hz)",
+    ylabel="Response"
+)
+lines!(ax2,f_input,Hd.(f_input))
+ax3 = Axis(fig[2,1];
+    xscale=log10,
+    xlabel="Frequency (Hz)",
+    ylabel="Response"
+)
+lines!(ax3,f_input,Hv.(f_input))
+ax4 = Axis(fig[2,2];
+    xscale=log10,
+    xlabel="Frequency (Hz)",
+    ylabel="Response"
+)
+lines!(ax4,f_input,Ha.(f_input))
+Makie.DataInspector(fig)
+fig
+
+rank(Ň)
+Ǎ*Ň |> norm
+# Left hand side
+Q̃L̂ = Q̃*L̂
+
+Bᵀ = -Q̃L̂
+ℬᵀ = transpose(Ň)*Bᵀ
+
+S,D = TR.static_kinematic_determine(ℬᵀ)
+ns = size(S,2)
+nk = size(D,2)
+
+λ = -inv(Ǎ*transpose(Ǎ))*Ǎ*Bᵀ*f
+Ǩa = TR.∂Aᵀλ∂q̌(bot.tg,λ)
+𝒦a = transpose(Ň)*Ǩa*Ň |> Symmetric 
+vals_𝒦a,vecs_𝒦a = eigen(𝒦a)
+
+Ǩm = TR.build_Ǩm!(bot.tg,q,k)
+Ǩg = TR.build_Ǩg!(bot.tg,q,f)
+vec𝒦ps = [
+    begin
+        si = S[:,i]
+        # s = S\f
+        # @show s
+        λi = inv(Ǎ*transpose(Ǎ))*Ǎ*Bᵀ*si
+        # @show f,λ
+        Ǩai = - TR.∂Aᵀλ∂q̌(bot.tg,λi)
+
+        Ǩgi = TR.build_Ǩg!(bot.tg,q,si)
+
+        𝒦pi = transpose(Ň)*(Ǩgi.+Ǩai)*Ň |> Symmetric 
+        # vec𝒦pi = SymmetricPacked(𝒦pi).tri
+        vec𝒦pi = vec(𝒦pi)
+    end
+    for i = 1:ns
+]
+
+mat𝒦ps = reduce(hcat,vec𝒦ps)
+
+𝒦m = transpose(Ň)*Ǩm*Ň |> Symmetric
+vec𝒦m = vec(𝒦m)
+vecI = vec(Matrix(1.0I,size(𝒦m)))
+
+𝒦g = transpose(Ň)*Ǩg*Ň |> Symmetric 
+𝒦p = 𝒦g.+ 𝒦a |> Symmetric 
+𝒦 = 𝒦m.+ 𝒦p |> Symmetric
+
+vals_𝒦m,vecs_𝒦m = eigen(𝒦m)
+sort(vals_𝒦m)
+vm = vecs_𝒦m[:,1:nk]
+
+vals_𝒦p,vecs_𝒦p = eigen(𝒦p)
+sort(vals_𝒦p)
+
+vals_𝒦,vecs_𝒦 = eigen(𝒦)
+sort(vals_𝒦)
+
+v = vecs_𝒦[:,1:6]
+v'*𝒦*v
+
+
+Ňv = Ň*nullspace(v')
+
+r𝒦m = transpose(Ňv)*(Ǩm)*Ňv |> Symmetric 
+# vecr𝒦m = SymmetricPacked(r𝒦m).tri
+rd = nullspace(r𝒦m)
+vecr𝒦m = vec(r𝒦m)
+
+# vecI = SymmetricPacked(Matrix(1.0I,size(r𝒦m))).tri
+vecI = vec(Matrix(1.0I,size(r𝒦m)))
+r𝒦m |> issymmetric
+
+r𝒦g = transpose(Ňv)*(Ǩg)*Ňv |> Symmetric 
+r𝒦a = transpose(Ňv)*(Ǩa)*Ňv |> Symmetric 
+r𝒦p = r𝒦g .+ r𝒦a
+vals_r𝒦p,vecs_r𝒦p = eigen(r𝒦p)
+@myshow sort(vals_𝒦p)
+
+vals_rd𝒦pd,vecs_rd𝒦pd = eigen(rd'*r𝒦p*rd)
+@myshow sort(vals_rd𝒦pd)
+
+vecr𝒦ps = [
+    begin
+        si = S[:,i]
+        # s = S\f
+        # @show s
+        λi = inv(Ǎ*transpose(Ǎ))*Ǎ*Bᵀ*si
+        # @show f,λ
+        Ǩai = - TR.∂Aᵀλ∂q̌(bot.tg,λi)
+
+        Ǩgi = TR.build_Ǩg!(bot.tg,q,si)
+
+        r𝒦pi = transpose(Ňv)*(Ǩgi.+Ǩai)*Ňv |> Symmetric 
+        # vecr𝒦pi = SymmetricPacked(r𝒦pi).tri
+        vecr𝒦pi = vec(r𝒦pi)
+    end
+    for i = 1:ns
+]
+
+matr𝒦ps = reduce(hcat,vecr𝒦ps)
+
+ᾱ = [1.0]
+A = hcat(
+    -Matrix(1.0I,ns,ns),
+    ᾱ,
+    zero(ᾱ)
+)
+b = [0.0]
+nx = ns+2
+result_max = TR.optimize_maximum_stiffness(matr𝒦ps,vecr𝒦m,vecI,A,b,nx)
+σ_max = result_max.x[end-1]
+ρ_max = result_max.x[end]
+
+𝒦_max = 𝒦m + σ_max*reshape(mat𝒦ps*ᾱ,size(𝒦m))
+vals_𝒦_max, vecs_𝒦_max = eigen(𝒦_max)
+
+vals, vecs = eigen(𝒦_max - ρ_max*I)
+@myshow vals
+
+result_zero = TR.optimize_zero_stiffness(matr𝒦ps,vecr𝒦m,vecI,
+    hcat(
+        -Matrix(1.0I,ns,ns),
+        ᾱ,
+    ),
+    [0.0],
+    ns+1,
+    result_max.x[1:end-1]
+)
+σ_zero = result_zero.x[end]
+
+𝒦_zero = 𝒦m + σ_zero*reshape(mat𝒦ps*ᾱ,size(𝒦m))
+vals_𝒦_zero, vecs_𝒦_zero = eigen(𝒦_zero)
+ρ_zero = vals_𝒦_zero[1]
+maxminmodes = hcat(
+    vecs_𝒦_max[:,1],
+    vecs_𝒦_zero[:,1:3],
+)
+
+ 
+σs = LinRange(0,40000,400)
+rρs =  [
+    begin
+        r𝒦 = r𝒦m + σ*reshape(matr𝒦ps*ᾱ,size(r𝒦m))
+        vals_r𝒦, vecs_r𝒦 = eigen(r𝒦)
+        vals_r𝒦
+    end
+    for σ in σs
+] |> VectorOfArray
+
+size(rρs,1)
+ρs =  [
+    begin
+        𝒦 = 𝒦m + σ*reshape(mat𝒦ps*ᾱ,size(𝒦m))
+        vals_𝒦, vecs_𝒦 = eigen(𝒦)
+        vals_𝒦[begin+1]
+    end
+    for σ in σs
+]
+
+with_theme(theme_pub;
+        resolution = (0.3tw,0.2tw),
+        figure_padding = (0,fontsize,0,fontsize),
+    ) do 
+    fig = Figure()
+    ax = Axis(fig[1,1],
+        xlabel = L"\sigma",
+        ylabel = L"\rho_{(\mathrm{1})}"
+    )
+    lines!(ax,σs,rρs[1,:],)
+    # xlims!(ax,0,5500)
+    # ylims!(ax,-400,600)
+    # for i = axes(rρs,1)
+    #     lines!(ax,σs,rρs[i,:],)
+    # end
+    scatter!(
+        ax,
+        [σ_max,σ_zero],
+        [ρ_max,ρ_zero]
+    )
+    text!([σ_max], [ρ_max], 
+        text = [L"\rho_{(1),\mathrm{max}}"],
+        align = (:center,:bottom),
+        offset = (0, fontsize/4)
+    )
+    text!([σ_zero], [ρ_zero], 
+        text = [L"\sigma_{\mathrm{max}}"],
+        align = (:right,:center),
+        offset = (-fontsize/2, 0)
+    )
+    # text!(x, y, text = string.(aligns), align = aligns)
+    # savefig(fig,"superball_curve")
+    fig
+end
+
+TR.undamped_eigen!(bot;scaling=0.1)
+with_theme(theme_pub;
+        fontsize = 6 |> pt2px,
+        Axis3 = (
+            azimuth = 7.045530633326983,
+            elevation = 0.7926990816987238
+        )
+    ) do 
+    plot_traj!(
+        bot,
+        AxisType=Axis3,
+        gridsize=(2,3),
+        atsteps = collect(2:7).+6,
+        showinit = true,
+        doslide=false,
+        showinfo=false,
+        showground=false,
+        showpoints=false,
+        showlabels=false,
+        showcables=true,
+        meshcolor=:black,
+        xlims = (-0.7,0.7),
+        ylims = (-0.7,0.7),
+        # xlims = (-1.5,0.7),
+        # ylims = (-1.2,1.2),
+        zlims = (-1e-4,0.5),
+        titleformatfunc = (sgi,tt)-> begin
+            rich(
+                rich("($(alphabet[sgi])) ", font=:bold),
+                (@sprintf "f = %.4G (Hz)" tt/(2π))
+            )
+        end,
+    )
+end
+sqrt.(ω²[7:end])./(2π)
+ω²,δq̌ =
+# bar
+A = ((5e-3)^2-(4e-3)^2)*π
+ρ = 1800.0
+b = 1.01
+m = A*b*ρ
+
+# cable 
+A = (0.32e-3)^2*π
+ρ = 1435
+E = 131e9
+# cable diagonal
+l = 0.6489
+# cable horizontal
+l = 0.5464
+
+k = E*A/l
+17/k
+
+m = A*l*ρ

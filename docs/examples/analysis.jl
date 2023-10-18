@@ -4,7 +4,7 @@ function get_trajectory!(bot::TR.TensegrityRobot,rbid::Int,pid::Int,step_range=:
     (; tg, traj)= bot
 	T = TR.get_numbertype(bot)
     rp = Vector{T}[]
-    rbs = TR.get_rigidbodies(tg)
+    rbs = TR.get_bodies(tg)
     rb = rbs[rbid]
     for q in traj.q
         TR.update_rigids!(tg,q)
@@ -21,7 +21,7 @@ function get_velocity!(bot::TR.TensegrityRobot,rbid::Int,pid::Int,step_range=:)
     (; tg, traj)= bot
 	T = TR.get_numbertype(bot)
     ṙp = Vector{T}[]
-    rbs = TR.get_rigidbodies(tg)
+    rbs = TR.get_bodies(tg)
     rb = rbs[rbid]
     for (q,q̇) in zip(traj.q, traj.q̇)
         TR.update_rigids!(tg,q,q̇)
@@ -38,7 +38,7 @@ function get_kinetic_energy!(bot::TR.TensegrityRobot,rbid::Int,step_range=:)
     (; tg, traj)= bot
 	numberType = TR.get_numbertype(bot)
     T = numberType[]
-    rbs = TR.get_rigidbodies(tg)
+    rbs = TR.get_bodies(tg)
     rb = rbs[rbid]
     for (q,q̇) in zip(traj.q, traj.q̇)
         TR.update_rigids!(tg,q,q̇)
@@ -55,7 +55,7 @@ function get_mid_velocity!(bot::TR.TensegrityRobot,rbid::Int,pid::Int,step_range
 	T = TR.get_numbertype(bot)
 	h = t[begin+1] - t[begin]
     ṙp = Vector{T}[]
-    rbs = TR.get_rigidbodies(tg)
+    rbs = TR.get_bodies(tg)
     rb = rbs[rbid]
     for (qₖ,qₖ₋₁) in zip(traj.q[begin+1:end], traj.q[begin:end-1])
         TR.update_rigids!(tg,(qₖ.+qₖ₋₁)./2,(qₖ.-qₖ₋₁)./h)
@@ -68,7 +68,7 @@ function get_orientation!(bot::TR.TensegrityRobot,rbid::Int,step_range=:)
     (; tg, traj)= bot
 	T = TR.get_numbertype(bot)
     R = VectorOfArray(Vector{Matrix{T}}())
-    rbs = TR.get_rigidbodies(tg)
+    rbs = TR.get_bodies(tg)
     rb = rbs[rbid]
     for (q,q̇) in zip(traj.q, traj.q̇)
         TR.update_rigids!(tg,q,q̇)
@@ -82,7 +82,7 @@ function get_angular_velocity!(bot::TR.TensegrityRobot,rbid::Int,step_range=:)
     (; tg, traj)= bot
 	T = TR.get_numbertype(bot)
     ω = Vector{T}[]
-    rbs = TR.get_rigidbodies(tg)
+    rbs = TR.get_bodies(tg)
     rb = rbs[rbid]
     for (q,q̇) in zip(traj.q, traj.q̇)
         TR.update_rigids!(tg,q,q̇)
@@ -216,7 +216,7 @@ function issliding(contact;vtol=1e-8)
 	cs.active && norm(cs.v[2:3]) > vtol
 end
 
-function get_contact_angle(contact;Λtol=1e-8,vtol=Λtol)
+function get_contact_angle(contact;Λtol=1e-7,vtol=Λtol)
 	(;id,μ,e,state) = contact
 	(;active,persistent,v,Λ) = state
 	if active
@@ -231,10 +231,10 @@ function get_contact_angle(contact;Λtol=1e-8,vtol=Λtol)
 		δα = α_v - rem2pi(α_Λ-π,RoundNearest)
 		# if !persistent
 			if Λₜ > Λtol &&  vₜ > vtol
-				return δα
+			# 	return δα
+				return acos(clamp((v[2:3] ⋅ Λ[2:3])/(Λₜ*vₜ),-1,1))
 			else
 				return missing
-				# return v[2:3] ⋅ Λ[2:3]
 			end
 		# end
 	end

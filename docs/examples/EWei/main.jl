@@ -33,7 +33,7 @@ bot1 = BuildTail(1; β=.9)
 # rigid body mesh
 TR.update!(bot1.tg)
 TR.update_orientations!(bot1.tg)
-rbs = TR.get_rigidbodies(bot1.tg)
+rbs = TR.get_bodies(bot1.tg)
 rbs[5].state.R
 rbs[5].state.cache.funcs.lncs
 plot_rigid(rbs[2];showmesh=true,showupdatemesh=false)

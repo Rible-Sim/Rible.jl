@@ -57,7 +57,6 @@ function find_full_pres_indices(lncs,q)
 end
 
 function ∂Aᵀλ∂q̌(tg::AbstractTensegrityStructure,λ)
-    c = get_c(tg)
     (;numbered,indexed,jointed) = tg.connectivity
     (;nfree,ninconstraints,mem2sysfree,mem2sysincst) = indexed
     (;njoints,nexconstraints,joints,joint2sysexcst) = jointed
@@ -77,7 +76,7 @@ function ∂Aᵀλ∂q̌(tg::AbstractTensegrityStructure,λ)
         foreach(joints) do joint
             jointexcst = joint2sysexcst[joint.id]
             jointfree = get_jointed_free(joint,indexed)
-            ret[jointfree,jointfree] .+= make_∂Aᵀλ∂q(joint,numbered,c)(λ[jointexcst])
+            ret[jointfree,jointfree] .+= make_∂Aᵀλ∂q(joint,tg)(λ[jointexcst])
         end
     end
     ret
@@ -145,6 +144,20 @@ function linearize(tginput,λ,u,q,q̇=zero(q))
 end
 
 
+function make_intrinsic_nullspace(tg,q)
+    (;bodies,connectivity) = tg
+    (;indexed,) = connectivity
+    (;nfull,mem2sysfull,sysndof,mem2sysndof,) = indexed
+    ret = zeros(eltype(q),nfull,sysndof)
+    foreach(bodies) do rb
+        rbid = rb.prop.id
+        (;nmcs) = rb.state.cache.funcs
+        mem2full = mem2sysfull[rbid]
+        ret[mem2full,mem2sysndof[rbid]] = NCF.make_N(nmcs)(q[mem2full])
+    end
+    ret
+end
+
 function frequencyshift(M̂,Ĉ,K̂,α::Real)
     M̄ = M̂
     C̄ = 2α*M̂ + Ĉ
@@ -184,30 +197,61 @@ function build_Ǩ(tg)
     build_Ǩ(tg,λ)
 end
 
-function build_Ǩm_Ǩg!(tg::TensegrityStructure,q,f,k)
+function build_Ǩm!(tg::TensegrityStructure,q,k)
     (;ndim) = tg
-    (;numbered,indexed,tensioned) = tg.connectivity
-    (;nfull,nfree,syspres,sysfree,mem2sysfull) = indexed
+    (;indexed,tensioned) = tg.connectivity
+    (;nfull,nfree,sysfree,mem2sysfull) = indexed
     (;connected) = tensioned
     (;cables) = tg.tensiles
-    (;mem2num,num2sys) = numbered
     update!(tg,q)
     Jj = zeros(eltype(q),ndim,nfull)
     retǨm = zeros(eltype(q),nfree,nfree)
-    retǨg = zeros(eltype(q),nfree,nfree)
     foreach(connected) do scnt
         j = scnt.id
-        rb1 = scnt.end1.rbsig
-        rb2 = scnt.end2.rbsig
-        ap1id = scnt.end1.pid
-        ap2id = scnt.end2.pid
+        rb1 = scnt.hen.rbsig
+        rb2 = scnt.egg.rbsig
+        ap1id = scnt.hen.pid
+        ap2id = scnt.egg.pid
         C1 = rb1.state.cache.Cps[ap1id]
         C2 = rb2.state.cache.Cps[ap2id]
         mfull1 = mem2sysfull[rb1.prop.id]
         mfull2 = mem2sysfull[rb2.prop.id]
         cable = cables[j]
         (;state) = cable
-        (;direction,length,tension) = state
+        (;length,) = state
+        s = 1/length
+        Jj .= 0
+        Jj[:,mfull2] .+= C2
+        Jj[:,mfull1] .-= C1
+        Uj = transpose(Jj)*Jj
+        Ūjq = Uj[sysfree,:]*q
+        retǨm .+= k[j]*s^2*(Ūjq*transpose(Ūjq))
+    end
+    retǨm
+end
+
+function build_Ǩg!(tg::TensegrityStructure,q,f)
+    (;ndim) = tg
+    (;indexed,tensioned) = tg.connectivity
+    (;nfull,nfree,sysfree,mem2sysfull) = indexed
+    (;connected) = tensioned
+    (;cables) = tg.tensiles
+    update!(tg,q)
+    Jj = zeros(eltype(q),ndim,nfull)
+    retǨg = zeros(eltype(q),nfree,nfree)
+    foreach(connected) do scnt
+        j = scnt.id
+        rb1 = scnt.hen.rbsig
+        rb2 = scnt.egg.rbsig
+        ap1id = scnt.hen.pid
+        ap2id = scnt.egg.pid
+        C1 = rb1.state.cache.Cps[ap1id]
+        C2 = rb2.state.cache.Cps[ap2id]
+        mfull1 = mem2sysfull[rb1.prop.id]
+        mfull2 = mem2sysfull[rb2.prop.id]
+        cable = cables[j]
+        (;state) = cable
+        (;length,) = state
         s = 1/length
         Jj .= 0
         Jj[:,mfull2] .+= C2
@@ -215,10 +259,9 @@ function build_Ǩm_Ǩg!(tg::TensegrityStructure,q,f,k)
         Uj = transpose(Jj)*Jj
         Ǔj = @view Uj[sysfree,sysfree]
         Ūjq = Uj[sysfree,:]*q
-        retǨm .+= k[j]*s^2*(Ūjq*transpose(Ūjq))
         retǨg .+= f[j]/length*(Ǔj-s^2*Ūjq*transpose(Ūjq))
     end
-    retǨm,retǨg
+    retǨg
 end
 
 function make_Ǩm_Ǩg(tg,q0)
@@ -237,12 +280,12 @@ function make_Ǩm_Ǩg(tg,q0)
         retǨg = zeros(eltype(q̌),nfree,nfree)
         foreach(connected) do scnt
             j = scnt.id
-            rb1 = scnt.end1.rbsig
-            rb2 = scnt.end2.rbsig
+            rb1 = scnt.hen.rbsig
+            rb2 = scnt.egg.rbsig
             rb1id = rb1.prop.id
             rb2id = rb2.prop.id
-            ap1id = scnt.end1.pid
-            ap2id = scnt.end2.pid
+            ap1id = scnt.hen.pid
+            ap2id = scnt.egg.pid
             c1 = c[num2sys[mem2num[rb1id][ap1id]]]
             c2 = c[num2sys[mem2num[rb2id][ap2id]]]
             C1 = rb1.state.cache.funcs.C(c1)
@@ -269,10 +312,10 @@ function make_Ǩm_Ǩg(tg,q0)
         retǨg = zeros(eltype(q̌),nfree,nfree)
         foreach(connected) do scnt
             j = scnt.id
-            rb1 = scnt.end1.rbsig
-            rb2 = scnt.end2.rbsig
-            ap1id = scnt.end1.pid
-            ap2id = scnt.end2.pid
+            rb1 = scnt.hen.rbsig
+            rb2 = scnt.egg.rbsig
+            ap1id = scnt.hen.pid
+            ap2id = scnt.egg.pid
             C1 = rb1.state.cache.Cps[ap1id]
             C2 = rb2.state.cache.Cps[ap2id]
             mfull1 = mem2sysfull[rb1.prop.id]
@@ -310,12 +353,12 @@ function make_S(tg,q0)
         Jj = zeros(eltype(q̌),ndim,nfull)
         foreach(connected) do scnt
             j = scnt.id
-            rb1 = scnt.end1.rbsig
-            rb2 = scnt.end2.rbsig
+            rb1 = scnt.hen.rbsig
+            rb2 = scnt.egg.rbsig
             rb1id = rb1.prop.id
             rb2id = rb2.prop.id
-            ap1id = scnt.end1.pid
-            ap2id = scnt.end2.pid
+            ap1id = scnt.hen.pid
+            ap2id = scnt.egg.pid
             # c1 = c[num2sys[mem2num[rb1id][ap1id]]]
             # c2 = c[num2sys[mem2num[rb2id][ap2id]]]
             # C1 = rb1.state.cache.funcs.C(c1)
@@ -340,12 +383,12 @@ function make_S(tg,q0)
         Jj = zeros(eltype(q̌),ndim,nfull)
         foreach(connected) do scnt
             j = scnt.id
-            rb1 = scnt.end1.rbsig
-            rb2 = scnt.end2.rbsig
+            rb1 = scnt.hen.rbsig
+            rb2 = scnt.egg.rbsig
             rb1id = rb1.prop.id
             rb2id = rb2.prop.id
-            ap1id = scnt.end1.pid
-            ap2id = scnt.end2.pid
+            ap1id = scnt.hen.pid
+            ap2id = scnt.egg.pid
             c1 = c[num2sys[mem2num[rb1id][ap1id]]]
             c2 = c[num2sys[mem2num[rb2id][ap2id]]]
             C1 = rb1.state.cache.funcs.C(c1)
@@ -388,11 +431,11 @@ function build_∂Q̌∂q̌(tg,@eponymargs(connected,))
     J̌ = zeros(T,ndim,nfree)
     foreach(connected) do cc
         cable = cables[cc.id]
-        (;end1,end2) = cc
-        rb1 = end1.rbsig
-        rb2 = end2.rbsig
-        C1 = rb1.state.cache.Cps[end1.pid]
-        C2 = rb2.state.cache.Cps[end2.pid]
+        (;hen,egg) = cc
+        rb1 = hen.rbsig
+        rb2 = egg.rbsig
+        C1 = rb1.state.cache.Cps[hen.pid]
+        C2 = rb2.state.cache.Cps[egg.pid]
         free_idx1 = rb1.state.cache.free_idx
         free_idx2 = rb2.state.cache.free_idx
         mfree1 = mem2sysfree[rb1.prop.id]
@@ -436,11 +479,11 @@ function build_∂Q̌∂q̌(tg,@eponymargs(clustered))
         i += 1
         foreach(clustercable) do cc
             cable = clustercables[i].segs[cc.id]
-            (;end1,end2) = cc
-            rb1 = end1.rbsig
-            rb2 = end2.rbsig
-            C1 = rb1.state.cache.Cps[end1.pid]
-            C2 = rb2.state.cache.Cps[end2.pid]
+            (;hen,egg) = cc
+            rb1 = hen.rbsig
+            rb2 = egg.rbsig
+            C1 = rb1.state.cache.Cps[hen.pid]
+            C2 = rb2.state.cache.Cps[egg.pid]
             free_idx1 = rb1.state.cache.free_idx
             free_idx2 = rb2.state.cache.free_idx
             mfree1 = mem2sysfree[rb1.prop.id]
@@ -480,11 +523,11 @@ function build_∂Q̌∂q̌!(∂Q̌∂q̌,tg)
     J̌ = zeros(T,ndim,nfree)
     foreach(connected) do cc
         cable = cables[cc.id]
-        (;end1,end2) = cc
-        rb1 = end1.rbsig
-        rb2 = end2.rbsig
-        C1 = rb1.state.cache.Cps[end1.pid]
-        C2 = rb2.state.cache.Cps[end2.pid]
+        (;hen,egg) = cc
+        rb1 = hen.rbsig
+        rb2 = egg.rbsig
+        C1 = rb1.state.cache.Cps[hen.pid]
+        C2 = rb2.state.cache.Cps[egg.pid]
         free_idx1 = rb1.state.cache.free_idx
         free_idx2 = rb2.state.cache.free_idx
         mfree1 = mem2sysfree[rb1.prop.id]
@@ -550,11 +593,11 @@ function build_∂Q̌∂q̌̇(tg, @eponymargs(connected, ))
     J̌ = zeros(T,ndim,nfree)
     foreach(connected) do cc
         cable = cables[cc.id]
-        (;end1,end2) = cc
-        rb1 = end1.rbsig
-        rb2 = end2.rbsig
-        C1 = rb1.state.cache.Cps[end1.pid]
-        C2 = rb2.state.cache.Cps[end2.pid]
+        (;hen,egg) = cc
+        rb1 = hen.rbsig
+        rb2 = egg.rbsig
+        C1 = rb1.state.cache.Cps[hen.pid]
+        C2 = rb2.state.cache.Cps[egg.pid]
         free_idx1 = rb1.state.cache.free_idx
         free_idx2 = rb2.state.cache.free_idx
         mfree1 = mem2sysfree[rb1.prop.id]
@@ -596,11 +639,11 @@ function build_∂Q̌∂q̌̇(tg, @eponymargs(clustered, ))
         i += 1
         foreach(clustercable) do cc
             cable = clustercables[i].segs[cc.id]
-            (;end1,end2) = cc
-            rb1 = end1.rbsig
-            rb2 = end2.rbsig
-            C1 = rb1.state.cache.Cps[end1.pid]
-            C2 = rb2.state.cache.Cps[end2.pid]
+            (;hen,egg) = cc
+            rb1 = hen.rbsig
+            rb2 = egg.rbsig
+            C1 = rb1.state.cache.Cps[hen.pid]
+            C2 = rb2.state.cache.Cps[egg.pid]
             free_idx1 = rb1.state.cache.free_idx
             free_idx2 = rb2.state.cache.free_idx
             mfree1 = mem2sysfree[rb1.prop.id]
@@ -637,11 +680,11 @@ function build_∂Q̌∂q̌̇!(∂Q̌∂q̌̇,tg)
     J̌ = zeros(T,ndim,nfree)
     foreach(connected) do cc
         cable = cables[cc.id]
-        (;end1,end2) = cc
-        rb1 = end1.rbsig
-        rb2 = end2.rbsig
-        C1 = rb1.state.cache.Cps[end1.pid]
-        C2 = rb2.state.cache.Cps[end2.pid]
+        (;hen,egg) = cc
+        rb1 = hen.rbsig
+        rb2 = egg.rbsig
+        C1 = rb1.state.cache.Cps[hen.pid]
+        C2 = rb2.state.cache.Cps[egg.pid]
         free_idx1 = rb1.state.cache.free_idx
         free_idx2 = rb2.state.cache.free_idx
         mfree1 = mem2sysfree[rb1.prop.id]
@@ -703,11 +746,11 @@ function build_∂Q̌∂s̄(tg)
         foreach(clustercable) do cc
             j += 1
             cable = clustercables[i].segs[cc.id]
-            (;end1,end2) = cc
-            rb1 = end1.rbsig
-            rb2 = end2.rbsig
-            C1 = rb1.state.cache.Cps[end1.pid]
-            C2 = rb2.state.cache.Cps[end2.pid]
+            (;hen,egg) = cc
+            rb1 = hen.rbsig
+            rb2 = egg.rbsig
+            C1 = rb1.state.cache.Cps[hen.pid]
+            C2 = rb2.state.cache.Cps[egg.pid]
             free_idx1 = rb1.state.cache.free_idx
             free_idx2 = rb2.state.cache.free_idx
             mfree1 = mem2sysfree[rb1.prop.id]

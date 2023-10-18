@@ -175,7 +175,7 @@ n = 4
 tail = make_new_tail(n)
 
 # 检查连接点
-rbs = TR.get_rigidbodies(tail.tg)
+rbs = TR.get_bodies(tail.tg)
 plot_rigid(rbs[2])
 
 

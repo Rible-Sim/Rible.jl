@@ -1,6 +1,6 @@
 
 function get_cube_bars(tg)
-    rb = TR.get_rigidbodies(tg)[1]
+    rb = TR.get_bodies(tg)[1]
     ps = Point.(rb.state.rps)
     fs = [
         GeometryBasics.QuadFace(1,3,4,2),

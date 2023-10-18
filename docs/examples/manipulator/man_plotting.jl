@@ -49,8 +49,8 @@ function get_cables(tg)
     ret = Vector{Pair{Point{ndim,T},Point{ndim,T}}}()
     mapreduce(
         (scnt)->
-        Point(scnt.end1.rbsig.state.rps[scnt.end1.pid]) =>
-        Point(scnt.end2.rbsig.state.rps[scnt.end2.pid]),
+        Point(scnt.hen.rbsig.state.rps[scnt.hen.pid]) =>
+        Point(scnt.egg.rbsig.state.rps[scnt.egg.pid]),
         vcat,
         tensioned.connected
         ;init=ret
@@ -58,7 +58,7 @@ function get_cables(tg)
 end
 
 function get_bars_and_cables(tg)
-    rbs = TR.get_rigidbodies(tg)
+    rbs = TR.get_bodies(tg)
     bars = Observable(
                 reduce(
                     vcat,[
@@ -86,7 +86,7 @@ end
 function update_scene!(tg,bars,cables,q)
     cnt = tg.connectivity
     TR.update_rigids!(tg,q)
-    rbs = TR.get_rigidbodies(tg)
+    rbs = TR.get_bodies(tg)
     bars[] = reduce(
         vcat,[
             get_bars(rb)

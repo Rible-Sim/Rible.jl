@@ -158,23 +158,27 @@ function quad(c=100.0;
     cnt = TR.Connectivity(numberedpoints, indexedcoords, tensioned)
     # #
 
-	contacts = [TR.Contact(i,μ,e) for i = 1:4]
+    contacts = [TR.Contact(i,μ,e) for i = 1:4]
 
     tg = TR.TensegrityStructure(rigdibodies, tensiles, cnt, contacts)
     bot = TR.TensegrityRobot(tg, hub)
 end
 
-function rigidbar(i,ri,rj;
+function rigidbar(i,
+        ri,rj;
         ṙi,ṙj,
         m = 0.05,
         movable = true,
         constrained = false,
         ci = Int[],
-        Φi = [1]
+        Φi = [1],
+        isbody = false,
+        loadmesh = true,
     )
     ro = (ri + rj)/2
     ṙo = (ṙi + ṙj)/2
     u = rj - ri
+    u̇ = ṙj - ṙi
     u /= norm(u)
     v,w = Meshes.householderbasis(u)
     R = SMatrix{3,3}(hcat(u,v,w))
@@ -183,67 +187,87 @@ function rigidbar(i,ri,rj;
     r̄g  = SVector{3}(   0,0.0,0.0)
     r̄p1 = SVector{3}(-b/2,0.0,0.0)
     r̄p2 = SVector{3}( b/2,0.0,0.0)
+    r̄p3 = SVector{3}(   0,0.0,0.0)
     inertia = m*b^2/12
     Ī = SMatrix{3,3}([
-        inertia 0 0;
-        0       0 0;
-        0       0 0
+        inertia 0          0;
+        0       inertia    0;
+        0       0     inertia
     ])
-    r̄ps = [r̄p1,r̄p2]
+    r̄ps = [r̄p1,r̄p2,r̄p3]
+    ās = [SVector(1.0,0,0),SVector(1.0,0,0),SVector(1.0,0,0)]
     prop = TR.RigidBodyProperty(
         i,
         movable,
         m,
         Ī,
         r̄g,
-        r̄ps;
+        r̄ps,
+        ās;
         constrained = constrained,
     )
-    
-    lncs, _ = TR.NCF.NC3D2P(ri, rj, ro, R)
-    ω = TR.NCF.find_ω(lncs,vcat(ri,rj),vcat(ṙi,ṙj))
-    if constrained
-        ci = collect(1:6)
-        Φi = Int[]
+    pretty_table(
+        SortedDict(
+            [
+                ("id", i),
+                ("bar length", b),
+            ]
+        )
+    )
+    if isbody
+        @show isbody
+        lncs, _ = TR.NCF.NC1P3V(ri, ro, R)
+        ω = zero(ṙo)
+    else
+        lncs, _ = TR.NCF.NC3D1P1V(ri, u, ro, R)
+        ω = TR.NCF.find_ω(lncs,vcat(ri,u),vcat(ṙi,u̇))
+        # @show ω, ṙi, u̇
     end
     state = TR.RigidBodyState(prop, lncs, ro, R, ṙo, ω, ci, Φi)
     # leg_mesh = load("400杆.STL")
-    barmesh = endpoints2mesh(r̄p1,r̄p2;radius = norm(r̄p2-r̄p1)/40)
+    if loadmesh
+        barmesh = load(joinpath(assetdir,"BZ.STL")) |> make_patch(;
+            scale=1/1000,
+            rot = RotY(π/2),
+        )
+    else
+        barmesh = endpoints2mesh(r̄p1,r̄p2;radius = norm(r̄p2-r̄p1)/40)
+    end
     rb = TR.RigidBody(prop, state, barmesh)
 end
 
 function uni(c=100.0;
-            μ = 0.9,
-            e = 0.0,
-            z0 = 0.2,
-            ωz = 5.0,
-            mbar = 0.05
-        )
-    lₛ = 80e-3
-    DE = 130.64e-3
-
-    p = OffsetArray(SVector{3}.(
-        [
-            [√3*lₛ/2/3,0     ,0],
-            [       0,-lₛ/2  ,0],
-            [       0, lₛ/2  ,0],
-            [√3*lₛ/2  ,0,0],
-            [√3*lₛ/2  ,0,0],
-            [√3*lₛ/2/3,0, DE/2],
-            [√3*lₛ/2/3,0,-DE/2]
-        ].+Ref([0,0,z0])
-    ),0:6)
+        μ = 0.9,
+        e = 0.0,
+        z0 = 0.2,
+        ωz = 5.0,
+        mbar = 0.05,
+        Rbar = RotZ(0.0),
+        isbody = false,
+    )
+    lₛ = 0.104
+    DE = 0.415
+    θ = 2π/3
+    p = SVector{3}.(
+        [   
+            [0,0,0.0],
+            lₛ .*[cos(0θ), sin(0θ),0],
+            lₛ .*[cos(1θ), sin(1θ),0],
+            lₛ .*[cos(2θ), sin(2θ),0],
+            [0,0,-DE/2],
+            [0,0, DE/2]
+        ]
+    )
     # fig,ax,plt = scatter(p)
     # # ax.aspect = DataAspect()
     # fig
     ṙo_ref = SVector(0.0,0,0)
     function rigidbase(i,p)
-
         movable = true
-        constrained = false
-        ci = Int[]
-        Φi = collect(1:6)
-        ri = p[0]
+        constrained = true
+        ci = collect(1:12)
+        Φi = Int[]
+        ri = p[1]
         ro = ri
         R = SMatrix{3,3}(Matrix(1.0I,3,3))
         ṙo = ṙo_ref
@@ -251,7 +275,8 @@ function uni(c=100.0;
         # ω = zeros(3)
         r̄g = SVector{3}(0.0,0.0,0.0)
         # @show p
-        r̄ps = [p[i]-p[0] for i = 1:3]
+        r̄ps = p[[2,3,4,1]]
+        ās = [SVector(0,0,1.0) for i = 1:4]
         m = inertia = 0.1
         Ī = SMatrix{3,3}(
             [
@@ -266,32 +291,44 @@ function uni(c=100.0;
             m,
             Ī,
             r̄g,
-            r̄ps;
+            r̄ps,
+            ās;
             constrained = constrained,
         )
         lncs, _ = TR.NCF.NC1P3V(ri, ro, R, ṙo, ω)
         state = TR.RigidBodyState(prop, lncs, ri, R, ṙo, ω, ci, Φi)
-        # trunk_mesh = load("身体.STL")
-        long = 25
+        trimesh = load("BASE.STL") |> make_patch(;
+            scale=1/1000,
+            trans = [0,0,0.005],
+            rot = RotZ(π/2),
+        )
+        # long = 25
 
-        b1 = endpoints2mesh(r̄ps[1],r̄ps[2];radius = norm(r̄ps[2]-r̄ps[1])/long)
-        b2 = endpoints2mesh(r̄ps[2],r̄ps[3];radius = norm(r̄ps[3]-r̄ps[2])/long)
-        b3 = endpoints2mesh(r̄ps[3],r̄ps[1];radius = norm(r̄ps[3]-r̄ps[1])/long)
-        trimesh = GB.merge([b1,b2,b3])
+        # b1 = endpoints2mesh(r̄ps[1],r̄ps[2];radius = norm(r̄ps[2]-r̄ps[1])/long)
+        # b2 = endpoints2mesh(r̄ps[2],r̄ps[3];radius = norm(r̄ps[3]-r̄ps[2])/long)
+        # b3 = endpoints2mesh(r̄ps[3],r̄ps[1];radius = norm(r̄ps[3]-r̄ps[1])/long)
+        # trimesh = GB.merge([b1,b2,b3])
         TR.RigidBody(prop, state, trimesh)
     end
 
+    rb1 = rigidbar(
+        1, 
+        Rbar*p[end-1],
+        Rbar*p[end];
+        ṙi = ṙo_ref,
+        ṙj = ṙo_ref,
+        m = mbar,
+        movable = true,
+        constrained = false,
+        ci = Int[],
+        Φi = collect(1:6),
+        # Φi = [1],
+        isbody,
+    )
+    rb2 = rigidbase(2, p)
     rbs = [
-        rigidbar(
-            1, p[end-1],p[end];
-            ṙi = ṙo_ref,ṙj = ṙo_ref,
-            m = mbar,
-            movable = true,
-            constrained = true,
-            ci = collect(1:6),
-            Φi = Int[],            
-        ),
-        rigidbase(2, p)
+        rb1,
+        rb2
     ]
     rigdibodies = TypeSortedCollection(rbs)
     numberedpoints = TR.number(rigdibodies)
@@ -304,53 +341,85 @@ function uni(c=100.0;
     original_restlens[4:6] .= 80e-3
 
     ks = zeros(ncables)
-    ks[1:3] .= 1000.0
+    ks[1:3] .= 900.0
     ks[4:6] .= 1000.0
 
     cables = [
-        TR.Cable3D(i, original_restlens[i], ks[i], c;slack=false) for i = 1:ncables
+    TR.Cable3D(i, original_restlens[i], ks[i], c;slack=false) for i = 1:ncables
     ]
     #
     tensiles = (cables = cables,)
     acs = [
-        TR.ManualActuator(
-            i,
-            collect(1:6), [original_restlens[6*(i-1)+j] for j = 1:6],
-        ) for i = [1]
+    TR.ManualActuator(
+        i,
+        collect(1:6), [original_restlens[6*(i-1)+j] for j = 1:6],
+    ) for i = [1]
     ]
     hub = (actuators = acs,)
     # #
     matrix_cnt = zeros(Int,ncables,2)
     for j = 1:ncables
-        if j < 4
-            matrix_cnt[j, 1:2] = [1, -j]
-        else
-            matrix_cnt[j, 1:2] = [2, -(j-3)]
-        end
+    if j < 4
+        matrix_cnt[j, 1:2] = [1, -j]
+    else
+        matrix_cnt[j, 1:2] = [2, -(j-3)]
+    end
     end
     # display(matrix_cnt)
     connected = TR.connect(rigdibodies, matrix_cnt)
     tensioned = @eponymtuple(connected,)
-    #
-    cnt = TR.Connectivity(numberedpoints, indexedcoords, tensioned)
-    # #
+    
+    # uj = TR.PinJoint(1,
+    #     TR.End2End(
+    #         1,
+    #         TR.ID(rb2,4,4),
+    #         TR.ID(rb1,3,3),
+    #     )
+    # )
 
-	contacts = [TR.Contact(i,μ,e) for i = 1:2]
+    # uj = TR.UniversalJoint(1,
+    #     TR.End2End(
+    #         1,
+    #         TR.ID(rb2,4,4),
+    #         TR.ID(rb1,3,3),
+    #     )
+    # )
+
+    uj = TR.UniversalPrismaticJoint(1,
+        TR.End2End(
+            1,
+            TR.ID(rb2,4,4),
+            TR.ID(rb1,3,3),
+        )
+    )
+
+    jointed = TR.join([uj],indexedcoords)
+
+    cnt = TR.Connectivity(numberedpoints, indexedcoords, tensioned, jointed)
+  
+    contacts = [TR.Contact(i,μ,e) for i = 1:2]
 
     tg = TR.TensegrityStructure(rigdibodies, tensiles, cnt, contacts)
     bot = TR.TensegrityRobot(tg, hub)
 end
 
 function superball(c=0.0;
+            ṙo = SVector(0.0,0.0,0),
+            ω = SVector(0.0,0.0,0.0),
             μ = 0.9,
             e = 0.0,
-            constrained = false,
+            l = 1.7/2,
+            d = l/2,
+            z0 = l^2/(sqrt(5)*d) - 1e-7,
+            θ = atan(0.5,1),
+            R = RotY(θ),
+            ro = SVector(0,0,z0),
+            k = 4000.0,
+            constrained = true,
+            addconst = Float64[],
+            loadmesh = true,
         )
-    l = 1.7/2
-    d = l/2    
-    z0 = l^2/(sqrt(5)*d) - 1e-7
-    θ = atan(0.5,1)
-    p = Ref(RotY(θ)) .* SVector{3}.(
+    p = Ref(R) .* SVector{3}.(
         [
             [ 0,  d,  l], [ 0,  d, -l],
             [ 0, -d, -l], [ 0, -d,  l],
@@ -359,10 +428,10 @@ function superball(c=0.0;
             [ l,  0,  d], [-l,  0,  d],
             [-l,  0, -d], [ l,  0, -d],
         ]
-    ).+Ref([0,0,z0])
+    ).+Ref(ro)
     # p |> display
     ṗ = [
-        SVector(5.0,1.0,0) + SVector(0.0,0.0,0.0)×r
+        ṙo + ω×(r-ro)
         for r in p
     ]
     rbs = [
@@ -372,7 +441,11 @@ function superball(c=0.0;
             ṙi=ṗ[2i-1],
             ṙj=ṗ[2i  ], 
             m = 5.0,
-            constrained = ifelse(i==1,true,false)
+            constrained = ifelse(i==1 && constrained,true,false),
+            ci = ifelse(i==1 && constrained,collect(1:6),Int[]),
+            Φi = ifelse(i==1 && constrained,Int[],[1]),
+            loadmesh,
+            isbody =false,
             )
         for i = 1:6
     ]
@@ -383,10 +456,20 @@ function superball(c=0.0;
     ncables = 24
 
     original_restlens = zeros(ncables)
+    original_restlens .= 1.199744871391589
     original_restlens .= 0.996
     ks = zeros(ncables)
-    ks .= 4000.0
+    ks .= k
 
+    pretty_table(
+        SortedDict(
+            [
+                ("stiffness", k),
+                ("bar length", 2l),
+                ("bar distance", d)
+            ]
+        )
+    )
     cables = [
         TR.Cable3D(i, original_restlens[i], ks[i], c;slack=false) for i = 1:ncables
     ]
@@ -420,10 +503,28 @@ function superball(c=0.0;
     connected = TR.connect(rigdibodies, matrix_cnt)
     tensioned = @eponymtuple(connected,)
     #
-    cnt = TR.Connectivity(numberedpoints, indexedcoords, tensioned)
+    
+    if isempty(addconst)
+        cnt = TR.Connectivity(numberedpoints, indexedcoords, tensioned)
+    else
+        cst1 = TR.LinearJoint(
+            1,
+            1,
+            [0.0],
+            addconst
+        )
+        jointed = TR.join([cst1],indexedcoords)
+        cnt = TR.Connectivity(
+            numberedpoints, 
+            indexedcoords, 
+            tensioned,
+            jointed
+            )
+    end
+
     # #
 
-	contacts = [TR.Contact(i,μ,e) for i = 1:12]
+    contacts = [TR.Contact(i,μ,e) for i = 1:12]
 
     tg = TR.TensegrityStructure(rigdibodies, tensiles, cnt, contacts)
     bot = TR.TensegrityRobot(tg, hub)

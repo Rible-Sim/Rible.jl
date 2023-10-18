@@ -1320,7 +1320,7 @@ function plot_tower3d_vis_nodpl(bots,figname=nothing)
                 zlims = (-0.001,0.5),
                 titleformatfunc = (sgi,tt) -> "",
                 sup! = (ax,tgob,sgi) -> begin
-                    rbs = TR.get_rigidbodies(tgob[])
+                    rbs = TR.get_bodies(tgob[])
                     for rbid in 7:10
                         # for rbid in [10]
                         if rbid in 7:8
@@ -1636,7 +1636,7 @@ function plot_tower3d_vis(bot0,bot1,figname=nothing)
                 zlims = (-0.001,0.5),
                 titleformatfunc = (sgi,tt) -> "",
                 sup! = (ax,tgob,sgi) -> begin
-                    rbs = TR.get_rigidbodies(tgob[])
+                    rbs = TR.get_bodies(tgob[])
                     # for rbid in 7:10
                     for rbid in [10]
                         if rbid in 7:8

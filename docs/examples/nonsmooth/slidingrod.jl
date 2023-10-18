@@ -116,7 +116,7 @@ plot_traj!(bar;textsize=60)
 
 function contact_dynamics(tg)
 	# bars = TR.get_rigidbars(tg)
-	rbs = TR.get_rigidbodies(tg)
+	rbs = TR.get_bodies(tg)
 	μ = 0.1
 	e = 0.0
 	contacts = [TR.Contact(i,μ,e) for i = 1:2]
@@ -224,7 +224,7 @@ plot_traj!(bar;textsize=60)
 
 function find_θs(bot)
 	(;tg,traj) = bot
-	rbs = TR.get_rigidbodies(tg)
+	rbs = TR.get_bodies(tg)
     [
         begin
             TR.update_rigids!(tg,q)

@@ -26,6 +26,28 @@ tenmarkers::Vector{Symbol} = [
 ]
 tlabel::LaTeXString = L"t~(\mathrm{s})"
 
+
+function match_figsize(figsize)
+    @match figsize begin
+        :UHD => (3840,2160)
+        :FHD => (1920,1080)
+        :HD  => (1280,720)
+        fs::Tuple => fs
+    end
+end
+
+macro myshow(exs...)
+    blk = Expr(:block)
+    for ex in exs
+        push!(blk.args, :(print($(sprint(Base.show_unquoted,ex)*" = "))))
+        push!(blk.args, :(show(stdout, "text/plain", begin value=$(esc(ex)) end)))
+        push!(blk.args, :(println()))
+    end
+    isempty(exs) || push!(blk.args, :value)
+    return blk
+end
+
+
 function hidex(ax)
     ax.xticklabelsvisible = false
     ax.xlabelvisible = false
@@ -58,7 +80,7 @@ theme_pub = Theme(;
     markersize,
     linewidth,
     figure_padding = (fontsize,fontsize,fontsize,fontsize),
-    resolution=(0.9tw,0.8tw),
+    resolution=match_figsize(:FHD),
     palette = (
         vlinecolor = [:slategrey],
         linestyle = [
@@ -75,6 +97,7 @@ theme_pub = Theme(;
             :diamond,:hexagon,
             :star8,:star5
         ],
+        markercolor = [:red, :blue],
     ),
     Axis = (
         # titlefont = "CMU Serif Bold",
@@ -97,77 +120,17 @@ theme_pub = Theme(;
     ),
     Mesh = (
         color = :slategrey,
-        transparency = true
+        transparency = false
+    ),
+    Poly = (
+        color = :slategrey,
+        transparency = false,
     )
 )
 
-function plot_rigid(rb::TR.AbstractRigidBody;
-        AxisType = LScene,
-        fig = Figure(resolution=(1920,1080)),
-        showpoints=true,
-        showmesh=true,
-        showupdatemesh=false
-    )
-    (;r̄g,r̄ps) = rb.prop
-    (;mesh) = rb
-    ndim = TR.get_ndim(rb)
-    if ndim == 2 && !showmesh
-        ax = Axis(fig[1,1])
-        ax.aspect = DataAspect()
-    else
-        # ax = LScene(fig[1,1], scenekw = (clear=true,))
-        ax = Axis3(fig[1,1],aspect=:data,)
-    end
-    if showpoints
-        scatter!(ax,r̄ps,markersize=5)
-        scatter!(ax,r̄g,markersize=5)
-        text!(ax,
-            ["$i $(string(r̄p))" for (i,r̄p) in enumerate(r̄ps)] ,
-            position = r̄ps,
-            color = :darkblue,
-            align = (:left, :baseline),
-            offset = (-5, 10)
-        )
-        text!(ax,
-            "r̄g $(string(r̄g))",
-            position = r̄g,
-            color = :darkred,
-            align = (:left, :baseline),
-            offset = (-5, 10)
-        )
-    end
-    if !(mesh isa Nothing)
-        if showmesh
-            mesh!(ax,mesh;)
-        end
-        if showupdatemesh
-            mesh!(ax,build_mesh(rb))
-        end
-    end
-    fig
-end
+set_theme!(theme_pub)
 
-function plot_tg!(tg::TR.TensegrityStructure)
-    ndim = TR.get_ndim(tg)
-    fig = Figure(resolution=(1280,720))
-    if ndim == 2
-        ax = Axis(fig[1,1], aspect=:data)
-    else
-        ax = Axis3(fig[1,1], aspect=:data)
-    end
-    tgob = Observable(deepcopy(tg))
-    init_plot!(ax,tgob)
-    fig
-end
 
-function match_figsize(figsize)
-    @match figsize begin
-        :UHD => (3840,2160)
-        :FHD => (1920,1080)
-        :HD  => (1280,720)
-        fs::Tuple => fs
-    end
-end
 
 function time2step(at,t)
     atstep = findfirst((x)->x>=at, t)
@@ -180,7 +143,7 @@ function get_groundmesh(f::Function,rect)
 end
 
 function get_groundmesh(plane::TR.Plane,rect)
-    GB.Mesh(rect, NaiveSurfaceNets()) do v
+    GB.Mesh(rect, MarchingCubes()) do v
         TR.signed_distance(v,plane)
     end |> make_patch(;color = :snow)
 end
@@ -195,7 +158,7 @@ end
 function plot_traj!(bot::TR.TensegrityRobot;
         AxisType=LScene,
         figsize=:FHD,
-        fig = Figure(resolution=match_figsize(figsize)),
+        fig = Figure(),
         gridsize=(1,1),
         attimes=nothing,
         atsteps=nothing,
@@ -207,6 +170,7 @@ function plot_traj!(bot::TR.TensegrityRobot;
         showmesh=true,
         showwire=false,
         showtitle=true,
+        showcables=true,
         showinfo=true,
         xlims=(-1.0,1.0),
         ylims=(-1.0,1.0),
@@ -214,13 +178,10 @@ function plot_traj!(bot::TR.TensegrityRobot;
         showground=true,
         ground=nothing,
         showback=false,
-        fontsize=20,
         actuate=false,
         figname=nothing,
         showinit=false,
-        tgini=nothing,
-        rowgap=2fontsize,
-        colgap=2fontsize,
+        auto=false,
         titleformatfunc = (sgi,tt)-> begin
             rich(
                 rich("($(alphabet[sgi])) ", font=:bold),
@@ -231,26 +192,13 @@ function plot_traj!(bot::TR.TensegrityRobot;
         kargs...
     )
     (;tg,traj) = bot
+    ndim = TR.get_ndim(tg)
     tg.state.system.q .= traj.q[begin]
     TR.update!(tg)
-    if tgini isa Nothing
-        tgobini = Observable(deepcopy(tg))
-    elseif tgini isa TR.TensegrityStructure
-        tgobini = Observable(tgini)
-    else
-        @warn "Not supported type of tgini"
-        showinit = false
-    end
-
-    hasmesh = mapreduce(|, TR.get_rigidbodies(tg)) do rb
-        rb.mesh isa GB.Mesh
-    end
-    showmesh = showmesh && hasmesh
-    @show showmesh
-    ndim = TR.get_ndim(tg)
-    xmin,xmax = xlims
-    ymin,ymax = ylims
-    zmin,zmax = zlims
+    tgobini = Observable(deepcopy(tg))
+    xmin, xmax = xlims
+    ymin, ymax = ylims
+    zmin, zmax = zlims
     xwid = xmax - xmin
     ywid = ymax - ymin
     zwid = zmax - zmin
@@ -263,7 +211,7 @@ function plot_traj!(bot::TR.TensegrityRobot;
         (a::Nothing,b::Nothing) => [
                 1 for sgi in eachindex(subgrids)
             ]
-    	(a,b::Nothing) => [
+        (a,b::Nothing) => [
                 time2step(a[sgi],traj.t)
                 for sgi in eachindex(subgrids)
             ]
@@ -273,11 +221,8 @@ function plot_traj!(bot::TR.TensegrityRobot;
             b
         end
     end
-
     # @warn "Overwriting `atsteps`"
     # @warn "Ignoring `attimes`"
-    rowgap!(grid1,rowgap)
-	colgap!(grid1,colgap)
     for sgi in eachindex(parsed_steps)
         if sgi > length(subgrids)
             sg = subgrids[end]
@@ -288,13 +233,13 @@ function plot_traj!(bot::TR.TensegrityRobot;
         this_time = Observable(traj.t[this_step])
         TR.goto_step!(bot,this_step;actuate)
         tgob = Observable(deepcopy(tg))
-        axtitle = lift(this_time) do tt
+        axtitle = Makie.lift(this_time) do tt
             titleformatfunc(sgi,tt)
         end
         if ndim == 2 && !showmesh
             # showinfo = false
             showground = false
-            ax = Axis(sg[1,1],title=axtitle)
+            ax = Axis(sg[1,1],)
             ax.aspect = DataAspect()
             xlims!(ax,xmin,xmax)
             ylims!(ax,ymin,ymax)
@@ -321,21 +266,27 @@ function plot_traj!(bot::TR.TensegrityRobot;
             groundmesh = get_groundmesh(ground,rect)
             mesh!(ax,groundmesh;color = :snow)
         end
-        if showinit
-            # init_plot!(ax,deepcopy(tgob);showmesh,showwire,isref=true,showpoints,kargs...)
-            # println("Showing init")
-            # sup!(ax,tgobini,sgi)
-            init_plot!(ax,tgobini;
-                showmesh,showwire,
-                isref=true,
-                showcables=false,
-                showpoints,kargs...)
+        if showwire || showmesh || showcables || showlabels || showpoints
+            if showinit
+                viz!(ax,tgobini;
+                    showmesh,
+                    showwire,
+                    isref=true,
+                    showcables=false,
+                    showpoints,
+                    kargs...
+                )
+            end
+            viz!(ax,tgob;
+                showmesh,
+                showwire,
+                showlabels,
+                showpoints,
+                showcables,
+                kargs...
+            )
         end
         sup!(ax,tgob,sgi)
-        init_plot!(ax,tgob;
-            showlabels,showmesh,showwire,fontsize,showpoints,
-            kargs...
-        )
         if showtitle    
             Label(
                 sg[1, 1, Top()],
@@ -364,25 +315,24 @@ function plot_traj!(bot::TR.TensegrityRobot;
                 inspectable=false
             )
         end
-
         if doslide || dorecord
             if showinfo
                 grid2 = sg[:,2] = GridLayout(;tellheight=false)
                 grid_info = grid2[1,1] = GridLayout(;tellheight=false)
                 dict_info = [
-                    "fig. height" => lift(string,ax.height),
-                    "fig. width" => lift(string,ax.width)
+                    "fig. height" => Makie.lift(string,ax.height),
+                    "fig. width" => Makie.lift(string,ax.width)
                 ]
                 if ndim == 3 && AxisType == Axis3
                     cam_info = [
-                        "azimuth" => lift(string,ax.azimuth),
-                        "elevation" => lift(string,ax.elevation)
+                        "azimuth" => Makie.lift(string,ax.azimuth),
+                        "elevation" => Makie.lift(string,ax.elevation)
                     ]
                     append!(dict_info,cam_info)
                 end
                 for (i,(infoname,infovalue)) in enumerate(dict_info)
                     Label(grid_info[i,1],
-                        lift(infovalue) do iv
+                        Makie.lift(infovalue) do iv
                             "$infoname = $iv"
                         end,
                         justification = :left,
@@ -436,6 +386,13 @@ function plot_traj!(bot::TR.TensegrityRobot;
                     this_time[] = traj.t[this_step]
                     TR.analyse_slack(tg,true)
                     tgob[] = tg
+                    if auto
+                        if AxisType <: LScene
+                            center!(ax.scene)
+                        elseif AxisType <: Axis3
+                            autolimits!(ax)
+                        end
+                    end
                 end
             end
         end
@@ -465,154 +422,205 @@ function savefig(fig,figname=nothing)
     fig
 end
 
-function init_plot!(ax,tgob;
+@recipe(Viz, tg) do scene
+    # theme_pub,
+    Attributes(        
         isref=false,
-        showlabels=true,
-        showpoints=true,
+        showlabels=false,
+        show_cable_labels = false,
+        show_mass_center_labels = false,
+        show_node_labels = false,
+        showpoints=false,
+        show_mass_centers = false,
+        show_nodes = false,
+        showarrows=false,
         showmesh=true,
         showwire=false,
         showcables=true,
-        fontsize=10,
+        pointcolor=:black,
         slack_linestyle = :dash,
         cablecolor=:deepskyblue,
         cablelabelcolor=:darkgreen,
         rigidlabelcolor=:darkblue,
         refcolor=:lightgrey,
-        cablewidth=2
+        cablewidth=2,
+        meshcolor=:slategrey,
     )
-    (;tensiles,nbodies) = tgob[]
-    ncables = length(tensiles.cables)
-    ndim = TR.get_ndim(tgob[])
-    if isref
+end
+
+function Makie.plot!(viz::Viz{Tuple{S}};
+    ) where S <:TR.AbstractBody
+    body_ob = viz[:tg]
+    # body decorations
+    mass_center_ob = @lift $body_ob.state.rg |> Makie.Point
+    nodes_ob = @lift $body_ob.state.rps .|> Makie.Point
+    # arrows_ob = @lift body_ob.state.as .|> Makie.Point
+    id  = @lift $body_ob.prop.id
+    if viz.show_mass_centers[]
+        scatter!(viz,mass_center_ob;)
+        if viz.show_mass_center_labels[]
+            text!(viz,
+                "r$(id[])g" ,
+                position = mass_center_ob,
+                color = viz.rigidlabelcolor[],
+                align = (:left, :top),
+                offset = (-5, -10)
+            )
+        end
+    end
+    if viz.show_nodes[]
+        scatter!(viz,nodes_ob;color=viz.pointcolor[])
+        if viz.show_node_labels[]
+            text!(viz,
+                ["r$(id[])p$pid" for (pid,rp) in enumerate(nodes_ob[])],
+                position = nodes_ob,
+                color = :darkred,
+                align = (:left, :top),
+                offset = (0,2fontsize*(rand()-0.5))
+            )
+        end
+    end
+    # body mesh
+    if viz.showmesh[] || viz.showwire[]
+        meshes_ob = @lift build_mesh($body_ob,color=viz.meshcolor[])
+        if viz.showwire[]
+            strokewidth = linewidth
+        else
+            strokewidth = 0
+        end
+        if viz.isref[]
+            mesh!(viz, meshes_ob; shading = true)
+        else
+            poly!(viz, meshes_ob; shading = true,
+                # strokewidth
+            )
+        end
+    end
+    viz
+end
+
+function Makie.plot!(viz::Viz{Tuple{Vector{S}}};
+    ) where S <: TR.Cable
+    cables_ob = viz[:tg]
+    point_mid_ob = @lift [
+        begin 
+            point_start = cab.state.start
+            point_stop = cab.state.stop 
+            (point_start .+ point_stop)./2 |> Makie.Point
+        end
+        for cab in $cables_ob
+    ]
+
+    slackseg_ob = @lift [
+        begin 
+            point_start = cab.state.start |> Makie.Point
+            point_stop = cab.state.stop |> Makie.Point
+            (point_start,point_stop)
+        end
+        for cab in $cables_ob if cab.state.length <= cab.state.restlen
+    ]
+
+    noslackseg_ob = @lift [
+        begin 
+            point_start = cab.state.start |> Makie.Point
+            point_stop = cab.state.stop |> Makie.Point
+            (point_start,point_stop)
+        end
+        for cab in $cables_ob if cab.state.length > cab.state.restlen
+    ]
+
+    ids_ob = @lift [
+        "c$(cab.id)"
+         for cab in $cables_ob
+    ]
+    # slackonly=false,
+    # noslackonly=true
+    linesegments!(
+        viz, noslackseg_ob, 
+        color = viz.cablecolor[], 
+        linewidth = viz.cablewidth[], 
+        linestyle = :solid
+    )
+    linesegments!(
+        viz, slackseg_ob, 
+        color = viz.cablecolor[], 
+        linewidth = viz.cablewidth[], 
+        linestyle = viz.slack_linestyle[]
+    )
+    # show cable labels
+    if viz.show_cable_labels[]
+        text!(viz,
+            ids_ob,
+            position = point_mid_ob,
+            color = viz.cablelabelcolor[],
+            align = (:left, :top),
+            offset = (-5, -10)
+        )
+    end
+    viz
+end
+
+function Makie.plot!(viz::Viz{Tuple{S}};
+    ) where S <:TR.AbstractTensegrityStructure
+    if viz.isref[]
         showlabels = false
         cablecolor=
-        cablelabelcolor=
-        rigidlabelcolor=refcolor
+        cablelabelcolor=viz.refcolor[]
+        meshcolor=viz.refcolor[]
+        viz.showcables[] = false
+    else
+        meshcolor=viz.meshcolor[]
+        cablecolor = viz.cablecolor[]
+        cablelabelcolor = viz.cablelabelcolor[]
     end
-    # cables
-    if (ncables !== 0) && showcables
-        linesegs_noslack_cables = @lift begin
-            get_linesegs_cables($tgob;slackonly=false,noslackonly=true)
-        end
-        linesegs_slack_cables = @lift begin
-            get_linesegs_cables($tgob;slackonly=true,noslackonly=false)
-        end
-        linesegments!(ax, linesegs_noslack_cables, 
-            color = cablecolor, linewidth = cablewidth)
-        linesegments!(ax, linesegs_slack_cables, 
-            color = cablecolor, linewidth = cablewidth, linestyle = slack_linestyle)
-
-        rcs_by_cables = @lift begin
-            (;tensioned) = $tgob.connectivity
-            ndim = TR.get_ndim($tgob)
-            T = TR.get_numbertype($tgob)
-            ret = Vector{MVector{ndim,T}}()
-            mapreduce(
-                (scnt)->
-                [(
-                    scnt.end1.rbsig.state.rps[scnt.end1.pid].+
-                    scnt.end2.rbsig.state.rps[scnt.end2.pid]
-                )./2],
-                vcat,
-                tensioned.connected
-                ;init=ret
-            )
-        end
-        # @show rcs_by_cables
-        if showlabels
-            text!(ax,
-                ["c$(i)" for (i,rc) in enumerate(rcs_by_cables[])] ,
-                position = rcs_by_cables,
-                fontsize = fontsize,
-                color = cablelabelcolor,
-                align = (:left, :top),
-                offset = (-5, -10)
-            )
-        end
+    if viz.showlabels[]
+        show_cable_labels = 
+        show_mass_center_labels = 
+        show_node_labels = true
+    else
+        show_cable_labels = viz.show_cable_labels[]
+        show_mass_center_labels = viz.show_mass_center_labels[]
+        show_node_labels = viz.show_node_labels[]
     end
-
-    rbsob = @lift begin
-        TR.get_rigidbodies($tgob;visual=true)
+    if viz.showpoints[]
+        show_mass_centers = show_nodes = true
+    else
+        show_mass_centers = viz.show_mass_centers[]
+        show_nodes = viz.show_nodes[]
     end
-    nb = length(rbsob[])
-    if showmesh || showwire
-        for rbid = 1:nb
-            if showwire
-                strokewidth = linewidth
-            else
-                strokewidth = 0
-            end
-            if isref
-                rigid_mesh = @lift begin
-                    rb = ($rbsob)[rbid]
-                    build_mesh(rb; color = refcolor)
-                end
-                mesh!(ax, 
-                    rigid_mesh;
-                    shading = true
-                )
-            else
-                rigid_mesh = @lift begin
-                    rb = ($rbsob)[rbid]
-                    build_mesh(rb)
-                end
-                poly!(ax, rigid_mesh;
-                    # color = :grey,
-                    shading = true,
-                    # strokewidth
-                    transparency = true
-                )
-            end
-        end
+    tgob = viz[:tg]
+    (;tensiles,nbodies) = tgob[]
+    ncables = length(tensiles.cables)
+    if ncables > 0 && viz.showcables[]
+        cables_ob = @lift $tgob.tensiles.cables
+        viz!(viz,cables_ob;
+            cablecolor,
+            cablewidth = viz.cablewidth[],
+            cablelabelcolor = viz.cablelabelcolor[],
+            slack_linestyle = viz.slack_linestyle[],
+            show_cable_labels,
+        )
     end
-    # mass centers
-    rg_by_rbs = @lift begin
-        [rb.state.rg for rb in $rbsob]
-    end
-    # points on rigidbodies
-    if showpoints || showlabels
-        rps_by_rbs = [
-            @lift begin
-                rbs = TR.get_rigidbodies($tgob)
-                rbs[rbid].state.rps
-            end
-            for rbid = 1:nbodies
+    if nbodies > 0
+        bodies_ob = @lift TR.get_bodies($tgob)
+        bodies_array_ob = [
+            @lift $(bodies_ob)[i]
+            for i = 1:nbodies
         ]
-        if showpoints
-            scatter!(ax,rg_by_rbs; )
-            for (rbid,rps) in enumerate(rps_by_rbs)
-                scatter!(ax,rps)
-            end
-        end
-        if showlabels
-            text!(ax,
-                ["r$(i)g" for (i,rg) in enumerate(rg_by_rbs[])] ,
-                position = rg_by_rbs,
-                fontsize = fontsize,
-                color = rigidlabelcolor,
-                align = (:left, :top),
-                offset = (-5, -10)
+        for body_ob in bodies_array_ob
+            viz!(viz,body_ob;
+                show_mass_centers,
+                show_mass_center_labels,
+                show_nodes,
+                show_node_labels,
+                meshcolor,
+                pointcolor = viz.pointcolor[],
+                showmesh = viz.showmesh[],
+                # showwire = viz.showwire[],
             )
-            for (rbid,rps) in enumerate(rps_by_rbs)
-                text!(ax,
-                    # ["r$(rbid)p$pid $(string(rp))" for (pid,rp) in enumerate(rps[])],
-                    ["r$(rbid)p$pid" for (pid,rp) in enumerate(rps[])],
-                    position = rps,
-                    fontsize = fontsize,
-                    color = :darkred,
-                    align = (:left, :top),
-                    offset = (20(rand()-0.5), 20(rand()-0.5))
-                )
-            end
         end
     end
-    # if showjoints
-    #     jointed = @lift begin
-    #         (;jointed) = $tgob
-    #         (;njoints,joints) = jointed
-    #     end
-
-    # end
+    viz
 end
 
 function get3Dstate(rb)
@@ -640,23 +648,23 @@ function get3Dstate(rb)
 end
 
 function get_linesegs_cables(tg;slackonly=false,noslackonly=false)
-	(;connected) = tg.connectivity.tensioned
-	(;cables) = tg.tensiles
-	ndim = TR.get_ndim(tg)
-	T = TR.get_numbertype(tg)
-	linesegs_cables = Vector{Tuple{Point{ndim,T},Point{ndim,T}}}()
-	foreach(connected) do scnt
-		scable = cables[scnt.id]
-		ret = (Point(scnt.end1.rbsig.state.rps[scnt.end1.pid]),
-				Point(scnt.end2.rbsig.state.rps[scnt.end2.pid]))
+    (;connected) = tg.connectivity.tensioned
+    (;cables) = tg.tensiles
+    ndim = TR.get_ndim(tg)
+    T = TR.get_numbertype(tg)
+    linesegs_cables = Vector{Tuple{Point{ndim,T},Point{ndim,T}}}()
+    foreach(connected) do scnt
+        scable = cables[scnt.id]
+        ret = (Point(scnt.hen.rbsig.state.rps[scnt.hen.pid]),
+                Point(scnt.egg.rbsig.state.rps[scnt.egg.pid]))
         slacking = scable.state.tension <= 0
         if (slackonly && slacking) ||
            (noslackonly && !slacking) ||
            (!slackonly && !noslackonly)
-			push!(linesegs_cables,ret)
-		end
-	end
-	linesegs_cables
+            push!(linesegs_cables,ret)
+        end
+    end
+    linesegs_cables
 end
 
 function build_mesh(rb::TR.AbstractRigidBody;update=true,color=nothing)
@@ -689,11 +697,11 @@ function build_mesh(rb::TR.AbstractRigidBody;update=true,color=nothing)
     # GB.Mesh(GB.meta(coloredpoints,normals=nls),fac)
 end
 
-function make_patch(;trans=[0.0,0,0],rot=RotX(0.0),color=:slategrey)
-    parsedcolor = parse(Makie.ColorTypes.RGB{Float32},color)
+function make_patch(;trans=[0.0,0,0],rot=RotX(0.0),scale=1,color=:slategrey)
+    parsedcolor = parse(Makie.ColorTypes.RGBA{Float32},color)
     function patch(mesh)
         ct = Translation(trans) ∘ LinearMap(rot)
-        updated_pos = ct.(mesh.position)
+        updated_pos = ct.(mesh.position.*scale)
         fac = GB.faces(mesh)
         nls = GB.normals(updated_pos,fac)
         colors = fill(parsedcolor,length(updated_pos))
@@ -707,14 +715,14 @@ function endpoints2mesh(
         n1=10,n2=2,
         color=:slategrey
     )
-	cyl_bar = Meshes.Cylinder(
+    cyl_bar = Meshes.Cylinder(
         Meshes.Point(p1),
         Meshes.Point(p2),
         radius
     )
     cylsurf_bar = Meshes.boundary(cyl_bar)
     # Meshes.sample(cylsurf_bar,Meshes.RegularSampling(10,3))
-	cyl_bar_simple = Meshes.discretize(cylsurf_bar,Meshes.RegularDiscretization(n1,n2))
+    cyl_bar_simple = Meshes.discretize(cylsurf_bar,Meshes.RegularDiscretization(n1,n2))
     simple2mesh(cyl_bar_simple,color)
 end
 
@@ -730,7 +738,7 @@ function spbasis(n)
     t,b
 end
 
-function build_mesh(fb::TR.FlexibleBody,nsegs=100)
+function build_mesh(fb::TR.FlexibleBody,nsegs=100;color=:slategrey)
     (;state) = fb
     (;cache) = state
     (;funcs,e) = cache
@@ -756,7 +764,7 @@ function build_mesh(fb::TR.FlexibleBody,nsegs=100)
         R*Meshes.Vec(radius*cos(φ), radius*sin(φ), 0.0) + o
     end
 
-    points = Meshes.ivec(point(φ, x) for φ in φrange, x in xrange) |> collect
+    points = IterTools.ivec(point(φ, x) for φ in φrange, x in xrange) |> collect
      # connect regular samples with quadrangles
     nx, ny = sz
     topo   = Meshes.GridTopology((nx-1, ny-1))
@@ -771,7 +779,7 @@ function build_mesh(fb::TR.FlexibleBody,nsegs=100)
     end
 
     connec = middle
-    Meshes.SimpleMesh(points, connec) |> simple2mesh 
+    Meshes.SimpleMesh(points, connec) |> (x)->simple2mesh(x,color)
 end
 
 function parse_Adams_dynamic(url)
@@ -814,26 +822,25 @@ function parse_Adams_frequency(url)
 end
 
 function simple2mesh(sp,color=:slategrey)
-	dim   = Meshes.embeddim(sp)
-	nvert = Meshes.nvertices(sp)
-	nelem = Meshes.nelements(sp)
-	verts = Meshes.vertices(sp)
-	topo  = Meshes.topology(sp)
-	elems = Meshes.elements(topo)
+    dim   = Meshes.embeddim(sp)
+    nvert = Meshes.nvertices(sp)
+    nelem = Meshes.nelements(sp)
+    verts = Meshes.vertices(sp)
+    topo  = Meshes.topology(sp)
+    elems = Meshes.elements(topo)
 
-	# coordinates of vertices
-	coords = Meshes.coordinates.(verts)
-	# fan triangulation (assume convexity)
-	tris4elem = map(elems) do elem
-	  I = Meshes.indices(elem)
-	  [[I[1], I[i], I[i+1]] for i in 2:length(I)-1]
-	end
+    # coordinates of vertices
+    coords = Meshes.coordinates.(verts)
+    # fan triangulation (assume convexity)
+    tris4elem = map(elems) do elem
+      I = Meshes.indices(elem)
+      [[I[1], I[i], I[i+1]] for i in 2:length(I)-1]
+    end
 
-	# flatten vector of triangles
-	tris = [tri for tris in tris4elem for tri in tris]
-
-	points  = GB.Point.(coords)
-	faces  = GB.TriangleFace{UInt64}.(tris)
+    # flatten vector of triangles
+    tris = [tri for tris in tris4elem for tri in tris]
+    points  = GB.Point.(coords)
+    faces  = GB.TriangleFace{UInt64}.(tris)
     nls = GB.normals(points,faces)
     parsedcolor = parse(Makie.ColorTypes.RGB{Float32},color)
     colors = fill(parsedcolor,length(points))
@@ -841,46 +848,46 @@ function simple2mesh(sp,color=:slategrey)
 end
 
 function plotsave_energy(bot,figname=nothing)
-	(;traj) = bot
-	(;t) = traj
-	tmin,tmax = t[begin], t[end]
-	titles = [
-		"机械能",
-		"动能",
-		"势能"
-	]
-	with_theme(theme_pub; resolution = (0.9tw,0.6tw)) do
-		ME = TR.mechanical_energy!(bot;gravity=true)
-		fig = Figure()
-		axs = [
-			begin
-				ax = Axis(
-					fig[i,1],
-					xlabel=L"t~\mathrm{(s)}",
-					ylabel="Energy (J)",
-					title=titles[i]
-				)
-				xlims!(ax,tmin,tmax)
-				# ylims!(ax,,)
-				if i !== 3
-					ax.xlabelvisible = false
-					ax.xticklabelsvisible = false
-				end
-				Label(fig[i,1,TopLeft()], "($(alphabet[i]))")
-				ax
-			end
-			for i = 1:3
-		]
+    (;traj) = bot
+    (;t) = traj
+    tmin,tmax = t[begin], t[end]
+    titles = [
+        "机械能",
+        "动能",
+        "势能"
+    ]
+    with_theme(theme_pub; resolution = (0.9tw,0.6tw)) do
+        ME = TR.mechanical_energy!(bot;gravity=true)
+        fig = Figure()
+        axs = [
+            begin
+                ax = Axis(
+                    fig[i,1],
+                    xlabel=L"t~\mathrm{(s)}",
+                    ylabel="Energy (J)",
+                    title=titles[i]
+                )
+                xlims!(ax,tmin,tmax)
+                # ylims!(ax,,)
+                if i !== 3
+                    ax.xlabelvisible = false
+                    ax.xticklabelsvisible = false
+                end
+                Label(fig[i,1,TopLeft()], "($(alphabet[i]))")
+                ax
+            end
+            for i = 1:3
+        ]
 
-		lines!(axs[1], t, ME.E)
-		lines!(axs[2], t, ME.T)
-		lines!(axs[3], t, ME.V)
+        lines!(axs[1], t, ME.E)
+        lines!(axs[2], t, ME.T)
+        lines!(axs[3], t, ME.V)
 
 
-		savefig(fig,figname)
+        savefig(fig,figname)
 
-		fig
-	end
+        fig
+    end
 end
 
 function plotsave_friction_direction(bots,x,xs,figname=nothing;
@@ -890,145 +897,282 @@ function plotsave_friction_direction(bots,x,xs,figname=nothing;
         vtol=1e-5,
         cid = 1,
     )
-	with_theme(theme_pub;
+    with_theme(theme_pub;
         resolution
-	) do
-		fig = Figure()
-		for (botid,bot) in enumerate(bots)
-			ax1 = Axis(fig[botid,1],
-						xlabel=tlabel,
-						ylabel=L"\delta\alpha~(\mathrm{Rad})",
-						title=latexstring("$x=$(xs[botid])")
-				)
-			ax2 = Axis(fig[botid,2],
-						xlabel=tlabel,
-						ylabel=L"\delta\theta~(\mathrm{Rad})",
-						title=latexstring("$x=$(xs[botid])")
-				)
-			Label(fig[botid,1,TopLeft()],"($(alphabet[2botid-1]))")
-			Label(fig[botid,2,TopLeft()],"($(alphabet[2botid]))")
-			(;t) = bot.traj
-			contacts_traj_voa = VectorOfArray(bot.contacts_traj)
+    ) do
+        fig = Figure()
+        for (botid,bot) in enumerate(bots)
+            ax1 = Axis(fig[botid,1],
+                        xlabel=tlabel,
+                        ylabel=L"\delta\alpha~(\mathrm{Rad})",
+                        title=latexstring("$x=$(xs[botid])")
+                )
+            ax2 = Axis(fig[botid,2],
+                        xlabel=tlabel,
+                        ylabel=L"\delta\theta~(\mathrm{Rad})",
+                        title=latexstring("$x=$(xs[botid])")
+                )
+            Label(fig[botid,1,TopLeft()],"($(alphabet[2botid-1]))")
+            Label(fig[botid,2,TopLeft()],"($(alphabet[2botid]))")
+            (;t) = bot.traj
+            contacts_traj_voa = VectorOfArray(bot.contacts_traj)
             if eltype(xs) <: Int
-			    c1s = contacts_traj_voa[xs[botid],:]
+                c1s = contacts_traj_voa[xs[botid],:]
             else
                 c1s = contacts_traj_voa[cid,:]
             end
-			idx_sli = findall(c1s) do c
-						issliding(c;vtol)
-					end
-			idx_imp = findall(isimpact,c1s) ∩ idx_sli
-			δα_imp = map(c1s[idx_imp]) do c
-						get_contact_angle(c)
-					end
-			idx_per = findall(doespersist,c1s) ∩ idx_sli
+            idx_sli = findall(c1s) do c
+                        issliding(c;vtol)
+                    end
+            idx_imp = findall(isimpact,c1s) ∩ idx_sli
+            δα_imp = map(c1s[idx_imp]) do c
+                        get_contact_angle(c)
+                    end
+            idx_per = findall(doespersist,c1s) ∩ idx_sli
             # @show idx_per[begin]
-			δα_per = map(c1s[idx_per]) do c
-						get_contact_angle(c)
-					end
-			scaling = 10.0^(-mo_α)
-			Label(fig[botid,1,Top()],latexstring("\\times 10^{-$(mo_α)}"))
-			markersize = fontsize
-			scatter!(ax1,t[idx_per],δα_per./scaling;
-						marker=:diamond, markersize)
-			scatter!(ax1,t[idx_imp],δα_imp./scaling;
-						marker=:xcross, markersize)
-			ylims!(ax1,-1.0,1.0)
-			xlims!(ax1,extrema(t)...)
+            δα_per = map(c1s[idx_per]) do c
+                        get_contact_angle(c)
+                    end
+            scaling = 10.0^(-mo_α)
+            Label(fig[botid,1,Top()],latexstring("\\times 10^{-$(mo_α)}"))
+            markersize = fontsize
+            scatter!(ax1,t[idx_per],δα_per./scaling;
+                        marker=:diamond, markersize)
+            scatter!(ax1,t[idx_imp],δα_imp./scaling;
+                        marker=:xcross, markersize)
+            ylims!(ax1,-1.0,1.0)
+            xlims!(ax1,extrema(t)...)
 
-			θ_imp = map(c1s[idx_imp]) do c
-					get_friction_direction(c)
-				end
-			θ_per = map(c1s[idx_per]) do c
-					get_friction_direction(c)
-				end
-			scaling = 10.0^(-mo)
-			Label(fig[botid,2,Top()],latexstring("\\times 10^{-$(mo)}"))
-			scatter!(ax2,t[idx_per],(θ_per.-π/4)./scaling, label="Persistent";
-						marker=:diamond, markersize)
-			scatter!(ax2,t[idx_imp],(θ_imp.-π/4)./scaling, label="Impact";
-						marker=:xcross, markersize)
-			xlims!(ax2,extrema(t)...)
-			ylims!(ax2,-1.0,1.0)
-			if botid !== length(bots)
-				hidex(ax1)
-				hidex(ax2)
-			else
-				Legend(fig[length(bots)+1,:],ax2;
-					orientation=:horizontal
-				)
-			end
-		end
-		rowgap!(fig.layout,fontsize/2)
-		savefig(fig,figname)
-		fig
-	end
+            θ_imp = map(c1s[idx_imp]) do c
+                    get_friction_direction(c)
+                end
+            θ_per = map(c1s[idx_per]) do c
+                    get_friction_direction(c)
+                end
+            scaling = 10.0^(-mo)
+            Label(fig[botid,2,Top()],latexstring("\\times 10^{-$(mo)}"))
+            scatter!(ax2,t[idx_per],(θ_per.-π/4)./scaling, label="Persistent";
+                        marker=:diamond, markersize)
+            scatter!(ax2,t[idx_imp],(θ_imp.-π/4)./scaling, label="Impact";
+                        marker=:xcross, markersize)
+            xlims!(ax2,extrema(t)...)
+            ylims!(ax2,-1.0,1.0)
+            if botid !== length(bots)
+                hidex(ax1)
+                hidex(ax2)
+            else
+                Legend(fig[length(bots)+1,:],ax2;
+                    orientation=:horizontal
+                )
+            end
+        end
+        rowgap!(fig.layout,fontsize/2)
+        savefig(fig,figname)
+        fig
+    end
 end
 
-function plotsave_error(mbots,dts,figname=nothing;
-        bid = 1,
-        pid = 0,
-        di = 1,
-        resolution = (0.8tw,0.3tw),
+function get_err_avg(bots;bid=1,pid=1,di=1,field=:traj)
+    nbots = length(bots)
+    lastbot = bots[nbots]
+    if field == :traj
+        get! = get_trajectory!
+    elseif field == :vel
+        get! = get_velocity!
+    end
+    lastbot_traj = get!(lastbot,bid,pid)
+    lastbot_t = lastbot.traj.t
+    lastbot_dt = lastbot_t[begin+1]-lastbot_t[begin]
+    lastbot_traj_itp = begin 
+        itp = interpolate(lastbot_traj[di,:], BSpline(Linear()))
+        scale(
+            itp,
+            lastbot_t[begin]:lastbot_dt:lastbot_t[end]
+        )
+    end
+    dts = [
+        bot.traj.t[begin+1]-bot.traj.t[begin]
+        for bot in bots[begin:end-1]
+    ]
+    err_avg = [
+        begin
+            (;t) = bot.traj
+            bot_traj_di = get!(
+                bots[i],bid,pid
+            )[di,begin:end-1]
+            ref_traj_di = lastbot_traj_itp(
+                t[begin:end-1]
+            ) 
+            bot_traj_di .- ref_traj_di .|> abs |> mean
+        end
+        for (i,bot) in enumerate(bots[1:nbots-1])
+    ]
+    dts,err_avg
+end
+
+function plot_convergence_order!(ax,dts,err_avg;show_orders=true)
+
+    scatterlines!(ax,
+        dts,
+        err_avg;
+        marker=:rect,
+        color=:red,
+        label="NMSI"
     )
-	with_theme(theme_pub;
-            resolution,
-            figure_padding = (0,fontsize,0,0),
-		) do
-		fig = Figure()
-		for j in axes(mbots,2)
-			bots = mbots[:,j]
-			nbots = length(bots)
-			itp = interpolate(get_trajectory!(bots[nbots],bid,pid)[di,:], BSpline(Linear()))
-			ref_traj = scale(itp,0:dts[nbots]:bots[nbots].traj.t[end])
-			# ref_traj(0:0.1:2)
-			err_avg = [
-				get_trajectory!(bots[i],bid,pid)[di,begin:end-1].-ref_traj(bots[i].traj.t[begin:end-1]) .|> abs |> mean
-				for (i,dt) in enumerate(dts[1:nbots-1])
-			]
-            @show err_avg
-			ax = Axis(fig[1,j];
-				xlabel = L"h",
-				ylabel = "Avg. Err.",
-				yscale = Makie.log10,yminorticksvisible = true, yminorgridvisible = true,yminorticks = IntervalsBetween(8),
-				xscale = Makie.log10,xminorticksvisible = true, xminorgridvisible = true,xminorticks = IntervalsBetween(8),
-				)
-			Label(fig[1,j,TopLeft()],"($(alphabet[j]))")
-			scatterlines!(ax,dts[1:nbots-1],err_avg;marker=:rect,color=:red,label="Error of NMSI")
-			lines!(ax,dts[1:nbots-1],err_avg[1] .*(dts[1:nbots-1]./dts[1]).^2,label="2nd-Order")
-			lines!(ax,dts[1:nbots-1],err_avg[1] .*(dts[1:nbots-1]./dts[1]),label="1st-Order")
-			# ylims!(ax,1e-11,1e-2)
-			if j == 1
-				axislegend(ax;position=:rb)
-			else
-				hidey(ax)
-			end
-		end
-		savefig(fig,figname)
-		fig
-	end
+    
+
+    if show_orders
+        o2 = err_avg[1] .*(dts./dts[1]).^2
+        lines!(ax,dts,o2,label=L"\mathcal{O}(h^2)")
+        o1 = err_avg[1] .*(dts./dts[1])
+        lines!(ax,dts,o1,label=L"\mathcal{O}(h)")
+    end
+
+    ax.xlabel = L"h~(\mathrm{s})"
+    ax.yscale = Makie.log10
+    ax.yminorticksvisible = true 
+    ax.yminorgridvisible = true 
+    ax.yminorticks = IntervalsBetween(8)
+    ax.xscale = Makie.log10
+    ax.xminorticksvisible = true 
+    ax.xminorgridvisible = true 
+    ax.xminorticks = IntervalsBetween(8)
+
+    ax
 end
 
 function plotsave_contact_persistent(bot,figname=nothing;
     cid=1,
     tol = 1e-7 # rule out false active
     )
-	with_theme(theme_pub;) do
-		contacts_traj_voa = VectorOfArray(bot.contacts_traj)
-		c1_traj = contacts_traj_voa[cid,:]
-		# steps = 1:length(c1_traj)
-		active_nonpersist = findall(c1_traj) do c
-			c.state.active && !c.state.persistent && norm(c.state.Λ) > tol
-		end
-		active_persist = findall(c1_traj) do c
-			c.state.active && c.state.persistent && norm(c.state.Λ) > tol
-		end
-		fig = Figure()
-		ax = Axis(fig[1,1], xlabel = "Step", ylabel = "Contact Type")
-		scatter!(ax,active_nonpersist,one.(active_nonpersist),label="Impact")
-		scatter!(ax,active_persist,zero.(active_persist),label="Persistent")
-		axislegend(ax)
+    with_theme(theme_pub;) do
+        contacts_traj_voa = VectorOfArray(bot.contacts_traj)
+        c1_traj = contacts_traj_voa[cid,:]
+        # steps = 1:length(c1_traj)
+        active_nonpersist = findall(c1_traj) do c
+            c.state.active && !c.state.persistent && norm(c.state.Λ) > tol
+        end
+        active_persist = findall(c1_traj) do c
+            c.state.active && c.state.persistent && norm(c.state.Λ) > tol
+        end
+        # @myshow active_persist
+        fig = Figure()
+        ax = Axis(fig[1,1], xlabel = "Step", ylabel = "Contact Type")
+        scatter!(ax,active_nonpersist,one.(active_nonpersist),label="Impact")
+        scatter!(ax,active_persist,zero.(active_persist),label="Persistent")
+        axislegend(ax)
         savefig(fig,figname)
-		fig
-	end
+        fig
+    end
+end
+
+function plot_self_stress_states(
+        botinput,
+        S;
+        rtol = 1e-14
+        # Ň = build_Ň(bot.tg)
+    )
+    bot = deepcopy(botinput)
+    @myshow S
+    maxS = maximum(abs.(S))
+    Sbool = S.> maxS*rtol
+    S[.!Sbool] .= 0.0
+    ns = size(S,2)
+    with_theme(theme_pub;
+        ) do 
+        plot_traj!(
+            bot;
+            AxisType=Axis3,
+            gridsize=(1,ns), 
+            doslide=false,
+            showlabels=false,
+            showpoints=false,
+            showcables = false,
+            xlims = (-4e-1,4e-1),
+            ylims = (-4e-1,4e-1),
+            zlims = (-4e-1,4e-1),
+            showground = false,
+            sup! = (ax,tgob,sgi)-> begin
+            # cables
+                hidexyz(ax)
+                @myshow Sbool[:,sgi]
+                linesegs_cables = @lift begin
+                    get_linesegs_cables($tgob;)[Sbool[:,sgi]]
+                end
+                linesegments!(ax, 
+                    linesegs_cables, 
+                    color = :red, 
+                    # linewidth = cablewidth
+                    )
+                rcs_by_cables = @lift begin
+                    (;tensioned) = $tgob.connectivity
+                    ndim = TR.get_ndim($tgob)
+                    T = TR.get_numbertype($tgob)
+                    ret = Vector{MVector{ndim,T}}()
+                    mapreduce(
+                        (scnt)->
+                        [(
+                            scnt.hen.rbsig.state.rps[scnt.hen.pid].+
+                            scnt.egg.rbsig.state.rps[scnt.egg.pid]
+                        )./2],
+                        vcat,
+                        tensioned.connected
+                        ;init=ret
+                    )
+                end
+                # @show rcs_by_cables
+                Stext = [
+                        @sprintf "%4.2f"  S[i,sgi] 
+                        for i in axes(S,1)
+                        if Sbool[i,sgi]
+                    ]
+                @myshow Stext
+                text!(
+                    ax,
+                    Stext,
+                    position = rcs_by_cables[][Sbool[:,sgi]],
+                    fontsize = fontsize,
+                    color = :red,
+                    align = (:right, :top),
+                    offset = (-fontsize/2, 0)
+                )
+            end
+        )
+    end
+end
+
+
+function plot_kinematic_indeterminacy(
+        botinput,
+        D,
+        Ň,
+        # Ň = build_Ň(bot.tg)
+    )
+    bot = deepcopy(botinput)
+    nk = size(D,2)
+    δq̌ = [Ň*D[:,i] for i in axes(D,2)]
+    scaling=0.3
+    for i = 1:nk
+        push!(bot.traj,deepcopy(bot.traj[end]))
+        bot.traj.t[end] = i
+        δq̌i = δq̌[i]
+        ratio = norm(δq̌i)/norm(q̌)
+        bot.traj.q̌[end] .= q̌ .+ scaling.*δq̌i/ratio
+    end
+    plot_traj!(
+        bot;
+        AxisType=Axis3,
+        gridsize=(1,nk),        
+        atsteps=2:nk+1,
+        doslide=false,
+        showlabels=false,
+        showpoints=false,
+        # showcables = false,
+        showground = false,
+        # xlims = (-4e-2,4e-2),
+        # ylims = (-4e-2,4e-2),
+        # zlims = (-4e-2,4e-2),        
+        slack_linestyle = :solid,
+        showinit = true,
+    )
 end

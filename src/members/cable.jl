@@ -9,6 +9,10 @@ mutable struct CableState{N,T}
     tension::T
     direction::MArray{Tuple{N},T,1,N}
     force::MArray{Tuple{N},T,1,N}
+    start::MArray{Tuple{N},T,1,N}
+    stop::MArray{Tuple{N},T,1,N}
+    start_vel::MArray{Tuple{N},T,1,N}
+    stop_vel::MArray{Tuple{N},T,1,N}
 end
 
 """
@@ -16,7 +20,18 @@ end
 $(TYPEDSIGNATURES)
 """
 function CableState(restlen,direction)
-    CableState(restlen,restlen,zero(restlen),zero(restlen),direction,zero(direction))
+    CableState(
+        restlen,
+        restlen,
+        zero(restlen),
+        zero(restlen),
+        direction,
+        zero(direction),
+        zero(direction),
+        zero(direction),
+        zero(direction),
+        zero(direction)
+        )
 end
 
 """
@@ -62,6 +77,8 @@ function update!(cab::Cable,p1,p2,ṗ1,ṗ2)
 	# state.force .= ṗ2 - ṗ1 # Δṙ
 	# state.lengthdot = (transpose(state.direction)*state.force)/state.length
 	# state.direction ./= state.length
+    state.start,     state.stop = p1, p2
+    state.start_vel, state.stop_vel = ṗ1, ṗ2
 	l = p2 - p1
 	l̇ = ṗ2 - ṗ1
 	state.length = norm(l)

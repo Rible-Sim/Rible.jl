@@ -96,8 +96,10 @@ function GDR!(
         maxiters=Int(1e4),
         res=1e-7,
         N=10,
-        ξ=1e-7
+        ξ=1e-7,
+        verbose=false,
     )
+    reset!(bot)
     (;tg,traj) = bot
     x,x̌,𝛚,𝐛,𝐉 = initialize_GDR(tg,F;gravity)
     # 𝛄 = make_viscous_damper()
@@ -138,6 +140,9 @@ function GDR!(
         elseif rs[end] > rs[end-1]
             # @error("Diverging")
             # break
+        end
+        if verbose
+            println("itr: $itr, normr: $normr")
         end
     end
     rs,bs,ss,bot

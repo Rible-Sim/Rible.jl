@@ -13,6 +13,9 @@ import JuMP, COSMO, Clarabel
 using BlockArrays
 using BlockDiagonals
 using SymmetricFormats
+using Polyhedra
+import CDDLib 
+lib = CDDLib.Library()
 using Tullio
 using Quaternions
 using ForwardDiff
@@ -20,6 +23,8 @@ using FiniteDiff
 using RowEchelon
 using HomotopyContinuation
 using DynamicPolynomials
+using Graphs
+using MetaGraphsNext
 using TypeSortedCollections
 using EzXML
 using ProgressMeter, Printf
@@ -52,6 +57,8 @@ include("robots/clustertensegrity.jl")
 
 include("control/control.jl")
 
+include("mechanics/constraints.jl")
+
 include("mechanics/inverse_statics.jl")
 
 include("mechanics/forward_statics.jl")
@@ -61,6 +68,8 @@ include("mechanics/dynamic_relax.jl")
 include("mechanics/contact.jl")
 
 include("mechanics/linearization.jl")
+
+include("mechanics/stiffness.jl")
 
 include("mechanics/solvers.jl")
 
