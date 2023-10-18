@@ -69,16 +69,19 @@ function make_zhongccp_ns_stepk(nq,nλ,na,qₖ₋₁,vₖ₋₁,pₖ₋₁,tₖ�
 
         𝐉[n1+1:n2,   1:n1] .=  -scaling.*Aₖ
 
-        𝐁 .= 0
-        𝐁[   1:n1,1:nΛ] .= h.*scaling.*transpose(D)*H
+        lu𝐉 = lu(𝐉)
 
-        
-        pₖ .= Momentum_k(qₖ₋₁,pₖ₋₁,qₖ,λₘ,M,A,scaling,h)
-        vₖ .= invM*pₖ        
-        ∂vₘ∂qₖ = 1/h*I
-        ∂vₖ∂qₖ = 2/h*I + 1/(h).*invM*(∂Aᵀλ∂q(qₖ,λₘ))
-        ∂vₖ∂λₘ = scaling.*invM*transpose(Aₖ-Aₖ₋₁)/(h)
         if na != 0
+            𝐁 .= 0
+            𝐁[   1:n1,1:nΛ] .= h.*scaling.*transpose(D)*H
+
+            
+            pₖ .= Momentum_k(qₖ₋₁,pₖ₋₁,qₖ,λₘ,M,A,scaling,h)
+            vₖ .= invM*pₖ        
+            ∂vₘ∂qₖ = 1/h*I
+            ∂vₖ∂qₖ = 2/h*I + 1/(h).*invM*(∂Aᵀλ∂q(qₖ,λₘ))
+            ∂vₖ∂λₘ = scaling.*invM*transpose(Aₖ-Aₖ₋₁)/(h)
+            
             v́⁺ = Dₘ*vₘ .+ Dₖ*vₖ
             ∂v́⁺∂qₖ = Dₘ*∂vₘ∂qₖ .+ Dₖ*∂vₖ∂qₖ
             𝐜ᵀ .= 0
@@ -102,10 +105,11 @@ function make_zhongccp_ns_stepk(nq,nλ,na,qₖ₋₁,vₖ₋₁,pₖ₋₁,tₖ�
                 𝐜ᵀ[is+1:is+3,n1+1:n2] .= Dⁱₖ*∂vₖ∂λₘ
             end
 
-            𝐜ᵀinv𝐉 = 𝐜ᵀ*inv(𝐉)
-            𝐍 .= 𝐜ᵀinv𝐉*𝐁
-            𝐫 .= (v́⁺ + 𝐛) .-𝐜ᵀinv𝐉*(𝐫𝐞𝐬 + 𝐁*𝚲ₖ)
+            # 𝐜ᵀinv𝐉 = 𝐜ᵀ*inv(𝐉)
+            𝐍 .= 𝐜ᵀ*(lu𝐉\𝐁)
+            𝐫 .= (v́⁺ + 𝐛) .-𝐜ᵀ*(lu𝐉\(𝐫𝐞𝐬 + 𝐁*𝚲ₖ))
         end
+        lu𝐉
         # debug
         # @show norm(D*vₖ + 𝐛), norm(𝐫𝐞𝐬)
         # @show 𝚲ₖ, D*vₖ, 𝐛
@@ -210,11 +214,11 @@ function solve!(intor::Integrator,solvercache::ZhongCCPCache;
             𝚲ₖ .= repeat([𝚲_guess,0,0],na)
             x[      1:nq]          .= qₖ
             x[   nq+1:nq+nλ]       .= 0.0
-            𝚲ʳₖ .= 0.0
+            𝚲ʳₖ .= 𝚲ₖ
             Nmax = 50
             for iteration = 1:maxiters
                 # @show iteration,D,ηs,es,gaps
-                ns_stepk!(Res,Jac,𝐁,𝐛,𝐜ᵀ,𝐍,𝐫,x,𝚲ₖ,D,Dₘ,Dₖ,H,filtered_gaps,es,timestep,iteration)
+                luJac = ns_stepk!(Res,Jac,𝐁,𝐛,𝐜ᵀ,𝐍,𝐫,x,𝚲ₖ,D,Dₘ,Dₖ,H,filtered_gaps,es,timestep,iteration)
                 normRes = norm(Res)
                 if na == 0
                     if normRes < ftol
@@ -222,7 +226,7 @@ function solve!(intor::Integrator,solvercache::ZhongCCPCache;
                         iteration_break = iteration-1
                         break
                     end
-                    Δx .= -Jac\Res
+                    Δx .= luJac\(-Res)
                     x .+= Δx
                 else # na!=0
                     if iteration < 4
@@ -230,7 +234,8 @@ function solve!(intor::Integrator,solvercache::ZhongCCPCache;
                     else
                         Nmax = 50
                     end
-                    𝚲ₖini = repeat([𝚲_guess,0,0],na)
+                    # 𝚲ₖini = repeat([𝚲_guess,0,0],na)
+                    𝚲ₖini = deepcopy(𝚲ₖ)
                     𝚲ₖini[begin+1:3:end] .= 0.0
                     𝚲ₖini[begin+2:3:end] .= 0.0
                     yₖini = 𝐍*𝚲ₖ + 𝐫
@@ -256,7 +261,7 @@ function solve!(intor::Integrator,solvercache::ZhongCCPCache;
                         iteration_break = iteration-1
                         isconverged = false
                     end
-                    Δx .= Jac\minusRes𝚲
+                    Δx .= luJac\minusRes𝚲
                     𝚲ʳₖ .= 𝚲ₖ
                     x .+= Δx
                     # @show timestep, iteration, normRes, norm(Δx), norm(Δ𝚲ₖ),persistent_indices

@@ -198,7 +198,7 @@ function IPM!(output,nu,nΛ,Λ,y,N,r;ftol=1e-14,Nmax=50)
         if res < ftol
             # @show k, Λ_split[1],y_split[1]
             # @show Λ_split[1]⊙y_split[1]
-
+            # @show k
             break
         elseif k == Nmax
             # @warn "IPM: Max iteration $k reached"
@@ -212,7 +212,8 @@ function IPM!(output,nu,nΛ,Λ,y,N,r;ftol=1e-14,Nmax=50)
 
         # @show Λₛ,yₛ
         # η = 1.0
-        Δxp = 𝐉\(-𝐫𝐞𝐬)
+        lu𝐉 = lu(𝐉)
+        Δxp = lu𝐉\(-𝐫𝐞𝐬)
         ΔΛp = @view Δxp[   1:n1]
         Δyp = @view Δxp[n1+1:n2]
         ΔΛp_split = split_by_lengths(ΔΛp,3)
@@ -247,7 +248,7 @@ function IPM!(output,nu,nΛ,Λ,y,N,r;ftol=1e-14,Nmax=50)
         # res = norm(𝐫𝐞𝐬)
         # @show 𝐫𝐞𝐬
         # @show res
-        Δxc = 𝐉\(-𝐫𝐞𝐬)
+        Δxc = lu𝐉\(-𝐫𝐞𝐬)
         # η = exp(-0.1μ) + 0.9
         ΔΛc = @view Δxc[   1:n1]
         Δyc = @view Δxc[n1+1:n2]

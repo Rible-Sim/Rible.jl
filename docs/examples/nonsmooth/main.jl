@@ -752,13 +752,13 @@ topq = make_top(ro,R,ṙo,Ω;μ,e,loadmesh=true)
 TR.solve!(
     TR.SimProblem(topq,top_contact_dynfuncs),
     TR.ZhongQCCP();
-    tspan = (0.0,10.0),
-    dt=2e-3,
-    ftol=1e-10,maxiters=50,exception=false,verbose_contact=false
+    tspan,
+    dt=h,
+    ftol=1e-14,
+    maxiters=50,exception=false,verbose_contact=true
 )
 me = TR.mechanical_energy!(topq)
 rp5 = get_trajectory!(topq,1,5)
-
 
 plot_traj!(
     topq;
@@ -775,7 +775,7 @@ TR.solve!(
     tspan,
     dt=h,
     ftol=1e-14,
-    maxiters=50,exception=false,verbose=false
+    maxiters=50,exception=false,verbose_contact=true
 )
 
 plot_traj!(
@@ -900,21 +900,21 @@ TR.set_new_initial!(topq_longtime,topq.traj.q[end],topq.traj.q̇[end])
 TR.solve!(
     TR.SimProblem(topq_longtime,top_contact_dynfuncs),
     TR.ZhongQCCP();
-    tspan = (0.0,10.0),
+    tspan = (0.0,50.0),
     dt=2e-3,
     ftol=1e-14,
     maxiters=100,exception=false,verbose=false
 )
 me = TR.mechanical_energy!(topq_longtime)
 rp5 = get_trajectory!(topq_longtime,1,5)
-
+lines(topq_longtime.traj.t,-rp5[3,:].-(-rp5[3,1]))
 
 topn_longtime = deepcopy(topn)
 TR.set_new_initial!(topn_longtime,topn.traj.q[end],topn.traj.q̇[end])
 TR.solve!(
     TR.SimProblem(topn_longtime,top_contact_dynfuncs),
     TR.ZhongCCP();
-    tspan = (0.0,50.0),
+    tspan = (0.0,500.0),
     dt=2e-3,
     ftol=1e-14,
     maxiters=100,exception=false,verbose=false
@@ -930,14 +930,15 @@ with_theme(theme_pub;
         resolution = (0.7tw,0.2tw),
         figure_padding = (0,fontsize,0,fontsize/2)
     ) do
-    # bot = topn_longtime
-    bot = topq_longtime
+    bot = topn_longtime
+    # bot = topq_longtime
     (;t) = bot.traj
     fig = Figure()
     ax1 = Axis(fig[1,1];xlabel=tlabel, ylabel="Rel. Err.")
     ax2 = Axis(fig[1,2];xlabel=tlabel, ylabel="Abs. Err. (m)")
     skipstep = 500
     startstep = time2step(12.1,t)
+    @myshow length(t[startstep:skipstep:end])
     lines!(ax1,
         t[startstep:skipstep:end],
         (me.E[startstep:skipstep:end].-me.E[startstep])./me.E[startstep]
@@ -947,12 +948,12 @@ with_theme(theme_pub;
     @myshow rp5[3,startstep]
     lines!(ax2,
         t[startstep:skipstep:end],
-        (-rp5[3,startstep:skipstep:end]).-(-rp5[3,startstep]),
+        (-rp5[3,startstep:skipstep:end]).-(-rp5[3,startstep]).,
     )
     xlims!(ax2,extrema(t)...)
     Label(fig[1,1,TopLeft()], rich("($(alphabet[1]))",font=:bold))
     Label(fig[1,2,TopLeft()], rich("($(alphabet[2]))",font=:bold))
-    # savefig(fig,"spinningtop_longtime")
+    savefig(fig,"spinningtop_longtime")
     fig    
 end
 
@@ -1117,7 +1118,7 @@ GM.activate!();with_theme(theme_pub;
         xlabel = tlabel,
         ylabel = "Abs. Err. (m)",
     )
-    mo_rp5=10
+    mo_rp5=14
     scaling = 10.0^(-mo_rp5)
     Label(gd2[1,1,Top()],latexstring("\\times 10^{-$(mo_rp5)}"))
     @myshow -rp5[3,stepstart]
@@ -1136,7 +1137,7 @@ GM.activate!();with_theme(theme_pub;
     α_per = map(c1s[idx_per]) do c
         get_contact_angle(c;Λtol=0)
     end
-    lines!(ax4,t[idx_per],(α_per.-π)./scaling;)
+    lines!(ax4,t[idx_per],abs.(α_per.-π)./scaling;)
     ax5 = Axis(gd3[1,1],
         xlabel = tlabel,
         ylabel = "Energy (J)",
@@ -2853,7 +2854,7 @@ end
 tspan = (0.0,5.0)
 h = 1e-2
 prob = TR.SimProblem(ballbot,ball_dynfuncs)
-@time TR.solve!(prob,TR.ZhongCCP();tspan,dt=h,ftol=1e-12,maxiters=100,exception=false)
+@time TR.solve!(prob,TR.ZhongCCP();tspan,dt=h,ftol=1e-14,maxiters=100,exception=false)
 
 GM.activate!(); plotsave_contactpoints(ballbot)
 
@@ -2880,7 +2881,7 @@ superballs_dt = [
         prob = TR.SimProblem(ballbot_dt,ball_dynfuncs)
         TR.solve!(prob,
             TR.ZhongCCP();
-            tspan=(0.0,0.1),dt,ftol=1e-12,
+            tspan=(0.0,0.1),dt,ftol=1e-14,
             maxiters=500,exception=false
         )
     end

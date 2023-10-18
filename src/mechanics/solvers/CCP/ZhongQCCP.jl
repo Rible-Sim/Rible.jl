@@ -36,17 +36,17 @@ function generate_cache(::ZhongQCCP,intor;dt,kargs...)
     ZhongQCCPCache(cache)
 end
 
-function Momentum_k(qₖ₋₁,pₖ₋₁,qₖ,λₘ,Mₘ,A,Λₘ,Dₖ₋₁,Dₖ,H,scalingΛ,h)
+function Momentum_k(qₖ₋₁,pₖ₋₁,qₖ,λₘ,Mₘ,A,Λₘ,Dₖ₋₁,Dₖ,H,scaling,h)
     pₖ = -pₖ₋₁ .+ 
         2/h.*Mₘ*(qₖ.-qₖ₋₁) .+ 
-        scalingΛ/h.*(transpose(A(qₖ))-transpose(A(qₖ₋₁)))*λₘ .+
-        scalingΛ/h.*(transpose(Dₖ)-transpose(Dₖ₋₁))*H*Λₘ
+        scaling/h.*(transpose(A(qₖ))-transpose(A(qₖ₋₁)))*λₘ .+
+        scaling.*(transpose(Dₖ)-transpose(Dₖ₋₁))*H*Λₘ
 end
 
 function make_zhongccp_ns_stepk(
         nq,nλ,na,qₖ₋₁,vₖ₋₁,pₖ₋₁,tₖ₋₁,pₖ,vₖ,
         F!,Jac_F!,get_directions_and_positions,get_∂Dq̇∂q,get_∂DᵀΛ∂q,
-        cache,h,scalingΛ,persistent_indices
+        cache,h,scaling,persistent_indices
     )
     (;M!,Jac_M!,M⁻¹!,Jac_M⁻¹!,Φ,A,∂Aᵀλ∂q) = cache
     ∂Fₘ∂qₘ = cache.∂F∂q
@@ -60,7 +60,7 @@ function make_zhongccp_ns_stepk(
     n2 = nq+nλ
     nΛ = 3na
     nx = n2
-    function ns_stepk!(𝐫𝐞𝐬,𝐉,𝐁,𝐛,𝐜ᵀ,𝐍,𝐫,x,𝚲ₘ,Dₖ₋₁,ŕₖ₋₁,H,filtered_gaps,es,timestep,iteration)
+    function ns_stepk!(𝐫𝐞𝐬,𝐉,𝐁,𝐛,𝐜ᵀ,𝐍,𝐫,x,Λₘ,Dₖ₋₁,ŕₖ₋₁,H,filtered_gaps,es,timestep,iteration)
         # @show timestep, iteration, na, persistent_indices
         qₖ = @view x[   1:n1]
         λₘ = @view x[n1+1:n2]
@@ -80,34 +80,34 @@ function make_zhongccp_ns_stepk(
         𝐫𝐞𝐬[   1:n1] .= h.*Mₘ*vₘ .- 
                         h.*pₖ₋₁ .-
                         (h^2)/2 .*Fₘ .-
-                        scalingΛ .*transpose(Aₖ₋₁)*λₘ .-
-                        scalingΛ .*transpose(Dₖ₋₁)*H*𝚲ₘ 
-        𝐫𝐞𝐬[n1+1:n2] .= scalingΛ .*Φ(qₖ)
+                        scaling.*transpose(Aₖ₋₁)*λₘ .-
+                        scaling*h .*transpose(Dₖ₋₁)*H*Λₘ 
+        𝐫𝐞𝐬[n1+1:n2] .= scaling.*Φ(qₖ)
         
         𝐉 .= 0.0
         𝐉[   1:n1,   1:n1] .=  Mₘ .+ 1/2 .*∂Mₘqₖ∂qₘ .-h^2/2 .*(1/2 .*∂Fₘ∂qₘ .+ 1/h.*∂Fₘ∂q̇ₘ)
-        𝐉[   1:n1,n1+1:n2] .= -scalingΛ .*transpose(Aₖ₋₁)
-        𝐉[n1+1:n2,   1:n1] .=  scalingΛ .*Aₖ
+        𝐉[   1:n1,n1+1:n2] .= -scaling.*transpose(Aₖ₋₁)
+        𝐉[n1+1:n2,   1:n1] .=  scaling.*Aₖ
         
         if na != 0
             Dₖ,ŕₖ = get_directions_and_positions(qₖ)
-            pₖ .= Momentum_k(qₖ₋₁,pₖ₋₁,qₖ,λₘ,Mₘ,A,𝚲ₘ,Dₖ₋₁,Dₖ,H,scalingΛ,h)
+            pₖ .= Momentum_k(qₖ₋₁,pₖ₋₁,qₖ,λₘ,Mₘ,A,Λₘ,Dₖ₋₁,Dₖ,H,scaling,h)
             M⁻¹!(M⁻¹ₖ,qₖ) 
             vₖ .= M⁻¹ₖ*pₖ
             M⁻¹!(M⁻¹ₘ,qₘ)
             Jac_M⁻¹!(∂M⁻¹ₖpₖ∂qₖ,qₖ,pₖ)
             ∂Aᵀₖλₘ∂qₖ = ∂Aᵀλ∂q(qₖ,λₘ)
-            ∂DᵀₖHΛₘ∂qₖ = get_∂DᵀΛ∂q(qₖ,H*𝚲ₘ)
+            ∂DᵀₖHΛₘ∂qₖ = get_∂DᵀΛ∂q(qₖ,H*Λₘ)
             ∂Mₘq̇ₘ∂qₘ = zero(∂Mₘqₖ∂qₘ)
             Jac_M!(∂Mₘq̇ₘ∂qₘ,qₘ,q̇ₘ)
             ∂pₖ∂qₖ = 2/h.*Mₘ + 
                     ∂Mₘq̇ₘ∂qₘ .+
-                    scalingΛ/(h).*∂Aᵀₖλₘ∂qₖ .+ 
-                    scalingΛ/(h).*∂DᵀₖHΛₘ∂qₖ
+                    scaling/(h).*∂Aᵀₖλₘ∂qₖ .+ 
+                    scaling.*∂DᵀₖHΛₘ∂qₖ
             ∂vₖ∂qₖ = M⁻¹ₖ*∂pₖ∂qₖ .+ ∂M⁻¹ₖpₖ∂qₖ
-            ∂vₖ∂λₘ = M⁻¹ₘ*scalingΛ*transpose(Aₖ-Aₖ₋₁)/(h)
+            ∂vₖ∂λₘ = scaling/h.*M⁻¹ₘ*transpose(Aₖ-Aₖ₋₁)
             𝐁 .= 0
-            𝐁[  1:n1,   1:nΛ] .= scalingΛ .*transpose(Dₖ₋₁)*H
+            𝐁[  1:n1,   1:nΛ] .= scaling.*h .*transpose(Dₖ₋₁)*H
             ∂Dₖvₖ∂qₖ = get_∂Dq̇∂q(qₖ,vₖ)
             v́ₖ = Dₖ*vₖ
             ∂v́ₖ∂qₖ = Dₖ*∂vₖ∂qₖ .+ ∂Dₖvₖ∂qₖ 
@@ -130,7 +130,7 @@ function make_zhongccp_ns_stepk(
                 v́⁺[is+1:is+3] = vⁱ⁺
                 vₜⁱ⁺   = norm(vⁱ⁺[2:3])
                 # vₙⁱ   = vⁱ⁺[1]
-                # @show timestep,iteration, vₙⁱₖ₋₁, vₙⁱ, vₜⁱₖ₋₁, vₜⁱ, 𝚲ₘ
+                # @show timestep,iteration, vₙⁱₖ₋₁, vₙⁱ, vₜⁱₖ₋₁, vₜⁱ, Λₘ
                 v́ₜⁱ = vₜⁱ⁺ + es[i]*min(vₙⁱₖ₋₁,zero(T))
                 𝐛[is+1:is+3] .= [v́ₜⁱ+filtered_gaps[i],0,0]
                 
@@ -150,10 +150,10 @@ function make_zhongccp_ns_stepk(
             𝐍 .= 𝐜ᵀinv𝐉*𝐁
             # debug
             # @show norm(D*vₖ + 𝐛), norm(𝐫𝐞𝐬)
-            # @show 𝚲ₘ, D*vₖ, 𝐛
+            # @show Λₘ, D*vₖ, 𝐛
             # @show v́ₖ
-            # @show 𝚲ₘ[1:3]⋅(v́ₖ + 𝐛)[1:3]
-            𝐫 .= (v́⁺ + 𝐛) - 𝐜ᵀinv𝐉*(𝐫𝐞𝐬 + 𝐁*𝚲ₘ)
+            # @show Λₘ[1:3]⋅(v́ₖ + 𝐛)[1:3]
+            𝐫 .= (v́⁺ + 𝐛) - 𝐜ᵀinv𝐉*(𝐫𝐞𝐬 + 𝐁*Λₘ)
         end
 
     end
@@ -191,7 +191,7 @@ function solve!(intor::Integrator,solvercache::ZhongQCCPCache;
     Jac = zeros(T,nx,nx)
     mr = norm(M,Inf)
     scaling = mr
-
+    @show mr
     iteration = 0
     prog = Progress(totalstep; dt=1.0, enabled=progress)
     for timestep = 1:totalstep
@@ -232,34 +232,33 @@ function solve!(intor::Integrator,solvercache::ZhongQCCPCache;
         normRes = typemax(T)
         iteration_break = 0
         nΛ = 3na
-        𝚲ₘ = zeros(T,nΛ)
-        𝚲ʳₖ = copy(𝚲ₘ)
-        Δ𝚲ₖ = copy(𝚲ₘ)
+        Λₘ = zeros(T,nΛ)
+        Λʳₖ = copy(Λₘ)
+        ΔΛₖ = copy(Λₘ)
         𝐁 = zeros(T,nx,nΛ)
         𝐛 = zeros(T,nΛ)
         𝐜ᵀ = zeros(T,nΛ,nx)
         𝐍 = zeros(T,nΛ,nΛ)
         𝐫 = zeros(T,nΛ)
-        scalingΛ = dt
         get_directions_and_positions_active(q) = get_directions_and_positions(active_contacts,q)
         get_∂Dq̇∂q_active(q,q̇) = get_∂Dq̇∂q(active_contacts,q,q̇)
         get_∂DᵀΛ∂q_active(q,Λ) = get_∂DᵀΛ∂q(active_contacts,q,Λ)
         ns_stepk! = make_zhongccp_ns_stepk(
             nq,nλ,na,qₖ₋₁,q̇ₖ₋₁,pₖ₋₁,tₖ₋₁,pₖ,q̇ₖ,
             F!,Jac_F!,get_directions_and_positions_active,get_∂Dq̇∂q_active,get_∂DᵀΛ∂q_active,
-            cache,dt,scalingΛ,persistent_indices
+            cache,dt,scaling,persistent_indices
         )
         restart_count = 0
-        𝚲_guess = 10.0
+        Λ_guess = 1.0
         while restart_count < 10
-            𝚲ₘ .= repeat([𝚲_guess,0,0],na)
+            Λₘ .= repeat([Λ_guess,0,0],na)
             x[      1:nq]          .= qₖ
             x[   nq+1:nq+nλ]       .= 0.0
-            𝚲ʳₖ .= 0.0
+            Λʳₖ .= Λₘ
             Nmax = 50
             for iteration = 1:maxiters
                 # @show iteration,D,ηs,es,gaps
-                ns_stepk!(Res,Jac,𝐁,𝐛,𝐜ᵀ,𝐍,𝐫,x,𝚲ₘ,Dₖ₋₁,ŕₖ₋₁,H,filtered_gaps,es,timestep,iteration)
+                ns_stepk!(Res,Jac,𝐁,𝐛,𝐜ᵀ,𝐍,𝐫,x,Λₘ,Dₖ₋₁,ŕₖ₋₁,H,filtered_gaps,es,timestep,iteration)
                 if na == 0
                     normRes = norm(Res)
                     if normRes < ftol
@@ -270,26 +269,20 @@ function solve!(intor::Integrator,solvercache::ZhongQCCPCache;
                     Δx .= -Jac\Res
                     x .+= Δx
                 else # na!=0
-                    if timestep == 308 
-                        @show timestep,iteration,normRes,norm(Res),𝚲ₘ
-                        # # 𝚲ₘini = repeat([1.0,0,0],na)
-                        # 𝚲ₘini = deepcopy(𝚲ʳₖ)
-                        Nmax = 1000
-                    end
-                    # else
-                    # end
-                    𝚲ₘini = repeat([𝚲_guess,0,0],na)
-                    𝚲ₘini[begin+1:3:end] .= 0.0
-                    𝚲ₘini[begin+2:3:end] .= 0.0
-                    # yini = deepcopy(𝚲ₘini)
-                    yini = 𝐍*𝚲ₘ + 𝐫
+                    # @show timestep,iteration,normRes,Λₘ
+                    # Λₘini = repeat([Λ_guess,0,0],na)
+                    Λₘini = deepcopy(Λₘ)
+                    Λₘini[begin+1:3:end] .= 0.0
+                    Λₘini[begin+2:3:end] .= 0.0
+                    # yini = deepcopy(Λₘini)
+                    yini = 𝐍*Λₘ + 𝐫
                     yini .= abs.(yini)
                     yini[begin+1:3:end] .= 0.0
                     yini[begin+2:3:end] .= 0.0
-                    IPM!(𝚲ₘ,na,nΛ,𝚲ₘini,yini,𝐍,𝐫;ftol=1e-14,Nmax)
-                    Δ𝚲ₖ .= 𝚲ₘ - 𝚲ʳₖ
-                    minusRes𝚲 = -Res + 𝐁*(Δ𝚲ₖ)
-                    normRes = norm(minusRes𝚲)
+                    IPM!(Λₘ,na,nΛ,Λₘini,yini,𝐍,𝐫;ftol=1e-14,Nmax)
+                    ΔΛₖ .= Λₘ - Λʳₖ
+                    minusResΛ = -Res + 𝐁*(ΔΛₖ)
+                    normRes = norm(minusResΛ)
                     if  normRes < ftol
                         isconverged = true
                         iteration_break = iteration-1
@@ -303,29 +296,29 @@ function solve!(intor::Integrator,solvercache::ZhongQCCPCache;
                         iteration_break = iteration-1
                         isconverged = false
                     end
-                    Δx .= Jac\minusRes𝚲
-                    𝚲ʳₖ .= 𝚲ₘ
+                    Δx .= Jac\minusResΛ
+                    Λʳₖ .= Λₘ
                     x .+= Δx
-                    # @show timestep, iteration, normRes, norm(Δx), norm(Δ𝚲ₖ),persistent_indices
+                    # @show timestep, iteration, normRes, norm(Δx), norm(ΔΛₖ),persistent_indices
                 end
             end
             if isconverged
                 break
             end
             restart_count += 1
-            𝚲_guess /= 10
-            # @warn "restarting step: $timestep, count: $restart_count, 𝚲_guess = $𝚲_guess"
+            Λ_guess /= 10
+            # @warn "restarting step: $timestep, count: $restart_count, Λ_guess = $Λ_guess"
         end
         qₖ .= x[      1:nq]
         λₘ .= x[   nq+1:nq+nλ]
         qₖ₋½ .= (qₖ.+qₖ₋₁)./2
         M!(M,qₖ₋½)
         Dₖ,_ = get_directions_and_positions(active_contacts,qₖ)
-        pₖ .= Momentum_k(qₖ₋₁,pₖ₋₁,qₖ,λₘ,M,A,𝚲ₘ,Dₖ₋₁,Dₖ,H,scalingΛ,dt)
+        pₖ .= Momentum_k(qₖ₋₁,pₖ₋₁,qₖ,λₘ,M,A,Λₘ,Dₖ₋₁,Dₖ,H,scaling,dt)
         M⁻¹!(M⁻¹,qₖ)
         q̇ₖ .= M⁻¹*pₖ
         if na != 0
-            update_contacts!(active_contacts,Dₖ*q̇ₖ,𝚲ₘ./scalingΛ)
+            update_contacts!(active_contacts,Dₖ*q̇ₖ,Λₘ./(scaling*dt))
         end
         if !isconverged
             @warn "Newton max iterations $maxiters, at timestep=$timestep, normRes=$(normRes)"
