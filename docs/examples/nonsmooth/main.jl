@@ -12,6 +12,7 @@ import GLMakie as GM
 import CairoMakie as CM
 GM.activate!()
 using LaTeXStrings
+using BlockDiagonals
 using RecursiveArrayTools
 using Interpolations
 using EponymTuples
@@ -3308,7 +3309,22 @@ function make_cube(ro = [0.0,0.0,0.5],
     ])
     nls = GB.normals(pts,fcs)
     cube_mesh = GB.Mesh(GB.meta(pts,normals=nls),fcs)
-    prop = TR.RigidBodyProperty(1,true,m,inertia,r̄g,r̄ps)
+    ās = [
+        SVector(1.0,0,0) for _ in eachindex(r̄ps)
+    ]
+    μs = fill(μ,length(r̄ps))
+    es = fill(e,length(r̄ps))
+    prop = TR.RigidBodyProperty(
+        1,
+        true,
+        m,
+        inertia,
+        r̄g,
+        r̄ps,
+        ās,
+        μs,
+        es,
+    )
     ri = copy(ro)
     lncs,q,q̇ = TR.NCF.NC1P3V(ri,ro,R,ṙo,ω)
     state = TR.RigidBodyState(prop,lncs,ro,R,ṙo,ω)
@@ -3324,14 +3340,13 @@ function make_cube(ro = [0.0,0.0,0.5],
     connected = TR.connect(rbs,zeros(Int,0,0))
     tensioned = @eponymtuple(connected)
     cnt = TR.Connectivity(numberedpoints,indexedcoords,tensioned)
-    contacts = [TR.Contact(i,μ,e) for i = 1:8]
-    tg = TR.TensegrityStructure(rbs,tensiles,cnt,contacts)
+    # contacts = [TR.Contact(i,μ,e) for i = 1:8]
+    tg = TR.TensegrityStructure(rbs,tensiles,cnt)
     bot = TR.TensegrityRobot(tg,nothing)
 end
 
 cubebot = make_cube()
 plot_traj!(cubebot)
-
 function cube_contact_dynfuncs(bot)
     (;tg) = bot
     function F!(F,q,q̇,t)
@@ -3341,6 +3356,7 @@ function cube_contact_dynfuncs(bot)
         TR.apply_gravity!(tg)
         F .= TR.generate_forces!(tg)
     end
+
     function Jac_F!(∂F∂q̌,∂F∂q̌̇,q,q̇,t)
         ∂F∂q̌ .= 0
         ∂F∂q̌̇ .= 0
@@ -3351,109 +3367,129 @@ function cube_contact_dynfuncs(bot)
         TR.build_∂Q̌∂q̌̇!(∂F∂q̌̇,tg)
     end
 
-    rbs = TR.get_bodies(tg)
-    rb1 = rbs[1]
+    function prepare_contacts!(qˣ)
+        T = eltype(qˣ)
+        contacts_bits = [
+            BitVector()
+            for _ in 1:tg.nbodies
+        ]
+        es = T[]
+        μs = T[]
+        gaps = T[]
+        na = 0
+        Ls = Matrix{T}[]
 
-    function prepare_contacts!(contacts,q)
-        TR.update_rigids!(tg,q)
-        rb = rbs[1]
-        for (cid,pid) in enumerate(1:8)
-            gap = rb.state.rps[pid][3] 
-            TR.activate!(contacts[cid],gap)
-        end
-        active_contacts = filter(contacts) do c
-            c.state.active
-        end
-        na = length(active_contacts)
-        inv_μ_vec = ones(eltype(q),3na)
         n = [0,0,1.0]
-        for (i,ac) in enumerate(active_contacts)
-            (;id,state) = ac
-            state.frame = TR.SpatialFrame(n)
-            inv_μ_vec[3(i-1)+1] = 1/ac.μ
+
+        # backtracking
+        # TR.update_rigids!(tg,q)
+        # foreach(tg.bodies) do body
+        #     (;state) = body
+        #     (;contacts,rps) = state
+        #     for pid in eachindex(rps)
+        #         rp = rps[pid]
+        #         contact = contacts[pid]
+        #         gap = rp[3]
+        #         TR.activate!(contact,gap)
+        #     end
+        # end
+        # check active and persist
+        TR.update_rigids!(tg,qˣ)
+        foreach(tg.bodies) do body
+            (;prop,state) = body
+            bid = prop.id
+            (;contacts,rps) = state
+            contacts_bits[bid] = BitVector(undef,length(rps))
+            contacts_bits[bid] .= false
+            for pid in eachindex(rps)
+                rp = rps[pid]
+                contact = contacts[pid]
+                (;e,μ) = contact
+                gap = rp[3]
+                TR.activate!(contact,gap)
+                if contact.state.active
+                    contacts_bits[bid][pid] = true
+                    contact.state.frame = TR.SpatialFrame(n)
+                    push!(gaps,gap)
+                    push!(es,e)
+                    push!(μs,μ)
+                    na += 1
+                end
+            end
+            active_idx = findall(contacts_bits[bid])
+            na_body = length(active_idx)
+            R = zeros(T,3na_body,6)
+            for (i,pid) in enumerate(active_idx)
+                rp = rps[pid]
+                contact = contacts[pid]
+                (;e,μ) = contact
+                (;n,t1,t2) = contact.state.frame
+                dm = hcat(1/μ*n,t1,t2) |> transpose
+                R[3(i-1)+1:3(i-1)+3,1:3] = dm 
+                R[3(i-1)+1:3(i-1)+3,4:6] = dm*(-TR.NCF.skew(rp))
+            end
+            L_body = I-pinv(R)'*R'
+            push!(Ls,L_body)
         end
-        es = [ac.e for ac in active_contacts]
-        gaps = [ac.state.gap for ac in active_contacts]
-        H = Diagonal(inv_μ_vec)
-        active_contacts, gaps, H, es
+        L = BlockDiagonal(Ls)
+        inv_μs = ones(T,3na)
+        for i = 1:na
+            inv_μs[3(i-1)+1] = 1/μs[i]
+        end
+        H = Diagonal(inv_μs)
+        na, contacts_bits, gaps, H, es, L
     end
 
-    function get_directions_and_positions(active_contacts,q)
-        na = length(active_contacts)
-        TR.update_rigids!(tg,q)
-        D = Matrix{eltype(q)}(undef,3na,length(q))
-        ŕ = Vector{eltype(q)}(undef,3na)
-        for (i,ac) in enumerate(active_contacts)
-            (;id,state) = ac
-            (;n,t1,t2) = state.frame
-            C = rb1.state.cache.Cps[id]
-            CT = C*TR.build_T(tg,1)
-            dm = hcat(n,t1,t2) |> transpose
-            D[3(i-1)+1:3(i-1)+3,:] = dm*CT
-            ŕ[3(i-1)+1:3(i-1)+3] = dm*rb1.state.rps[id]
-        end
-        D,ŕ
-    end
-
-    function get_distribution_law(active_contacts,q)
-        na = length(active_contacts)
-        TR.update_rigids!(tg,q)
-        P = Matrix{eltype(q)}(undef,3na,length(q))
-        ŕ = Vector{eltype(q)}(undef,3na)
-        for (i,ac) in enumerate(active_contacts)
-            (;id,state) = ac
-            C = rb1.state.cache.Cps[id]
-            CT = C*TR.build_T(tg,1)
-            P[3(i-1)+1:3(i-1)+3,:] = CT
-        end
-        P⁺ = pinv(P)
-        L = (I-P⁺'*P')
-    end
-
-    function get_∂Dq̇∂q(active_contacts,q,q̇)
-        na = length(active_contacts)
-        TR.update_rigids!(tg,q)
+    function get_directions_and_positions(na,contacts_bits,q,q̇=zero(q),Λ=zeros(eltype(q),3na))
         T = eltype(q)
         nq = length(q)
+        TR.update_rigids!(tg,q)
+        D = Matrix{T}(undef,3na,length(q))
+        Dₘ = zero(D)
+        Dₖ = zero(D)
+        ŕ = Vector{T}(undef,3na)
         ∂Dq̇∂q = zeros(T,3na,nq)
-        for (i,ac) in enumerate(active_contacts)
-            (;id,state) = ac
-            (;n,t1,t2) = state.frame
-            r̄p = rb1.prop.r̄ps[id]
-            if rb1.state.cache.funcs.nmcs isa TR.QBF.QC
-                ∂Cẋ∂x = TR.QBF.make_∂Cẋ∂x(r̄p)
-                TI = TR.build_T(tg,1)
-                ∂Cq̇∂q = ∂Cẋ∂x(TI*q,TI*q̇)*TI
-                ∂Dq̇∂q[3(i-1)+1,:] = transpose(n)*∂Cq̇∂q
-                ∂Dq̇∂q[3(i-1)+2,:] = transpose(t1)*∂Cq̇∂q
-                ∂Dq̇∂q[3(i-1)+3,:] = transpose(t2)*∂Cq̇∂q
-            end
-        end
-        ∂Dq̇∂q
-    end
-
-    function get_∂DᵀΛ∂q(active_contacts,q,Λ)
-        na = length(active_contacts)
-        TR.update_rigids!(tg,q)
-        T = eltype(q)
-        nq = length(q)
         ∂DᵀΛ∂q = zeros(T,nq,nq)
-        for (i,ac) in enumerate(active_contacts)
-            (;id,state) = ac
-            (;n,t1,t2) = state.frame
-            r̄p = rb1.prop.r̄ps[id]
-            if rb1.state.cache.funcs.nmcs isa TR.QBF.QC
-                ∂Cᵀf∂x = TR.QBF.make_∂Cᵀf∂x(r̄p)
-                TI = TR.build_T(tg,1)
-                Λi = @view Λ[3(i-1)+1:3(i-1)+3]
-                fi = hcat(n,t1,t2)*Λi
-                ∂DᵀΛ∂q .+= transpose(TI)*∂Cᵀf∂x(TI*q,fi)*TI
+        ci = 0
+        foreach(tg.bodies) do body
+            (;prop,state) = body
+            bid = prop.id
+            (;contacts,rps) = state
+            active_idx = findall(contacts_bits[bid])
+            for pid in active_idx
+                contact = contacts[pid]
+                rp = rps[pid]
+                (;n,t1,t2) = contact.state.frame
+                C = state.cache.Cps[pid]
+                CT = C*TR.build_T(tg,bid)
+                dm = hcat(n,t1,t2) |> transpose
+                epi = 3ci+1:3ci+3
+                D[epi,:] = dm*CT
+                ŕ[epi]   = dm*rp
+                if state.cache.funcs.nmcs isa TR.QBF.QC
+                    T = TR.build_T(tg,bid)
+                    r̄p = prop.r̄ps[pid]
+
+                    ∂Cẋ∂x = TR.QBF.make_∂Cẋ∂x(r̄p)
+                    ∂Cq̇∂q = ∂Cẋ∂x(T*q,T*q̇)*T
+                    ∂Dq̇∂q[3ci+1:3ci+3,:] = dm*∂Cq̇∂q
+                    ∂Cᵀf∂x = TR.QBF.make_∂Cᵀf∂x(r̄p)
+                    Λi = @view Λ[epi]
+                    fi = dm'*Λi
+                    ∂DᵀΛ∂q .+= transpose(T)*∂Cᵀf∂x(T*q,fi)*T
+                end
+                if contact.state.persistent
+                    Dₘ[epi,:] .= D[epi,:]
+                else
+                    Dₖ[epi,:] .= D[epi,:]
+                end
+                ci += 1
             end
         end
-        ∂DᵀΛ∂q
+        D, Dₘ, Dₖ, ŕ, ∂Dq̇∂q, ∂DᵀΛ∂q
     end
 
-    @eponymtuple(F!,Jac_F!,prepare_contacts!,get_directions_and_positions,get_∂Dq̇∂q,get_∂DᵀΛ∂q)
+    @eponymtuple(F!,Jac_F!,prepare_contacts!,get_directions_and_positions)
 end
 
 ros = [[0,0,z] for z = 10.0:-0.1:0.0]
@@ -3475,14 +3511,13 @@ ṙo = [0.0,0.0,0.0]
 # cube = make_cube()
 # cube = make_cube(ros[1])
 cube = make_cube(ros[2],Ro,ṙo,0.1.*ωo)
-tspan = (0.0,1.91)
-tspan = (0.0,2.5)
+tspan = (0.0,5.0)
+tspan = (0.0,50.0)
 dt = 1e-3
-
 
 prob = TR.SimProblem(cube,cube_contact_dynfuncs)
 TR.solve!(prob,
-    TR.ZhongCCP();tspan,dt,ftol=1e-14,maxiters=50,exception=false
+    TR.ZhongCCP();tspan,dt,ftol=1e-10,maxiters=50,exception=false
 )
 
 plot_traj!(cube;
@@ -3497,91 +3532,22 @@ plot_traj!(cube;
 ME = TR.mechanical_energy!(cube)
 lines(cube.traj.t,ME.E)
 
-ts,qs,vs,as,ṽ̇s = TR.NSSFC.nssfc(nq,nλ,q0,v0,p,h,contact_dynfuncs(cube),tspan;tol=1e-6,imax=10)
+contacts_traj_voa = cube.contacts_traj |> VectorOfArray
+fig = Figure()
+ax1 = Axis(fig[1,1])
+for i = [1,3,5,7]
+    λn = [c.state.Λ[1] for c in contacts_traj_voa[i,:]]
+    lines!(ax1,λn,label="$i")
+end
+ax2 = Axis(fig[1,2])
+for i = [1,3,5,7]
+    λt = [c.state.Λ[2] for c in contacts_traj_voa[i,:]]
+    lines!(ax2,λt,label="$i")
+end
+ax3 = Axis(fig[1,3])
+for i = [1,3,5,7]
+    λb = [c.state.Λ[3] for c in contacts_traj_voa[i,:]]
+    lines!(ax3,λb,label="$i")
+end
+fig
 
-ts,cs,qs,vs,ps,λs,μs = TR.NSSFC.nhsolve(nq,nλ,nμ,q0,v0,contact_dynfuncs(cube),tspan;
-            dt=h,ftol=1e-6,imax=50,exception=true)
-
-ts,cs,qs,vs,ps,λs,μs = TR.NSSFC.ipsolve(nq,nλ,nμ,q0,v0,contact_dynfuncs(cube),tspan;
-            dt=h,ftol=1e-10,imax=50,exception=false)
-
-ts,qs,vs,as,ṽ̇s = TR.NSSFC.nssfc(n,b,q26026,v26026,p,h,contact_dynfuncs(cube),tspan;tol=1e-10,imax=100)
-
-cuberef = deepcopy(cube)
-prob = TR.SimProblem(cuberef,dynfuncs,tspan)
-TR.solve!(prob,TR.Zhong06();dt=h,ftol=1e-14)
-
-vis(cuberef,contact_dynamics)
-
-cube = make_cube(ros[1],Ro,ṙo,ωo)
-# cube = make_cube(ros[1])
-# cube = make_cube()
-
-TR.prepare_traj!(cube.traj;tspan,dt=h,restart=true)
-
-cube.traj.t[2:end] = ts[2:end]
-cube.traj.q[2:end] = qs[2:end]
-cube.traj.q̇[2:end] = vs[2:end]
-
-vis(cube,contact_dynamics)
-
-vis(cube,contact_dynamics;do_record=true)
-
-plot(cube.traj.ts,VectorOfArray(cube.traj.qs)[7,:],color="yellow")
-plot!(cuberef.traj.ts,VectorOfArray(cuberef.traj.qs)[7,:],color="blue")
-
-ME = TR.mechanical_energy!(cube;gravity=true,)
-
-ME.E
-scatter(ME.E)
-kes,epes,gpes,es,es_err = analyse_energy(cube;gravity=true,elasticity=false)
-es_off = OffsetArray(es,0:length(es)-1)
-kes_off = OffsetArray(kes,0:length(es)-1)
-gpes_off = OffsetArray(gpes,0:length(es)-1)
-steprange = 0:length(es)-1
-steprange = 558:560
-steprange = 5574:5600
-steprange = 55740:56000
-es1 = es_off[steprange[1]]
-plot(steprange,(es_off[steprange].-es1)./es1)
-plot(steprange,kes_off[steprange])
-plot(steprange,gpes_off[steprange])
-smoothsteps = findall((x)->x==0,cs)
-plotsmoothsteps = [x for x in smoothsteps if x∈steprange]
-plot!(plotsmoothsteps,es_off[plotsmoothsteps],color=:blue)
-
--0.0016049537616469219-(-0.0016048102389008441)
-
-plot(epes[6400:6500])
-ylims!(78,80)
-
-plot(ts,kes[begin+1:end])
-plot(ts,gpes[begin+1:end])
-
-ros = [q[1:3] for q in qs]
-ṙos = [q̇[1:3] for q̇ in vs]
-r̈os = [ṽ̇[1:3] for ṽ̇ in ṽ̇s]
-aos = [a[1:3] for a in as]
-
-plot(ts,norm.(ros))
-
-plot(ts,norm.(ṙos))
-
-plot!(ts,norm.(ros))
-
-plot(ts,norm.(r̈os))
-
-
-plot(ts,norm.(aos))
-
-plot!(ts,gpes[begin+1:end])
-
-norm(ṙos[1393])/norm(ṙos[1392])
-
-y_split = [[0.09510319720143898, -0.008672570657933804, 0.09470694080223288], [0.23134216351905035, 0.1781735286559687, 0.10655619736781423], [0.25492807263830397, 0.18779000020080971, -0.14810414657700796]]
-[yi[1] - norm(yi[2:3]) for yi in y_split]
-[norm(yi[2:3]) for yi in y_split]
-Λ_split = [[6.077211920457062e-5, 5.541879908804313e-6, -6.051890646476349e-5], [1.6851978930926635e-17, -1.4431551427742453e-17, -7.662097843905011e-18], [1.0182657945568905e-17, -7.963039923870281e-18, 5.867035717865434e-18]]
-[Λi[1] - norm(Λi[2:3]) for Λi in Λ_split]
-[Λi[1] for Λi in Λ_split]
-[norm(Λi[2:3]) for Λi in Λ_split]

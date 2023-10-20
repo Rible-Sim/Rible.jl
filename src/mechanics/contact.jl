@@ -89,12 +89,23 @@ function activate!(state::FrictionalContactState,gap)
     state.persistent = (pre_active == state.active)
 end
 
-function update_contacts!(contacts, v, Λ)
-    vs = split_by_lengths(v,3)
-    Λs = split_by_lengths(Λ,3)
-    for (ac,va,Λa) in zip(contacts,vs,Λs)
-        ac.state.v = SVector{3}(va)
-        ac.state.Λ = SVector{3}(Λa)
+function update_contacts!(sys_contacts, tg, contacts_bits, v, Λ)
+    (;numbered) = tg.connectivity
+    (;mem2num) = numbered
+    is = 0
+    for bid in 1:tg.nbodies
+        contacts_bools = Bool.(contacts_bits[bid])
+        for (pid,cid) in enumerate(mem2num[bid])
+            contact = sys_contacts[cid]
+            if contacts_bools[pid]
+                contact.state.active = true
+                contact.state.v = SVector{3}(v[3is+1:3is+3])
+                contact.state.Λ = SVector{3}(Λ[3is+1:3is+3])
+                is += 1
+            else
+                contact.state.active = false
+            end
+        end
     end
 end
 

@@ -61,7 +61,7 @@ end
 function get_actuate_seqs(bot,g0=[0.0])
     (;tg) = bot
     (;nrigids) = tg
-    (;mem2num,num2ID,num2sys) = tg.connectivity.numbered
+    (;mem2num,num2sys) = tg.connectivity.numbered
     tg_end = deepcopy(tg)
     nsegs = nrigids-1
     startsols,parameters0 = TR.get_start_system(bot,TR.AllMode())
@@ -447,7 +447,7 @@ function get_actuate_video(bot_input;g0=[0.0])
     bot = deepcopy(bot_input)
     (;tg) = bot
     (;nrigids) = tg
-    (;mem2num,num2ID,num2sys) = tg.connectivity.numbered
+    (;mem2num,num2sys) = tg.connectivity.numbered
     tg_end = deepcopy(tg)
     nsegs = nrigids-1
     startsols,parameters0 = TR.get_start_system(bot,TR.DeformMode())

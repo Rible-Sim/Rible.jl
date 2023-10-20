@@ -847,49 +847,6 @@ function simple2mesh(sp,color=:slategrey)
     GB.Mesh(GB.meta(points,normals=nls,color=colors),faces)
 end
 
-function plotsave_energy(bot,figname=nothing)
-    (;traj) = bot
-    (;t) = traj
-    tmin,tmax = t[begin], t[end]
-    titles = [
-        "机械能",
-        "动能",
-        "势能"
-    ]
-    with_theme(theme_pub; resolution = (0.9tw,0.6tw)) do
-        ME = TR.mechanical_energy!(bot;gravity=true)
-        fig = Figure()
-        axs = [
-            begin
-                ax = Axis(
-                    fig[i,1],
-                    xlabel=L"t~\mathrm{(s)}",
-                    ylabel="Energy (J)",
-                    title=titles[i]
-                )
-                xlims!(ax,tmin,tmax)
-                # ylims!(ax,,)
-                if i !== 3
-                    ax.xlabelvisible = false
-                    ax.xticklabelsvisible = false
-                end
-                Label(fig[i,1,TopLeft()], "($(alphabet[i]))")
-                ax
-            end
-            for i = 1:3
-        ]
-
-        lines!(axs[1], t, ME.E)
-        lines!(axs[2], t, ME.T)
-        lines!(axs[3], t, ME.V)
-
-
-        savefig(fig,figname)
-
-        fig
-    end
-end
-
 function plotsave_friction_direction(bots,x,xs,figname=nothing;
         resolution = (0.9tw,0.4tw),
         mo = 8,

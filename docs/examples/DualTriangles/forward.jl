@@ -47,12 +47,12 @@ rb1 = man_inv.tg.rigidbodies.data[1][1]
 TR.update_points!(man_inv.tg)
 
 
-(;mem2num,num2ID,num2sys) = man_inv.tg.connectivity.numbered
+(;mem2num,num2sys) = man_inv.tg.connectivity.numbered
 TR.get_c(man_inv)[indr1p2]
 
 # !!!! Check inverse statics first !!!!
 function get_testall_seq(bot;g=0.0,amax=0.01,amin=-0.01,n=20)
-    (;mem2num,num2ID,num2sys) = bot.tg.connectivity.numbered
+    (;mem2num,num2sys) = bot.tg.connectivity.numbered
     indr1p2 = num2sys[mem2num[1][2]]
     indr2p5 = num2sys[mem2num[2][5]]
     start_sol,parameters0 = TR.get_start_system(bot,TR.AllMode())

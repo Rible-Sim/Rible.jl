@@ -8,7 +8,7 @@ abstract type AbstractRigidBodyState{N,T} <: AbstractBodyState{N,T} end
 abstract type ExternalConstraints{T} end
 
 """
-刚体属性类
+Rigid Body 属性Type 
 $(TYPEDEF)
 ---
 $(TYPEDFIELDS)
@@ -32,10 +32,14 @@ struct RigidBodyProperty{N,T} <: AbstractRigidBodyProperty{N,T}
     r̄ps::Vector{SVector{N,T}}
     "Axes in local frame"
     ās::Vector{SVector{N,T}}
+    "Friction coefficients"
+    μs::Vector{T}
+    "Restitution coefficients"
+    es::Vector{T}
 end
 
 """
-刚体属性构造子
+Rigid Body 属性Constructor 
 $(TYPEDSIGNATURES)
 """
 function RigidBodyProperty(
@@ -43,7 +47,9 @@ function RigidBodyProperty(
         mass::T,inertia_input,
         r̄g::AbstractVector,
         r̄ps=SVector{size(inertia_input,1),T}[],
-        ās=SVector{size(inertia_input,1),T}[];
+        ās=SVector{size(inertia_input,1),T}[],
+        μs=zeros(T,length(r̄ps)),
+        es=zeros(T,length(r̄ps));
         constrained = false,
         type = :generic
     ) where T
@@ -63,7 +69,9 @@ function RigidBodyProperty(
         mtype(inertia_input),
         r̄type(r̄g),
         r̄type.(r̄ps),
-        ātype.(ās)
+        ātype.(ās),
+        μs,
+        es
     )
 end
 
@@ -145,12 +153,12 @@ function get_CoordinatesCache(prop::RigidBodyProperty{N,T},
 end
 
 """
-刚体状态mutable类。所有坐标在同一个惯性系中表达。
+Rigid Body State mutableType 。所有坐标在同一个惯性系中表达。
 $(TYPEDEF)
 ---
 $(TYPEDFIELDS)
 """
-mutable struct RigidBodyState{N,M,T,cacheType} <: AbstractRigidBodyState{N,T}
+mutable struct RigidBodyState{N,M,T,cacheType,contactType} <: AbstractRigidBodyState{N,T}
     "Origin of local frame"
     ro::MVector{N,T}
     "Rotation Matrix of local frame"
@@ -181,10 +189,12 @@ mutable struct RigidBodyState{N,M,T,cacheType} <: AbstractRigidBodyState{N,T}
     τps::Vector{MVector{M,T}}
     "Other cache"
     cache::cacheType
+    "Contacts"
+    contacts::Vector{contactType}
 end
 
 """
-刚体状态构造子
+Rigid Body State Constructor 
 $(TYPEDSIGNATURES)
 ---
 `pres_idx`为约束坐标的索引。
@@ -195,7 +205,7 @@ function RigidBodyState(prop::RigidBodyProperty{N,T},
                         r_input,rotation_input,ṙ_input,ω_input,
                         pres_idx=Int[],
                         Φ_mask=get_Φ_mask(lncs)) where {N,T}
-    (;r̄g,r̄ps,ās) = prop
+    (;r̄g,r̄ps,ās,μs,es) = prop
     nr̄ps = length(r̄ps)
     nās = length(ās)
     ro = MVector{N}(r_input)
@@ -221,20 +231,30 @@ function RigidBodyState(prop::RigidBodyProperty{N,T},
     τps = MVector{M,T}[zeros(T,M) for i in 1:nās]
 
     cache = get_CoordinatesCache(prop,lncs,pres_idx,Φ_mask)
-
-    RigidBodyState(ro,R,ṙo,ω,rg,ṙg,rps,ṙps,as,ȧs,f,τ,fps,τps,cache)
+    contacts = [Contact(i,μs[i],es[i]) for i in 1:nr̄ps]
+    RigidBodyState(
+        ro,R,
+        ṙo,ω,
+        rg,ṙg,
+        rps,ṙps,
+        as,ȧs,
+        f,τ,
+        fps,τps,
+        cache,
+        contacts
+    )
 end
 
 """
-通用刚体类
+通用Rigid Body Type 
 $(TYPEDEF)
 ---
 $(TYPEDFIELDS)
 """
 struct RigidBody{N,M,T,cacheType,meshType} <: AbstractRigidBody{N,T}
-    "刚体属性"
+    "Rigid Body 属性"
     prop::RigidBodyProperty{N,T}
-    "刚体状态"
+    "Rigid Body State "
     state::RigidBodyState{N,M,T,cacheType}
     "可视化网格"
     mesh::meshType
@@ -366,7 +386,7 @@ function get_rbids(rbs)
 end
 
 """
-返回约束方程编号。
+Return 约束方程编号。
 $(TYPEDSIGNATURES)
 """
 function get_Φ_mask(lncs::NCF.LNC)
@@ -379,7 +399,7 @@ get_Φ_mask(::QBF.QC) = collect(1:1)
 
 # operations on rigid body
 """
-返回刚体平移动能。
+Return Rigid Body 平移动能。
 $(TYPEDSIGNATURES)
 """
 function kinetic_energy_translation(rb::AbstractRigidBody)
@@ -389,7 +409,7 @@ function kinetic_energy_translation(rb::AbstractRigidBody)
 end
 
 """
-返回刚体旋转动能。
+Return Rigid Body 旋转动能。
 $(TYPEDSIGNATURES)
 """
 function kinetic_energy_rotation(rb::AbstractRigidBody)
@@ -400,7 +420,7 @@ function kinetic_energy_rotation(rb::AbstractRigidBody)
 end
 
 """
-返回刚体重力势能。
+Return Rigid Body 重力势能。
 $(TYPEDSIGNATURES)
 """
 function potential_energy_gravity(rb::AbstractRigidBody)
@@ -411,7 +431,7 @@ function potential_energy_gravity(rb::AbstractRigidBody)
 end
 
 """
-返回刚体应变势能。
+Return Rigid Body 应变势能。
 $(TYPEDSIGNATURES)
 """
 function potential_energy_strain(rb::AbstractRigidBody)
