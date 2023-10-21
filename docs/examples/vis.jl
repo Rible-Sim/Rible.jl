@@ -1133,3 +1133,42 @@ function plot_kinematic_indeterminacy(
         showinit = true,
     )
 end
+
+
+function plotsave_contactpoints(bot,figname=nothing)
+    contacts_traj_voa = VectorOfArray(bot.contacts_traj)
+    (;t) = bot.traj
+    with_theme(theme_pub;
+            figure_padding = (0,fontsize,0,0),
+            resolution = (0.9tw,0.3tw),
+        ) do 
+        fig = Figure()
+        ax = Axis(fig[1,1], xlabel = tlabel, ylabel = "Contact No.")
+        markersize = fontsize
+        nc = size(contacts_traj_voa,1)
+        for ic in eachindex(contacts_traj_voa[1])
+            c_traj = contacts_traj_voa[ic,:]
+            idx_imp = findall((x)->isimpact(x;Λtol=0), c_traj)
+            idx_per = findall((x)->doespersist(x;Λtol=0),c_traj)
+            scatter!(ax,t[idx_per],fill(ic,length(idx_per)); marker=:diamond, markersize)
+            scatter!(ax,t[idx_imp],fill(ic,length(idx_imp)); marker=:xcross, markersize)
+        end
+        xlims!(ax,t[begin],t[end])
+        ylims!(ax,0.5,nc+0.5)
+        ax.yticks = 1:nc
+        elem_1 = [MarkerElement(;color = :blue, marker = :xcross, markersize)]
+        elem_2 = [MarkerElement(;color = :blue, marker = :diamond, markersize)]
+        Legend(fig[1, 1],
+            [elem_1, elem_2],
+            ["Impact", "Persistent"],
+            tellheight = false,
+            tellwidth = false,
+            orientation = :horizontal, 
+            halign = :right,
+            valign = :top,
+            margin = (0,fontsize,fontsize,2fontsize)
+        )
+        savefig(fig,figname)
+        fig
+    end
+end

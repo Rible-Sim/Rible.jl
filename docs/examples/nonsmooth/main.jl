@@ -1776,6 +1776,8 @@ cablemesh = sample(ancs,e,1000)
 mesh(cablemesh,transparency=false)
 
 function make_hammer(id,r̄ijkl,ro,R,ri,rj=nothing,rk=nothing,rl=nothing;
+        μ,e,
+        ω = zero(ro),
         movable = true,
         constrained = false,
         pres_idx = Int[],
@@ -1807,12 +1809,20 @@ function make_hammer(id,r̄ijkl,ro,R,ri,rj=nothing,rk=nothing,rl=nothing;
             for i = [1,2,4,5]
         ]
     )
-    @show m,diag(Īg),r̄g,length(r̄ps)
-    prop = TR.RigidBodyProperty(id,movable,m,Īg,
-                r̄g,r̄ps;constrained=constrained
+    ās = [
+        SVector(1.0,0,0) 
+        for _ in eachindex(r̄ps)
+    ]
+    μs = fill(μ,length(r̄ps))
+    es = fill(e,length(r̄ps))
+    @show m,diag(Īg),r̄g,length(r̄ps),μs,es
+    prop = TR.RigidBodyProperty(
+                id,movable,m,Īg,
+                r̄g,r̄ps,ās,
+                μs,es;
+                constrained=constrained
                 )
     ṙo = zero(ro)
-    ω = zero(ro)
     if rj isa Nothing
         lncs,_ = TR.NCF.NC1P3V(ri,ro,R,ṙo,ω)
     elseif rk isa Nothing
@@ -1851,9 +1861,9 @@ function cable_ancf(pres_idx, 𝐞, L = 1.0)
     T = typeof(L)
     r̄g = SVector(L/2,T(0),T(0))
     r̄p1 = SVector(T(0),T(0),T(0))
-    r̄p2 = SVector(L,T(0),T(0))
+    # r̄p2 = SVector(L,T(0),T(0))
     r̄ps = [
-        r̄p1,r̄p2
+        r̄p1,
     ]
     prop = TR.FlexibleBodyProperty(
         1,
@@ -1878,7 +1888,8 @@ function make_flexcable(;
         e = 0.9,
         L = 1.0,
         nx = 2,
-        R = RotY(deg2rad(-60))
+        R = RotY(deg2rad(-60)),
+        ω = zero(ri)
     )
     if doDR
         fb_pres_idx = [7,8,9]
@@ -1905,6 +1916,8 @@ function make_flexcable(;
         rj,
         R,
         rj;
+        μ,e,
+        ω,
         pres_idx=rb_pres_idx,
         constrained=ifelse(!isempty(rb_pres_idx),true,false)
     )
@@ -1925,8 +1938,7 @@ function make_flexcable(;
     cst1 = TR.FixedIndicesConstraint(1,[1,2,3],ri)
     jointed = TR.join((cst1,),indexedcoords)
     cnt = TR.Connectivity(numberedpoints,indexedcoords,tensioned,jointed)
-    contacts = [TR.Contact(i,μ,e) for i = 1:14]
-    tg = TR.TensegrityStructure(fbs,tensiles,cnt,contacts)
+    tg = TR.TensegrityStructure(fbs,tensiles,cnt,)
     bot = TR.TensegrityRobot(tg)
 end
 
@@ -1948,108 +1960,157 @@ function flexcable_contact_dynfuncs(bot,ground_plane)
         TR.build_∂Q̌∂q̌!(∂F∂q̌,tg)
         # TR.build_∂Q̌∂q̌̇!(∂F∂q̌̇,tg)
     end
-    pids = collect(1:14)
-    rbs = TR.get_bodies(tg)
-    rblast = rbs[end]
-    nb = length(rbs)
     (;n) = ground_plane
-    function prepare_contacts!(contacts,q)
-        TR.update_rigids!(tg,q)
-        
-        gaps = [
-            TR.signed_distance(
-                rblast.state.rps[pid],
-                inclined_plane
-            )
-            for pid in pids
+    function prepare_contacts!(qˣ)
+        T = eltype(qˣ)
+        contacts_bits = [
+            BitVector()
+            for _ in 1:tg.nbodies
         ]
-        deepest_gap, active_pid = findmin(gaps)
-        TR.activate!(contacts[active_pid],deepest_gap)
-        active_contacts = filter(contacts) do c
-            c.state.active
+        es = T[]
+        μs = T[]
+        gaps = T[]
+        na = 0
+        # backtracking
+        # TR.update_rigids!(tg,q)
+        # foreach(tg.bodies) do body
+        #     (;state) = body
+        #     (;contacts,rps) = state
+        #     for pid in eachindex(rps)
+        #         rp = rps[pid]
+        #         contact = contacts[pid]
+        #         gap = rp[3]
+        #         TR.activate!(contact,gap)
+        #     end
+        # end
+        # check active and persist
+        TR.update_rigids!(tg,qˣ)
+        foreach(tg.bodies) do body
+            (;prop,state) = body
+            bid = prop.id
+            (;contacts,rps) = state
+            contacts_bits[bid] = BitVector(undef,length(rps))
+            contacts_bits[bid] .= false
+            if body isa TR.AbstractRigidBody
+                for pid in eachindex(rps)
+                    rp = rps[pid]
+                    contact = contacts[pid]
+                    (;e,μ) = contact
+                    gap = TR.signed_distance(
+                        rp,
+                        ground_plane
+                    )
+                    TR.activate!(contact,gap)
+                    if contact.state.active
+                        # @show rp
+                        contacts_bits[bid][pid] = true
+                        contact.state.frame = TR.SpatialFrame(n)
+                        push!(gaps,gap)
+                        push!(es,e)
+                        push!(μs,μ)
+                        na += 1
+                    end
+                end
+            end
         end
-        na = length(active_contacts)
-        inv_μ_vec = ones(eltype(q),3na)
-        for (i,ac) in enumerate(active_contacts)
-            (;id,state) = ac
-            state.frame = TR.SpatialFrame(n)
-            inv_μ_vec[3(i-1)+1] = 1/ac.μ
+        inv_μs = ones(T,3na)
+        for i = 1:na
+            inv_μs[3(i-1)+1] = 1/μs[i]
         end
-        es = [ac.e for ac in active_contacts]
-        gaps = [ac.state.gap for ac in active_contacts]
-        H = Diagonal(inv_μ_vec)
-        active_contacts, gaps, H, es
+        H = Diagonal(inv_μs)
+        na, contacts_bits, gaps, H, es
     end
     
-    function get_directions_and_positions(active_contacts,q)
-        na = length(active_contacts)
+    function get_directions_and_positions(na,contacts_bits,q,q̇=zero(q),Λ=zeros(eltype(q),3na))
+        T = eltype(q)
+        nq = length(q)
         TR.update_rigids!(tg,q)
-        D = Matrix{eltype(q)}(undef,3na,length(q))
-        ŕ = Vector{eltype(q)}(undef,3na)
-        for (i,ac) in enumerate(active_contacts)
-            (;id,state) = ac
-            (;n,t1,t2) = state.frame
-            dm = hcat(n,t1,t2) |> transpose
-            ŕ[3(i-1)+1:3(i-1)+3] = dm*rblast.state.rps[id]
-            # S = rblast.state.cache.Sps[id]
-            # ST = S*TR.build_T(tg,nb)
-            # D[3(i-1)+1:3(i-1)+3,:] = dm*ST
-            C = rblast.state.cache.Cps[id]
-            CT = C*TR.build_T(tg,nb)
-            D[3(i-1)+1:3(i-1)+3,:] = dm*CT
+        D = Matrix{T}(undef,3na,length(q))
+        Dₘ = zero(D)
+        Dₖ = zero(D)
+        ŕ = Vector{T}(undef,3na)
+        ∂Dq̇∂q = zeros(T,3na,nq)
+        ∂DᵀΛ∂q = zeros(T,nq,nq)
+        ci = 0
+        foreach(tg.bodies) do body
+            (;prop,state) = body
+            bid = prop.id
+            (;contacts,rps) = state
+            active_idx = findall(contacts_bits[bid])
+            for pid in active_idx
+                contact = contacts[pid]
+                rp = rps[pid]
+                (;n,t1,t2) = contact.state.frame
+                C = state.cache.Cps[pid]
+                CT = C*TR.build_T(tg,bid)
+                dm = hcat(n,t1,t2) |> transpose
+                epi = 3ci+1:3ci+3
+                D[epi,:] = dm*CT
+                ŕ[epi]   = dm*rp
+                if state.cache.funcs.nmcs isa TR.QBF.QC
+                    T = TR.build_T(tg,bid)
+                    r̄p = prop.r̄ps[pid]
+
+                    ∂Cẋ∂x = TR.QBF.make_∂Cẋ∂x(r̄p)
+                    ∂Cq̇∂q = ∂Cẋ∂x(T*q,T*q̇)*T
+                    ∂Dq̇∂q[3ci+1:3ci+3,:] = dm*∂Cq̇∂q
+                    ∂Cᵀf∂x = TR.QBF.make_∂Cᵀf∂x(r̄p)
+                    Λi = @view Λ[epi]
+                    fi = dm'*Λi
+                    ∂DᵀΛ∂q .+= transpose(T)*∂Cᵀf∂x(T*q,fi)*T
+                end
+                if contact.state.persistent
+                    Dₘ[epi,:] .= D[epi,:]
+                else
+                    Dₖ[epi,:] .= D[epi,:]
+                end
+                ci += 1
+            end
         end
-        D,ŕ
+        D, Dₘ, Dₖ, ŕ, ∂Dq̇∂q, ∂DᵀΛ∂q
     end
 
-    function get_∂Dq̇∂q(active_contacts,q,q̇)
-        na = length(active_contacts)
-        TR.update_rigids!(tg,q)
+    function get_distribution_law(na,contacts_bits,q)
         T = eltype(q)
-        nq = length(q)
-        ∂Dq̇∂q = zeros(T,3na,nq)
-        for (i,ac) in enumerate(active_contacts)
-            (;id,state) = ac
-            (;n,t1,t2) = state.frame
-            r̄p = rblast.prop.r̄ps[id]
-            if rblast.state.cache.funcs.nmcs isa TR.QBF.QC
-                ∂Cẋ∂x = TR.QBF.make_∂Cẋ∂x(r̄p)
-                TI = TR.build_T(tg,nb)
-                ∂Cq̇∂q = ∂Cẋ∂x(TI*q,TI*q̇)*TI
-                ∂Dq̇∂q[3(i-1)+1,:] = transpose(n)*∂Cq̇∂q
-                ∂Dq̇∂q[3(i-1)+2,:] = transpose(t1)*∂Cq̇∂q
-                ∂Dq̇∂q[3(i-1)+3,:] = transpose(t2)*∂Cq̇∂q
-            end
-        end
-        ∂Dq̇∂q
-    end
-    
-    function get_∂DᵀΛ∂q(active_contacts,q,Λ)
-        na = length(active_contacts)
         TR.update_rigids!(tg,q)
-        T = eltype(q)
-        nq = length(q)
-        ∂DᵀΛ∂q = zeros(T,nq,nq)
-        for (i,ac) in enumerate(active_contacts)
-            (;id,state) = ac
-            (;n,t1,t2) = state.frame
-            r̄p = rblast.prop.r̄ps[id]
-            if rblast.state.cache.funcs.nmcs isa TR.QBF.QC
-                ∂Cᵀf∂x = TR.QBF.make_∂Cᵀf∂x(r̄p)
-                TI = TR.build_T(tg,nb)
-                Λi = @view Λ[3(i-1)+1:3(i-1)+3]
-                fi = hcat(n,t1,t2)*Λi
-                ∂DᵀΛ∂q .+= transpose(TI)*∂Cᵀf∂x(TI*q,fi)*TI
+        Ls = Matrix{T}[]
+        foreach(tg.bodies) do body
+            (;prop,state) = body
+            bid = prop.id
+            (;contacts,rps) = state
+            active_idx = findall(contacts_bits[bid])
+            na_body = length(active_idx)
+            R = zeros(T,3na_body,6)
+            inv_μs_body = ones(T,3na_body)
+            for (i,pid) in enumerate(active_idx)
+                rp = rps[pid]
+                contact = contacts[pid]
+                (;e,μ) = contact
+                (;n,t1,t2) = contact.state.frame
+                inv_μs_body[3(i-1)+1] = 1/μ
+                dm = hcat(n,t1,t2) |> transpose
+                R[3(i-1)+1:3(i-1)+3,1:3] = dm
+                R[3(i-1)+1:3(i-1)+3,4:6] = dm*(-TR.NCF.skew(rp))
             end
+            L_body = (I-pinv(R)'*R')*Diagonal(inv_μs_body)
+            push!(Ls,L_body)
         end
-        ∂DᵀΛ∂q
+        L = BlockDiagonal(Ls)
     end
     # @eponymtuple(F!,Jac_F!)
-    @eponymtuple(F!,Jac_F!,prepare_contacts!,get_directions_and_positions,get_∂Dq̇∂q,get_∂DᵀΛ∂q)
+    @eponymtuple(F!,Jac_F!,prepare_contacts!,get_directions_and_positions,get_distribution_law)
 end
 
 # don't bother
 R = RotXY(deg2rad(0),deg2rad(-0))
-inclined_plane = TR.Plane(R*[0,0,1.0],[0,-0.0,-0.0])
+inclined_plane = TR.Plane(R*[0,0,1.0],[-1.039230,-0.0,0.781])
+p1 =  [-1.039230,0,0.780]
+p2 = [-1.173952,-0.11,0.8646278]
+p3 = [-0.901447,-0.112500,0.762216]
+n = (p2-p1) × (p3 - p1 )
+
+inclined_plane = TR.Plane(n,p3.+[0,0,0.001])
+
 
 flexcable_DR = make_flexcable(;
         ri  = [ 0.0, 0.0, 1.5],
@@ -2065,7 +2126,8 @@ flexcable = make_flexcable(;
     rj  = [-0.6*√3, 0.0, 1.2],
     rjx = [ 0.0,-1.0, 0.0],
     e = 0.0,
-    μ=0.01,L=1.2,nx=5,R=RotY(-π/2)
+    μ=0.1,L=1.2,nx=5,R=RotY(-π/2),
+    ω=-200n,
 )
 
 # flexcable_DR = make_flexcable(;R = RotY(-π/2),L=1.5,nx=5,doDR=true)
@@ -2094,13 +2156,8 @@ end
 
 
 # sliding and avg err 
-tspan = (0.0,1.0)
-h = 1e-3
-TR.solve!(
-    TR.SimProblem(flexcable,(x)->flexcable_contact_dynfuncs(x,inclined_plane)),
-    TR.Zhong06();
-    tspan,dt=h,ftol=1e-14,maxiters=50,exception=true,verbose=false
-)
+tspan = (0.0,1.5)
+h = 2e-4
 
 TR.solve!(
     TR.SimProblem(flexcable,(x)->flexcable_contact_dynfuncs(x,inclined_plane)),
@@ -2108,58 +2165,55 @@ TR.solve!(
     tspan,dt=h,ftol=1e-14,maxiters=50,exception=false,verbose=false
 )
 
-plotsave_contact_persistent(flexcable)
+plotsave_contactpoints(flexcable,)
 
-rp2 = get_trajectory!(flexcable,6,1)
-lines(rp2[3,:])
+rp2 = get_trajectory!(flexcable,6,10)
+lines(rp2[2,:])
 
 me = TR.mechanical_energy!(flexcable)
 lines((me.E.-me.E[begin])./me.E[begin])
 
-contacts_traj_voa = VectorOfArray(flexcable.contacts_traj)
-csa = StructArray(contacts_traj_voa[1,1:5])
-
-    
 #dt
 # dts = [1e-1,3e-2,1e-2,3e-3,1e-3,1e-4]
-dts = [1e-2,5e-3,2e-3,1e-3,5e-4,2e-4,1e-5]
+dts = [1e-2,5e-3,2e-3,1e-3,5e-4,2e-4,2e-5]
 flexcables_dt = [
     begin
-        flexcable = make_flexcable(;μ=0.05, L=1.5,nx=5)
-        TR.set_new_initial!(flexcable,flexcable_DR.traj.q[end],flexcable_DR.traj.q̇[end])
-        TR.solve!(TR.SimProblem(flexcable,(x)->flexcable_contact_dynfuncs(x,inclined_plane)),
+        flexcable_dt = deepcopy(flexcable)
+        TR.solve!(
+            TR.SimProblem(flexcable_dt,(x)->flexcable_contact_dynfuncs(x,inclined_plane)),
                 TR.ZhongCCP();
-                tspan=(0.0,0.4),dt,ftol=1e-14,maxiters=50,exception=false)
+                tspan=(0.0,0.12),dt,ftol=1e-14,maxiters=50,exception=false)
     end
     for dt in dts
 ]
 
-
-plotsave_contact_persistent(flexcables_dt[2])
-
-flexcables_dt[3].tg |> viz
-
-GM.activate!(); plotsave_error(flexcables_dt,dts,bid=6,pid=2,di=2)
-
-_, err_avg = get_err_avg(flexcables_dt;bid=6,pid=2,di=2)
+_, err_avg = get_err_avg(flexcables_dt;bid=6,pid=10,di=1)
 
 with_theme(theme_pub;
         resolution = (0.9tw,0.45tw),
-        figure_padding = (0,fontsize,0,0),
+        figure_padding = (fontsize,fontsize,0,0),
         Axis3=(
             azimuth = 7.595530633326987,
             elevation = 0.14269908169872403
         )
     ) do
     bot = flexcable
+    (;t) = bot.traj
     bots = flexcables_dt
-    rp2 = get_trajectory!(bot,6,2)
+    rp1 = get_trajectory!(bot,6,1)
+    rp12 = get_trajectory!(bot,6,12)
+    rp10 = get_trajectory!(bot,6,10)
     fig = Figure()
     gd2 = fig[1,2] = GridLayout()
     gd3 = fig[2,2] = GridLayout()
     gd1 = fig[:,1] = GridLayout()
-    steps = 1:150:length(bot.traj)
+    steps = 1:1000:length(bot.traj)
+    laststep = last(steps)
     cg = cgrad(:winter, length(steps), categorical = true, rev = true)
+    nstep = length(steps)
+    alphas = fill(0.2,nstep)
+    alphas[1:3] = [1, 0.2, 0.2]
+    alphas[end] = 1
     plot_traj!(
         bot;
         AxisType=Axis3,
@@ -2169,38 +2223,47 @@ with_theme(theme_pub;
         showpoints=false,
         showlabels=false,
         showarrows=false,
-        showmesh=true,
+        showcables=false,
+        showwire=false,
+        showmesh=false,
         xlims=(-1.2,1.0),
-        ylims=(-0.5,0.5),
-        zlims=(-0.4,1.8),
+        ylims=(-0.3,0.8),
+        zlims=(-0.0,1.8),
         doslide=false,
         showinfo=false,
         ground=inclined_plane,
-        # figname="cable.mp4",
         sup! = (ax,_,_) -> begin
             for (i,step) in enumerate(steps)
                 TR.goto_step!(bot,step)
                 tgvis = deepcopy(bot.tg)
-                viz!(ax,tgvis;meshcolor=cg[i])
+                (;r,g,b) = cg[i]
+                viz!(ax,tgvis;
+                    meshcolor=Makie.RGBAf(r,g,b,alphas[i])
+                )
             end
-            lines!(ax,rp2[:,1:505],color=:red)
-            lines!(ax,rp2[:,506:end],color=:blue)
+            lines!(ax,rp1[begin:laststep],color=:red)
+            lines!(ax,rp12[begin:laststep],color=:blue)
+            lines!(ax,rp10[begin:laststep],color=:purple)
+            # lines!(ax,rp2[:,506:end],color=:blue)
             handlemesh = load(joinpath(TR.assetpath(),"把柄.STL")) |> make_patch(;
                 scale = 1/400,
                 trans = [ 0.0, 0.0, 1.55],
                 rot = RotY(-π/2)
             )
+            hidey(ax)
             mesh!(ax,handlemesh)
         end
     )
     ax2 = Axis(gd2[1,1],
-        xlabel = L"x~(\mathrm{m})",
-        ylabel = L"y~(\mathrm{m})",
-        aspect = DataAspect()
+        xlabel = tlabel,
+        ylabel = "Energy (J)",
+        # aspect = DataAspect()
     )
-    lines!(ax2,get_trajectory!(bots[1],6,2)[1:2,:],label = L"h=10^{-2}")
-    lines!(ax2,get_trajectory!(bots[7],6,2)[1:2,:],label = L"h=10^{-5}")
-    axislegend(ax2)
+    lines!(ax2,t,me.E,label="E")
+    lines!(ax2,t,me.T,label="T")
+    lines!(ax2,t,me.V,label="V")
+    # axislegend(ax2)
+    Legend(gd2[1,2],ax2)
     ax3 = Axis(gd3[1,1])
     plot_convergence_order!(ax3,dts[begin:end-1],err_avg;show_orders=true)
     Legend(gd3[1,2],ax3)
@@ -2249,6 +2312,8 @@ TR.set_new_initial!(flexcable,flexcable_DR.traj.q[end],flexcable_DR.traj.q̇[end
 plane_normal = RotZY(deg2rad(-7.5),deg2rad(-90))*[0,0,1.0]
 inclined_plane = TR.Plane(plane_normal,[0.05,0,0])
 
+plane_normal'*rp+inclined_plane.d
+
 GM.activate!();with_theme(theme_pub;
         Poly= (
             transparency = true,
@@ -2259,12 +2324,12 @@ GM.activate!();with_theme(theme_pub;
     )
 end
 
-tspan = (0.0,1.5)
 h = 2e-4
+tspan = (0.0,1.5)
 TR.solve!(
     TR.SimProblem(flexcable,(x)->flexcable_contact_dynfuncs(x,inclined_plane)),
     TR.ZhongCCP();
-    tspan,dt=h,ftol=1e-14,maxiters=50,exception=true,verbose=false
+    tspan,dt=h,ftol=1e-14,maxiters=50,exception=false,verbose=false
 )
 
 me = TR.mechanical_energy!(flexcable)
@@ -2389,7 +2454,7 @@ with_theme(theme_pub;
     fig
 end
 
-#-- metero end
+#-- meteor end
 
 #----------- unibot ---------------
 unibot = uni(0.0;
@@ -2703,19 +2768,6 @@ GM.activate!(); plot_traj!(unibot_z0)
 
 #-------- SUPERBall ---------
 
-l = 1.7/2
-d = l/2
-ballbot = superball(
-    0.0;
-    ṙo = SVector(2.0,1.0,0),
-    ω = SVector(0.0,0.0,1.0),
-    μ = 0.05,
-    e = 0.0,
-    l,d,
-    z0 = l^2/(sqrt(5)*d) - 1e-3,
-    constrained = false,
-    loadmesh = false,
-)
 
 plot_traj!(ballbot)
 
@@ -2766,91 +2818,145 @@ function ball_dynfuncs(bot)
 
     bars = TR.get_rigidbars(tg)
     
-    function prepare_contacts!(contacts,q)
-        TR.update_rigids!(tg,q)
-        foreach(bars) do rb
-            rbid = rb.prop.id
-            gap1 = rb.state.rps[1][3]
-            TR.activate!(contacts[2rbid-1],gap1)
-            gap2 = rb.state.rps[2][3]
-            TR.activate!(contacts[2rbid  ],gap2)
-        end
-        active_contacts = filter(contacts) do c
-            c.state.active
-        end
-        na = length(active_contacts)
-        inv_μ_vec = ones(eltype(q),3na)
+    function prepare_contacts!(qˣ)
+        T = eltype(qˣ)
+        contacts_bits = [
+            BitVector()
+            for _ in 1:tg.nbodies
+        ]
+        es = T[]
+        μs = T[]
+        gaps = T[]
+        na = 0
+        Ls = Matrix{T}[]
+
         n = [0,0,1.0]
-        for (i,ac) in enumerate(active_contacts)
-            (;state) = ac
-            state.frame = TR.SpatialFrame(n)
-            inv_μ_vec[3(i-1)+1] = 1/ac.μ
+
+        # backtracking
+        # TR.update_rigids!(tg,q)
+        # foreach(tg.bodies) do body
+        #     (;state) = body
+        #     (;contacts,rps) = state
+        #     for pid in eachindex(rps)
+        #         rp = rps[pid]
+        #         contact = contacts[pid]
+        #         gap = rp[3]
+        #         TR.activate!(contact,gap)
+        #     end
+        # end
+        # check active and persist
+        TR.update_rigids!(tg,qˣ)
+        foreach(tg.bodies) do body
+            (;prop,state) = body
+            bid = prop.id
+            (;contacts,rps) = state
+            contacts_bits[bid] = BitVector(undef,length(rps))
+            contacts_bits[bid] .= false
+            for pid in eachindex(rps)
+                rp = rps[pid]
+                contact = contacts[pid]
+                (;e,μ) = contact
+                gap = rp[3]
+                TR.activate!(contact,gap)
+                if contact.state.active
+                    contacts_bits[bid][pid] = true
+                    contact.state.frame = TR.SpatialFrame(n)
+                    push!(gaps,gap)
+                    push!(es,e)
+                    push!(μs,μ)
+                    na += 1
+                end
+            end
+            active_idx = findall(contacts_bits[bid])
+            na_body = length(active_idx)
+            R = zeros(T,3na_body,6)
+            for (i,pid) in enumerate(active_idx)
+                rp = rps[pid]
+                contact = contacts[pid]
+                (;e,μ) = contact
+                (;n,t1,t2) = contact.state.frame
+                dm = hcat(1/μ*n,t1,t2) |> transpose
+                R[3(i-1)+1:3(i-1)+3,1:3] = dm 
+                R[3(i-1)+1:3(i-1)+3,4:6] = dm*(-TR.NCF.skew(rp))
+            end
+            L_body = I-pinv(R)'*R'
+            push!(Ls,L_body)
         end
-        es = [ac.e for ac in active_contacts]
-        gaps = [ac.state.gap for ac in active_contacts]
-        H = Diagonal(inv_μ_vec)
-        active_contacts, gaps, H, es
+        L = BlockDiagonal(Ls)
+        inv_μs = ones(T,3na)
+        for i = 1:na
+            inv_μs[3(i-1)+1] = 1/μs[i]
+        end
+        H = Diagonal(inv_μs)
+        na, contacts_bits, gaps, H, es, L
     end
 
-    function get_directions_and_positions(active_contacts,q)
-        na = length(active_contacts)
+    function get_directions_and_positions(na,contacts_bits,q,q̇=zero(q),Λ=zeros(eltype(q),3na))
+        T = eltype(q)
+        nq = length(q)
         TR.update_rigids!(tg,q)
-        D = Matrix{eltype(q)}(undef,3na,length(q))
-        ŕ = Vector{eltype(q)}(undef,3na)
-        for (i,ac) in enumerate(active_contacts)
-            (;id,state) = ac
-            rbid,pid = divrem(ac.id-1,2) .+ 1
-            (;n,t1,t2) = state.frame
-            C = bars[rbid].state.cache.Cps[pid]
-            CT = C*TR.build_T(tg,rbid)
-            dm = hcat(n,t1,t2) |> transpose
-            D[3(i-1)+1:3(i-1)+3,:] = dm*CT
-            ŕ[3(i-1)+1:3(i-1)+3] = dm*bars[rbid].state.rps[pid]
+        D = Matrix{T}(undef,3na,length(q))
+        Dₘ = zero(D)
+        Dₖ = zero(D)
+        ŕ = Vector{T}(undef,3na)
+        ∂Dq̇∂q = zeros(T,3na,nq)
+        ∂DᵀΛ∂q = zeros(T,nq,nq)
+        ci = 0
+        foreach(tg.bodies) do body
+            (;prop,state) = body
+            bid = prop.id
+            (;contacts,rps) = state
+            active_idx = findall(contacts_bits[bid])
+            for pid in active_idx
+                contact = contacts[pid]
+                rp = rps[pid]
+                (;n,t1,t2) = contact.state.frame
+                C = state.cache.Cps[pid]
+                CT = C*TR.build_T(tg,bid)
+                dm = hcat(n,t1,t2) |> transpose
+                epi = 3ci+1:3ci+3
+                D[epi,:] = dm*CT
+                ŕ[epi]   = dm*rp
+                if state.cache.funcs.nmcs isa TR.QBF.QC
+                    T = TR.build_T(tg,bid)
+                    r̄p = prop.r̄ps[pid]
+
+                    ∂Cẋ∂x = TR.QBF.make_∂Cẋ∂x(r̄p)
+                    ∂Cq̇∂q = ∂Cẋ∂x(T*q,T*q̇)*T
+                    ∂Dq̇∂q[3ci+1:3ci+3,:] = dm*∂Cq̇∂q
+                    ∂Cᵀf∂x = TR.QBF.make_∂Cᵀf∂x(r̄p)
+                    Λi = @view Λ[epi]
+                    fi = dm'*Λi
+                    ∂DᵀΛ∂q .+= transpose(T)*∂Cᵀf∂x(T*q,fi)*T
+                end
+                if contact.state.persistent
+                    Dₘ[epi,:] .= D[epi,:]
+                else
+                    Dₖ[epi,:] .= D[epi,:]
+                end
+                ci += 1
+            end
         end
-        D,ŕ
+        D, Dₘ, Dₖ, ŕ, ∂Dq̇∂q, ∂DᵀΛ∂q
     end
 
     @eponymtuple(F!,Jac_F!,prepare_contacts!,get_directions_and_positions)
 end
 
-function plotsave_contactpoints(bot,figname=nothing)
-    contacts_traj_voa = VectorOfArray(bot.contacts_traj)
-    (;t) = bot.traj
-    with_theme(theme_pub;
-            figure_padding = (0,fontsize,0,0),
-            resolution = (0.9tw,0.3tw),
-        ) do 
-        fig = Figure()
-        ax = Axis(fig[1,1], xlabel = tlabel, ylabel = "Contact No.")
-        markersize = fontsize
-        for ic in eachindex(contacts_traj_voa[1])
-            c_traj = contacts_traj_voa[ic,:]
-            idx_imp = findall(isimpact, c_traj)
-            idx_per = findall(doespersist,c_traj)
-            scatter!(ax,t[idx_per],fill(ic,length(idx_per)); marker=:diamond, markersize)
-            scatter!(ax,t[idx_imp],fill(ic,length(idx_imp)); marker=:xcross, markersize)
-        end
-        xlims!(ax,t[begin],t[end])
-        ylims!(ax,0.5,12.5)
-        ax.yticks = 1:12
-        elem_1 = [MarkerElement(;color = :blue, marker = :xcross, markersize)]
-        elem_2 = [MarkerElement(;color = :blue, marker = :diamond, markersize)]
-        Legend(fig[1, 1],
-            [elem_1, elem_2],
-            ["Impact", "Persistent"],
-            tellheight = false,
-            tellwidth = false,
-            orientation = :horizontal, 
-            halign = :right,
-            valign = :top,
-            margin = (0,fontsize,fontsize,2fontsize)
-        )
-        savefig(fig,figname)
-        fig
-    end
-end
 
-
+l = 1.7/2
+d = l/2
+ballbot = superball(
+    0.0;
+    ṙo = SVector(2.0,1.0,0),
+    ω = SVector(0.0,0.0,1.0),
+    μ = 0.05,
+    e = 0.0,
+    l,d,
+    z0 = l^2/(sqrt(5)*d) - 1e-3,
+    constrained = false,
+    loadmesh = false,
+)
 # testing
 tspan = (0.0,5.0)
 h = 1e-2
@@ -2962,7 +3068,7 @@ GM.activate!(); with_theme(theme_pub;
     )
     colsize!(fig.layout,1,0.55tw)
     colgap!(fig.layout,2fontsize)
-    savefig(fig,"ballbot_sliding")
+    # savefig(fig,"ballbot_sliding")
     fig
 end
 
@@ -3367,6 +3473,8 @@ function cube_contact_dynfuncs(bot)
         TR.build_∂Q̌∂q̌̇!(∂F∂q̌̇,tg)
     end
 
+
+    n = [0,0,1.0]
     function prepare_contacts!(qˣ)
         T = eltype(qˣ)
         contacts_bits = [
@@ -3378,8 +3486,6 @@ function cube_contact_dynfuncs(bot)
         gaps = T[]
         na = 0
         Ls = Matrix{T}[]
-
-        n = [0,0,1.0]
 
         # backtracking
         # TR.update_rigids!(tg,q)
@@ -3489,7 +3595,35 @@ function cube_contact_dynfuncs(bot)
         D, Dₘ, Dₖ, ŕ, ∂Dq̇∂q, ∂DᵀΛ∂q
     end
 
-    @eponymtuple(F!,Jac_F!,prepare_contacts!,get_directions_and_positions)
+    function get_distribution_law(na,contacts_bits,q)
+        T = eltype(q)
+        TR.update_rigids!(tg,q)
+        Ls = Matrix{T}[]
+        foreach(tg.bodies) do body
+            (;prop,state) = body
+            bid = prop.id
+            (;contacts,rps) = state
+            active_idx = findall(contacts_bits[bid])
+            na_body = length(active_idx)
+            R = zeros(T,3na_body,6)
+            inv_μs_body = ones(T,3na_body)
+            for (i,pid) in enumerate(active_idx)
+                rp = rps[pid]
+                contact = contacts[pid]
+                (;e,μ) = contact
+                (;n,t1,t2) = contact.state.frame
+                inv_μs_body[3(i-1)+1] = 1/μ
+                dm = hcat(n,t1,t2) |> transpose
+                R[3(i-1)+1:3(i-1)+3,1:3] = dm
+                R[3(i-1)+1:3(i-1)+3,4:6] = dm*(-TR.NCF.skew(rp))
+            end
+            L_body = (I-pinv(R)'*R')*Diagonal(inv_μs_body)
+            push!(Ls,L_body)
+        end
+        L = BlockDiagonal(Ls)
+    end
+
+    @eponymtuple(F!,Jac_F!,prepare_contacts!,get_directions_and_positions,get_distribution_law)
 end
 
 ros = [[0,0,z] for z = 10.0:-0.1:0.0]
@@ -3510,7 +3644,7 @@ ṙo = [0.0,0.0,0.0]
 ωo = [3.0,4.0,5.0]
 # cube = make_cube()
 # cube = make_cube(ros[1])
-cube = make_cube(ros[2],Ro,ṙo,0.1.*ωo)
+cube = make_cube(ros[2],Ro,ṙo,0.1.*ωo;μ=0.1)
 tspan = (0.0,5.0)
 tspan = (0.0,50.0)
 dt = 1e-3

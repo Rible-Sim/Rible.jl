@@ -38,7 +38,7 @@ function make_zhongccp_ns_stepk(nq,nλ,na,qₖ₋₁,vₖ₋₁,pₖ₋₁,tₖ�
     n2 = nq+nλ
     nΛ = 3na
     nx = n2
-    function ns_stepk!(𝐫𝐞𝐬,𝐉,𝐁,𝐛,𝐜ᵀ,𝐍,𝐫,x,Λₖ,D,Dₘ,Dₖ,H,L,es,timestep,iteration)
+    function ns_stepk!(𝐫𝐞𝐬,𝐉,Fₘ,∂F∂q,∂F∂q̇,𝐁,𝐛,𝐜ᵀ,𝐍,𝐫,x,Λₖ,D,Dₘ,Dₖ,H,L,es,timestep,iteration)
         # @show timestep, iteration, na
         qₖ = @view x[   1:n1]
         λₘ = @view x[n1+1:n2]
@@ -46,11 +46,7 @@ function make_zhongccp_ns_stepk(nq,nλ,na,qₖ₋₁,vₖ₋₁,pₖ₋₁,tₖ�
         q̇ₘ = (qₖ.-qₖ₋₁)./h
         vₘ = q̇ₘ
         tₘ = tₖ₋₁+h/2
-        T = eltype(qₖ)
-        Fₘ = zeros(T,nq)
         F!(Fₘ,qₘ,q̇ₘ,tₘ)
-        ∂F∂q = zeros(T,nq,nq)
-        ∂F∂q̇ = zeros(T,nq,nq)
         Jac_F!(∂F∂q,∂F∂q̇,qₘ,q̇ₘ,tₘ)
 
         Aₖ₋₁ = A(qₖ₋₁)
@@ -94,7 +90,7 @@ function make_zhongccp_ns_stepk(nq,nλ,na,qₖ₋₁,vₖ₋₁,pₖ₋₁,tₖ�
                 vₙⁱₖ₋₁ = vⁱₖ₋₁[1]
                 vₙⁱ   = vⁱ⁺[1]
                 # @show timestep,iteration, vₙⁱₖ₋₁, vₙⁱ, vₜⁱₖ₋₁, vₜⁱ, Λₖ
-                v́ₜⁱ = vₜⁱ⁺ + es[i]*min(vₙⁱₖ₋₁,zero(T))
+                v́ₜⁱ = vₜⁱ⁺ + es[i]*min(vₙⁱₖ₋₁,zero(vₙⁱₖ₋₁))
                 𝐛[is+1:is+3] .= [v́ₜⁱ,0,0]
                 
                 Dⁱₘ = @view Dₘ[is+1:is+3,:]
@@ -127,7 +123,7 @@ function solve!(intor::Integrator,solvercache::ZhongCCPCache;
     (;prob,controller,tspan,restart,totalstep) = intor
     (;bot,dynfuncs) = prob
     (;traj,contacts_traj) = bot
-    (;F!, Jac_F!, prepare_contacts!,get_directions_and_positions) = dynfuncs
+    (;F!, Jac_F!, prepare_contacts!,get_directions_and_positions,get_distribution_law) = dynfuncs
     (;cache) = solvercache
     (;M,Φ,A,Ψ,B,∂Ψ∂q,∂Aᵀλ∂q,∂Bᵀμ∂q) = cache
     invM = inv(M)
@@ -139,6 +135,7 @@ function solve!(intor::Integrator,solvercache::ZhongCCPCache;
     T = eltype(q0)
     nq = length(q0)
     nλ = length(λ0)
+    F = zeros(T,nq)
     ∂F∂q = zeros(T,nq,nq)
     ∂F∂q̇ = zeros(T,nq,nq)
     prepare_contacts!(q0)
@@ -172,7 +169,7 @@ function solve!(intor::Integrator,solvercache::ZhongCCPCache;
         qˣ = qₖ₋₁ .+ dt./2 .*q̇ₖ₋₁
         qₖ .= qₖ₋₁ .+ dt .*q̇ₖ₋₁
         q̇ₖ .= q̇ₖ₋₁
-        na, contacts_bits, gaps, H, es, L = prepare_contacts!(qˣ)
+        na, contacts_bits, gaps, H, es = prepare_contacts!(qˣ)
         D,Dₘ,Dₖ,_ = get_directions_and_positions(na,contacts_bits, qˣ)
         isconverged = false
         normRes = typemax(T)
@@ -204,7 +201,8 @@ function solve!(intor::Integrator,solvercache::ZhongCCPCache;
             Nmax = 50
             for iteration = 1:maxiters
                 # @show iteration,D,ηs,es,gaps
-                luJac = ns_stepk!(Res,Jac,𝐁,𝐛,𝐜ᵀ,𝐍,𝐫,x,Λₖ,D,Dₘ,Dₖ,H,L,es,timestep,iteration)
+                L = get_distribution_law(na,contacts_bits, x[1:nq])
+                luJac = ns_stepk!(Res,Jac,F,∂F∂q,∂F∂q̇,𝐁,𝐛,𝐜ᵀ,𝐍,𝐫,x,Λₖ,D,Dₘ,Dₖ,H,L,es,timestep,iteration)
                 normRes = norm(Res)
                 if na == 0
                     if normRes < ftol
@@ -215,6 +213,7 @@ function solve!(intor::Integrator,solvercache::ZhongCCPCache;
                     Δx .= luJac\(-Res)
                     x .+= Δx
                 else # na!=0
+                    # @show na
                     # @show es
                     # @show H
                     # @show D
@@ -231,6 +230,12 @@ function solve!(intor::Integrator,solvercache::ZhongCCPCache;
                     Λₖini[begin+2:3:end] .= 0.0
                     if na > 10
                         @show timestep, iteration
+                        # @show rref_with_pivots(𝐍)
+                        @show norm(𝐍), norm(L)
+                        @show size(L), rank(L)
+                        # @show qr(𝐍)
+                        @show L*Λₖ
+                        @show qr(L).R[1,:]
                         @show :befor, size(𝐍), rank(𝐍), cond(𝐍)
                     end
                     𝐍 .+= L
@@ -242,7 +247,7 @@ function solve!(intor::Integrator,solvercache::ZhongCCPCache;
                     # yini = repeat([0.1,0,0],na)
                     if na > 10
                         @show :after, size(𝐍), rank(𝐍), cond(𝐍)
-                        @show size(L), rank(L)
+                        
                         # W_I = vcat(
                         #     W,
                         #     Matrix(-1I,3na,3na)
