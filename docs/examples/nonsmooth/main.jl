@@ -2787,44 +2787,19 @@ function ball_dynfuncs(bot)
     (;tg) = bot
     (;mem2num) = tg.connectivity.numbered
     npoints = length.(mem2num) |> sum
-
-    contacts_bits = [
-        BitVector(undef,length(mem))
-        for mem in mem2num
-    ]
-
-    contacts_sys = [
-        [
-            TR.Contact(id,0.5,0.5)
-            for id in mem
-        ]
-        for mem in mem2num
-    ]
-
-    μs_sys = [
-        fill(0.5,length(mem))
-        for mem in mem2num
-    ]
-
-    es_sys = [
-        fill(0.5,length(mem))
-        for mem in mem2num
-    ]
-
-    gaps_sys = [
-        fill(0.0,length(mem))
-        for mem in mem2num
-    ]
+    active_bits = BitVector(undef,npoints)
+    T = TR.get_numbertype(tg)
+    μs_sys = ones(T,npoints)
+    es_sys = zeros(T,npoints)
+    gaps_sys = fill(typemax(T),npoints)
 
     # initilize
     foreach(tg.bodies) do body
         (;prop,state) = body
         bid = prop.id
         (;μs,es) = prop
-        (;contacts) = state
-        contacts_sys[bid] = contacts
-        μs_sys[bid] = deepcopy(μs)
-        es_sys[bid] = deepcopy(es)
+        μs_sys[mem2num[bid]] .= μs
+        es_sys[mem2num[bid]] .= es
     end
 
     # gap normal
@@ -2849,7 +2824,6 @@ function ball_dynfuncs(bot)
 
     bars = TR.get_rigidbars(tg)
     
-    
     function prepare_contacts!(contacts_glb,q)
         T = eltype(q)
         nq = length(q)
@@ -2859,7 +2833,7 @@ function ball_dynfuncs(bot)
             (;prop,state) = body
             bid = prop.id
             (;contacts,rps) = state
-            contacts_bits[bid] .= false
+            active_bits[mem2num[bid]] .= false
             if body isa TR.AbstractRigidBody
                 for pid in eachindex(rps)
                     rp = rps[pid]
@@ -2869,30 +2843,27 @@ function ball_dynfuncs(bot)
                     TR.activate!(contact,gap)
                     TR.activate!(contacts_glb[mem2num[bid][pid]],gap)
                     if contact.state.active
-                        contacts_bits[bid][pid] = true
+                        active_bits[mem2num[bid][pid]] = true
                         contact.state.frame = TR.SpatialFrame(n)
                         contacts_glb[mem2num[bid][pid]].state.frame = contact.state.frame
                         na += 1
                     else
                     end
                 end
-                contacts_sys[bid] = contacts
             end
         end
-        active_contacts = filter(contacts_glb) do c
-            c.state.active
-        end
+        active_contacts = contacts_glb[active_bits]
         # @show na, length(active_contacts)
         inv_μs = ones(T,3na)
-        for (i,ac) in enumerate(active_contacts)
-            inv_μs[3(i-1)+1] = 1/ac.μ
+        for (i,μ) in enumerate(μs_sys[active_bits])
+            inv_μs[3(i-1)+1] = 1/μ
         end
-        es = [ac.e for ac in active_contacts]
         H = Diagonal(inv_μs)
-        na, active_contacts, H, es
+        es = es_sys[active_bits]
+        na, active_contacts, active_bits, H, es
     end
 
-    function get_directions_and_positions(na, active_contacts,q)
+    function get_directions_and_positions(na, active_contacts,active_bits, q)
         T = eltype(q)
         nq = length(q)
         TR.update_rigids!(tg,q)

@@ -170,8 +170,8 @@ function solve!(intor::Integrator,solvercache::ZhongCCPCache;
         qˣ = qₖ₋₁ .+ dt./2 .*q̇ₖ₋₁
         qₖ .= qₖ₋₁ .+ dt .*q̇ₖ₋₁
         q̇ₖ .= q̇ₖ₋₁
-        na,active_contacts,H,es = prepare_contacts!(cₖ,qˣ)
-        D,Dₘ,Dₖ,_ = get_directions_and_positions(na,active_contacts,qˣ)        
+        na,active_contacts,contacts_bits, H,es = prepare_contacts!(cₖ,qˣ)
+        D,Dₘ,Dₖ,_ = get_directions_and_positions(na,active_contacts,contacts_bits, qˣ)        
         
         isconverged = false
         normRes = typemax(T)
