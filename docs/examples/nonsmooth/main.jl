@@ -17,6 +17,7 @@ using Interpolations
 using EponymTuples
 using CircularArrays
 using TypeSortedCollections
+using BlockDiagonals
 using DataStructures
 using PrettyTables
 using Printf
@@ -2788,10 +2789,6 @@ function ball_dynfuncs(bot)
     (;mem2num) = tg.connectivity.numbered
     npoints = length.(mem2num) |> sum
     contacts_bits = BitVector(undef,npoints)
-    mem2act_idx = [
-        Int[]
-        for _ in 1:tg.nbodies
-    ]
     T = TR.get_numbertype(tg)
     μs_sys = ones(T,npoints)
     es_sys = zeros(T,npoints)
@@ -2825,8 +2822,6 @@ function ball_dynfuncs(bot)
         TR.build_∂Q̌∂q̌!(∂F∂q̌,tg)
         TR.build_∂Q̌∂q̌̇!(∂F∂q̌̇,tg)
     end
-
-    bars = TR.get_rigidbars(tg)
     
     function prepare_contacts!(q)
         T = eltype(q)
@@ -2920,10 +2915,41 @@ function ball_dynfuncs(bot)
         D,Dₘ,Dₖ,ŕ
     end
 
-    @eponymtuple(F!,Jac_F!,prepare_contacts!,get_directions_and_positions)
+    function get_distribution_law(mem2act_idx,q)
+        T = eltype(q)
+        TR.update_rigids!(tg,q)
+        Ls = [
+            begin 
+                na_body = count(!iszero, mem)
+                zeros(T,3na_body,3na_body)
+            end
+            for mem in mem2act_idx
+        ]
+        foreach(tg.bodies) do body
+            (;prop,state) = body
+            bid = prop.id
+            (;contacts,rps) = state
+            active_idx = findall(!iszero,mem2act_idx[bid])
+            na_body = length(active_idx)
+            R = zeros(T,3na_body,6)
+            inv_μs_body = ones(T,3na_body)
+            for (i,pid) in enumerate(active_idx)
+                rp = rps[pid]
+                contact = contacts[pid]
+                (;e,μ) = contact
+                (;n,t1,t2) = contact.state.frame
+                inv_μs_body[3(i-1)+1] = 1/μ
+                dm = hcat(n,t1,t2) |> transpose
+                R[3(i-1)+1:3(i-1)+3,1:3] = dm
+                R[3(i-1)+1:3(i-1)+3,4:6] = dm*(-TR.NCF.skew(rp))
+            end
+            Ls[bid] .= (I-pinv(R)'*R')*Diagonal(inv_μs_body)
+        end
+        L = BlockDiagonal(Ls)
+    end
+
+    @eponymtuple(F!,Jac_F!,prepare_contacts!,get_directions_and_positions,get_distribution_law)
 end
-
-
 
 # testing
 tspan = (0.0,5.0)

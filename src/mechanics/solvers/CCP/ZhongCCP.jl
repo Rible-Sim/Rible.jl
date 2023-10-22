@@ -124,7 +124,7 @@ function solve!(intor::Integrator,solvercache::ZhongCCPCache;
     (;prob,controller,tspan,restart,totalstep) = intor
     (;bot,dynfuncs) = prob
     (;traj,contacts_traj) = bot
-    (;F!, Jac_F!, prepare_contacts!,get_directions_and_positions) = dynfuncs
+    (;F!, Jac_F!, prepare_contacts!,get_directions_and_positions,get_distribution_law) = dynfuncs
     (;cache) = solvercache
     (;M,Φ,A,Ψ,B,∂Ψ∂q,∂Aᵀλ∂q,∂Bᵀμ∂q) = cache
     invM = inv(M)
@@ -200,6 +200,7 @@ function solve!(intor::Integrator,solvercache::ZhongCCPCache;
             Nmax = 50
             for iteration = 1:maxiters
                 # @show iteration,D,ηs,es,gaps
+                # L = get_distribution_law(mem2act_idx,x[1:nq])
                 luJac = ns_stepk!(Res,Jac,F,∂F∂q,∂F∂q̇,𝐁,𝐛,𝐜ᵀ,𝐍,𝐫,x,Λₖ,D,Dₘ,Dₖ,H,es,timestep,iteration)
                 normRes = norm(Res)
                 if na == 0
