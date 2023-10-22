@@ -89,10 +89,14 @@ function activate!(state::FrictionalContactState,gap)
     state.persistent = (pre_active == state.active)
 end
 
-function update_contacts!(contacts, v, Λ)
+function update_contacts!(contacts, contacts_previous, v, Λ)
     vs = split_by_lengths(v,3)
     Λs = split_by_lengths(Λ,3)
-    for (ac,va,Λa) in zip(contacts,vs,Λs)
+    for (ac,acp,va,Λa) in zip(contacts, contacts_previous, vs,Λs)
+        if acp.state.active
+            ac.state.persistent = true
+        end
+        ac.state.active = true
         ac.state.v = SVector{3}(va)
         ac.state.Λ = SVector{3}(Λa)
     end

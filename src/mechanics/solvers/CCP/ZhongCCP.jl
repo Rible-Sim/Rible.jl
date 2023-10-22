@@ -159,7 +159,7 @@ function solve!(intor::Integrator,solvercache::ZhongCCPCache;
         #---------Time Step k Control-----------
         # control!(intor,cache)
         #---------Time Step k Control-----------
-        push!(contacts_traj,deepcopy(contacts_traj[end]))
+        cₖ₋₁ = contacts_traj[timestep]
         cₖ = contacts_traj[timestep+1]
         qₖ₋₁ = traj.q[timestep]
         q̇ₖ₋₁ = traj.q̇[timestep]
@@ -196,7 +196,7 @@ function solve!(intor::Integrator,solvercache::ZhongCCPCache;
         
         restart_count = 0
         Λ_guess = 0.1
-        while restart_count < 1
+        while restart_count < 10
             Λₖ .= repeat([Λ_guess,0,0],na)
             x[      1:nq]          .= qₖ
             x[   nq+1:nq+nλ]       .= 0.0
@@ -278,7 +278,7 @@ function solve!(intor::Integrator,solvercache::ZhongCCPCache;
         q̇ₖ .= invM*pₖ
 
         if na != 0
-            update_contacts!(cₖ[contacts_bits],Dₘ*(qₖ.-qₖ₋₁).+Dₖ*q̇ₖ,2*Λₖ./(scaling*dt))
+            update_contacts!(cₖ[contacts_bits],cₖ₋₁[contacts_bits],Dₘ*(qₖ.-qₖ₋₁).+Dₖ*q̇ₖ,2*Λₖ./(scaling*dt))
         end
 
         if !isconverged
