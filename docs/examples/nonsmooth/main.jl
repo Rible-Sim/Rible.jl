@@ -2787,7 +2787,11 @@ function ball_dynfuncs(bot)
     (;tg) = bot
     (;mem2num) = tg.connectivity.numbered
     npoints = length.(mem2num) |> sum
-    active_bits = BitVector(undef,npoints)
+    contacts_bits = BitVector(undef,npoints)
+    mem2act_idx = [
+        Int[]
+        for _ in 1:tg.nbodies
+    ]
     T = TR.get_numbertype(tg)
     μs_sys = ones(T,npoints)
     es_sys = zeros(T,npoints)
@@ -2824,7 +2828,7 @@ function ball_dynfuncs(bot)
 
     bars = TR.get_rigidbars(tg)
     
-    function prepare_contacts!(contacts_glb,q)
+    function prepare_contacts!(q)
         T = eltype(q)
         nq = length(q)
         na = 0
@@ -2833,7 +2837,7 @@ function ball_dynfuncs(bot)
             (;prop,state) = body
             bid = prop.id
             (;contacts,rps) = state
-            active_bits[mem2num[bid]] .= false
+            contacts_bits[mem2num[bid]] .= false
             if body isa TR.AbstractRigidBody
                 for pid in eachindex(rps)
                     rp = rps[pid]
@@ -2841,54 +2845,77 @@ function ball_dynfuncs(bot)
                     (;e,μ) = contact
                     gap = rp[3]
                     TR.activate!(contact,gap)
-                    TR.activate!(contacts_glb[mem2num[bid][pid]],gap)
                     if contact.state.active
-                        active_bits[mem2num[bid][pid]] = true
+                        contacts_bits[mem2num[bid][pid]] = true
                         contact.state.frame = TR.SpatialFrame(n)
-                        contacts_glb[mem2num[bid][pid]].state.frame = contact.state.frame
                         na += 1
                     else
                     end
                 end
             end
         end
-        active_contacts = contacts_glb[active_bits]
+        # member's points indices to system's active points' indices
+        mem2act_idx = deepcopy(mem2num)
+        act_start = 0
+        for bid = 1:tg.nbodies
+            mem2act_idx[bid] .= 0
+            contacts_bits_body = findall(contacts_bits[mem2num[bid]])
+            nactive_body = length(contacts_bits_body)
+            mem2act_idx[bid][contacts_bits_body] .= act_start+1:act_start+nactive_body
+            act_start += nactive_body
+        end
         # @show na, length(active_contacts)
         inv_μs = ones(T,3na)
-        for (i,μ) in enumerate(μs_sys[active_bits])
+        for (i,μ) in enumerate(μs_sys[contacts_bits])
             inv_μs[3(i-1)+1] = 1/μ
         end
         H = Diagonal(inv_μs)
-        es = es_sys[active_bits]
-        na, active_contacts, active_bits, H, es
+        es = es_sys[contacts_bits]
+        na, mem2act_idx, contacts_bits, H, es
     end
 
-    function get_directions_and_positions(na, active_contacts,active_bits, q)
+    function get_directions_and_positions(na, mem2act_idx, q)
         T = eltype(q)
         nq = length(q)
         TR.update_rigids!(tg,q)
         D = Matrix{T}(undef,3na,nq)
-        ŕ = Vector{T}(undef,3na)
-        for (i,ac) in enumerate(active_contacts)
-            (;id,state) = ac
-            rbid,pid = divrem(ac.id-1,2) .+ 1
-            (;n,t1,t2) = state.frame
-            C = bars[rbid].state.cache.Cps[pid]
-            CT = C*TR.build_T(tg,rbid)
-            dm = hcat(n,t1,t2) |> transpose
-            D[3(i-1)+1:3(i-1)+3,:] = dm*CT
-            ŕ[3(i-1)+1:3(i-1)+3] = dm*bars[rbid].state.rps[pid]
-        end
-        persistent_indices = findall((c)->c.state.persistent,active_contacts)
         Dₘ = zero(D)
-        Dₖ = copy(D)
-        # Dₘ = copy(D)
-        # Dₖ = zero(D)
-        if (na !== 0) && !isempty(persistent_indices)
-            epi = reduce(vcat,[collect(3(i-1)+1:3i) for i in persistent_indices])
-            Dₘ[epi,:] .= D[epi,:]
-            Dₖ[epi,:] .= 0
-            # filtered_gaps[persistent_indices] = gaps[persistent_indices]
+        Dₖ = zero(D)
+        ŕ = Vector{T}(undef,3na)
+        foreach(tg.bodies) do body
+            (;prop,state) = body
+            bid = prop.id
+            (;contacts,rps) = state
+            for (pid,contact) in enumerate(contacts)
+                if contact.state.active
+                    rp = rps[pid]
+                    (;n,t1,t2) = contact.state.frame
+                    C = state.cache.Cps[pid]
+                    CT = C*TR.build_T(tg,bid)
+                    dm = hcat(n,t1,t2) |> transpose
+                    ci = mem2act_idx[bid][pid]
+                    epi = 3(ci-1)+1:3ci
+                    D[epi,:] = dm*CT
+                    ŕ[epi]   = dm*rp
+                    if state.cache.funcs.nmcs isa TR.QBF.QC
+                        T = TR.build_T(tg,bid)
+                        r̄p = prop.r̄ps[pid]
+
+                        ∂Cẋ∂x = TR.QBF.make_∂Cẋ∂x(r̄p)
+                        ∂Cq̇∂q = ∂Cẋ∂x(T*q,T*q̇)*T
+                        ∂Dq̇∂q[3ci+1:3ci+3,:] = dm*∂Cq̇∂q
+                        ∂Cᵀf∂x = TR.QBF.make_∂Cᵀf∂x(r̄p)
+                        Λi = @view Λ[epi]
+                        fi = dm'*Λi
+                        ∂DᵀΛ∂q .+= transpose(T)*∂Cᵀf∂x(T*q,fi)*T
+                    end
+                    if contact.state.persistent
+                        Dₘ[epi,:] .= D[epi,:]
+                    else
+                        Dₖ[epi,:] .= D[epi,:]
+                    end
+                end
+            end
         end
         D,Dₘ,Dₖ,ŕ
     end

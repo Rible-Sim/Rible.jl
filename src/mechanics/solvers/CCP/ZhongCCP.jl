@@ -139,7 +139,7 @@ function solve!(intor::Integrator,solvercache::ZhongCCPCache;
     F = zeros(T,nq)
     ∂F∂q = zeros(T,nq,nq)
     ∂F∂q̇ = zeros(T,nq,nq)
-    prepare_contacts!(contacts_traj[end],q0)
+    prepare_contacts!(q0)
     nx = nq + nλ
 
     Δx = zeros(T,nx)
@@ -170,8 +170,8 @@ function solve!(intor::Integrator,solvercache::ZhongCCPCache;
         qˣ = qₖ₋₁ .+ dt./2 .*q̇ₖ₋₁
         qₖ .= qₖ₋₁ .+ dt .*q̇ₖ₋₁
         q̇ₖ .= q̇ₖ₋₁
-        na,active_contacts,contacts_bits, H,es = prepare_contacts!(cₖ,qˣ)
-        D,Dₘ,Dₖ,_ = get_directions_and_positions(na,active_contacts,contacts_bits, qˣ)        
+        na,mem2act_idx,contacts_bits,H,es = prepare_contacts!(qˣ)
+        D,Dₘ,Dₖ,_ = get_directions_and_positions(na,mem2act_idx, qˣ)        
         
         isconverged = false
         normRes = typemax(T)
@@ -260,7 +260,7 @@ function solve!(intor::Integrator,solvercache::ZhongCCPCache;
         q̇ₖ .= invM*pₖ
 
         if na != 0
-            update_contacts!(active_contacts,Dₘ*(qₖ.-qₖ₋₁).+Dₖ*q̇ₖ,2*Λₖ./(scaling*dt))
+            update_contacts!(cₖ[contacts_bits],Dₘ*(qₖ.-qₖ₋₁).+Dₖ*q̇ₖ,2*Λₖ./(scaling*dt))
         end
 
         if !isconverged
