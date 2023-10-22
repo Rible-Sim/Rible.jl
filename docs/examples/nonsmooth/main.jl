@@ -2867,30 +2867,24 @@ function ball_dynfuncs(bot)
                     (;e,μ) = contact
                     gap = rp[3]
                     TR.activate!(contact,gap)
+                    TR.activate!(contacts_glb[mem2num[bid][pid]],gap)
                     if contact.state.active
                         contacts_bits[bid][pid] = true
                         contact.state.frame = TR.SpatialFrame(n)
+                        contacts_glb[mem2num[bid][pid]].state.frame = contact.state.frame
                         na += 1
+                    else
                     end
                 end
                 contacts_sys[bid] = contacts
             end
         end
-        foreach(bars) do rb
-            rbid = rb.prop.id
-            gap1 = rb.state.rps[1][3]
-            TR.activate!(contacts_glb[2rbid-1],gap1)
-            gap2 = rb.state.rps[2][3]
-            TR.activate!(contacts_glb[2rbid  ],gap2)
-        end
         active_contacts = filter(contacts_glb) do c
             c.state.active
         end
-        # na = length(active_contacts)
+        # @show na, length(active_contacts)
         inv_μs = ones(T,3na)
         for (i,ac) in enumerate(active_contacts)
-            (;state) = ac
-            state.frame = TR.SpatialFrame(n)
             inv_μs[3(i-1)+1] = 1/ac.μ
         end
         es = [ac.e for ac in active_contacts]
