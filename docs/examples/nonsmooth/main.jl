@@ -2849,6 +2849,13 @@ function ball_dynfuncs(bot)
                 end
             end
         end
+        # @show na, length(active_contacts)
+        inv_μs = ones(T,3na)
+        for (i,μ) in enumerate(μs_sys[contacts_bits])
+            inv_μs[3(i-1)+1] = 1/μ
+        end
+        H = Diagonal(inv_μs)
+        es = es_sys[contacts_bits]
         # member's points indices to system's active points' indices
         mem2act_idx = deepcopy(mem2num)
         act_start = 0
@@ -2859,24 +2866,25 @@ function ball_dynfuncs(bot)
             mem2act_idx[bid][contacts_bits_body] .= act_start+1:act_start+nactive_body
             act_start += nactive_body
         end
-        # @show na, length(active_contacts)
-        inv_μs = ones(T,3na)
-        for (i,μ) in enumerate(μs_sys[contacts_bits])
-            inv_μs[3(i-1)+1] = 1/μ
-        end
-        H = Diagonal(inv_μs)
-        es = es_sys[contacts_bits]
-        na, mem2act_idx, contacts_bits, H, es
-    end
-
-    function get_directions_and_positions(na, mem2act_idx, q)
-        T = eltype(q)
-        nq = length(q)
-        TR.update_rigids!(tg,q)
+        Ls = [
+            begin 
+                na_body = count(!iszero, mem)
+                zeros(T,3na_body,3na_body)
+            end
+            for mem in mem2act_idx
+        ]
+        L = BlockDiagonal(Ls)
         D = Matrix{T}(undef,3na,nq)
         Dₘ = zero(D)
         Dₖ = zero(D)
         ŕ = Vector{T}(undef,3na)
+        na, mem2act_idx, contacts_bits, H, es, D, Dₘ,Dₖ,ŕ, L
+    end
+
+    function get_directions_and_positions!(D,Dₘ,Dₖ,ŕ, mem2act_idx, q)
+        T = eltype(q)
+        nq = length(q)
+        TR.update_rigids!(tg,q)
         foreach(tg.bodies) do body
             (;prop,state) = body
             bid = prop.id
@@ -2912,19 +2920,11 @@ function ball_dynfuncs(bot)
                 end
             end
         end
-        D,Dₘ,Dₖ,ŕ
     end
 
-    function get_distribution_law(mem2act_idx,q)
+    function get_distribution_law!(L,mem2act_idx,q)
         T = eltype(q)
         TR.update_rigids!(tg,q)
-        Ls = [
-            begin 
-                na_body = count(!iszero, mem)
-                zeros(T,3na_body,3na_body)
-            end
-            for mem in mem2act_idx
-        ]
         foreach(tg.bodies) do body
             (;prop,state) = body
             bid = prop.id
@@ -2943,9 +2943,8 @@ function ball_dynfuncs(bot)
                 R[3(i-1)+1:3(i-1)+3,1:3] = dm
                 R[3(i-1)+1:3(i-1)+3,4:6] = dm*(-TR.NCF.skew(rp))
             end
-            Ls[bid] .= (I-pinv(R)'*R')*Diagonal(inv_μs_body)
+            blocks(L)[bid] .= (I-pinv(R)'*R')*Diagonal(inv_μs_body)
         end
-        L = BlockDiagonal(Ls)
     end
 
     @eponymtuple(F!,Jac_F!,prepare_contacts!,get_directions_and_positions,get_distribution_law)

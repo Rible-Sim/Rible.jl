@@ -124,7 +124,11 @@ function solve!(intor::Integrator,solvercache::ZhongCCPCache;
     (;prob,controller,tspan,restart,totalstep) = intor
     (;bot,dynfuncs) = prob
     (;traj,contacts_traj) = bot
-    (;F!, Jac_F!, prepare_contacts!,get_directions_and_positions,get_distribution_law) = dynfuncs
+    (;F!, Jac_F!, 
+        prepare_contacts!,
+        get_directions_and_positions!,
+        get_distribution_law!
+    ) = dynfuncs
     (;cache) = solvercache
     (;M,Φ,A,Ψ,B,∂Ψ∂q,∂Aᵀλ∂q,∂Bᵀμ∂q) = cache
     invM = inv(M)
@@ -170,8 +174,8 @@ function solve!(intor::Integrator,solvercache::ZhongCCPCache;
         qˣ = qₖ₋₁ .+ dt./2 .*q̇ₖ₋₁
         qₖ .= qₖ₋₁ .+ dt .*q̇ₖ₋₁
         q̇ₖ .= q̇ₖ₋₁
-        na,mem2act_idx,contacts_bits,H,es = prepare_contacts!(qˣ)
-        D,Dₘ,Dₖ,_ = get_directions_and_positions(na,mem2act_idx, qˣ)        
+        na,mem2act_idx,contacts_bits,H,es,D, Dₘ,Dₖ,ŕ, L = prepare_contacts!(qˣ)
+        get_directions_and_positions!(D, Dₘ,Dₖ,ŕ, mem2act_idx, qˣ)        
         
         isconverged = false
         normRes = typemax(T)
