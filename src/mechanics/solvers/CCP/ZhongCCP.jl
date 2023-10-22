@@ -225,10 +225,47 @@ function solve!(intor::Integrator,solvercache::ZhongCCPCache;
                     Λₖini = deepcopy(Λₖ)
                     Λₖini[begin+1:3:end] .= 0.0
                     Λₖini[begin+2:3:end] .= 0.0
+                    if na > 10
+                        @show timestep, iteration
+                        # @show rref_with_pivots(𝐍)
+                        @show norm(𝐍), norm(L)
+                        @show size(L), rank(L)
+                        # @show qr(𝐍)
+                        @show L*Λₖ
+                        @show qr(L).R |> diag
+                        @show :befor, size(𝐍), rank(𝐍), cond(𝐍)
+                    end
+                    𝐍 .+= L
                     yₖini = 𝐍*Λₖ + 𝐫
                     yₖini .= abs.(yₖini)
                     yₖini[begin+1:3:end] .= 0.0
                     yₖini[begin+2:3:end] .= 0.0
+                    # @show Λₖini[begin:3:end], yₖini[begin:3:end]
+                    # yini = repeat([0.1,0,0],na)
+                    if na > 10
+                        @show :after, size(𝐍), rank(𝐍), cond(𝐍)
+                        
+                        # W_I = vcat(
+                        #     W,
+                        #     Matrix(-1I,3na,3na)
+                        # )
+
+                        # hr = hrep(W_I, zeros(2*3na),  BitSet(1:3na))
+                        # ph = polyhedron(hr, lib)
+                        # vr = vrep(ph)
+                        # @assert npoints(vr) == 1
+                        # @show nrays(vr)
+                        # rayas = [ray.a for ray in rays(vr)]
+                        # if isempty(rayas)
+                        #     @show "empty rays"
+                        # else
+                        #     contact_force_states = reduce(hcat,[ray.a for ray in rays(vr)])
+                        #     @show contact_force_states
+                        # end
+                        # _,_,WV = svd(W; full = true)
+                        # @show WV[:,rank(W)+1:end]
+                    end
+
                     IPM!(Λₖ,na,nΛ,Λₖini,yₖini,𝐍,𝐫;ftol=1e-14,Nmax)                    
                     ΔΛₖ .= Λₖ - Λʳₖ
                     minusResΛ = -Res + 𝐁*(ΔΛₖ)
@@ -269,7 +306,7 @@ function solve!(intor::Integrator,solvercache::ZhongCCPCache;
         end
 
         if !isconverged
-            @warn "Newton max iterations $maxiters, at timestep=$timestep, normRes=$(normRes)"
+            @warn "Newton max iterations $maxiters, at timestep=$timestep, normRes=$(normRes), restart_count=$(restart_count)"
             if exception
                 @error "Not converged!"
                 break

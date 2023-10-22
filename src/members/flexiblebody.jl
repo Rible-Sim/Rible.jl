@@ -8,6 +8,16 @@ struct FlexibleBodyProperty{N,T} <: AbstractFlexibleBodyProperty{N,T}
     mass::T
     r̄g::SVector{N,T}
     r̄ps::Vector{SVector{N,T}}
+    μs::Vector{T}
+    es::Vector{T}
+end
+
+function FlexibleBodyProperty(
+        id,type,mass::T,r̄g,r̄ps,
+        μs=zeros(T,length(r̄ps)),
+        es=zeros(T,length(r̄ps));
+    ) where T
+    FlexibleBodyProperty(id,type,mass,r̄g,r̄ps,μs,es)
 end
 
 struct FlexibleBodyCoordinatesCache{fT,MT,JT,VT,eT,ArrayT,N,M}
@@ -80,7 +90,7 @@ function get_CoordinatesCache(
         ∂T∂qᵀ,So,Sg,Sps)
 end
 
-struct FlexibleBodyState{N,T,cacheType} <: AbstractFlexibleBodyState{N,T}
+struct FlexibleBodyState{N,T,cacheType,contactType} <: AbstractFlexibleBodyState{N,T}
     rg::MVector{N,T}
 	"Velocity of the centroid"
     ṙg::MVector{N,T}
@@ -94,6 +104,8 @@ struct FlexibleBodyState{N,T,cacheType} <: AbstractFlexibleBodyState{N,T}
     fps::Vector{MVector{N,T}}
 	"Cache"
     cache::cacheType
+    "Contacts"
+    contacts::Vector{contactType}
 end
 
 function FlexibleBodyState(prop::FlexibleBodyProperty{N,T},
@@ -102,7 +114,7 @@ function FlexibleBodyState(prop::FlexibleBodyProperty{N,T},
         ė=zero(e);
         pres_idx=Int[],
         Φ_mask=get_Φ_mask(ancs)) where {N,T}
-    (;r̄g,r̄ps) = prop
+    (;r̄g,r̄ps,μs,es) = prop
     nr̄ps = length(r̄ps)
     nc = ANCF.get_ncoords(ancs)
     cache = get_CoordinatesCache(
@@ -119,8 +131,8 @@ function FlexibleBodyState(prop::FlexibleBodyProperty{N,T},
     rps = [MVector{N}(Sps[i]*e) for i in 1:nr̄ps]
     ṙps = [MVector{N}(Sps[i]*ė) for i in 1:nr̄ps]
     fps = [@MVector zeros(T,N) for i in 1:nr̄ps]
- 
-    FlexibleBodyState(rg,ṙg,rps,ṙps,f,fps,cache)
+    contacts = [Contact(i,μs[i],es[i]) for i in 1:nr̄ps]
+    FlexibleBodyState(rg,ṙg,rps,ṙps,f,fps,cache,contacts)
 end
 
 struct FlexibleBody{N,T,cacheType,meshType} <: AbstractFlexibleBody{N,T}
