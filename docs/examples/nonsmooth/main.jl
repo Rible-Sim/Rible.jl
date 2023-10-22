@@ -2947,7 +2947,12 @@ function ball_dynfuncs(bot)
         end
     end
 
-    @eponymtuple(F!,Jac_F!,prepare_contacts!,get_directions_and_positions,get_distribution_law)
+    @eponymtuple(
+        F!,Jac_F!,
+        prepare_contacts!,
+        get_directions_and_positions!,
+        get_distribution_law!
+    )
 end
 
 # testing

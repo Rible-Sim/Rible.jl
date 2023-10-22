@@ -204,7 +204,7 @@ function solve!(intor::Integrator,solvercache::ZhongCCPCache;
             Nmax = 50
             for iteration = 1:maxiters
                 # @show iteration,D,ηs,es,gaps
-                # L = get_distribution_law(mem2act_idx,x[1:nq])
+                get_distribution_law!(L,mem2act_idx,x[1:nq])
                 luJac = ns_stepk!(Res,Jac,F,∂F∂q,∂F∂q̇,𝐁,𝐛,𝐜ᵀ,𝐍,𝐫,x,Λₖ,D,Dₘ,Dₖ,H,es,timestep,iteration)
                 normRes = norm(Res)
                 if na == 0
