@@ -196,7 +196,7 @@ function solve!(intor::Integrator,solvercache::ZhongCCPCache;
         
         restart_count = 0
         Λ_guess = 0.1
-        while restart_count < 10
+        while restart_count < 1
             Λₖ .= repeat([Λ_guess,0,0],na)
             x[      1:nq]          .= qₖ
             x[   nq+1:nq+nλ]       .= 0.0
@@ -216,7 +216,7 @@ function solve!(intor::Integrator,solvercache::ZhongCCPCache;
                     Δx .= luJac\(-Res)
                     x .+= Δx
                 else # na!=0
-                    if iteration < 4
+                    if iteration < 2
                         Nmax = 50
                     else
                         Nmax = 50
@@ -225,47 +225,23 @@ function solve!(intor::Integrator,solvercache::ZhongCCPCache;
                     Λₖini = deepcopy(Λₖ)
                     Λₖini[begin+1:3:end] .= 0.0
                     Λₖini[begin+2:3:end] .= 0.0
-                    if na > 10
+                    if false 
                         @show timestep, iteration
-                        # @show rref_with_pivots(𝐍)
-                        @show norm(𝐍), norm(L)
-                        @show size(L), rank(L)
-                        # @show qr(𝐍)
-                        @show L*Λₖ
-                        @show qr(L).R |> diag
-                        @show :befor, size(𝐍), rank(𝐍), cond(𝐍)
+                        @show Λₖ
+                        # @show norm(𝐍),norm(L)
+                        # @show L*Λₖ
+                        # @show qr(L).R |> diag
+                        # @show :befor, size(𝐍), rank(𝐍), cond(𝐍)
                     end
                     𝐍 .+= L
                     yₖini = 𝐍*Λₖ + 𝐫
+                    if false 
+                        # @show :after, size(𝐍), rank(𝐍), cond(𝐍)
+                        @show yₖini
+                    end
                     yₖini .= abs.(yₖini)
                     yₖini[begin+1:3:end] .= 0.0
                     yₖini[begin+2:3:end] .= 0.0
-                    # @show Λₖini[begin:3:end], yₖini[begin:3:end]
-                    # yini = repeat([0.1,0,0],na)
-                    if na > 10
-                        @show :after, size(𝐍), rank(𝐍), cond(𝐍)
-                        
-                        # W_I = vcat(
-                        #     W,
-                        #     Matrix(-1I,3na,3na)
-                        # )
-
-                        # hr = hrep(W_I, zeros(2*3na),  BitSet(1:3na))
-                        # ph = polyhedron(hr, lib)
-                        # vr = vrep(ph)
-                        # @assert npoints(vr) == 1
-                        # @show nrays(vr)
-                        # rayas = [ray.a for ray in rays(vr)]
-                        # if isempty(rayas)
-                        #     @show "empty rays"
-                        # else
-                        #     contact_force_states = reduce(hcat,[ray.a for ray in rays(vr)])
-                        #     @show contact_force_states
-                        # end
-                        # _,_,WV = svd(W; full = true)
-                        # @show WV[:,rank(W)+1:end]
-                    end
-
                     IPM!(Λₖ,na,nΛ,Λₖini,yₖini,𝐍,𝐫;ftol=1e-14,Nmax)                    
                     ΔΛₖ .= Λₖ - Λʳₖ
                     minusResΛ = -Res + 𝐁*(ΔΛₖ)

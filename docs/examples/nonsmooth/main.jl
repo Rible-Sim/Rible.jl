@@ -66,9 +66,15 @@ function new_pointmass(;
     r̄g  = SVector{3}([ 0.0, 0.0, 0.0])
     r̄p1 = SVector{3}([ 0.0, 0.0, 0.0])
     r̄ps = [r̄p1]
-    prop = TR.RigidBodyProperty(1,movable,m,Ia,
-                r̄g,r̄ps;constrained=constrained
-                )
+    ās = [SVector{3}([ 1.0, 0.0, 0.0])]
+    μs = [μ]
+    es = [e]
+    prop = TR.RigidBodyProperty(
+        1,movable,m,Ia,
+        r̄g,r̄ps,ās,
+        μs,es,
+        ;constrained=constrained
+    )
     R = RotX(0.0)
     ω = zero(ro)
     rps = Ref(ro) .+ Ref(R).*r̄ps
@@ -94,6 +100,28 @@ end
 
 function pm_contact_dynfuncs(bot;θ=0.0)
     (;tg) = bot
+    (;mem2num) = tg.connectivity.numbered
+    npoints = length.(mem2num) |> sum
+    contacts_bits = BitVector(undef,npoints)
+    T = TR.get_numbertype(tg)
+    μs_sys = ones(T,npoints)
+    es_sys = zeros(T,npoints)
+    gaps_sys = fill(typemax(T),npoints)
+
+    # initilize
+    foreach(tg.bodies) do body
+        (;prop,state) = body
+        bid = prop.id
+        (;μs,es) = prop
+        μs_sys[mem2num[bid]] .= μs
+        es_sys[mem2num[bid]] .= es
+    end
+
+    # gap normal
+    a = tan(θ)
+    n = [-a,0,1]
+    inclined_plane = TR.Plane(n,zeros(3))
+
     function F!(F,q,q̇,t)
         TR.clear_forces!(tg)
         TR.update_rigids!(tg,q,q̇)
@@ -111,53 +139,138 @@ function pm_contact_dynfuncs(bot;θ=0.0)
         TR.build_∂Q̌∂q̌̇!(∂F∂q̌̇,tg)
     end
 
-    rbs = TR.get_bodies(tg)
-
-    a = tan(θ)
-    n = [-a,0,1]
-    inclined_plane = TR.Plane(n,zeros(3))
-    function prepare_contacts!(contacts,q)
+    function prepare_contacts!(q)
         T = eltype(q)
-
-        g = TR.signed_distance(q,inclined_plane)
-
-        TR.activate!(contacts[1],g)
-
-        active_contacts = filter(contacts) do c
-            c.state.active
-        end
-
-        na = length(active_contacts)
-        inv_μ_vec = ones(T,3na)
-        for (i,ac) in enumerate(active_contacts)
-            (;id,state) = ac
-            state.frame = TR.SpatialFrame(n)
-            inv_μ_vec[3(i-1)+1] = 1/ac.μ
-        end
-        es = [ac.e for ac in active_contacts]
-        gaps = [ac.state.gap for ac in active_contacts]
-        H = Diagonal(inv_μ_vec)
-        active_contacts, gaps, H, es
-    end
-
-    function get_directions_and_positions(active_contacts,q)
-        na = length(active_contacts)
+        nq = length(q)
+        na = 0
         TR.update_rigids!(tg,q)
-        D = Matrix{eltype(q)}(undef,3na,length(q))
-        ŕ = Vector{eltype(q)}(undef,3na)
-        for (i,ac) in enumerate(active_contacts)
-            (;id,state) = ac
-            (;n,t1,t2) = state.frame
-            rbid = ac.id
-            C = rbs[rbid].state.cache.Cps[1]
-            CT = C*TR.build_T(tg,1)
-            dm = hcat(n,t1,t2) |> transpose
-            D[3(i-1)+1:3(i-1)+3,:] = dm*CT
-            ŕ[3(i-1)+1:3(i-1)+3] = dm*rbs[rbid].state.rps[id]
+        foreach(tg.bodies) do body
+            (;prop,state) = body
+            bid = prop.id
+            (;contacts,rps) = state
+            contacts_bits[mem2num[bid]] .= false
+            if body isa TR.AbstractRigidBody
+                for pid in eachindex(rps)
+                    rp = rps[pid]
+                    contact = contacts[pid]
+                    (;e,μ) = contact
+                    gap = TR.signed_distance(rp,inclined_plane)
+                    TR.activate!(contact,gap)
+                    if contact.state.active
+                        contacts_bits[mem2num[bid][pid]] = true
+                        contact.state.frame = TR.SpatialFrame(n)
+                        na += 1
+                    else
+                    end
+                end
+            end
         end
-        D,ŕ
+        # @show na, length(active_contacts)
+        inv_μs = ones(T,3na)
+        for (i,μ) in enumerate(μs_sys[contacts_bits])
+            inv_μs[3(i-1)+1] = 1/μ
+        end
+        H = Diagonal(inv_μs)
+        es = es_sys[contacts_bits]
+        # member's points indices to system's active points' indices
+        mem2act_idx = deepcopy(mem2num)
+        act_start = 0
+        for bid = 1:tg.nbodies
+            mem2act_idx[bid] .= 0
+            contacts_bits_body = findall(contacts_bits[mem2num[bid]])
+            nactive_body = length(contacts_bits_body)
+            mem2act_idx[bid][contacts_bits_body] .= act_start+1:act_start+nactive_body
+            act_start += nactive_body
+        end
+        Ls = [
+            begin 
+                na_body = count(!iszero, mem)
+                zeros(T,3na_body,3na_body)
+            end
+            for mem in mem2act_idx
+        ]
+        L = BlockDiagonal(Ls)
+        D = Matrix{T}(undef,3na,nq)
+        Dₘ = zero(D)
+        Dₖ = zero(D)
+        ŕ = Vector{T}(undef,3na)
+        na, mem2act_idx, contacts_bits, H, es, D, Dₘ, Dₖ,ŕ, L
     end
-    @eponymtuple(F!,Jac_F!,prepare_contacts!,get_directions_and_positions)
+
+    function get_directions_and_positions!(D,Dₘ,Dₖ,ŕ, mem2act_idx, q)
+        T = eltype(q)
+        nq = length(q)
+        TR.update_rigids!(tg,q)
+        foreach(tg.bodies) do body
+            (;prop,state) = body
+            bid = prop.id
+            (;contacts,rps) = state
+            for (pid,contact) in enumerate(contacts)
+                if contact.state.active
+                    rp = rps[pid]
+                    (;n,t1,t2) = contact.state.frame
+                    C = state.cache.Cps[pid]
+                    CT = C*TR.build_T(tg,bid)
+                    dm = hcat(n,t1,t2) |> transpose
+                    ci = mem2act_idx[bid][pid]
+                    epi = 3(ci-1)+1:3ci
+                    D[epi,:] = dm*CT
+                    ŕ[epi]   = dm*rp
+                    if state.cache.funcs.nmcs isa TR.QBF.QC
+                        T = TR.build_T(tg,bid)
+                        r̄p = prop.r̄ps[pid]
+
+                        ∂Cẋ∂x = TR.QBF.make_∂Cẋ∂x(r̄p)
+                        ∂Cq̇∂q = ∂Cẋ∂x(T*q,T*q̇)*T
+                        ∂Dq̇∂q[3ci+1:3ci+3,:] = dm*∂Cq̇∂q
+                        ∂Cᵀf∂x = TR.QBF.make_∂Cᵀf∂x(r̄p)
+                        Λi = @view Λ[epi]
+                        fi = dm'*Λi
+                        ∂DᵀΛ∂q .+= transpose(T)*∂Cᵀf∂x(T*q,fi)*T
+                    end
+                    if contact.state.persistent
+                        Dₘ[epi,:] .= D[epi,:]
+                    else
+                        Dₖ[epi,:] .= D[epi,:]
+                    end
+                end
+            end
+        end
+    end
+
+    function get_distribution_law!(L,mem2act_idx,q)
+        T = eltype(q)
+        TR.update_rigids!(tg,q)
+        foreach(tg.bodies) do body
+            (;prop,state) = body
+            bid = prop.id
+            (;contacts,rps) = state
+            active_idx = findall(!iszero,mem2act_idx[bid])
+            na_body = length(active_idx)
+            if na_body > 1
+                R = zeros(T,3na_body,6)
+                inv_μs_body = ones(T,3na_body)
+                for (i,pid) in enumerate(active_idx)
+                    rp = rps[pid]
+                    contact = contacts[pid]
+                    (;e,μ) = contact
+                    (;n,t1,t2) = contact.state.frame
+                    inv_μs_body[3(i-1)+1] = 1/μ
+                    dm = hcat(n,t1,t2) |> transpose
+                    R[3(i-1)+1:3(i-1)+3,1:3] = dm
+                    R[3(i-1)+1:3(i-1)+3,4:6] = dm*(-TR.NCF.skew(rp))
+                end
+                blocks(L)[bid] .= (I-pinv(R)'*R')*Diagonal(inv_μs_body)
+            end
+        end
+    end
+
+    @eponymtuple(
+        F!,Jac_F!,
+        prepare_contacts!,
+        get_directions_and_positions!,
+        get_distribution_law!
+    )
 end
 
 tspan = (0.0,0.455)
@@ -1996,7 +2109,7 @@ function flexcable_contact_dynfuncs(bot,ground_plane)
                     (;e,μ) = contact
                     gap = TR.signed_distance(
                         rp,
-                        inclined_plane
+                        ground_plane
                     )
                     TR.activate!(contact,gap)
                     if contact.state.active
@@ -2189,7 +2302,7 @@ lines((me.E.-me.E[begin])./me.E[begin])
 
 #dt
 # dts = [1e-1,3e-2,1e-2,3e-3,1e-3,1e-4]
-dts = [1e-2,5e-3,2e-3,1e-3,5e-4,2e-4,2e-5]
+dts = [1e-2,5e-3,2e-3,0.99e-3,5e-4,2e-4,2e-5]
 flexcables_dt = [
     begin
         flexcable_dt = deepcopy(flexcable)
@@ -2414,7 +2527,7 @@ with_theme(theme_pub;
         ylabel = L"\acute{v}_n~(\mathrm{m/s})",
         # aspect = DataAspect()
     )
-    impact_time = 0.5984
+    impact_time = 2995*h
     step_before_impact = time2step(impact_time,t)
     @myshow step_before_impact
     vminus, vplus = pnvp2[step_before_impact:step_before_impact+1]
