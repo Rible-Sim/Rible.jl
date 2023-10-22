@@ -2931,19 +2931,21 @@ function ball_dynfuncs(bot)
             (;contacts,rps) = state
             active_idx = findall(!iszero,mem2act_idx[bid])
             na_body = length(active_idx)
-            R = zeros(T,3na_body,6)
-            inv_μs_body = ones(T,3na_body)
-            for (i,pid) in enumerate(active_idx)
-                rp = rps[pid]
-                contact = contacts[pid]
-                (;e,μ) = contact
-                (;n,t1,t2) = contact.state.frame
-                inv_μs_body[3(i-1)+1] = 1/μ
-                dm = hcat(n,t1,t2) |> transpose
-                R[3(i-1)+1:3(i-1)+3,1:3] = dm
-                R[3(i-1)+1:3(i-1)+3,4:6] = dm*(-TR.NCF.skew(rp))
+            if na_body > 1
+                R = zeros(T,3na_body,6)
+                inv_μs_body = ones(T,3na_body)
+                for (i,pid) in enumerate(active_idx)
+                    rp = rps[pid]
+                    contact = contacts[pid]
+                    (;e,μ) = contact
+                    (;n,t1,t2) = contact.state.frame
+                    inv_μs_body[3(i-1)+1] = 1/μ
+                    dm = hcat(n,t1,t2) |> transpose
+                    R[3(i-1)+1:3(i-1)+3,1:3] = dm
+                    R[3(i-1)+1:3(i-1)+3,4:6] = dm*(-TR.NCF.skew(rp))
+                end
+                blocks(L)[bid] .= (I-pinv(R)'*R')*Diagonal(inv_μs_body)
             end
-            blocks(L)[bid] .= (I-pinv(R)'*R')*Diagonal(inv_μs_body)
         end
     end
 
@@ -3066,7 +3068,7 @@ GM.activate!(); with_theme(theme_pub;
     )
     colsize!(fig.layout,1,0.55tw)
     colgap!(fig.layout,2fontsize)
-    savefig(fig,"ballbot_sliding")
+    # savefig(fig,"ballbot_sliding")
     fig
 end
 
