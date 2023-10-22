@@ -174,9 +174,7 @@ function solve!(intor::Integrator,solvercache::ZhongCCPCache;
         qˣ = qₖ₋₁ .+ dt./2 .*q̇ₖ₋₁
         qₖ .= qₖ₋₁ .+ dt .*q̇ₖ₋₁
         q̇ₖ .= q̇ₖ₋₁
-        na,mem2act_idx,contacts_bits,H,es,D, Dₘ,Dₖ,ŕ, L = prepare_contacts!(qˣ)
-        get_directions_and_positions!(D, Dₘ,Dₖ,ŕ, mem2act_idx, qˣ)        
-        
+        na,mem2act_idx,persistent_indices,contacts_bits,H,es,D, Dₘ,Dₖ,∂Dq̇∂q, ∂DᵀΛ∂q,ŕ, L = prepare_contacts!(qˣ)
         isconverged = false
         normRes = typemax(T)
         iteration_break = 0
@@ -192,6 +190,7 @@ function solve!(intor::Integrator,solvercache::ZhongCCPCache;
         𝐜ᵀ = zeros(T,nΛ,nx)
         𝐍 = zeros(T,nΛ,nΛ)
         𝐫 = zeros(T,nΛ)
+        get_directions_and_positions!(D, Dₘ,Dₖ,∂Dq̇∂q, ∂DᵀΛ∂q, ŕ, qˣ, q̇ₖ₋₁, Λₖ,mem2act_idx,)        
         ns_stepk! = make_zhongccp_ns_stepk(nq,nλ,na,qₖ₋₁,q̇ₖ₋₁,pₖ₋₁,tₖ₋₁,pₖ,q̇ₖ,dynfuncs,cache,invM,dt,scaling)
         
         restart_count = 0

@@ -749,6 +749,7 @@ function top_contact_dynfuncs(bot)
     (;mem2num) = tg.connectivity.numbered
     npoints = length.(mem2num) |> sum
     contacts_bits = BitVector(undef,npoints)
+    persistent_bits = BitVector(undef,npoints)
     T = TR.get_numbertype(tg)
     μs_sys = ones(T,npoints)
     es_sys = zeros(T,npoints)
@@ -793,6 +794,7 @@ function top_contact_dynfuncs(bot)
             bid = prop.id
             (;contacts,rps) = state
             contacts_bits[mem2num[bid]] .= false
+            persistent_bits[mem2num[bid]] .= false
             if body isa TR.AbstractRigidBody
                 for pid in eachindex(rps)
                     rp = rps[pid]
@@ -803,8 +805,10 @@ function top_contact_dynfuncs(bot)
                     if contact.state.active
                         contacts_bits[mem2num[bid][pid]] = true
                         contact.state.frame = TR.SpatialFrame(n)
+                        if contact.state.persistent
+                            persistent_bits[mem2num[bid][pid]] = true
+                        end
                         na += 1
-                    else
                     end
                 end
             end
@@ -819,11 +823,15 @@ function top_contact_dynfuncs(bot)
         # member's points indices to system's active points' indices
         mem2act_idx = deepcopy(mem2num)
         act_start = 0
+        persistent_indices = Int[]
         for bid = 1:tg.nbodies
             mem2act_idx[bid] .= 0
             contacts_bits_body = findall(contacts_bits[mem2num[bid]])
             nactive_body = length(contacts_bits_body)
-            mem2act_idx[bid][contacts_bits_body] .= act_start+1:act_start+nactive_body
+            mem_idx = act_start+1:act_start+nactive_body
+            mem2act_idx[bid][contacts_bits_body] .= mem_idx
+            mem_per_idx = findall(persistent_bits[mem2num[bid]][contacts_bits_body])
+            append!(persistent_indices,mem_idx[mem_per_idx])
             act_start += nactive_body
         end
         Ls = [
@@ -834,17 +842,19 @@ function top_contact_dynfuncs(bot)
             for mem in mem2act_idx
         ]
         L = BlockDiagonal(Ls)
-        D = Matrix{T}(undef,3na,nq)
-        Dₘ = zero(D)
-        Dₖ = zero(D)
+        D = zeros(T,3na,nq)
+        Dper = zero(D)
+        Dimp = zero(D)
+        ∂Dq̇∂q = zeros(T,3na,nq)
+        ∂DᵀΛ∂q = zeros(T,nq,nq)
         ŕ = Vector{T}(undef,3na)
-        na, mem2act_idx, contacts_bits, H, es, D, Dₘ,Dₖ,ŕ, L
+        na, mem2act_idx, persistent_indices, contacts_bits, H, es, D, Dper, Dimp, ∂Dq̇∂q, ∂DᵀΛ∂q, ŕ, L
     end
 
-    function get_directions_and_positions!(D,Dₘ,Dₖ,ŕ, mem2act_idx, q)
-        T = eltype(q)
-        nq = length(q)
+    function get_directions_and_positions!(D, Dper,Dimp, ∂Dq̇∂q, ∂DᵀΛ∂q, ŕ, q, q̇, Λ, mem2act_idx,)
         TR.update_rigids!(tg,q)
+        ∂Dq̇∂q .= 0
+        ∂DᵀΛ∂q .= 0
         foreach(tg.bodies) do body
             (;prop,state) = body
             bid = prop.id
@@ -861,21 +871,20 @@ function top_contact_dynfuncs(bot)
                     D[epi,:] = dm*CT
                     ŕ[epi]   = dm*rp
                     if state.cache.funcs.nmcs isa TR.QBF.QC
-                        T = TR.build_T(tg,bid)
+                        Tbody = TR.build_T(tg,bid)
                         r̄p = prop.r̄ps[pid]
-
                         ∂Cẋ∂x = TR.QBF.make_∂Cẋ∂x(r̄p)
-                        ∂Cq̇∂q = ∂Cẋ∂x(T*q,T*q̇)*T
-                        ∂Dq̇∂q[3ci+1:3ci+3,:] = dm*∂Cq̇∂q
+                        ∂Cq̇∂q = ∂Cẋ∂x(Tbody*q,Tbody*q̇)*Tbody
+                        ∂Dq̇∂q[epi,:] = dm*∂Cq̇∂q
                         ∂Cᵀf∂x = TR.QBF.make_∂Cᵀf∂x(r̄p)
                         Λi = @view Λ[epi]
                         fi = dm'*Λi
-                        ∂DᵀΛ∂q .+= transpose(T)*∂Cᵀf∂x(T*q,fi)*T
+                        ∂DᵀΛ∂q .+= transpose(Tbody)*∂Cᵀf∂x(Tbody*q,fi)*Tbody
                     end
                     if contact.state.persistent
-                        Dₘ[epi,:] .= D[epi,:]
+                        Dper[epi,:] .= D[epi,:]
                     else
-                        Dₖ[epi,:] .= D[epi,:]
+                        Dimp[epi,:] .= D[epi,:]
                     end
                 end
             end
@@ -1160,8 +1169,6 @@ plot_traj!(top;showinfo=false,rigidcolor=:white,showwire=true,figsize=(0.6tw,0.6
 
 me = TR.mechanical_energy!(top)
 me.E |> lines
-
-
 
 contacts_traj_voa = VectorOfArray(top.contacts_traj)
 for (i,c) in enumerate(contacts_traj_voa[1,end-10:end])
