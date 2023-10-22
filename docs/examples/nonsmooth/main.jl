@@ -2702,19 +2702,6 @@ GM.activate!(); plot_traj!(unibot_z0)
 
 #-------- SUPERBall ---------
 
-l = 1.7/2
-d = l/2
-ballbot = superball(
-    0.0;
-    ṙo = SVector(2.0,1.0,0),
-    ω = SVector(0.0,0.0,1.0),
-    μ = 0.05,
-    e = 0.0,
-    l,d,
-    z0 = l^2/(sqrt(5)*d) - 1e-3,
-    constrained = false,
-    loadmesh = false,
-)
 
 plot_traj!(ballbot)
 
@@ -2743,85 +2730,6 @@ GM.activate!(); plot_traj!(ballbot;
     ylims = [-1,3],
     zlims = [-1e-3,2.4],
 )
-
-function ball_dynfuncs(bot)
-    (;tg) = bot
-    function F!(F,q,q̇,t)
-        TR.clear_forces!(tg)
-        TR.update_rigids!(tg,q,q̇)
-        TR.update_tensiles!(tg)
-        TR.apply_gravity!(tg)
-        F .= TR.generate_forces!(tg)
-    end
-    function Jac_F!(∂F∂q̌,∂F∂q̌̇,q,q̇,t)
-        ∂F∂q̌ .= 0
-        ∂F∂q̌̇ .= 0
-        TR.clear_forces!(tg)
-        TR.update_rigids!(tg,q,q̇)
-        TR.update_tensiles!(tg)
-        TR.build_∂Q̌∂q̌!(∂F∂q̌,tg)
-        TR.build_∂Q̌∂q̌̇!(∂F∂q̌̇,tg)
-    end
-
-    bars = TR.get_rigidbars(tg)
-    
-    function prepare_contacts!(contacts,q)
-        TR.update_rigids!(tg,q)
-        foreach(bars) do rb
-            rbid = rb.prop.id
-            gap1 = rb.state.rps[1][3]
-            TR.activate!(contacts[2rbid-1],gap1)
-            gap2 = rb.state.rps[2][3]
-            TR.activate!(contacts[2rbid  ],gap2)
-        end
-        active_contacts = filter(contacts) do c
-            c.state.active
-        end
-        na = length(active_contacts)
-        inv_μ_vec = ones(eltype(q),3na)
-        n = [0,0,1.0]
-        for (i,ac) in enumerate(active_contacts)
-            (;state) = ac
-            state.frame = TR.SpatialFrame(n)
-            inv_μ_vec[3(i-1)+1] = 1/ac.μ
-        end
-        es = [ac.e for ac in active_contacts]
-        H = Diagonal(inv_μ_vec)
-        na, active_contacts, H, es
-    end
-
-    function get_directions_and_positions(na, active_contacts,q)
-        T = eltype(q)
-        nq = length(q)
-        TR.update_rigids!(tg,q)
-        D = Matrix{T}(undef,3na,nq)
-        ŕ = Vector{T}(undef,3na)
-        for (i,ac) in enumerate(active_contacts)
-            (;id,state) = ac
-            rbid,pid = divrem(ac.id-1,2) .+ 1
-            (;n,t1,t2) = state.frame
-            C = bars[rbid].state.cache.Cps[pid]
-            CT = C*TR.build_T(tg,rbid)
-            dm = hcat(n,t1,t2) |> transpose
-            D[3(i-1)+1:3(i-1)+3,:] = dm*CT
-            ŕ[3(i-1)+1:3(i-1)+3] = dm*bars[rbid].state.rps[pid]
-        end
-        persistent_indices = findall((c)->c.state.persistent,active_contacts)
-        Dₘ = zero(D)
-        Dₖ = copy(D)
-        # Dₘ = copy(D)
-        # Dₖ = zero(D)
-        if (na !== 0) && !isempty(persistent_indices)
-            epi = reduce(vcat,[collect(3(i-1)+1:3i) for i in persistent_indices])
-            Dₘ[epi,:] .= D[epi,:]
-            Dₖ[epi,:] .= 0
-            # filtered_gaps[persistent_indices] = gaps[persistent_indices]
-        end
-        D,Dₘ,Dₖ,ŕ
-    end
-
-    @eponymtuple(F!,Jac_F!,prepare_contacts!,get_directions_and_positions)
-end
 
 function plotsave_contactpoints(bot,figname=nothing)
     contacts_traj_voa = VectorOfArray(bot.contacts_traj)
@@ -2860,13 +2768,111 @@ function plotsave_contactpoints(bot,figname=nothing)
     end
 end
 
+#-- testing
+l = 1.7/2
+d = l/2
+ballbot = superball(
+    0.0;
+    ṙo = SVector(2.0,1.0,0),
+    ω = SVector(0.0,0.0,1.0),
+    μ = 0.05,
+    e = 0.0,
+    l,d,
+    z0 = l^2/(sqrt(5)*d) - 1e-3,
+    constrained = false,
+    loadmesh = false,
+)
+
+function ball_dynfuncs(bot)
+    (;tg) = bot
+    function F!(F,q,q̇,t)
+        TR.clear_forces!(tg)
+        TR.update_rigids!(tg,q,q̇)
+        TR.update_tensiles!(tg)
+        TR.apply_gravity!(tg)
+        F .= TR.generate_forces!(tg)
+    end
+    function Jac_F!(∂F∂q̌,∂F∂q̌̇,q,q̇,t)
+        ∂F∂q̌ .= 0
+        ∂F∂q̌̇ .= 0
+        TR.clear_forces!(tg)
+        TR.update_rigids!(tg,q,q̇)
+        TR.update_tensiles!(tg)
+        TR.build_∂Q̌∂q̌!(∂F∂q̌,tg)
+        TR.build_∂Q̌∂q̌̇!(∂F∂q̌̇,tg)
+    end
+
+    bars = TR.get_rigidbars(tg)
+    
+    n = [0,0,1.0]
+    
+    function prepare_contacts!(contacts,q)
+        T = eltype(q)
+        nq = length(q)
+        TR.update_rigids!(tg,q)
+        foreach(bars) do rb
+            rbid = rb.prop.id
+            gap1 = rb.state.rps[1][3]
+            TR.activate!(contacts[2rbid-1],gap1)
+            gap2 = rb.state.rps[2][3]
+            TR.activate!(contacts[2rbid  ],gap2)
+        end
+        active_contacts = filter(contacts) do c
+            c.state.active
+        end
+        na = length(active_contacts)
+        inv_μs = ones(T,3na)
+        for (i,ac) in enumerate(active_contacts)
+            (;state) = ac
+            state.frame = TR.SpatialFrame(n)
+            inv_μs[3(i-1)+1] = 1/ac.μ
+        end
+        es = [ac.e for ac in active_contacts]
+        H = Diagonal(inv_μs)
+        na, active_contacts, H, es
+    end
+
+    function get_directions_and_positions(na, active_contacts,q)
+        T = eltype(q)
+        nq = length(q)
+        TR.update_rigids!(tg,q)
+        D = Matrix{T}(undef,3na,nq)
+        ŕ = Vector{T}(undef,3na)
+        for (i,ac) in enumerate(active_contacts)
+            (;id,state) = ac
+            rbid,pid = divrem(ac.id-1,2) .+ 1
+            (;n,t1,t2) = state.frame
+            C = bars[rbid].state.cache.Cps[pid]
+            CT = C*TR.build_T(tg,rbid)
+            dm = hcat(n,t1,t2) |> transpose
+            D[3(i-1)+1:3(i-1)+3,:] = dm*CT
+            ŕ[3(i-1)+1:3(i-1)+3] = dm*bars[rbid].state.rps[pid]
+        end
+        persistent_indices = findall((c)->c.state.persistent,active_contacts)
+        Dₘ = zero(D)
+        Dₖ = copy(D)
+        # Dₘ = copy(D)
+        # Dₖ = zero(D)
+        if (na !== 0) && !isempty(persistent_indices)
+            epi = reduce(vcat,[collect(3(i-1)+1:3i) for i in persistent_indices])
+            Dₘ[epi,:] .= D[epi,:]
+            Dₖ[epi,:] .= 0
+            # filtered_gaps[persistent_indices] = gaps[persistent_indices]
+        end
+        D,Dₘ,Dₖ,ŕ
+    end
+
+    @eponymtuple(F!,Jac_F!,prepare_contacts!,get_directions_and_positions)
+end
+
+
 
 # testing
 tspan = (0.0,5.0)
 h = 1e-2
 prob = TR.SimProblem(ballbot,ball_dynfuncs)
 @time TR.solve!(prob,TR.ZhongCCP();tspan,dt=h,ftol=1e-14,maxiters=100,exception=false)
-
+#-- end testing
 GM.activate!(); plotsave_contactpoints(ballbot)
 
 plot_traj!(ballbot;)

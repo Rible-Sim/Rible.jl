@@ -181,9 +181,6 @@ function solve!(intor::Integrator,solvercache::ZhongCCPCache;
         isconverged = false
         nΛ = 3na
         Λₖ = zeros(T,nΛ)
-        Λₖ .= repeat([0.1,0,0],na)
-        yₖ = zeros(T,nΛ)
-        yₖ .= repeat([1.0,0,0],na)
         Λʳₖ = copy(Λₖ)
         ΔΛₖ = copy(Λₖ)
         𝐁 = zeros(T,nx,nΛ)
@@ -227,8 +224,6 @@ function solve!(intor::Integrator,solvercache::ZhongCCPCache;
                     yₖini .= abs.(yₖini)
                     yₖini[begin+1:3:end] .= 0.0
                     yₖini[begin+2:3:end] .= 0.0
-                    # @show Λₖini[begin:3:end], yₖini[begin:3:end]
-                    # yini = repeat([0.1,0,0],na)
                     IPM!(Λₖ,na,nΛ,Λₖini,yₖini,𝐍,𝐫;ftol=1e-14,Nmax)                    
                     ΔΛₖ .= Λₖ - Λʳₖ
                     minusResΛ = -Res + 𝐁*(ΔΛₖ)
@@ -249,7 +244,7 @@ function solve!(intor::Integrator,solvercache::ZhongCCPCache;
                     Δx .= luJac\minusResΛ
                     Λʳₖ .= Λₖ
                     x .+= Δx
-                    # @show timestep, iteration, normRes, norm(Δx), norm(ΔΛₖ),persistent_indices
+                    # @show timestep, iteration, normRes, norm(Δx), norm(ΔΛₖ)
                 end
             end
             if isconverged

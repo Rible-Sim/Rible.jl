@@ -168,6 +168,8 @@ function rigidbar(i,
         ri,rj;
         ṙi,ṙj,
         m = 0.05,
+        μ = 0.9,
+        e = 0.0,
         movable = true,
         constrained = false,
         ci = Int[],
@@ -194,8 +196,10 @@ function rigidbar(i,
         0       inertia    0;
         0       0     inertia
     ])
-    r̄ps = [r̄p1,r̄p2,r̄p3]
+    r̄ps = [r̄p1,r̄p2]
     ās = [SVector(1.0,0,0),SVector(1.0,0,0),SVector(1.0,0,0)]
+    μs = fill(μ,length(r̄ps))
+    es = fill(e,length(r̄ps))
     prop = TR.RigidBodyProperty(
         i,
         movable,
@@ -203,7 +207,9 @@ function rigidbar(i,
         Ī,
         r̄g,
         r̄ps,
-        ās;
+        ās,
+        μs,
+        es;
         constrained = constrained,
     )
     pretty_table(
@@ -441,6 +447,8 @@ function superball(c=0.0;
             ṙi=ṗ[2i-1],
             ṙj=ṗ[2i  ], 
             m = 5.0,
+            μ = 0.9,
+            e = 0.0,
             constrained = ifelse(i==1 && constrained,true,false),
             ci = ifelse(i==1 && constrained,collect(1:6),Int[]),
             Φi = ifelse(i==1 && constrained,Int[],[1]),
@@ -524,8 +532,8 @@ function superball(c=0.0;
 
     # #
 
-    contacts = [TR.Contact(i,μ,e) for i = 1:12]
+    # contacts = [TR.Contact(i,μ,e) for i = 1:12]
 
-    tg = TR.TensegrityStructure(rigdibodies, tensiles, cnt, contacts)
+    tg = TR.TensegrityStructure(rigdibodies, tensiles, cnt, )
     bot = TR.TensegrityRobot(tg, hub)
 end
