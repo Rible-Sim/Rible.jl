@@ -2786,16 +2786,16 @@ function ball_dynfuncs(bot)
             inv_μ_vec[3(i-1)+1] = 1/ac.μ
         end
         es = [ac.e for ac in active_contacts]
-        gaps = [ac.state.gap for ac in active_contacts]
         H = Diagonal(inv_μ_vec)
-        active_contacts, gaps, H, es
+        na, active_contacts, H, es
     end
 
-    function get_directions_and_positions(active_contacts,q)
-        na = length(active_contacts)
+    function get_directions_and_positions(na, active_contacts,q)
+        T = eltype(q)
+        nq = length(q)
         TR.update_rigids!(tg,q)
-        D = Matrix{eltype(q)}(undef,3na,length(q))
-        ŕ = Vector{eltype(q)}(undef,3na)
+        D = Matrix{T}(undef,3na,nq)
+        ŕ = Vector{T}(undef,3na)
         for (i,ac) in enumerate(active_contacts)
             (;id,state) = ac
             rbid,pid = divrem(ac.id-1,2) .+ 1
@@ -2806,7 +2806,18 @@ function ball_dynfuncs(bot)
             D[3(i-1)+1:3(i-1)+3,:] = dm*CT
             ŕ[3(i-1)+1:3(i-1)+3] = dm*bars[rbid].state.rps[pid]
         end
-        D,ŕ
+        persistent_indices = findall((c)->c.state.persistent,active_contacts)
+        Dₘ = zero(D)
+        Dₖ = copy(D)
+        # Dₘ = copy(D)
+        # Dₖ = zero(D)
+        if (na !== 0) && !isempty(persistent_indices)
+            epi = reduce(vcat,[collect(3(i-1)+1:3i) for i in persistent_indices])
+            Dₘ[epi,:] .= D[epi,:]
+            Dₖ[epi,:] .= 0
+            # filtered_gaps[persistent_indices] = gaps[persistent_indices]
+        end
+        D,Dₘ,Dₖ,ŕ
     end
 
     @eponymtuple(F!,Jac_F!,prepare_contacts!,get_directions_and_positions)
