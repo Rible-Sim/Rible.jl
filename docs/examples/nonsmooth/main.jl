@@ -2785,6 +2785,51 @@ ballbot = superball(
 
 function ball_dynfuncs(bot)
     (;tg) = bot
+    (;mem2num) = tg.connectivity.numbered
+    npoints = length.(mem2num) |> sum
+
+    contacts_bits = [
+        BitVector(undef,length(mem))
+        for mem in mem2num
+    ]
+
+    contacts_sys = [
+        [
+            TR.Contact(id,0.5,0.5)
+            for id in mem
+        ]
+        for mem in mem2num
+    ]
+
+    μs_sys = [
+        fill(0.5,length(mem))
+        for mem in mem2num
+    ]
+
+    es_sys = [
+        fill(0.5,length(mem))
+        for mem in mem2num
+    ]
+
+    gaps_sys = [
+        fill(0.0,length(mem))
+        for mem in mem2num
+    ]
+
+    # initilize
+    foreach(tg.bodies) do body
+        (;prop,state) = body
+        bid = prop.id
+        (;μs,es) = prop
+        (;contacts) = state
+        contacts_sys[bid] = contacts
+        μs_sys[bid] = deepcopy(μs)
+        es_sys[bid] = deepcopy(es)
+    end
+
+    # gap normal
+    n = [0,0,1.0]
+
     function F!(F,q,q̇,t)
         TR.clear_forces!(tg)
         TR.update_rigids!(tg,q,q̇)
@@ -2804,23 +2849,44 @@ function ball_dynfuncs(bot)
 
     bars = TR.get_rigidbars(tg)
     
-    n = [0,0,1.0]
     
-    function prepare_contacts!(contacts,q)
+    function prepare_contacts!(contacts_glb,q)
         T = eltype(q)
         nq = length(q)
+        na = 0
         TR.update_rigids!(tg,q)
+        foreach(tg.bodies) do body
+            (;prop,state) = body
+            bid = prop.id
+            (;contacts,rps) = state
+            contacts_bits[bid] .= false
+            if body isa TR.AbstractRigidBody
+                for pid in eachindex(rps)
+                    rp = rps[pid]
+                    contact = contacts[pid]
+                    (;e,μ) = contact
+                    gap = rp[3]
+                    TR.activate!(contact,gap)
+                    if contact.state.active
+                        contacts_bits[bid][pid] = true
+                        contact.state.frame = TR.SpatialFrame(n)
+                        na += 1
+                    end
+                end
+                contacts_sys[bid] = contacts
+            end
+        end
         foreach(bars) do rb
             rbid = rb.prop.id
             gap1 = rb.state.rps[1][3]
-            TR.activate!(contacts[2rbid-1],gap1)
+            TR.activate!(contacts_glb[2rbid-1],gap1)
             gap2 = rb.state.rps[2][3]
-            TR.activate!(contacts[2rbid  ],gap2)
+            TR.activate!(contacts_glb[2rbid  ],gap2)
         end
-        active_contacts = filter(contacts) do c
+        active_contacts = filter(contacts_glb) do c
             c.state.active
         end
-        na = length(active_contacts)
+        # na = length(active_contacts)
         inv_μs = ones(T,3na)
         for (i,ac) in enumerate(active_contacts)
             (;state) = ac
