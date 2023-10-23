@@ -204,7 +204,7 @@ function IPM!(output,nu,nΛ,Λ,y,N,r;ftol=1e-14,Nmax=50)
             # @show k
             break
         elseif k == Nmax
-            # @warn "IPM: Max iteration $k reached"
+            @warn "IPM: Max iteration $k reached"
         end
 
         𝐉[n1+1:n2,   1:n1] .=  BlockDiagonal(mat.(y_split))

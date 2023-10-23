@@ -90,17 +90,17 @@ function make_zhongccp_ns_stepk(nq,nλ,na,qₖ₋₁,vₖ₋₁,pₖ₋₁,tₖ�
                 vₜⁱ⁺   = norm(vⁱ⁺[2:3])
                 vₙⁱₖ₋₁ = vⁱₖ₋₁[1]
                 vₙⁱ   = vⁱ⁺[1]
-                # @show timestep,iteration, vₙⁱₖ₋₁, vₙⁱ, vₜⁱₖ₋₁, vₜⁱ, Λₖ
-                v́ₜⁱ = vₜⁱ⁺ + es[i]*min(vₙⁱₖ₋₁,zero(vₙⁱₖ₋₁))
+                v́ₜⁱ = vₜⁱ⁺ + es[i]*min(vₙⁱₖ₋₁,0)
                 𝐛[is+1:is+3] .= [v́ₜⁱ,0,0]
-                
                 Dⁱₘ = @view Dₘ[is+1:is+3,:]
                 Dⁱₖ = @view Dₖ[is+1:is+3,:]
                 𝐜ᵀ[is+1     ,   1:n1] .= 1/(norm(v́⁺[is+2:is+3])+1e-14)*(v́⁺[is+2]*∂v́⁺∂qₖ[is+2,:] .+ v́⁺[is+3]*∂v́⁺∂qₖ[is+3,:])
                 𝐜ᵀ[is+1:is+3,   1:n1] .+= ∂v́⁺∂qₖ[is+1:is+3,:]
                 𝐜ᵀ[is+1:is+3,n1+1:n2] .= Dⁱₖ*∂vₖ∂λₘ
             end
-
+            if na == 2
+                @show timestep,iteration, v́⁺ + 𝐛,  Λₖ, (v́⁺ + 𝐛)⋅Λₖ
+            end
             # 𝐜ᵀinv𝐉 = 𝐜ᵀ*inv(𝐉)
             𝐍 .= 𝐜ᵀ*(lu𝐉\𝐁)
             𝐫 .= (v́⁺ + 𝐛) .-𝐜ᵀ*(lu𝐉\(𝐫𝐞𝐬 + 𝐁*Λₖ))
@@ -224,17 +224,17 @@ function solve!(intor::Integrator,solvercache::ZhongCCPCache;
                     Λₖini = deepcopy(Λₖ)
                     Λₖini[begin+1:3:end] .= 0.0
                     Λₖini[begin+2:3:end] .= 0.0
-                    if false 
-                        @show timestep, iteration
+                    if na==2 
+                        @show timestep, iteration, persistent_indices
                         @show Λₖ
                         # @show norm(𝐍),norm(L)
-                        # @show L*Λₖ
+                        @show L*Λₖ
                         # @show qr(L).R |> diag
                         # @show :befor, size(𝐍), rank(𝐍), cond(𝐍)
                     end
                     𝐍 .+= L
                     yₖini = 𝐍*Λₖ + 𝐫
-                    if false 
+                    if na==2 
                         # @show :after, size(𝐍), rank(𝐍), cond(𝐍)
                         @show yₖini
                     end
