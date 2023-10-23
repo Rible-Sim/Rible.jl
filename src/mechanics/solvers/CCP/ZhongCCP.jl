@@ -38,7 +38,7 @@ function make_zhongccp_ns_stepk(nq,nλ,na,qₖ₋₁,vₖ₋₁,pₖ₋₁,tₖ�
     n2 = nq+nλ
     nΛ = 3na
     nx = n2
-    function ns_stepk!(𝐫𝐞𝐬,𝐉,Fₘ,∂F∂q,∂F∂q̇,𝐁,𝐛,𝐜ᵀ,𝐍,𝐫,x,Λₖ,D,Dₘ,Dₖ,H,L,es,timestep,iteration)
+    function ns_stepk!(𝐫𝐞𝐬,𝐉,Fₘ,∂F∂q,∂F∂q̇,𝐁,𝐛,𝐜ᵀ,𝐍,𝐫,x,Λₖ,D,Dₘ,Dₖ,H,es,timestep,iteration)
         # @show timestep, iteration, na
         qₖ = @view x[   1:n1]
         λₘ = @view x[n1+1:n2]
@@ -51,6 +51,7 @@ function make_zhongccp_ns_stepk(nq,nλ,na,qₖ₋₁,vₖ₋₁,pₖ₋₁,tₖ�
 
         Aₖ₋₁ = A(qₖ₋₁)
         Aₖ   = A(qₖ)
+
         𝐫𝐞𝐬[   1:n1] .= -h.*pₖ₋₁ .+ M*(qₖ.-qₖ₋₁) .-
                         h.*scaling.*transpose(D)*H*Λₖ .-
                            scaling.*transpose(Aₖ₋₁)*λₘ .-
@@ -89,17 +90,14 @@ function make_zhongccp_ns_stepk(nq,nλ,na,qₖ₋₁,vₖ₋₁,pₖ₋₁,tₖ�
                 vₜⁱ⁺   = norm(vⁱ⁺[2:3])
                 vₙⁱₖ₋₁ = vⁱₖ₋₁[1]
                 vₙⁱ   = vⁱ⁺[1]
-                # @show timestep,iteration, vₙⁱₖ₋₁, vₙⁱ, vₜⁱₖ₋₁, vₜⁱ, Λₖ
-                v́ₜⁱ = vₜⁱ⁺ + es[i]*min(vₙⁱₖ₋₁,zero(vₙⁱₖ₋₁))
+                v́ₜⁱ = vₜⁱ⁺ + es[i]*min(vₙⁱₖ₋₁,0)
                 𝐛[is+1:is+3] .= [v́ₜⁱ,0,0]
-                
                 Dⁱₘ = @view Dₘ[is+1:is+3,:]
                 Dⁱₖ = @view Dₖ[is+1:is+3,:]
                 𝐜ᵀ[is+1     ,   1:n1] .= 1/(norm(v́⁺[is+2:is+3])+1e-14)*(v́⁺[is+2]*∂v́⁺∂qₖ[is+2,:] .+ v́⁺[is+3]*∂v́⁺∂qₖ[is+3,:])
                 𝐜ᵀ[is+1:is+3,   1:n1] .+= ∂v́⁺∂qₖ[is+1:is+3,:]
                 𝐜ᵀ[is+1:is+3,n1+1:n2] .= Dⁱₖ*∂vₖ∂λₘ
             end
-
             # 𝐜ᵀinv𝐉 = 𝐜ᵀ*inv(𝐉)
             𝐍 .= 𝐜ᵀ*(lu𝐉\𝐁)
             𝐫 .= (v́⁺ + 𝐛) .-𝐜ᵀ*(lu𝐉\(𝐫𝐞𝐬 + 𝐁*Λₖ))
@@ -123,7 +121,11 @@ function solve!(intor::Integrator,solvercache::ZhongCCPCache;
     (;prob,controller,tspan,restart,totalstep) = intor
     (;bot,dynfuncs) = prob
     (;traj,contacts_traj) = bot
-    (;F!, Jac_F!, prepare_contacts!,get_directions_and_positions,get_distribution_law) = dynfuncs
+    (;F!, Jac_F!, 
+        prepare_contacts!,
+        get_directions_and_positions!,
+        get_distribution_law!
+    ) = dynfuncs
     (;cache) = solvercache
     (;M,Φ,A,Ψ,B,∂Ψ∂q,∂Aᵀλ∂q,∂Bᵀμ∂q) = cache
     invM = inv(M)
@@ -154,7 +156,7 @@ function solve!(intor::Integrator,solvercache::ZhongCCPCache;
         #---------Time Step k Control-----------
         # control!(intor,cache)
         #---------Time Step k Control-----------
-        push!(contacts_traj,deepcopy(contacts_traj[end]))
+        cₖ₋₁ = contacts_traj[timestep]
         cₖ = contacts_traj[timestep+1]
         qₖ₋₁ = traj.q[timestep]
         q̇ₖ₋₁ = traj.q̇[timestep]
@@ -169,8 +171,7 @@ function solve!(intor::Integrator,solvercache::ZhongCCPCache;
         qˣ = qₖ₋₁ .+ dt./2 .*q̇ₖ₋₁
         qₖ .= qₖ₋₁ .+ dt .*q̇ₖ₋₁
         q̇ₖ .= q̇ₖ₋₁
-        na, contacts_bits, gaps, H, es = prepare_contacts!(qˣ)
-        D,Dₘ,Dₖ,_ = get_directions_and_positions(na,contacts_bits, qˣ)
+        na,mem2act_idx,persistent_indices,contacts_bits,H,es,D, Dₘ,Dₖ,∂Dq̇∂q, ∂DᵀΛ∂q,ŕ, L = prepare_contacts!(qˣ)
         isconverged = false
         normRes = typemax(T)
         iteration_break = 0
@@ -179,9 +180,6 @@ function solve!(intor::Integrator,solvercache::ZhongCCPCache;
         isconverged = false
         nΛ = 3na
         Λₖ = zeros(T,nΛ)
-        Λₖ .= repeat([0.1,0,0],na)
-        yₖ = zeros(T,nΛ)
-        yₖ .= repeat([1.0,0,0],na)
         Λʳₖ = copy(Λₖ)
         ΔΛₖ = copy(Λₖ)
         𝐁 = zeros(T,nx,nΛ)
@@ -189,6 +187,7 @@ function solve!(intor::Integrator,solvercache::ZhongCCPCache;
         𝐜ᵀ = zeros(T,nΛ,nx)
         𝐍 = zeros(T,nΛ,nΛ)
         𝐫 = zeros(T,nΛ)
+        get_directions_and_positions!(D, Dₘ,Dₖ,∂Dq̇∂q, ∂DᵀΛ∂q, ŕ, qˣ, q̇ₖ₋₁, Λₖ,mem2act_idx,)        
         ns_stepk! = make_zhongccp_ns_stepk(nq,nλ,na,qₖ₋₁,q̇ₖ₋₁,pₖ₋₁,tₖ₋₁,pₖ,q̇ₖ,dynfuncs,cache,invM,dt,scaling)
         
         restart_count = 0
@@ -201,8 +200,8 @@ function solve!(intor::Integrator,solvercache::ZhongCCPCache;
             Nmax = 50
             for iteration = 1:maxiters
                 # @show iteration,D,ηs,es,gaps
-                L = get_distribution_law(na,contacts_bits, x[1:nq])
-                luJac = ns_stepk!(Res,Jac,F,∂F∂q,∂F∂q̇,𝐁,𝐛,𝐜ᵀ,𝐍,𝐫,x,Λₖ,D,Dₘ,Dₖ,H,L,es,timestep,iteration)
+                get_distribution_law!(L,mem2act_idx,x[1:nq])
+                luJac = ns_stepk!(Res,Jac,F,∂F∂q,∂F∂q̇,𝐁,𝐛,𝐜ᵀ,𝐍,𝐫,x,Λₖ,D,Dₘ,Dₖ,H,es,timestep,iteration)
                 normRes = norm(Res)
                 if na == 0
                     if normRes < ftol
@@ -213,13 +212,7 @@ function solve!(intor::Integrator,solvercache::ZhongCCPCache;
                     Δx .= luJac\(-Res)
                     x .+= Δx
                 else # na!=0
-                    # @show na
-                    # @show es
-                    # @show H
-                    # @show D
-                    # @show Dₘ
-                    # @show Dₖ
-                    if iteration < 4
+                    if iteration < 2
                         Nmax = 50
                     else
                         Nmax = 50
@@ -228,47 +221,22 @@ function solve!(intor::Integrator,solvercache::ZhongCCPCache;
                     Λₖini = deepcopy(Λₖ)
                     Λₖini[begin+1:3:end] .= 0.0
                     Λₖini[begin+2:3:end] .= 0.0
-                    if na > 10
-                        @show timestep, iteration
-                        # @show rref_with_pivots(𝐍)
-                        @show norm(𝐍), norm(L)
-                        @show size(L), rank(L)
-                        # @show qr(𝐍)
-                        @show L*Λₖ
-                        @show qr(L).R[1,:]
-                        @show :befor, size(𝐍), rank(𝐍), cond(𝐍)
+                    if false 
+                        # @show timestep, iteration
+                        # @show norm(𝐍),norm(L)
+                        @show norm(L*Λₖ)
+                        # @show qr(L).R |> diag
+                        # @show :befor, size(𝐍), rank(𝐍), cond(𝐍)
                     end
                     𝐍 .+= L
                     yₖini = 𝐍*Λₖ + 𝐫
+                    if false 
+                        # @show :after, size(𝐍), rank(𝐍), cond(𝐍)
+                        # @show yₖini
+                    end
                     yₖini .= abs.(yₖini)
                     yₖini[begin+1:3:end] .= 0.0
                     yₖini[begin+2:3:end] .= 0.0
-                    # @show Λₖini[begin:3:end], yₖini[begin:3:end]
-                    # yini = repeat([0.1,0,0],na)
-                    if na > 10
-                        @show :after, size(𝐍), rank(𝐍), cond(𝐍)
-                        
-                        # W_I = vcat(
-                        #     W,
-                        #     Matrix(-1I,3na,3na)
-                        # )
-
-                        # hr = hrep(W_I, zeros(2*3na),  BitSet(1:3na))
-                        # ph = polyhedron(hr, lib)
-                        # vr = vrep(ph)
-                        # @assert npoints(vr) == 1
-                        # @show nrays(vr)
-                        # rayas = [ray.a for ray in rays(vr)]
-                        # if isempty(rayas)
-                        #     @show "empty rays"
-                        # else
-                        #     contact_force_states = reduce(hcat,[ray.a for ray in rays(vr)])
-                        #     @show contact_force_states
-                        # end
-                        # _,_,WV = svd(W; full = true)
-                        # @show WV[:,rank(W)+1:end]
-                    end
-
                     IPM!(Λₖ,na,nΛ,Λₖini,yₖini,𝐍,𝐫;ftol=1e-14,Nmax)                    
                     ΔΛₖ .= Λₖ - Λʳₖ
                     minusResΛ = -Res + 𝐁*(ΔΛₖ)
@@ -305,11 +273,11 @@ function solve!(intor::Integrator,solvercache::ZhongCCPCache;
         q̇ₖ .= invM*pₖ
 
         if na != 0
-            update_contacts!(cₖ,bot.tg,contacts_bits,Dₘ*(qₖ.-qₖ₋₁).+Dₖ*q̇ₖ,2*Λₖ./(scaling*dt))
+            update_contacts!(cₖ[contacts_bits],cₖ₋₁[contacts_bits],Dₘ*(qₖ.-qₖ₋₁).+Dₖ*q̇ₖ,2*Λₖ./(scaling*dt))
         end
 
         if !isconverged
-            @warn "Newton max iterations $maxiters, at timestep=$timestep, normRes=$(normRes)"
+            @warn "Newton max iterations $maxiters, at timestep=$timestep, normRes=$(normRes), restart_count=$(restart_count)"
             if exception
                 @error "Not converged!"
                 break

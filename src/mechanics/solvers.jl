@@ -43,15 +43,20 @@ struct Integrator{ProbType,CtrlType,T}
     totalstep::Int
 end
 
-function prepare_traj!(traj;tspan,dt,restart=true)
+function prepare_traj!(traj,contacts_traj;tspan,dt,restart=true)
     if restart
         resize!(traj,1)
+        resize!(contacts_traj,1)
     end
     tstart,tend = tspan
     totaltime = tend - tstart
     totalstep = ceil(Int,totaltime/dt)
     for istep = 1:totalstep
-        push!(traj,deepcopy(traj[end]))
+        push!(traj,deepcopy(traj[end]))        
+        push!(contacts_traj,deepcopy(contacts_traj[end]))
+        for c in contacts_traj[end]
+            c.state.active = false
+        end
         traj.t[end] = tstart + dt*istep
     end
     totalstep
@@ -62,8 +67,7 @@ function solve!(prob::SimProblem,solver::AbstractSolver,
                 tspan,dt,restart=true,karg...)
     (;bot,dynfuncs) = prob
     (;tg,traj,contacts_traj) = bot
-    if restart; resize!(contacts_traj,1); end
-    totalstep = prepare_traj!(traj;tspan,dt,restart)
+    totalstep = prepare_traj!(traj,contacts_traj;tspan,dt,restart)
     (;prescribe!, actuate!) = controller
     if !isa(prescribe!, Nothing)
         for i in eachindex(traj)

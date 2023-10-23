@@ -168,13 +168,14 @@ function rigidbar(i,
         ri,rj;
         ṙi,ṙj,
         m = 0.05,
+        μ = 0.9,
+        e = 0.0,
         movable = true,
         constrained = false,
         ci = Int[],
         Φi = [1],
         isbody = false,
         loadmesh = true,
-        μ,e
     )
     ro = (ri + rj)/2
     ṙo = (ṙi + ṙj)/2
@@ -188,6 +189,7 @@ function rigidbar(i,
     r̄g  = SVector{3}(   0,0.0,0.0)
     r̄p1 = SVector{3}(-b/2,0.0,0.0)
     r̄p2 = SVector{3}( b/2,0.0,0.0)
+    r̄p3 = SVector{3}(   0,0.0,0.0)
     inertia = m*b^2/12
     Ī = SMatrix{3,3}([
         inertia 0          0;
@@ -196,8 +198,8 @@ function rigidbar(i,
     ])
     r̄ps = [r̄p1,r̄p2]
     ās = [SVector(1.0,0,0),SVector(1.0,0,0),SVector(1.0,0,0)]
-    μs = [μ,μ]
-    es = [e,e]
+    μs = fill(μ,length(r̄ps))
+    es = fill(e,length(r̄ps))
     prop = TR.RigidBodyProperty(
         i,
         movable,
@@ -445,12 +447,13 @@ function superball(c=0.0;
             ṙi=ṗ[2i-1],
             ṙj=ṗ[2i  ], 
             m = 5.0,
+            μ,
+            e,
             constrained = ifelse(i==1 && constrained,true,false),
             ci = ifelse(i==1 && constrained,collect(1:6),Int[]),
             Φi = ifelse(i==1 && constrained,Int[],[1]),
             loadmesh,
             isbody =false,
-            μ,e
             )
         for i = 1:6
     ]
@@ -529,6 +532,8 @@ function superball(c=0.0;
 
     # #
 
-    tg = TR.TensegrityStructure(rigdibodies, tensiles, cnt)
+    # contacts = [TR.Contact(i,μ,e) for i = 1:12]
+
+    tg = TR.TensegrityStructure(rigdibodies, tensiles, cnt, )
     bot = TR.TensegrityRobot(tg, hub)
 end

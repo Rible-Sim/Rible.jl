@@ -517,6 +517,20 @@ function TensegrityStructure(bodies,tensiles,cnt::Connectivity)
         @warn "Non positive degree of freedom: $ndof."
     end
     state = TensegrityState(bodies,tensiles,cnt)
+
+    (;mem2num) = cnt.numbered
+    contacts = reduce(
+        vcat,
+        map(sort(bodies)) do body
+            (;prop,) = body
+            (;μs,es) = prop
+            rbid = prop.id
+            [
+                Contact(id,μ,e)
+                for (id,μ,e) in  zip(mem2num[rbid],μs,es)
+            ]
+        end
+    )
     tg = TensegrityStructure(
         ndim,ndof,nconstraints,
         nbodies,ntensiles,

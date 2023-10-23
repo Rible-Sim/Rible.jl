@@ -1,0 +1,79 @@
+{
+	"files": [
+		{
+			"path": "examples/stiffness/main.jl",
+			"bookmarks": [
+				{
+					"line": 0,
+					"column": 17,
+					"label": ""
+				}
+			]
+		},
+		{
+			"path": "examples/nonsmooth/main.jl",
+			"bookmarks": [
+				{
+					"line": 0,
+					"column": 12,
+					"label": ""
+				},
+				{
+					"line": 53,
+					"column": 6,
+					"label": ""
+				},
+				{
+					"line": 488,
+					"column": 8,
+					"label": ""
+				},
+				{
+					"line": 1568,
+					"column": 17,
+					"label": ""
+				},
+				{
+					"line": 2154,
+					"column": 11,
+					"label": ""
+				},
+				{
+					"line": 2405,
+					"column": 29,
+					"label": ""
+				},
+				{
+					"line": 2636,
+					"column": 9,
+					"label": ""
+				},
+				{
+					"line": 2805,
+					"column": 9,
+					"label": ""
+				},
+				{
+					"line": 2891,
+					"column": 8,
+					"label": ""
+				}
+			]
+		},
+		{
+			"path": "examples/ES/main.jl",
+			"bookmarks": [
+				{
+					"line": 0,
+					"column": 17,
+					"label": ""
+				},
+				{
+					"line": 2277,
+					"column": 17,
+					"label": ""
+				}
+			]
+		}
+	]
+}

@@ -189,12 +189,14 @@ function IPM!(output,nu,nΛ,Λ,y,N,r;ftol=1e-14,Nmax=50)
     𝐫𝐞𝐬 = zeros(T,nx)
     𝐉 = zeros(T,nx,nx)
     μ = transpose(y)*Λ/nΛ
+
     𝐉[   1:n1,   1:n1] .=  N
     𝐉[   1:n1,n1+1:n2] .= -Matrix(1I,nΛ,nΛ)
     for k = 1:Nmax
 
         𝐫𝐞𝐬[   1:n1] .= N*Λ .+ r .- y
         𝐫𝐞𝐬[n1+1:n2] .= reduce(vcat,Λ_split⊙y_split)
+
         res = norm(𝐫𝐞𝐬)
         if res < ftol
             # @show k, Λ_split[1],y_split[1]
@@ -204,6 +206,7 @@ function IPM!(output,nu,nΛ,Λ,y,N,r;ftol=1e-14,Nmax=50)
         elseif k == Nmax
             # @warn "IPM: Max iteration $k reached"
         end
+
         𝐉[n1+1:n2,   1:n1] .=  BlockDiagonal(mat.(y_split))
         𝐉[n1+1:n2,n1+1:n2] .=  BlockDiagonal(mat.(Λ_split))
 
@@ -256,7 +259,7 @@ function IPM!(output,nu,nΛ,Λ,y,N,r;ftol=1e-14,Nmax=50)
         # @show Λ_split,ΔΛc_split
         α_y = find_cone_step_length(y_split,Δyc_split,J)
         αmax = min(α_Λ,α_y)
-        α = min(1,0.9αmax)
+        α = min(1,0.99αmax)
         Λ_split .+= α.*ΔΛc_split
         y_split .+= α.*Δyc_split
         # @show ΔΛc_split, Δyc_split
