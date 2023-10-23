@@ -129,7 +129,7 @@ function contact_dynfuncs(bot;
                     TR.activate!(contact,gap)
                     if contact.state.active
                         contacts_bits[mem2num[bid][pid]] = true
-                        contact.state.frame = TR.SpatialFrame(n)
+                        contact.state.frame = TR.SpatialFrame(flatplane.n)
                         if contact.state.persistent
                             persistent_bits[mem2num[bid][pid]] = true
                         end
