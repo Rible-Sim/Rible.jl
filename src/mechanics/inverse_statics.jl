@@ -1,5 +1,5 @@
-function build_T(tg,i)
-    (;indexed) = tg.connectivity
+function build_T(st,i)
+    (;indexed) = st.connectivity
     (;nfull,mem2sysfull) = indexed
     T = spzeros(Int,length(mem2sysfull[i]),nfull)
     # Ť = zeros(Int,length(mem2sysfull[i]),nfree)
@@ -16,14 +16,14 @@ function build_Ci(rb)
     ])
 end
 
-function build_Q̃(tg)
-    (;tensioned,indexed) = tg.connectivity
+function build_Q̃(st)
+    (;tensioned,indexed) = st.connectivity
     (;connected) = tensioned
-    (;cables) = tg.tensiles
+    (;cables) = st.tensiles
     ncables = length(cables)
     (;nfree,mem2sysfree) = indexed
-    T = get_numbertype(tg)
-    ndim = get_ndim(tg)
+    T = get_numbertype(st)
+    ndim = get_ndim(st)
     Q̃ = zeros(T,nfree,ndim*ncables)
 
     foreach(connected) do cc
@@ -64,12 +64,12 @@ end
 
 
 
-function build_L̂(tg)
-    (;connectivity,ndim) = tg
+function build_L̂(st)
+    (;connectivity,ndim) = st
     (;connected) = connectivity.tensioned
-    (;cables) = tg.tensiles
+    (;cables) = st.tensiles
     ncables = length(cables)
-    T = get_numbertype(tg)
+    T = get_numbertype(st)
     L̂ = spzeros(T, ncables*ndim, ncables)
     foreach(connected) do scnt
         j = scnt.id
@@ -80,12 +80,12 @@ function build_L̂(tg)
     L̂
 end
 
-function build_K̂(tg)
-    (;connectivity,ndim) = tg
+function build_K̂(st)
+    (;connectivity,ndim) = st
     (;connected) = connectivity.tensioned
-    (;cables) = tg.tensiles
+    (;cables) = st.tensiles
     ncables = length(cables)
-    T = get_numbertype(tg)
+    T = get_numbertype(st)
     K̂ = spzeros(T, ncables*ndim, ncables)
     foreach(connected) do scnt
         j = scnt.id
@@ -96,12 +96,12 @@ function build_K̂(tg)
     K̂
 end
 
-function build_L(tg)
-    (;connectivity,ndim) = tg
+function build_L(st)
+    (;connectivity,ndim) = st
     (;connected) = connectivity.tensioned
-    (;cables) = tg.tensiles
+    (;cables) = st.tensiles
     ncables = length(cables)
-    T = get_numbertype(tg)
+    T = get_numbertype(st)
     L = spzeros(T, ncables*ndim, ncables)
     foreach(connected) do scnt
         j = scnt.id
@@ -112,33 +112,33 @@ function build_L(tg)
     L
 end
 
-function build_Γ(tg)
+function build_Γ(st)
     function inner_Γ(q)
-        clear_forces!(tg)
-        update_rigids!(tg,q)
-        update_cables_apply_forces!(tg)
-        forces = [s.state.tension.*s.state.direction for s in tg.cables]
+        clear_forces!(st)
+        update_rigids!(st,q)
+        update_cables_apply_forces!(st)
+        forces = [s.state.tension.*s.state.direction for s in st.cables]
         reduce(vcat,forces)
     end
 end
 
 function build_Ǧ(tginput;factor=1.0)
-    tg = deepcopy(tginput)
-    clear_forces!(tg)
-    apply_gravity!(tg;factor)
-    Ǧ = generate_forces!(tg)
+    st = deepcopy(tginput)
+    clear_forces!(st)
+    apply_gravity!(st;factor)
+    Ǧ = generate_forces!(st)
 end
 
-function make_U(tg)
-    (;ndim) = tg
-    (;nfull) = tg.connectivity.indexed
-    (;cables) = tg.tensiles
+function make_U(st)
+    (;ndim) = st
+    (;nfull) = st.connectivity.indexed
+    (;cables) = st.tensiles
     ncables = length(cables)
     function inner_U(s,u)
         ret = zeros(eltype(s),ncables*ndim,nfull)
         for i = 1:ncables
             k = cables[i].k
-            Ji = Array(build_Ji(tg,i))
+            Ji = Array(build_Ji(st,i))
             ret[(i-1)*ndim+1:i*ndim,:] = k*Ji*(1-s[i]*u[i])
         end
         ret
@@ -146,7 +146,7 @@ function make_U(tg)
     function inner_U(s,u,k)
         ret = zeros(eltype(s),ncables*ndim,nfull)
         for i = 1:ncables
-            Ji = Array(build_Ji(tg,i))
+            Ji = Array(build_Ji(st,i))
             ret[(i-1)*ndim+1:i*ndim,:] = k[i]*Ji*(1-s[i]*u[i])
         end
         ret
@@ -154,12 +154,12 @@ function make_U(tg)
     inner_U
 end
 
-function make_Q̌(tg,q0)
-    (;ndim) = tg
-    (;numbered,indexed,tensioned) = tg.connectivity
+function make_Q̌(st,q0)
+    (;ndim) = st
+    (;numbered,indexed,tensioned) = st.connectivity
     (;nfull,nfree,syspres,sysfree,mem2sysfull) = indexed
     (;connected) = tensioned
-    (;cables) = tg.tensiles
+    (;cables) = st.tensiles
     (;mem2num,num2sys) = numbered
     function inner_Q̌(q̌,s,u)
 		q = Vector{eltype(q̌)}(undef,nfull)
@@ -234,8 +234,8 @@ function make_Q̌(tg,q0)
     #         c2 = c[is2+1:is2+ndim]
     #         C1 = rb1.state.cache.funcs.C(c1)
     #         C2 = rb2.state.cache.funcs.C(c2)
-    #         T1 = build_Ti(tg,rb1id)
-    #         T2 = build_Ti(tg,rb2id)
+    #         T1 = build_Ti(st,rb1id)
+    #         T2 = build_Ti(st,rb2id)
     #         Jj = C2*T2-C1*T1
     #         Uj = transpose(Jj)*Jj
     #         ret .+= γ[j]*Uj*q̌
@@ -265,15 +265,15 @@ function check_inverse_sanity(B)
     ret
 end
 
-function build_inverse_statics_core(tginput,tgref::TensegrityStructure,Fˣ=nothing;gravity=false)
+function build_inverse_statics_core(tginput,tgref::Structure,Fˣ=nothing;gravity=false)
     q = get_q(tgref)
     q̌ = get_q̌(tgref)
-    tg = deepcopy(tginput)
-    clear_forces!(tg)
-    update_rigids!(tg,q)
-    update_tensiles!(tg)
+    st = deepcopy(tginput)
+    clear_forces!(st)
+    update_rigids!(st,q)
+    update_tensiles!(st)
     if gravity
-        Ǧ = build_Ǧ(tg)
+        Ǧ = build_Ǧ(st)
     else
         Ǧ = zero(q̌)
     end
@@ -283,19 +283,19 @@ function build_inverse_statics_core(tginput,tgref::TensegrityStructure,Fˣ=nothi
         F̌ = F̌ˣ + Ǧ
     end
 
-    build_inverse_statics_core(tg,q,F̌)
+    build_inverse_statics_core(st,q,F̌)
 end
 
-function build_inverse_statics_core(tg,q::AbstractVector,F)
-    A = make_A(tg)
+function build_inverse_statics_core(st,q::AbstractVector,F)
+    A = make_A(st)
     Nᵀ = transpose(nullspace(A(q)))
-    Q̃ = build_Q̃(tg)
-    tg,Nᵀ,Q̃,F
+    Q̃ = build_Q̃(st)
+    st,Nᵀ,Q̃,F
 end
 
 function build_inverse_statics_for_density(tginput,tgref,Fˣ=nothing;gravity=false,scale=true)
-    tg,Nᵀ,Q̃,F = build_inverse_statics_core(tginput,tgref,Fˣ;gravity)
-    L = build_L(tg)
+    st,Nᵀ,Q̃,F = build_inverse_statics_core(tginput,tgref,Fˣ;gravity)
+    L = build_L(st)
     # Left hand side
     Q̃L = Q̃*L
 
@@ -308,11 +308,11 @@ function build_inverse_statics_for_density(tginput,tgref,Fˣ=nothing;gravity=fal
 end
 
 function build_inverse_statics_for_stiffness(tginput,tgref,Fˣ=nothing;gravity=false,scale=true)
-    tg,Nᵀ,Q̃,F = build_inverse_statics_core(tginput,tgref,Fˣ;gravity)
+    st,Nᵀ,Q̃,F = build_inverse_statics_core(tginput,tgref,Fˣ;gravity)
 
-    L̂ = build_L̂(tg)
-    ℓ = get_cables_len(tg)
-    u = get_cables_restlen(tg)
+    L̂ = build_L̂(st)
+    ℓ = get_cables_len(st)
+    u = get_cables_restlen(st)
 
     # Left hand side
     Q̃L̄ = Q̃*L̂*Diagonal(ℓ-u)
@@ -326,9 +326,9 @@ function build_inverse_statics_for_stiffness(tginput,tgref,Fˣ=nothing;gravity=f
 end
 
 function build_inverse_statics_for_restlength(tginput,tgref,Fˣ=nothing;gravity=false,scale=true)
-    tg,Nᵀ,Q̃,F = build_inverse_statics_core(tginput,tgref,Fˣ;gravity)
-    ℓ = get_cables_len(tg)
-    K̂ = build_K̂(tg)
+    st,Nᵀ,Q̃,F = build_inverse_statics_core(tginput,tgref,Fˣ;gravity)
+    ℓ = get_cables_len(st)
+    K̂ = build_K̂(st)
     # Left hand side
     Q̃K̂ = Q̃*K̂
 
@@ -340,9 +340,9 @@ function build_inverse_statics_for_restlength(tginput,tgref,Fˣ=nothing;gravity=
 end
 
 function build_inverse_statics_for_force(tginput,tgref,Fˣ=nothing;gravity=false,scale=true)
-    tg,Nᵀ,Q̃,F = build_inverse_statics_core(tginput,tgref,Fˣ;gravity)
+    st,Nᵀ,Q̃,F = build_inverse_statics_core(tginput,tgref,Fˣ;gravity)
 
-    L̂ = build_L̂(tg)
+    L̂ = build_L̂(st)
 
     # Left hand side
     Q̃L̂ = Q̃*L̂
@@ -355,16 +355,16 @@ function build_inverse_statics_for_force(tginput,tgref,Fˣ=nothing;gravity=false
     B,F̃
 end
 
-function build_inverse_statics_for_actuation(botinput,botref::TensegrityRobot,
+function build_inverse_statics_for_actuation(botinput,botref::Robot,
                                         Fˣ=nothing;Y=build_Y(botinput),gravity=false,scale=true)
-    build_inverse_statics_for_actuation(botinput,botref.tg,Fˣ;Y,gravity,scale)
+    build_inverse_statics_for_actuation(botinput,botref.st,Fˣ;Y,gravity,scale)
 end
 
-function build_inverse_statics_for_actuation(botinput,tgref::TensegrityStructure,
+function build_inverse_statics_for_actuation(botinput,tgref::Structure,
                                         Fˣ=nothing;Y=build_Y(botinput),gravity=false,scale=true)
-    tg,Nᵀ,Q̃,F = build_inverse_statics_core(botinput.tg,tgref,Fˣ;gravity)
+    st,Nᵀ,Q̃,F = build_inverse_statics_core(botinput.st,tgref,Fˣ;gravity)
 
-    L̂ = build_L̂(tg)
+    L̂ = build_L̂(st)
 
     # Left hand side
     Q̃L̂Y = Q̃*L̂*Y
@@ -377,15 +377,15 @@ function build_inverse_statics_for_actuation(botinput,tgref::TensegrityStructure
     B,F̃
 end
 
-function build_inverse_statics_for_actuation_force(botinput,botref::TensegrityRobot,
+function build_inverse_statics_for_actuation_force(botinput,botref::Robot,
                                         Fˣ=nothing;Y=build_Y(botinput),gravity=false,scale=true)
-    build_inverse_statics_for_actuation_force(botinput,botref.tg,Fˣ;Y,gravity,scale)
+    build_inverse_statics_for_actuation_force(botinput,botref.st,Fˣ;Y,gravity,scale)
 end
 
-function build_inverse_statics_for_actuation_force(botinput,tgref::TensegrityStructure,
+function build_inverse_statics_for_actuation_force(botinput,tgref::Structure,
                                         Fˣ=nothing;Y=build_Y(botinput),gravity=false,scale=true)
-    tg,Nᵀ,Q̃,F = build_inverse_statics_core(botinput.tg,tgref,Fˣ;gravity)
-    L̂ = build_L̂(tg)
+    st,Nᵀ,Q̃,F = build_inverse_statics_core(botinput.st,tgref,Fˣ;gravity)
+    L̂ = build_L̂(st)
     # Left hand side
     Q̃L̂Y = Q̃*L̂*Y
 
@@ -405,13 +405,13 @@ function get_solution_set(B,F̃)
     return x,nb
 end
 
-function check_restlen(tg)
-    u = get_cables_restlen(tg)
-    check_restlen(tg,u)
+function check_restlen(st)
+    u = get_cables_restlen(st)
+    check_restlen(st,u)
 end
 
-function check_restlen(tg,u)
-    ℓ = get_cables_len(tg)
+function check_restlen(st,u)
+    ℓ = get_cables_len(st)
     if any((x)->x<0,u)
         @warn "Negative rest lengths"
     end
@@ -421,11 +421,11 @@ function check_restlen(tg,u)
 end
 
 function check_actuation(bot,Y,a)
-    @unpack tg = bot
+    @unpack st = bot
     Δu = Y*a
     u0 = get_original_restlen(bot)
     u = u0 + Δu
-    check_restlen(bot.tg,u)
+    check_restlen(bot.st,u)
     u
 end
 
@@ -450,19 +450,19 @@ function get_inverse_func(tg_input,reftg,Y;gravity=false,recheck=true,scale=true
 end
 
 function check_static_equilibrium(tg_input,q,λ,F=nothing;gravity=false)
-    tg = deepcopy(tg_input)
-    clear_forces!(tg)
-    distribute_q_to_rbs!(tg,q)
-    update_cables_apply_forces!(tg)
-    check_restlen(tg,get_cables_restlen(tg))
+    st = deepcopy(tg_input)
+    clear_forces!(st)
+    distribute_q_to_rbs!(st,q)
+    update_cables_apply_forces!(st)
+    check_restlen(st,get_cables_restlen(st))
     if gravity
-        apply_gravity!(tg)
+        apply_gravity!(st)
     end
-    generalized_forces = assemble_forces(tg)
+    generalized_forces = assemble_forces(st)
     if !isnothing(F)
         generalized_forces .+= F[:]
     end
-    constraint_forces = transpose(make_A(tg)(q))*λ
+    constraint_forces = transpose(make_A(st)(q))*λ
     static_equilibrium = constraint_forces ≈ generalized_forces
     @debug "Res. forces = $(generalized_forces-constraint_forces)"
     if !static_equilibrium
@@ -478,33 +478,33 @@ function check_static_equilibrium_output_multipliers(tg_input;F=nothing,gravity=
 end
 
 function check_static_equilibrium_output_multipliers(tg_input,q,F=nothing;gravity=false)
-    tg = deepcopy(tg_input)
-    check_static_equilibrium_output_multipliers!(tg,q,F;gravity)
+    st = deepcopy(tg_input)
+    check_static_equilibrium_output_multipliers!(st,q,F;gravity)
 end
 
-function check_static_equilibrium_output_multipliers!(tg,q,F=nothing;
+function check_static_equilibrium_output_multipliers!(st,q,F=nothing;
         gravity=false,
         # stpt = nothing
     )
-    clear_forces!(tg)
-    update_rigids!(tg)
-    update_tensiles!(tg)
-    # check_restlen(tg,get_cables_restlen(tg))
+    clear_forces!(st)
+    update_rigids!(st)
+    update_tensiles!(st)
+    # check_restlen(st,get_cables_restlen(st))
     if gravity
-        apply_gravity!(tg)
+        apply_gravity!(st)
     end
-    generalized_forces = generate_forces!(tg)
+    generalized_forces = generate_forces!(st)
     if !isnothing(F)
         generalized_forces .+= F[:]
     end
-    q = get_q(tg)
-    c = get_c(tg)
-    q̌ = get_q̌(tg)
-    A = make_A(tg,q)(q̌,c)
+    q = get_q(st)
+    c = get_c(st)
+    q̌ = get_q̌(st)
+    A = make_A(st,q)(q̌,c)
     # # @show A
-    # s = get_s(tg)
-    # u = get_cables_restlen(tg)
-    # k = get_cables_stiffness(tg)
+    # s = get_s(st)
+    # u = get_cables_restlen(st)
+    # k = get_cables_stiffness(st)
     # if !(stpt isa Nothing) 
     #     @show stpt.q - q |> norm
     #     @show stpt.q̌ - q̌ |> norm
@@ -514,7 +514,7 @@ function check_static_equilibrium_output_multipliers!(tg,q,F=nothing;
     #     @show stpt.c - c |> norm
     # end
 
-    # ǧeneralized_forces = make_Q̌(tg,q)(q̌,s,u,k,c)
+    # ǧeneralized_forces = make_Q̌(st,q)(q̌,s,u,k,c)
     # # @show s 
     # @show generalized_forces - ǧeneralized_forces
     λ = inv(A*transpose(A))*A*(-generalized_forces)
@@ -528,13 +528,13 @@ function check_static_equilibrium_output_multipliers!(tg,q,F=nothing;
     static_equilibrium, λ
 end
 
-function inverse_for_restlength(botinput,botref::TensegrityRobot,Fˣ=nothing;
+function inverse_for_restlength(botinput,botref::Robot,Fˣ=nothing;
         gravity=false,scale=true,recheck=true,kwarg...
     )
-    inverse_for_restlength(botinput.tg,botref.tg,Fˣ;gravity,scale,recheck,kwarg...)
+    inverse_for_restlength(botinput.st,botref.st,Fˣ;gravity,scale,recheck,kwarg...)
 end
 
-function inverse_for_restlength(tginput,tgref::TensegrityStructure,Fˣ=nothing;
+function inverse_for_restlength(tginput,tgref::Structure,Fˣ=nothing;
         gravity=false,scale=true,recheck=true,
         eps_abs=1e-6,eps_rel=1e-6,verbose=false,
         fmin=0.0,
@@ -592,11 +592,11 @@ function inverse_for_restlength(tginput,tgref::TensegrityStructure,Fˣ=nothing;
     x0
 end
 
-function inverse_for_multipliers(botinput::TensegrityRobot,botref::TensegrityRobot=botinput,F=nothing;gravity=false,scale=true,recheck=true)
-    inverse_for_multipliers(botinput.tg,botref.tg,F;gravity,scale,recheck)
+function inverse_for_multipliers(botinput::Robot,botref::Robot=botinput,F=nothing;gravity=false,scale=true,recheck=true)
+    inverse_for_multipliers(botinput.st,botref.st,F;gravity,scale,recheck)
 end
 
-function inverse_for_multipliers(tginput::TensegrityStructure,tgref::TensegrityStructure=tginput,F=nothing;gravity=false,scale=true,recheck=true)
+function inverse_for_multipliers(tginput::Structure,tgref::Structure=tginput,F=nothing;gravity=false,scale=true,recheck=true)
     q = get_q(tgref)
     _,λ = check_static_equilibrium_output_multipliers(tginput,q;gravity)
     λ
@@ -604,7 +604,7 @@ end
 
 function inverse_for_actuation(botinput,botref,Fˣ=nothing;Y=build_Y(botinput),
                     gravity=false,scale=true,recheck=true)
-    tgref = botref.tg
+    tgref = botref.st
     B,F̃ = build_inverse_statics_for_actuation(botinput,tgref,Fˣ;Y,gravity,scale)
     if check_inverse_sanity(B)
         y0 = B\F̃
@@ -618,7 +618,7 @@ function inverse_for_actuation(botinput,botref,Fˣ=nothing;Y=build_Y(botinput),
         botcheck = deepcopy(botinput)
         q = get_q(tgref)
         actuate!(botcheck,a)
-        _,λ = check_static_equilibrium_output_multipliers(botcheck.tg,q;gravity)
+        _,λ = check_static_equilibrium_output_multipliers(botcheck.st,q;gravity)
     end
     λ,a
 end
@@ -635,9 +635,9 @@ function optimize_for_stiffness_and_restlen(
 
     f0,Z = get_solution_set(B,F̃)
     @show size(Z)
-    ncables = bot.tg.tensiles.cables |> length
+    ncables = bot.st.tensiles.cables |> length
     Y = build_Y(bot)
-    l0 = get_cables_len(bot.tg)
+    l0 = get_cables_len(bot.st)
 
     # decision variables [k,x_ini,x]
     O_YZ = zero(Y*Z)

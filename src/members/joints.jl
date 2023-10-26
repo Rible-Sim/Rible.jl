@@ -134,15 +134,15 @@ function FixedIndicesConstraint(id,indices,values)
     FixedIndicesConstraint(id,length(indices),indices,values)
 end
 
-function make_Φ(cst::FixedIndicesConstraint,tg)
+function make_Φ(cst::FixedIndicesConstraint,st)
     @unpack indices, values = cst
     @inline @inbounds inner_Φ(q)   = q[indices]-values
     @inline @inbounds inner_Φ(q,d) = q[indices]-d
     inner_Φ
 end
 
-function make_A(cst::FixedIndicesConstraint,tg)
-    (;indexed,numbered) = tg.connectivity
+function make_A(cst::FixedIndicesConstraint,st)
+    (;indexed,numbered) = st.connectivity
     nΦ = cst.nconstraints
     indices = cst.indices
     (;sysfree,nfree) = indexed

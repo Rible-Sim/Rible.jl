@@ -102,7 +102,7 @@ function update!(cab::Cable,p1,p2,ṗ1,ṗ2)
 end
 
 """
-计算绳索势能。
+计算绳索potential energy 。
 $(TYPEDSIGNATURES)
 """
 function potential_energy(cab::Cable)

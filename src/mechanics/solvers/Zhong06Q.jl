@@ -5,13 +5,13 @@ struct Zhong06QCache{CacheType}
 end
 
 function generate_cache(solver::Zhong06Q,intor;dt,kargs...)
-    (;tg) = intor.prob.bot
-    M = build_M(tg) |> Matrix
-    ∂Mq̇∂q = build_∂Mq̇∂q(tg)
-    M! = make_M!(tg)
-    Jac_M! = make_Jac_M!(tg)
-    Φ = make_Φ(tg)
-    A = make_A(tg)
+    (;st) = intor.prob.bot
+    M = build_M(st) |> Matrix
+    ∂Mq̇∂q = build_∂Mq̇∂q(st)
+    M! = make_M!(st)
+    Jac_M! = make_Jac_M!(st)
+    Φ = make_Φ(st)
+    A = make_A(st)
     cache = @eponymtuple(M,∂Mq̇∂q,M!,Jac_M!,Φ,A)
     Zhong06QCache(cache)
 end

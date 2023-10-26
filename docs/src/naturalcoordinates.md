@@ -1,4 +1,4 @@
 # 自然坐标
 ```@autodocs
-Modules = [TensegrityRobots.NCF]
+Modules = [Rible.NCF]
 ```

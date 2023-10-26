@@ -22,7 +22,7 @@ using Makie
 import GLMakie as GM
 GM.activate!()
 using Revise
-import TensegrityRobots as TR
+import Rible as RB
 
 include("examples/vis.jl")
 ````
@@ -99,7 +99,7 @@ function make_new_tail(n)
         r̄ps = [r̄p1,r̄p2]
         nr̄p = length(r̄ps)
         ṙo = zeros(2); ω = 0.0
-        prop = TR.RigidBodyProperty(
+        prop = RB.RigidBodyProperty(
             i,
             movable,
             m,
@@ -110,18 +110,18 @@ function make_new_tail(n)
         )
         ro = ri
         if isodd(pos)
-            lncs, _ = TR.NCF.NC2P1V(ri, rj, ro, α, ṙo, ω)
+            lncs, _ = RB.NCF.NC2P1V(ri, rj, ro, α, ṙo, ω)
         else
-            lncs, _ = TR.NCF.NC2D2P(ri, rj, ro, α, ṙo, ω)
+            lncs, _ = RB.NCF.NC2D2P(ri, rj, ro, α, ṙo, ω)
         end
-        state = TR.RigidBodyState(prop, lncs, ri, α, ṙo, ω, ci, Φi)
-        rb = TR.RigidBody(prop, state)
+        state = RB.RigidBodyState(prop, lncs, ri, α, ṙo, ω, ci, Φi)
+        rb = RB.RigidBody(prop, state)
     end
     rbs = [
         rigidbody(i, O) for i = 1:nb
     ]
     rigdibodies = TypeSortedCollection(rbs)
-    numberedpoints = TR.number(rigdibodies)
+    numberedpoints = RB.number(rigdibodies)
     matrix_sharing_raw = Vector{Matrix{Int}}()
     for i = 1:2n
         s = zeros(2, nb)
@@ -136,7 +136,7 @@ function make_new_tail(n)
     end
     matrix_sharing = reduce(vcat, matrix_sharing_raw)
     display(matrix_sharing)
-    indexedcoords = TR.index(rigdibodies, matrix_sharing)
+    indexedcoords = RB.index(rigdibodies, matrix_sharing)
 
     ncables = 4n
     original_restlens = zeros(ncables)
@@ -147,10 +147,10 @@ function make_new_tail(n)
         ks[i] = ifelse(j ∈ [1, 0], 100, 100.0)
     end
     cables =
-        [TR.Cable2D(i, 0.5original_restlens[i], ks[i], 0.0) for i = 1:ncables]  #
+        [RB.Cable2D(i, 0.5original_restlens[i], ks[i], 0.0) for i = 1:ncables]  #
     tensiles = (cables = cables,)
     acs = [
-        TR.ManualActuator(1,
+        RB.ManualActuator(1,
             [4(i-1)+j for i = 1:n for j = 1:4],
             5original_restlens[[4(i-1)+j for i = 1:n for j = 1:4]],
         )
@@ -172,12 +172,12 @@ function make_new_tail(n)
     end
     matrix_cnt = reduce(vcat, matrix_cnt_raw)
     display(matrix_cnt)
-    connected = TR.connect(rigdibodies, matrix_cnt)
+    connected = RB.connect(rigdibodies, matrix_cnt)
     tensioned = @eponymtuple(connected,)
-    cnt = TR.Connectivity(numberedpoints, indexedcoords, tensioned)
+    cnt = RB.Connectivity(numberedpoints, indexedcoords, tensioned)
 
-    tg = TR.TensegrityStructure(rigdibodies, tensiles, cnt)
-    bot = TR.TensegrityRobot(tg, hub)
+    st = RB.Structure(rigdibodies, tensiles, cnt)
+    bot = RB.Robot(st, hub)
 end
 ````
 
@@ -196,28 +196,28 @@ tail = make_new_tail(n)
 检查连接点
 
 ````@example tail
-rbs = TR.get_bodies(tail.tg)
+rbs = RB.get_bodies(tail.st)
 plot_rigid(rbs[2])
 ````
 
 设置初始条件
 
 ````@example tail
-tail.traj.q̇[begin][tail.tg.connectivity.indexed.mem2sysfull[end][1:4]] .= [0.1,0.0,0.1,0.0]
+tail.traj.q̇[begin][tail.st.connectivity.indexed.mem2sysfull[end][1:4]] .= [0.1,0.0,0.1,0.0]
 ````
 
 定义广义力函数
 
 ````@example tail
 function dynfuncs(bot)
-    (;tg) = bot
+    (;st) = bot
     function F!(F,q,q̇,t)
-        TR.clear_forces!(tg)
-        TR.update_rigids!(tg,q,q̇)
-        TR.update_tensiles!(tg)
-        # TR.apply_gravity!(tg)
-        TR.generate_forces!(tg)
-        TR.get_force!(F,tg)
+        RB.clear_forces!(st)
+        RB.update_rigids!(st,q,q̇)
+        RB.update_tensiles!(st)
+        # RB.apply_gravity!(st)
+        RB.generate_forces!(st)
+        RB.get_force!(F,st)
     end
     Jac_F! = nothing
     @eponymtuple(F!)
@@ -227,13 +227,13 @@ end
 动力学仿真问题
 
 ````@example tail
-prob = TR.SimProblem(tail,dynfuncs)
+prob = RB.SimProblem(tail,dynfuncs)
 ````
 
 动力学仿真求解
 
 ````@example tail
-TR.solve!(prob,TR.Zhong06();dt=0.01,tspan=(0.0,10.0),ftol=1e-13,verbose=true)
+RB.solve!(prob,RB.Zhong06();dt=0.01,tspan=(0.0,10.0),ftol=1e-13,verbose=true)
 ````
 
 可视化
@@ -245,7 +245,7 @@ plot_traj!(tail;showmesh=false,showinfo=false,showground=false)
 系统机械能
 
 ````@example tail
-me = TR.mechanical_energy!(tail)
+me = RB.mechanical_energy!(tail)
 scatter(me.E)
 ````
 

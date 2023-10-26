@@ -148,30 +148,6 @@ rotation_matrix(θ) = @SMatrix [cos(θ) -sin(θ); sin(θ) cos(θ)]
     u, v
 end
 
-"""
-Return 斜对称矩阵。
-$(TYPEDSIGNATURES)
-"""
-function skew(w)
-    w1,w2,w3 = w
-    o = zero(w1)
-    @SMatrix [o -w3 w2;
-              w3 o -w1;
-             -w2 w1 o]
-end
-
-function skew(w::SVector{3})
-    w1,w2,w3 = w
-    o = zero(w1)
-    @SMatrix [o -w3 w2;
-              w3 o -w1;
-             -w2 w1 o]
-end
-
-function skew(a::SVector{2})
-	[-a[2],a[1]]
-end
-
 function Base.getproperty(nmcs::LNC,p::Symbol)
     if (p == :r̄i) 
         return nmcs.data.r̄i

@@ -5,20 +5,20 @@ struct ZhongQCCPCache{CacheType}
 end
 
 function generate_cache(::ZhongQCCP,intor;dt,kargs...)
-    (;tg) = intor.prob.bot
-    M = build_M(tg) 
-    M⁻¹ = build_M⁻¹(tg) 
-    ∂Mq̇∂q = build_∂Mq̇∂q(tg)
-    ∂M⁻¹p∂q = build_∂M⁻¹p∂q(tg)
-    M! = make_M!(tg)
-    M⁻¹! = make_M⁻¹!(tg)
-    Jac_M! = make_Jac_M!(tg)
-    Jac_M⁻¹! = make_Jac_M⁻¹!(tg)
-    Φ = make_Φ(tg)
-    A = make_A(tg)
+    (;st) = intor.prob.bot
+    M = build_M(st) 
+    M⁻¹ = build_M⁻¹(st) 
+    ∂Mq̇∂q = build_∂Mq̇∂q(st)
+    ∂M⁻¹p∂q = build_∂M⁻¹p∂q(st)
+    M! = make_M!(st)
+    M⁻¹! = make_M⁻¹!(st)
+    Jac_M! = make_Jac_M!(st)
+    Jac_M⁻¹! = make_Jac_M⁻¹!(st)
+    Φ = make_Φ(st)
+    A = make_A(st)
 
     nq = size(M,2)
-    T = get_numbertype(tg)
+    T = get_numbertype(st)
     ∂F∂q = zeros(T,nq,nq)
     ∂F∂q̇ = zeros(T,nq,nq)
     Ψ(q,q̇) = Vector{T}()
@@ -26,8 +26,8 @@ function generate_cache(::ZhongQCCP,intor;dt,kargs...)
     B(q) = Matrix{T}(undef,0,nq)
 
     # ∂𝐌𝐚∂𝐪(q,a) = zeros(T,nq,nq)
-    ∂Aᵀλ∂q(q,λ) = ∂Aᵀλ∂q̌(tg,λ)
-    # ∂𝚽𝐪𝐯∂𝒒(q,v) = TR.∂Aq̇∂q(tg,v)
+    ∂Aᵀλ∂q(q,λ) = ∂Aᵀλ∂q̌(st,λ)
+    # ∂𝚽𝐪𝐯∂𝒒(q,v) = RB.∂Aq̇∂q(st,v)
     ∂Bᵀμ∂q(q,μ) = zeros(T,nq,nq)
     cache = @eponymtuple(
         M,M⁻¹,∂Mq̇∂q,∂M⁻¹p∂q,

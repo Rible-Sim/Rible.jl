@@ -1,5 +1,5 @@
 # 刚体
 ```@autodocs
-Modules = [TensegrityRobots]
+Modules = [Rible]
 Pages   = ["rigidbody.jl"]
 ```

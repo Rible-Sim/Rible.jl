@@ -1,8 +1,7 @@
 # Rible 逸步
-Towards a physics-based, AI-powered simulator for computational design of **Ri**gid-flexi**ble** robots.
+Towards a physics-based AI-powered simulator for computational design of **Ri**gid-flexi**ble** robots.
  
-[![License: Anti 996](https://img.shields.io/badge/License-Anti%20996-blue.svg?style=flat-square)](https://github.com/996icu/996.ICU/blob/master/LICENSE)
-[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg?style=flat-square)](https://www.gnu.org/licenses/gpl-3.0)
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg?style=flat-square)](https://opensource.org/licenses/Apache-2.0)
 
 | **Documentation**                                   |
 |:---------------------------------------------------:|
@@ -11,7 +10,7 @@ Towards a physics-based, AI-powered simulator for computational design of **Ri**
 License
 ---
 
-Dual licensed under [the GPL and Anti-996 licenses](LICENSE)
+Licensed under [the Apache License, Version 2.0](LICENSE)
 
 [docs-master-img]: https://img.shields.io/badge/docs-master-blue?style=flat-square
-[docs-master-url]: https://robotgroup.gitlab.io/TensegrityRobots.jl
+[docs-master-url]: https://robotgroup.gitlab.io/Rible.jl

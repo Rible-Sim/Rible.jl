@@ -1,5 +1,5 @@
 # 线性化
 ```@autodocs
-Modules = [TensegrityRobots]
+Modules = [Rible]
 Pages   = ["linearization.jl"]
 ```

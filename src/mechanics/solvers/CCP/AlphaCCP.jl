@@ -34,13 +34,13 @@ end
 function generate_cache(solver::AlphaCCP,intor;dt,kargs...)
     (;prob,state) = intor
     (;bot,dynfuncs) = prob
-    (;tg) = bot
+    (;st) = bot
     (;q,q̇) = state.now
     (;ρ∞) = solver
     coeffs = generalized_α(ρ∞,dt)
     # F!,_ = dynfuncs
-    # mm = TR.build_MassMatrices(bot)
-    M = Matrix(build_M(tg))
+    # mm = RB.build_MassMatrices(bot)
+    M = Matrix(build_M(st))
     # (;M) = mm
     A = make_A(bot)
     Φ = make_Φ(bot)
@@ -52,8 +52,8 @@ function generate_cache(solver::AlphaCCP,intor;dt,kargs...)
     B(q) = Matrix{T}(undef,0,nq)
 
     # ∂𝐌𝐚∂𝐪(q,a) = zeros(T,nq,nq)
-    ∂Aᵀλ∂q(q,λ) = ∂Aᵀλ∂q̌(tg,λ)
-    # ∂𝚽𝐪𝐯∂𝒒(q,v) = TR.∂Aq̇∂q(tg,v)
+    ∂Aᵀλ∂q(q,λ) = ∂Aᵀλ∂q̌(st,λ)
+    # ∂𝚽𝐪𝐯∂𝒒(q,v) = RB.∂Aq̇∂q(st,v)
     ∂Bᵀμ∂q(q,μ) = zeros(T,nq,nq)
     cache = @eponymtuple(M,Φ,A,Ψ,B,∂Ψ∂q,∂Aᵀλ∂q,∂Bᵀμ∂q,coeffs)
     AlphaCCPCache(cache)

@@ -61,11 +61,11 @@ function check_slackness(𝐥,𝐮)
     end
 end
 
-function forward_system(tg,mode=PrimalMode();F̌=reshape(build_Ǧ(tg),:,1))
-    (;nconstraints) = tg
-    (;nfree) = tg.connectivity.indexed
-    (;nc) = tg.connectivity.numbered
-    ns = tg.tensiles.cables |> length
+function forward_system(st,mode=PrimalMode();F̌=reshape(build_Ǧ(st),:,1))
+    (;nconstraints) = st
+    (;nfree) = st.connectivity.indexed
+    (;nc) = st.connectivity.numbered
+    ns = st.tensiles.cables |> length
     nλ = nconstraints
     @polyvar q̌[1:nfree]
     @polyvar s[1:ns]
@@ -83,11 +83,11 @@ function forward_system(tg,mode=PrimalMode();F̌=reshape(build_Ǧ(tg),:,1))
     polyk = 1.0k .+ 0.0
     polyu = 1.0u .+ 0.0
     polyg = 1.0g .+ 0.0
-    q0 = get_q(tg)
-    Φ = make_Φ(tg,q0)
-    A = make_A(tg,q0)
-    Q̌ = make_Q̌(tg,q0)
-    S = make_S(tg,q0)
+    q0 = get_q(st)
+    Φ = make_Φ(st,q0)
+    A = make_A(st,q0)
+    Q̌ = make_Q̌(st,q0)
+    S = make_S(st,q0)
 
     variable_groups = [q̌,s,λ]
     var_lens = length.(variable_groups)
@@ -161,13 +161,13 @@ function find_diff_system(
     Psys,ide_pindx
 end
 
-function forward_once(tg::TensegrityStructure,
+function forward_once(st::Structure,
                         startsols_input,
                         start_parameters_input,
                         target_parameters_input,
-                        mode=PrimalMode();F=reshape(build_G(tg),:,1))
+                        mode=PrimalMode();F=reshape(build_G(st),:,1))
 
-    P_all,var_lens,parameters = forward_system(tg,mode;F)
+    P_all,var_lens,parameters = forward_system(st,mode;F)
     Psys, diff_parameter_points  = find_diff_system(
                 P_all,parameters,
                 start_parameters_input,
@@ -216,15 +216,15 @@ function forward_sequence(Psys::HomotopyContinuation.System,
     solseq
 end
 
-function forward_sequence(tg::TensegrityStructure,
+function forward_sequence(st::Structure,
         startsols,
         start_parameters,
         target_parameters,
         mode=PrimalMode();
-        F̌=reshape(build_Ǧ(tg),:,1),
+        F̌=reshape(build_Ǧ(st),:,1),
         n=1
     )
-    P,var_lens,parameters = forward_system(tg,mode;F̌)
+    P,var_lens,parameters = forward_system(st,mode;F̌)
     parameter_points = [
         start_parameters,
         target_parameters,
@@ -259,10 +259,10 @@ function forward_multi_sequence(Psys::HomotopyContinuation.System,
     ]
 end
 
-function forward_multi_sequence(tg::TensegrityStructure,startsols,
+function forward_multi_sequence(st::Structure,startsols,
                         parameter_points,mode=PrimalMode();
-                        F̌=reshape(build_Ǧ(tg),:,1),n=1)
-    P,var_lens,parameters = forward_system(tg,mode;F̌)
+                        F̌=reshape(build_Ǧ(st),:,1),n=1)
+    P,var_lens,parameters = forward_system(st,mode;F̌)
     # q̌0,s0,λ0 = startsols
     # q̌,s,λ = variable_groups
     # Pz = map(P) do z
@@ -275,12 +275,12 @@ function forward_multi_sequence(tg::TensegrityStructure,startsols,
                 parameter_points
             )
     seqs = forward_multi_sequence(Psys,var_lens,startsols,parameter_points, ide_pindx,mode;n)
-    [recover.(seq,Ref(tg)) for seq in seqs]
+    [recover.(seq,Ref(st)) for seq in seqs]
 end
 
-function recover(state::NamedTuple,tg::AbstractTensegrityStructure)
-    q = get_q(tg)
-    (;sysfree) = tg.connectivity.indexed
+function recover(state::NamedTuple,st::AbstractStructure)
+    q = get_q(st)
+    (;sysfree) = st.connectivity.indexed
     q[sysfree] = state.q̌
     merge((q=q,),state)
 end
@@ -294,9 +294,9 @@ function apply!(bot,seq)
 end
 
 function get_start_sol(bot)
-    (;tg) = bot
-    q̌ = get_q̌(tg)
-    isequ, λ = check_static_equilibrium_output_multipliers(bot.tg)
+    (;st) = bot
+    q̌ = get_q̌(st)
+    isequ, λ = check_static_equilibrium_output_multipliers(bot.st)
     if isequ
         @info "Alreadly in static equilibrium, skipping inverse."
         # λ = inverse_for_multipliers(bot,bot);
@@ -309,22 +309,22 @@ function get_start_sol(bot)
     @eponymtuple(q̌,s,λ),u
 end
 
-function get_start_system(bot,mode=PrimalMode();F=reshape(build_Ǧ(bot.tg),:,1))
-    (;tg) = bot
+function get_start_system(bot,mode=PrimalMode();F=reshape(build_Ǧ(bot.st),:,1))
+    (;st) = bot
     start_sol,u = get_start_sol(bot)
     g = zeros(get_numbertype(bot),size(F,2))
     if typeof(mode)<:PrimalMode
         start_parameters = @eponymtuple(u,g)
     elseif typeof(mode)<:StiffMode
-        k = get_cables_stiffness(tg)
+        k = get_cables_stiffness(st)
         start_parameters = @eponymtuple(k,u,g)
     elseif typeof(mode)<:DeformMode
-        d = get_d(tg)
+        d = get_d(st)
         start_parameters = @eponymtuple(d,u,g)
     elseif typeof(mode)<:AllMode
-        d = get_d(tg)
-        c = get_c(tg)
-        k = get_cables_stiffness(tg)
+        d = get_d(st)
+        c = get_c(st)
+        k = get_cables_stiffness(st)
         start_parameters = @eponymtuple(d,c,k,u,g)
     else
         error("Invalid mode")

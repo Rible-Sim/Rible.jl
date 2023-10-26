@@ -8,7 +8,7 @@ abstract type AbstractRigidBodyState{N,T} <: AbstractBodyState{N,T} end
 abstract type ExternalConstraints{T} end
 
 """
-Rigid Body 属性Type 
+Rigid Body Property Type 
 $(TYPEDEF)
 ---
 $(TYPEDFIELDS)
@@ -39,7 +39,7 @@ struct RigidBodyProperty{N,T} <: AbstractRigidBodyProperty{N,T}
 end
 
 """
-Rigid Body 属性Constructor 
+Rigid Body Property Constructor 
 $(TYPEDSIGNATURES)
 """
 function RigidBodyProperty(
@@ -252,7 +252,7 @@ $(TYPEDEF)
 $(TYPEDFIELDS)
 """
 struct RigidBody{N,M,T,cacheType,meshType} <: AbstractRigidBody{N,T}
-    "Rigid Body 属性"
+    "Rigid Body Property "
     prop::RigidBodyProperty{N,T}
     "Rigid Body State "
     state::RigidBodyState{N,M,T,cacheType}
@@ -267,6 +267,21 @@ update_rigid!(rb::AbstractBody,q,q̇) = update_rigid!(rb.state,rb.state.cache,rb
 move_rigid!(rb::AbstractBody,q,q̇)	= move_rigid!(rb.state,rb.state.cache,rb.prop,q,q̇)
 stretch_rigid!(rb::AbstractBody,c) = stretch_rigid!(rb.state.cache,rb.prop,c)
 update_transformations!(rb::AbstractBody,q) = update_transformations!(rb.state.cache,rb.state,rb.prop,q)
+
+
+function body2coordinates(rb::RigidBody)
+    (;ro,R,ṙo,ω,cache) = rb.state
+    rigidState2coordinates(cache.funcs.nmcs,ro,R,ṙo,ω)
+end
+
+
+function rigidState2coordinates(nmcs::NCF.LNC,ro,R,ṙo,ω)
+    NCF.rigidstate2naturalcoords(nmcs,ro,R,ṙo,ω)
+end
+
+function rigidState2coordinates(nmcs::QBF.QC,ro,R,ṙo,ω)
+    QBF.rigidState2coordinates(ro,R,ṙo,ω)
+end
 
 function update_rigid!(state::RigidBodyState,
             cache::NonminimalCoordinatesCache{<:NCF.CoordinateFunctions},
@@ -356,12 +371,12 @@ function update_transformations!(
         for i = 1:3 
         	Cp[i,i] = 1
         end
-        Cp[1:3,4:7] .= -2R*NCF.skew(r̄p)*L
+        Cp[1:3,4:7] .= -2R*skew(r̄p)*L
     end 
     for i = 1:3 
     	Cg[i,i] = 1
     end
-    Cg[1:3,4:7] .= -2R*NCF.skew(r̄g)*L
+    Cg[1:3,4:7] .= -2R*skew(r̄g)*L
 end
 
 function generalize_force!(F,state::AbstractRigidBodyState)
@@ -399,7 +414,7 @@ get_Φ_mask(::QBF.QC) = collect(1:1)
 
 # operations on rigid body
 """
-Return Rigid Body 平移动能。
+Return Rigid Body translational kinetic energy 。
 $(TYPEDSIGNATURES)
 """
 function kinetic_energy_translation(rb::AbstractRigidBody)
@@ -409,7 +424,7 @@ function kinetic_energy_translation(rb::AbstractRigidBody)
 end
 
 """
-Return Rigid Body 旋转动能。
+Return Rigid Body rotational kinetic energy 。
 $(TYPEDSIGNATURES)
 """
 function kinetic_energy_rotation(rb::AbstractRigidBody)
@@ -420,7 +435,7 @@ function kinetic_energy_rotation(rb::AbstractRigidBody)
 end
 
 """
-Return Rigid Body 重力势能。
+Return Rigid Body gravity potential energy 。
 $(TYPEDSIGNATURES)
 """
 function potential_energy_gravity(rb::AbstractRigidBody)
@@ -431,10 +446,22 @@ function potential_energy_gravity(rb::AbstractRigidBody)
 end
 
 """
-Return Rigid Body 应变势能。
+Return Rigid Body Strain potential energy 。
 $(TYPEDSIGNATURES)
 """
 function potential_energy_strain(rb::AbstractRigidBody)
     zero(get_numbertype(rb))
 end
 
+
+function clear_forces!(rb::AbstractRigidBody)
+    (;state) = rb
+    state.f .= 0
+    foreach(state.fps) do fp
+        fp .= 0
+    end
+    state.τ .= 0
+    foreach(state.τps) do τp
+          τp .= 0
+    end
+end

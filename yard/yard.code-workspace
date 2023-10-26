@@ -1,0 +1,13 @@
+{
+	"folders": [
+		{
+			"path": "../yard"
+		},
+		{
+			"path": ".."
+		}
+	],
+	"settings": {
+		"julia.environmentPath": "/Users/jacob/Library/CloudStorage/OneDrive-SharedLibraries-onedrive/projects/Rible.jl/yard"
+	}
+}

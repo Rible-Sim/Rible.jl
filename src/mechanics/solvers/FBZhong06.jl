@@ -15,7 +15,7 @@ function generate_cache(::FBZhong06,intor;dt,kargs...)
     # (;M) = mm
     A = make_A(bot)
     Φ = make_Φ(bot)
-    Ψ = make_Ψ(bot.tg)
+    Ψ = make_Ψ(bot.st)
     FBZhong06Cache(mm,A,Φ,Ψ)
 end
 
@@ -72,9 +72,9 @@ function solve!(intor::Integrator,cache::FBZhong06Cache;
             h = dt
             q̌ᵏ .= x[1:nq̌]
             sᵏ .= x[nq̌+nλ+1:nx]
-            ζ = build_ζ(bot.tg)
-            ∂ζ∂q = build_∂ζ∂q(bot.tg, q̌ᵏ)
-            ∂ζ∂s̄ = build_∂ζ∂s̄(bot.tg)
+            ζ = build_ζ(bot.st)
+            ∂ζ∂q = build_∂ζ∂q(bot.st, q̌ᵏ)
+            ∂ζ∂s̄ = build_∂ζ∂s̄(bot.st)
             n = length(ζ)
             ∂s̄∂s̄ = I(n)
             κ₁ = 10; κ₂ = 10
@@ -82,9 +82,9 @@ function solve!(intor::Integrator,cache::FBZhong06Cache;
             coζ = coes*diagm([ζ[i]/κ₁^2 for i in 1:n]) - diagm([1/κ₁ for i in 1:n])
             cos̄ = coes*diagm([κ₂^2*sᵏ[i] for i in 1:n]) - diagm([κ₂ for i in 1:n])
             # Jac_F!(∂F∂q̌,∂F∂q̌̇,(qᵏ.+qᵏ⁻¹)./2,(qᵏ.-qᵏ⁻¹)./h,tᵏ⁻¹+h/2)
-            ∂Q̌∂q̌̇ = build_∂Q̌∂q̌̇(bot.tg)
-            ∂Q̌∂q̌ = build_∂Q̌∂q̌(bot.tg)
-            ∂Q̌∂s̄ = build_∂Q̌∂s̄(bot.tg)
+            ∂Q̌∂q̌̇ = build_∂Q̌∂q̌̇(bot.st)
+            ∂Q̌∂q̌ = build_∂Q̌∂q̌(bot.st)
+            ∂Q̌∂s̄ = build_∂Q̌∂s̄(bot.st)
             Jac[   1:nq̌ ,      1:nq̌    ] .=  M̌.-h^2/2 .*(1/2 .*∂Q̌∂q̌.+1/h.*∂Q̌∂q̌̇)
             Jac[   1:nq̌ ,   nq̌+1:nq̌+nλ ] .= scaling.*Aᵀ
             # @show nq̌, length(Jac[1, nq̌+nλ+1:end])
@@ -104,9 +104,9 @@ function solve!(intor::Integrator,cache::FBZhong06Cache;
             h = dt
             q̌ᵏ .= x[1:nq̌]
             sᵏ .= x[nq̌+nλ+1:nx]
-            ζ = build_ζ(bot.tg)
-            ∂ζ∂q = Record_build_∂ζ∂q(bot.tg, q̌ᵏ,"t1.xlsx","t1")
-            ∂ζ∂s̄ = build_∂ζ∂s̄(bot.tg)
+            ζ = build_ζ(bot.st)
+            ∂ζ∂q = Record_build_∂ζ∂q(bot.st, q̌ᵏ,"t1.xlsx","t1")
+            ∂ζ∂s̄ = build_∂ζ∂s̄(bot.st)
             n = length(ζ)
             ∂s̄∂s̄ = I(n)
             κ₁ = 10; κ₂ = 10
@@ -114,9 +114,9 @@ function solve!(intor::Integrator,cache::FBZhong06Cache;
             coζ = coes*diagm([ζ[i]/κ₁^2 for i in 1:n]) - diagm([1/κ₁ for i in 1:n])
             cos̄ = coes*diagm([κ₂^2*sᵏ[i] for i in 1:n]) - diagm([κ₂ for i in 1:n])
             # Jac_F!(∂F∂q̌,∂F∂q̌̇,(qᵏ.+qᵏ⁻¹)./2,(qᵏ.-qᵏ⁻¹)./h,tᵏ⁻¹+h/2)
-            ∂Q̌∂q̌̇ = build_∂Q̌∂q̌̇(bot.tg)
-            ∂Q̌∂q̌ = build_∂Q̌∂q̌(bot.tg)
-            ∂Q̌∂s̄ = build_∂Q̌∂s̄(bot.tg)
+            ∂Q̌∂q̌̇ = build_∂Q̌∂q̌̇(bot.st)
+            ∂Q̌∂q̌ = build_∂Q̌∂q̌(bot.st)
+            ∂Q̌∂s̄ = build_∂Q̌∂s̄(bot.st)
             # @show nq̌, length(Jac[1, nq̌+nλ+1:end])
             # @show size(∂Q̌∂s̄)
             return coζ, ∂ζ∂q, q̌ᵏ
@@ -151,7 +151,7 @@ function solve!(intor::Integrator,cache::FBZhong06Cache;
         initial_x
         Aᵀ = transpose(A(qᵏ⁻¹))
         if !(actuate! isa Nothing)
-            actuate!(bot.tg, tᵏ⁻¹; dt)
+            actuate!(bot.st, tᵏ⁻¹; dt)
         end
         Res_stepk! = make_Res_stepk(qᵏ,q̌ᵏ,λᵏ,sᵏ,qᵏ⁻¹,p̌ᵏ⁻¹,F̌,Aᵀ,tᵏ⁻¹)
         if Jac_F! isa Nothing

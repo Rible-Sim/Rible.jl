@@ -66,12 +66,12 @@ function solve!(prob::SimProblem,solver::AbstractSolver,
                 controller = (prescribe! = nothing, actuate! = nothing);
                 tspan,dt,restart=true,karg...)
     (;bot,dynfuncs) = prob
-    (;tg,traj,contacts_traj) = bot
+    (;st,traj,contacts_traj) = bot
     totalstep = prepare_traj!(traj,contacts_traj;tspan,dt,restart)
     (;prescribe!, actuate!) = controller
     if !isa(prescribe!, Nothing)
         for i in eachindex(traj)
-            prescribe!(traj[i],tg)
+            prescribe!(traj[i],st)
         end
     end
     intor = Integrator(prob,controller,tspan,restart,totalstep)

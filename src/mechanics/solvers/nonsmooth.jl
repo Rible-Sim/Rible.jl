@@ -34,7 +34,7 @@ function initial_guesses(c,ū,qₙ,vₙ,aₙ,ṽ̇ₙ,p,h)
 end
 
 module NSGA
-import ..TensegrityRobots as TR
+import ..Rible as TR
 using LinearAlgebra
 using BlockDiagonals
 using Parameters
@@ -218,10 +218,10 @@ function initialize_St(n,c,ū,q0,v0,t,p,h,𝒞,𝒰c,𝐞,dyfuncs,tspan;tol=1e-
         vₙ = vs[timestep]
         aₙ = as[timestep]
         ṽ̇ₙ = ṽ̇s[timestep]
-        qₙ₊₁ ,vₙ₊₁ ,aₙ₊₁ ,ṽₙ₊₁ ,ṽ̇ₙ₊₁ ,Uₙ₊₁ ,Wₙ₊₁ ,𝛌ₙ₊₁ ,𝛎ₙ₊₁ ,𝚲ₙ₊₁  = TR.initial_guesses(c,ū,qₙ,vₙ,aₙ,ṽ̇ₙ,p,h)
+        qₙ₊₁ ,vₙ₊₁ ,aₙ₊₁ ,ṽₙ₊₁ ,ṽ̇ₙ₊₁ ,Uₙ₊₁ ,Wₙ₊₁ ,𝛌ₙ₊₁ ,𝛎ₙ₊₁ ,𝚲ₙ₊₁  = RB.initial_guesses(c,ū,qₙ,vₙ,aₙ,ṽ̇ₙ,p,h)
         xe = (qₙ₊₁, vₙ₊₁, ṽ̇ₙ₊₁, ṽₙ₊₁, 𝛌ₙ₊₁, Uₙ₊₁, 𝛎ₙ₊₁, Wₙ₊₁, 𝚲ₙ₊₁)
         q̃ₙ₊₁ = copy(qₙ₊₁)
-        active_sets = TR.initialize_active_sets(𝒞,𝒰c)
+        active_sets = RB.initialize_active_sets(𝒞,𝒰c)
         update_active_sets!(active_sets,qₙ,vₙ,q̃ₙ₊₁,xe,𝐞,𝒈,𝒈𝒒,r)
         for i = 1:imax
             xe = (qₙ₊₁, vₙ₊₁, ṽ̇ₙ₊₁, ṽₙ₊₁, 𝛌ₙ₊₁, Uₙ₊₁, 𝛎ₙ₊₁, Wₙ₊₁, 𝚲ₙ₊₁)
@@ -239,7 +239,7 @@ function initialize_St(n,c,ū,q0,v0,t,p,h,𝒞,𝒰c,𝐞,dyfuncs,tspan;tol=1e-
             𝐫ˢ, _, _ = residuals
             Sₜˢ = compute_Sₜˢ(n,c,ū,xe,t,p,h,active_sets,dyfuncs)
             Δxˢ = -Sₜˢ\𝐫ˢ
-            Δṽ,Δ𝛌 = TR.split_by_lengths(Δxˢ,[n,ū])
+            Δṽ,Δ𝛌 = RB.split_by_lengths(Δxˢ,[n,ū])
             Δ𝛌 /= -h
             ṽₙ₊₁ += Δṽ
             ṽ̇ₙ₊₁ += (1-αm)/(1-αf)/(γ*h)*Δṽ
@@ -251,7 +251,7 @@ function initialize_St(n,c,ū,q0,v0,t,p,h,𝒞,𝒰c,𝐞,dyfuncs,tspan;tol=1e-
             _, 𝐫ᵖ, _ = get_residuals(qₙ,vₙ,xe,t,h,active_sets,𝐞,𝐌,𝒈,𝒈𝒒,𝐟)
             Sₜᵖ = compute_Sₜᵖ(n,c,ū,xe,t,p,h,active_sets,dyfuncs)
             Δxᵖ = -Sₜᵖ\𝐫ᵖ
-            ΔU,Δ𝛎 = TR.split_by_lengths(Δxᵖ,[n,c])
+            ΔU,Δ𝛎 = RB.split_by_lengths(Δxᵖ,[n,c])
             # ΔU *=  h
             Δ𝛎 *= -1
             Uₙ₊₁ += ΔU
@@ -262,7 +262,7 @@ function initialize_St(n,c,ū,q0,v0,t,p,h,𝒞,𝒰c,𝐞,dyfuncs,tspan;tol=1e-
             _, _, 𝐫ᵛ = get_residuals(qₙ,vₙ,xe,t,h,active_sets,𝐞,𝐌,𝒈,𝒈𝒒,𝐟)
             Sₜᵛ = compute_Sₜᵛ(n,c,ū,xe,t,p,h,active_sets,dyfuncs)
             Δxᵛ = -Sₜᵛ\𝐫ᵛ
-            ΔW,Δ𝚲 = TR.split_by_lengths(Δxᵛ,[n,c])
+            ΔW,Δ𝚲 = RB.split_by_lengths(Δxᵛ,[n,c])
             Δ𝚲 *= -1
             Wₙ₊₁ += ΔW
             vₙ₊₁ = ṽₙ₊₁ + Wₙ₊₁
@@ -280,7 +280,7 @@ end
 end
 
 module RobustNSGA
-import ..TensegrityRobots as TR
+import ..Rible as TR
 using BlockDiagonals
 using Parameters
 
@@ -457,7 +457,7 @@ function robustnsga(n,c,ū,q0,v0,t,p,h,𝒞,𝒰c,𝐞,dyfuncs,tspan;tol=1e-14,
         q̃ₙ₊₁ = copy(qₙ₊₁)
         xe = (qₙ₊₁, q̃ₙ₊₁, vₙ₊₁, ṽ̇ₙ₊₁, ṽₙ₊₁, 𝛌ₙ₊₁, Uₙ₊₁, 𝛎ₙ₊₁, Wₙ₊₁, 𝚲ₙ₊₁)
 
-        active_sets = TR.initialize_active_sets(𝒞,𝒰c)
+        active_sets = RB.initialize_active_sets(𝒞,𝒰c)
         update_active_sets!(active_sets,qₙ,vₙ,q̃ₙ₊₁,xe,𝐞,𝒈,𝒈𝒒,r)
         # Step 1
         for i = 1:imax
@@ -472,7 +472,7 @@ function robustnsga(n,c,ū,q0,v0,t,p,h,𝒞,𝒰c,𝐞,dyfuncs,tspan;tol=1e-14,
             end
             Sₜˢ = compute_Sₜˢ(n,c,ū,xe,t,p,h,active_sets,dyfuncs)
             Δxˢ = -Sₜˢ\𝐫ˢ
-            Δṽ,Δ𝛌 = TR.split_by_lengths(Δxˢ,[n,ū])
+            Δṽ,Δ𝛌 = RB.split_by_lengths(Δxˢ,[n,ū])
             ṽₙ₊₁ += Δṽ
             ṽ̇ₙ₊₁ += (1-αm)/(1-αf)/(γ*h)*Δṽ
             qₙ₊₁ += h*β/γ*Δṽ
@@ -491,7 +491,7 @@ function robustnsga(n,c,ū,q0,v0,t,p,h,𝒞,𝒰c,𝐞,dyfuncs,tspan;tol=1e-14,
             end
             Sₜᵖ = compute_Sₜᵖ(n,c,ū,xe,t,p,h,active_sets,dyfuncs)
             Δxᵖ = -Sₜᵖ\𝐫ᵖ
-            ΔU,Δ𝛎 = TR.split_by_lengths(Δxᵖ,[n,c])
+            ΔU,Δ𝛎 = RB.split_by_lengths(Δxᵖ,[n,c])
             Uₙ₊₁ += ΔU
             qₙ₊₁ += ΔU
             𝛎ₙ₊₁ += Δ𝛎
@@ -509,7 +509,7 @@ function robustnsga(n,c,ū,q0,v0,t,p,h,𝒞,𝒰c,𝐞,dyfuncs,tspan;tol=1e-14,
             end
             Sₜᵛ = compute_Sₜᵛ(n,c,ū,xe,t,p,h,active_sets,dyfuncs)
             Δxᵛ = -Sₜᵛ\𝐫ᵛ
-            ΔW,Δ𝚲 = TR.split_by_lengths(Δxᵛ,[n,c])
+            ΔW,Δ𝚲 = RB.split_by_lengths(Δxᵛ,[n,c])
             Wₙ₊₁ += ΔW
             vₙ₊₁ = ṽₙ₊₁ + Wₙ₊₁
             𝚲ₙ₊₁ += Δ𝚲

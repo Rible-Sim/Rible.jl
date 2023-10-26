@@ -1,6 +1,6 @@
-using TensegrityRobot
+using Rible
 using Test
 
-@testset "TensegrityRobot.jl" begin
+@testset "Rible.jl" begin
     # Write your tests here.
 end

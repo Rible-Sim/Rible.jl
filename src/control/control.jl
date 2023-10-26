@@ -28,8 +28,8 @@ function ManualActuator(actid,ids::AbstractVector,values::AbstractVector,coupler
     ManualActuator(actid,coupler,@eponymtuple(ids,values))
 end
 
-function actuate!(tg,act::AbstractActuator{<:Uncoupled},μ::AbstractVector)
-    (;cables) = tg.tensiles
+function actuate!(st,act::AbstractActuator{<:Uncoupled},μ::AbstractVector)
+    (;cables) = st.tensiles
     (;reg) = act
     (;ids, values) = reg
     for (id, original_restlen) in zip(ids,values)
@@ -38,8 +38,8 @@ function actuate!(tg,act::AbstractActuator{<:Uncoupled},μ::AbstractVector)
     end
 end
 
-function actuate!(tg,act::AbstractActuator{<:Serial},μ::Number)
-    (;cables) = tg.tensiles
+function actuate!(st,act::AbstractActuator{<:Serial},μ::Number)
+    (;cables) = st.tensiles
     (;reg) = act
     (;ids, values) = reg
     for (id, original_restlen) in zip(ids,values)
@@ -48,8 +48,8 @@ function actuate!(tg,act::AbstractActuator{<:Serial},μ::Number)
     end
 end
 
-function actuate!(tg,act::AbstractActuator{<:Ganged},μ::Number)
-    (;cables) = tg
+function actuate!(st,act::AbstractActuator{<:Ganged},μ::Number)
+    (;cables) = st
     (;reg) = act
     (;ids, values) = reg
     cable1 = select_by_id(cables,ids[1])
@@ -64,8 +64,8 @@ struct PrescribedActuator{MT,FT}
     pres::FT
 end
 
-function actuate!(tg,act::PrescribedActuator,t::Real)
-    actuate!(tg,act.manual,act.pres(t))
+function actuate!(st,act::PrescribedActuator,t::Real)
+    actuate!(st,act.manual,act.pres(t))
 end
 #
 # struct ManualHeater{CT,HT,TT} <:Heater
@@ -99,25 +99,25 @@ end
 
 select_by_id(xs,id) = xs[findfirst((x)->x.id==id, xs)]
 
-function actuate!(bot::TensegrityRobot,μs)
-    (;tg, hub) = bot
+function actuate!(bot::Robot,μs)
+    (;st, hub) = bot
     (;actuators) = hub
     foreach(actuators) do actuator
         (;id) = actuator
-        actuate!(tg,actuator,μs[id])
+        actuate!(st,actuator,μs[id])
     end
 end
 
-# function heat!(tr::TensegrityRobot,us;inc=false)
-#     @unpack tg, hub = tr
+# function heat!(tr::Robot,us;inc=false)
+#     @unpack st, hub = tr
 #     @unpack heaters = hub
 #     for (heater,u) in zip(heaters,us)
-#         heat!(heater,tg,u;inc)
+#         heat!(heater,st,u;inc)
 #     end
 # end
 #
-# function heat!(ctrller::ManualHeater,tg,u;inc=false,abs=true)
-#     @unpack SMA_cables = tg.tensiles
+# function heat!(ctrller::ManualHeater,st,u;inc=false,abs=true)
+#     @unpack SMA_cables = st.tensiles
 #     @unpack id_string, original_value, heating_law = ctrller.act
 #     s = select_by_id(SMA_cables,id_string)
 #     if abs
@@ -132,8 +132,8 @@ end
 #     heat!(s,heating_law)
 # end
 #
-# @inline function heat!(ctrller::ManualSerialHeater,tg::TensegrityStructure,u;inc=false)
-#     heat!(ctrller,tg.tensiles.SMA_cables,u;inc)
+# @inline function heat!(ctrller::ManualSerialHeater,st::Structure,u;inc=false)
+#     heat!(ctrller,st.tensiles.SMA_cables,u;inc)
 # end
 #
 # function heat!(ctrller::ManualSerialHeater,
@@ -159,8 +159,8 @@ end
 #     s.law.F0, s.law.k = heating_law(s.state.temp)
 # end
 
-function set_restlen!(tg,u)
-    for (i,s) in enumerate(tg.tensiles.cables)
+function set_restlen!(st,u)
+    for (i,s) in enumerate(st.tensiles.cables)
         s.state.restlen = u[i]
     end
 end

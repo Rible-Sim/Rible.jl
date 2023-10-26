@@ -1,5 +1,5 @@
 # 逆向静力学
 ```@autodocs
-Modules = [TensegrityRobots]
+Modules = [Rible]
 Pages   = ["inverse_statics.jl"]
 ```

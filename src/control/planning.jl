@@ -13,10 +13,10 @@ struct Chart{T,ϕcT,make_ψcT}
     neighbor_vectors::Vector{Vector{T}}
 end
 
-function build_Jac_F(tg)
-    A = build_A(tg)
-    Φ = build_Φ(tg)
-    nq = tg.ncoords
+function build_Jac_F(st)
+    A = build_A(st)
+    Φ = build_Φ(st)
+    nq = st.ncoords
     function inner_F(x)
         q = @view x[1:nq]
         q̇ = @view x[nq+1:2nq]
@@ -26,7 +26,7 @@ function build_Jac_F(tg)
         q = @view x[1:nq]
         q̇ = @view x[nq+1:2nq]
         A_matrix = A(q)
-        ∂Aq̇∂q_matrix = ∂Aq̇∂q(tg, q̇)
+        ∂Aq̇∂q_matrix = ∂Aq̇∂q(st, q̇)
         Jac1 = hcat(A_matrix, zero(A_matrix))
         Jac2 = hcat(∂Aq̇∂q_matrix, A_matrix)
         Jac_F = vcat(Jac1, Jac2)
@@ -34,10 +34,10 @@ function build_Jac_F(tg)
     inner_F, inner_Jac_F
 end
 
-function Chart(tg, qc::AbstractVector{T}, q̇c::AbstractVector{T};
+function Chart(st, qc::AbstractVector{T}, q̇c::AbstractVector{T};
                 ε=zero(T), α=zero(T), ρ=one(T), σ=2one(T)) where T
-    nc = get_nconstraint(tg)
-    F, Jac_F = build_Jac_F(tg)
+    nc = get_nconstraint(st)
+    F, Jac_F = build_Jac_F(st)
     xc = vcat(qc, q̇c)
     Q, R = qr(transpose(Jac_F(xc)))
     Uc = Q[:, size(R, 1)+1:end]

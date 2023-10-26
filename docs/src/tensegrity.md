@@ -1,5 +1,5 @@
 # 张拉整体结构
 ```@autodocs
-Modules = [TensegrityRobots]
+Modules = [Rible]
 Pages   = ["tensegrity.jl"]
 ```

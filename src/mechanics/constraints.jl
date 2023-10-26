@@ -1,6 +1,6 @@
 
-function make_Φ(cst::PrototypeJoint,tg::TensegrityStructure)
-    (;indexed,numbered) = tg.connectivity
+function make_Φ(cst::PrototypeJoint,st::Structure)
+    (;indexed,numbered) = st.connectivity
     (;mem2sysfull) = indexed
     (;num2sys,mem2num) = numbered
     (;
@@ -74,15 +74,15 @@ function make_Φ(cst::PrototypeJoint,tg::TensegrityStructure)
         _inner_Φ(q,d,c)
     end
     function inner_Φ(q)
-        d = get_d(tg)
-        c = get_c(tg)
+        d = get_d(st)
+        c = get_c(st)
         _inner_Φ(q,d,c)
     end
     inner_Φ
 end
 
-function make_A(cst::PrototypeJoint,tg::TensegrityStructure)
-    (;indexed,numbered) = tg.connectivity
+function make_A(cst::PrototypeJoint,st::Structure)
+    (;indexed,numbered) = st.connectivity
     (;mem2sysfree,mem2sysfull,nfree) = indexed
     (;num2sys,mem2num) = numbered
     (;
@@ -206,14 +206,14 @@ function make_A(cst::PrototypeJoint,tg::TensegrityStructure)
         _inner_A(q,c)
     end
     function inner_A(q)
-        c = get_c(tg)
+        c = get_c(st)
         _inner_A(q,c)
     end
     inner_A
 end
 
-function make_Φqᵀq(cst::PrototypeJoint,tg::TensegrityStructure)
-    (;numbered) = tg.connectivity
+function make_Φqᵀq(cst::PrototypeJoint,st::Structure)
+    (;numbered) = st.connectivity
     (;mem2num,num2sys) = numbered
     (;
         e2e,
@@ -234,7 +234,7 @@ function make_Φqᵀq(cst::PrototypeJoint,tg::TensegrityStructure)
     T = get_numbertype(cst)
     I_Int = NCF.make_I(Int,ndim)
     # translate
-    c = get_c(tg)
+    c = get_c(st)
     c_hen = c[num2sys[mem2num[id_hen][hen.pid]]]
     c_egg = c[num2sys[mem2num[id_egg][egg.pid]]]
     C_hen = hen.rbsig.state.cache.funcs.C(c_hen)
@@ -392,10 +392,10 @@ function get_jointed_free(cst,indexed)
     )
 end
 
-function make_∂Aᵀλ∂q(cst,tg)
+function make_∂Aᵀλ∂q(cst,st)
     (;nconstraints) = cst
     uci = get_jointed_free_idx(cst)
-    Φqᵀq = make_Φqᵀq(cst,tg)
+    Φqᵀq = make_Φqᵀq(cst,st)
     function ∂Aᵀλ∂q(λ)
         ret = [
             begin
@@ -417,7 +417,7 @@ function get_jointed_free(cst::LinearJoint,indexed)
     cst2sysfree = collect(1:indexed.nfree)
 end
 
-function make_∂Aᵀλ∂q(cst::LinearJoint,tg)
+function make_∂Aᵀλ∂q(cst::LinearJoint,st)
     uci = get_jointed_free_idx(cst)
     function ∂Aᵀλ∂q(λ)
         zeros(eltype(λ),length(uci),length(uci))
@@ -429,8 +429,8 @@ function get_jointed_free(cst::FixedIndicesConstraint,indexed)
     cst2sysfree = collect(1:indexed.nfree)
 end
 
-function make_∂Aᵀλ∂q(cst::FixedIndicesConstraint,tg)
-    (;nfree) = tg.connectivity.indexed
+function make_∂Aᵀλ∂q(cst::FixedIndicesConstraint,st)
+    (;nfree) = st.connectivity.indexed
     function ∂Aᵀλ∂q(λ)
         zeros(eltype(λ),nfree,nfree)
     end

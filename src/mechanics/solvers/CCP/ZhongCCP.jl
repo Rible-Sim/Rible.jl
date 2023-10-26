@@ -7,8 +7,8 @@ end
 function generate_cache(::ZhongCCP,intor;dt,kargs...)
     (;prob) = intor
     (;bot,dynfuncs) = prob
-    (;tg) = bot
-    M = Matrix(build_M(tg))
+    (;st) = bot
+    M = Matrix(build_M(st))
     Φ = make_Φ(bot)
     A = make_A(bot)
 
@@ -19,8 +19,8 @@ function generate_cache(::ZhongCCP,intor;dt,kargs...)
     B(q) = Matrix{T}(undef,0,nq)
 
     # ∂𝐌𝐚∂𝐪(q,a) = zeros(T,nq,nq)
-    ∂Aᵀλ∂q(q,λ) = ∂Aᵀλ∂q̌(tg,λ)
-    # ∂𝚽𝐪𝐯∂𝒒(q,v) = TR.∂Aq̇∂q(tg,v)
+    ∂Aᵀλ∂q(q,λ) = ∂Aᵀλ∂q̌(st,λ)
+    # ∂𝚽𝐪𝐯∂𝒒(q,v) = RB.∂Aq̇∂q(st,v)
     ∂Bᵀμ∂q(q,μ) = zeros(T,nq,nq)
     cache = @eponymtuple(M,Φ,A,Ψ,B,∂Ψ∂q,∂Aᵀλ∂q,∂Bᵀμ∂q)
     ZhongCCPCache(cache)

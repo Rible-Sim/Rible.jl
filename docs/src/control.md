@@ -1,5 +1,5 @@
 # 控制中心
 ```@autodocs
-Modules = [TensegrityRobots]
+Modules = [Rible]
 Pages   = ["control.jl"]
 ```

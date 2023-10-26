@@ -1,32 +1,32 @@
 using Documenter
 using DocStringExtensions
-using TensegrityRobots
+using Rible
 
 makedocs(
-    sitename = "张拉整体机器人",
+    sitename = "Rible",
     format = Documenter.HTML(),
-    modules = [TensegrityRobots],
+    modules = [Rible],
     workdir = @__DIR__,
     pages = [
         "index.md",
         "setup.md",
-        "建模基础" => [
+        "Modeling" => [
             "naturalcoordinates.md",
             "rigidbody.md",
             "cable.md",
         ],
         "tensegrity.md",
         "control.md",
-        "分析方法基础" => [
+        "Linearization" => [
             "linearization.md"
         ],
-        "静力学分析" => [
+        "Statics" => [
             "inverse_statics.md"
         ],
-        "动力学分析" => [
+        "Dynamics" => [
             "solvers.md"
         ],
-        "例子" => [
+        "Examples" => [
             "tail.md"
         ]
     ]

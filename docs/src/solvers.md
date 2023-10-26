@@ -1,5 +1,5 @@
 # 动力学仿真
 ```@autodocs
-Modules = [TensegrityRobots]
+Modules = [Rible]
 Pages   = ["solvers.jl"]
 ```

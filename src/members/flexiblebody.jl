@@ -148,6 +148,12 @@ function FlexibleBody(prop,state)
     FlexibleBody(prop,state,nothing)
 end
 
+
+function body2coordinates(fb::FlexibleBody)
+    (;e,ė) = fb.state.cache
+    e,ė
+end
+
 function update_rigid!(
         state::FlexibleBodyState,
         cache::FlexibleBodyCoordinatesCache{<:ANCF.CoordinateFunctions},
@@ -294,4 +300,12 @@ function subdivide(fb::FlexibleBody,nx=1,ny=1,nz=1)
         ]
     )
     subfbs,sm
+end
+
+function clear_forces!(fb::AbstractFlexibleBody)
+    (;state) = fb
+    state.f .= 0
+    foreach(state.fps) do fp
+        fp .= 0
+    end
 end

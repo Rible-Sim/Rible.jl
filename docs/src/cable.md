@@ -1,5 +1,5 @@
 # 绳索
 ```@autodocs
-Modules = [TensegrityRobots]
+Modules = [Rible]
 Pages   = ["cable.jl"]
 ```

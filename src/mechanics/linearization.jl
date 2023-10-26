@@ -56,12 +56,12 @@ function find_full_pres_indices(lncs,q)
     col_index[size(Aq,1)+1:end] |> sort
 end
 
-function ∂Aᵀλ∂q̌(tg::AbstractTensegrityStructure,λ)
-    (;numbered,indexed,jointed) = tg.connectivity
+function ∂Aᵀλ∂q̌(st::AbstractStructure,λ)
+    (;numbered,indexed,jointed) = st.connectivity
     (;nfree,ninconstraints,mem2sysfree,mem2sysincst) = indexed
     (;njoints,nexconstraints,joints,joint2sysexcst) = jointed
     ret = zeros(eltype(λ),nfree,nfree)
-    (;bodies,nconstraints) = tg
+    (;bodies,nconstraints) = st
     foreach(bodies) do rb
         rbid = rb.prop.id
         memfree = mem2sysfree[rbid]
@@ -72,20 +72,20 @@ function ∂Aᵀλ∂q̌(tg::AbstractTensegrityStructure,λ)
         end
     end
     #todo skip 2D for now
-    if get_ndim(tg) == 3
+    if get_ndim(st) == 3
         foreach(joints) do joint
             jointexcst = joint2sysexcst[joint.id]
             jointfree = get_jointed_free(joint,indexed)
-            ret[jointfree,jointfree] .+= make_∂Aᵀλ∂q(joint,tg)(λ[jointexcst])
+            ret[jointfree,jointfree] .+= make_∂Aᵀλ∂q(joint,st)(λ[jointexcst])
         end
     end
     ret
 end
 
-function ∂Aq̇∂q(tg,q̇)
-    (;nfree) = tg.connectivity.indexed
-    (;bodies,nconstraints) = tg
-    (;indexed,jointed) = tg.connectivity
+function ∂Aq̇∂q(st,q̇)
+    (;nfree) = st.connectivity.indexed
+    (;bodies,nconstraints) = st
+    (;indexed,jointed) = st.connectivity
     (;ninconstraints,mem2sysfree,mem2sysincst) = indexed
     ret = zeros(eltype(q̇),nconstraints,nfree)
     foreach(bodies) do rb
@@ -101,13 +101,13 @@ function ∂Aq̇∂q(tg,q̇)
     ret
 end
 
-function test_fvector(tg,q0)
+function test_fvector(st,q0)
     function L(q)
-        reset_forces!(tg)
-        distribute_q_to_rbs!(tg,q,zero(q))
-        update_cables_apply_forces!(tg)
-        fvector(tg)
-        [tg.cables[i].state.length for i = 1:2]
+        reset_forces!(st)
+        distribute_q_to_rbs!(st,q,zero(q))
+        update_cables_apply_forces!(st)
+        fvector(st)
+        [st.cables[i].state.length for i = 1:2]
     end
     FiniteDiff.finite_difference_jacobian(L,q0)
 end
@@ -117,16 +117,16 @@ end
 $(TYPEDSIGNATURES)
 """
 function linearize(tginput,λ,u,q,q̇=zero(q))
-    tg = deepcopy(tginput)
-    set_restlen!(tg,u)
-    reset_forces!(tg)
-    distribute_q_to_rbs!(tg,q,q̇)
-    update_cables_apply_forces!(tg)
-    M = build_massmatrix(tg)
-    A = build_A(tg)
-    Q̃ = build_Q̃(tg)
-    ∂L∂q,∂L∂q̇ = build_tangent(tg)
-    @unpack ncoords,nconstraint = tg
+    st = deepcopy(tginput)
+    set_restlen!(st,u)
+    reset_forces!(st)
+    distribute_q_to_rbs!(st,q,q̇)
+    update_cables_apply_forces!(st)
+    M = build_massmatrix(st)
+    A = build_A(st)
+    Q̃ = build_Q̃(st)
+    ∂L∂q,∂L∂q̇ = build_tangent(st)
+    @unpack ncoords,nconstraint = st
     nz = ncoords + nconstraint
     M̂ = zeros(eltype(q),nz,nz)
     Ĉ  = zeros(eltype(q),nz,nz)
@@ -134,8 +134,8 @@ function linearize(tginput,λ,u,q,q̇=zero(q))
     M̂[1:ncoords,1:ncoords] .= M
     Ĉ[1:ncoords,1:ncoords] .= -Q̃*∂L∂q̇
 
-    # fjac = test_fvector(tg,q)
-    K̂[1:ncoords,1:ncoords] .= -Q̃*∂L∂q .+ ∂Aᵀλ∂q(tg,λ)
+    # fjac = test_fvector(st,q)
+    K̂[1:ncoords,1:ncoords] .= -Q̃*∂L∂q .+ ∂Aᵀλ∂q(st,λ)
     Aq = A(q)
     c = maximum(abs.(K̂[1:ncoords,1:ncoords]))
     K̂[1:ncoords,ncoords+1:nz] .= c.*transpose(Aq)
@@ -144,8 +144,8 @@ function linearize(tginput,λ,u,q,q̇=zero(q))
 end
 
 
-function make_intrinsic_nullspace(tg,q)
-    (;bodies,connectivity) = tg
+function make_intrinsic_nullspace(st,q)
+    (;bodies,connectivity) = st
     (;indexed,) = connectivity
     (;nfull,mem2sysfull,sysndof,mem2sysndof,) = indexed
     ret = zeros(eltype(q),nfull,sysndof)
@@ -192,18 +192,18 @@ function find_finite(ω2,Z,ndof)
     finite_ω2,finite_Z
 end
 
-function build_Ǩ(tg)
-    _,λ = check_static_equilibrium_output_multipliers(tg)
-    build_Ǩ(tg,λ)
+function build_Ǩ(st)
+    _,λ = check_static_equilibrium_output_multipliers(st)
+    build_Ǩ(st,λ)
 end
 
-function build_Ǩm!(tg::TensegrityStructure,q,k)
-    (;ndim) = tg
-    (;indexed,tensioned) = tg.connectivity
+function build_Ǩm!(st::Structure,q,k)
+    (;ndim) = st
+    (;indexed,tensioned) = st.connectivity
     (;nfull,nfree,sysfree,mem2sysfull) = indexed
     (;connected) = tensioned
-    (;cables) = tg.tensiles
-    update!(tg,q)
+    (;cables) = st.tensiles
+    update!(st,q)
     Jj = zeros(eltype(q),ndim,nfull)
     retǨm = zeros(eltype(q),nfree,nfree)
     foreach(connected) do scnt
@@ -230,13 +230,13 @@ function build_Ǩm!(tg::TensegrityStructure,q,k)
     retǨm
 end
 
-function build_Ǩg!(tg::TensegrityStructure,q,f)
-    (;ndim) = tg
-    (;indexed,tensioned) = tg.connectivity
+function build_Ǩg!(st::Structure,q,f)
+    (;ndim) = st
+    (;indexed,tensioned) = st.connectivity
     (;nfull,nfree,sysfree,mem2sysfull) = indexed
     (;connected) = tensioned
-    (;cables) = tg.tensiles
-    update!(tg,q)
+    (;cables) = st.tensiles
+    update!(st,q)
     Jj = zeros(eltype(q),ndim,nfull)
     retǨg = zeros(eltype(q),nfree,nfree)
     foreach(connected) do scnt
@@ -264,12 +264,12 @@ function build_Ǩg!(tg::TensegrityStructure,q,f)
     retǨg
 end
 
-function make_Ǩm_Ǩg(tg,q0)
-    (;ndim) = tg
-    (;numbered,indexed,tensioned) = tg.connectivity
+function make_Ǩm_Ǩg(st,q0)
+    (;ndim) = st
+    (;numbered,indexed,tensioned) = st.connectivity
     (;nfull,nfree,syspres,sysfree,mem2sysfull) = indexed
     (;connected) = tensioned
-    (;cables) = tg.tensiles
+    (;cables) = st.tensiles
     (;mem2num,num2sys) = numbered
     function inner_Ǩm_Ǩg(q̌,s,μ,k,c)
 		q = Vector{eltype(q̌)}(undef,nfull)
@@ -337,13 +337,13 @@ function make_Ǩm_Ǩg(tg,q0)
     end
 end
 
-function make_S(tg,q0)
-    (;ndim) = tg
-    (;numbered,indexed,tensioned) = tg.connectivity
+function make_S(st,q0)
+    (;ndim) = st
+    (;numbered,indexed,tensioned) = st.connectivity
     (;syspres,sysfree,nfull,mem2sysfull) = indexed
     (;mem2num,num2sys) = numbered
     (;connected) = tensioned
-    (;cables) = tg.tensiles
+    (;cables) = st.tensiles
     ncables = length(cables)
     function inner_S(q̌,s)
 		q = Vector{eltype(q̌)}(undef,nfull)
@@ -407,24 +407,24 @@ function make_S(tg,q0)
 end
 
 # Out-of-place ∂Q̌∂q̌ (dispatch)
-function build_∂Q̌∂q̌(tg)
-    build_∂Q̌∂q̌(tg, tg.connectivity.tensioned)
+function build_∂Q̌∂q̌(st)
+    build_∂Q̌∂q̌(st, st.connectivity.tensioned)
 end
 
 # Out-of-place ∂Q̌∂q̌ for cables and clustered cables
-function build_∂Q̌∂q̌(tg, @eponymargs(connected, clustered))
-    ∂Q̌∂q̌1 = build_∂Q̌∂q̌(tg, @eponymtuple(connected))
-    ∂Q̌∂q̌2 = build_∂Q̌∂q̌(tg, @eponymtuple(clustered))
+function build_∂Q̌∂q̌(st, @eponymargs(connected, clustered))
+    ∂Q̌∂q̌1 = build_∂Q̌∂q̌(st, @eponymtuple(connected))
+    ∂Q̌∂q̌2 = build_∂Q̌∂q̌(st, @eponymtuple(clustered))
     return ∂Q̌∂q̌1 + ∂Q̌∂q̌2
 end
 
 # Out-of-place ∂Q̌∂q̌ for cables
-function build_∂Q̌∂q̌(tg,@eponymargs(connected,))
-    (;cables) = tg.tensiles
-    (;indexed) = tg.connectivity
+function build_∂Q̌∂q̌(st,@eponymargs(connected,))
+    (;cables) = st.tensiles
+    (;indexed) = st.connectivity
     (;nfull,nfree,sysfree,mem2sysfree,mem2sysfull) = indexed
-    T = get_numbertype(tg)
-    ndim = get_ndim(tg)
+    T = get_numbertype(st)
+    ndim = get_ndim(st)
     ∂Q̌∂q̌ = zeros(T,nfree,nfree)
     D = @MMatrix zeros(T,ndim,ndim)
     Im = Symmetric(SMatrix{ndim,ndim}(one(T)*I))
@@ -464,12 +464,12 @@ function build_∂Q̌∂q̌(tg,@eponymargs(connected,))
 end
 
 # Out-of-place ∂Q̌∂q̌ for cluster cables
-function build_∂Q̌∂q̌(tg,@eponymargs(clustered))
-    (;clustercables) = tg.tensiles
-    (;indexed) = tg.connectivity
+function build_∂Q̌∂q̌(st,@eponymargs(clustered))
+    (;clustercables) = st.tensiles
+    (;indexed) = st.connectivity
     (;nfull,nfree,sysfree,mem2sysfree,mem2sysfull) = indexed
-    T = get_numbertype(tg)
-    ndim = get_ndim(tg)
+    T = get_numbertype(st)
+    ndim = get_ndim(st)
     ∂Q̌∂q̌ = zeros(T,nfree,nfree)
     D = @MMatrix zeros(T,ndim,ndim)
     Im = Symmetric(SMatrix{ndim,ndim}(one(T)*I))
@@ -509,14 +509,14 @@ function build_∂Q̌∂q̌(tg,@eponymargs(clustered))
 end
 
 # In-place ∂Q̌∂q̌ for cables and flexible bodies
-function build_∂Q̌∂q̌!(∂Q̌∂q̌,tg)
-    (;bodies,connectivity) = tg
+function build_∂Q̌∂q̌!(∂Q̌∂q̌,st)
+    (;bodies,connectivity) = st
     (;tensioned,indexed) = connectivity
-    (;cables) = tg.tensiles
+    (;cables) = st.tensiles
     (;connected) = tensioned
     (;nfull,nfree,sysfree,mem2sysfree,mem2sysfull) = indexed
-    T = get_numbertype(tg)
-    ndim = get_ndim(tg)
+    T = get_numbertype(st)
+    ndim = get_ndim(st)
     # ∂Q̌∂q̌ = zeros(T,nfree,nfree)
     D = @MMatrix zeros(T,ndim,ndim)
     Im = Symmetric(SMatrix{ndim,ndim}(one(T)*I))
@@ -569,24 +569,24 @@ function build_∂Q̌∂q̌!(∂Q̌∂q̌,tg)
 end
 
 # Out-of-place ∂Q̌∂q̌̇ (dispatch)
-function build_∂Q̌∂q̌̇(tg)
-    build_∂Q̌∂q̌̇(tg, tg.connectivity.tensioned)
+function build_∂Q̌∂q̌̇(st)
+    build_∂Q̌∂q̌̇(st, st.connectivity.tensioned)
 end
 
 # Out-of-place ∂Q̌∂q̌̇ for cables and clustered cables
-function build_∂Q̌∂q̌̇(tg, @eponymargs(connected, clustered))
-    ∂Q̌∂q̌̇1 = build_∂Q̌∂q̌̇(tg, @eponymtuple(connected))
-    ∂Q̌∂q̌̇2 = build_∂Q̌∂q̌̇(tg, @eponymtuple(clustered))
+function build_∂Q̌∂q̌̇(st, @eponymargs(connected, clustered))
+    ∂Q̌∂q̌̇1 = build_∂Q̌∂q̌̇(st, @eponymtuple(connected))
+    ∂Q̌∂q̌̇2 = build_∂Q̌∂q̌̇(st, @eponymtuple(clustered))
     return ∂Q̌∂q̌̇1 + ∂Q̌∂q̌̇2
 end
 
 # Out-of-place ∂Q̌∂q̌̇ for cables
-function build_∂Q̌∂q̌̇(tg, @eponymargs(connected, ))
-    (;cables) = tg.tensiles
-    (;indexed) = tg.connectivity
+function build_∂Q̌∂q̌̇(st, @eponymargs(connected, ))
+    (;cables) = st.tensiles
+    (;indexed) = st.connectivity
     (;nfull,nfree,sysfree,mem2sysfree,mem2sysfull) = indexed
-    T = get_numbertype(tg)
-    ndim = get_ndim(tg)
+    T = get_numbertype(st)
+    ndim = get_ndim(st)
     ∂Q̌∂q̌̇ = zeros(T,nfree,nfree)
     D = @MMatrix zeros(T,ndim,ndim)
     Im = Symmetric(SMatrix{ndim,ndim}(one(T)*I))
@@ -624,12 +624,12 @@ function build_∂Q̌∂q̌̇(tg, @eponymargs(connected, ))
 end
 
 # Out-of-place ∂Q̌∂q̌̇ for clustered cables
-function build_∂Q̌∂q̌̇(tg, @eponymargs(clustered, ))
-    (;clustercables) = tg.tensiles
-    (;indexed) = tg.connectivity
+function build_∂Q̌∂q̌̇(st, @eponymargs(clustered, ))
+    (;clustercables) = st.tensiles
+    (;indexed) = st.connectivity
     (;nfull,nfree,sysfree,mem2sysfree,mem2sysfull) = indexed
-    T = get_numbertype(tg)
-    ndim = get_ndim(tg)
+    T = get_numbertype(st)
+    ndim = get_ndim(st)
     ∂Q̌∂q̌̇ = zeros(T,nfree,nfree)
     D = @MMatrix zeros(T,ndim,ndim)
     Im = Symmetric(SMatrix{ndim,ndim}(one(T)*I))
@@ -667,13 +667,13 @@ function build_∂Q̌∂q̌̇(tg, @eponymargs(clustered, ))
 end
 
 # In-place ∂Q̌∂q̌̇ for cables
-function build_∂Q̌∂q̌̇!(∂Q̌∂q̌̇,tg)
-    (;tensioned,indexed) = tg.connectivity
+function build_∂Q̌∂q̌̇!(∂Q̌∂q̌̇,st)
+    (;tensioned,indexed) = st.connectivity
     (;connected) = tensioned
-    (;cables) = tg.tensiles
+    (;cables) = st.tensiles
     (;nfull,nfree,sysfree,mem2sysfree,mem2sysfull) = indexed
-    T = get_numbertype(tg)
-    ndim = get_ndim(tg)
+    T = get_numbertype(st)
+    ndim = get_ndim(st)
     # ∂Q̌∂q̌̇ = zeros(T,nfree,nfree)
     D = @MMatrix zeros(T,ndim,ndim)
     Im = Symmetric(SMatrix{ndim,ndim}(one(T)*I))
@@ -709,15 +709,15 @@ function build_∂Q̌∂q̌̇!(∂Q̌∂q̌̇,tg)
     end
 end
 
-function build_∂Q̌∂s̄(tg)
-    (;connectivity) = tg
-    (;cables,clustercables) = tg.tensiles
+function build_∂Q̌∂s̄(st)
+    (;connectivity) = st
+    (;cables,clustercables) = st.tensiles
     nclustercables = length(clustercables)
     (;tensioned,indexed) = connectivity
     (;nfull,nfree,sysfree,mem2sysfree,mem2sysfull) = indexed
     ns = sum([length(clustercables[i].sps) for i in 1:nclustercables])
-    T = get_numbertype(tg)
-    ndim = get_ndim(tg)
+    T = get_numbertype(st)
+    ndim = get_ndim(st)
     ∂Q̌∂s̄ = zeros(T,2ns,nfree)
     D = zeros(T, ndim)
     lkn = zeros(T, 2ns, ndim)
@@ -773,11 +773,11 @@ function build_∂Q̌∂s̄(tg)
     return ∂Q̌∂s̄'
 end
 
-function build_Ǩ(tg,λ)
-    (;nfree) = tg.connectivity.indexed
-    T = get_numbertype(tg)
+function build_Ǩ(st,λ)
+    (;nfree) = st.connectivity.indexed
+    T = get_numbertype(st)
     # Ǩ = zeros(T,nfree,nfree)
-    Ǩ = -build_∂Q̌∂q̌(tg) .- ∂Aᵀλ∂q̌(tg,λ)
+    Ǩ = -build_∂Q̌∂q̌(st) .- ∂Aᵀλ∂q̌(st,λ)
     # Ǩ .= Ǩ
     Ǩ
 end
@@ -792,13 +792,13 @@ function norm_wrt!(Z,M)
     Z
 end
 
-function undamped_eigen(tg;gravity=false)
-    _,λ = check_static_equilibrium_output_multipliers(tg;gravity)
-    q = get_q(tg)
-    q̌ = get_q̌(tg)
-    M̌ = build_M̌(tg)
-    Ǩ = build_Ǩ(tg,λ)
-    Ǎ = make_A(tg)(q)
+function undamped_eigen(st;gravity=false)
+    _,λ = check_static_equilibrium_output_multipliers(st;gravity)
+    q = get_q(st)
+    q̌ = get_q̌(st)
+    M̌ = build_M̌(st)
+    Ǩ = build_Ǩ(st,λ)
+    Ǎ = make_A(st)(q)
     Ň = nullspace(Ǎ)
     ℳ = transpose(Ň)*M̌*Ň
     𝒦 = transpose(Ň)*Ǩ*Ň
@@ -824,10 +824,10 @@ function undamped_eigen(tg;gravity=false)
     # eigen(K̂,M̂)
 end
 
-function undamped_eigen!(bot::TensegrityRobot;gravity=false,scaling=0.01)
-    (;tg,traj) = bot
-    q̌ = get_q̌(tg)
-    ω²,δq̌ = undamped_eigen(tg;gravity)
+function undamped_eigen!(bot::Robot;gravity=false,scaling=0.01)
+    (;st,traj) = bot
+    q̌ = get_q̌(st)
+    ω²,δq̌ = undamped_eigen(st;gravity)
     neg_indices = findall(ω².<=0)
     if !isempty(neg_indices)
         @warn "Negative ω² occurs, indices $neg_indices, zeroing."
@@ -846,30 +846,30 @@ function undamped_eigen!(bot::TensegrityRobot;gravity=false,scaling=0.01)
     bot
 end
 
-function old_undamped_eigen(tg)
-    λ0 = check_static_equilibrium_output_multipliers(tg)
-    M̂,Ĉ,K̂ = linearize(tg,q0,λ0)
+function old_undamped_eigen(st)
+    λ0 = check_static_equilibrium_output_multipliers(st)
+    M̂,Ĉ,K̂ = linearize(st,q0,λ0)
     α = 10
     M̄,K̄ = frequencyshift(M̂,K̂,α)
     # @show size(K̄),rank(K̄),cond(K̄),rank(M̄)
     d,aug_Z = eigen(K̄,M̄)
     aug_ω2 = d .- α
-    @unpack ncoords, ndof = tg
+    @unpack ncoords, ndof = st
     # @show aug_ω2
     ω2,Z = find_finite(aug_ω2,aug_Z,ndof)
     ω = sqrt.(ω2)
     Zq = Z[1:ncoords,:]
-    M = build_massmatrix(tg)
+    M = build_massmatrix(st)
     normalize_wrt_mass!(Zq,M)
     ω, Zq#, Z
 end
 
-function undamped_modal_solve!(tg,q0,q̇0,λ0,tf,dt)
-    M̂,Ĉ,K̂ = linearize(tg,q0,λ0)
+function undamped_modal_solve!(st,q0,q̇0,λ0,tf,dt)
+    M̂,Ĉ,K̂ = linearize(st,q0,λ0)
     # show(stdout,"text/plain",K̂)
     # showtable(K̂)
-    # M̄,C̄,K̄ = TR.frequencyshift(M̂,Ĉ,K̂,0.1)
-    # M̃,K̃ = TR.enlarge(M̄,C̄,K̄)
+    # M̄,C̄,K̄ = RB.frequencyshift(M̂,Ĉ,K̂,0.1)
+    # M̃,K̃ = RB.enlarge(M̄,C̄,K̄)
     aug_ω2,aug_Z = eigen(K̂,M̂)
     ω2,Z = find_finite(aug_ω2,aug_Z)
     # @show aug_ω2,ω2
@@ -929,24 +929,24 @@ end
 校核稳定性。
 $(TYPEDSIGNATURES)
 """
-function check_stability(tg::TensegrityStructure;F̌=nothing,verbose=false)
-    static_equilibrium,λ = check_static_equilibrium_output_multipliers(tg;F=F̌)
+function check_stability(st::Structure;F̌=nothing,verbose=false)
+    static_equilibrium,λ = check_static_equilibrium_output_multipliers(st;F=F̌)
     @assert static_equilibrium
-    check_stability(tg,λ;verbose)
+    check_stability(st,λ;verbose)
 end
 
-function check_stability(tg::TensegrityStructure,λ;verbose=false)
-    q = get_q(tg)
-    c = get_c(tg)
-    A = make_A(tg,q)
+function check_stability(st::Structure,λ;verbose=false)
+    q = get_q(st)
+    c = get_c(st)
+    A = make_A(st,q)
     Ň(q̌,c) = nullspace(A(q̌))
-    check_stability(tg,λ,Ň;verbose)
+    check_stability(st,λ,Ň;verbose)
 end
 
-function check_stability(tg::TensegrityStructure,λ,Ň;verbose=false)
-    q̌ = get_q̌(tg)
-    c = get_c(tg)
-    Ǩ0 = build_Ǩ(tg,λ)
+function check_stability(st::Structure,λ,Ň;verbose=false)
+    q̌ = get_q̌(st)
+    c = get_c(st)
+    Ǩ0 = build_Ǩ(st,λ)
     Ň0 = Ň(q̌,c)
     𝒦0 = transpose(Ň0)*Ǩ0*Ň0
     eigen_result = eigen(𝒦0)
@@ -960,16 +960,16 @@ function check_stability(tg::TensegrityStructure,λ,Ň;verbose=false)
     isstable, Ň0, eigen_result
 end
 
-function check_stability!(bot::TensegrityRobot,Ň;
+function check_stability!(bot::Robot,Ň;
         gravity=false,
         scaling=0.01,
         scalings=nothing
     )
-    (;tg,traj) = bot
-    static_equilibrium,λ = check_static_equilibrium_output_multipliers(tg)
+    (;st,traj) = bot
+    static_equilibrium,λ = check_static_equilibrium_output_multipliers(st)
     @assert static_equilibrium
-    q̌ = get_q̌(tg)
-    _, Ň0, er = check_stability(bot.tg,λ,Ň;verbose=true)
+    q̌ = get_q̌(st)
+    _, Ň0, er = check_stability(bot.st,λ,Ň;verbose=true)
     resize!(traj,1)
     for i in 1:length(er.values)
         push!(traj,deepcopy(traj[end]))
@@ -987,8 +987,8 @@ function check_stability!(bot::TensegrityRobot,Ň;
     bot
 end
 
-function make_N(tg::TensegrityStructure,q0::AbstractVector)
-	(;bodies,connectivity) = tg
+function make_N(st::Structure,q0::AbstractVector)
+	(;bodies,connectivity) = st
     (;nfree,nfull,syspres,sysfree,mem2sysfree,mem2sysincst,ninconstraints) = connectivity.indexed
     function inner_N(q̌)
         T = eltype(q̌)
@@ -1005,15 +1005,15 @@ function make_N(tg::TensegrityStructure,q0::AbstractVector)
                         u,v,w = NCF.get_uvw(lncs,q̌[memfree])
                         N = @view ret[mem2sysfree[rbid],mem2sysincst[rbid]]
                         N[1:3,1:3]   .= Matrix(1I,3,3)
-                        N[4:6,4:6]   .= -NCF.skew(u)
-                        N[7:9,4:6]   .= -NCF.skew(v)
-                        N[10:12,4:6] .= -NCF.skew(w)
+                        N[4:6,4:6]   .= -skew(u)
+                        N[7:9,4:6]   .= -skew(v)
+                        N[10:12,4:6] .= -skew(w)
                 elseif lncs isa NCF.LNC2D6C                    
                         u,v = NCF.get_uv(lncs,q̌[memfree])
                         N = @view ret[mem2sysfree[rbid],mem2sysincst[rbid]]
                         N[1:2,1:2] .= Matrix(1I,2,2)
-                        N[3:4,3] .= -NCF.skew(u)
-                        N[5:6,3] .= -NCF.skew(v)
+                        N[3:4,3] .= -skew(u)
+                        N[5:6,3] .= -skew(v)
                 end
             end
         end
@@ -1025,20 +1025,20 @@ function get_poly(bot_input;
         Ň
     )
     bot = deepcopy(bot_input)
-    (;tg) = bot
-    # (;ndof,nconstraints,connectivity) = bot.tg
-    # (;cables) = tg.tensiles
+    (;st) = bot
+    # (;ndof,nconstraints,connectivity) = bot.st
+    # (;cables) = st.tensiles
     # (;nfull,nfree) = connectivity.indexed
     # ncables = length(cables)
     # nλ = nconstraints
-    gue = get_initial(tg)
-    Φ = make_Φ(tg,gue.q)
-    A = make_A(tg,gue.q)
-    Q̌ = make_Q̌(tg,gue.q)
-    S = make_S(tg,gue.q)
-    Ǩm_Ǩg = make_Ǩm_Ǩg(tg,gue.q)
+    gue = get_initial(st)
+    Φ = make_Φ(st,gue.q)
+    A = make_A(st,gue.q)
+    Q̌ = make_Q̌(st,gue.q)
+    S = make_S(st,gue.q)
+    Ǩm_Ǩg = make_Ǩm_Ǩg(st,gue.q)
 
-    pv = get_polyvar(tg)
+    pv = get_polyvar(st)
 
     pnq̌ = 1.0pv.q̌ .+ 0.0
     pns = 1.0pv.s .+ 0.0
@@ -1066,7 +1066,7 @@ function get_poly(bot_input;
         # transpose(pnξ)*pnξ-1;
     ]
 
-    # Ǩ0 = TR.build_Ǩ(bot.tg,gue.λ)
+    # Ǩ0 = RB.build_Ǩ(bot.st,gue.λ)
     # Ǩx = map(polyǨ) do z
     # 		z(
     # 			pv.q̌=>gue.q̌,
@@ -1201,7 +1201,7 @@ function path_follow_critical(bot_input)
 	end
 	path_result1 = path_results[1]
 	sol = real(solution(path_result1))
-	q̌,s,λ,ξ,ζ = TR.split_by_lengths(sol,length.(variable_groups))
+	q̌,s,λ,ξ,ζ = RB.split_by_lengths(sol,length.(variable_groups))
 	@eponymtuple(q̌,s,λ,ξ,ζ)
 end
 

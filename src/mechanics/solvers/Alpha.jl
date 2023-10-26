@@ -30,7 +30,7 @@ function generate_cache(solver::Alpha,intor;dt,kargs...)
     # (;M) = mm
     A = make_A(bot)
     Φ = make_Φ(bot)
-    ∂Ǎᵀλ∂q̌ = (q,λ)->∂Aᵀλ∂q̌(bot.tg,λ)
+    ∂Ǎᵀλ∂q̌ = (q,λ)->∂Aᵀλ∂q̌(bot.st,λ)
     funcs = @eponymtuple(A,Φ,∂Ǎᵀλ∂q̌)
     h = dt
     β′ = (1-αm)/((h^2)*β*(1-αf))

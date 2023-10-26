@@ -1,6 +1,6 @@
 
 module NSSFC
-import ..TensegrityRobots as TR
+import ..Rible as TR
 using Parameters
 using LinearAlgebra
 using StaticArrays
@@ -89,8 +89,8 @@ function ip_ns_stepk_maker(nq,nλ,nμ,nu,qₛ₋₁,q̇ₛ₋₁,pₛ₋₁,tₛ
                 ∂𝐛∂𝐱[is+1:is+3,n2+1:n3] .= D̃i*∂vₛ∂μₛ
             end
             # @show "before",yₛ,Λₛ
-            Λ_split = TR.split_by_lengths(Λₛ,3)
-            y_split = TR.split_by_lengths(yₛ,3)
+            Λ_split = RB.split_by_lengths(Λₛ,3)
+            y_split = RB.split_by_lengths(yₛ,3)
             Λ_cone = [transpose(Λi)*J*Λi for Λi in Λ_split]
             y_cone = [transpose(yi)*J*yi for yi in y_split]
             # @show Λ_cone
@@ -146,8 +146,8 @@ function ip_ns_stepk_maker(nq,nλ,nμ,nu,qₛ₋₁,q̇ₛ₋₁,pₛ₋₁,tₛ
         Δxp = 𝐉\(-𝐫𝐞𝐬)
         ΔΛp = @view Δxp[n3+1:n4]
         Δyp = @view Δxp[n4+1:n5]
-        ΔΛp_split = TR.split_by_lengths(ΔΛp,3)
-        Δyp_split = TR.split_by_lengths(Δyp,3)
+        ΔΛp_split = RB.split_by_lengths(ΔΛp,3)
+        Δyp_split = RB.split_by_lengths(Δyp,3)
         # @show ΔΛp, Δyp
         # @show z_split,W_blocks,Δyp_split,ΔΛp_split,J
         αp_Λ = find_cone_step_length(Λ_split,ΔΛp_split,J)
@@ -177,8 +177,8 @@ function ip_ns_stepk_maker(nq,nλ,nμ,nu,qₛ₋₁,q̇ₛ₋₁,pₛ₋₁,tₛ
         # η = exp(-0.1μ) + 0.9
         ΔΛc = @view Δxc[n3+1:n4]
         Δyc = @view Δxc[n4+1:n5]
-        ΔΛc_split = TR.split_by_lengths(ΔΛc,3)
-        Δyc_split = TR.split_by_lengths(Δyc,3)
+        ΔΛc_split = RB.split_by_lengths(ΔΛc,3)
+        Δyc_split = RB.split_by_lengths(Δyc,3)
         # αmax = find_cone_step_length(z_split,W_blocks,Δyc_split,ΔΛc_split,J)
         α_Λ = find_cone_step_length(Λ_split,ΔΛc_split,J)
         # @show Λ_split,ΔΛc_split
