@@ -71,7 +71,8 @@ function dynfuncs(bot;actuate=false,gravity=false,(Fˣ!)=(F,t)->nothing)
 end
 
 function contact_dynfuncs(bot;
-        flatplane = RB.Plane([0,0,1.0],[0,0,0.0])
+        flatplane = RB.Plane([0,0,1.0],[0,0,0.0]),
+        checkpersist = true,
     )
     (;st) = bot
     (;mem2num) = st.connectivity.numbered
@@ -126,6 +127,9 @@ function contact_dynfuncs(bot;
                     contact = contacts[pid]
                     (;e,μ) = contact
                     gap = RB.signed_distance(rp,flatplane)
+                    if !checkpersist
+                        contact.state.active = false
+                    end
                     RB.activate!(contact,gap)
                     if contact.state.active
                         contacts_bits[mem2num[bid][pid]] = true
