@@ -281,11 +281,11 @@ function link_to_rigidbody(i,link::RB.URDF.Link,
     if inertial isa Nothing
         mass = 0.0
         inertia = @SMatrix zeros(3,3)
-        r̄g = @SVector zeros(3)
+        mass_locus = @SVector zeros(3)
         R̄ = RotX(0.0)
     else
         (;mass,inertia) = inertial
-        r̄g = inertial.origin.xyz
+        mass_locus = inertial.origin.xyz
         R̄ = RotXYZ(inertial.origin.rpy...)
     end
     ṙo = zero(ro)
@@ -295,12 +295,12 @@ function link_to_rigidbody(i,link::RB.URDF.Link,
     # e = 0.9,
     movable = true
     
-    r̄ps = [zero(ro)]
+    loci = [zero(ro)]
     prop = RB.RigidBodyProperty(
         i,
         movable,
         mass,inertia,
-        r̄g,r̄ps;
+        mass_locus,loci;
         constrained,
         type=Symbol(link.name)
     )
@@ -443,53 +443,53 @@ function parse_joints_links!(
                             jointid += 1
                             if joint.type == "fixed"
                                 @warn "fixed joint: $(joint.name)"
-                                push!(bodiesdict[parent].prop.r̄ps,joint.origin.xyz)
+                                push!(bodiesdict[parent].prop.loci,joint.origin.xyz)
                                 (;C,c) = bodiesdict[parent].state.cache.funcs
                                 push!(bodiesdict[parent].state.cache.Cps,C(c(joint.origin.xyz)))
                                 fixedaxis = [1.0,0,0]
-                                push!(bodiesdict[parent].prop.ās,fixedaxis)
+                                push!(bodiesdict[parent].prop.axes,fixedaxis)
                                 push!(bodiesdict[parent].state.as,bodiesdict[parent].state.R*fixedaxis)
                                 fixedjoint = RB.FixedJoint(
                                     jointid,
                                     RB.End2End(
                                         ijoint,
                                         RB.ID(bodiesdict[parent],
-                                        length(bodiesdict[parent].prop.r̄ps),
-                                        length(bodiesdict[parent].prop.ās)),
+                                        length(bodiesdict[parent].prop.loci),
+                                        length(bodiesdict[parent].prop.axes)),
                                         RB.ID(bodiesdict[child],1),
                                     )
                                 )
                                 push!(jointcsts,fixedjoint)
                             elseif joint.type == "revolute"
-                                push!(bodiesdict[parent].prop.r̄ps,joint.origin.xyz)
+                                push!(bodiesdict[parent].prop.loci,joint.origin.xyz)
                                 (;C,c) = bodiesdict[parent].state.cache.funcs
                                 push!(bodiesdict[parent].state.cache.Cps,C(c(joint.origin.xyz)))
-                                push!(bodiesdict[parent].prop.ās,joint.mobility.axis)
+                                push!(bodiesdict[parent].prop.axes,joint.mobility.axis)
                                 push!(bodiesdict[parent].state.as,bodiesdict[parent].state.R*joint.mobility.axis)
                                 revjoint = RB.RevoluteJoint(
                                     jointid,
                                     RB.End2End(
                                         ijoint,
                                         RB.ID(bodiesdict[parent],
-                                        length(bodiesdict[parent].prop.r̄ps),
-                                        length(bodiesdict[parent].prop.ās)),
+                                        length(bodiesdict[parent].prop.loci),
+                                        length(bodiesdict[parent].prop.axes)),
                                         RB.ID(bodiesdict[child],1),
                                     )
                                 )
                                 push!(jointcsts,revjoint)
                             elseif joint.type == "prismatic"
-                                push!(bodiesdict[parent].prop.r̄ps,joint.origin.xyz)
+                                push!(bodiesdict[parent].prop.loci,joint.origin.xyz)
                                 (;C,c) = bodiesdict[parent].state.cache.funcs
                                 push!(bodiesdict[parent].state.cache.Cps,C(c(joint.origin.xyz)))
-                                push!(bodiesdict[parent].prop.ās,joint.mobility.axis)
+                                push!(bodiesdict[parent].prop.axes,joint.mobility.axis)
                                 push!(bodiesdict[parent].state.as,bodiesdict[parent].state.R*joint.mobility.axis)
                                 prmjoint = RB.PrismaticJoint(
                                     jointid,
                                     RB.End2End(
                                         ijoint,
                                         RB.ID(bodiesdict[parent],
-                                        length(bodiesdict[parent].prop.r̄ps),
-                                        length(bodiesdict[parent].prop.ās)),
+                                        length(bodiesdict[parent].prop.loci),
+                                        length(bodiesdict[parent].prop.axes)),
                                         RB.ID(bodiesdict[child],1),
                                     )
                                 )

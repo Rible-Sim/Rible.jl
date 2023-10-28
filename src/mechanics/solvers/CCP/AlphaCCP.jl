@@ -59,7 +59,7 @@ function generate_cache(solver::AlphaCCP,intor;dt,kargs...)
     AlphaCCPCache(cache)
 end
 
-function update_nonsmooth!(Res,Jac,nq,nλ,na,xe,vₛ,gₙ,Dₛ₊₁,H,es,t,p,h,scaling,dynfuncs,cache)
+function update_nonsmooth!(Res,Jac,nq,nλ,na,xe,vₛ,gₙ,Dₛ₊₁,H,restitution_coefficients,t,p,h,scaling,dynfuncs,cache)
     qₛ₊₁, vₛ₊₁, ṽₛ₊₁, ṽ̇ₛ₊₁, 𝛌bₛ₊₁, 𝚲uₛ₊₁ = xe
     F!,Jac_F!,_ = dynfuncs
     (;M,Φ,A,Ψ,B,∂Ψ∂q,∂Aᵀλ∂q,∂Bᵀμ∂q) = cache
@@ -121,9 +121,9 @@ function update_nonsmooth!(Res,Jac,nq,nλ,na,xe,vₛ,gₙ,Dₛ₊₁,H,es,t,p,h,
         # @show i, vₙⁱₛ, vₜⁱₛ₊₁
         # @show vₛ, vⁱₛ
         # @show Dₛ₊₁
-        # @show i,μs[i],es[i],vₙⁱₛ
+        # @show i,friction_coefficients[i],restitution_coefficients[i],vₙⁱₛ
         # @show i, 𝚲uₛ₊₁[is+1]
-        𝐛[is+1] = vₜⁱₛ₊₁ + es[i]*vₙⁱₛ
+        𝐛[is+1] = vₜⁱₛ₊₁ + restitution_coefficients[i]*vₙⁱₛ
     end
     𝐫 = (Dₛ₊₁*vₛ₊₁ + 𝐛) - 𝐜ᵀinv𝐉*(Res + 𝐁*𝚲uₛ₊₁)
     # @show Dₛ₊₁*vₛ₊₁
@@ -197,7 +197,7 @@ function solve!(intor::Integrator,solvercache::AlphaCCPCache;
 
         # contact detection
         qˣ .= qₛ₊₁
-        active_contacts,na,gₙ,Dₛ₊₁,H,es = prepare_contacts!(cₛ₊₁,qˣ)
+        active_contacts,na,gₙ,Dₛ₊₁,H,restitution_coefficients = prepare_contacts!(cₛ₊₁,qˣ)
         nΛ = 3na
         𝚲uₛ₊₁ = zeros(T,nΛ)
         𝚲uʳₛ₊₁ = copy(𝚲uₛ₊₁)
@@ -206,7 +206,7 @@ function solve!(intor::Integrator,solvercache::AlphaCCPCache;
         for iteration = 1:maxiters
             xe = (qₛ₊₁, vₛ₊₁, ṽₛ₊₁, ṽ̇ₛ₊₁, 𝛌bₛ₊₁, 𝚲uₛ₊₁)
 
-            𝐁,𝐜ᵀ,𝐍,𝐫 = update_nonsmooth!(Res,Jac,nq,nλ,na,xe,vₛ,gₙ,Dₛ₊₁,H,es,tₛ₊₁,coeffs,dt,scaling,dynfuncs,cache)
+            𝐁,𝐜ᵀ,𝐍,𝐫 = update_nonsmooth!(Res,Jac,nq,nλ,na,xe,vₛ,gₙ,Dₛ₊₁,H,restitution_coefficients,tₛ₊₁,coeffs,dt,scaling,dynfuncs,cache)
 
             normRes = norm(Res)
             # @show normRes
@@ -216,14 +216,14 @@ function solve!(intor::Integrator,solvercache::AlphaCCPCache;
             end
             if na != 0
                 # B = make_B(u,Dₛ₊₁,invM)
-                # r4 = make_residual4(μs,𝐍,𝐫)
-                # 𝚲uₛ₊₁,_ = Jacobi(B,r,μs,𝐍,𝐫;τ=1e-13,Nmax=1000)
-                # 𝚲uₛ₊₁,GS_k,GS_res = GaussSeidel(u,B,r,μs,𝐍,𝐫)
+                # r4 = make_residual4(friction_coefficients,𝐍,𝐫)
+                # 𝚲uₛ₊₁,_ = Jacobi(B,r,friction_coefficients,𝐍,𝐫;τ=1e-13,Nmax=1000)
+                # 𝚲uₛ₊₁,GS_k,GS_res = GaussSeidel(u,B,r,friction_coefficients,𝐍,𝐫)
                 # @show GS_k,GS_res
-                # 𝚲uₛ₊₁,_ = APGD(r,μs,𝐍,𝐫)
+                # 𝚲uₛ₊₁,_ = APGD(r,friction_coefficients,𝐍,𝐫)
                 # @show 𝚲uₛ₊₁, vₛ₊₁
-                # 𝚲uₛ₊₁,_  = APGD(r,μs,𝐍,𝐫;τ=1e-10,Nmax=1000)
-                # APGD!(𝚲uₛ₊₁,r4,μs,𝐍,𝐫;τ=1e-10,Nmax=1000)
+                # 𝚲uₛ₊₁,_  = APGD(r,friction_coefficients,𝐍,𝐫;τ=1e-10,Nmax=1000)
+                # APGD!(𝚲uₛ₊₁,r4,friction_coefficients,𝐍,𝐫;τ=1e-10,Nmax=1000)
                 IPM!(𝚲uₛ₊₁,na,nΛ,repeat([0.01,0,0],na),repeat([0.01,0,0],na),𝐍,𝐫;ftol=1e-14,Nmax=50)
 
                 # @show sum(𝚲uₛ₊₁/h)

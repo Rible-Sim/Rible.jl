@@ -62,6 +62,6 @@ sol = TS.solve(prob,TS.Zhong06(),dt=dt,ftol=1e-12,verbose=true)
 
 kes = [RB.kinetic_energy_coords(manipulator,q,q̇) for (q,q̇) in zip(sol.qs,sol.q̇s)]
 pes = [RB.gravity_potential_energy(manipulator,q) for q in sol.qs]
-es = kes .+ pes
-plt.plot(sol.ts,es)
+restitution_coefficients = kes .+ pes
+plt.plot(sol.ts,restitution_coefficients)
 plt.ylim(-0.44,-0.46)

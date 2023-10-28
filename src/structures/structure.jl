@@ -139,11 +139,11 @@ function Structure(bodies,tensiles,cnt::Connectivity)
         vcat,
         map(sort(bodies)) do body
             (;prop,) = body
-            (;μs,es) = prop
-            rbid = prop.id
+            (;loci) = prop
+            bodyid = prop.id
             [
-                Contact(id,μ,e)
-                for (id,μ,e) in  zip(mem2num[rbid],μs,es)
+                Contact(id,lo.friction_coefficient,lo.restitution_coefficient)
+                for (id,lo) in  zip(mem2num[bodyid],loci)
             ]
         end
     )
@@ -186,9 +186,9 @@ function build_M(st::AbstractStructure)
     (;nfull,mem2sysfull) = st.connectivity.indexed
     T = get_numbertype(st)
     M = spzeros(T,nfull,nfull)
-    foreach(st.bodies) do rb
-        memfull = mem2sysfull[rb.prop.id]
-        M[memfull,memfull] .+= rb.state.cache.M
+    foreach(st.bodies) do body
+        memfull = mem2sysfull[body.prop.id]
+        M[memfull,memfull] .+= body.state.cache.M
     end
     # @assert issymmetric(M)
     M
@@ -198,9 +198,9 @@ function build_M⁻¹(st::AbstractStructure)
     (;nfull,mem2sysfull) = st.connectivity.indexed
     T = get_numbertype(st)
     M⁻¹ = spzeros(T,nfull,nfull)
-    foreach(st.bodies) do rb
-        memfull = mem2sysfull[rb.prop.id]
-        M⁻¹[memfull,memfull] .+= rb.state.cache.M⁻¹
+    foreach(st.bodies) do body
+        memfull = mem2sysfull[body.prop.id]
+        M⁻¹[memfull,memfull] .+= body.state.cache.M⁻¹
     end
     # @assert issymmetric(M⁻¹)
     M⁻¹
@@ -216,9 +216,9 @@ function build_∂Mq̇∂q(st::AbstractStructure)
     (;nfull,mem2sysfull) = st.connectivity.indexed
     T = get_numbertype(st)
     ∂Mq̇∂q = spzeros(T,nfull,nfull)
-    foreach(st.bodies) do rb
-        memfull = mem2sysfull[rb.prop.id]
-        ∂Mq̇∂q[memfull,memfull] .+= rb.state.cache.∂Mq̇∂q
+    foreach(st.bodies) do body
+        memfull = mem2sysfull[body.prop.id]
+        ∂Mq̇∂q[memfull,memfull] .+= body.state.cache.∂Mq̇∂q
     end
     ∂Mq̇∂q
     # symsparsecsr(M;symmetrize=true)
@@ -228,9 +228,9 @@ function build_∂M⁻¹p∂q(st::AbstractStructure)
     (;nfull,mem2sysfull) = st.connectivity.indexed
     T = get_numbertype(st)
     ∂M⁻¹p∂q = spzeros(T,nfull,nfull)
-    foreach(st.bodies) do rb
-        memfull = mem2sysfull[rb.prop.id]
-        ∂M⁻¹p∂q[memfull,memfull] .+= rb.state.cache.∂M⁻¹p∂q
+    foreach(st.bodies) do body
+        memfull = mem2sysfull[body.prop.id]
+        ∂M⁻¹p∂q[memfull,memfull] .+= body.state.cache.∂M⁻¹p∂q
     end
     ∂M⁻¹p∂q
     # symsparsecsr(M;symmetrize=true)
@@ -268,9 +268,9 @@ function build_∂T∂qᵀ(st::AbstractStructure)
     (;nfull,mem2sysfull) = st.connectivity.indexed
     T = get_numbertype(st)
     ∂T∂qᵀ = zeros(T,nfull)
-    foreach(st.bodies) do rb
-        memfull = mem2sysfull[rb.prop.id]
-        ∂T∂qᵀ[memfull] .+= rb.state.cache.∂T∂qᵀ
+    foreach(st.bodies) do body
+        memfull = mem2sysfull[body.prop.id]
+        ∂T∂qᵀ[memfull] .+= body.state.cache.∂T∂qᵀ
     end
     ∂T∂qᵀ
 end
@@ -286,13 +286,13 @@ function make_Φ(st::AbstractStructure,q0::AbstractVector)
         q[syspres] .= q0[syspres]
         q[sysfree] .= q̌
         ret = Vector{eltype(q̌)}(undef,nconstraints)
-        foreach(bodies) do rb
-            rbid = rb.prop.id
-            memfull = mem2sysfull[rbid]
-            memfree = mem2sysfree[rbid]
-            memincst = mem2sysincst[rbid]
+        foreach(bodies) do body
+            bodyid = body.prop.id
+            memfull = mem2sysfull[bodyid]
+            memfree = mem2sysfree[bodyid]
+            memincst = mem2sysincst[bodyid]
             if !isempty(memincst)
-                ret[memincst] .= rb.state.cache.funcs.Φ(q[memfull],d[memincst])
+                ret[memincst] .= body.state.cache.funcs.Φ(q[memfull],d[memincst])
             end
         end
         is = Ref(ninconstraints)
@@ -324,13 +324,13 @@ function make_Φ(st::AbstractStructure)
     @inline @inbounds function inner_Φ(q)
         ret = Vector{eltype(q)}(undef,nconstraints)
         is = Ref(ninconstraints)
-        foreach(bodies) do rb
-            rbid = rb.prop.id
-            memfull = mem2sysfull[rbid]
-            memfree = mem2sysfree[rbid]
-            memincst = mem2sysincst[rbid]
+        foreach(bodies) do body
+            bodyid = body.prop.id
+            memfull = mem2sysfull[bodyid]
+            memfree = mem2sysfree[bodyid]
+            memincst = mem2sysincst[bodyid]
             if !isempty(memincst)
-                ret[memincst] .= rb.state.cache.funcs.Φ(q[memfull])
+                ret[memincst] .= body.state.cache.funcs.Φ(q[memfull])
             end
         end
         foreach(jointed.joints) do joint
@@ -354,13 +354,13 @@ function make_A(st::AbstractStructure,q0::AbstractVector)
         q[syspres] .= q0[syspres]
         q[sysfree] .= q̌
         ret = zeros(eltype(q̌),nconstraints,nfree)
-        foreach(bodies) do rb
-            rbid = rb.prop.id
-            memfull = mem2sysfull[rbid]
-            memfree = mem2sysfree[rbid]
-            memincst = mem2sysincst[rbid]
+        foreach(bodies) do body
+            bodyid = body.prop.id
+            memfull = mem2sysfull[bodyid]
+            memfree = mem2sysfree[bodyid]
+            memincst = mem2sysincst[bodyid]
             if !isempty(memincst)
-                ret[memincst,memfree] .= rb.state.cache.funcs.Φq(q[memfull])
+                ret[memincst,memfree] .= body.state.cache.funcs.Φq(q[memfull])
             end
         end
         is = Ref(ninconstraints)
@@ -387,13 +387,13 @@ function make_A(st::AbstractStructure)
     @inline @inbounds function inner_A(q)
         ret = zeros(eltype(q),nconstraints,nfree)
         is = Ref(ninconstraints)
-        foreach(bodies) do rb
-            rbid = rb.prop.id
-            memfull = mem2sysfull[rbid]
-            memfree = mem2sysfree[rbid]
-            memincst = mem2sysincst[rbid]
+        foreach(bodies) do body
+            bodyid = body.prop.id
+            memfull = mem2sysfull[bodyid]
+            memfree = mem2sysfree[bodyid]
+            memincst = mem2sysincst[bodyid]
             if !isempty(memincst)
-                ret[memincst,memfree] .= rb.state.cache.funcs.Φq(q[memfull])
+                ret[memincst,memfree] .= body.state.cache.funcs.Φq(q[memfull])
             end
         end
         foreach(jointed.joints) do joint
@@ -405,15 +405,15 @@ function make_A(st::AbstractStructure)
     end
 end
 
-function build_F̌(st,rbid,pid,f)
+function build_F̌(st,bodyid,pid,f)
     T = get_numbertype(st)
     (;nfree,mem2sysfree) = st.connectivity.indexed
     F̌ = zeros(T,nfree)
-    foreach(st.bodies) do rb
-        if rb.prop.id == rbid
-            C = rb.state.cache.Cps[pid]
-            memfree = mem2sysfree[rbid]
-            uci = rb.state.cache.free_idx
+    foreach(st.bodies) do body
+        if body.prop.id == bodyid
+            C = body.state.cache.Cps[pid]
+            memfree = mem2sysfree[bodyid]
+            uci = body.state.cache.free_idx
             F̌[memfree] = (transpose(C)*f)[uci,:]
         end
     end
@@ -434,14 +434,14 @@ function check_jacobian_singularity(st)
     if sys_rank < minimum(size(Aq))
         @warn "System's Jacobian is singular: rank(A(q))=$(sys_rank)<$(minimum(size(Aq)))"
     end
-    foreach(bodies) do rb
-        rbid = rb.prop.id
-        uci = rb.state.cache.free_idx
-        q_rb = state.parts[rbid].q
-        Aq_rb = rb.state.cache.funcs.Φq(q_rb)
+    foreach(bodies) do body
+        bodyid = body.prop.id
+        uci = body.state.cache.free_idx
+        q_rb = state.parts[bodyid].q
+        Aq_rb = body.state.cache.funcs.Φq(q_rb)
         rb_rank = rank(Aq_rb)
         if rb_rank < minimum(size(Aq_rb))
-            @warn "The $(rbid)th rigid body's Jacobian is singular: rank(A(q))=$(rb_rank)<$(minimum(size(Aq_rb)))"
+            @warn "The $(bodyid)th rigid body's Jacobian is singular: rank(A(q))=$(rb_rank)<$(minimum(size(Aq_rb)))"
         end
     end
 end
@@ -471,16 +471,16 @@ $(TYPEDSIGNATURES)
 """
 function potential_energy_gravity(st::Structure)
     V = Ref(zero(get_numbertype(st)))
-    foreach(st.bodies) do rb
-        V[] += potential_energy_gravity(rb)
+    foreach(st.bodies) do body
+        V[] += potential_energy_gravity(body)
     end
     V[]
 end
 
 function potential_energy_strain(st::Structure)
     V = Ref(zero(get_numbertype(st)))
-    foreach(st.bodies) do rb
-        V[] += potential_energy_strain(rb)
+    foreach(st.bodies) do body
+        V[] += potential_energy_strain(body)
     end
     V[]
 end

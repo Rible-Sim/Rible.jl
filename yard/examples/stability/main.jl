@@ -47,11 +47,11 @@ function get_μs_σs(bot,B,F̃)
 	σmax =  (ℓ - x)./ nb |> maximum
 	σmin = -x./nb |> maximum
 	σs = LinRange(σmin,σmax,21)
-	μs = [x + σ*nb for σ in σs]
-	x,nb,μs,σs
+	friction_coefficients = [x + σ*nb for σ in σs]
+	x,nb,friction_coefficients,σs
 end
 
-function compute_evs(bot,μs,Ň)
+function compute_evs(bot,friction_coefficients,Ň)
 	(;st) = bot
 	evs = [	
 		begin
@@ -63,8 +63,8 @@ function compute_evs(bot,μs,Ň)
 			# A(ini.q̌)*Ň(ini.q̌)
 			rb2 = RB.get_bodies(st)[2]
 			ka = [
-				transpose(rb2.state.rps[i]-rb2.state.ro)*rb2.state.fps[i]
-				for i in eachindex(rb2.prop.r̄ps)
+				transpose(rb2.state.loci_states[i]-rb2.state.ro)*rb2.state.fps[i]
+				for i in eachindex(rb2.prop.loci)
 			] |> sum
 			Ň0 = Ň(ini.q̌,ini.c)
 			# Ň0 = Ň(ini.q̌)
@@ -90,7 +90,7 @@ function compute_evs(bot,μs,Ň)
 			δV = δVm+δVg+δVa
 			@eponymtuple( values = er.values, vectors = er.vectors, ka, δVm,δVg,δVa,δV)
 		end
-		for μ in μs[begin:end-1]
+		for μ in friction_coefficients[begin:end-1]
 	] |> StructArray
 end
 
@@ -192,15 +192,15 @@ GM.activate!(); with_theme(theme_pub;
 end
 B,F̃ = RB.build_inverse_statics_for_restlength(spine2d2.st,spine2d2.st)
 
-μ0, nb, μs, σs = get_μs_σs(spine2d2,B,F̃)
+μ0, nb, friction_coefficients, σs = get_μs_σs(spine2d2,B,F̃)
 @show μ0[[1,3]], nb[[1,3]]
 nb
-μ = μs[end]
+μ = friction_coefficients[end]
 @show σs |> extrema
 
 Ň = (q̌,c)-> RB.make_N(spine2d2.st,RB.get_q(spine2d2.st))(q̌)
 
-evs = compute_evs(spine2d2,μs,Ň)
+evs = compute_evs(spine2d2,friction_coefficients,Ň)
 
 evs.ka |> scatterlines
 @show evs.δVa |> extrema
@@ -266,7 +266,7 @@ display(B)
 display(B⁺)
 push!(F̃,κ[1]*ℓ[1] - κ[4]*ℓ[4] )
 display(F̃)
-μ0, nb, μs,σs = get_μs_σs(spine3d2,B⁺,F̃)
+μ0, nb, friction_coefficients,σs = get_μs_σs(spine3d2,B⁺,F̃)
 display(μ0)
 display(nb)
 @show size(nb)
@@ -278,14 +278,14 @@ f[1]/f[4]
 
 Ň = (q̌,c) -> RB.make_N(spine3d2.st,RB.get_q(spine3d2.st))(q̌)
 
-evs = compute_evs(spine3d2,μs,Ň)
+evs = compute_evs(spine3d2,friction_coefficients,Ň)
 @show evs.δVa |> extrema
 
 GM.activate!(); plotsave_evs(evs,σs[begin:end-1])
 CM.activate!(); plotsave_evs(evs,σs[begin:end-1],"ultra_eigen_values")
 # μ = RB.inverse_for_restlength(spine3d2,spine3d2;eps_abs=1e-8,eps_rel=1e-8)
 
-RB.set_restlen!(spine3d2.st,μs[1])
+RB.set_restlen!(spine3d2.st,friction_coefficients[1])
 RB.update!(spine3d2.st)
 _,λ = RB.check_static_equilibrium_output_multipliers(spine3d2.st)
 
@@ -332,12 +332,12 @@ function make_Ň(st,q)
 	N = RB.make_N(st,q)
 	function inner_Ň(q̌,c)
 		# ret = zeros(eltype(q̌),nfree,ndof)
-		rbid = 2
+		bodyid = 2
 		pid = 1
-		q_rb = @view q̌[mem2sysfree[rbid]]
+		q_rb = @view q̌[mem2sysfree[bodyid]]
 		u_rb = SVector{2}(q_rb[3:4])
 		v_rb = SVector{2}(q_rb[5:6])
-		ic = mem2num[rbid][pid]
+		ic = mem2num[bodyid][pid]
 		c1,c2 = c[num2sys[ic]]
 		ret = N(q̌)*[
 			c1.*skew(u_rb) .+ c2.*skew(v_rb);
@@ -363,12 +363,12 @@ A(RB.get_q̌(man1.st))*Ň(RB.get_q̌(man1.st),RB.get_c(man1.st)) |> norm
 
 B,F̃ = RB.build_inverse_statics_for_restlength(man1.st,man1.st)
 
-μ0, nb, μs,σs = get_μs_σs(man1,B,F̃)
+μ0, nb, friction_coefficients,σs = get_μs_σs(man1,B,F̃)
 μ0
 @show Δμ = nb[:,1]
 @show σs |> extrema
 
-evs = compute_evs(man1,μs,Ň)
+evs = compute_evs(man1,friction_coefficients,Ň)
 values = evs.values |> VectorOfArray
 
 GM.activate!(); plotsave_evs(evs,σs[begin:end-1];)

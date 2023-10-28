@@ -332,30 +332,30 @@ function make_∂T∂xᵀ∂x(qcs::QC)
     end
 end
 
-function rigidState2coordinates(ro,R,ṙo,ω)
+function rigidState2coordinates(origin_position,R,origin_velocity,ω)
     Rmat = RotMatrix(R)
     q = QuatRotation(Rmat).q |> vec
     Ω = inv(Rmat)*ω
     q̇ = localAngular2quatVel(q,Ω)
-    x = vcat(ro,q)
-    ẋ = vcat(ṙo,q̇)
+    x = vcat(origin_position,q)
+    ẋ = vcat(origin_velocity,q̇)
     x, ẋ
 end
 
-function find_R(x)
+function find_rotation(x)
     q = @view x[4:7]
     RotMatrix(QuatRotation(q))
 end
 
-function find_Ω(x,ẋ)
+function find_local_angular_velocity(x,ẋ)
     q = @view x[4:7] 
     q̇ = @view ẋ[4:7]
     quatVel2localAngular(q,q̇)
 end
 
-function find_ω(x,ẋ)
-    R = find_R(x)
-    Ω = find_Ω(x,ẋ)
+function find_angular_velocity(x,ẋ)
+    R = find_rotation(x)
+    Ω = find_local_angular_velocity(x,ẋ)
     R*Ω
 end
 

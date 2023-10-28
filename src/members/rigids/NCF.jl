@@ -6,6 +6,8 @@ using ForwardDiff
 using DocStringExtensions
 using SymmetricFormats
 
+import ..Rible: HouseholderOrthogonalization
+
 export get_nconstraints, get_ncoords, get_ndof, get_nlocaldim
 
 """
@@ -107,46 +109,6 @@ Return 自由度数。
 $(TYPEDSIGNATURES)
 """
 get_ndof(nmcs::LNC) =  get_ncoords(nmcs) - get_nconstraints(nmcs)
-
-# """
-# Return 外积结果。
-# $(TYPEDSIGNATURES)
-# """
-@inline @inbounds function LinearAlgebra.cross(a::Number,b::AbstractVector)
-    ret = similar(b)
-    ret[1] = -a*b[2]
-    ret[2] =  a*b[1]
-    ret
-end
-@inline @inbounds function LinearAlgebra.cross(a::StaticArray{Tuple{1}, T, 1},b::StaticArray{Tuple{2}, T, 1}) where T
-    ret = similar(b)
-    ret[1] = -a[1]*b[2]
-    ret[2] =  a[1]*b[1]
-    ret
-end
-
-"""
-Return 旋转矩阵。
-$(TYPEDSIGNATURES)
-"""
-rotation_matrix(θ) = @SMatrix [cos(θ) -sin(θ); sin(θ) cos(θ)]
-
-# """
-# ！！！！！！！！！
-# $(TYPEDSIGNATURES)
-# """
-@inline @inbounds function HouseholderOrthogonalization(n)
-    n̂ = norm(n)
-    _, i = findmax(n.+n̂)
-    ei = 1:3 .== i
-    h = n + n̂*ei
-    H = I - 2h*transpose(h)/(transpose(h)*h)
-    u, v  = [H[:,j] for j = 1:3 if j != i]
-    if i == 2
-        u, v = v, u
-    end
-    u, v
-end
 
 function Base.getproperty(nmcs::LNC,p::Symbol)
     if (p == :r̄i) 
@@ -354,17 +316,17 @@ get_conversion(::LNC4P) = kron(
 Return rigid body natural coodinates 
 $(TYPEDSIGNATURES)
 """
-function rigidstate2naturalcoords(nmcs::Union{LNC2D2C,LNC3D3C},ro,R)
-    ro
+function rigidstate2naturalcoords(nmcs::Union{LNC2D2C,LNC3D3C},origin_position,R)
+    origin_position
 end
 
-function rigidstate2naturalcoords(nmcs::Union{LNC2D2C,LNC3D3C},ro,R,ṙo,ω)
-    ro,ṙo
+function rigidstate2naturalcoords(nmcs::Union{LNC2D2C,LNC3D3C},origin_position,R,origin_velocity,ω)
+    origin_position,origin_velocity
 end
 
-function rigidstate2naturalcoords(nmcs,ro,R)
+function rigidstate2naturalcoords(nmcs,origin_position,R)
     (;r̄i,X̄) = nmcs
-    ri = ro + R*r̄i
+    ri = origin_position + R*r̄i
     X = R*X̄
     qstd = vcat(ri,vec(X))
     Y = get_conversion(nmcs)
@@ -372,10 +334,10 @@ function rigidstate2naturalcoords(nmcs,ro,R)
     q
 end
 
-function rigidstate2naturalcoords(nmcs,ro,R,ṙo,ω)
+function rigidstate2naturalcoords(nmcs,origin_position,R,origin_velocity,ω)
     (;r̄i,X̄) = nmcs
-    ri = ro + R*r̄i
-    ṙi = ṙo + ω×(ri-ro)
+    ri = origin_position + R*r̄i
+    ṙi = origin_velocity + ω×(ri-origin_position)
     X = R*X̄
     Ẋ = reduce(hcat,Ref(ω) .× eachcol(X))
     qstd = vcat(ri,vec(X))
@@ -418,10 +380,10 @@ Return 2D rigid bar natural coodinates 。
 $(TYPEDSIGNATURES)
 """
 function NC2D1P1V(ri::AbstractVector{T},u::AbstractVector{T},
-               ro=SVector{2}(zeros(T,2)),R=SMatrix{2,2}(one(T)*I)
+               origin_position=SVector{2}(zeros(T,2)),R=SMatrix{2,2}(one(T)*I)
                ) where T
     invR = transpose(R) # because this is a rotation matrix
-    r̄i = invR*(ri-ro) #
+    r̄i = invR*(ri-origin_position) #
     ū = invR*u
     X̄ = ū
     nmcs = LNC2D1P1V(
@@ -434,21 +396,21 @@ function NC2D1P1V(ri::AbstractVector{T},u::AbstractVector{T},
     nmcs,q
 end
 
-function NC2D1P1V(ri,u,ro,θ::Number,ṙo,ω)
+function NC2D1P1V(ri,u,origin_position,θ::Number,origin_velocity,ω)
     R = rotation_matrix(θ)
-    nmcs,q = NC2D1P1V(ri,u,ro,R)
-    ṙi = ṙo + ω×(ri-ro)
-    u̇ = ṙo + ω×u
+    nmcs,q = NC2D1P1V(ri,u,origin_position,R)
+    ṙi = origin_velocity + ω×(ri-origin_position)
+    u̇ = origin_velocity + ω×u
     q̇ = vcat(ṙi,u̇)
     nmcs,SVector{4}(q),SVector{4}(q̇)
 end
 
 function NC2D2P(ri::AbstractVector{T},rj::AbstractVector{T},
-    ro=SVector{2}(zeros(T,2)),R=SMatrix{2,2}(one(T)*I)
+    origin_position=SVector{2}(zeros(T,2)),R=SMatrix{2,2}(one(T)*I)
     ) where T
     invR = transpose(R) # because this is a rotation matrix
-    r̄i = invR*(ri-ro) #
-    r̄j = invR*(rj-ro) #
+    r̄i = invR*(ri-origin_position) #
+    r̄j = invR*(rj-origin_position) #
     ū = r̄j-r̄i
     X̄ = ū
     nmcs = LNC2D2P(
@@ -461,11 +423,11 @@ function NC2D2P(ri::AbstractVector{T},rj::AbstractVector{T},
     nmcs,q
 end
 
-function NC2D2P(ri,rj,ro,θ::Number,ṙo,ω)
+function NC2D2P(ri,rj,origin_position,θ::Number,origin_velocity,ω)
     R = rotation_matrix(θ)
-    nmcs,q = NC2D2P(ri,rj,ro,R)
-    ṙi = ṙo + ω×(ri-ro)
-    ṙj = ṙo + ω×(rj-ro)
+    nmcs,q = NC2D2P(ri,rj,origin_position,R)
+    ṙi = origin_velocity + ω×(ri-origin_position)
+    ṙj = origin_velocity + ω×(rj-origin_position)
     q̇ = vcat(ṙi,ṙj)
     nmcs,SVector{4}(q),SVector{4}(q̇)
 end
@@ -475,10 +437,10 @@ Return 3D rigid bar natural coodinates 。
 $(TYPEDSIGNATURES)
 """
 function NC3D1P1V(ri::AbstractVector{T},u::AbstractVector{T},
-               ro=SVector{3}(zeros(T,3)),R=SMatrix{3,3}(one(T)*I)
+               origin_position=SVector{3}(zeros(T,3)),R=SMatrix{3,3}(one(T)*I)
                ) where T
     invR = transpose(R) # because this is a rotation matrix
-    r̄i = invR*(ri-ro) 
+    r̄i = invR*(ri-origin_position) 
     ū = invR*u
     X̄ = ū
     nmcs = LNC3D1P1V(
@@ -491,20 +453,20 @@ function NC3D1P1V(ri::AbstractVector{T},u::AbstractVector{T},
     nmcs,q
 end
 
-function NC3D1P1V(ri,u,ro,R::AbstractMatrix,ṙo,ω)
-    nmcs,q = NC3D1P1V(ri,u,ro,R)
-    ṙi = ṙo + ω×(ri-ro)
-    u̇ = ṙo + ω×u
+function NC3D1P1V(ri,u,origin_position,R::AbstractMatrix,origin_velocity,ω)
+    nmcs,q = NC3D1P1V(ri,u,origin_position,R)
+    ṙi = origin_velocity + ω×(ri-origin_position)
+    u̇ = origin_velocity + ω×u
     q̇ = vcat(ṙi,u̇)
     nmcs,SVector{6}(q),SVector{6}(q̇)
 end
 
 function NC3D2P(ri::AbstractVector{T},rj::AbstractVector{T},
-    ro=SVector{3}(zeros(T,3)),R=SMatrix{3,3}(one(T)*I)
+    origin_position=SVector{3}(zeros(T,3)),R=SMatrix{3,3}(one(T)*I)
     ) where T
     invR = transpose(R) # because this is a rotation matrix
-    r̄i = invR*(ri-ro) #
-    r̄j = invR*(rj-ro)
+    r̄i = invR*(ri-origin_position) #
+    r̄j = invR*(rj-origin_position)
     ū = r̄j-r̄i
     X̄ = ū
     nmcs = LNC3D2P(
@@ -517,10 +479,10 @@ function NC3D2P(ri::AbstractVector{T},rj::AbstractVector{T},
     nmcs,q
 end
 
-function NC3D2P(ri,rj,ro,R::AbstractMatrix,ṙo,ω)
-    nmcs,q = NC3D2P(ri,rj,ro,R)
-    ṙi = ṙo + ω×(ri-ro)
-    ṙj = ṙo + ω×(rj-ro)
+function NC3D2P(ri,rj,origin_position,R::AbstractMatrix,origin_velocity,ω)
+    nmcs,q = NC3D2P(ri,rj,origin_position,R)
+    ṙi = origin_velocity + ω×(ri-origin_position)
+    ṙj = origin_velocity + ω×(rj-origin_position)
     q̇ = vcat(ṙi,ṙj)
     nmcs,SVector{6}(q),SVector{6}(q̇)
 end
@@ -530,14 +492,14 @@ Return 2D rigid bodies natural coodinates ，使用1个基本点、2个基本向
 $(TYPEDSIGNATURES)
 """
 function NC1P2V(ri::AbstractVector{T},
-               ro=SVector{2}(zeros(T,2)),R=SMatrix{2,2}(one(T)*I)
+               origin_position=SVector{2}(zeros(T,2)),R=SMatrix{2,2}(one(T)*I)
                ) where T
     o = zero(T)
     i = one(T)
     ū = SVector(i,o)
     v̄ = SVector(o,i)
     invR = transpose(R) # because this is a rotation matrix
-    r̄i = invR*(ri-ro) #
+    r̄i = invR*(ri-origin_position) #
     u = R*ū
     v = R*v̄
     X̄ = hcat(ū,v̄)
@@ -551,10 +513,10 @@ function NC1P2V(ri::AbstractVector{T},
     nmcs,q
 end
 
-function NC1P2V(ri,ro,θ,ṙo,ω)
+function NC1P2V(ri,origin_position,θ,origin_velocity,ω)
     R = rotation_matrix(θ)
-    nmcs,q = NC1P2V(ri,ro,R)
-    ṙi = ṙo + ω×(ri-ro)
+    nmcs,q = NC1P2V(ri,origin_position,R)
+    ṙi = origin_velocity + ω×(ri-origin_position)
     u̇ = ω×q[3:4]
     v̇ = ω×q[5:6]
     q̇ = vcat(ṙi,u̇,v̇)
@@ -566,10 +528,10 @@ Return 2D rigid bodies natural coodinates ，使用2个基本点、1个基本向
 $(TYPEDSIGNATURES)
 """
 function NC2P1V(ri::AbstractVector{T},rj::AbstractVector{T},
-                ro=SVector{2}(zeros(T,2)),R=SMatrix{2,2}(one(T)*I)) where T
+                origin_position=SVector{2}(zeros(T,2)),R=SMatrix{2,2}(one(T)*I)) where T
     invR = transpose(R) # because this is a rotation matrix
-    r̄i = invR*(ri-ro)
-    r̄j = invR*(rj-ro)
+    r̄i = invR*(ri-origin_position)
+    r̄j = invR*(rj-origin_position)
     ū = r̄j-r̄i
     v̄ = rotation_matrix(π/2)*ū
     v = R*v̄
@@ -584,11 +546,11 @@ function NC2P1V(ri::AbstractVector{T},rj::AbstractVector{T},
     nmcs,q
 end
 
-function NC2P1V(ri,rj,ro,θ,ṙo,ω)
+function NC2P1V(ri,rj,origin_position,θ,origin_velocity,ω)
     R = rotation_matrix(θ)
-    nmcs,q = NC2P1V(ri,rj,ro,R)
-    ṙi = ṙo + ω×(ri-ro)
-    ṙj = ṙo + ω×(rj-ro)
+    nmcs,q = NC2P1V(ri,rj,origin_position,R)
+    ṙi = origin_velocity + ω×(ri-origin_position)
+    ṙj = origin_velocity + ω×(rj-origin_position)
     v̇ = ω×q[5:6]
     q̇ = vcat(ṙi,ṙj,v̇)
     nmcs,SVector{6}(q),SVector{6}(q̇)
@@ -599,11 +561,11 @@ Return 2D rigid bodies natural coodinates ，使用3个基本点。
 $(TYPEDSIGNATURES)
 """
 function NC3P(ri::AbstractVector{T},rj::AbstractVector{T},rk::AbstractVector{T},
-              ro=SVector{2}(zeros(T,2)),R=SMatrix{2,2}(one(T)*I)) where T
+              origin_position=SVector{2}(zeros(T,2)),R=SMatrix{2,2}(one(T)*I)) where T
     invR = transpose(R) # because this is a rotation matrix
-    r̄i = invR*(ri-ro)
-    r̄j = invR*(rj-ro)
-    r̄k = invR*(rk-ro)
+    r̄i = invR*(ri-origin_position)
+    r̄j = invR*(rj-origin_position)
+    r̄k = invR*(rk-origin_position)
     ū = r̄j - r̄i
     v̄ = r̄k - r̄i
     X̄ = hcat(ū,v̄)
@@ -616,12 +578,12 @@ function NC3P(ri::AbstractVector{T},rj::AbstractVector{T},rk::AbstractVector{T},
     q = vcat(ri,rj,rk)
     nmcs,q
 end
-function NC3P(ri,rj,rk,ro,θ,ṙo,ω)
+function NC3P(ri,rj,rk,origin_position,θ,origin_velocity,ω)
     R = rotation_matrix(θ)
-    nmcs,q = NC3P(ri,rj,rk,ro,R)
-    ṙi = ṙo + ω×(ri-ro)
-    ṙj = ṙo + ω×(rj-ro)
-    ṙk = ṙo + ω×(rk-ro)
+    nmcs,q = NC3P(ri,rj,rk,origin_position,R)
+    ṙi = origin_velocity + ω×(ri-origin_position)
+    ṙj = origin_velocity + ω×(rj-origin_position)
+    ṙk = origin_velocity + ω×(rk-origin_position)
     q̇ = vcat(ṙi,ṙj,ṙk)
     nmcs,SVector{6}(q),SVector{6}(q̇)
 end
@@ -632,7 +594,7 @@ Return 3D rigid bodies natural coodinates ，使用1个基本点、3个基本向
 $(TYPEDSIGNATURES)
 """
 function NC1P3V(ri::AbstractVector{T},
-                ro=zeros(T,3),R=Matrix(one(T)*I,3,3)
+                origin_position=zeros(T,3),R=Matrix(one(T)*I,3,3)
                 ) where T
     o = zero(T)
     i = one(T)
@@ -640,7 +602,7 @@ function NC1P3V(ri::AbstractVector{T},
     v̄ = SVector(o,i,o)
     w̄ = SVector(o,o,i)
     invR = transpose(R) # because this is a rotation matrix
-    r̄i = invR*(ri-ro) #
+    r̄i = invR*(ri-origin_position) #
     u = R*ū
     v = R*v̄
     w = R*w̄
@@ -655,12 +617,12 @@ function NC1P3V(ri::AbstractVector{T},
     nmcs,q
 end
 function NC1P3V(ri::AbstractVector{T},u::AbstractVector{T},v::AbstractVector{T},w::AbstractVector{T},
-                ro=zeros(T,3),R=Matrix(one(T)*I,3,3)
+                origin_position=zeros(T,3),R=Matrix(one(T)*I,3,3)
                 ) where T
     o = zero(T)
     i = one(T)
     invR = transpose(R) # because this is a rotation matrix
-    r̄i = invR*(ri-ro) #
+    r̄i = invR*(ri-origin_position) #
     ū = invR*u
     v̄ = invR*v
     w̄ = invR*w
@@ -675,9 +637,9 @@ function NC1P3V(ri::AbstractVector{T},u::AbstractVector{T},v::AbstractVector{T},
     nmcs,q
 end
 
-function NC1P3V(ri,ro,R,ṙo,ω)
-    nmcs,q = NC1P3V(ri,ro,R)
-    ṙi = ṙo + ω×(ri-ro)
+function NC1P3V(ri,origin_position,R,origin_velocity,ω)
+    nmcs,q = NC1P3V(ri,origin_position,R)
+    ṙi = origin_velocity + ω×(ri-origin_position)
     u̇ = ω×q[4:6]
     v̇ = ω×q[7:9]
     ẇ = ω×q[10:12]
@@ -685,9 +647,9 @@ function NC1P3V(ri,ro,R,ṙo,ω)
     nmcs,SVector{12}(q),SVector{12}(q̇)
 end
 
-function NC1P3V(ri,u,v,w,ro,R,ṙo,ω)
-    nmcs,q = NC1P3V(ri,u,v,w,ro,R)
-    ṙi = ṙo + ω×(ri-ro)
+function NC1P3V(ri,u,v,w,origin_position,R,origin_velocity,ω)
+    nmcs,q = NC1P3V(ri,u,v,w,origin_position,R)
+    ṙi = origin_velocity + ω×(ri-origin_position)
     u̇ = ω×u
     v̇ = ω×v
     ẇ = ω×w
@@ -700,11 +662,11 @@ Return 3D rigid bodies natural coodinates ，使用2个基本点、2个基本向
 $(TYPEDSIGNATURES)
 """
 function NC2P2V(ri::AbstractVector{T},rj::AbstractVector{T},
-                       ro=zeros(T,3),R=Matrix(one(T)*I,3,3)
+                       origin_position=zeros(T,3),R=Matrix(one(T)*I,3,3)
                        ) where T
     invR = transpose(R) # because this is a rotation matrix
-    r̄i = invR*(ri-ro)
-    r̄j = invR*(rj-ro)
+    r̄i = invR*(ri-origin_position)
+    r̄j = invR*(rj-origin_position)
     u = rj-ri
     ū = invR*u
     v̄,w̄ = HouseholderOrthogonalization(ū./norm(ū)).*norm(ū)
@@ -723,11 +685,11 @@ end
 
 function NC2P2V(ri::AbstractVector{T},rj::AbstractVector{T},
                 v::AbstractVector{T},w::AbstractVector{T},
-                       ro=zeros(T,3),R=Matrix(one(T)*I,3,3)
+                       origin_position=zeros(T,3),R=Matrix(one(T)*I,3,3)
                        ) where T
     invR = transpose(R) # because this is a rotation matrix
-    r̄i = invR*(ri-ro)
-    r̄j = invR*(rj-ro)
+    r̄i = invR*(ri-origin_position)
+    r̄j = invR*(rj-origin_position)
     u = rj-ri
     ū = invR*u
     v̄ = invR*v
@@ -743,20 +705,20 @@ function NC2P2V(ri::AbstractVector{T},rj::AbstractVector{T},
     nmcs,q
 end
 
-function NC2P2V(ri,rj,ro,R,ṙo,ω)
-    nmcs,q = NC2P2V(ri,rj,ro,R)
-    ṙi = ṙo + ω×(ri-ro)
-    ṙj = ṙo + ω×(rj-ro)
+function NC2P2V(ri,rj,origin_position,R,origin_velocity,ω)
+    nmcs,q = NC2P2V(ri,rj,origin_position,R)
+    ṙi = origin_velocity + ω×(ri-origin_position)
+    ṙj = origin_velocity + ω×(rj-origin_position)
     v̇ = ω×q[7:9]
     ẇ = ω×q[10:12]
     q̇ = vcat(ṙi,ṙj,v̇,ẇ)
     nmcs,SVector{12}(q),SVector{12}(q̇)
 end
 
-function NC2P2V(ri,rj,v,w,ro,R,ṙo,ω)
-    nmcs,q = NC2P2V(ri,rj,v,w,ro,R)
-    ṙi = ṙo + ω×(ri-ro)
-    ṙj = ṙo + ω×(rj-ro)
+function NC2P2V(ri,rj,v,w,origin_position,R,origin_velocity,ω)
+    nmcs,q = NC2P2V(ri,rj,v,w,origin_position,R)
+    ṙi = origin_velocity + ω×(ri-origin_position)
+    ṙj = origin_velocity + ω×(rj-origin_position)
     v̇ = ω×v
     ẇ = ω×w
     q̇ = vcat(ṙi,ṙj,v̇,ẇ)
@@ -769,15 +731,15 @@ $(TYPEDSIGNATURES)
 """
 function NC3P1V(ri::AbstractVector{T},rj::AbstractVector{T},
                        rk::AbstractVector{T},
-                       ro=zeros(T,3),R=Matrix(one(T)*I,3,3)
+                       origin_position=zeros(T,3),R=Matrix(one(T)*I,3,3)
                        ) where T
     u = rj-ri
     v = rk-ri
     w = u×v
     invR = transpose(R) # because this is a rotation matrix
-    r̄i = invR*(ri-ro)
-    r̄j = invR*(rj-ro)
-    r̄k = invR*(rk-ro)
+    r̄i = invR*(ri-origin_position)
+    r̄j = invR*(rj-origin_position)
+    r̄k = invR*(rk-origin_position)
     ū = r̄j-r̄i
     v̄ = r̄k-r̄i
     w̄ = invR*w
@@ -792,11 +754,11 @@ function NC3P1V(ri::AbstractVector{T},rj::AbstractVector{T},
     nmcs,q
 end
 
-function NC3P1V(ri,rj,rk,ro,R,ṙo,ω)
-    nmcs,q = NC3P1V(ri,rj,rk,ro,R)
-    ṙi = ṙo + ω×(ri-ro)
-    ṙj = ṙo + ω×(rj-ro)
-    ṙk = ṙo + ω×(rk-ro)
+function NC3P1V(ri,rj,rk,origin_position,R,origin_velocity,ω)
+    nmcs,q = NC3P1V(ri,rj,rk,origin_position,R)
+    ṙi = origin_velocity + ω×(ri-origin_position)
+    ṙj = origin_velocity + ω×(rj-origin_position)
+    ṙk = origin_velocity + ω×(rk-origin_position)
     ẇ = ω×q[10:12]
     q̇ = vcat(ṙi,ṙj,ṙk,ẇ)
     nmcs,SVector{12}(q),SVector{12}(q̇)
@@ -808,13 +770,13 @@ $(TYPEDSIGNATURES)
 """
 function NC4P(ri::AbstractVector{T},rj::AbstractVector{T},
                        rk::AbstractVector{T},rl::AbstractVector{T},
-                       ro=zeros(T,3),R=Matrix(one(T)*I,3,3)
+                       origin_position=zeros(T,3),R=Matrix(one(T)*I,3,3)
                        ) where T
     invR = transpose(R) # because this is a rotation matrix
-    r̄i = invR*(ri-ro)
-    r̄j = invR*(rj-ro)
-    r̄k = invR*(rk-ro)
-    r̄l = invR*(rl-ro)
+    r̄i = invR*(ri-origin_position)
+    r̄j = invR*(rj-origin_position)
+    r̄k = invR*(rk-origin_position)
+    r̄l = invR*(rl-origin_position)
     ū = r̄j - r̄i
     v̄ = r̄k - r̄i
     w̄ = r̄l - r̄i
@@ -829,12 +791,12 @@ function NC4P(ri::AbstractVector{T},rj::AbstractVector{T},
     nmcs,q
 end
 
-function NC4P(ri,rj,rk,rl,ro,R,ṙo,ω)
-    nmcs,q = NC4P(ri,rj,rk,rl,ro,R)
-    ṙi = ṙo + ω×(ri-ro)
-    ṙj = ṙo + ω×(rj-ro)
-    ṙk = ṙo + ω×(rk-ro)
-    ṙl = ṙo + ω×(rl-ro)
+function NC4P(ri,rj,rk,rl,origin_position,R,origin_velocity,ω)
+    nmcs,q = NC4P(ri,rj,rk,rl,origin_position,R)
+    ṙi = origin_velocity + ω×(ri-origin_position)
+    ṙj = origin_velocity + ω×(rj-origin_position)
+    ṙk = origin_velocity + ω×(rk-origin_position)
+    ṙl = origin_velocity + ω×(rl-origin_position)
     q̇ = vcat(ṙi,ṙj,ṙk,ṙl)
     nmcs,SVector{12}(q),SVector{12}(q̇)
 end
@@ -1341,24 +1303,24 @@ end
 Ī2J̄(::Union{LNC2D2C,LNC3D3C,LNC2D6C,LNC3D6C},Ī)  = Ī
 Ī2J̄(::LNC3D12C,Ī) = 1/2*tr(Ī)*I-Ī
 
-function Īg2az(nmcs,m,Īg,r̄g)
+function Īg2az(nmcs,m,Īg,mass_locus)
     (;r̄i,invX̄) = nmcs
-    a = invX̄*(r̄g-r̄i)
+    a = invX̄*(mass_locus-r̄i)
     J̄g = Ī2J̄(nmcs,Īg)
-    J̄o = J̄g + m*r̄g*transpose(r̄g)
-    J̄i = J̄o - m*r̄i*transpose(r̄g) - m*r̄g*transpose(r̄i) + m*r̄i*transpose(r̄i)
+    J̄o = J̄g + m*mass_locus*transpose(mass_locus)
+    J̄i = J̄o - m*r̄i*transpose(mass_locus) - m*mass_locus*transpose(r̄i) + m*r̄i*transpose(r̄i)
     z = invX̄*J̄i*transpose(invX̄)
     #@assert issymmetric(z)
     a,Symmetric(z)
 end
 
 ## Mass matrices: standard
-function make_M(cf::CoordinateFunctions,m::T,Īg,r̄g) where {T} # ami (area moment of inertia tensor)
+function make_M(cf::CoordinateFunctions,m::T,Īg,mass_locus) where {T} # ami (area moment of inertia tensor)
     (;nmcs) = cf
     ndim = get_ndim(nmcs)
     nld = get_nlocaldim(nmcs)
     ncoords = get_ncoords(nmcs)
-    a,z = Īg2az(nmcs,m,Īg,r̄g)
+    a,z = Īg2az(nmcs,m,Īg,mass_locus)
     M_raw = zeros(T,1+nld,1+nld)
     M_raw[1,1] = m
     M_raw[2:1+nld,1] = m*a
@@ -1379,15 +1341,15 @@ function make_X(nmcs::LNC,q::AbstractVector)
     if (nmcs isa LNC2D2C) || (nmcs isa LNC3D3C)
         return X
     elseif  (nmcs isa LNC2D4C) || (nmcs isa LNC3D6C)
-        # return find_R(nmcs,q)
+        # return find_rotation(nmcs,q)
         return SMatrix{ndim,1}(X)
     else
         return SMatrix{ndim,ndim}(X)
     end
 end
 
-find_R(q::AbstractVector, nmcs::LNC) = find_R(nmcs,q)
-function find_R(nmcs::LNC,q::AbstractVector)
+find_rotation(q::AbstractVector, nmcs::LNC) = find_rotation(nmcs,q)
+function find_rotation(nmcs::LNC,q::AbstractVector)
     (;invX̄) = nmcs
     ndim = get_ndim(nmcs)
     if nmcs isa LNC2D4C
@@ -1407,9 +1369,9 @@ function find_R(nmcs::LNC,q::AbstractVector)
     return R
 end
 
-find_ω(q::AbstractVector,q̇::AbstractVector,nmcs::LNC3D) = find_ω(nmcs,q,q̇)
+find_angular_velocity(q::AbstractVector,q̇::AbstractVector,nmcs::LNC3D) = find_angular_velocity(nmcs,q,q̇)
 
-function find_ω(nmcs::LNC,q::AbstractVector,q̇::AbstractVector)
+function find_angular_velocity(nmcs::LNC,q::AbstractVector,q̇::AbstractVector)
     Ẋ = make_X(nmcs,q̇)
     X = make_X(nmcs,q)
     ndim = get_ndim(nmcs)

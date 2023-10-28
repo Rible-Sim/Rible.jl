@@ -8,10 +8,10 @@ function build_2d_bar(id,ri,rj;α = 0.0, ci = Int[])
 	u = rj - ri
 	b = norm(u)
 	α = atan(u[2],u[1])
-	r̄g  = SVector{2}([ b/2,0])
+	mass_locus  = SVector{2}([ b/2,0])
 	r̄p1 = SVector{2}([ 0.0,0])
 	r̄p2 = SVector{2}([   b,0])
-	r̄ps = [r̄p1,r̄p2]
+	loci = [r̄p1,r̄p2]
 	m = 2.6934977798E-02
 	Īg = SMatrix{2,2}(
 		[
@@ -20,14 +20,14 @@ function build_2d_bar(id,ri,rj;α = 0.0, ci = Int[])
 		]
 	)
 	prop = RB.RigidBodyProperty(id,movable,m,Īg,
-				r̄g,r̄ps;constrained=constrained
+				mass_locus,loci;constrained=constrained
 				)
 	ω = 0.0
 	ro = ri
 	ṙo = zero(ro)
 	lncs,q0,q̇0 = RB.NCF.NC2D2P(ri,rj,ro,α,ṙo,ω)
 	state = RB.RigidBodyState(prop,lncs,ro,α,ṙo,ω,ci)
-	rb = RB.RigidBody(prop,state)
+	body = RB.RigidBody(prop,state)
 end
 
 function build_2d_tri(id,ri,rj=nothing,rk=nothing;
@@ -49,15 +49,15 @@ function build_2d_tri(id,ri,rj=nothing,rk=nothing;
 	b2 = b - b1
 	a1 = 1.0b; b1 = √(2b^2-a1^2)
 	a2 = 1.2b; b2 = √(2b^2-a2^2)
-	r̄g  = SVector{2}([ (b1+b)/3, h/3])
+	mass_locus  = SVector{2}([ (b1+b)/3, h/3])
 	r̄p1 = SVector{2}([      0.0, 0.0])
 	r̄p2 = SVector{2}([       -a1, b2])
 	r̄p3 = SVector{2}([        a1, b2])
 	r̄p4 = SVector{2}([      -3a2, b2])
 	r̄p5 = SVector{2}([       3a2, b2])
-	r̄ps = [r̄p1,r̄p2,r̄p3,r̄p4,r̄p5]
-	@myshow r̄ps
-	ās = [ SVector{2}([      1.0, 0.0])]
+	loci = [r̄p1,r̄p2,r̄p3,r̄p4,r̄p5]
+	@myshow loci
+	axes = [ SVector{2}([      1.0, 0.0])]
 	Īgx = (b*h^3)/36
 	Īgy = h*b*(b^2 - b*b1 + b1^2)/36
 	A = b*h/2
@@ -72,10 +72,10 @@ function build_2d_tri(id,ri,rj=nothing,rk=nothing;
 			Īgxy Īgx
 		]
 	)
-	@show norm(r̄g),m,Īg,tr(Īg)
-	@show r̄g,atan(r̄g[2],r̄g[1])
+	@show norm(mass_locus),m,Īg,tr(Īg)
+	@show mass_locus,atan(mass_locus[2],mass_locus[1])
 	prop = RB.RigidBodyProperty(id,movable,m,Īg,
-				r̄g,r̄ps,;constrained=constrained
+				mass_locus,loci,;constrained=constrained
 				)
 	ω = 0.0
 	ro = ri
@@ -101,7 +101,7 @@ function build_2d_tri(id,ri,rj=nothing,rk=nothing;
 		end
 	end
 	state = RB.RigidBodyState(prop,lncs,ro,α,ṙo,ω,ci,Φi)
-	rb = RB.RigidBody(prop,state,trimesh)
+	body = RB.RigidBody(prop,state,trimesh)
 end
 
 function build_2d_ground(id)
@@ -114,20 +114,20 @@ function build_2d_ground(id)
 	Ia = SMatrix{2,2}(Matrix(m*a^2*I,2,2))
 	r̄g_x = 0.0
 	r̄g_y = 0.0
-	r̄g  = SVector{2}([ 0.0, 0.0])
+	mass_locus  = SVector{2}([ 0.0, 0.0])
 	r̄p1 = SVector{2}([ 0.0, 0.0])
 	r̄p2 = SVector{2}([ -b1, 0.0])
 	r̄p3 = SVector{2}([ 2b1, 0.0])
-	r̄ps = [r̄p1,r̄p2,r̄p3]
+	loci = [r̄p1,r̄p2,r̄p3]
 	prop = RB.RigidBodyProperty(id,movable,m,Ia,
-				r̄g,r̄ps;constrained=constrained
+				mass_locus,loci;constrained=constrained
 				)
 	α = 0.0; ω = 0.0
 	R = RB.rotation_matrix(α)
 	ro = zeros(2)
 	ṙo = zero(ro)
-	rps = Ref(ro) .+ Ref(R).*r̄ps
-	lncs,q0 = RB.NCF.NCMP(rps,ro,R,ṙo,ω)
+	loci_states = Ref(ro) .+ Ref(R).*loci
+	lncs,q0 = RB.NCF.NCMP(loci_states,ro,R,ṙo,ω)
 	# cf = RB.NCF.CoordinateFunctions(lncs,q0,ci,uci)
 	# @show typeof(lncs)
 	nq = length(q0)
@@ -135,7 +135,7 @@ function build_2d_ground(id)
 	uci = Int[]
 	Φi = Int[]
 	state = RB.RigidBodyState(prop,lncs,ro,α,ṙo,ω,ci,Φi)
-	rb = RB.RigidBody(prop,state)
+	body = RB.RigidBody(prop,state)
 end
 
 function two_tri(;k=100.0,c=0.0,ratio=0.8)
@@ -392,24 +392,24 @@ function plot_tower2d!(ax,
 	linesegs_tris =  Vector{Tuple{Point{ndim,T},Point{ndim,T}}}()
 	ploys_tris = Vector{Vector{Point{ndim,T}}}()
 	for rb in rbs
-		if rb.state.cache.funcs.nmcs isa RB.NCF.LNC2D2P
+		if body.state.cache.funcs.nmcs isa RB.NCF.LNC2D2P
 			push!(
 				linesegs_bars,
-				(Point(rb.state.rps[1]),Point(rb.state.rps[2])),
+				(Point(body.state.loci_states[1]),Point(body.state.loci_states[2])),
 			)
-		elseif rb.state.cache.funcs.nmcs isa RB.NCF.LNCMP
+		elseif body.state.cache.funcs.nmcs isa RB.NCF.LNCMP
 		else
 			append!(
 				linesegs_tris,
 				[
-					(Point(rb.state.rps[1]), Point(rb.state.rps[2])),
-					(Point(rb.state.rps[2]), Point(rb.state.rps[3])),
-					(Point(rb.state.rps[3]), Point(rb.state.rps[1])),
+					(Point(body.state.loci_states[1]), Point(body.state.loci_states[2])),
+					(Point(body.state.loci_states[2]), Point(body.state.loci_states[3])),
+					(Point(body.state.loci_states[3]), Point(body.state.loci_states[1])),
 				]
 			)
 			push!(
 				ploys_tris,
-				[Point(rb.state.rps[i]) for i = 1:3]
+				[Point(body.state.loci_states[i]) for i = 1:3]
 			)
 		end
 	end
@@ -450,11 +450,11 @@ function plot_one_bar_one_tri!(ax,
 		ndim = RB.get_ndim($tgob)
 		T = RB.get_numbertype($tgob)
 		ret = Vector{Pair{Point{ndim,T},Point{ndim,T}}}()
-		foreach($tgob.bodies) do rb
-			if rb.state.cache.funcs.nmcs isa RB.NCF.LNC2D2P
+		foreach($tgob.bodies) do body
+			if body.state.cache.funcs.nmcs isa RB.NCF.LNC2D2P
 				push!(ret,
-					Point(rb.state.rps[1])=>
-					Point(rb.state.rps[2])
+					Point(body.state.loci_states[1])=>
+					Point(body.state.loci_states[2])
 				)
 			end
 		end
@@ -465,12 +465,12 @@ function plot_one_bar_one_tri!(ax,
 		ndim = RB.get_ndim($tgob)
 		T = RB.get_numbertype($tgob)
 		ret = Vector{Vector{Point{ndim,T}}}()
-		foreach($tgob.bodies) do rb
-			if rb.state.cache.funcs.nmcs isa RB.NCF.LNC2D2P
+		foreach($tgob.bodies) do body
+			if body.state.cache.funcs.nmcs isa RB.NCF.LNC2D2P
 				nothing
 			else
 				push!(ret,
-					[Point(rb.state.rps[i]) for i = 1:3]
+					[Point(body.state.loci_states[i]) for i = 1:3]
 				)
 			end
 		end
@@ -666,14 +666,14 @@ function trapezoid(id,ri,ro=ri,
 	r̄p2 = SVector{2}([  r, 0.0])
 	r̄p3 = SVector{2}([ -b/2,  h])
 	r̄p4 = SVector{2}([  b/2,  h])
-	r̄ps = [r̄p1,r̄p2,r̄p3,r̄p4]
+	loci = [r̄p1,r̄p2,r̄p3,r̄p4]
 	ρ = 1.0
 	m1 = ρ*2r
 	m2 = ρ*h
 	m3 = ρ*b
 	m = m1+m2+m3
 	r̄gy = (m2*h/2+m3*h)/m
-	r̄g  = SVector{2}([  0, r̄gy])
+	mass_locus  = SVector{2}([  0, r̄gy])
 	I1_c = m1*(2r)^2/12
 	I2_c = m2*h^2/12
 	I3_c = m3*b^2/12
@@ -689,14 +689,14 @@ function trapezoid(id,ri,ro=ri,
 	)
 
 	prop = RB.RigidBodyProperty(id,movable,m,Īg,
-				r̄g,r̄ps;constrained=constrained
+				mass_locus,loci;constrained=constrained
 				)
 	ω = 0.0
 	# ṙo = [0.0,0.0001]
 	ṙo = zero(ro)
 	lncs,q0,q̇0 = RB.NCF.NC1P2V(ri,ro,α,ṙo,ω)
 	state = RB.RigidBodyState(prop,lncs,ro,α,ṙo,ω,ci,Φi)
-	rb = RB.RigidBody(prop,state)
+	body = RB.RigidBody(prop,state)
 
 end
 

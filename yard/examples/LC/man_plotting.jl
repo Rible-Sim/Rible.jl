@@ -2,23 +2,23 @@ function get_cables(st)
     (;connected) = st.connectivity
     ret = Vector{Pair{Point2{Float64},Point2{Float64}}}(undef,st.ncables)
     map!(ret,connected) do scnt
-        Point(scnt.hen.rbsig.state.rps[scnt.hen.pid]) =>
-        Point(scnt.egg.rbsig.state.rps[scnt.egg.pid])
+        Point(scnt.hen.rbsig.state.loci_states[scnt.hen.pid]) =>
+        Point(scnt.egg.rbsig.state.loci_states[scnt.egg.pid])
     end
     ret
 end
 
-function rb_bars(rb)
-    (;lncs) = rb.state.cache.funcs
+function rb_bars(body)
+    (;lncs) = body.state.cache.funcs
     if lncs isa RB.NCF.LocalNCF2D2P
         return [
-            Point(rb.state.rps[1]) => Point(rb.state.rps[2]);
+            Point(body.state.loci_states[1]) => Point(body.state.loci_states[2]);
         ]
     else
         return [
-            Point(rb.state.rps[1]) => Point(rb.state.rps[2]);
-            Point(rb.state.rps[2]) => Point(rb.state.rps[3]);
-            Point(rb.state.rps[3]) => Point(rb.state.rps[1]);
+            Point(body.state.loci_states[1]) => Point(body.state.loci_states[2]);
+            Point(body.state.loci_states[2]) => Point(body.state.loci_states[3]);
+            Point(body.state.loci_states[3]) => Point(body.state.loci_states[1]);
         ]
     end
 end
@@ -26,8 +26,8 @@ end
 function update_scene!(st,bars,cables,q)
     cnt = st.connectivity
     RB.update_rigids!(st,q)
-    foreach(st.rigidbodies) do rb
-        bars[rbid][] = rb_bars(rb)
+    foreach(st.rigidbodies) do body
+        bars[bodyid][] = rb_bars(body)
     end
     cables[] = RB.get_cables(st)
     # angles = update_angles(st)
@@ -51,8 +51,8 @@ end
 
 function bars_and_cables(st)
     bars = Vector{Observable}(undef,st.nrigids)
-    map!(bars,st.rigidbodies) do rb
-        Observable(rb_bars(rb))
+    map!(bars,st.rigidbodies) do body
+        Observable(rb_bars(body))
     end
     # @show bars
     cables = Observable(get_cables(st))

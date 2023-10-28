@@ -38,7 +38,7 @@ function make_zhongccp_ns_stepk(nq,nλ,na,qₖ₋₁,vₖ₋₁,pₖ₋₁,tₖ�
     n2 = nq+nλ
     nΛ = 3na
     nx = n2
-    function ns_stepk!(𝐫𝐞𝐬,𝐉,Fₘ,∂F∂q,∂F∂q̇,𝐁,𝐛,𝐜ᵀ,𝐍,𝐫,x,Λₖ,D,Dₘ,Dₖ,H,es,timestep,iteration)
+    function ns_stepk!(𝐫𝐞𝐬,𝐉,Fₘ,∂F∂q,∂F∂q̇,𝐁,𝐛,𝐜ᵀ,𝐍,𝐫,x,Λₖ,D,Dₘ,Dₖ,H,restitution_coefficients,timestep,iteration)
         # @show timestep, iteration, na
         qₖ = @view x[   1:n1]
         λₘ = @view x[n1+1:n2]
@@ -90,7 +90,7 @@ function make_zhongccp_ns_stepk(nq,nλ,na,qₖ₋₁,vₖ₋₁,pₖ₋₁,tₖ�
                 vₜⁱ⁺   = norm(vⁱ⁺[2:3])
                 vₙⁱₖ₋₁ = vⁱₖ₋₁[1]
                 vₙⁱ   = vⁱ⁺[1]
-                v́ₜⁱ = vₜⁱ⁺ + es[i]*min(vₙⁱₖ₋₁,0)
+                v́ₜⁱ = vₜⁱ⁺ + restitution_coefficients[i]*min(vₙⁱₖ₋₁,0)
                 𝐛[is+1:is+3] .= [v́ₜⁱ,0,0]
                 Dⁱₘ = @view Dₘ[is+1:is+3,:]
                 Dⁱₖ = @view Dₖ[is+1:is+3,:]
@@ -171,7 +171,7 @@ function solve!(intor::Integrator,solvercache::ZhongCCPCache;
         qˣ = qₖ₋₁ .+ dt./2 .*q̇ₖ₋₁
         qₖ .= qₖ₋₁ .+ dt .*q̇ₖ₋₁
         q̇ₖ .= q̇ₖ₋₁
-        na,mem2act_idx,persistent_indices,contacts_bits,H,es,D, Dₘ,Dₖ,∂Dq̇∂q, ∂DᵀΛ∂q,ŕ, L = prepare_contacts!(qˣ)
+        na,mem2act_idx,persistent_indices,contacts_bits,H,restitution_coefficients,D, Dₘ,Dₖ,∂Dq̇∂q, ∂DᵀΛ∂q,ŕ, L = prepare_contacts!(qˣ)
         isconverged = false
         normRes = typemax(T)
         iteration_break = 0
@@ -199,9 +199,9 @@ function solve!(intor::Integrator,solvercache::ZhongCCPCache;
             Λʳₖ .= Λₖ
             Nmax = 50
             for iteration = 1:maxiters
-                # @show iteration,D,ηs,es,gaps
+                # @show iteration,D,ηs,restitution_coefficients,gaps
                 get_distribution_law!(L,mem2act_idx,x[1:nq])
-                luJac = ns_stepk!(Res,Jac,F,∂F∂q,∂F∂q̇,𝐁,𝐛,𝐜ᵀ,𝐍,𝐫,x,Λₖ,D,Dₘ,Dₖ,H,es,timestep,iteration)
+                luJac = ns_stepk!(Res,Jac,F,∂F∂q,∂F∂q̇,𝐁,𝐛,𝐜ᵀ,𝐍,𝐫,x,Λₖ,D,Dₘ,Dₖ,H,restitution_coefficients,timestep,iteration)
                 normRes = norm(Res)
                 if na == 0
                     if normRes < ftol

@@ -1,5 +1,5 @@
-function rb_bars(rb)
-    ps = rb.state.p
+function rb_bars(body)
+    ps = body.state.p
     cs = [[1,2,3],[4,7,10],[5,8,11],[6,9,12],[10,11,12]]
     vcat(collect(Base.Iterators.flatten([[Point(ps[c[1]]) => Point(ps[c[2]]),
             Point(ps[c[2]]) => Point(ps[c[3]]),
@@ -19,7 +19,7 @@ function read_rb_mesh()
 end
 
 function bars_and_strings(st)
-    bars = [Node(rb_bars(rb)
+    bars = [Node(rb_bars(body)
             ) for rb in st.rigidbodies]
     strings = Node(RB.get_strings(st))
     bars,strings
@@ -33,7 +33,7 @@ end
 
 function get_spheres(st)
     r = 0.002
-    [Makie.Sphere(Point3f0(rp), r) for rb in st.rigidbodies for rp in rb.state.rps]
+    [Makie.Sphere(Point3f0(rp), r) for rb in st.rigidbodies for rp in body.state.loci_states]
 end
 
 function pyramids_strings_and_spheres(st,pyramid)
@@ -47,8 +47,8 @@ function update_rb_mesh!(meshobj,rb)
     n1 = [1,0,0]
     n2 = [0,1,0]
     n3 = [0,0,1]
-    @unpack c,C = rb.state.cache.funcs
-    q = rb.state.coords.q
+    @unpack c,C = body.state.cache.funcs
+    q = body.state.coords.q
     r = C(c(o))*q
     R1 = C(c(n1))*q-r
     R2 = C(c(n2))*q-r
@@ -198,11 +198,11 @@ function bars_and_strings_segs_3D(tgstruct;ref=false)
     bars_segs, strings_segs
 end
 
-function get_trajectory(rbid,pid,st,sol,step_range=:)
+function get_trajectory(bodyid,pid,st,sol,step_range=:)
     rp = VectorOfArray(Vector{Vector{Float64}}())
     for q in sol.qs
         RB.distribute_q_to_rbs!(st,q)
-        push!(rp,st.rigidbodies[rbid].state.p[pid])
+        push!(rp,st.rigidbodies[bodyid].state.p[pid])
     end
     rp
 end

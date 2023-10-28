@@ -9,7 +9,7 @@ function spine3d(n;c=0.0)
     mass = 0.1 #kg
     #inertia = Matrix(Diagonal([45.174,45.174,25.787]))*1e-8 # N/m^2
     inertia = Matrix(Diagonal([45.174,45.174,25.787]))*1e-2
-    r̄g = [0.0, 0.0, 0.0]
+    mass_locus = [0.0, 0.0, 0.0]
 
     ap_x = cos(θ)*a
     ap_y = sin(θ)*a
@@ -26,7 +26,7 @@ function spine3d(n;c=0.0)
 
     props = [RB.RigidBodyProperty(i,movable[i],mass,
                 SMatrix{3,3}(inertia),
-                SVector{3}(r̄g),
+                SVector{3}(mass_locus),
                 aps;constrained=constrained[i]) for i = 1:n]
 
     rs = [[0.0,0.0,i*h] for i = 0:n-1]
@@ -49,7 +49,7 @@ function spine3d(n;c=0.0)
         # lncs,q,q̇ = RB.NCF.NC2P2V(rk,rl,r,R,ṙ,ω)
         lncs,_ = RB.NCF.NC1P3V(r,r,R,ṙ,ω)
         state = RB.RigidBodyState(prop,lncs,r,R,ṙ,ω,ci,Φi)
-        rb = RB.RigidBody(prop,state)
+        body = RB.RigidBody(prop,state)
     end
     rbs = [rigidbody(i,props[i],aps,rs[i],Rs[i],ṙs[i],ωs[i]) for i = 1:n]
 	rigdibodies = TypeSortedCollection(rbs)

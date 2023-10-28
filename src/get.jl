@@ -52,10 +52,10 @@ function get_s(st::Structure)
     1 ./get_cables_len(st::Structure)
 end
 
-function get_c(st::Structure,rbid,pid)
+function get_c(st::Structure,bodyid,pid)
     (;mem2num,num2sys) = st.connectivity.numbered
     (;c) = st.state.system
-    cidx = mem2num[rbid][pid]
+    cidx = mem2num[bodyid][pid]
     c[num2sys[cidx]]
 end
 
@@ -66,33 +66,33 @@ function get_c(bodies,numbered::NumberedPoints)
     T = get_numbertype(bodies)
     (;mem2num,num2sys,nc) = numbered
     ret = zeros(T,nc)
-    foreach(bodies) do rb
-        rbid = rb.prop.id
-        for i in eachindex(rb.prop.r̄ps)
-            ip = mem2num[rbid][i]
-            ret[num2sys[ip]] .= get_c(rb,rb.prop.r̄ps[i])
+    foreach(bodies) do body
+        bodyid = body.prop.id
+        for i in eachindex(body.prop.loci)
+            ip = mem2num[bodyid][i]
+            ret[num2sys[ip]] .= get_c(body,body.prop.loci[i].position)
         end
     end
     ret
 end
 
-function get_c(rb::RigidBody,r̄p)
-    rb.state.cache.funcs.c(r̄p)
+function get_c(body::RigidBody,r̄p)
+    body.state.cache.funcs.c(r̄p)
 end
 
-function get_c(rb::FlexibleBody,r̄p)
-    rb.state.cache.funcs.x(r̄p)
+function get_c(body::FlexibleBody,r̄p)
+    body.state.cache.funcs.x(r̄p)
 end
 
 function set_C!(st::Structure,c)
     T = get_numbertype(st::Structure)
     (;numbered,indexed) = st.connectivity
     (;mem2num,num2sys,nc) = numbered
-    foreach(st.bodies) do rb
-        rbid = rb.prop.id
-        for i in eachindex(rb.prop.r̄ps)
-            ip = mem2num[rbid][i]
-            rb.state.cache.Cps[i] = rb.state.cache.funcs.C(c[num2sys[ip]])
+    foreach(st.bodies) do body
+        bodyid = body.prop.id
+        for i in eachindex(body.prop.loci)
+            ip = mem2num[bodyid][i]
+            body.state.cache.Cps[i] = body.state.cache.funcs.C(c[num2sys[ip]])
         end
     end
 end
@@ -104,11 +104,11 @@ function get_d(st::Structure)
     T = get_numbertype(st::Structure)
     d = Vector{T}(undef,nconstraints)
     is = Ref(ninconstraints)
-    foreach(bodies) do rb
-        rbid = rb.prop.id
-        memincst = mem2sysincst[rbid]
+    foreach(bodies) do body
+        bodyid = body.prop.id
+        memincst = mem2sysincst[bodyid]
         if !isempty(memincst)
-            d[memincst] .= NCF.get_deform(rb.state.cache.funcs.nmcs)
+            d[memincst] .= NCF.get_deform(body.state.cache.funcs.nmcs)
         end
     end
     foreach(jointed.joints) do joint
@@ -148,15 +148,15 @@ get_nconstraints(st::Structure) = st.nconstraints
 function get_nconstraints(rbs::TypeSortedCollection)
     ninconstraints = mapreduce(get_ninconstraints,+,rbs,init=0)
 end
-get_ninconstraints(rb::AbstractRigidBody) = get_nconstraints(rb.state.cache.funcs.nmcs)
-get_nbodycoords(rb::AbstractRigidBody) = get_nbodycoords(rb.state.cache.funcs.nmcs)
-get_ndof(rb::AbstractRigidBody) = get_ndof(rb.state.cache.funcs.nmcs)
-get_nlocaldim(rb::AbstractRigidBody) = get_nlocaldim(rb.state.cache)
+get_ninconstraints(body::AbstractRigidBody) = get_nconstraints(body.state.cache.funcs.nmcs)
+get_nbodycoords(body::AbstractRigidBody) = get_nbodycoords(body.state.cache.funcs.nmcs)
+get_ndof(body::AbstractRigidBody) = get_ndof(body.state.cache.funcs.nmcs)
+get_nlocaldim(body::AbstractRigidBody) = get_nlocaldim(body.state.cache)
 get_nlocaldim(cache::NonminimalCoordinatesCache) = get_nlocaldim(cache.funcs.nmcs)
 
 get_ninconstraints(fb::AbstractFlexibleBody) = get_nconstraints(fb.state.cache.funcs.ancs)
 get_nbodycoords(fb::AbstractFlexibleBody) = get_nbodycoords(fb.state.cache.funcs.ancs)
-get_ndof(rb::AbstractFlexibleBody) = get_ndof(rb.state.cache.funcs.ancs)
+get_ndof(body::AbstractFlexibleBody) = get_ndof(body.state.cache.funcs.ancs)
 get_nlocaldim(fb::AbstractFlexibleBody) = get_nlocaldim(fb.state.cache)
 get_nlocaldim(cache::FlexibleBodyCoordinatesCache) = get_nlocaldim(cache.funcs.ancs)
 
@@ -185,7 +185,7 @@ get_gravity(bot::Robot) = get_gravity(bot.st)
 get_gravity(st::Structure) = get_gravity(st.bodies)
 get_gravity(rbs::AbstractVector{<:AbstractRigidBody}) = get_gravity(eltype(rbs))
 get_gravity(rbs::TypeSortedCollection) = get_gravity(eltype(rbs.data[1]))
-get_gravity(rb::AbstractBody) = get_gravity(typeof(rb))
+get_gravity(body::AbstractBody) = get_gravity(typeof(body))
 get_gravity(::Type{<:AbstractBody{2,T}}) where {T} = SVector(zero(T),        -9.81*one(T))
 get_gravity(::Type{<:AbstractBody{3,T}}) where {T} = SVector(zero(T),zero(T),-9.81*one(T))
 # get_gravity(::Type{<:AbstractBody{3,T}}) where {T} = SVector(zero(T),-9.81*one(T),zero(T))

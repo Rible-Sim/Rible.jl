@@ -24,8 +24,8 @@ function get_elastic_potential_energy(st,sol)
 end
 
 function velocity_to_kinetic_energy(vs,ω1s,ω2s,ω3s,rb)
-    inertia = rb.prop.inertia
-    mass = rb.prop.mass
+    inertia = body.prop.inertia
+    mass = body.prop.mass
     rb_ke = Vector{Float64}()
     for (v,ω1,ω2,ω3) in zip(vs,ω1s,ω2s,ω3s)
         trans_ke = 1/2*mass*v^2
@@ -43,15 +43,15 @@ function get_kinetic_energy(st,sol)
     for (q,q̇) in zip(sol.qs,sol.q̇s)
         RB.reset_forces!(st)
         RB.distribute_q_to_rbs!(st,q,q̇)
-        rbs_ke = [RB.kinetic_energy_coords(rb) for rb in rbs]
+        rbs_ke = [RB.kinetic_energy_coords(body) for rb in rbs]
         push!(ke.u,rbs_ke)
     end
     ke
 end
 
 function cm_to_gravity_potential_energy(cms,rb)
-    g = RB.get_gravity(rb)
-    gpes = -g[end]*cms*rb.prop.mass
+    g = RB.get_gravity(body)
+    gpes = -g[end]*cms*body.prop.mass
 end
 
 function adams_to_energy(res,tr,l0,s_index,energy1;gravity=false)

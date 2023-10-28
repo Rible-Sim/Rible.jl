@@ -52,8 +52,8 @@ end
 #-- point Mass
 
 function new_pointmass(;
-        ro = [0.0,0.0,1.0],
-        ṙo = zero(ro),
+        origin_position = [0.0,0.0,1.0],
+        origin_velocity = zero(origin_position),
         m = 1.0,
         μ = 0.3,
         e = 0.9
@@ -61,25 +61,25 @@ function new_pointmass(;
     movable = false
     constrained = true
     Ia = SMatrix{3,3}(Matrix(m*I,3,3))
-    r̄g  = SVector{3}([ 0.0, 0.0, 0.0])
+    mass_locus  = SVector{3}([ 0.0, 0.0, 0.0])
     r̄p1 = SVector{3}([ 0.0, 0.0, 0.0])
-    r̄ps = [r̄p1]
-    ās = [SVector{3}([ 1.0, 0.0, 0.0])]
-    μs = [μ]
-    es = [e]
+    loci = [r̄p1]
+    axes = [SVector{3}([ 1.0, 0.0, 0.0])]
+    friction_coefficients = [μ]
+    restitution_coefficients = [e]
     prop = RB.RigidBodyProperty(
         1,movable,m,Ia,
-        r̄g,r̄ps,ās,
-        μs,es,
+        mass_locus,loci,axes,
+        friction_coefficients,restitution_coefficients,
         ;constrained=constrained
     )
-    ω = zero(ro)
+    ω = zero(origin_position)
     R = RotX(0.0)
-    rps = Ref(ro) .+ Ref(R).*r̄ps
-    lncs, _ = RB.NCF.NC3D1P(rps[1],)
+    loci = Ref(origin_position) .+ Ref(R).*loci
+    lncs, _ = RB.NCF.NC3D1P(loci[1],)
     ci = Int[]
     Φi = Int[]
-    state = RB.RigidBodyState(prop,lncs,ro,R,ṙo,ω,ci,Φi)
+    state = RB.RigidBodyState(prop,lncs,origin_position,R,origin_velocity,ω,ci,Φi)
     rb1 = RB.RigidBody(prop,state)
 
     rbs = TypeSortedCollection((rb1,))
@@ -108,12 +108,12 @@ tspan = (0.0,1.5)
 h = 1e-3
 
 # horizontal plane
-es = [0.5]
+restitution_coefficients = [0.5]
 v0s = [1.0]
 pms_hp = [
     begin
         pm = new_pointmass(;
-                e,μ=0.1,ṙo = [v0,0,0]
+                e,μ=0.1,origin_velocity = [v0,0,0]
             )
         RB.solve!(
             RB.SimProblem(pm,pm_contact_dynfuncs),
@@ -124,7 +124,7 @@ pms_hp = [
             exception=false
         )
     end
-    for v0 in v0s for e in es
+    for v0 in v0s for e in restitution_coefficients
 ]
 
 GM.activate!();with_theme(theme_pub;
@@ -214,20 +214,20 @@ end
 
 θ = 15 |> deg2rad
 inclined_plane = RB.Plane([-tan(θ),0,1],zeros(3))
-ro = [0.0,0,-1e-7]
-ṙo = [2.0cos(θ),0,2.0sin(θ)]
-# ṙo = [0,-2.0,0]
+origin_position = [0.0,0,-1e-7]
+origin_velocity = [2.0cos(θ),0,2.0sin(θ)]
+# origin_velocity = [0,-2.0,0]
 
 # analytical
 g = 9.81
 μ=0.3
-vo = norm(ṙo)
+vo = norm(origin_velocity)
 a = -μ*g*cos(θ)-g*sin(θ)
 # μ*g*cos(θ)-g*sin(θ)
 tf = -vo/a
 # d(t) -> vo*t+1/2*a*t^2
 tspan = (0.0,0.6)
-pm = new_pointmass(;e=0.0, μ, ro, ṙo)
+pm = new_pointmass(;e=0.0, μ, origin_position, origin_velocity)
 
 prob = RB.SimProblem(pm,(x)->pm_contact_dynfuncs(x;θ))
 RB.solve!(prob,RB.ZhongCCP();tspan,dt=1e-3,ftol=1e-14,maxiters=50,exception=false)
@@ -235,7 +235,7 @@ RB.solve!(prob,RB.ZhongCCP();tspan,dt=1e-3,ftol=1e-14,maxiters=50,exception=fals
 rp1 = RB.get_trajectory!(pm,1,1)
 ṙp1 = RB.get_velocity!(pm,1,1)
 dp1 = rp1.u .|> norm
-vl1 = [u ⋅ normalize(ṙo) for u in ṙp1]
+vl1 = [u ⋅ normalize(origin_velocity) for u in ṙp1]
 # overshoot!
 scatterlines(vl1)
 GM.activate!(); with_theme(theme_pub;
@@ -339,9 +339,9 @@ end
 
 #--  Spinning top
 
-function make_top(ro = [0.0,0.0,0.0],
+function make_top(origin_position = [0.0,0.0,0.0],
         R = one(RotMatrix{3}),
-        ṙo = [0.0,0.0,0.0],
+        origin_velocity = [0.0,0.0,0.0],
         Ω = [0.0,0.0,5.0],
         cT = RB.QBF.QC;
         μ = 0.5,
@@ -359,7 +359,7 @@ function make_top(ro = [0.0,0.0,0.0],
     end
 
     m =  0.58387070
-    r̄g = @SVector zeros(3)
+    mass_locus = @SVector zeros(3)
     # Ī = SMatrix{3,3}(Matrix(1.0I,3,3))
     Ī = SMatrix{3,3}(
         Diagonal(SA[
@@ -372,11 +372,11 @@ function make_top(ro = [0.0,0.0,0.0],
     # h = 0.02292582
     radius = 0.044/√2
     h = 2*0.01897941
-    r̄ps = [radius.*[1,1,0] for i = 1:4]
-    push!(r̄ps,[0,0,-h])
-    ās = [SVector(1.0,0,0) for i = 1:5]
-    μs = [μ for i = 1:5]
-    es = [e for i = 1:5]
+    loci = [radius.*[1,1,0] for i = 1:4]
+    push!(loci,[0,0,-h])
+    axes = [SVector(1.0,0,0) for i = 1:5]
+    friction_coefficients = [μ for i = 1:5]
+    restitution_coefficients = [e for i = 1:5]
     if loadmesh
         topmesh = load(
             RB.assetpath("Toupise2.STL")
@@ -385,7 +385,7 @@ function make_top(ro = [0.0,0.0,0.0],
             color,
         )
     else
-        pts = Point3.(r̄ps)
+        pts = Point3.(loci)
         fcs = GB.TriangleFace.([
             [5,1,2],
             [5,4,3],
@@ -401,18 +401,18 @@ function make_top(ro = [0.0,0.0,0.0],
     end
     prop = RB.RigidBodyProperty(
         1,movable,m,Ī,
-        r̄g,r̄ps,ās,
-        μs,es;
+        mass_locus,loci,axes,
+        friction_coefficients,restitution_coefficients;
         constrained
     )
-    ri = ro+R*r̄ps[5]
+    ri = origin_position+R*loci[5]
     @myshow ri
     if cT == RB.QBF.QC
         nmcs = RB.QBF.QC(m,Ī)
     else
-        nmcs, _ = RB.NCF.NC1P3V(ri,ro,R,ṙo,ω)
+        nmcs, _ = RB.NCF.NC1P3V(ri,origin_position,R,origin_velocity,ω)
     end
-    state = RB.RigidBodyState(prop,nmcs,ro,R,ṙo,ω,pres_idx)
+    state = RB.RigidBodyState(prop,nmcs,origin_position,R,origin_velocity,ω,pres_idx)
     rb1 = RB.RigidBody(prop,state,topmesh)
     rbs = TypeSortedCollection((rb1,))
     numberedpoints = RB.number(rbs)
@@ -434,12 +434,12 @@ function top_contact_dynfuncs(bot;checkpersist=true,)
     )
 end
 
-ro = [0,0,0.5]
+origin_position = [0,0,0.5]
 R = RotX(0.0)
-ṙo = [1.0,0.0,0.0]
+origin_velocity = [1.0,0.0,0.0]
 Ω = [0.0,0.0,200.0]
 # R = rand(RotMatrix3)
-# ṙo = rand(3)
+# origin_velocity = rand(3)
 # Ω = rand(3)
 
 # tspan = (0.0,1.0)
@@ -448,7 +448,7 @@ e = 0.5
 tspan = (0.0,1.8)
 h = 1e-4
 
-topq = make_top(ro,R,ṙo,Ω;μ,e,loadmesh=true)
+topq = make_top(origin_position,R,origin_velocity,Ω;μ,e,loadmesh=true)
 #note subsequent iteration slow convergence 
 #note initial guess can not improve it?
 RB.solve!(
@@ -471,7 +471,7 @@ plot_traj!(
     showarrows=false,
 )
 
-topn = make_top(ro,R,ṙo,Ω,RB.NCF.LNC;μ,e,loadmesh=true)
+topn = make_top(origin_position,R,origin_velocity,Ω,RB.NCF.LNC;μ,e,loadmesh=true)
 RB.solve!(
     RB.SimProblem(topn,top_contact_dynfuncs),
     RB.ZhongCCP();
@@ -618,11 +618,11 @@ topn_longtimes = [
     begin
         h = 2*0.01897941
         θ = π/18
-        ro = h.*[0,sin(θ),cos(θ)]
+        origin_position = h.*[0,sin(θ),cos(θ)]
         R = RotX(θ)
-        ṙo = [0.0,0.0,0.0]
+        origin_velocity = [0.0,0.0,0.0]
         Ω = [0.0,0.0,200.0]
-        bot = make_top(ro,R,ṙo,Ω,RB.NCF.LNC;μ,e,loadmesh=true)
+        bot = make_top(origin_position,R,origin_velocity,Ω,RB.NCF.LNC;μ,e,loadmesh=true)
         RB.solve!(
             RB.SimProblem(bot,(x)->top_contact_dynfuncs(x;checkpersist=check)),
             RB.ZhongCCP();
@@ -718,13 +718,13 @@ end
 # sliding
 
 R = RotX(π/18)
-ro = [0,0,0.037]
+origin_position = [0,0,0.037]
 Ω = [0,0,50.0]
 dts = [1e-3,1e-2]
 checks = [true,false]
 tops_e0 = [
     begin   
-        topbot = make_top(ro,R,ṙo,Ω,RB.NCF.LNC; μ = 0.01, e = 0.0,loadmesh=true)
+        topbot = make_top(origin_position,R,origin_velocity,Ω,RB.NCF.LNC; μ = 0.01, e = 0.0,loadmesh=true)
         RB.solve!(
             RB.SimProblem(topbot,(x)->top_contact_dynfuncs(x;checkpersist=check)),
             RB.ZhongCCP();
@@ -980,8 +980,8 @@ function make_bar(;
  l = 1.0
  Ixx = 1/12*m*l^2
  Ī = SMatrix{3,3}(Diagonal([Ixx,0.0,0.0]))
- r̄g = SVector{3}(0.0,0.0,0.0)
- r̄ps = SVector{3}.([
+ mass_locus = SVector{3}(0.0,0.0,0.0)
+ loci = SVector{3}.([
      [ -l/2, 0.0, 0.0],
      [  l/2, 0.0, 0.0]
  ])
@@ -990,22 +990,22 @@ function make_bar(;
  xoffset = 1e-6
  ri = [     0.0-xoffset,0.0,sin(θ)*l-zoffset]
  rj = [cos(θ)*l-xoffset,0.0,     0.0-zoffset]
- ro = (ri + rj)./2
- ṙo = zero(ro)
- ω = zero(ro)
+ origin_position = (ri + rj)./2
+ origin_velocity = zero(origin_position)
+ ω = zero(origin_position)
  R = Matrix(RotY(θ))
 
  # b = l/2*ω[2]*sin(θ)-9.81
  # p⁺ = 1 + 3*cos(θ)^2-μ*cos(θ)*sin(θ)
  # @show b,p⁺
 
- prop = RB.RigidBodyProperty(1,movable,m,Ī,r̄g,r̄ps;constrained)
+ prop = RB.RigidBodyProperty(1,movable,m,Ī,mass_locus,loci;constrained)
 
- lncs, _ = RB.NCF.NC3D2P(ri,rj,ro,R,ṙo,ω)
- state = RB.RigidBodyState(prop,lncs,ro,R,ṙo,ω)
+ lncs, _ = RB.NCF.NC3D2P(ri,rj,origin_position,R,origin_velocity,ω)
+ state = RB.RigidBodyState(prop,lncs,origin_position,R,origin_velocity,ω)
 
- p1 = Meshes.Point(r̄ps[1])
- p2 = Meshes.Point(r̄ps[2])
+ p1 = Meshes.Point(loci[1])
+ p2 = Meshes.Point(loci[2])
  s = Meshes.Segment(p1,p2)
  cyl_bar = Meshes.Cylinder(Meshes.length(s)/40,s)
  cylsurf_bar = Meshes.boundary(cyl_bar)
@@ -1051,10 +1051,10 @@ function bar_contact_dynfuncs(bot)
  rbs = RB.get_bodies(st)
  function prepare_contacts!(contacts, q)
      RB.update_rigids!(st,q)
-     rb = rbs[1]
+     body = rbs[1]
      dirs = [1,3]
      for pid = 1:2
-         gap = rb.state.rps[pid][dirs[pid]]
+         gap = body.state.loci[pid][dirs[pid]]
          RB.activate!(contacts[pid],gap)
      end
      active_contacts = filter(contacts) do c
@@ -1066,11 +1066,11 @@ function bar_contact_dynfuncs(bot)
      for (i,ac) in enumerate(active_contacts)
          (;id,state) = ac
          n = float.(1:3 .== dirs[id])
-         state.frame = RB.SpatialFrame(n)
+         state.frame = RB.spatial_frame(n)
          (;n,t1,t2) = state.frame
-         rbid = 1
-         C = rbs[rbid].state.cache.Cps[id]
-         CT = C*RB.build_T(st,rbid)
+         bodyid = 1
+         C = rbs[bodyid].state.cache.Cps[id]
+         CT = C*RB.build_T(st,bodyid)
          Dn = Matrix(transpose(n)*CT)
          Dt1 = Matrix(transpose(t1)*CT)
          Dt2 = Matrix(transpose(t2)*CT)
@@ -1079,10 +1079,10 @@ function bar_contact_dynfuncs(bot)
          D[3(i-1)+3,:] = Dt2
          inv_μ_vec[3(i-1)+1] = 1/ac.μ
      end
-     es = [ac.e for ac in active_contacts]
+     restitution_coefficients = [ac.e for ac in active_contacts]
      gaps = [ac.state.gap for ac in active_contacts]
      H = Diagonal(inv_μ_vec)
-     active_contacts, na, gaps, D, H, es
+     active_contacts, na, gaps, D, H, restitution_coefficients
  end
  F!,Jac_F!,prepare_contacts!
 end
@@ -1119,9 +1119,9 @@ cablemesh = sample(ancs,e,1000)
 
 mesh(cablemesh,transparency=false)
 
-function make_hammer(id,r̄ijkl,ro,R,ri,rj=nothing,rk=nothing,rl=nothing;
+function make_hammer(id,r̄ijkl,origin_position,R,ri,rj=nothing,rk=nothing,rl=nothing;
         μ,e,
-        ω = zero(ro),
+        ω = zero(origin_position),
         movable = true,
         constrained = false,
         pres_idx = Int[],
@@ -1137,44 +1137,44 @@ function make_hammer(id,r̄ijkl,ro,R,ri,rj=nothing,rk=nothing,rl=nothing;
             ])
         )
     )
-    r̄g = SVector(-0.20,0,0)
-    # r̄ps = deepcopy(r̄ijkl)
-    r̄ps = vcat(
+    mass_locus = SVector(-0.20,0,0)
+    # loci = deepcopy(r̄ijkl)
+    loci = vcat(
         [
-            SVector(0.22*cos(i*π/2),0.0,0.22*sin(i*π/2)) + r̄g
+            SVector(0.22*cos(i*π/2),0.0,0.22*sin(i*π/2)) + mass_locus
             for i = -2:1
         ],
         [
-            RotY( π/4)*SVector(0.0,0.22*cos(i*π/3),0.22*sin(i*π/3)) + r̄g
+            RotY( π/4)*SVector(0.0,0.22*cos(i*π/3),0.22*sin(i*π/3)) + mass_locus
             for i = 1:6
         ],
         [
-            RotY(-π/4)*SVector(0.0,0.22*cos(i*π/3),0.22*sin(i*π/3)) + r̄g
+            RotY(-π/4)*SVector(0.0,0.22*cos(i*π/3),0.22*sin(i*π/3)) + mass_locus
             for i = [1,2,4,5]
         ]
     )
-    ās = [
+    axes = [
         SVector(1.0,0,0) 
-        for _ in eachindex(r̄ps)
+        for _ in eachindex(loci)
     ]
-    μs = fill(μ,length(r̄ps))
-    es = fill(e,length(r̄ps))
-    @show m,diag(Īg),r̄g,length(r̄ps),μs,es
+    friction_coefficients = fill(μ,length(loci))
+    restitution_coefficients = fill(e,length(loci))
+    @show m,diag(Īg),mass_locus,length(loci),friction_coefficients,restitution_coefficients
     prop = RB.RigidBodyProperty(
                 id,movable,m,Īg,
-                r̄g,r̄ps,ās,
-                μs,es;
+                mass_locus,loci,axes,
+                friction_coefficients,restitution_coefficients;
                 constrained=constrained
                 )
-    ṙo = zero(ro)
+    origin_velocity = zero(origin_position)
     if rj isa Nothing
-        lncs,_ = RB.NCF.NC1P3V(ri,ro,R,ṙo,ω)
+        lncs,_ = RB.NCF.NC1P3V(ri,origin_position,R,origin_velocity,ω)
     elseif rk isa Nothing
-        lncs,_ = RB.NCF.NC2P2V(ri,rj,ro,R,ṙo,ω)
+        lncs,_ = RB.NCF.NC2P2V(ri,rj,origin_position,R,origin_velocity,ω)
     elseif rl isa Nothing
-        lncs,_ = RB.NCF.NC3P1V(ri,rj,rk,ro,R,ṙo,ω)
+        lncs,_ = RB.NCF.NC3P1V(ri,rj,rk,origin_position,R,origin_velocity,ω)
     else
-        lncs,_ = RB.NCF.NC4P(ri,rj,rk,rl,ro,R,ṙo,ω)
+        lncs,_ = RB.NCF.NC4P(ri,rj,rk,rl,origin_position,R,origin_velocity,ω)
     end
     # cf = RB.NCF.CoordinateFunctions(lncs,q0,pres_idx,free_idx)
     # @show typeof(lncs)
@@ -1183,8 +1183,8 @@ function make_hammer(id,r̄ijkl,ro,R,ri,rj=nothing,rk=nothing,rl=nothing;
         scale = 1/400,
         trans = [-0.20,0,0],
     )
-    state = RB.RigidBodyState(prop,lncs,ro,R,ṙo,ω,pres_idx,Φ_mask)
-    rb = RB.RigidBody(prop,state,meteormesh)
+    state = RB.RigidBodyState(prop,lncs,origin_position,R,origin_velocity,ω,pres_idx,Φ_mask)
+    body = RB.RigidBody(prop,state,meteormesh)
 end
 
 function cable_ancf(pres_idx, 𝐞, L = 1.0) 
@@ -1203,19 +1203,19 @@ function cable_ancf(pres_idx, 𝐞, L = 1.0)
     mass = RB.ANCF.build_mass(ancs)
     @show mass
     T = typeof(L)
-    r̄g = SVector(L/2,T(0),T(0))
+    mass_locus = SVector(L/2,T(0),T(0))
     r̄p1 = SVector(T(0),T(0),T(0))
     # r̄p2 = SVector(L,T(0),T(0))
-    r̄ps = [
+    loci = [
         r̄p1,
     ]
     prop = RB.FlexibleBodyProperty(
         1,
         :cable,
         mass,
-        r̄g,
-        # length(r̄ps),
-        r̄ps
+        mass_locus,
+        # length(loci),
+        loci
     )
     # cache = RB.get_CoordinatesCache(prop,ancs,𝐞)
     state = RB.FlexibleBodyState(prop,ancs,𝐞;pres_idx)
@@ -1254,7 +1254,7 @@ function make_flexcable(;
             [0,0,1],
         ]
     )
-    rb = make_hammer(
+    rigidbody = make_hammer(
         nx+1,
         r̄ijkl,
         rj,
@@ -1265,7 +1265,7 @@ function make_flexcable(;
         pres_idx=rb_pres_idx,
         constrained=ifelse(!isempty(rb_pres_idx),true,false)
     )
-    fbs = TypeSortedCollection(vcat(subfbs,rb))
+    fbs = TypeSortedCollection(vcat(subfbs,rigidbody))
     # fbs = TypeSortedCollection([fb1,])
     numberedpoints = RB.number(fbs)
     # indexedcoords = RB.index(fbs,)
@@ -1899,9 +1899,6 @@ GM.activate!(); plot_traj!(unibot_z0)
 
 #-------- SUPERBall ---------
 
-
-plot_traj!(ballbot)
-
 GM.activate!(); with_theme(theme_pub;
         Scatter = (markersize = fontsize,)	
     ) do
@@ -1933,7 +1930,7 @@ l = 1.7/2
 d = l/2
 ballbot = superball(
     0.0;
-    ṙo = SVector(2.0,1.0,0),
+    origin_velocity = SVector(2.0,1.0,0),
     ω = SVector(0.0,0.0,1.0),
     μ = 0.05,
     e = 0.0,
@@ -2081,8 +2078,8 @@ function plotsave_velocity_restitution(bots,showlegend,
         grids = [GridLayout(fig[i,j]) for i in 1:length(bots), j = 1:2]
         for (botid,bot) in enumerate(bots)
             ax1 = Axis(grids[botid,1][1,1], xlabel = tlabel, ylabel = L"v~(\mathrm{m/s})",)
-            rbid,pid = divrem(cps[botid]-1,2) .+ 1
-            ṙpc_mid = get_mid_velocity!(bot,rbid,pid)
+            bodyid,pid = divrem(cps[botid]-1,2) .+ 1
+            ṙpc_mid = get_mid_velocity!(bot,bodyid,pid)
             t_mids = get_time_mids(bot)
             lines!(ax1,t_mids,ṙpc_mid[3,:], label="v́ₙ")
             lines!(ax1,t_mids,ṙpc_mid[1,:], label="v́ₜ" )
@@ -2092,7 +2089,7 @@ function plotsave_velocity_restitution(bots,showlegend,
             Label(grids[botid,1][1,1,Top()], "Contact No.$(cps[botid])", halign = :center)
 
             ax2 = Axis(grids[botid,2][1,1], xlabel = "Count", ylabel = L"e_{\mathrm{eff}}")
-            vz = RB.get_velocity!(bot,rbid,pid)[3,:]
+            vz = RB.get_velocity!(bot,bodyid,pid)[3,:]
 
             contacts_traj_voa = VectorOfArray(bot.contacts_traj)
             c1_traj = contacts_traj_voa[cps[botid],:]
@@ -2131,7 +2128,7 @@ CM.activate!(); plotsave_velocity_restitution(
 # rolling
 ballbot = superball(
     0.0;
-    ṙo = SVector(7.0,2.0,-7.0),
+    origin_velocity = SVector(7.0,2.0,-7.0),
     ω = SVector(0.0,0.0,0.0),
     μ = 0.9,
     e = 0.8,
@@ -2333,22 +2330,22 @@ me.E |> lines
 contacts_traj_voa = VectorOfArray(quadbot.contacts_traj)
 
 #-- cube
-function make_cube(ro = [0.0,0.0,0.5],
+function make_cube(origin_position = [0.0,0.0,0.5],
         R = one(RotMatrix{3}),
-        ṙo = [2.0,0.0,0.0],
+        origin_velocity = [2.0,0.0,0.0],
         ω = [0.0,0.0,5.0];
         μ = 0.9,
         e = 0.0
     )
     m = 1.0
-    r̄g = zeros(3)
+    mass_locus = zeros(3)
     inertia = SMatrix{3,3}(Matrix(1.0I,3,3))
     h = 5.0
-    r̄ps = [h.*[x,y,z] for z = [-1,1] for y = [-1,1] for x = [-1,1]]
-    ās = [SVector(1.0,0,0) for _ = 1:length(r̄ps)]
-    μs = [μ for _ = 1:length(r̄ps)]
-    es = [e for _ = 1:length(r̄ps)]
-    pts = Point3.(r̄ps)
+    loci = [h.*[x,y,z] for z = [-1,1] for y = [-1,1] for x = [-1,1]]
+    axes = [SVector(1.0,0,0) for _ = 1:length(loci)]
+    friction_coefficients = [μ for _ = 1:length(loci)]
+    restitution_coefficients = [e for _ = 1:length(loci)]
+    pts = Point3.(loci)
     fcs = GB.QuadFace.([
         [1,3,4,2],
         [3,7,8,4],
@@ -2361,12 +2358,12 @@ function make_cube(ro = [0.0,0.0,0.5],
     cube_mesh = GB.Mesh(GB.meta(pts,normals=nls),fcs)
     prop = RB.RigidBodyProperty(
         1,true,m,inertia,
-        r̄g,r̄ps,ās,
-        μs,es,
+        mass_locus,loci,axes,
+        friction_coefficients,restitution_coefficients,
         )
-    ri = copy(ro)
-    lncs,q,q̇ = RB.NCF.NC1P3V(ri,ro,R,ṙo,ω)
-    state = RB.RigidBodyState(prop,lncs,ro,R,ṙo,ω)
+    ri = copy(origin_position)
+    lncs,q,q̇ = RB.NCF.NC1P3V(ri,origin_position,R,origin_velocity,ω)
+    state = RB.RigidBodyState(prop,lncs,origin_position,R,origin_velocity,ω)
     rb1 = RB.RigidBody(prop,state,cube_mesh)
     rbs = TypeSortedCollection((rb1,))
     numberedpoints = RB.number(rbs)
@@ -2396,10 +2393,10 @@ end
 ros = [[0,0,z] for z = 10.0:-0.1:0.0]
 qs = [
     begin
-        cube = make_cube(ro,RotXY(π/4,π/4))
+        cube = make_cube(origin_position,RotXY(π/4,π/4))
         q = RB.get_q(cube.st)
     end
-    for ro in ros
+    for origin_position in ros
 ]
 # p = RB.generalized_α(1.0)
 Ro = [
@@ -2407,11 +2404,11 @@ Ro = [
     0.769524   0.011314  -0.638518;
     0.521314   0.566385   0.63831
 ]
-ṙo = [0.0,0.0,0.0]
+origin_velocity = [0.0,0.0,0.0]
 ωo = [3.0,4.0,5.0]
 # cube = make_cube()
 # cube = make_cube(ros[1])
-cube = make_cube(ros[2],Ro,ṙo,0.1.*ωo)
+cube = make_cube(ros[2],Ro,origin_velocity,0.1.*ωo)
 tspan = (0.0,1.91)
 tspan = (0.0,5.0)
 dt = 1e-3
@@ -2435,10 +2432,10 @@ lines(cube.traj.t,ME.E)
 
 ts,qs,vs,as,ṽ̇s = RB.NSSFC.nssfc(nq,nλ,q0,v0,p,h,contact_dynfuncs(cube),tspan;tol=1e-6,imax=10)
 
-ts,cs,qs,vs,ps,λs,μs = RB.NSSFC.nhsolve(nq,nλ,nμ,q0,v0,contact_dynfuncs(cube),tspan;
+ts,cs,qs,vs,ps,λs,friction_coefficients = RB.NSSFC.nhsolve(nq,nλ,nμ,q0,v0,contact_dynfuncs(cube),tspan;
             dt=h,ftol=1e-6,imax=50,exception=true)
 
-ts,cs,qs,vs,ps,λs,μs = RB.NSSFC.ipsolve(nq,nλ,nμ,q0,v0,contact_dynfuncs(cube),tspan;
+ts,cs,qs,vs,ps,λs,friction_coefficients = RB.NSSFC.ipsolve(nq,nλ,nμ,q0,v0,contact_dynfuncs(cube),tspan;
             dt=h,ftol=1e-10,imax=50,exception=false)
 
 ts,qs,vs,as,ṽ̇s = RB.NSSFC.nssfc(n,b,q26026,v26026,p,h,contact_dynfuncs(cube),tspan;tol=1e-10,imax=100)
@@ -2449,7 +2446,7 @@ RB.solve!(prob,RB.Zhong06();dt=h,ftol=1e-14)
 
 vis(cuberef,contact_dynamics)
 
-cube = make_cube(ros[1],Ro,ṙo,ωo)
+cube = make_cube(ros[1],Ro,origin_velocity,ωo)
 # cube = make_cube(ros[1])
 # cube = make_cube()
 
@@ -2470,11 +2467,11 @@ ME = RB.mechanical_energy!(cube;gravity=true,)
 
 ME.E
 scatter(ME.E)
-kes,epes,gpes,es,es_err = analyse_energy(cube;gravity=true,elasticity=false)
-es_off = OffsetArray(es,0:length(es)-1)
-kes_off = OffsetArray(kes,0:length(es)-1)
-gpes_off = OffsetArray(gpes,0:length(es)-1)
-steprange = 0:length(es)-1
+kes,epes,gpes,restitution_coefficients,es_err = analyse_energy(cube;gravity=true,elasticity=false)
+es_off = OffsetArray(restitution_coefficients,0:length(restitution_coefficients)-1)
+kes_off = OffsetArray(kes,0:length(restitution_coefficients)-1)
+gpes_off = OffsetArray(gpes,0:length(restitution_coefficients)-1)
+steprange = 0:length(restitution_coefficients)-1
 steprange = 558:560
 steprange = 5574:5600
 steprange = 55740:56000

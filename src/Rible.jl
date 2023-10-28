@@ -40,18 +40,25 @@ assetpath(files...) = normpath(joinpath(ASSETS_DIR, files...))
 
 include("utils.jl")
 
-include("coordinates/QBF.jl")
+
+include("members/loci.jl")
+
+include("members/abstract_body.jl")
+
+include("members/rigids/QBF.jl")
 using .QBF
-include("coordinates/NCF.jl")
+
+include("members/rigids/NCF.jl")
 using .NCF
-include("coordinates/ANCF.jl")
+
+include("members/rigids/rigid_body.jl")
+
+include("members/flexibles/cables.jl")
+
+include("members/flexibles/finite_elements/ANCF.jl")
 import .ANCF
 
-include("members/rigidbody.jl")
-
-include("members/flexiblebody.jl")
-
-include("members/cable.jl")
+include("members/flexibles/flexible_body.jl")
 
 include("members/joints.jl")
 
@@ -85,9 +92,9 @@ include("mechanics/solvers.jl")
 
 include("misc/miscellaneous.jl")
 
-include("misc/analysis.jl")
+include("postprocess/analysis.jl")
 
-include("misc/URDF.jl")
+include("preprocess/URDF.jl")
 import .URDF
 
 include("precompile.jl")

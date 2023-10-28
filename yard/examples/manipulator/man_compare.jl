@@ -5,7 +5,7 @@ function get_kinetic_energy(st,sol)
     for (q,q̇) in zip(sol.qs,sol.q̇s)
         RB.reset_forces!(st)
         RB.distribute_q_to_rbs!(st,q,q̇)
-        rbs_ke = [RB.kinetic_energy_coords(rb) for rb in rbs]
+        rbs_ke = [RB.kinetic_energy_coords(body) for rb in rbs]
         push!(ke.u,rbs_ke)
     end
     ke
@@ -36,8 +36,8 @@ function get_elastic_potential_energy(st,sol)
 end
 
 function velocity_to_kinetic_energy(vs,ωs,rb)
-    inertia = rb.prop.inertia
-    mass = rb.prop.mass
+    inertia = body.prop.inertia
+    mass = body.prop.mass
     rb_ke = Vector{Float64}()
     for (v,ω) in zip(vs,ωs)
         trans_ke = 1/2*mass*v^2
@@ -50,9 +50,9 @@ end
 
 function position_to_gravity_potential_energy(rs,rb)
     pe = Vector{Float64}()
-    g = RB.get_gravity(rb)
+    g = RB.get_gravity(body)
     for r in rs
-        push!(pe,-r*g[2]*rb.prop.mass)
+        push!(pe,-r*g[2]*body.prop.mass)
     end
     pe
 end
@@ -63,7 +63,7 @@ function get_gravity_potential_energy(st,sol)
     for (q,q̇) in zip(sol.qs,sol.q̇s)
         RB.reset_forces!(st)
         RB.distribute_q_to_rbs!(st,q,q̇)
-        rbs_gpe = [RB.potential_energy(rb) for rb in rbs]
+        rbs_gpe = [RB.potential_energy(body) for rb in rbs]
         push!(gpe.u,rbs_gpe)
     end
     gpe

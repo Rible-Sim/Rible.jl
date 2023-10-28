@@ -1,7 +1,7 @@
-rb_bars(rb) = [Point(rb.state.rps[1]) => Point(rb.state.rps[2]);]
+rb_bars(body) = [Point(body.state.loci_states[1]) => Point(body.state.loci_states[2]);]
 
 function bars_and_cables(tgstruct)
-    bars = [Node(rb_bars(rb)) for rb in tgstruct.rigidbodies]
+    bars = [Node(rb_bars(body)) for rb in tgstruct.rigidbodies]
     cables = Node(RB.get_cables(tgstruct))
     bars, cables
 end
@@ -24,7 +24,7 @@ function update_scene!(st,bars,cables,q)
     cnt = st.connectivity
     RB.distribute_q_to_rbs!(st,q)
     for (id,rb) in enumerate(st.rigidbodies)
-        bars[id][] = rb_bars(rb)
+        bars[id][] = rb_bars(body)
     end
     cables[] = RB.get_cables(st)
     # angles = update_angles(st)

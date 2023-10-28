@@ -110,13 +110,13 @@ f = RB.get_cables_tension(bot)
 function verify_lambda(st)
     T = RB.get_numbertype(st)
     λs = zeros(T,st.nbodies)
-    foreach(st.bodies) do rb
-        (;prop,state) = rb
-        (;rps,ro,fps) = state
+    foreach(st.bodies) do body
+        (;prop,state) = body
+        (;loci_states,ro,fps) = state
         @myshow prop.id
-        @myshow rps
+        @myshow loci_states
         @myshow fps
-        for (rp,fp) in zip(rps,fps)
+        for (rp,fp) in zip(loci_states,fps)
             λs[prop.id] += 1/2*(rp-ro)'*fp
         end
     end
@@ -611,8 +611,8 @@ GM.activate!();with_theme(theme_pub;
                 mapreduce(
                     (scnt)->
                     [(
-                        scnt.hen.rbsig.state.rps[scnt.hen.pid].+
-                        scnt.egg.rbsig.state.rps[scnt.egg.pid]
+                        scnt.hen.rbsig.state.loci_states[scnt.hen.pid].+
+                        scnt.egg.rbsig.state.loci_states[scnt.egg.pid]
                     )./2],
                     vcat,
                     tensioned.connected
@@ -1097,8 +1097,8 @@ GM.activate!();with_theme(theme_pub;
                 mapreduce(
                     (scnt)->
                     [(
-                        scnt.hen.rbsig.state.rps[scnt.hen.pid].+
-                        scnt.egg.rbsig.state.rps[scnt.egg.pid]
+                        scnt.hen.rbsig.state.loci_states[scnt.hen.pid].+
+                        scnt.egg.rbsig.state.loci_states[scnt.egg.pid]
                     )./2],
                     vcat,
                     tensioned.connected
@@ -1551,8 +1551,8 @@ GM.activate!();with_theme(theme_pub;
                 mapreduce(
                     (scnt)->
                     [(
-                        scnt.hen.rbsig.state.rps[scnt.hen.pid].+
-                        scnt.egg.rbsig.state.rps[scnt.egg.pid]
+                        scnt.hen.rbsig.state.loci_states[scnt.hen.pid].+
+                        scnt.egg.rbsig.state.loci_states[scnt.egg.pid]
                     )./2],
                     vcat,
                     tensioned.connected
@@ -1986,8 +1986,8 @@ GM.activate!();with_theme(theme_pub;
                 mapreduce(
                     (scnt)->
                     [(
-                        scnt.hen.rbsig.state.rps[scnt.hen.pid].+
-                        scnt.egg.rbsig.state.rps[scnt.egg.pid]
+                        scnt.hen.rbsig.state.loci_states[scnt.hen.pid].+
+                        scnt.egg.rbsig.state.loci_states[scnt.egg.pid]
                     )./2],
                     vcat,
                     tensioned.connected
@@ -2229,8 +2229,8 @@ GM.activate!();with_theme(theme_pub;
                 mapreduce(
                     (scnt)->
                     [(
-                        scnt.hen.rbsig.state.rps[scnt.hen.pid].+
-                        scnt.egg.rbsig.state.rps[scnt.egg.pid]
+                        scnt.hen.rbsig.state.loci_states[scnt.hen.pid].+
+                        scnt.egg.rbsig.state.loci_states[scnt.egg.pid]
                     )./2],
                     vcat,
                     tensioned.connected

@@ -50,9 +50,9 @@ for (i,j) in enumerate(hor_index)
     L[j] = hor_lengths[i]
 end
 
-r̄g = [zeros(2) for i = 1:nb]
+mass_locus = [zeros(2) for i = 1:nb]
 for (i,j) in enumerate(ver_index)
-    r̄g[j] .= [ver_lengths[i]/2,0.0]
+    mass_locus[j] .= [ver_lengths[i]/2,0.0]
 end
 #这个东西没懂
 
@@ -91,7 +91,7 @@ for (i,j) in enumerate(hor_index)
 end
 #推测p为约束
 
-function rigidbody(i,r̄g,m,inertia,ri,rj,aps)
+function rigidbody(i,mass_locus,m,inertia,ri,rj,aps)
     if i == 1
         movable = true
         constrained = true
@@ -105,13 +105,13 @@ function rigidbody(i,r̄g,m,inertia,ri,rj,aps)
     aps = [SVector{2}(aps[i]) for i = 1:nap]
     prop = RB.RigidBodyProperty(i,movable,
                 m,inertia,
-                SVector{2}(r̄g),
+                SVector{2}(mass_locus),
                 aps;constrained=constrained
                 )
     state = RB.RigidBodyState(prop,ri,rj,pres_idx)
-    rb = RB.RigidBody(prop,state)
+    body = RB.RigidBody(prop,state)
 end
-rbs = [rigidbody(i,r̄g[i],m[i],inertia[i],ri[i],rj[i],[p1[i],p2[i]]) for i = 1:nb]
+rbs = [rigidbody(i,mass_locus[i],m[i],inertia[i],ri[i],rj[i],[p1[i],p2[i]]) for i = 1:nb]
 
 ncables = 4n
 original_restlens = zeros(ncables)

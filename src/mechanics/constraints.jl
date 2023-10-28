@@ -17,8 +17,8 @@ function make_Φ(cst::PrototypeJoint,st::Structure)
         ret = zeros(eltype(q),nconstraints)
         q_hen = @view q[mem2sysfull[id_hen]]
         q_egg = @view q[mem2sysfull[id_egg]]
-        R_hen = NCF.find_R(nmcs_hen,q_hen)
-        R_egg = NCF.find_R(nmcs_egg,q_egg)
+        R_hen = NCF.find_rotation(nmcs_hen,q_hen)
+        R_egg = NCF.find_rotation(nmcs_egg,q_egg)
         # translate
         c_hen = c[num2sys[mem2num[id_hen]][hen.pid]]
         c_egg = c[num2sys[mem2num[id_egg]][egg.pid]]
@@ -105,8 +105,8 @@ function make_A(cst::PrototypeJoint,st::Structure)
         ret = zeros(eltype(q),nconstraints,nfree)
         q_hen = @view q[mem2sysfull[id_hen]]
         q_egg = @view q[mem2sysfull[id_egg]]
-        R_hen = NCF.find_R(nmcs_hen,q_hen)
-        R_egg = NCF.find_R(nmcs_egg,q_egg)
+        R_hen = NCF.find_rotation(nmcs_hen,q_hen)
+        R_egg = NCF.find_rotation(nmcs_egg,q_egg)
         # translate 
         c_hen = c[num2sys[mem2num[id_hen][hen.pid]]]
         c_egg = c[num2sys[mem2num[id_egg][egg.pid]]]

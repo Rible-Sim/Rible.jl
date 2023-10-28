@@ -26,11 +26,11 @@ function Robot(st,hub=nothing)
             vcat,
             map(get_bodies(st)) do body
                 (;prop,) = body
-                (;μs,es) = prop
-                rbid = prop.id
+                (;loci) = prop
+                bodyid = prop.id
                 [
-                    Contact(id,μ,e)
-                    for (id,μ,e) in  zip(mem2num[rbid],μs,es)
+                    Contact(id,lo.friction_coefficient,lo.restitution_coefficient)
+                    for (id,lo) in  zip(mem2num[bodyid],loci)
                 ]
             end
         )

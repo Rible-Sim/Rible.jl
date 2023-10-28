@@ -119,18 +119,18 @@ function controlplot(trajs,n=6)
     end
     for (id,ax) in enumerate(axs)
         if id <= n
-            @unpack ts,es,us = trajs[id]
+            @unpack ts,restitution_coefficients,us = trajs[id]
             bx = ax.twinx()
             ax.grid(which="major", axis="both")
             # bx.grid("on")
-            ep = ax.plot(ts,es,label=latexstring("\\epsilon_$id"), lw = 3)
+            ep = ax.plot(ts,restitution_coefficients,label=latexstring("\\epsilon_$id"), lw = 3)
             up = bx.plot(ts,us,label=latexstring("u_$id"), lw = 0.02, color=:orange)
             ps = [ep[1],up[1]]
             bx.set_ylabel(L"u")
             bx.set_ylim([0.0,1.0])
-            ax.set_ylim(es[1].*[-0.2,1.2])
+            ax.set_ylim(restitution_coefficients[1].*[-0.2,1.2])
             ax.yaxis.set_major_locator(plt.matplotlib.ticker.MultipleLocator(0.2es[1]))
-            ax.yaxis.set_major_formatter(plt.matplotlib.ticker.PercentFormatter(xmax=es[1]))
+            ax.yaxis.set_major_formatter(plt.matplotlib.ticker.PercentFormatter(xmax=restitution_coefficients[1]))
             ax.set_ylabel(L"\epsilon(\%)")
             ax.set_xlabel(L"t")
             ax.legend(ps, [p_.get_label() for p_ in ps])
@@ -167,7 +167,7 @@ pyplot()
 
 kes = [RB.kinetic_energy_coords(manipulator,q,q̇) for (q,q̇) in zip(sol.qs,sol.q̇s)]
 pes = [RB.potential_energy(manipulator,q,q̇) for (q,q̇) in zip(sol.qs,sol.q̇s)]
-es = kes .+ pes
+restitution_coefficients = kes .+ pes
 
 function showactuator(tgstruct)
     for (acid,actuator) in enumerate(tgstruct.actuators)

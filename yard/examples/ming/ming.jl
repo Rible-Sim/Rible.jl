@@ -209,10 +209,10 @@ _,_ = simulate_linkn(spine3)
 plotstructure(spine3,pyramid)
 plotstructure(spine3,pyramid;record_name="90.mp4")
 
-function get_forces(tr,rbid)
+function get_forces(tr,bodyid)
     @unpack st = tr
-    rb = st.rigidbodies[rbid]
-    norm.(rb.state.Faps)
+    body = st.rigidbodies[bodyid]
+    norm.(body.state.Faps)
 end
 
 get_forces(spine3,2)

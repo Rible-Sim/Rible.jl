@@ -37,7 +37,7 @@ function links(n,di,rm;k=3e1,c=0.0)
 	# 		   1.164e-05 2175.129 8.24e-06;
     #            6.58e-06	8.24e-06 2460.3283]
    	inertia = Matrix(Diagonal([2175.129,2175.129,2460.3283]))*1.e-7
-    r̄g = [0.0, 0.0, 7.5932384]*1.e-2
+    mass_locus = [0.0, 0.0, 7.5932384]*1.e-2
 
 
     ap1 = SVector{3}([0.0, 0.0, 0.0])
@@ -53,7 +53,7 @@ function links(n,di,rm;k=3e1,c=0.0)
 
     props = [RB.RigidBodyProperty(i,movable[i],mass,
                 SMatrix{3,3}(inertia),
-                SVector{3}(r̄g),
+                SVector{3}(mass_locus),
                 aps;constrained=constrained[i]) for i = 1:n]
 
     rs,Rs = bend(n,di,rm)
@@ -72,7 +72,7 @@ function links(n,di,rm;k=3e1,c=0.0)
 			pres_idx = Int[]
 		end
         state = RB.RigidBodyState(prop,lncs,ro,R,ṙo,ω,q,q̇,pres_idx)
-        rb = RB.RigidBody(prop,state)
+        body = RB.RigidBody(prop,state)
     end
     rbs = [rigidbody(i,props[i],aps,rs[i],Rs[i],ṙs[i],ωs[i]) for i = 1:n]
 

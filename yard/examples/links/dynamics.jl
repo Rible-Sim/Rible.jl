@@ -82,7 +82,7 @@ plotstructure(linkn_undamped)
 displacement_constraint_errors, velocity_constraint_errors = compute_contraint_error(linkn_undamped)
 plt.plot(displacement_constraint_errors)
 plt.plot(velocity_constraint_errors)
-kes,epes,_,es,es_err = analyse_energy(linkn_undamped,gravity=true,elasticity=true)
+kes,epes,_,restitution_coefficients,es_err = analyse_energy(linkn_undamped,gravity=true,elasticity=true)
 plt.plot(es_err)
 test_slackness(linkn_undamped)
 
@@ -206,9 +206,9 @@ function pyplot_energy(tr,l0s;gravity=false)
     ss = st.strings
     s_index = [2,3,1,5,6,4]
 
-    kes,epes,_,es,es_err = analyse_energy(tr; gravity, elasticity=true)
+    kes,epes,_,restitution_coefficients,es_err = analyse_energy(tr; gravity, elasticity=true)
     @show mean(es_err)
-    energy1 = es[1]
+    energy1 = restitution_coefficients[1]
     ke_E,epe_H,energy_H,energy_error_H = adams_to_energy(resH,tr,l0s,s_index,energy1;gravity)
     ke_E,epe_E,energy_E,energy_error_E = adams_to_energy(resE,tr,l0s,s_index,energy1;gravity)
     @show mean(energy_error_H)
@@ -263,8 +263,8 @@ function pyplot_damped_energy(tg1,sol1,tg2,sol2)
     kes1,epes1,_,es1,es_err1 = analyse_energy(tg1,sol1,elasticity=true)
     kes2,epes2,_,es2,es_err2 = analyse_energy(tg2,sol2,elasticity=true)
     fig, ax = plt.subplots(3,1,figsize=(6,9))
-    function etp_and_itp(nodes,A)
-        extrapolate(interpolate((nodes,),A, Gridded(Linear())), Flat())
+    function etp_and_itp(loci,A)
+        extrapolate(interpolate((loci,),A, Gridded(Linear())), Flat())
     end
     ts1 = sol1.ts
     es2_ts1 = [etp_and_itp(sol2.ts,es2)(t) for t in sol1.ts]

@@ -43,10 +43,10 @@ function dist!(st,state)
     RB.update_points!(st,state.c)
     RB.update_rigids!(st,state.q)
     d = Ref(zero(T))
-    foreach(st.rigidbodies) do rb
-        rbid = rb.prop.id
-        if rbid in collect(1:2:11)
-            d[] += abs(norm(rb.state.rps[7] .- origin(target)) - radius(target))
+    foreach(st.rigidbodies) do body
+        bodyid = body.prop.id
+        if bodyid in collect(1:2:11)
+            d[] += abs(norm(body.state.loci_states[7] .- origin(target)) - radius(target))
         end
     end
     d[]
@@ -148,7 +148,7 @@ function get_actuate_seqs(bot,g0=[0.0])
     @show dist!(tg_end,seq_ref0[end])
     Random.seed!(2);
     N = length(x0)
-    es = ES(
+    restitution_coefficients = ES(
         initStrategy=IsotropicStrategy(0.0002, 1.0/sqrt(2N), 1.0/sqrt(2*sqrt(N))),
         recombination=average,
         srecombination=average,
@@ -164,7 +164,7 @@ function get_actuate_seqs(bot,g0=[0.0])
         successive_f_tol = 10,
         # parallelization = :thread,
     )
-    rst = Evolutionary.optimize(f, csts, x0, es, opts)
+    rst = Evolutionary.optimize(f, csts, x0, restitution_coefficients, opts)
     f_core(rst.minimizer),seq_ref0
 end
 seq1, seq1_ref = get_actuate_seqs(man_inv)
@@ -189,7 +189,7 @@ ax.limits
 rosenbrock(x) = (1.0 - x[1])^2 + 100.0 * (x[2] - x[1]^2)^2
 Random.seed!(2);
 N = 60
-es = ES(
+restitution_coefficients = ES(
     initStrategy=IsotropicStrategy(N),
     recombination=average,
     srecombination=average,
@@ -204,7 +204,7 @@ opts = Evolutionary.Options(
     show_trace = true,
     parallelization = :thread,
 )
-Evolutionary.optimize(rosenbrock, randn(N), es, opts)
+Evolutionary.optimize(rosenbrock, randn(N), restitution_coefficients, opts)
 
 csts = BoxConstraints(
     -2ones(N),

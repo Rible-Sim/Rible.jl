@@ -62,7 +62,7 @@ function make_new_tail(n)
             ri = SVector{2}(O[:,1, lev+1])
             rj = SVector{2}(O[:,2, lev+1])
             b = norm(rj-ri)
-            r̄g = SVector{2}(0.0,0.0)
+            mass_locus = SVector{2}(0.0,0.0)
             r̄p1 = SVector{2}(-b,0.0)
             r̄p2 = SVector{2}( b,0.0)
             m = inertia = 0.1
@@ -75,7 +75,7 @@ function make_new_tail(n)
             ri = SVector{2}(O[:,1, lev])
             rj = SVector{2}(O[:,1, lev+1])
             b = norm(rj-ri)
-            r̄g = SVector{2}(b/2,0.0)
+            mass_locus = SVector{2}(b/2,0.0)
             r̄p1 = SVector{2}(0.0,0.0)
             r̄p2 = SVector{2}(  b,0.0)
             m = inertia = 0.1
@@ -84,16 +84,16 @@ function make_new_tail(n)
                 0 0
             ])
         end
-        r̄ps = [r̄p1,r̄p2]
-        nr̄p = length(r̄ps)
+        loci = [r̄p1,r̄p2]
+        nr̄p = length(loci)
         ṙo = zeros(2); ω = 0.0
         prop = RB.RigidBodyProperty(
             i,
             movable,
             m,
             Ī,
-            SVector{2}(r̄g),
-            r̄ps;
+            SVector{2}(mass_locus),
+            loci;
             constrained = constrained,
         )
         ro = ri
@@ -103,7 +103,7 @@ function make_new_tail(n)
             lncs, _ = RB.NCF.NC2D2P(ri, rj, ro, α, ṙo, ω)
         end
         state = RB.RigidBodyState(prop, lncs, ri, α, ṙo, ω, ci, Φi)
-        rb = RB.RigidBody(prop, state)
+        body = RB.RigidBody(prop, state)
     end
     rbs = [
         rigidbody(i, O) for i = 1:nb

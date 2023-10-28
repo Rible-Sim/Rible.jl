@@ -72,7 +72,7 @@ function man_ndof(ndof,onedir=[1.0,0.0];θ=0.0,k=0.0,c=0.0,unit="mks",restlen=0.
         if isodd(i)
             CoM_y = -CoM_y
         end
-        r̄g = SVector{2}([CoM_x,CoM_y])
+        mass_locus = SVector{2}([CoM_x,CoM_y])
 
         # nap = 3 #?
 		sti_l = 0.01832
@@ -116,7 +116,7 @@ function man_ndof(ndof,onedir=[1.0,0.0];θ=0.0,k=0.0,c=0.0,unit="mks",restlen=0.
         prop = RB.RigidBodyProperty(
 					i,movable,m,
 					Ī,
-                    r̄g,
+                    mass_locus,
 					aps;
 					constrained=constrained
                     )
@@ -131,7 +131,7 @@ function man_ndof(ndof,onedir=[1.0,0.0];θ=0.0,k=0.0,c=0.0,unit="mks",restlen=0.
 		prop = RB.RigidBodyProperty(
 					i,movable,m,
 					Ī,
-					r̄g,
+					mass_locus,
 					aps;
 					constrained=ifelse(i in [1,2],true,false)
 					)
@@ -148,7 +148,7 @@ function man_ndof(ndof,onedir=[1.0,0.0];θ=0.0,k=0.0,c=0.0,unit="mks",restlen=0.
 		end
 		state = RB.RigidBodyState(prop, lncs, ri, α, ṙo, ω, ci, Φi)
 
-        rb = RB.RigidBody(prop,state)
+        body = RB.RigidBody(prop,state)
     end
     rbs = [rigidbody(i,m[i],a[i],
             Ia[i],A[:,i],A[:,i+1]) for i = 1:nbodies]
@@ -240,13 +240,13 @@ function get_angles(bot)
     (;st) = bot
     rbs = RB.get_bodies(st)
     angles = zeros(st.nrigids-1)
-    for (rbid,rb) in enumerate(rbs)
-        if rbid > 1
-			state0 = rbs[rbid-1].state
-            v = state0.rps[2]-state0.rps[1]
-            state1 = rbs[rbid].state
-            w = state1.rps[2]-state1.rps[1]
-            angles[rbid-1] = get_angle(v,w)
+    for (bodyid,rb) in enumerate(rbs)
+        if bodyid > 1
+			state0 = rbs[bodyid-1].state
+            v = state0.loci_states[2]-state0.loci_states[1]
+            state1 = rbs[bodyid].state
+            w = state1.loci_states[2]-state1.loci_states[1]
+            angles[bodyid-1] = get_angle(v,w)
         end
     end
     rad2deg.(angles)

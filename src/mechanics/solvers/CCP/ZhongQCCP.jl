@@ -66,7 +66,7 @@ function make_zhongccp_ns_stepk(
     function ns_stepk!(𝐫𝐞𝐬,𝐉,𝐁,𝐛,𝐜ᵀ,𝐍,𝐫,
             x,Λₘ,Dₖ₋₁,ŕₖ₋₁,
             Dₖ,Dper, Dimp, ∂Dₖvₖ∂qₖ, ∂DᵀₖHΛₘ∂qₖ, ŕₖ,H,
-            es,timestep,iteration)
+            restitution_coefficients,timestep,iteration)
         # @show timestep, iteration, na, persistent_indices
         qₖ = @view x[   1:n1]
         λₘ = @view x[n1+1:n2]
@@ -132,7 +132,7 @@ function make_zhongccp_ns_stepk(
                 vₜⁱ⁺   = norm(vⁱ⁺[2:3])
                 # vₙⁱ   = vⁱ⁺[1]
                 # @show timestep,iteration, vₙⁱₖ₋₁, vₙⁱ, vₜⁱₖ₋₁, vₜⁱ, Λₘ
-                v́ₜⁱ = vₜⁱ⁺ + es[i]*min(vₙⁱₖ₋₁,zero(vₙⁱₖ₋₁))
+                v́ₜⁱ = vₜⁱ⁺ + restitution_coefficients[i]*min(vₙⁱₖ₋₁,zero(vₙⁱₖ₋₁))
                 𝐛[is+1:is+3] .= [v́ₜⁱ,0,0]
                 
                 Dⁱₖ = @view Dₖ[is+1:is+3,:]                
@@ -215,7 +215,7 @@ function solve!(intor::Integrator,solvercache::ZhongQCCPCache;
         qₖ .= qₖ₋₁ .+ dt .*q̇ₖ₋₁
         q̇ₖ .= q̇ₖ₋₁
         na,mem2act_idx,persistent_indices,contacts_bits,
-        H,es,Dₖ₋₁, Dper, Dimp, ∂Dq̇∂q, ∂DᵀΛ∂q, ŕₖ₋₁, 
+        H,restitution_coefficients,Dₖ₋₁, Dper, Dimp, ∂Dq̇∂q, ∂DᵀΛ∂q, ŕₖ₋₁, 
         L = prepare_contacts!(qₖ₋½)
         isconverged = false
         normRes = typemax(T)
@@ -247,11 +247,11 @@ function solve!(intor::Integrator,solvercache::ZhongQCCPCache;
             Λʳₖ .= Λₘ
             Nmax = 50
             for iteration = 1:maxiters
-                # @show iteration,D,ηs,es,gaps
+                # @show iteration,D,ηs,restitution_coefficients,gaps
                 ns_stepk!(Res,Jac,
                     𝐁,𝐛,𝐜ᵀ,𝐍,𝐫,x,Λₘ,
                     Dₖ₋₁,ŕₖ₋₁,Dₖ,Dper,Dimp,∂Dq̇∂q,∂DᵀΛ∂q,ŕₖ,H,
-                    es,timestep,iteration
+                    restitution_coefficients,timestep,iteration
                 )
                 if na == 0
                     normRes = norm(Res)

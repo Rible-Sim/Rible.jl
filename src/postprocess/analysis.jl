@@ -1,90 +1,85 @@
-function get_trajectory!(bot::Robot,rbid::Int,pid::Int,step_range=:)
+function get_trajectory!(bot::Robot,bodyid::Int,pid::Int,step_range=:)
     (; st, traj)= bot
 	T = get_numbertype(bot)
-    rp = Vector{T}[]
-    rbs = get_bodies(st)
-    rb = rbs[rbid]
-    for q in traj.q
-        update_rigids!(st,q)
-        if pid == 0
-            push!(rp,rb.state.rg)
-        else
-            push!(rp,rb.state.rps[pid])
-        end
-    end
-    rp[step_range] |> VectorOfArray
-end
-
-function get_velocity!(bot::Robot,rbid::Int,pid::Int,step_range=:)
-    (; st, traj)= bot
-	T = get_numbertype(bot)
-    ṙp = Vector{T}[]
-    rbs = get_bodies(st)
-    rb = rbs[rbid]
-    for (q,q̇) in zip(traj.q, traj.q̇)
+    N = get_ndim(bot)
+    position_traj = [
+        zeros(T,N)
+        for _ in eachindex(traj)
+    ]
+    bodies = get_bodies(st)
+    body = bodies[bodyid]
+    for (i,state) in enumerate(traj)
+        (;t,q,q̇) = state 
         update_rigids!(st,q,q̇)
         if pid == 0
-            push!(ṙp,rb.state.ṙg)
+            position_traj[i] .= body.state.mass_locus_state.position
         else
-	        push!(ṙp,rb.state.ṙps[pid])
+	        position_traj[i] .= body.state.loci_states[pid].position
 		end
     end
-    ṙp[step_range] |> VectorOfArray
+    position_traj[step_range] |> VectorOfArray
 end
 
-function get_kinetic_energy!(bot::Robot,rbid::Int,step_range=:)
+function get_velocity!(bot::Robot,bodyid::Int,pid::Int,step_range=:)
     (; st, traj)= bot
-	numberType = get_numbertype(bot)
-    T = numberType[]
-    rbs = get_bodies(st)
-    rb = rbs[rbid]
-    for (q,q̇) in zip(traj.q, traj.q̇)
+	T = get_numbertype(bot)
+    N = get_ndim(bot)
+    velocity_traj = [
+        zeros(T,N)
+        for _ in eachindex(traj)
+    ]
+    bodies = get_bodies(st)
+    body = bodies[bodyid]
+    for (i,state) in enumerate(traj)
+        (;t,q,q̇) = state 
         update_rigids!(st,q,q̇)
-        Tt = kinetic_energy_translation(rb)
-        Tr = kinetic_energy_rotation(rb)
-        push!(T,Tt+Tr)
+        if pid == 0
+            velocity_traj[i] .= body.state.mass_locus_state.velocity
+        else
+	        velocity_traj[i] .= body.state.loci_states[pid].velocity
+		end
     end
-    T[step_range]
+    velocity_traj[step_range] |> VectorOfArray
 end
 
-function get_mid_velocity!(bot::Robot,rbid::Int,pid::Int,step_range=:)
+function get_mid_velocity!(bot::Robot,bodyid::Int,pid::Int,step_range=:)
     (; st, traj)= bot
 	(; t, q) = traj
 	T = get_numbertype(bot)
 	h = t[begin+1] - t[begin]
     ṙp = Vector{T}[]
-    rbs = get_bodies(st)
-    rb = rbs[rbid]
+    bodies = get_bodies(st)
+    body = bodies[bodyid]
     for (qₖ,qₖ₋₁) in zip(traj.q[begin+1:end], traj.q[begin:end-1])
         update_rigids!(st,(qₖ.+qₖ₋₁)./2,(qₖ.-qₖ₋₁)./h)
-        push!(ṙp,rb.state.ṙps[pid])
+        push!(ṙp,body.state.ṙps[pid])
     end
     ṙp[step_range] |> VectorOfArray
 end
 
-function get_orientation!(bot::Robot,rbid::Int,step_range=:)
+function get_orientation!(bot::Robot,bodyid::Int,step_range=:)
     (; st, traj)= bot
 	T = get_numbertype(bot)
     R = VectorOfArray(Vector{Matrix{T}}())
-    rbs = get_bodies(st)
-    rb = rbs[rbid]
+    bodies = get_bodies(st)
+    body = bodies[bodyid]
     for (q,q̇) in zip(traj.q, traj.q̇)
         update_rigids!(st,q,q̇)
         update_orientations!(st)
-        push!(R,rb.state.R)
+        push!(R,body.state.R)
     end
     R[step_range] |> VectorOfArray
 end
 
-function get_angular_velocity!(bot::Robot,rbid::Int,step_range=:)
+function get_angular_velocity!(bot::Robot,bodyid::Int,step_range=:)
     (; st, traj)= bot
 	T = get_numbertype(bot)
     ω = Vector{T}[]
-    rbs = get_bodies(st)
-    rb = rbs[rbid]
+    bodies = get_bodies(st)
+    body = bodies[bodyid]
     for (q,q̇) in zip(traj.q, traj.q̇)
         update_rigids!(st,q,q̇)
-        push!(ω,rb.state.ω)
+        push!(ω,body.state.ω)
     end
     ω[step_range] |> VectorOfArray
 end
@@ -120,7 +115,7 @@ function analyse_energy(tr_input;actuation=false,gravity=false,elasticity=false,
     epes = 0.0
     gpes = 0.0
 
-    es = kes
+    restitution_coefficients = kes
     if elasticity
         if actuation
             as = get_actuation_traj(tr)
@@ -129,16 +124,16 @@ function analyse_energy(tr_input;actuation=false,gravity=false,elasticity=false,
             epes = factor.*[elastic_potential_energy(st,q) for q in traj.qs]
         end
 
-        es += epes
+        restitution_coefficients += epes
     end
     if gravity
         gpes = factor.*[gravity_potential_energy(st,q) for q in traj.qs]
-        es += gpes
+        restitution_coefficients += gpes
     end
-    es1 = es[1]
-    es_err = abs.((es.-es1)./es1)
+    es1 = restitution_coefficients[1]
+    es_err = abs.((restitution_coefficients.-es1)./es1)
 
-    kes,epes,gpes,es,es_err
+    kes,epes,gpes,restitution_coefficients,es_err
 end
 
 function string_potential(tgstruct,sol)

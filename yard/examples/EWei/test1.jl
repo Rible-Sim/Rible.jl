@@ -46,7 +46,7 @@ function rigidbody(i, rij, apss, rg)
     aps = apss
     u = rj - ri
     α = atan(u[2], u[1])
-    r̄g = rg
+    mass_locus = rg
     m = 1.0
     I = .5
     nrp = length(aps)
@@ -59,7 +59,7 @@ function rigidbody(i, rij, apss, rg)
             I 0
             0 I
         ]),
-        SVector{2}(r̄g),
+        SVector{2}(mass_locus),
         [SVector{2}(aps[i]) for i in 1:nrp],
         constrained=constrained
     )
@@ -70,7 +70,7 @@ function rigidbody(i, rij, apss, rg)
         lncs, _ = RB.NCF.NC2D2P(SVector{2}(ri), SVector{2}(rj), ro, α, ṙo, ω)
     end
     state = RB.RigidBodyState(prop, lncs, ri, α, ṙo, ω, ci, Φi)
-    rb = RB.RigidBody(prop, state)
+    body = RB.RigidBody(prop, state)
 end
 rij = [[[0.0, 0.0], [1.0, 0.0]],
        [[0.0, 0.0], [0.0, 1.0]],

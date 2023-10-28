@@ -508,26 +508,26 @@ function pres2d!(sysstate,st;aux=true)
     (;mem2syspres) = connectivity.indexed
     amp = 0.01
     p = 6π
-    foreach(bodies) do rb
-        rbid = rb.prop.id
-        if rbid == 1
-            q̃[mem2syspres[rbid]] .= [     amp*sin(p*t),0]
-            q̃̇[mem2syspres[rbid]] .= [   p*amp*cos(p*t),0]
-            q̃̈[mem2syspres[rbid]] .= [-p^2*amp*sin(p*t),0]
+    foreach(bodies) do body
+        bodyid = body.prop.id
+        if bodyid == 1
+            q̃[mem2syspres[bodyid]] .= [     amp*sin(p*t),0]
+            q̃̇[mem2syspres[bodyid]] .= [   p*amp*cos(p*t),0]
+            q̃̈[mem2syspres[bodyid]] .= [-p^2*amp*sin(p*t),0]
         end
-        if rbid == 2
-            q̃[mem2syspres[rbid]] .= [ 0.1+amp*sin(p*t),0]
-            q̃̇[mem2syspres[rbid]] .= [   p*amp*cos(p*t),0]
-            q̃̈[mem2syspres[rbid]] .= [-p^2*amp*sin(p*t),0]
+        if bodyid == 2
+            q̃[mem2syspres[bodyid]] .= [ 0.1+amp*sin(p*t),0]
+            q̃̇[mem2syspres[bodyid]] .= [   p*amp*cos(p*t),0]
+            q̃̈[mem2syspres[bodyid]] .= [-p^2*amp*sin(p*t),0]
         end
         if aux
-            if rbid == 8
-                q̃[mem2syspres[rbid][3:4]] .= [-0.1+amp*sin(p*t),0]
-                q̃̇[mem2syspres[rbid][3:4]] .= [   p*amp*cos(p*t),0]
-                q̃̈[mem2syspres[rbid][3:4]] .= [-p^2*amp*sin(p*t),0]
-                q̃[mem2syspres[rbid][5:6]] .= [ 0.2+amp*sin(p*t),0]
-                q̃̇[mem2syspres[rbid][5:6]] .= [   p*amp*cos(p*t),0]
-                q̃̈[mem2syspres[rbid][5:6]] .= [-p^2*amp*sin(p*t),0]
+            if bodyid == 8
+                q̃[mem2syspres[bodyid][3:4]] .= [-0.1+amp*sin(p*t),0]
+                q̃̇[mem2syspres[bodyid][3:4]] .= [   p*amp*cos(p*t),0]
+                q̃̈[mem2syspres[bodyid][3:4]] .= [-p^2*amp*sin(p*t),0]
+                q̃[mem2syspres[bodyid][5:6]] .= [ 0.2+amp*sin(p*t),0]
+                q̃̇[mem2syspres[bodyid][5:6]] .= [   p*amp*cos(p*t),0]
+                q̃̈[mem2syspres[bodyid][5:6]] .= [-p^2*amp*sin(p*t),0]
             end
         end
     end
@@ -867,37 +867,37 @@ function pres3d!(sysstate,st;ν=0.5)
     (;mem2syspres) = connectivity.indexed
     amp = 0.01
     p = ν*2π
-    foreach(bodies) do rb
-        rbid = rb.prop.id
-        if rbid in [1,2,3]
+    foreach(bodies) do body
+        bodyid = body.prop.id
+        if bodyid in [1,2,3]
             r0 = zeros(3)
-            if rbid == 1
+            if bodyid == 1
                 r0 .= [
                     0.1,
                     0.0,
                     0.0
                 ]
-                q̃[mem2syspres[rbid]] .= r0 .+ [amp*sin(p*t),0,0]
-                q̃̇[mem2syspres[rbid]] .=     [amp*p*cos(p*t),0,0]
-                q̃̈[mem2syspres[rbid]] .=  [-amp*p^2*sin(p*t),0,0]
-            elseif rbid == 2
+                q̃[mem2syspres[bodyid]] .= r0 .+ [amp*sin(p*t),0,0]
+                q̃̇[mem2syspres[bodyid]] .=     [amp*p*cos(p*t),0,0]
+                q̃̈[mem2syspres[bodyid]] .=  [-amp*p^2*sin(p*t),0,0]
+            elseif bodyid == 2
                 r0 .= [
                     -0.05,
                      0.08660254037844387,
                     0.0
                 ]
-                q̃[mem2syspres[rbid]] .= r0 .+ [amp*sin(p*t),0,0]
-                q̃̇[mem2syspres[rbid]] .=     [amp*p*cos(p*t),0,0]
-                q̃̈[mem2syspres[rbid]] .=  [-amp*p^2*sin(p*t),0,0]
-            elseif rbid == 3
+                q̃[mem2syspres[bodyid]] .= r0 .+ [amp*sin(p*t),0,0]
+                q̃̇[mem2syspres[bodyid]] .=     [amp*p*cos(p*t),0,0]
+                q̃̈[mem2syspres[bodyid]] .=  [-amp*p^2*sin(p*t),0,0]
+            elseif bodyid == 3
                 r0 .= [
                     -0.05,
                     -0.08660254037844387,
                     0.0
                 ]
-                q̃[mem2syspres[rbid]] .= r0 .+ [amp*sin(p*t),0,0]
-                q̃̇[mem2syspres[rbid]] .=     [amp*p*cos(p*t),0,0]
-                q̃̈[mem2syspres[rbid]] .=  [-amp*p^2*sin(p*t),0,0]
+                q̃[mem2syspres[bodyid]] .= r0 .+ [amp*sin(p*t),0,0]
+                q̃̇[mem2syspres[bodyid]] .=     [amp*p*cos(p*t),0,0]
+                q̃̈[mem2syspres[bodyid]] .=  [-amp*p^2*sin(p*t),0,0]
             end
         end
     end
@@ -975,7 +975,7 @@ CM.activate!()
 CM.save(texroot*raw"\OneDrive - 中山大学\Papers\DynamicTensegrity\CS\images\compose_tower3d.pdf", fig_compose_tower3d)
 
 function plot_restlengths(bots,figname=nothing)
-    μs = [RB.get_cables_restlen(bot) for bot in bots]
+    friction_coefficients = [RB.get_cables_restlen(bot) for bot in bots]
     # cg = cgrad(:Dark2_6, 6, categorical = true)[[4,3,6]]
     # set_theme!(theme_pub;
     #         palette = (color = cg, ),
@@ -995,7 +995,7 @@ function plot_restlengths(bots,figname=nothing)
         x = vec([collect(1:24)';collect(1:24)'])
         grp = repeat([1,2],24)
         display(x)
-        height = vec([μs[1]';μs[2]'])
+        height = vec([friction_coefficients[1]';friction_coefficients[2]'])
         colors = Makie.wong_colors()
         barplot!(
             ax1, x, height; 
@@ -1321,14 +1321,14 @@ function plot_tower3d_vis_nodpl(bots,figname=nothing)
                 titleformatfunc = (sgi,tt) -> "",
                 sup! = (ax,tgob,sgi) -> begin
                     rbs = RB.get_bodies(tgob[])
-                    for rbid in 7:10
-                        # for rbid in [10]
-                        if rbid in 7:8
+                    for bodyid in 7:10
+                        # for bodyid in [10]
+                        if bodyid in 7:8
                             pid = 4
                         else
                             pid = 3
                         end
-                        meshscatter!(ax,[rbs[rbid].state.rps[pid]], 
+                        meshscatter!(ax,[rbs[bodyid].state.loci_states[pid]], 
                             color = :darkblue, 
                             markersize = 0.008)
                     end                    
@@ -1343,7 +1343,7 @@ function plot_tower3d_vis_nodpl(bots,figname=nothing)
                     )
                     foreach(bjs) do (key,values)
                         foreach(values) do value
-                            meshscatter!(ax,[rbs[key].state.rps[value]], 
+                            meshscatter!(ax,[rbs[key].state.loci_states[value]], 
                                 color = :lightblue, 
                                 markersize = 0.008)
                         end
@@ -1637,14 +1637,14 @@ function plot_tower3d_vis(bot0,bot1,figname=nothing)
                 titleformatfunc = (sgi,tt) -> "",
                 sup! = (ax,tgob,sgi) -> begin
                     rbs = RB.get_bodies(tgob[])
-                    # for rbid in 7:10
-                    for rbid in [10]
-                        if rbid in 7:8
+                    # for bodyid in 7:10
+                    for bodyid in [10]
+                        if bodyid in 7:8
                             pid = 4
                         else
                             pid = 3
                         end
-                        meshscatter!(ax,[rbs[rbid].state.rps[pid]], 
+                        meshscatter!(ax,[rbs[bodyid].state.loci_states[pid]], 
                             color = :darkblue, 
                             markersize = 0.008)
                     end
@@ -1996,12 +1996,12 @@ RB.update!(newembed0_outer.st)
 RB.check_static_equilibrium_output_multipliers(newembed0_outer.st;gravity)
 RB.undamped_eigen(newembed0_outer.st;gravity)
 RB.undamped_eigen!(newembed0_outer;gravity)
-μs = [μ0o,μ1o]
+friction_coefficients = [μ0o,μ1o]
 
 Td = 15.0
 tend = 20.0
 
-μs = [
+friction_coefficients = [
     begin
         μ = deepcopy(μ0o)
         μ[begin:3m*j] .= μ1[begin:3m*j]
@@ -2010,14 +2010,14 @@ tend = 20.0
     for j = 0:n
 ]
 
-function make_multi_stages_pres_actor(μs;start = 0.0, stop = 10.0, len = 2, )
-    nμ = length(μs[begin])
+function make_multi_stages_pres_actor(friction_coefficients;start = 0.0, stop = 10.0, len = 2, )
+    nμ = length(friction_coefficients[begin])
 
     function itp(t)
         scaled_itps = extrapolate(
             Interpolations.scale(
                 interpolate(
-                    reduce(hcat,μs),
+                    reduce(hcat,friction_coefficients),
                     (NoInterp(),BSpline(Linear()))
                     # (NoInterp(),BSpline(Quadratic(Flat(OnGrid()))))
                 ),
@@ -2034,11 +2034,11 @@ function make_multi_stages_pres_actor(μs;start = 0.0, stop = 10.0, len = 2, )
         itp
     )
 end
-make_multi_stages_pres_actor(μs;start=0.0,stop=Td,len=n+1)
+make_multi_stages_pres_actor(friction_coefficients;start=0.0,stop=Td,len=n+1)
 
 newembed1_outer_deploy = RB.Robot(
     deepcopy(newembed1_outer.st),
-    (actuators=[make_multi_stages_pres_actor(μs;start=0.0,stop=Td,len=length(μs))],)
+    (actuators=[make_multi_stages_pres_actor(friction_coefficients;start=0.0,stop=Td,len=length(friction_coefficients))],)
 )
 
 RB.solve!(

@@ -69,6 +69,6 @@ plotstructure(tail,sol,sliderplot)
 plotstructure(tail,sol,recordplot)
 # sol = TS.solve(prob,TS.ConstSPARK(1),dt=dt,ftol=1e-12,verbose=true)
 @code_warntype TS.solve(prob,TS.Zhong06(),dt=dt,ftol=1e-14,verbose=true)
-kes,epes,gpes,es,es_err = analyse_energy(tail,sol;gravity=false,elasticity=true)
-es
-plot(es)
+kes,epes,gpes,restitution_coefficients,es_err = analyse_energy(tail,sol;gravity=false,elasticity=true)
+restitution_coefficients
+plot(restitution_coefficients)

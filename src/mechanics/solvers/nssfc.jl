@@ -29,7 +29,7 @@ function ip_ns_stepk_maker(nq,nλ,nμ,nu,qₛ₋₁,q̇ₛ₋₁,pₛ₋₁,tₛ
     e = [one(T),zero(T),zero(T)]
     J = Diagonal([one(T),-one(T),-one(T)])
     𝐞_split = [e for i = 1:nu]
-    function ip_ns_stepk!(𝐫𝐞𝐬,𝐉,x,Dₛ,ηs,es,H,μ)
+    function ip_ns_stepk!(𝐫𝐞𝐬,𝐉,x,Dₛ,ηs,restitution_coefficients,H,μ)
         # function inner_res(x)
             qₛ = @view x[   1:n1]
             λₛ = @view x[n1+1:n2]
@@ -81,7 +81,7 @@ function ip_ns_stepk_maker(nq,nλ,nμ,nu,qₛ₋₁,q̇ₛ₋₁,pₛ₋₁,tₛ
                 vₙⁱₛ₋₁ = vⁱₛ₋₁[1]
                 vₙⁱₛ = vⁱₛ[1]
                 # @show vₜⁱₛ, vₙⁱₛ₋₁, vₙⁱₛ
-                𝐛[is+1] = ηs[i]*vₜⁱₛ + es[i]*vₙⁱₛ₋₁
+                𝐛[is+1] = ηs[i]*vₜⁱₛ + restitution_coefficients[i]*vₙⁱₛ₋₁
                 D̃i = copy(Dₛ[is+1:is+3,:])
                 # D̃i[1,:] .+= (vⁱₛ[2].*Dₛ[is+2,:].+vⁱₛ[3].*Dₛ[is+3,:])./vₜⁱₛ
                 ∂𝐛∂𝐱[is+1:is+3,   1:n1] .= D̃i*∂vₛ∂qₛ
@@ -225,7 +225,7 @@ function ipsolve(nq,nλ,nμ,q0,q̇0,dyfuncs,tspan;dt=0.01,ftol=1e-14,xtol=ftol,v
     q̇s = OffsetArray([copy(q̇0) for i in 1:totalstep+1],0:totalstep)
     ps = OffsetArray([M*copy(q̇0) for i in 1:totalstep+1],0:totalstep)
     λs = OffsetArray([zeros(eltype(q0),nλ) for i in 1:totalstep+1],0:totalstep)
-    μs = OffsetArray([zeros(eltype(q0),nμ) for i in 1:totalstep+1],0:totalstep)
+    friction_coefficients = OffsetArray([zeros(eltype(q0),nμ) for i in 1:totalstep+1],0:totalstep)
     # Λs = [zeros(eltype(q0),nu) for i in 1:totalstep+1]
     invM = inv(M)
     # F⁺ = zero(q0)
@@ -249,14 +249,14 @@ function ipsolve(nq,nλ,nμ,q0,q̇0,dyfuncs,tspan;dt=0.01,ftol=1e-14,xtol=ftol,v
         q̇ₛ₋₁ = q̇s[timestep-1]
         pₛ₋₁ = ps[timestep-1]
         λₛ₋₁ = λs[timestep-1]
-        μₛ₋₁ = μs[timestep-1]
+        μₛ₋₁ = friction_coefficients[timestep-1]
         tₛ₋₁ = ts[timestep-1]
         q̃ₛ   = q̃s[timestep]
         qₛ   = qs[timestep]
         q̇ₛ   = q̇s[timestep]
         pₛ   = ps[timestep]
         λₛ   = λs[timestep]
-        μₛ   = μs[timestep]
+        μₛ   = friction_coefficients[timestep]
         qˣ = qₛ₋₁ .+ dt./2 .*q̇ₛ₋₁
         qₛ .= qₛ₋₁ .+ dt.*q̇ₛ₋₁
         # q̇ₛ .= q̇ₛ₋₁
@@ -306,13 +306,13 @@ function ipsolve(nq,nλ,nμ,q0,q̇0,dyfuncs,tspan;dt=0.01,ftol=1e-14,xtol=ftol,v
             ip_ns_stepk! = ip_ns_stepk_maker(nq,nλ,nμ,nu,qₛ₋₁,q̇ₛ₋₁,pₛ₋₁,tₛ₋₁,dyfuncs,invM,dt)
             μ = 1.0
             for iteration = 1:imax
-                Dₛ,ηs,es,H = get_D(active_indices,qₛ)
+                Dₛ,ηs,restitution_coefficients,H = get_D(active_indices,qₛ)
                 # ηs .= 1
                 _,_,g = get_indices(qₛ)
                 gₙ = g[active_indices]
-                # @show iteration,Dₛ,ηs,es,gₙ
+                # @show iteration,Dₛ,ηs,restitution_coefficients,gₙ
                 μ,Δxc = ip_ns_stepk!(nonsmooth_R,nonsmooth_J,
-                            nonsmooth_x,Dₛ,ηs,es,H,μ)
+                            nonsmooth_x,Dₛ,ηs,restitution_coefficients,H,μ)
                 res = norm(Δxc)
                 @show timestep, iteration, res
                 iteration_break = iteration
@@ -357,7 +357,7 @@ function ipsolve(nq,nλ,nμ,q0,q̇0,dyfuncs,tspan;dt=0.01,ftol=1e-14,xtol=ftol,v
         end
         next!(prog)
     end
-    ts,cs,qs,q̇s,ps,λs,μs
+    ts,cs,qs,q̇s,ps,λs,friction_coefficients
 end
 
 end

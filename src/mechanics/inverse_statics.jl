@@ -10,9 +10,9 @@ function build_T(st,i)
     T
 end
 
-function build_Ci(rb)
+function build_Ci(body)
     Ci = reduce(hcat,[
-        transpose(Cpi) for Cpi in rb.state.cache.Cp
+        transpose(Cpi) for Cpi in body.state.cache.Cp
     ])
 end
 

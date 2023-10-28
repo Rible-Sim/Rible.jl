@@ -11,7 +11,7 @@ import Rible as RB
 function make_rollingdisk()
     m = 1.0
     R = 1.0
-    r̄g = zeros(2)
+    mass_locus = zeros(2)
     Īg = SMatrix{2,2}(
 		[
 			1/4*m*R^2       0.0;
@@ -22,10 +22,10 @@ function make_rollingdisk()
     α = 0.0
     ṙo = [0.0,0.0]
     ω = 4.0
-    aps = [r̄g]
+    aps = [mass_locus]
     movable = true
 	constrained = false
-    prop = RB.RigidBodyProperty(1,true,m,Īg,r̄g,aps)
+    prop = RB.RigidBodyProperty(1,true,m,Īg,mass_locus,aps)
     ri = copy(ro)
     lncs,q,q̇ = RB.NCF.NC1P2V(ri,ro,α,ṙo,ω)
     state = RB.RigidBodyState(prop,lncs,ro,α,ṙo,ω)
@@ -149,9 +149,9 @@ tspan = (0.0,10.0)
 q0 = RB.get_q(disk.st)
 q̇0 = RB.get_q̇(disk.st)
 prob = RB.SimProblem(disk,dynfuncs)
-ts,qs,q̇s,ps,λs,μs = RB.nhsolve(prob,6,3,2,2,q0,q̇0;tspan,dt=h,ftol=1e-10,exception=false)
-ts,qs,q̇s,ps,λs,μs = RB.snhsolve(prob,6,3,2,2,q0,q̇0;tspan,dt=h,ftol=1e-12,exception=true)
-ts,qs,q̇s,ps,λs,μs = RB.ipsolve(prob,6,3,2,q0,q̇0;dt=h,ftol=1e-10,exception=false)
+ts,qs,q̇s,ps,λs,friction_coefficients = RB.nhsolve(prob,6,3,2,2,q0,q̇0;tspan,dt=h,ftol=1e-10,exception=false)
+ts,qs,q̇s,ps,λs,friction_coefficients = RB.snhsolve(prob,6,3,2,2,q0,q̇0;tspan,dt=h,ftol=1e-12,exception=true)
+ts,qs,q̇s,ps,λs,friction_coefficients = RB.ipsolve(prob,6,3,2,q0,q̇0;dt=h,ftol=1e-10,exception=false)
 
 RB.prepare_traj!(disk.traj;tspan,dt=h,restart=true)
 

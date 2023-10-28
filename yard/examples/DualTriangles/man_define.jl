@@ -105,7 +105,7 @@ function man_ndof(ndof,onedir=[0.0,-1.0];θ=0.0,k=0.0,c=0.0,unit="mks",restlen=0
 			ap8_y = -a/2+sti_l
 		end
 
-        r̄g = SVector{2}([CoM_x,CoM_y])
+        mass_locus = SVector{2}([CoM_x,CoM_y])
 		ap5 = SVector{2}([ap5_x,ap5_y])
 		ap6 = SVector{2}([ap6_x,ap6_y])
 
@@ -117,7 +117,7 @@ function man_ndof(ndof,onedir=[0.0,-1.0];θ=0.0,k=0.0,c=0.0,unit="mks",restlen=0
         prop = RB.RigidBodyProperty(
 					i,movable,m,
 					Ī,
-                    r̄g,
+                    mass_locus,
 					aps;
 					constrained=ifelse(i==1,true,false)
                 )
@@ -135,7 +135,7 @@ function man_ndof(ndof,onedir=[0.0,-1.0];θ=0.0,k=0.0,c=0.0,unit="mks",restlen=0
 		end
         state = RB.RigidBodyState(prop,lncs,ro,α,ṙo,ω,ci,Φi)
 
-        rb = RB.RigidBody(prop,state)
+        body = RB.RigidBody(prop,state)
     end
     rbs = [
 		rigidbody(i,m[i],a[i],
@@ -420,7 +420,7 @@ function man_ndof_2022(ndof,onedir=[1.0,0.0];θ=0.0,k=1250.0,c=0.0,unit="mks")
 		end
 		##--------------------
 
-		r̄g  = SVector{2}([CoM_x,CoM_y])
+		mass_locus  = SVector{2}([CoM_x,CoM_y])
 		ap4 = SVector{2}([ap4_x,ap4_y])
 		ap5 = SVector{2}([ap5_x,ap5_y])
 		ap6 = SVector{2}([ap6_x,ap6_y])
@@ -429,7 +429,7 @@ function man_ndof_2022(ndof,onedir=[1.0,0.0];θ=0.0,k=1250.0,c=0.0,unit="mks")
 		aps = [ap1,ap2,ap3,ap4,ap5,ap6,ap7,ap8]
 
         prop = RB.RigidBodyProperty(i,movable,m,Ia,
-                    r̄g,aps;constrained=constrained
+                    mass_locus,aps;constrained=constrained
                     )
 
 		α = get_angle([1.0,0.0],rj-ri)
@@ -441,7 +441,7 @@ function man_ndof_2022(ndof,onedir=[1.0,0.0];θ=0.0,k=1250.0,c=0.0,unit="mks")
 
         state = RB.RigidBodyState(prop,lncs,ro,α,ṙo,ω,ci,Φi)
 
-        rb = RB.RigidBody(prop,state)
+        body = RB.RigidBody(prop,state)
 
     end
     rbs = [rigidbody(i,m[i],a[i],
@@ -549,13 +549,13 @@ function get_angles(bot)
     (;st) = bot
     rbs = RB.get_bodies(st)
     angles = zeros(st.nrigids-1)
-    for (rbid,rb) in enumerate(rbs)
-        if rbid > 1
-			state0 = rbs[rbid-1].state
-            v = state0.rps[2]-state0.rps[1]
-            state1 = rbs[rbid].state
-            w = state1.rps[2]-state1.rps[1]
-            angles[rbid-1] = get_angle(v,w)
+    for (bodyid,rb) in enumerate(rbs)
+        if bodyid > 1
+			state0 = rbs[bodyid-1].state
+            v = state0.loci_states[2]-state0.loci_states[1]
+            state1 = rbs[bodyid].state
+            w = state1.loci_states[2]-state1.loci_states[1]
+            angles[bodyid-1] = get_angle(v,w)
         end
     end
     rad2deg.(angles)

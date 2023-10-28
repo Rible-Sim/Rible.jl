@@ -22,16 +22,16 @@ function make_rod()
     movable = true
     constrained = false
     m = 0.402
-    r̄g = @SVector zeros(3)
-    ṙo = zero(r̄g)
-    ωo = zero(r̄g)
+    mass_locus = @SVector zeros(3)
+    ṙo = zero(mass_locus)
+    ωo = zero(mass_locus)
     l = 1.0
     rad = 0.002
     Ixx = 1/2*m*rad^2
     Iyy = Izz = 1/12*m*(3rad^2+l^2)
     Ī = SMatrix{3,3}(Diagonal([Ixx,Iyy,Izz]))
     r = 0.0
-    r̄ps = SVector{3}.([
+    loci = SVector{3}.([
         [-l/2, 0.0, 0.0],
         [ l/2, 0.0, 0.0],
         # [-l/2, 0.0,  -r],
@@ -47,7 +47,7 @@ function make_rod()
     ri = ro
     # @show ri,rj,ro
     Ro = Matrix(RotY(θ))
-    prop = RB.RigidBodyProperty(1,movable,m,Ī,r̄g,r̄ps;constrained)
+    prop = RB.RigidBodyProperty(1,movable,m,Ī,mass_locus,loci;constrained)
 
     lncs, _ = RB.NCF.NC1P3V(ri,ro,Ro,ṙo,ωo)
     state = RB.RigidBodyState(prop,lncs,ro,Ro,ṙo,ωo)
@@ -78,8 +78,8 @@ function make_bar()
     l = 1.0
     Ixx = 1/12*m*l^2
     Ī = SMatrix{3,3}(Diagonal([Ixx,0.0,0.0]))
-    r̄g = SVector{3}(0.0,0.0,0.0)
-    r̄ps = SVector{3}.([
+    mass_locus = SVector{3}(0.0,0.0,0.0)
+    loci = SVector{3}.([
         [ -l/2, 0.0, 0.0],
         [  l/2, 0.0, 0.0]
     ])
@@ -90,7 +90,7 @@ function make_bar()
     ṙo = zero(ro)
     ωo = zero(ro)
     Ro = Matrix(RotY(θ))
-    prop = RB.RigidBodyProperty(1,movable,m,Ī,r̄g,r̄ps;constrained)
+    prop = RB.RigidBodyProperty(1,movable,m,Ī,mass_locus,loci;constrained)
 
     lncs, _ = RB.NCF.NC3D2P(ri,rj,ro,Ro,ṙo,ωo)
     state = RB.RigidBodyState(prop,lncs,ro,Ro,ṙo,ωo)
@@ -123,9 +123,9 @@ function contact_dynamics(st)
 
     function prepare_contacts!(contacts, q)
 		RB.update_rigids!(st,q)
-		rb = rbs[1]
+		body = rbs[1]
 		for pid = 1:2
-			gap = rb.state.rps[pid][3]
+			gap = body.state.loci_states[pid][3]
 			contacts[pid].state.gap = gap
 			contacts[pid].state.active = ifelse(gap<0,true,false)
 		end
@@ -138,11 +138,11 @@ function contact_dynamics(st)
 		n = [0,0,1.0]
 		for (i,ac) in enumerate(active_contacts)
 			(;id,state) = ac
-            state.frame = RB.SpatialFrame(n)
+            state.frame = RB.spatial_frame(n)
 			(;n,t1,t2) = state.frame
-			rbid = 1
-            C = rbs[rbid].state.cache.Cps[id]
-			CT = C*RB.build_T(st,rbid)
+			bodyid = 1
+            C = rbs[bodyid].state.cache.Cps[id]
+			CT = C*RB.build_T(st,bodyid)
 			Dn = Matrix(transpose(n)*CT)
 			Dt1 = Matrix(transpose(t1)*CT)
 			Dt2 = Matrix(transpose(t2)*CT)
@@ -151,10 +151,10 @@ function contact_dynamics(st)
 			D[3(i-1)+3,:] = Dt2
 			inv_μ_vec[3(i-1)+1] = 1/ac.μ
 		end
-        es = [ac.e for ac in active_contacts]
+        restitution_coefficients = [ac.e for ac in active_contacts]
 		gaps = [ac.state.gap for ac in active_contacts]
 		H = Diagonal(inv_μ_vec)
-        active_contacts, na, gaps, D, H, es
+        active_contacts, na, gaps, D, H, restitution_coefficients
     end
 
 	function update_contacts!(active_contacts, v, Λ)

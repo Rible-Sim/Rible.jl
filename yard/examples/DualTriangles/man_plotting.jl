@@ -1,40 +1,40 @@
-function get_bars(rb)
-    # @show rb.state.rps[2]
+function get_bars(body)
+    # @show body.state.loci_states[2]
     [
-        Point(rb.state.rps[1]) => Point(rb.state.rps[3]),
-        Point(rb.state.rps[1]) => Point(rb.state.rps[4]),
-        Point(rb.state.rps[3]) => Point(rb.state.rps[2]),
-        Point(rb.state.rps[4]) => Point(rb.state.rps[2])
+        Point(body.state.loci_states[1]) => Point(body.state.loci_states[3]),
+        Point(body.state.loci_states[1]) => Point(body.state.loci_states[4]),
+        Point(body.state.loci_states[3]) => Point(body.state.loci_states[2]),
+        Point(body.state.loci_states[4]) => Point(body.state.loci_states[2])
     ]
 
 end
 
-function get_lower_bars(rbid,rb)
+function get_lower_bars(bodyid,rb)
     return [
-        Point(rb.state.rps[1]) => Point(rb.state.rps[4]),
-        Point(rb.state.rps[4]) => Point(rb.state.rps[2])
+        Point(body.state.loci_states[1]) => Point(body.state.loci_states[4]),
+        Point(body.state.loci_states[4]) => Point(body.state.loci_states[2])
     ]
 end
 
-function get_upper_bars(rbid,rb)
+function get_upper_bars(bodyid,rb)
     return [
-        Point(rb.state.rps[1]) => Point(rb.state.rps[3]),
-        Point(rb.state.rps[3]) => Point(rb.state.rps[2])
+        Point(body.state.loci_states[1]) => Point(body.state.loci_states[3]),
+        Point(body.state.loci_states[3]) => Point(body.state.loci_states[2])
     ]
 end
 
 function get_lower_bars(st)
-    bars = [Observable(get_lower_bars(rbid,rb)
-            ) for (rbid,rb) in enumerate(st.rigidbodies)]
+    bars = [Observable(get_lower_bars(bodyid,rb)
+            ) for (bodyid,rb) in enumerate(st.rigidbodies)]
 end
 
 function get_upper_bars(st)
-    bars = [Observable(get_upper_bars(rbid,rb)
-            ) for (rbid,rb) in enumerate(st.rigidbodies)]
+    bars = [Observable(get_upper_bars(bodyid,rb)
+            ) for (bodyid,rb) in enumerate(st.rigidbodies)]
 end
 
 function get_bars_and_strings(st)
-    bars = [Observable(get_bars(rb)
+    bars = [Observable(get_bars(body)
             ) for rb in st.rigidbodies]
     strings = Observable(RB.get_strings(st))
     bars, strings
@@ -59,7 +59,7 @@ function update_scene!(st,bars,strings,q)
     RB.distribute_q_to_rbs!(st,q)
     RB.update_strings_apply_forces!(st)
     for (id,rb) in enumerate(st.rigidbodies)
-        bars[id][] = get_bars(rb)
+        bars[id][] = get_bars(body)
     end
     strings[] = RB.get_strings(st)
     # angles = update_angles(st)

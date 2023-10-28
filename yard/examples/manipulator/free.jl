@@ -125,7 +125,7 @@ function pyplot_energy(tr,l0s)
     ts = traj.ts
     u0 = RB.get_original_restlen(tr)
     # ke,epe,gpe,energy,energy_error = adams_to_energy(res,tr,l0s,u0)
-    kes,epes,gpes,es,es_err = analyse_energy(tr;gravity=true,elasticity=true)
+    kes,epes,gpes,restitution_coefficients,es_err = analyse_energy(tr;gravity=true,elasticity=true)
 
     # @show maximum(energy_error)/maximum(es_err)
 

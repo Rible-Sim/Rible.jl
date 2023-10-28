@@ -24,38 +24,28 @@
 					"label": ""
 				},
 				{
-					"line": 339,
-					"column": 13,
+					"line": 971,
+					"column": 10,
 					"label": ""
 				},
 				{
 					"line": 1115,
+					"column": 12,
+					"label": ""
+				},
+				{
+					"line": 1479,
 					"column": 7,
 					"label": ""
 				},
 				{
-					"line": 1702,
-					"column": 11,
+					"line": 1648,
+					"column": 4,
 					"label": ""
 				},
 				{
-					"line": 1953,
-					"column": 29,
-					"label": ""
-				},
-				{
-					"line": 2184,
+					"line": 1899,
 					"column": 9,
-					"label": ""
-				},
-				{
-					"line": 2353,
-					"column": 9,
-					"label": ""
-				},
-				{
-					"line": 2439,
-					"column": 8,
 					"label": ""
 				}
 			]

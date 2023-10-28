@@ -369,7 +369,7 @@ GM.activate!(); with_theme(
     ) do 
     fig = Figure()
     rbs = RB.get_bodies(newsim_fixed)  
-    rb = rbs[2]
+    body = rbs[2]
     gd1 = fig[1,1] = GridLayout(;tellheight = false,)
     ax = Axis3(gd1[1,1];
         aspect=:data,        
@@ -393,7 +393,7 @@ GM.activate!(); with_theme(
     # #     showpoints = false,
     # #     showmesh = true,
     # # )
-    mesh!(ax,build_mesh(rb;update=false);shading = false,)
+    mesh!(ax,build_mesh(body;update=false);shading = false,)
     xlims!(ax,-0.15,0.15)
     ylims!(ax,-0.15,0.15)
     hidezdecorations!(ax)
@@ -1050,7 +1050,7 @@ RB.update!(newembed0_outer.st;gravity)
 RB.check_static_equilibrium_output_multipliers(newembed0_outer.st;gravity)
 RB.undamped_eigen(newembed0_outer.st;gravity)
 RB.undamped_eigen!(newembed0_outer;gravity)
-μs = [μ0o,μ1o]
+friction_coefficients = [μ0o,μ1o]
 
 barplot(μ0o)
 barplot!(μ1o)
@@ -1069,7 +1069,7 @@ pretty_table(
 Td = 8.0
 tend = 10.0
 
-μs = [
+friction_coefficients = [
     begin
         μ = deepcopy(μ0o)
         μ[begin:3m*j] .= μ1[begin:3m*j]
@@ -1078,14 +1078,14 @@ tend = 10.0
     for j = 0:n
 ]
 
-function make_multi_stages_pres_actor(μs;start = 0.0, stop = 10.0, len = 2, )
-    nμ = length(μs[begin])
+function make_multi_stages_pres_actor(friction_coefficients;start = 0.0, stop = 10.0, len = 2, )
+    nμ = length(friction_coefficients[begin])
 
     function itp(t)
         scaled_itps = extrapolate(
             Interpolations.scale(
                 interpolate(
-                    reduce(hcat,μs),
+                    reduce(hcat,friction_coefficients),
                     (NoInterp(),BSpline(Linear()))
                     # (NoInterp(),BSpline(Quadratic(Flat(OnGrid()))))
                 ),
@@ -1102,11 +1102,11 @@ function make_multi_stages_pres_actor(μs;start = 0.0, stop = 10.0, len = 2, )
         itp
     )
 end
-make_multi_stages_pres_actor(μs;start=0.0,stop=Td,len=n+1)
+make_multi_stages_pres_actor(friction_coefficients;start=0.0,stop=Td,len=n+1)
 
 newembed0_outer_deploy = RB.Robot(
     deepcopy(newembed0_outer.st),
-    (actuators=[make_multi_stages_pres_actor(μs;start=0.0,stop=Td,len=length(μs))],)
+    (actuators=[make_multi_stages_pres_actor(friction_coefficients;start=0.0,stop=Td,len=length(friction_coefficients))],)
 )
 
 RB.solve!(
@@ -1200,37 +1200,37 @@ function pres3d!(sysstate,st;ν=0.5)
     (;mem2syspres) = connectivity.indexed
     amp = 0.01
     p = ν*2π
-    foreach(bodies) do rb
-        rbid = rb.prop.id
-        if rbid in [1,2,3]
+    foreach(bodies) do body
+        bodyid = body.prop.id
+        if bodyid in [1,2,3]
             r0 = zeros(3)
-            if rbid == 1
+            if bodyid == 1
                 r0 .= [
                     0.1,
                     0.0,
                     0.0
                 ]
-                q̃[mem2syspres[rbid]] .= r0 .+ [amp*sin(p*t),0,0]
-                q̃̇[mem2syspres[rbid]] .=     [amp*p*cos(p*t),0,0]
-                q̃̈[mem2syspres[rbid]] .=  [-amp*p^2*sin(p*t),0,0]
-            elseif rbid == 2
+                q̃[mem2syspres[bodyid]] .= r0 .+ [amp*sin(p*t),0,0]
+                q̃̇[mem2syspres[bodyid]] .=     [amp*p*cos(p*t),0,0]
+                q̃̈[mem2syspres[bodyid]] .=  [-amp*p^2*sin(p*t),0,0]
+            elseif bodyid == 2
                 r0 .= [
                     -0.05,
                      0.08660254037844387,
                     0.0
                 ]
-                q̃[mem2syspres[rbid]] .= r0 .+ [amp*sin(p*t),0,0]
-                q̃̇[mem2syspres[rbid]] .=     [amp*p*cos(p*t),0,0]
-                q̃̈[mem2syspres[rbid]] .=  [-amp*p^2*sin(p*t),0,0]
-            elseif rbid == 3
+                q̃[mem2syspres[bodyid]] .= r0 .+ [amp*sin(p*t),0,0]
+                q̃̇[mem2syspres[bodyid]] .=     [amp*p*cos(p*t),0,0]
+                q̃̈[mem2syspres[bodyid]] .=  [-amp*p^2*sin(p*t),0,0]
+            elseif bodyid == 3
                 r0 .= [
                     -0.05,
                     -0.08660254037844387,
                     0.0
                 ]
-                q̃[mem2syspres[rbid]] .= r0 .+ [amp*sin(p*t),0,0]
-                q̃̇[mem2syspres[rbid]] .=     [amp*p*cos(p*t),0,0]
-                q̃̈[mem2syspres[rbid]] .=  [-amp*p^2*sin(p*t),0,0]
+                q̃[mem2syspres[bodyid]] .= r0 .+ [amp*sin(p*t),0,0]
+                q̃̇[mem2syspres[bodyid]] .=     [amp*p*cos(p*t),0,0]
+                q̃̈[mem2syspres[bodyid]] .=  [-amp*p^2*sin(p*t),0,0]
             end
         end
     end
@@ -1754,14 +1754,14 @@ function plot_tower3d_vis_nodpl(bots,figname=nothing)
                 titleformatfunc = (sgi,tt) -> "",
                 sup! = (ax,tgob,sgi) -> begin
                     rbs = RB.get_bodies(tgob[])
-                    for rbid in 7:10
-                        # for rbid in [10]
-                        if rbid in 7:8
+                    for bodyid in 7:10
+                        # for bodyid in [10]
+                        if bodyid in 7:8
                             pid = 4
                         else
                             pid = 3
                         end
-                        meshscatter!(ax,[rbs[rbid].state.rps[pid]], 
+                        meshscatter!(ax,[rbs[bodyid].state.loci_states[pid]], 
                             color = :darkblue, 
                             markersize = 0.008)
                     end                    
@@ -1776,7 +1776,7 @@ function plot_tower3d_vis_nodpl(bots,figname=nothing)
                     )
                     foreach(bjs) do (key,values)
                         foreach(values) do value
-                            meshscatter!(ax,[rbs[key].state.rps[value]], 
+                            meshscatter!(ax,[rbs[key].state.loci_states[value]], 
                                 color = :lightblue, 
                                 markersize = 0.008)
                         end
@@ -2060,14 +2060,14 @@ function plot_tower3d_vis(bot0,bot1,figname=nothing)
                 titleformatfunc = (sgi,tt) -> "",
                 sup! = (ax,tgob,sgi) -> begin
                     rbs = RB.get_bodies(tgob[])
-                    # for rbid in 7:10
-                    for rbid in [10]
-                        if rbid in 7:8
+                    # for bodyid in 7:10
+                    for bodyid in [10]
+                        if bodyid in 7:8
                             pid = 4
                         else
                             pid = 3
                         end
-                        meshscatter!(ax,[rbs[rbid].state.rps[pid]], 
+                        meshscatter!(ax,[rbs[bodyid].state.loci_states[pid]], 
                             color = :darkblue, 
                             markersize = 0.008)
                     end

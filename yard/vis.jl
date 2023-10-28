@@ -452,8 +452,13 @@ function Makie.plot!(viz::Viz{Tuple{S}};
     ) where S <:RB.AbstractBody
     body_ob = viz[:st]
     # body decorations
-    mass_center_ob = @lift $body_ob.state.rg |> Makie.Point
-    nodes_ob = @lift $body_ob.state.rps .|> Makie.Point
+    mass_center_ob = @lift $body_ob.state.mass_locus_state.position |> Makie.Point
+    nodes_ob = @lift begin
+        [
+            locus_state.position |> Makie.Point
+            for locus_state in $body_ob.state.loci_states
+        ]
+    end
     # arrows_ob = @lift body_ob.state.as .|> Makie.Point
     id  = @lift $body_ob.prop.id
     if viz.show_mass_centers[]
@@ -623,27 +628,27 @@ function Makie.plot!(viz::Viz{Tuple{S}};
     viz
 end
 
-function get3Dstate(rb)
-    (;state) = rb
-    (;ro,R,ṙo,ω) = state
-    ndim = RB.get_ndim(rb)
-    T = RB.get_numbertype(rb)
+function get3Dstate(body)
+    (;state) = body
+    (;origin_position,R,origin_velocity,ω) = state
+    ndim = RB.get_ndim(body)
+    T = RB.get_numbertype(body)
     o = zero(T)
     i = one(T)
     if ndim == 3
-        return ro, R, ṙo, ω
+        return origin_position, R, origin_velocity, ω
     else
-        ro3 = MVector{3}(ro[1],ro[2],o)
-        ṙo3 = MVector{3}(ṙo[1],ṙo[2],o)
+        origin_position_3D = MVector{3}(origin_position[1],origin_position[2],o)
+        origin_velocity_3D = MVector{3}(origin_velocity[1],origin_velocity[2],o)
         R3 = MMatrix{3,3}(
             [
-                R[1,1] -R[2,1] o;
-                -R[1,2] R[2,2] o;
-                o      o      i;
+                 R[1,1] -R[2,1] o;
+                -R[1,2]  R[2,2] o;
+                o      o        i;
             ]
         )
         ω3 = MVector{3}(o,o,ω[1])
-        return ro3, R3, ṙo3, ω3
+        return origin_position_3D, R3, origin_velocity_3D, ω3
     end
 end
 
@@ -655,8 +660,8 @@ function get_linesegs_cables(st;slackonly=false,noslackonly=false)
     linesegs_cables = Vector{Tuple{Point{ndim,T},Point{ndim,T}}}()
     foreach(connected) do scnt
         scable = cables[scnt.id]
-        ret = (Point(scnt.hen.rbsig.state.rps[scnt.hen.pid]),
-                Point(scnt.egg.rbsig.state.rps[scnt.egg.pid]))
+        ret = (Point(scnt.hen.rbsig.state.loci_states[scnt.hen.pid]),
+                Point(scnt.egg.rbsig.state.loci_states[scnt.egg.pid]))
         slacking = scable.state.tension <= 0
         if (slackonly && slacking) ||
            (noslackonly && !slacking) ||
@@ -667,16 +672,16 @@ function get_linesegs_cables(st;slackonly=false,noslackonly=false)
     linesegs_cables
 end
 
-function build_mesh(rb::RB.AbstractRigidBody;update=true,color=nothing)
-    (;mesh) = rb
+function build_mesh(body::RB.AbstractRigidBody;update=true,color=nothing)
+    (;mesh) = body
     @assert !(mesh isa Nothing)
     if update
-        ro,R = get3Dstate(rb)
+        origin_position,R,_ = get3Dstate(body)
     else
-        ro = SVector(0,0,0)
+        origin_position = SVector(0,0,0)
         R = Matrix(1I,3,3)
     end
-    trans = Translation(ro)
+    trans = Translation(origin_position)
     rot = LinearMap(R)
     ct = trans ∘ rot
     updated_pos = GB.Point3f.(ct.(mesh.position))
@@ -1069,8 +1074,8 @@ function plot_self_stress_states(
                     mapreduce(
                         (scnt)->
                         [(
-                            scnt.hen.rbsig.state.rps[scnt.hen.pid].+
-                            scnt.egg.rbsig.state.rps[scnt.egg.pid]
+                            scnt.hen.rbsig.state.loci_states[scnt.hen.pid].+
+                            scnt.egg.rbsig.state.loci_states[scnt.egg.pid]
                         )./2],
                         vcat,
                         tensioned.connected

@@ -26,10 +26,10 @@ function RigidBody(name,r = [0.0,0.0,0.0],
     ap2 = TRS.AnchorPoint([a*cos(θ), a*sin(θ), 0.0] + offset)
     ap3 = TRS.AnchorPoint([a*cos(θ), -a*sin(θ), 0.0] + offset)
     ap4 = TRS.AnchorPoint([0.0, 0.0, -h] + offset)
-    r̄g = @SVector zeros(3)
+    mass_locus = @SVector zeros(3)
     prop = TRS.RigidBodyProperty(name,:generic,1.0,
                 SMatrix{3,3}(1.0I),
-                r̄g,
+                mass_locus,
                 SVector(ap1,ap2,ap3,ap4))
 
     state = TRS.RigidBodyState(prop,r,R,ṙ,ω,Val(:NC))
@@ -56,9 +56,9 @@ function tg_spark(tgsys)
     nconstraint = ninconstraint + nexconstraint
     nq = nbodies*12
     mass_matrix = zeros(nq,nq)
-    for (rbid,rb) in enumerate(rigidbodies)
-        is = 12*(rbid - 1)
-        mass_matrix[is+1:is+12,is+1:is+12] .= rigidbodies[rbid].state.cache.M
+    for (bodyid,rb) in enumerate(rigidbodies)
+        is = 12*(bodyid - 1)
+        mass_matrix[is+1:is+12,is+1:is+12] .= rigidbodies[bodyid].state.cache.M
     end
     function M!(mm,q)
         mm .= mass_matrix
@@ -94,28 +94,28 @@ function tg_spark(tgsys)
     end
 
     function distribute_q_to_rbs!(rbs,q,q̇)
-        for (rbid,rb) = enumerate(rbs)
-            is = 12*(rbid-1)
-            rb.state.coords.q .= q[is+1:is+12]
-            rb.state.coords.q̇ .= q̇[is+1:is+12]
-            TRS.coords2state_kinetic!(rb)
+        for (bodyid,rb) = enumerate(rbs)
+            is = 12*(bodyid-1)
+            body.state.coords.q .= q[is+1:is+12]
+            body.state.coords.q̇ .= q̇[is+1:is+12]
+            TRS.coords2state_kinetic!(body)
         end
     end
     function F!(F,q,q̇,t)
         distribute_q_to_rbs!(rigidbodies,q,q̇)
         compute_string_forces!(rigidbodies,strings)
-        for (rbid,rb) = enumerate(rigidbodies)
-            is = 12*(rbid-1)
-            F[is+1:is+12] .= rb.state.coords.Q
+        for (bodyid,rb) = enumerate(rigidbodies)
+            is = 12*(bodyid-1)
+            F[is+1:is+12] .= body.state.coords.Q
         end
     end
 
 
     function Φ(q)
         ret = Vector{eltype(q)}(undef,nbodies*6)
-        for (rbid,rb) in enumerate(rigidbodies)
-            is = 6*(rbid-1)
-            ks = 12*(rbid-1)
+        for (bodyid,rb) in enumerate(rigidbodies)
+            is = 6*(bodyid-1)
+            ks = 12*(bodyid-1)
             ret[is+1:is+6] .= TRS.NC.Φ(q[ks+1:ks+12])
         end
         ret
@@ -123,9 +123,9 @@ function tg_spark(tgsys)
 
     function A(q)
         ret = zeros(eltype(q),6nbody,12nbody)
-        for (rbid,rb) in enumerate(rigidbodies)
-            is = 6*(rbid-1)
-            ks = 12*(rbid-1)
+        for (bodyid,rb) in enumerate(rigidbodies)
+            is = 6*(bodyid-1)
+            ks = 12*(bodyid-1)
             ret[is+1:is+6,ks+1:ks+12] .= TRS.NC.Φq(q[ks+1:ks+12])
         end
         ret
@@ -135,8 +135,8 @@ function tg_spark(tgsys)
 end
 A,Φ,∂T∂q̇!,F!,M!,jacs = tg_spark(tgsys)
 function system_variables(tgsys)
-    q = vcat([rb.state.coords.q for rb in tgsys.rigidbodies]...)
-    q̇ = vcat([rb.state.coords.q for rb in tgsys.rigidbodies]...)
+    q = vcat([body.state.coords.q for rb in tgsys.rigidbodies]...)
+    q̇ = vcat([body.state.coords.q for rb in tgsys.rigidbodies]...)
     q,q̇
 end
 q0,q̇0 = system_variables(tgsys)

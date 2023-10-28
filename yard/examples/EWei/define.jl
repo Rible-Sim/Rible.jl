@@ -1,5 +1,5 @@
-function RigidData(r̄g,m,i,r̄l,mesh=nothing)
-    @eponymtuple(r̄g,m,i,r̄l,mesh)
+function RigidData(mass_locus,m,i,r̄l,mesh=nothing)
+    @eponymtuple(mass_locus,m,i,r̄l,mesh)
 end
 
 """
@@ -37,9 +37,9 @@ function BuildTail()
     r̄l7 = [20, 21, 15]; r̄l8 = [20, 20, 15]
     r̄l9 = [20, 15, 15]; r̄l10 = [20, 15, 15]
 
-    function Get_apsAB(r̄, r̄g)
+    function Get_apsAB(r̄, mass_locus)
         ri = r̄
-        rj = r̄ + 2* [r̄g[2], r̄g[1]]
+        rj = r̄ + 2* [mass_locus[2], mass_locus[1]]
         aps = [[0.0, 0.0], 2r̄g, [15.1, 0.0]]
         return ri, rj, aps
     end
@@ -159,7 +159,7 @@ function BuildTail()
         ri, rj, aps = Get_aps(r̄si, rdsi.r̄l)
         u = rj - ri
         α = atan(u[2], u[1])
-        r̄g = rdsi.r̄g
+        mass_locus = rdsi.mass_locus
         m = rdsi.m*1e-3
         I = rdsi.i
         nrp = length(aps)
@@ -172,7 +172,7 @@ function BuildTail()
                 I 0
                 0 0
             ]),
-            SVector{2}(r̄g),
+            SVector{2}(mass_locus),
             [SVector{2}(aps[i]) for i in 1:nrp],
             constrained=constrained
         )
@@ -183,7 +183,7 @@ function BuildTail()
             lncs, _ = RB.NCF.NC2D2P(SVector{2}(ri), SVector{2}(rj), ro, α, ṙo, ω)
         end
         state = RB.RigidBodyState(prop, lncs, ri, α, ṙo, ω, ci, Φi)
-        rb = RB.RigidBody(prop, state)
+        body = RB.RigidBody(prop, state)
     end
 
     rbs = [rigidbody(i, rds[i], r̄s[i]) for i in 1:nb]
@@ -288,9 +288,9 @@ function BuildTail(type; β=1.0, μ=0.02)
     r̄l7 = [20, 21, 15]; r̄l8 = [20, 20, 15]
     r̄l9 = [20, 15, 15]; r̄l10 = [20, 15, 15]
 
-    function Get_apsAB(r̄, r̄g)
+    function Get_apsAB(r̄, mass_locus)
         ri = r̄
-        rj = r̄ + 2* [r̄g[2], r̄g[1]]
+        rj = r̄ + 2* [mass_locus[2], mass_locus[1]]
         aps = [[0.0, 0.0], 2r̄g, [15.1, 0.0]]
         return ri, rj, aps
     end
@@ -428,7 +428,7 @@ function BuildTail(type; β=1.0, μ=0.02)
         ri, rj, aps = Get_aps(r̄si, rdsi.r̄l)
         u = rj - ri
         α = atan(u[2], u[1])
-        r̄g = rdsi.r̄g
+        mass_locus = rdsi.mass_locus
         m = rdsi.m*1e-3
         I = rdsi.i
         nrp = length(aps)
@@ -441,7 +441,7 @@ function BuildTail(type; β=1.0, μ=0.02)
                 0.99I 0
                 0 0.01I
             ]),
-            SVector{2}(r̄g),
+            SVector{2}(mass_locus),
             [SVector{2}(aps[i]) for i in 1:nrp],
             constrained=constrained
         )
@@ -452,7 +452,7 @@ function BuildTail(type; β=1.0, μ=0.02)
             lncs, _ = RB.NCF.NC2D2P(SVector{2}(ri), SVector{2}(rj), ro, α, ṙo, ω)
         end
         state = RB.RigidBodyState(prop, lncs, ri, α, ṙo, ω, ci, Φi)
-        rb = RB.RigidBody(prop, state, rdsi.mesh)
+        body = RB.RigidBody(prop, state, rdsi.mesh)
     end
 
     rbs = [rigidbody(i, rds[i], r̄s[i]) for i in 1:nb]

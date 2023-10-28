@@ -13,20 +13,20 @@ function man_nd1(k=0.0,c=0.0;ratio=0.8)
 		Ia = SMatrix{2,2}(Matrix(m*a^2*I,2,2))
 		r̄g_x = 0.0
 		r̄g_y = 0.0
-		r̄g  = SVector{2}([r̄g_x,r̄g_y])
+		mass_locus  = SVector{2}([r̄g_x,r̄g_y])
 		ap1 = SVector{2}([ 0.0, 0.0])
 		ap2 = SVector{2}([-b1 , -h1])
 		ap3 = SVector{2}([ b1 , -h1])
 	    aps = [ap1,ap2,ap3]
 	    prop = RB.RigidBodyProperty(1,movable,m,Ia,
-	                r̄g,aps;constrained=constrained
+	                mass_locus,aps;constrained=constrained
 	                )
 		α = 0.0; ω = 0.0
 		ro = ri
 		ṙo = zero(ro)
 		lncs,_ = RB.NCF.NC1P2V(ri,ro,α,ṙo,ω)
 		state = RB.RigidBodyState(prop,lncs,ro,α,ṙo,ω,ci,Φi)
-	    rb = RB.RigidBody(prop,state)
+	    body = RB.RigidBody(prop,state)
 	end
 
 	function make_rb2(ri,rj,α)
@@ -40,20 +40,20 @@ function man_nd1(k=0.0,c=0.0;ratio=0.8)
 		Ia = SMatrix{2,2}(Matrix(m*a^2*I,2,2))
 		r̄g_x = 0.0
 		r̄g_y = 0.0
-		r̄g = SVector{2}([r̄g_x,r̄g_y])
+		mass_locus = SVector{2}([r̄g_x,r̄g_y])
 		ap1 = SVector{2}([0.0  ,0.0])
 		ap2 = SVector{2}([ b2  ,0.0])
 		ap3 = SVector{2}([ b2/2,0.0])
 	    aps = [ap1,ap2,ap3]
 	    prop = RB.RigidBodyProperty(2,movable,m,Ia,
-	                r̄g,aps;constrained=constrained
+	                mass_locus,aps;constrained=constrained
 	                )
 		ω = 0.0
 		ro = ri
 		ṙo = zero(ro)
 		lncs,_ = RB.NCF.NC2P1V(ri,rj,ro,α,ṙo,ω)
 		state = RB.RigidBodyState(prop,lncs,ro,α,ṙo,ω,pres_idx)
-	    rb = RB.RigidBody(prop,state)
+	    body = RB.RigidBody(prop,state)
 	end
 
 	function make_bar2(ri,rj,α)
@@ -67,19 +67,19 @@ function man_nd1(k=0.0,c=0.0;ratio=0.8)
 		Ia = SMatrix{2,2}(Matrix(m*a^2*I,2,2))
 		r̄g_x = 0.0
 		r̄g_y = 0.0
-		r̄g = SVector{2}([r̄g_x,r̄g_y])
+		mass_locus = SVector{2}([r̄g_x,r̄g_y])
 		ap1 = SVector{2}([0.0  ,0.0])
 		ap2 = SVector{2}([ b2  ,0.0])
 	    aps = [ap1,ap2]
 	    prop = RB.RigidBodyProperty(2,movable,m,Ia,
-	                r̄g,aps;constrained=constrained
+	                mass_locus,aps;constrained=constrained
 	                )
 		ω = 0.0
 		ro = ri
 		ṙo = zero(ro)
 		lncs,_ = RB.NCF.NC2D2P(ri,rj,ro,α,ṙo,ω)
 		state = RB.RigidBodyState(prop,lncs,ro,α,ṙo,ω,pres_idx)
-	    rb = RB.RigidBody(prop,state)
+	    body = RB.RigidBody(prop,state)
 	end
 
 	function make_rb3(ri,α)
@@ -92,20 +92,20 @@ function man_nd1(k=0.0,c=0.0;ratio=0.8)
 		Ia = SMatrix{2,2}(Matrix(m*a^2*I,2,2))
 		r̄g_x = 0.0
 		r̄g_y = 0.0
-		r̄g = SVector{2}([r̄g_x,r̄g_y])
+		mass_locus = SVector{2}([r̄g_x,r̄g_y])
 		ap1 = SVector{2}([0.0,0.0])
 		ap2 = SVector{2}([-b3,-h3])
 		ap3 = SVector{2}([ b3,-h3])
 	    aps = [ap1,ap2,ap3]
 	    prop = RB.RigidBodyProperty(3,movable,m,Ia,
-	                r̄g,aps;constrained=constrained
+	                mass_locus,aps;constrained=constrained
 	                )
 		ω = 0.0
 		ro = ri
 		ṙo = zero(ro)
 		lncs,_ = RB.NCF.NC1P2V(ri,ro,α,ṙo,ω)
 		state = RB.RigidBodyState(prop,lncs,ro,α,ṙo,ω)
-	    rb = RB.RigidBody(prop,state)
+	    body = RB.RigidBody(prop,state)
 	end
 
 	rI = SVector( 0.0,0.0)
@@ -131,8 +131,8 @@ function man_nd1(k=0.0,c=0.0;ratio=0.8)
 	# ratio = 0.85
     α = ratio
     β = ratio
-	innercableslen = α*norm(rb1.state.rps[3] - rb2.state.rps[2])
-    outercableslen = β*norm(rb1.state.rps[2] - rb3.state.rps[2])
+	innercableslen = α*norm(rb1.state.loci_states[3] - rb2.state.loci_states[2])
+    outercableslen = β*norm(rb1.state.loci_states[2] - rb3.state.loci_states[2])
     original_restlens = [innercableslen,innercableslen,outercableslen,outercableslen]
     # restlens = zeros(ncables)
     # actuallengths = zeros(ncables)

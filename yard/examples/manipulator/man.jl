@@ -47,7 +47,7 @@ function man(n,θ=0.0)
         if isodd(i)
             CoM_y = -CoM_y
         end
-        r̄g = SVector{2}([CoM_x,CoM_y])
+        mass_locus = SVector{2}([CoM_x,CoM_y])
 
         nap = 3
         ap1 = SVector{2}([0.0,0.0])
@@ -62,11 +62,11 @@ function man(n,θ=0.0)
 
         prop = R2.RigidBodyProperty(movable,name,type,
                     m,Ia,
-                    r̄g,
+                    mass_locus,
                     aps
                     )
         state = R2.RigidBodyState(prop,ri,rj)
-        rb = R2.RigidBody(prop,state)
+        body = R2.RigidBody(prop,state)
     end
     rbs = [rigidbody(i,m[i],a[i],
             Ia[i],A[:,i],A[:,i+1]) for i = 1:nbodies]
@@ -127,13 +127,13 @@ refman = man(n,-π/12)
 function update_angles(tgstruct)
     rbs = tgstruct.rigidbodies
     angles = zeros(tgstruct.nbodies)
-    for (rbid,rb) in enumerate(rbs)
-        if rbid > 1
-            state0 = rbs[rbid-1].state
+    for (bodyid,rb) in enumerate(rbs)
+        if bodyid > 1
+            state0 = rbs[bodyid-1].state
             V0 = state0.p[2]-state0.p[1]
-            state1 = rbs[rbid].state
+            state1 = rbs[bodyid].state
             V1 = state1.p[2]-state1.p[1]
-            angles[rbid] = atan(V1[1]*V0[2]-V1[2]*V0[1],V0[1]*V1[1]+V0[2]*V1[2])
+            angles[bodyid] = atan(V1[1]*V0[2]-V1[2]*V0[1],V0[1]*V1[1]+V0[2]*V1[2])
         end
     end
     angles

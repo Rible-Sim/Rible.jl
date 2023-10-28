@@ -73,7 +73,7 @@ function plotsave_inv_restlen(bots,xs,figname=nothing;
             i for i = 1:8
         ]
     )
-    μs = RB.get_cables_restlen.(bots) |> VectorOfArray
+    friction_coefficients = RB.get_cables_restlen.(bots) |> VectorOfArray
     fs = RB.get_cables_tension.(bots) |> VectorOfArray
 
     @show fs[round(Int,length(fs)/2)]
@@ -103,8 +103,8 @@ function plotsave_inv_restlen(bots,xs,figname=nothing;
         ax1 = Axis(fig[1,1];xlabel, ylabel = L"\mu~(\mathrm{m})")
         Label(fig[1,1,TopLeft()],"($(alphabet[1]))")
         for j in eachindex(groups)
-            lines!(ax1,xs,μs[groups[j][1],:];)
-            scatter!(ax1,xs,μs[groups[j][1],:];label = "No. $(string(groups[j]))")
+            lines!(ax1,xs,friction_coefficients[groups[j][1],:];)
+            scatter!(ax1,xs,friction_coefficients[groups[j][1],:];label = "No. $(string(groups[j]))")
         end
         ax2 = Axis(fig[1,2];xlabel, ylabel = L"f~(\mathrm{N})")
         Label(fig[1,2,TopLeft()],"($(alphabet[2]))")

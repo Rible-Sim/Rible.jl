@@ -20,18 +20,18 @@ function ∏c(μ::Real,γ::AbstractVector)
     end
 end
 
-function ∏c(μs::AbstractVector,γs::AbstractVector)
+function ∏c(friction_coefficients::AbstractVector,γs::AbstractVector)
     ret = similar(γs)
     is = 0
-    for i in 1:length(μs)
+    for i in 1:length(friction_coefficients)
         is = 3(i-1)
-        ret[is+1:is+3] = ∏c(μs[i],γs[is+1:is+3])
+        ret[is+1:is+3] = ∏c(friction_coefficients[i],γs[is+1:is+3])
     end
     ret
 end
 
-function make_residual1(μs,𝐍,𝐫)
-    nc = length(μs)
+function make_residual1(friction_coefficients,𝐍,𝐫)
+    nc = length(friction_coefficients)
     function r(𝛄)
         𝐱 = 𝐍*𝛄 + 𝐫
         𝒇 = [min(𝐱[3(i-1)+1],0) for i in 1:nc]
@@ -40,9 +40,9 @@ function make_residual1(μs,𝐍,𝐫)
     r
 end
 
-function make_residual4(μs,𝐍,𝐫;gd=1e-6)
+function make_residual4(friction_coefficients,𝐍,𝐫;gd=1e-6)
     nr = length(𝐫)
-    𝛙(𝛄) = 1/(nr*gd)*(𝛄 - ∏c(μs,𝛄-gd*(𝐍*𝛄 + 𝐫)))
+    𝛙(𝛄) = 1/(nr*gd)*(𝛄 - ∏c(friction_coefficients,𝛄-gd*(𝐍*𝛄 + 𝐫)))
     r(𝛄) = norm(𝛙(𝛄))
     r
 end
@@ -56,13 +56,13 @@ function make_B(nc,D,invM)
     BlockDiagonal([Matrix(gi*I,3,3) for gi in g])
 end
 
-function Jacobi(B,r,μs,𝐍,𝐫,𝛄0=zero(𝐫);τ=1e-5,Nmax=20,ω=0.3,λ=1.1)
+function Jacobi(B,r,friction_coefficients,𝐍,𝐫,𝛄0=zero(𝐫);τ=1e-5,Nmax=20,ω=0.3,λ=1.1)
     𝛄ₖ₊₁ = 𝛄0
     𝛄̂ₖ₊₁ = copy(𝛄ₖ₊₁)
     j = 0
     res = zero(eltype(𝛄ₖ₊₁))
     for k = 1:Nmax
-        𝛄̂ₖ₊₁ .= ∏c(μs,𝛄ₖ₊₁ - ω*B*(𝐍*𝛄ₖ₊₁ + 𝐫))
+        𝛄̂ₖ₊₁ .= ∏c(friction_coefficients,𝛄ₖ₊₁ - ω*B*(𝐍*𝛄ₖ₊₁ + 𝐫))
         𝛄ₖ₊₁ .= λ.*𝛄̂ₖ₊₁ .+ (1-λ).*𝛄ₖ₊₁
         res = r(𝛄ₖ₊₁)
         # @info "k=$k, res=$res"
@@ -78,19 +78,19 @@ function Jacobi(B,r,μs,𝐍,𝐫,𝛄0=zero(𝐫);τ=1e-5,Nmax=20,ω=0.3,λ=1.1
     𝛄ₖ₊₁,j,res
 end
 
-function GaussSeidel(nc,B,r,μs,𝐍,𝐫,𝛄0=zero(𝐫);τ=1e-5,Nmax=20,ω=1.0,λ=1.0)
+function GaussSeidel(nc,B,r,friction_coefficients,𝐍,𝐫,𝛄0=zero(𝐫);τ=1e-5,Nmax=20,ω=1.0,λ=1.0)
     𝛄ₖ = 𝛄0
     𝛄ₖ₊₁ = copy(𝛄ₖ)
     j = 0
     res = zero(eltype(𝛄ₖ₊₁))
     gd = 1e-6
     nr = length(𝐫)
-    𝛙(𝛄) = 1/(nr*gd)*(𝛄 - ∏c(μs,𝛄-gd*(𝐍*𝛄 + 𝐫)))
+    𝛙(𝛄) = 1/(nr*gd)*(𝛄 - ∏c(friction_coefficients,𝛄-gd*(𝐍*𝛄 + 𝐫)))
     for k = 1:Nmax
         for i = 1:nc
             is = 3(i-1)
             # Bᵢ = @view B[is+1:is+3,is+1:is+3]
-            𝛄̂ᵢₖ₊₁ = ∏c(μs[i],𝛄ₖ[is+1:is+3] - ω*((𝐍[is+1:is+3,:]*𝛄ₖ + 𝐫[is+1:is+3])))
+            𝛄̂ᵢₖ₊₁ = ∏c(friction_coefficients[i],𝛄ₖ[is+1:is+3] - ω*((𝐍[is+1:is+3,:]*𝛄ₖ + 𝐫[is+1:is+3])))
             𝛄ₖ₊₁[is+1:is+3] .= λ.*𝛄̂ᵢₖ₊₁ .+ (1-λ).*𝛄ₖ[is+1:is+3]
             𝛄ₖ[is+1:is+3] = 𝛄ₖ₊₁[is+1:is+3]
         end
@@ -108,7 +108,7 @@ function GaussSeidel(nc,B,r,μs,𝐍,𝐫,𝛄0=zero(𝐫);τ=1e-5,Nmax=20,ω=1.
     𝛄ₖ₊₁,j,res
 end
 
-function APGD!(output,r,μs,𝐍,𝐫;τ=1e-5,Nmax=20)
+function APGD!(output,r,friction_coefficients,𝐍,𝐫;τ=1e-5,Nmax=20)
     f(𝛄) = 1/2*transpose(𝛄)*𝐍*𝛄 + transpose(𝛄)*𝐫
     ∇f(𝛄) = 𝐍*𝛄 + 𝐫
     nr = length(𝐫)
@@ -125,11 +125,11 @@ function APGD!(output,r,μs,𝐍,𝐫;τ=1e-5,Nmax=20)
     for k = 1:Nmax
         # solve
         gₖ = ∇f(𝐲ₖ)
-        𝛄ₖ₊₁ .= ∏c(μs,𝐲ₖ-tₖ*gₖ)
+        𝛄ₖ₊₁ .= ∏c(friction_coefficients,𝐲ₖ-tₖ*gₖ)
         while f(𝛄ₖ₊₁) > f(𝐲ₖ) + transpose(gₖ)*(𝛄ₖ₊₁-𝐲ₖ) + 1/2*Lₖ*sum((𝛄ₖ₊₁.-𝐲ₖ).^2)
             Lₖ *= 2
             tₖ = 1/Lₖ
-            𝛄ₖ₊₁ .= ∏c(μs,𝐲ₖ-tₖ*gₖ)
+            𝛄ₖ₊₁ .= ∏c(friction_coefficients,𝐲ₖ-tₖ*gₖ)
         end
         # update
         θₖ₊₁ = next_θ(θₖ)

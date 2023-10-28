@@ -1,7 +1,7 @@
 
 function get_cube_bars(st)
-    rb = RB.get_bodies(st)[1]
-    ps = Point.(rb.state.rps)
+    body = RB.get_bodies(st)[1]
+    ps = Point.(body.state.loci_states)
     fs = [
         GeometryBasics.QuadFace(1,3,4,2),
         GeometryBasics.QuadFace(5,6,8,7),

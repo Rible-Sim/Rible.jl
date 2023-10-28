@@ -1,45 +1,45 @@
-function get_bars(rb)
+function get_bars(body)
     [
-    Point(rb.state.rps[1]) => Point(rb.state.rps[2]);
-    Point(rb.state.rps[2]) => Point(rb.state.rps[3]);
-    Point(rb.state.rps[3]) => Point(rb.state.rps[1]);
+    Point(body.state.loci_states[1]) => Point(body.state.loci_states[2]);
+    Point(body.state.loci_states[2]) => Point(body.state.loci_states[3]);
+    Point(body.state.loci_states[3]) => Point(body.state.loci_states[1]);
     ]
 end
 
-function get_lower_bars(rbid,rb)
-    if isodd(rbid)
+function get_lower_bars(bodyid,rb)
+    if isodd(bodyid)
         return [
-            Point(rb.state.rps[2]) => Point(rb.state.rps[3]),
-            Point(rb.state.rps[3]) => Point(rb.state.rps[1])
+            Point(body.state.loci_states[2]) => Point(body.state.loci_states[3]),
+            Point(body.state.loci_states[3]) => Point(body.state.loci_states[1])
         ]
     else
         return [
-            Point(rb.state.rps[1]) => Point(rb.state.rps[2])
+            Point(body.state.loci_states[1]) => Point(body.state.loci_states[2])
         ]
     end
 end
 
-function get_upper_bars(rbid,rb)
-    if iseven(rbid)
+function get_upper_bars(bodyid,rb)
+    if iseven(bodyid)
         return [
-            Point(rb.state.rps[2]) => Point(rb.state.rps[3]),
-            Point(rb.state.rps[3]) => Point(rb.state.rps[1])
+            Point(body.state.loci_states[2]) => Point(body.state.loci_states[3]),
+            Point(body.state.loci_states[3]) => Point(body.state.loci_states[1])
         ]
     else
         return [
-            Point(rb.state.rps[1]) => Point(rb.state.rps[2])
+            Point(body.state.loci_states[1]) => Point(body.state.loci_states[2])
         ]
     end
 end
 
 function get_lower_bars(st)
-    bars = [Observable(get_lower_bars(rbid,rb)
-            ) for (rbid,rb) in enumerate(st.rigidbodies)]
+    bars = [Observable(get_lower_bars(bodyid,rb)
+            ) for (bodyid,rb) in enumerate(st.rigidbodies)]
 end
 
 function get_upper_bars(st)
-    bars = [Observable(get_upper_bars(rbid,rb)
-            ) for (rbid,rb) in enumerate(st.rigidbodies)]
+    bars = [Observable(get_upper_bars(bodyid,rb)
+            ) for (bodyid,rb) in enumerate(st.rigidbodies)]
 end
 
 function get_cables(st)
@@ -49,8 +49,8 @@ function get_cables(st)
     ret = Vector{Pair{Point{ndim,T},Point{ndim,T}}}()
     mapreduce(
         (scnt)->
-        Point(scnt.hen.rbsig.state.rps[scnt.hen.pid]) =>
-        Point(scnt.egg.rbsig.state.rps[scnt.egg.pid]),
+        Point(scnt.hen.rbsig.state.loci_states[scnt.hen.pid]) =>
+        Point(scnt.egg.rbsig.state.loci_states[scnt.egg.pid]),
         vcat,
         tensioned.connected
         ;init=ret
@@ -62,7 +62,7 @@ function get_bars_and_cables(st)
     bars = Observable(
                 reduce(
                     vcat,[
-                        get_bars(rb)
+                        get_bars(body)
                         for rb in rbs
                     ]
                 )
@@ -89,7 +89,7 @@ function update_scene!(st,bars,cables,q)
     rbs = RB.get_bodies(st)
     bars[] = reduce(
         vcat,[
-            get_bars(rb)
+            get_bars(body)
             for rb in rbs
         ]
     )

@@ -83,28 +83,28 @@ end
 #
 # function ManualHeater(reg::SimpleRegistor{T},heating_law) where {T}
 #     ts = Vector{T}()
-#     es = Vector{T}()
+#     restitution_coefficients = Vector{T}()
 #     us = Vector{T}()
-#     traj = ControlTrajectory(ts,es,us)
+#     traj = ControlTrajectory(ts,restitution_coefficients,us)
 #     ManualHeater(reg,heating_law,traj)
 # end
 #
 # function ManualSerialHeater(regs::SimpleRegistors{T},heating_laws) where {T}
 #     ts = Vector{Vector{T}}()
-#     es = Vector{Vector{T}}()
+#     restitution_coefficients = Vector{Vector{T}}()
 #     us = Vector{Vector{T}}()
-#     trajs = ControlTrajectory(ts,es,us)
+#     trajs = ControlTrajectory(ts,restitution_coefficients,us)
 #     ManualSerialHeater(regs,heating_laws,trajs)
 # end
 
 select_by_id(xs,id) = xs[findfirst((x)->x.id==id, xs)]
 
-function actuate!(bot::Robot,μs)
+function actuate!(bot::Robot,friction_coefficients)
     (;st, hub) = bot
     (;actuators) = hub
     foreach(actuators) do actuator
         (;id) = actuator
-        actuate!(st,actuator,μs[id])
+        actuate!(st,actuator,friction_coefficients[id])
     end
 end
 

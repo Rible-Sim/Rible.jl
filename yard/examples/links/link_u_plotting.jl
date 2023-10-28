@@ -1,23 +1,23 @@
 # using Makie
 # AbstractPlotting.__init__()
 
-function rb_bars(rb)
+function rb_bars(body)
     vcat([
-        Point(rb.state.rps[1]) => Point(p)
-        for p in rb.state.rps[2:4]],
-        Point(rb.state.rps[2]) => Point(rb.state.rps[3]),
-        Point(rb.state.rps[3]) => Point(rb.state.rps[4]),
-        Point(rb.state.rps[4]) => Point(rb.state.rps[2]))
+        Point(body.state.loci_states[1]) => Point(p)
+        for p in body.state.loci_states[2:4]],
+        Point(body.state.loci_states[2]) => Point(body.state.loci_states[3]),
+        Point(body.state.loci_states[3]) => Point(body.state.loci_states[4]),
+        Point(body.state.loci_states[4]) => Point(body.state.loci_states[2]))
     # vcat([
-    #     Point(rb.state.rps[17]) => Point(p)
-    #     for p in rb.state.rps[7:9]],
-    #     Point(rb.state.rps[7]) => Point(rb.state.rps[8]),
-    #     Point(rb.state.rps[8]) => Point(rb.state.rps[9]),
-    #     Point(rb.state.rps[9]) => Point(rb.state.rps[7]))
+    #     Point(body.state.loci_states[17]) => Point(p)
+    #     for p in body.state.loci_states[7:9]],
+    #     Point(body.state.loci_states[7]) => Point(body.state.loci_states[8]),
+    #     Point(body.state.loci_states[8]) => Point(body.state.loci_states[9]),
+    #     Point(body.state.loci_states[9]) => Point(body.state.loci_states[7]))
 end
 
 function bars_and_strings(st)
-    bars = [Observable(rb_bars(rb)
+    bars = [Observable(rb_bars(body)
             ) for rb in st.rigidbodies]
     strings = Observable(RB.get_strings(st))
     bars,strings
@@ -102,7 +102,7 @@ function update_scene!(st,bars,strings,q)
     cnt = st.connectivity
     RB.distribute_q_to_rbs!(st,q)
     for (id,rb) in enumerate(st.rigidbodies)
-        bars[id][] = rb_bars(rb)
+        bars[id][] = rb_bars(body)
     end
     strings[] = RB.get_strings(st)
     # angles = update_angles(st)

@@ -41,10 +41,10 @@ function StructureState(bodies,tensiles,cnt::Connectivity{<:Any,<:Any,<:NamedTup
     nb = length(bodies)
     pres_idx_by_mem = Vector{Vector{Int}}(undef,nb)
     free_idx_by_mem = Vector{Vector{Int}}(undef,nb)
-    foreach(bodies) do rb
-        rbid = rb.prop.id
-        pres_idx_by_mem[rbid] = rb.state.cache.pres_idx
-        free_idx_by_mem[rbid] = rb.state.cache.free_idx
+    foreach(bodies) do body
+        bodyid = body.prop.id
+        pres_idx_by_mem[bodyid] = body.state.cache.pres_idx
+        free_idx_by_mem[bodyid] = body.state.cache.free_idx
     end
     T = get_numbertype(bodies)
     t = zero(T)
@@ -57,21 +57,21 @@ function StructureState(bodies,tensiles,cnt::Connectivity{<:Any,<:Any,<:NamedTup
     system = ClusterNonminimalCoordinatesState(t,q,q̇,q̈,F,λ,sysfree,syspres,s)
     parts = [
         begin
-            qmem = @view q[mem2sysfull[rbid]]
-            q̇mem = @view q̇[mem2sysfull[rbid]]
-            q̈mem = @view q̈[mem2sysfull[rbid]]
-            Fmem = @view F[mem2sysfull[rbid]]
-            λmem = @view λ[mem2sysincst[rbid]]
+            qmem = @view q[mem2sysfull[bodyid]]
+            q̇mem = @view q̇[mem2sysfull[bodyid]]
+            q̈mem = @view q̈[mem2sysfull[bodyid]]
+            Fmem = @view F[mem2sysfull[bodyid]]
+            λmem = @view λ[mem2sysincst[bodyid]]
             NonminimalCoordinatesState(t,qmem,q̇mem,q̈mem,Fmem,λmem,
-                                    free_idx_by_mem[rbid],pres_idx_by_mem[rbid])
+                                    free_idx_by_mem[bodyid],pres_idx_by_mem[bodyid])
         end
-        for rbid = 1:nb
+        for bodyid = 1:nb
     ]
-    foreach(bodies) do rb
-        (;ro,R,ṙo,ω,cache) = rb.state
+    foreach(bodies) do body
+        (;ro,R,ṙo,ω,cache) = body.state
         q,q̇ = NCF.rigidstate2naturalcoords(cache.funcs.lncs,ro,R,ṙo,ω)
-        parts[rb.prop.id].q .= q
-        parts[rb.prop.id].q̇ .= q̇
+        parts[body.prop.id].q .= q
+        parts[body.prop.id].q̇ .= q̇
     end
     StructureState(system,parts)
 end
@@ -90,10 +90,10 @@ function update_tensiles!(st, @eponymargs(clustered,))
             state2 = scnt[segid].egg.rbsig.state
             pid1 = scnt[segid].hen.pid
             pid2 = scnt[segid].egg.pid
-            p1 = state1.rps[pid1]
+            p1 = state1.loci_states[pid1]
             ṗ1 = state1.ṙps[pid1]
             f1 = state1.fps[pid1]
-            p2 = state2.rps[pid2]
+            p2 = state2.loci_states[pid2]
             ṗ2 = state2.ṙps[pid2]
             f2 = state2.fps[pid2]
             Δr = p2 - p1

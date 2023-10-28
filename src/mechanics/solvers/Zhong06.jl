@@ -131,7 +131,7 @@ function solve!(intor::Integrator,cache::Zhong06Cache;
             #     @show Jac_ref[end-4:end-3,:]
             # end
             # @show maximum(abs.(diff_Jac))for iteration = 1:maxiters
-            # @show iteration,D,ηs,es,gaps
+            # @show iteration,D,ηs,restitution_coefficients,gaps
             for iteration = 1:maxiters
                 Res_stepk!(initial_Res,initial_x)
                 normRes = norm(initial_Res)

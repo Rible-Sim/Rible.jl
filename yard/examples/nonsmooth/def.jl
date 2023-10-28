@@ -31,9 +31,9 @@ function quad(c=100.0;
         R = SMatrix{3,3}(Matrix(1.0I,3,3))
         ṙo = ṙo_ref
         ω = [0.1,0,0.1]
-        r̄g = SVector{3}(0.0,0.0,0.0)
+        mass_locus = SVector{3}(0.0,0.0,0.0)
         # @show p
-        r̄ps = [p[i]-p[0] for i = 1:12]
+        loci = [p[i]-p[0] for i = 1:12]
         m = inertia = 1.0
         Ī = SMatrix{3,3}(
             [
@@ -47,14 +47,14 @@ function quad(c=100.0;
             movable,
             m,
             Ī,
-            r̄g,
-            r̄ps;
+            mass_locus,
+            loci;
             constrained = constrained,
         )
         lncs, _ = RB.NCF.NC1P3V(ri, ro, R, ṙo, ω)
         state = RB.RigidBodyState(prop, lncs, ri, R, ṙo, ω, ci, Φi)
         trunk_mesh = load("身体.STL")
-        rb = RB.RigidBody(prop, state, trunk_mesh)
+        body = RB.RigidBody(prop, state, trunk_mesh)
     end
 
     function rigidbar(i,p)
@@ -74,7 +74,7 @@ function quad(c=100.0;
         ω = zero(ri)
         # if isodd(pos)
         b = norm(rj-ri)
-        r̄g  = SVector{3}(   0,0.0,0.0)
+        mass_locus  = SVector{3}(   0,0.0,0.0)
         r̄p1 = SVector{3}(-b/2,0.0,0.0)
         r̄p2 = SVector{3}( b/2,0.0,0.0)
         m = inertia = 0.2
@@ -83,20 +83,20 @@ function quad(c=100.0;
             0       0 0;
             0       0 0
         ])
-        r̄ps = [r̄p1,r̄p2]
+        loci = [r̄p1,r̄p2]
         prop = RB.RigidBodyProperty(
             i,
             movable,
             m,
             Ī,
-            r̄g,
-            r̄ps;
+            mass_locus,
+            loci;
             constrained = constrained,
         )
         lncs, _ = RB.NCF.NC3D2P(ri, rj, ro, R, ṙo, ω)
         state = RB.RigidBodyState(prop, lncs, ro, R, ṙo, ω, ci, Φi)
         leg_mesh = load("400杆.STL")
-        rb = RB.RigidBody(prop, state, leg_mesh)
+        body = RB.RigidBody(prop, state, leg_mesh)
     end
     rbs = vcat(
         rigidbase(5, p),[
@@ -186,7 +186,7 @@ function rigidbar(i,
     R = SMatrix{3,3}(hcat(u,v,w))
     # if isodd(pos)
     b = norm(rj-ri)
-    r̄g  = SVector{3}(   0,0.0,0.0)
+    mass_locus  = SVector{3}(   0,0.0,0.0)
     r̄p1 = SVector{3}(-b/2,0.0,0.0)
     r̄p2 = SVector{3}( b/2,0.0,0.0)
     r̄p3 = SVector{3}(   0,0.0,0.0)
@@ -196,20 +196,20 @@ function rigidbar(i,
         0       inertia    0;
         0       0     inertia
     ])
-    r̄ps = [r̄p1,r̄p2]
-    ās = [SVector(1.0,0,0),SVector(1.0,0,0),SVector(1.0,0,0)]
-    μs = fill(μ,length(r̄ps))
-    es = fill(e,length(r̄ps))
+    loci = [r̄p1,r̄p2]
+    axes = [SVector(1.0,0,0),SVector(1.0,0,0),SVector(1.0,0,0)]
+    friction_coefficients = fill(μ,length(loci))
+    restitution_coefficients = fill(e,length(loci))
     prop = RB.RigidBodyProperty(
         i,
         movable,
         m,
         Ī,
-        r̄g,
-        r̄ps,
-        ās,
-        μs,
-        es;
+        mass_locus,
+        loci,
+        axes,
+        friction_coefficients,
+        restitution_coefficients;
         constrained = constrained,
     )
     pretty_table(
@@ -226,7 +226,7 @@ function rigidbar(i,
         ω = zero(ṙo)
     else
         lncs, _ = RB.NCF.NC3D1P1V(ri, u, ro, R)
-        ω = RB.NCF.find_ω(lncs,vcat(ri,u),vcat(ṙi,u̇))
+        ω = RB.NCF.find_angular_velocity(lncs,vcat(ri,u),vcat(ṙi,u̇))
         # @show ω, ṙi, u̇
     end
     state = RB.RigidBodyState(prop, lncs, ro, R, ṙo, ω, ci, Φi)
@@ -239,7 +239,7 @@ function rigidbar(i,
     else
         barmesh = endpoints2mesh(r̄p1,r̄p2;radius = norm(r̄p2-r̄p1)/40)
     end
-    rb = RB.RigidBody(prop, state, barmesh)
+    body = RB.RigidBody(prop, state, barmesh)
 end
 
 function uni(c=100.0;
@@ -279,10 +279,10 @@ function uni(c=100.0;
         ṙo = ṙo_ref
         ω = [1.0,0,ωz]
         # ω = zeros(3)
-        r̄g = SVector{3}(0.0,0.0,0.0)
+        mass_locus = SVector{3}(0.0,0.0,0.0)
         # @show p
-        r̄ps = p[[2,3,4,1]]
-        ās = [SVector(0,0,1.0) for i = 1:4]
+        loci = p[[2,3,4,1]]
+        axes = [SVector(0,0,1.0) for i = 1:4]
         m = inertia = 0.1
         Ī = SMatrix{3,3}(
             [
@@ -296,9 +296,9 @@ function uni(c=100.0;
             movable,
             m,
             Ī,
-            r̄g,
-            r̄ps,
-            ās;
+            mass_locus,
+            loci,
+            axes;
             constrained = constrained,
         )
         lncs, _ = RB.NCF.NC1P3V(ri, ro, R, ṙo, ω)
@@ -310,9 +310,9 @@ function uni(c=100.0;
         )
         # long = 25
 
-        # b1 = endpoints2mesh(r̄ps[1],r̄ps[2];radius = norm(r̄ps[2]-r̄ps[1])/long)
-        # b2 = endpoints2mesh(r̄ps[2],r̄ps[3];radius = norm(r̄ps[3]-r̄ps[2])/long)
-        # b3 = endpoints2mesh(r̄ps[3],r̄ps[1];radius = norm(r̄ps[3]-r̄ps[1])/long)
+        # b1 = endpoints2mesh(loci[1],loci[2];radius = norm(loci[2]-loci[1])/long)
+        # b2 = endpoints2mesh(loci[2],loci[3];radius = norm(loci[3]-loci[2])/long)
+        # b3 = endpoints2mesh(loci[3],loci[1];radius = norm(loci[3]-loci[1])/long)
         # trimesh = GB.merge([b1,b2,b3])
         RB.RigidBody(prop, state, trimesh)
     end
@@ -410,16 +410,16 @@ function uni(c=100.0;
 end
 
 function superball(c=0.0;
-            ṙo = SVector(0.0,0.0,0),
+            z0 = l^2/(sqrt(5)*d) - 1e-7,
+            origin_position = SVector(0,0,z0),
+            θ = atan(0.5,1),
+            R = RotY(θ),
+            origin_velocity = SVector(0.0,0.0,0),
             ω = SVector(0.0,0.0,0.0),
             μ = 0.9,
             e = 0.0,
             l = 1.7/2,
             d = l/2,
-            z0 = l^2/(sqrt(5)*d) - 1e-7,
-            θ = atan(0.5,1),
-            R = RotY(θ),
-            ro = SVector(0,0,z0),
             k = 4000.0,
             constrained = true,
             addconst = Float64[],
@@ -434,10 +434,10 @@ function superball(c=0.0;
             [ l,  0,  d], [-l,  0,  d],
             [-l,  0, -d], [ l,  0, -d],
         ]
-    ).+Ref(ro)
+    ).+Ref(origin_position)
     # p |> display
     ṗ = [
-        ṙo + ω×(r-ro)
+        origin_velocity + ω×(r-origin_position)
         for r in p
     ]
     rbs = [

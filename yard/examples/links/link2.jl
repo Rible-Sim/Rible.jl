@@ -64,7 +64,7 @@ function links(n,a1=0.0,a2=0.0,α=0.0)
     mass = 0.025 #kg
     #inertia = Matrix(Diagonal([45.174,45.174,25.787]))*1e-8 # N/m^2
     inertia = Matrix(Diagonal([45.174,45.174,25.787]))*1e-3
-    r̄g = [0.0, 0.0, 0.0]
+    mass_locus = [0.0, 0.0, 0.0]
 
 
     ap1 = SVector{3}([0.0, 0.0, 0.0])
@@ -78,7 +78,7 @@ function links(n,a1=0.0,a2=0.0,α=0.0)
 
     props = [RB.RigidBodyProperty(i,movable[i],mass,
                 SMatrix{3,3}(inertia),
-                SVector{3}(r̄g),
+                SVector{3}(mass_locus),
                 aps) for i = 1:n]
 
     dr = 0.5h
@@ -93,7 +93,7 @@ function links(n,a1=0.0,a2=0.0,α=0.0)
         lncs,q,q̇ = RB.NCF.BP4P(ri,rj,rk,rl,r,R,ṙ,ω)
         state = RB.RigidBodyState(prop,lncs,r,R,ṙ,ω,q,q̇)
         @show R
-        rb = RB.RigidBody(prop,state)
+        body = RB.RigidBody(prop,state)
     end
     rbs = [rigidbody(props[i],aps,r[i],R[i],ṙ[i],ω[i]) for i = 1:n]
 

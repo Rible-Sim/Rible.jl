@@ -1,22 +1,22 @@
-function rb_bars(rb)
-    Cg = rb.state.cache.Cg
-    q = rb.state.coords.q
+function rb_bars(body)
+    Cg = body.state.cache.Cg
+    q = body.state.coords.q
     rg = Cg*q
     [Point(rg) => Point(p)
-        for p in rb.state.rps]
+        for p in body.state.loci_states]
 end
 
-function rb_sphere(rb)
-    Cg = rb.state.cache.Cg
-    q = rb.state.coords.q
+function rb_sphere(body)
+    Cg = body.state.cache.Cg
+    q = body.state.coords.q
     rg = Cg*q
     Sphere(Point3f(rg), 0.006f0)
 end
 
 function bars_and_cables(st)
-    bars = [Observable(rb_bars(rb)) for rb in st.rigidbodies]
+    bars = [Observable(rb_bars(body)) for rb in st.rigidbodies]
     cables = Observable(RB.get_cables(st))
-    spheres = [Observable(rb_sphere(rb)) for rb in st.rigidbodies]
+    spheres = [Observable(rb_sphere(body)) for rb in st.rigidbodies]
     bars, cables, spheres
 end
 
@@ -77,8 +77,8 @@ function update_scene!(st,bars,cables,spheres,q)
     cnt = st.connectivity
     RB.distribute_q_to_rbs!(st,q)
     for (id,rb) in enumerate(st.rigidbodies)
-        bars[id][] = rb_bars(rb)
-        spheres[id][] = rb_sphere(rb)
+        bars[id][] = rb_bars(body)
+        spheres[id][] = rb_sphere(body)
     end
     cables[] = RB.get_cables(st)
     # angles = update_angles(st)

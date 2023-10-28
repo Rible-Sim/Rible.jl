@@ -62,13 +62,13 @@ function ∂Aᵀλ∂q̌(st::AbstractStructure,λ)
     (;njoints,nexconstraints,joints,joint2sysexcst) = jointed
     ret = zeros(eltype(λ),nfree,nfree)
     (;bodies,nconstraints) = st
-    foreach(bodies) do rb
-        rbid = rb.prop.id
-        memfree = mem2sysfree[rbid]
-        memincst = mem2sysincst[rbid]
-        free_idx = rb.state.cache.free_idx
+    foreach(bodies) do body
+        bodyid = body.prop.id
+        memfree = mem2sysfree[bodyid]
+        memincst = mem2sysincst[bodyid]
+        free_idx = body.state.cache.free_idx
         if !isempty(memincst)
-            ret[memfree,memfree] .+= rb.state.cache.funcs.∂Aᵀλ∂q(λ[memincst])#[:,free_idx]
+            ret[memfree,memfree] .+= body.state.cache.funcs.∂Aᵀλ∂q(λ[memincst])#[:,free_idx]
         end
     end
     #todo skip 2D for now
@@ -88,14 +88,14 @@ function ∂Aq̇∂q(st,q̇)
     (;indexed,jointed) = st.connectivity
     (;ninconstraints,mem2sysfree,mem2sysincst) = indexed
     ret = zeros(eltype(q̇),nconstraints,nfree)
-    foreach(bodies) do rb
-        rbid = rb.prop.id
-        memfree = mem2sysfree[rbid]
-        memincst = mem2sysincst[rbid]
-        free_idx = rb.state.cache.free_idx
-        Φi = rb.state.cache.Φi
+    foreach(bodies) do body
+        bodyid = body.prop.id
+        memfree = mem2sysfree[bodyid]
+        memincst = mem2sysincst[bodyid]
+        free_idx = body.state.cache.free_idx
+        Φi = body.state.cache.Φi
         if !isempty(memincst)
-            ret[memincst,memfree] .+= rb.state.cache.funcs.∂Aq̇∂q(q̇[memfree])[Φi,free_idx]
+            ret[memincst,memfree] .+= body.state.cache.funcs.∂Aq̇∂q(q̇[memfree])[Φi,free_idx]
         end
     end
     ret
@@ -149,11 +149,11 @@ function make_intrinsic_nullspace(st,q)
     (;indexed,) = connectivity
     (;nfull,mem2sysfull,sysndof,mem2sysndof,) = indexed
     ret = zeros(eltype(q),nfull,sysndof)
-    foreach(bodies) do rb
-        rbid = rb.prop.id
-        (;nmcs) = rb.state.cache.funcs
-        mem2full = mem2sysfull[rbid]
-        ret[mem2full,mem2sysndof[rbid]] = NCF.make_N(nmcs)(q[mem2full])
+    foreach(bodies) do body
+        bodyid = body.prop.id
+        (;nmcs) = body.state.cache.funcs
+        mem2full = mem2sysfull[bodyid]
+        ret[mem2full,mem2sysndof[bodyid]] = NCF.make_N(nmcs)(q[mem2full])
     end
     ret
 end
@@ -996,21 +996,21 @@ function make_N(st::Structure,q0::AbstractVector)
 		q[syspres] .= q0[syspres]
 		q[sysfree] .= q̌
         ret = zeros(T,nfree,nfree-ninconstraints)
-        foreach(bodies) do rb
-            rbid = rb.prop.id
-            (;lncs) = rb.state.cache.funcs
-			memfree = mem2sysfree[rbid]
-            if !isempty(mem2sysincst[rbid])
+        foreach(bodies) do body
+            bodyid = body.prop.id
+            (;lncs) = body.state.cache.funcs
+			memfree = mem2sysfree[bodyid]
+            if !isempty(mem2sysincst[bodyid])
                 if lncs isa NCF.LNC3D12C
                         u,v,w = NCF.get_uvw(lncs,q̌[memfree])
-                        N = @view ret[mem2sysfree[rbid],mem2sysincst[rbid]]
+                        N = @view ret[mem2sysfree[bodyid],mem2sysincst[bodyid]]
                         N[1:3,1:3]   .= Matrix(1I,3,3)
                         N[4:6,4:6]   .= -skew(u)
                         N[7:9,4:6]   .= -skew(v)
                         N[10:12,4:6] .= -skew(w)
                 elseif lncs isa NCF.LNC2D6C                    
                         u,v = NCF.get_uv(lncs,q̌[memfree])
-                        N = @view ret[mem2sysfree[rbid],mem2sysincst[rbid]]
+                        N = @view ret[mem2sysfree[bodyid],mem2sysincst[bodyid]]
                         N[1:2,1:2] .= Matrix(1I,2,2)
                         N[3:4,3] .= -skew(u)
                         N[5:6,3] .= -skew(v)

@@ -22,12 +22,12 @@ function make_strut(id,ri,rj;ci = Int[])
 					   		  0.0 0.0 0.0;
 					          0.0 0.0 0.0])
 	# @show id,b#,m,Īg[1]
-	r̄g  = SVector{3}([b/2,0,0])
+	mass_locus  = SVector{3}([b/2,0,0])
 	r̄p1 = SVector{3}([0.0,0,0])
 	r̄p2 = SVector{3}([  b,0,0])
-	r̄ps = [r̄p1,r̄p2]
+	loci = [r̄p1,r̄p2]
 	prop = RB.RigidBodyProperty(id,movable,m,Īg,
-				r̄g,r̄ps;constrained=constrained
+				mass_locus,loci;constrained=constrained
 				)
 	# @show prop.inertia
 	ro = ri
@@ -36,7 +36,7 @@ function make_strut(id,ri,rj;ci = Int[])
 	lncs,q0,q̇0 = RB.NCF.NC3D2P(ri,rj,ro,R,ṙo,ω)
 	state = RB.RigidBodyState(prop,lncs,ro,R,ṙo,ω,ci)
 	strutmesh = endpoints2mesh(r̄p1,r̄p2)
-	rb = RB.RigidBody(prop,state,strutmesh)
+	body = RB.RigidBody(prop,state,strutmesh)
 end
 
 function nbridge(n,m=2;θ=missing,r=missing,c=0.0,h=1.0,o2=[0,4.0,0],right=false)
@@ -392,13 +392,13 @@ function nrailbridge(n,m=2;θ=missing,r=missing,c=0.0,h=1.0,o2=[0,4.0,0],right=f
 	    j = 3(i-1)+1
 	    inds = indexed.mem2sysfull[j]
 	    indx, indy, indz = inds[1:3]
-		rb = rbs[j]
+		body = rbs[j]
 		q, _ = RB.NCF.rigidstate2naturalcoords(
-						rb.state.cache.funcs.nmcs,
-						rb.state.ro,
-						rb.state.R,
-						rb.state.ṙo,
-						rb.state.ω)
+						body.state.cache.funcs.nmcs,
+						body.state.ro,
+						body.state.R,
+						body.state.ṙo,
+						body.state.ω)
 	    A_cst[2(i-1)+1,indx], A_cst[2(i-1)+1,indz] = q[3], -q[1]
 		A_cst[2(i-1)+2,indy] = 1
 	end

@@ -40,27 +40,27 @@ end
 linkmesh(0.5,1.0)
 set_theme!(resolution = (1280,720),center = false)
 scene = Scene()
-function update_rb_position!(scene,rbid,rb)
-    qtn = Rotations.Quat(rb.state.R)
-    rotate!(scene[rbid],AbstractPlotting.Quaternion(qtn.x,qtn.y,qtn.z,qtn.w))
-    translate!(scene[rbid],rb.state.rps)
+function update_rb_position!(scene,bodyid,rb)
+    qtn = Rotations.Quat(body.state.R)
+    rotate!(scene[bodyid],AbstractPlotting.Quaternion(qtn.x,qtn.y,qtn.z,qtn.w))
+    translate!(scene[bodyid],body.state.loci_states)
 end
 function draw_rbs!(scene,rbs)
-    for (rbid,rb) in enumerate(rbs)
+    for (bodyid,rb) in enumerate(rbs)
         mesh!(scene,linkmesh(0.5,1.0),color=:grey, show_axis=false)
         # mesh!(scene, Sphere(Point3(tglink.NC.r̄1), 0.04), color=:cyan, show_axis=false)
         # mesh!(scene, Sphere(Point3(tglink.NC.r̄2), 0.04), color=:cyan, show_axis=false)
         # mesh!(scene, Sphere(Point3(tglink.NC.r̄3), 0.04), color=:cyan, show_axis=false)
         # mesh!(scene, Sphere(Point3(tglink.NC.r̄4), 0.04), color=:cyan, show_axis=false)
 
-        update_rb_position!(scene,rbid,rb)
+        update_rb_position!(scene,bodyid,rb)
     end
 end
 draw_rbs!(scene,rbs)
 
 function update_rbs_position!(scene,rbs)
-    for (rbid,rb) in enumerate(rbs)
-        update_rb_position!(scene,rbid,rb)
+    for (bodyid,rb) in enumerate(rbs)
+        update_rb_position!(scene,bodyid,rb)
     end
 end
 update_rbs_position!(scene,rbs)
@@ -70,8 +70,8 @@ function string2linesegment(st)
     rba = rbs[rbida]
     rbb = rbs[rbidb]
     ra = rba.state.p[pida]
-    rb = rbb.state.p[pidb]
-    ls = Point3(ra...) => Point3(rb...)
+    body = rbb.state.p[pidb]
+    ls = Point3(ra...) => Point3(body...)
 end
 
 

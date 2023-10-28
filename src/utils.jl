@@ -46,3 +46,41 @@ end
 function skew(a::SVector{2})
 	[-a[2],a[1]]
 end
+
+@inline @inbounds function LinearAlgebra.cross(a::Number,b::AbstractVector)
+    ret = similar(b)
+    ret[1] = -a*b[2]
+    ret[2] =  a*b[1]
+    ret
+end
+
+@inline @inbounds function LinearAlgebra.cross(a::StaticArray{Tuple{1}, T, 1},b::StaticArray{Tuple{2}, T, 1}) where T
+    ret = similar(b)
+    ret[1] = -a[1]*b[2]
+    ret[2] =  a[1]*b[1]
+    ret
+end
+
+
+@inline @inbounds function HouseholderOrthogonalization(n)
+    n̂ = norm(n)
+    _, i = findmax(n.+n̂)
+    ei = 1:3 .== i
+    h = n + n̂*ei
+    H = I - 2h*transpose(h)/(transpose(h)*h)
+    u, v  = [H[:,j] for j = 1:3 if j != i]
+    if i == 2
+        u, v = v, u
+    end
+    u, v
+end
+
+function get_orthonormal_axes(normal::AbstractVector)
+    normal /= norm(normal)
+    tangent, bitangent = HouseholderOrthogonalization(normal)
+    SMatrix{3,3}(
+        normal[1], normal[2], normal[3],
+        tangent[1], tangent[2], tangent[3],
+        bitangent[1], bitangent[2], bitangent[3],
+    )
+end

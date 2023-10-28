@@ -25,7 +25,7 @@ function man_nd(n;θ=0.0,k=0.0,c=0.0)
             r̄g_x = a/2
             r̄g_y = 0
         end
-        r̄g = SVector{2}([r̄g_x,r̄g_y])
+        mass_locus = SVector{2}([r̄g_x,r̄g_y])
 
 
         if isodd(i)
@@ -47,10 +47,10 @@ function man_nd(n;θ=0.0,k=0.0,c=0.0)
 
 
         prop = RB.RigidBodyProperty(i,movable,m,Ia,
-                    r̄g,aps;constrained=constrained
+                    mass_locus,aps;constrained=constrained
                     )
         state = RB.RigidBodyState(prop,ri,rj,pres_idx)
-        rb = RB.RigidBody(prop,state)
+        body = RB.RigidBody(prop,state)
     end
 
     rbs = [rigidbody(i,m[i],a[i],

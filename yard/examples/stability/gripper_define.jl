@@ -4,7 +4,7 @@ function rigidbody(i,m,Ia,ri,rj,aps)
 	# end
 	u = rj - ri
 	d = norm(u)
-	r̄g = SVector{2}([d/2,0])
+	mass_locus = SVector{2}([d/2,0])
 
 	Ī = SMatrix{2, 2}([
 		0.99Ia 0
@@ -34,7 +34,7 @@ function rigidbody(i,m,Ia,ri,rj,aps)
 	prop = RB.RigidBodyProperty(
 				i,movable,m,
 				Ī,
-				r̄g,
+				mass_locus,
 				aps;
 				constrained
 				)
@@ -42,7 +42,7 @@ function rigidbody(i,m,Ia,ri,rj,aps)
 
 	state = RB.RigidBodyState(prop, lncs, ri, α, ṙo, ω, ci, Φi)
 
-	rb = RB.RigidBody(prop,state)
+	body = RB.RigidBody(prop,state)
 end
 
 function new_gripper(;c=0.0,x1 = 41.02, ϕ1 = 0.7652, ϕ2 = 0.0)
@@ -204,12 +204,12 @@ function sup_ggriper!(ax,tgob,sgi;
 			)
 		)
 		push!(ret,
-			Point(rbs[3].state.rps[1])=>
-			Point(rbs[3].state.rps[3])
+			Point(rbs[3].state.loci_states[1])=>
+			Point(rbs[3].state.loci_states[3])
 		)
 		push!(ret,
-			Point2(revert_y*rbs[3].state.rps[1])=>
-			Point2(revert_y*rbs[3].state.rps[3])
+			Point2(revert_y*rbs[3].state.loci_states[1])=>
+			Point2(revert_y*rbs[3].state.loci_states[3])
 		)
 
 		ret
@@ -254,13 +254,13 @@ function make_spine(n,θ=0.0)
 		ap2 = b*[cos( α),sin( α)]
 		ap3 = b*[cos(-α),sin(-α)]
 		# ap4 = [a,0.0]
-        r̄g = zeros(2)
+        mass_locus = zeros(2)
         aps = [ap1,ap2,ap3]
         m = 0.495 #kg
         inertia = SMatrix{2,2}(Diagonal(ones(2)))
         prop = RB.RigidBodyProperty(
 			i,
-			movable,m,inertia,r̄g,aps;
+			movable,m,inertia,mass_locus,aps;
 			constrained
 		)
 
@@ -312,19 +312,19 @@ function sup_spine2d!(ax,tgob,sgi)
 		ndim = RB.get_ndim($tgob)
         T = RB.get_numbertype($tgob)
         ret = Vector{Pair{Point{ndim,T},Point{ndim,T}}}()
-		foreach($tgob.rigidbodies) do rb
+		foreach($tgob.rigidbodies) do body
 			
 			push!(ret,
-				Point(rb.state.ro)=>
-				Point(rb.state.rps[1])
+				Point(body.state.ro)=>
+				Point(body.state.loci_states[1])
 			)
 			push!(ret,
-				Point(rb.state.ro)=>
-				Point(rb.state.rps[2])
+				Point(body.state.ro)=>
+				Point(body.state.loci_states[2])
 			)
 			push!(ret,
-				Point(rb.state.ro)=>
-				Point(rb.state.rps[3])
+				Point(body.state.ro)=>
+				Point(body.state.loci_states[3])
 			)
 
 		end
@@ -365,7 +365,7 @@ function dualtri(ndof,onedir=[1.0,0.0];θ=0.0,k=400.0,c=0.0,restlen=0.16)
 
     function rigidbody(i,m,a,Ia,ri,α)
 		movable = true
-        r̄g = SVector{2}([0.0,0.0])
+        mass_locus = SVector{2}([0.0,0.0])
 
         ap1 = SVector{2}([-a/2,0.0])
         ap2 = SVector{2}([ a/2,0.0])
@@ -399,7 +399,7 @@ function dualtri(ndof,onedir=[1.0,0.0];θ=0.0,k=400.0,c=0.0,restlen=0.16)
 		prop = RB.RigidBodyProperty(
 					i,movable,m,
 					Ī,
-                    r̄g,
+                    mass_locus,
 					aps;
 					constrained=constrained
                     )
@@ -408,7 +408,7 @@ function dualtri(ndof,onedir=[1.0,0.0];θ=0.0,k=400.0,c=0.0,restlen=0.16)
 
 		state = RB.RigidBodyState(prop, lncs, ri, α, ṙo, ω, ci, Φi)
 
-        rb = RB.RigidBody(prop,state)
+        body = RB.RigidBody(prop,state)
     end
     rbs = [
 		begin
@@ -488,19 +488,19 @@ function sup_dualtri!(ax,tgob;
 		ndim = RB.get_ndim($tgob)
         T = RB.get_numbertype($tgob)
         ret = Vector{Pair{Point{ndim,T},Point{ndim,T}}}()
-		foreach($tgob.rigidbodies) do rb
+		foreach($tgob.rigidbodies) do body
 			
 			push!(ret,
-				Point(rb.state.rps[1])=>
-				Point(rb.state.rps[2])
+				Point(body.state.loci_states[1])=>
+				Point(body.state.loci_states[2])
 			)
 			push!(ret,
-				Point(rb.state.rps[2])=>
-				Point(rb.state.rps[3])
+				Point(body.state.loci_states[2])=>
+				Point(body.state.loci_states[3])
 			)
 			push!(ret,
-				Point(rb.state.rps[3])=>
-				Point(rb.state.rps[1])
+				Point(body.state.loci_states[3])=>
+				Point(body.state.loci_states[1])
 			)
 
 		end
@@ -515,13 +515,13 @@ end
 function get_angles(st)
     rbs = RB.get_bodies(st)
     angles = zeros(st.nrigids-1)
-    for (rbid,rb) in enumerate(rbs)
-        if rbid > 1
-			state0 = rbs[rbid-1].state
-            v = state0.rps[2]-state0.rps[1]
-            state1 = rbs[rbid].state
-            w = state1.rps[2]-state1.rps[1]
-            angles[rbid-1] = get_angle(v,w)
+    for (bodyid,rb) in enumerate(rbs)
+        if bodyid > 1
+			state0 = rbs[bodyid-1].state
+            v = state0.loci_states[2]-state0.loci_states[1]
+            state1 = rbs[bodyid].state
+            w = state1.loci_states[2]-state1.loci_states[1]
+            angles[bodyid-1] = get_angle(v,w)
         end
     end
     rad2deg.(angles)

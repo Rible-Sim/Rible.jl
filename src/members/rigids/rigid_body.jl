@@ -1,7 +1,3 @@
-abstract type AbstractBody{N,T} end
-abstract type AbstractBodyProperty{N,T} end
-abstract type AbstractBodyState{N,T} end
-
 abstract type AbstractRigidBody{N,T} <: AbstractBody{N,T}end
 abstract type AbstractRigidBodyProperty{N,T} <: AbstractBodyProperty{N,T} end
 abstract type AbstractRigidBodyState{N,T} <: AbstractBodyState{N,T} end
@@ -27,15 +23,9 @@ struct RigidBodyProperty{N,T} <: AbstractRigidBodyProperty{N,T}
     "Inertia"
     inertia::SMatrix{N,N,T}
     "Centroid in local frame"
-    r̄g::SVector{N,T}
+    mass_locus::Locus{N,T}
     "Anchor points in local frame"
-    r̄ps::Vector{SVector{N,T}}
-    "Axes in local frame"
-    ās::Vector{SVector{N,T}}
-    "Friction coefficients"
-    μs::Vector{T}
-    "Restitution coefficients"
-    es::Vector{T}
+    loci::Vector{Locus{N,T}}
 end
 
 """
@@ -45,33 +35,43 @@ $(TYPEDSIGNATURES)
 function RigidBodyProperty(
         id::Integer,movable::Bool,
         mass::T,inertia_input,
-        r̄g::AbstractVector,
-        r̄ps=SVector{size(inertia_input,1),T}[],
-        ās=SVector{size(inertia_input,1),T}[],
-        μs=zeros(T,length(r̄ps)),
-        es=zeros(T,length(r̄ps));
+        mass_center_position::AbstractVector,
+        positions=SVector{size(inertia_input,1),T}[],
+        axes_normals=SVector{size(inertia_input,1),T}[],
+        friction_coefficients=zeros(T,length(positions)),
+        restitution_coefficients=zeros(T,length(positions));
         constrained = false,
         type = :generic
     ) where T
-    nr̄ps = length(r̄ps)
-    nās = length(ās)
     if !movable
         constrained = true
     end
     mtype = StaticArrays.similar_type(inertia_input)
-    r̄type = SVector{size(inertia_input,1)}
-    # ātype = SVector{2size(inertia_input,1)-3}	
-    ātype = SVector{size(inertia_input,1)}
+    VecType = SVector{size(inertia_input,1)}
+    mass_locus = Locus(
+        VecType(mass_center_position)
+    )
+    loci = [
+        Locus(
+            VecType(position),
+            VecType(normal),
+            friction_coefficient,
+            restitution_coefficient
+        )
+        for (position,normal,friction_coefficient,restitution_coefficient) in zip(
+            positions,
+            axes_normals,
+            friction_coefficients,
+            restitution_coefficients
+        )
+    ]
     return RigidBodyProperty(
         movable,constrained,
         id,type,
         mass,
         mtype(inertia_input),
-        r̄type(r̄g),
-        r̄type.(r̄ps),
-        ātype.(ās),
-        μs,
-        es
+        mass_locus,
+        loci
     )
 end
 
@@ -96,21 +96,22 @@ function get_CoordinatesCache(prop::RigidBodyProperty{N,T},
                                  lncs::NCF.LNC,
                                  pres_idx=Int[],
                                  Φ_mask=get_Φ_mask(lncs)) where {N,T}
-    (;mass,inertia,r̄g,r̄ps) = prop
-    nr̄ps = length(r̄ps)
+    (;mass,inertia,mass_locus,loci) = prop
+    mass_center = mass_locus.position
+    num_of_loci = length(loci)
     free_idx = NCF.get_free_idx(lncs,pres_idx)
     nΦ = length(Φ_mask)
     cf = NCF.CoordinateFunctions(lncs,free_idx,Φ_mask)
-    mass_matrix = NCF.make_M(cf,mass,inertia,r̄g)
+    mass_matrix = NCF.make_M(cf,mass,inertia,mass_center)
     M⁻¹ = inv(mass_matrix)
     ∂Mq̇∂q = zero(mass_matrix)
     ∂M⁻¹p∂q = zero(mass_matrix)
     Ṁq̇ = @MVector zeros(T,size(mass_matrix,2))
     ∂T∂qᵀ = @MVector zeros(T,size(mass_matrix,2))
     (;C,c) = cf
-    Co = C(c(zero(r̄g)))
-    Cg = C(c(r̄g))
-    Cps = [typeof(Cg)(C(c(r̄ps[i]))) for i in 1:nr̄ps]
+    Co = C(c(zero(mass_center)))
+    Cg = C(c(mass_center))
+    Cps = [typeof(Cg)(C(c(loci[i].position))) for i in 1:num_of_loci]
     if prop.movable
         if prop.constrained && pres_idx == Int[]
             @error "Rigid body constrained, but no index specified."
@@ -125,8 +126,9 @@ function get_CoordinatesCache(prop::RigidBodyProperty{N,T},
                                 qcs::QBF.QC,
                                 pres_idx=Int[],
                                 Φ_mask=get_Φ_mask(qcs)) where {N,T}
-    (;mass,inertia,r̄g,r̄ps) = prop
-    nr̄ps = length(r̄ps)
+    (;mass,inertia,mass_locus,loci) = prop
+    mass_center = mass_locus.position
+    num_of_loci = length(loci)
     free_idx = deleteat!(collect(1:7),pres_idx)
     nΦ = length(Φ_mask)
     cf = QBF.CoordinateFunctions(qcs)
@@ -141,7 +143,7 @@ function get_CoordinatesCache(prop::RigidBodyProperty{N,T},
         Co[i,i] = 1
     end
     Cg = deepcopy(Co)
-    Cps = [deepcopy(Co) for i in 1:nr̄ps]
+    Cps = [deepcopy(Co) for i in 1:num_of_loci]
     if prop.movable
         if prop.constrained && pres_idx == Int[]
             @error "Rigid body constrained, but no index specified."
@@ -160,33 +162,18 @@ $(TYPEDFIELDS)
 """
 mutable struct RigidBodyState{N,M,T,cacheType,contactType} <: AbstractRigidBodyState{N,T}
     "Origin of local frame"
-    ro::MVector{N,T}
+    origin_position::MVector{N,T}
     "Rotation Matrix of local frame"
     R::MMatrix{N,N,T}
     "Translational velocity of local frame"
-    ṙo::MVector{N,T}
+    origin_velocity::MVector{N,T}
     "Angular velocity of local frame (expressed in the global frame)"
     ω::MVector{M,T}
-    "Position of centroid in global frame"
-    rg::MVector{N,T}
-    "Velocity of centroid in global frame"
-    ṙg::MVector{N,T}
+    "Position of mass center in global frame"
+    mass_locus_state::LocusState{N,M,T}
     "Positions of anchor points in global frame"
-    rps::Vector{MVector{N,T}}
+    loci_states::Vector{LocusState{N,M,T}}
     "Velocities of anchor points in global frame"
-    ṙps::Vector{MVector{N,T}}
-    "Directions of axes in global frame"
-    as::Vector{MVector{N,T}}
-    "Angular velocities of axes in global frame"
-    ȧs::Vector{MVector{N,T}}
-    "Resultant force"
-    f::MVector{N,T}
-    "Resultant torque"
-    τ::MVector{M,T}
-    "Forces exerted at anchor points"
-    fps::Vector{MVector{N,T}}
-    "Torques exerted around axes"
-    τps::Vector{MVector{M,T}}
     "Other cache"
     cache::cacheType
     "Contacts"
@@ -205,11 +192,10 @@ function RigidBodyState(prop::RigidBodyProperty{N,T},
                         r_input,rotation_input,ṙ_input,ω_input,
                         pres_idx=Int[],
                         Φ_mask=get_Φ_mask(lncs)) where {N,T}
-    (;r̄g,r̄ps,ās,μs,es) = prop
-    nr̄ps = length(r̄ps)
-    nās = length(ās)
-    ro = MVector{N}(r_input)
-    ṙo = MVector{N}(ṙ_input)
+    (;mass_locus,loci) = prop
+    num_of_loci = length(loci)
+    origin_position = MVector{N}(r_input)
+    origin_velocity = MVector{N}(ṙ_input)
     if rotation_input isa Number
         rotation = rotation_matrix(rotation_input)
     else
@@ -218,28 +204,33 @@ function RigidBodyState(prop::RigidBodyProperty{N,T},
     R = MMatrix{N,N,T}(rotation)
     M = 2N-3
     ω = MVector{M}(ω_input)
-    rg = MVector{N}(ro+R*r̄g)
-    ṙg = MVector{N}(ṙo+ω×(rg-ro))
-    f = @MVector zeros(T,N)
-    τ = @MVector zeros(T,M)
-
-    rps = MVector{N,T}[(ro+R*r̄ps[i])      for i in 1:nr̄ps]
-    ṙps = MVector{N,T}[(ṙo+ω×(rps[i]-ro)) for i in 1:nr̄ps]
-    as  = MVector{N,T}[(R*ās[i])          for i in 1:nās]
-    ȧs  = MVector{N,T}[(ω×(as[i]))        for i in 1:nās]
-    fps = MVector{N,T}[zeros(T,N) for i in 1:nr̄ps]
-    τps = MVector{M,T}[zeros(T,M) for i in 1:nās]
-
+    mass_locus_state = LocusState(
+        mass_locus,
+        origin_position,R,
+        origin_velocity,ω
+    )
+    loci_states = [
+        LocusState(
+            lo,
+            origin_position,R,
+            origin_velocity,ω
+        )
+        for lo in loci
+    ]
+    
     cache = get_CoordinatesCache(prop,lncs,pres_idx,Φ_mask)
-    contacts = [Contact(i,μs[i],es[i]) for i in 1:nr̄ps]
+    contacts = [
+        Contact(i,
+            loci[i].friction_coefficient,
+            loci[i].restitution_coefficient
+        ) 
+        for i in 1:num_of_loci
+    ]
     RigidBodyState(
-        ro,R,
-        ṙo,ω,
-        rg,ṙg,
-        rps,ṙps,
-        as,ȧs,
-        f,τ,
-        fps,τps,
+        origin_position,R,
+        origin_velocity,ω,
+        mass_locus_state,
+        loci_states,
         cache,
         contacts
     )
@@ -256,51 +247,53 @@ struct RigidBody{N,M,T,cacheType,meshType} <: AbstractRigidBody{N,T}
     prop::RigidBodyProperty{N,T}
     "Rigid Body State "
     state::RigidBodyState{N,M,T,cacheType}
-    "可视化网格"
+    "Rigid Body Mesh"
     mesh::meshType
 end
 
 RigidBody(prop,state) = RigidBody(prop,state,nothing)
 
 
-update_rigid!(rb::AbstractBody,q,q̇) = update_rigid!(rb.state,rb.state.cache,rb.prop,q,q̇)
-move_rigid!(rb::AbstractBody,q,q̇)	= move_rigid!(rb.state,rb.state.cache,rb.prop,q,q̇)
-stretch_rigid!(rb::AbstractBody,c) = stretch_rigid!(rb.state.cache,rb.prop,c)
-update_transformations!(rb::AbstractBody,q) = update_transformations!(rb.state.cache,rb.state,rb.prop,q)
-
-
-function body2coordinates(rb::RigidBody)
-    (;ro,R,ṙo,ω,cache) = rb.state
-    rigidState2coordinates(cache.funcs.nmcs,ro,R,ṙo,ω)
+function body2coordinates(body::RigidBody)
+    (;origin_position,R,origin_velocity,ω,cache) = body.state
+    rigidState2coordinates(cache.funcs.nmcs,origin_position,R,origin_velocity,ω)
 end
 
 
-function rigidState2coordinates(nmcs::NCF.LNC,ro,R,ṙo,ω)
-    NCF.rigidstate2naturalcoords(nmcs,ro,R,ṙo,ω)
+function rigidState2coordinates(nmcs::NCF.LNC,origin_position,R,origin_velocity,ω)
+    NCF.rigidstate2naturalcoords(nmcs,origin_position,R,origin_velocity,ω)
 end
 
-function rigidState2coordinates(nmcs::QBF.QC,ro,R,ṙo,ω)
-    QBF.rigidState2coordinates(ro,R,ṙo,ω)
+function rigidState2coordinates(nmcs::QBF.QC,origin_position,R,origin_velocity,ω)
+    QBF.rigidState2coordinates(origin_position,R,origin_velocity,ω)
 end
 
-function update_rigid!(state::RigidBodyState,
+function update_body!(state::RigidBodyState,
             cache::NonminimalCoordinatesCache{<:NCF.CoordinateFunctions},
             prop::RigidBodyProperty,q,q̇)
-    (;cache,ro,R,ṙo,ω,rg,ṙg) = state
+    (;cache,
+    origin_position,R,
+    origin_velocity,ω,
+    mass_locus_state,
+    ) = state
     (;funcs,Co,Cg) = cache
     (;nmcs) = funcs
-    mul!(ro, Co, q)
-    mul!(ṙo, Co, q̇)
-    mul!(rg, Cg, q)
-    mul!(ṙg, Cg, q̇)
-    R .= NCF.find_R(nmcs,q)
-    ω .= NCF.find_ω(nmcs,q,q̇)
+    mul!(origin_position, Co, q)
+    mul!(origin_velocity, Co, q̇)
+    mul!(mass_locus_state.position, Cg, q)
+    mul!(mass_locus_state.velocity, Cg, q̇)
+    R .= NCF.find_rotation(nmcs,q)
+    ω .= NCF.find_angular_velocity(nmcs,q,q̇)
 end
 
-function update_rigid!(state::RigidBodyState,
+function update_body!(state::RigidBodyState,
             cache::NonminimalCoordinatesCache{<:QBF.CoordinateFunctions},
             prop::RigidBodyProperty,x,ẋ)
-    (;cache,ro,R,ṙo,ω,rg,ṙg) = state
+    (;cache,
+    origin_position,R,
+    origin_velocity,ω,
+    mass_locus_state,
+    ) = state
     (;M,M⁻¹,∂Mq̇∂q,∂M⁻¹p∂q,∂T∂qᵀ,funcs) = cache
     # update inertia
     # @show x[4:7],ẋ[4:7]
@@ -309,47 +302,50 @@ function update_rigid!(state::RigidBodyState,
     ∂Mq̇∂q .= funcs.build_∂Mẋ∂x(x,ẋ)
     ∂M⁻¹p∂q .= funcs.build_∂M⁻¹y∂x(x,M*ẋ)
     ∂T∂qᵀ .= funcs.build_∂T∂xᵀ(x,ẋ)
-    ro .= rg .= x[1:3]
-    ṙo .= ṙg .= ẋ[1:3]
-    R .= QBF.find_R(x)
-    ω .= R*QBF.find_Ω(x,ẋ)
+    origin_position .= mass_locus_state.position .= x[1:3]
+    origin_velocity .= mass_locus_state.velocity .= ẋ[1:3]
+    R .= QBF.find_rotation(x)
+    ω .= R*QBF.find_local_angular_velocity(x,ẋ)
 end
 
-function stretch_rigid!(cache::NonminimalCoordinatesCache{<:NCF.CoordinateFunctions},
+function stretch_body!(cache::NonminimalCoordinatesCache{<:NCF.CoordinateFunctions},
                     prop::RigidBodyProperty,c)
-    (;r̄ps) = prop
+    (;loci) = prop
     (;Cps,funcs) = cache
     nlocaldim = get_nlocaldim(cache)
-    for pid in eachindex(r̄ps)
+    for pid in eachindex(loci)
         Cps[pid] = funcs.C(c[nlocaldim*(pid-1)+1:nlocaldim*pid])
     end
 end
 
-function stretch_rigid!(cache::NonminimalCoordinatesCache{<:QBF.CoordinateFunctions},
+function stretch_body!(cache::NonminimalCoordinatesCache{<:QBF.CoordinateFunctions},
                 prop::RigidBodyProperty,c)
 end
 
-function move_rigid!(state::RigidBodyState,
+function move_body!(state::RigidBodyState,
                     cache::NonminimalCoordinatesCache{<:NCF.CoordinateFunctions},
                     prop::RigidBodyProperty,q,q̇)
-    (;rps,ṙps) = state
+    (;loci_states) = state
     (;Cps) = cache
-    for (i,(rp,ṙp)) in enumerate(zip(rps,ṙps))
-        mul!(rp, Cps[i], q)
-        mul!(ṙp, Cps[i], q̇)
+    for (i,locus_state) in enumerate(loci_states)
+        mul!(locus_state.position, Cps[i], q)
+        mul!(locus_state.velocity, Cps[i], q̇)
     end
 end
 
-function move_rigid!(state::RigidBodyState,
+function move_body!(state::RigidBodyState,
                     cache::NonminimalCoordinatesCache{<:QBF.CoordinateFunctions},
                     prop::RigidBodyProperty,q,q̇)
-    update_rigid!(state,cache,prop,q,q̇)
-    (;r̄ps) = prop
-    (;ro,R,ṙo,ω,rps,ṙps) = state
-    for (i,(rp,ṙp)) in enumerate(zip(rps,ṙps))
-        vp = R * r̄ps[i]
-        rp .= ro .+ vp
-        ṙp .= ṙo .+ ω × vp
+    update_body!(state,cache,prop,q,q̇)
+    (;loci) = prop
+    (;loci_states,
+    origin_position,R,
+    origin_velocity,ω,
+    ) = state
+    for (locus,locus_state) in zip(loci,loci_states)
+        relative_velocity = R * locus.position
+        locus_state.position .= origin_position .+ relative_velocity
+        locus_state.velocity .= origin_velocity .+ ω × relative_velocity
     end
 end
 
@@ -363,39 +359,37 @@ function update_transformations!(
         cache::NonminimalCoordinatesCache{<:QBF.CoordinateFunctions},
         state::RigidBodyState,
         prop::RigidBodyProperty,q)
-    (;r̄g,r̄ps) = prop
+    (;mass_locus,loci) = prop
     (;R,) = state
     (;Cg,Cps) = cache
     L = QBF.Lmat(q[4:7])
-    for (Cp,r̄p) in zip(Cps,r̄ps)
+    for (Cp,lo) in zip(Cps,loci)
         for i = 1:3 
         	Cp[i,i] = 1
         end
-        Cp[1:3,4:7] .= -2R*skew(r̄p)*L
+        Cp[1:3,4:7] .= -2R*skew(lo.position)*L
     end 
     for i = 1:3 
     	Cg[i,i] = 1
     end
-    Cg[1:3,4:7] .= -2R*skew(r̄g)*L
+    Cg[1:3,4:7] .= -2R*skew(mass_locus.position)*L
 end
 
 function generalize_force!(F,state::AbstractRigidBodyState)
-    (;cache,f,fps) = state
+    (;cache,mass_locus_state,loci_states) = state
     (;Cps,Cg,∂T∂qᵀ) = cache
-    for (pid,fp) in enumerate(fps)
-        # F .+= transpose(Cps[pid])*fp
-        mul!(F,transpose(Cps[pid]),fp,1,1)
+    for (pid,locus_state) in enumerate(loci_states)
+        mul!(F,transpose(Cps[pid]),locus_state.force,1,1)
     end
-    # F .+= transpose(Cg)*f
-    mul!(F,transpose(Cg),f,1,1)
+    mul!(F,transpose(Cg),mass_locus_state.force,1,1)
     F .+= ∂T∂qᵀ
     F
 end
 
 # kinematic joint constraints
 
-function get_rbids(rbs)
-    ids = mapreduce((rb)->rb.prop.id,vcat,rbs;init=Int[])
+function get_bodies_ids(bodies)
+    ids = mapreduce((body)->body.prop.id,vcat,bodies;init=Int[])
     nb = length(ids)
     ids,nb
 end
@@ -417,19 +411,19 @@ get_Φ_mask(::QBF.QC) = collect(1:1)
 Return Rigid Body translational kinetic energy 。
 $(TYPEDSIGNATURES)
 """
-function kinetic_energy_translation(rb::AbstractRigidBody)
-    (;mass) = rb.prop
-    (;ṙg) = rb.state
-    T = 1/2*transpose(ṙg)*mass*ṙg
+function kinetic_energy_translation(body::AbstractRigidBody)
+    (;mass) = body.prop
+    (;mass_center_velocity) = body.state
+    T = 1/2*transpose(mass_center_velocity)*mass*mass_center_velocity
 end
 
 """
 Return Rigid Body rotational kinetic energy 。
 $(TYPEDSIGNATURES)
 """
-function kinetic_energy_rotation(rb::AbstractRigidBody)
-    (;inertia) = rb.prop
-    (;R,ω) = rb.state
+function kinetic_energy_rotation(body::AbstractRigidBody)
+    (;inertia) = body.prop
+    (;R,ω) = body.state
     Ω = inv(R)*ω
     T = 1/2*transpose(Ω)*inertia*Ω
 end
@@ -438,30 +432,28 @@ end
 Return Rigid Body gravity potential energy 。
 $(TYPEDSIGNATURES)
 """
-function potential_energy_gravity(rb::AbstractRigidBody)
-    (;mass) = rb.prop
-    (;rg) = rb.state
-    gravity_acceleration = get_gravity(rb)
-    -transpose(rg)*gravity_acceleration*mass
+function potential_energy_gravity(body::AbstractRigidBody)
+    (;mass) = body.prop
+    (;mass_locus_state) = body.state
+    gravity_acceleration = get_gravity(body)
+    -transpose(mass_locus_state.position)*gravity_acceleration*mass
 end
 
 """
 Return Rigid Body Strain potential energy 。
 $(TYPEDSIGNATURES)
 """
-function potential_energy_strain(rb::AbstractRigidBody)
-    zero(get_numbertype(rb))
+function potential_energy_strain(body::AbstractRigidBody)
+    zero(get_numbertype(body))
 end
 
 
-function clear_forces!(rb::AbstractRigidBody)
-    (;state) = rb
-    state.f .= 0
-    foreach(state.fps) do fp
-        fp .= 0
-    end
-    state.τ .= 0
-    foreach(state.τps) do τp
-          τp .= 0
+function clear_forces!(body::AbstractRigidBody)
+    (;mass_locus_state,loci_states,) = body.state
+    mass_locus_state.force .= 0
+    mass_locus_state.torque .= 0
+    foreach(loci_states) do locus_state
+        locus_state.force .= 0
+        locus_state.torque .= 0
     end
 end

@@ -45,10 +45,10 @@ spine2 = spine_true(2,0.105,RotY(0.0))
 # @code_warntype A(q)
 plotstructure(spine2)
 
-rbid = 2
+bodyid = 2
 pid = 1
 f = [1.0,0.0,0.0]
-function get_seqs(bot,rbid,pid,f=[1.0,0.0,0.0],g2=[5.0])
+function get_seqs(bot,bodyid,pid,f=[1.0,0.0,0.0],g2=[5.0])
 
     # Y = RB.build_Y(bot)
 
@@ -66,7 +66,7 @@ function get_seqs(bot,rbid,pid,f=[1.0,0.0,0.0],g2=[5.0])
     parameters3 = (d=d3, u=u1, g=g2)
     parameters_seq = [parameters0,parameters1,parameters2,parameters3]
 
-    F̌ = RB.build_F̌(bot.st,rbid,pid,f)
+    F̌ = RB.build_F̌(bot.st,bodyid,pid,f)
     # sys,_ = RB.forward_system(bot.st,RB.DeformMode();F̌)
 
     # seq = RB.forward_once(bot.st,start_sol,parameters0,parameters1,RB.DeformMode();F)
@@ -79,17 +79,17 @@ function get_seqs(bot,rbid,pid,f=[1.0,0.0,0.0],g2=[5.0])
     # fig = plotstructure(bot,seqs[3])
 end
 spine2 = spine_true(2,0.105,RotY(0.0)); spine2_video = deepcopy(spine2)
-seqs = get_seqs(spine2,rbid,pid,f)
+seqs = get_seqs(spine2,bodyid,pid,f)
 
 RB.apply!(spine2,seqs[3])
 plot_traj!(spine2;)
 
-# @code_warntype get_seqs(spine2,rbid,pid,f)
+# @code_warntype get_seqs(spine2,bodyid,pid,f)
 seqs
 qs = [seqs[2][begin].q,seqs[3][begin].q,seqs[3][end].q]
 RB.set_new_initial!(spine2,qs[1])
 RB.get_cables_len(spine2)
-h = spine2.st.rigidbodies[2].state.rps[pid][3] - spine2.st.rigidbodies[1].state.rps[pid][3]
+h = spine2.st.rigidbodies[2].state.loci_states[pid][3] - spine2.st.rigidbodies[1].state.loci_states[pid][3]
 h
 nsteps = reduce(vcat,[seqs[i].nstep[2:end] for i = 1:3])
 stats_nstep = nsteps |> (x) -> [minimum(x), maximum(x), median(x), mean(x)]
@@ -122,10 +122,10 @@ function set_axis!(ax)
     zlims!(ax,-0.00,0.25)
 end
 
-function plot_force_arrow!(ax,st,rbid,pid,f,font_pixel)
+function plot_force_arrow!(ax,st,bodyid,pid,f,font_pixel)
     rbs = st.rigidbodies
-    rb = rbs[rbid]
-    rp = rb.state.cache.Cp[pid]*rb.state.coords.q
+    body = rbs[bodyid]
+    rp = body.state.cache.Cp[pid]*body.state.coords.q
     points = [Point3f(rp[1],rp[2],rp[3])]
     directions = [Point3f(f[1],f[2],f[3])]
     size_factor = 0.05
@@ -138,7 +138,7 @@ function plot_force_arrow!(ax,st,rbid,pid,f,font_pixel)
             align = (:left, :baseline), offset = (-5, 10))
 end
 
-function plot2(bot,qs,rbid,pid,f)
+function plot2(bot,qs,bodyid,pid,f)
     (;st) = bot
     fig_width = 165.0u"pt"
     fig_height = 90.89u"pt"
@@ -162,9 +162,9 @@ function plot2(bot,qs,rbid,pid,f)
     bars3,cables3 = plotstructure!(ax2,st)
     # update_scene!(st,bars1,cables1,qs[1])
     update_scene!(st,bars2,cables2,qs[2])
-    plot_force_arrow!(ax1,st,rbid,pid,f,font_pixel)
+    plot_force_arrow!(ax1,st,bodyid,pid,f,font_pixel)
     update_scene!(st,bars3,cables3,qs[3])
-    plot_force_arrow!(ax2,st,rbid,pid,f,font_pixel)
+    plot_force_arrow!(ax2,st,bodyid,pid,f,font_pixel)
     # set_axis!(ax1)
     set_axis!(ax1)
     set_axis!(ax2)
@@ -189,7 +189,7 @@ function plot2(bot,qs,rbid,pid,f)
     end
     fig,ax1
 end
-fig_3D_spine_vis,ax1 = plot2(spine2,qs,rbid,pid,f)
+fig_3D_spine_vis,ax1 = plot2(spine2,qs,bodyid,pid,f)
 fig_3D_spine_vis
 GLMakie.activate!()
 fig_3D_spine_vis
@@ -269,11 +269,11 @@ seq_sol = seqs[1][end]
 start_sol,parameters1 = RB.get_start_system(spine2_video,RB.build_Y(spine2),RB.DeformMode())
 parameters2 = deepcopy(parameters1)
 parameters2.g[1] = 5.0
-F = RB.build_F(spine2.st,rbid,pid,f)
+F = RB.build_F(spine2.st,bodyid,pid,f)
 seq2 = RB.forward_sequence(spine2_video.st,start_sol,parameters1,parameters2,RB.DeformMode();F)
 fig = plotstructure(spine2,seq2)
 
-function plot_video(bot,seq_sol,rbid,pid,f)
+function plot_video(bot,seq_sol,bodyid,pid,f)
     fig = Figure(resolution = (1280, 720))
     azimuth = 1.385530633326996
     elevation = 0.05269908169872413
@@ -286,7 +286,7 @@ function plot_video(bot,seq_sol,rbid,pid,f)
     # start_sol,parameters0 = RB.get_start_system(bot,RB.DeformMode())
     start_sol = (q=seq_sol.q,s=seq_sol.s,λ=seq_sol.λ)
     parameters0 = (d=seq_sol.d,u=seq_sol.u,g=seq_sol.g)
-    F = RB.build_F(bot.st,rbid,pid,f)
+    F = RB.build_F(bot.st,bodyid,pid,f)
     d0,u0,g0 = parameters0
     ls_g = labelslider!(fig, "f:", -5:0.5:5; format = x -> "$(x)N")
     fig[2, 1] = ls_g.layout
@@ -331,7 +331,7 @@ function plot_video(bot,seq_sol,rbid,pid,f)
     fig
 end
 
-plot_video(spine2_video,seq_sol,rbid,pid,f)
+plot_video(spine2_video,seq_sol,bodyid,pid,f)
 
 # Comparison
 
@@ -421,7 +421,7 @@ plot(errs)
 errs[end]
 @time tsff(spine2.st)
 @descend_code_warntype tsff(spine2.st)
-[rb.state.ro for rb in spine2.st.rigidbodies]
+[body.state.ro for rb in spine2.st.rigidbodies]
 
 identical_indices = [1,2,3,4] .== [1,2,3,5]
 a = collect(5:8)

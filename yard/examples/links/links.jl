@@ -29,7 +29,7 @@ function RigidBody(id;r = [0.0,0.0,-1.0],
 
     prop = RB.RigidBodyProperty(id,movable,mass,
                 SMatrix{3,3}(inertia),
-                SVector(r̄g...),
+                SVector(mass_locus...),
                 [ap1,ap2,ap3,ap4])
     cache = RB.NCFCache(prop)
     #state = RB.RigidBodyState(prop,r,R,ṙ,ω,Val(:NC))
@@ -40,28 +40,28 @@ end
 mass = 1.0 #kg
 #inertia = Matrix(Diagonal([45.174,45.174,25.787]))*1e-8 # N/m^2
 inertia = Matrix(Diagonal([45.174,45.174,25.787]))*1e-1
-r̄g = [0.0, 0.0, 17.56] .* 1e-4 # m
-rb1prop,rb1cache = RigidBody(1,mass = mass, inertia = inertia, r̄g = r̄g,
+mass_locus = [0.0, 0.0, 17.56] .* 1e-4 # m
+rb1prop,rb1cache = RigidBody(1,mass = mass, inertia = inertia, mass_locus = mass_locus,
                      r = [0.0,0.0, -1.0], movable = false)
-rb2 = RigidBody(:rb2,mass = mass, inertia = inertia, r̄g = r̄g,
+rb2 = RigidBody(:rb2,mass = mass, inertia = inertia, mass_locus = mass_locus,
                      r = [0.0,0.0,  -0.1], R = Matrix(RotX(0.45)))
-rb3 = RigidBody(:rb3,mass = mass, inertia = inertia, r̄g = r̄g,
+rb3 = RigidBody(:rb3,mass = mass, inertia = inertia, mass_locus = mass_locus,
                      r = [0.0,-0.3,  0.7], R = Matrix(RotX(0.8)))
 rbs = [rb1,rb2,rb3]
 
-rb1 = RigidBody(:rb1,mass = mass, inertia = inertia, r̄g = r̄g,
+rb1 = RigidBody(:rb1,mass = mass, inertia = inertia, mass_locus = mass_locus,
                      r = [0.0,0.0, -1.0])
-rb2 = RigidBody(:rb2,mass = mass, inertia = inertia, r̄g = r̄g,
+rb2 = RigidBody(:rb2,mass = mass, inertia = inertia, mass_locus = mass_locus,
                      r = [0.0,0.0,  -0.1], R = Matrix(RotX(-0.5)))
-rb3 = RigidBody(:rb3,mass = mass, inertia = inertia, r̄g = r̄g,
+rb3 = RigidBody(:rb3,mass = mass, inertia = inertia, mass_locus = mass_locus,
                      r = [0.0,0.3,  0.7], R = Matrix(RotX(-1.0)))
 rbs = [rb1,rb2,rb3]
 
-rb1 = RigidBody(:rb1,mass = mass, inertia = inertia, r̄g = r̄g,
+rb1 = RigidBody(:rb1,mass = mass, inertia = inertia, mass_locus = mass_locus,
                      r = [0.0,0.0, -1.0])
-rb2 = RigidBody(:rb2,mass = mass, inertia = inertia, r̄g = r̄g,
+rb2 = RigidBody(:rb2,mass = mass, inertia = inertia, mass_locus = mass_locus,
                      r = [0.0,0.0,  -0.1])
-rb3 = RigidBody(:rb3,mass = mass, inertia = inertia, r̄g = r̄g,
+rb3 = RigidBody(:rb3,mass = mass, inertia = inertia, mass_locus = mass_locus,
                      r = [0.0,0.0,  0.8])
 rbs = [rb1,rb2,rb3]
 
@@ -112,9 +112,9 @@ function tg_spark(tgsys)
     nconstraint = ninconstraint + nexconstraint
     nq = nbodies*12
     mass_matrix = zeros(nq,nq)
-    for (rbid,rb) in enumerate(mvrigidbodies)
-        is = 12*(rbid - 1)
-        mass_matrix[is+1:is+12,is+1:is+12] .= mvrigidbodies[rbid].state.cache.M
+    for (bodyid,rb) in enumerate(mvrigidbodies)
+        is = 12*(bodyid - 1)
+        mass_matrix[is+1:is+12,is+1:is+12] .= mvrigidbodies[bodyid].state.cache.M
     end
     function M!(mm,q)
         mm .= mass_matrix
@@ -130,18 +130,18 @@ function tg_spark(tgsys)
         RB.reset_forces!.(rigidbodies)
         RB.distribute_q_to_rbs!(mvrigidbodies,q,q̇)
         RB.compute_string_forces!(tgsys)
-        for (rbid,rb) = enumerate(mvrigidbodies)
-            is = 12*(rbid-1)
-            F[is+1:is+12] .= rb.state.coords.Q
+        for (bodyid,rb) = enumerate(mvrigidbodies)
+            is = 12*(bodyid-1)
+            F[is+1:is+12] .= body.state.coords.Q
         end
     end
 
 
     function Φ(q)
         ret = Vector{eltype(q)}(undef,nbodies*6)
-        for (rbid,rb) in enumerate(mvrigidbodies)
-            is = 6*(rbid-1)
-            ks = 12*(rbid-1)
+        for (bodyid,rb) in enumerate(mvrigidbodies)
+            is = 6*(bodyid-1)
+            ks = 12*(bodyid-1)
             ret[is+1:is+6] .= RB.NC.Φ(q[ks+1:ks+12])
         end
         ret
@@ -149,9 +149,9 @@ function tg_spark(tgsys)
 
     function A(q)
         ret = zeros(eltype(q),6nbody,12nbody)
-        for (rbid,rb) in enumerate(mvrigidbodies)
-            is = 6*(rbid-1)
-            ks = 12*(rbid-1)
+        for (bodyid,rb) in enumerate(mvrigidbodies)
+            is = 6*(bodyid-1)
+            ks = 12*(bodyid-1)
             ret[is+1:is+6,ks+1:ks+12] .= RB.NC.Φq(q[ks+1:ks+12])
         end
         ret
@@ -161,8 +161,8 @@ function tg_spark(tgsys)
 end
 A,Φ,∂T∂q̇!,F!,M!,jacs = tg_spark(tgsys)
 function system_variables(tgsys)
-    q = vcat([rb.state.coords.q for rb in tgsys.rigidbodies.movables]...)
-    q̇ = vcat([rb.state.coords.q̇ for rb in tgsys.rigidbodies.movables]...)
+    q = vcat([body.state.coords.q for rb in tgsys.rigidbodies.movables]...)
+    q̇ = vcat([body.state.coords.q̇ for rb in tgsys.rigidbodies.movables]...)
     q,q̇
 end
 q0,q̇0 = system_variables(tgsys)
@@ -187,8 +187,8 @@ end
 potential_energy(tgsys)
 function kinetic_energy(tgsys)
     ke = 0.0
-    for (rbid,rb) in enumerate(tgsys.rigidbodies)
-        ke_rb = RB.kinetic_energy(rb)
+    for (bodyid,rb) in enumerate(tgsys.rigidbodies)
+        ke_rb = RB.kinetic_energy(body)
         ke += ke_rb
     end
     ke
@@ -204,6 +204,6 @@ function energy(tgsys,q,q̇)
 end
 energy(tgsys,q0,q̇0)
 state
-ks,ps,es = [energy(tgsys,state.qs[it],state.q̇s[it]) for it in eachindex(state.ts)]
+ks,ps,restitution_coefficients = [energy(tgsys,state.qs[it],state.q̇s[it]) for it in eachindex(state.ts)]
 energy(tgsys,state.qs[1],state.q̇s[1])
 tgsys.rigidbodies[1].state.rpṡ

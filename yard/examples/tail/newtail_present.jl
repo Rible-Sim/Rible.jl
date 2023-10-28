@@ -54,9 +54,9 @@ end
 
 #L为长度矩阵
 
-r̄g = [zeros(2) for i = 1:nb]
+mass_locus = [zeros(2) for i = 1:nb]
 for (i,j) in enumerate(ver_index)
-    r̄g[j] .= [ver_lengths[i]/2,0.0]
+    mass_locus[j] .= [ver_lengths[i]/2,0.0]
 end
 
 inertia = zeros(nb)
@@ -96,7 +96,7 @@ for (i,j) in enumerate(hor_index)
 end
 #推测p为自由度
 ######################################分割线####################################
-function rigidbody(i,r̄g,m,inertia,ri,rj,aps)
+function rigidbody(i,mass_locus,m,inertia,ri,rj,aps)
     if i == 1
         movable = true
         constrained = true
@@ -110,13 +110,13 @@ function rigidbody(i,r̄g,m,inertia,ri,rj,aps)
     aps = [SVector{2}(aps[i]) for i = 1:nap]
     prop = RB.RigidBodyProperty(i,movable,
                 m,inertia,
-                SVector{2}(r̄g),
+                SVector{2}(mass_locus),
                 aps;constrained=constrained
                 )
     state = RB.RigidBodyState(prop,ri,rj,pres_idx)
-    rb = RB.RigidBody(prop,state)
+    body = RB.RigidBody(prop,state)
 end
-rbs = [rigidbody(i,r̄g[i],m[i],inertia[i],ri[i],rj[i],[p1[i],p2[i]]) for i = 1:nb]
+rbs = [rigidbody(i,mass_locus[i],m[i],inertia[i],ri[i],rj[i],[p1[i],p2[i]]) for i = 1:nb]
 #length(rbs)
 
 ncables = 4n
@@ -157,19 +157,19 @@ function jac_singularity_check(st)
     if sys_rank < minimum(size(Aq))
         @warn "System's Jacobian is singular: rank(A(q))=$(sys_rank)<$(minimum(size(Aq)))"
     end
-    for (rbid,rb) in enumerate(st.rigidbodies)
-        if rb.prop.movable && rb.prop.constrained
-            q_rb = rb.state.coords.q
-            Aq_rb = vcat(rb.state.cache.cfuncs.Φq(q_rb),
-                         rb.state.cache.funcs.Φq(q_rb))
+    for (bodyid,rb) in enumerate(st.rigidbodies)
+        if body.prop.movable && body.prop.constrained
+            q_rb = body.state.coords.q
+            Aq_rb = vcat(body.state.cache.cfuncs.Φq(q_rb),
+                         body.state.cache.funcs.Φq(q_rb))
             rb_rank = rank(Aq_rb)
-            intrinsic_Aq = rb.state.cache.funcs.Φq(q_rb)
-            # @show rbid,lucompletepiv!(copy(intrinsic_Aq))
+            intrinsic_Aq = body.state.cache.funcs.Φq(q_rb)
+            # @show bodyid,lucompletepiv!(copy(intrinsic_Aq))
             # col_index = GECP(intrinsic_Aq)
-            # @show rbid,col_index
+            # @show bodyid,col_index
             # @show rank(intrinsic_Aq[:,col_index[1:6]])
             if rb_rank < minimum(size(Aq_rb))
-                @warn "The $(rbid)th rigid body's Jacobian is singular: rank(A(q))=$(rb_rank)<$(minimum(size(Aq_rb)))"
+                @warn "The $(bodyid)th rigid body's Jacobian is singular: rank(A(q))=$(rb_rank)<$(minimum(size(Aq_rb)))"
             end
         end
     end
@@ -203,23 +203,23 @@ T = RB.get_numbertype(st)
 q = zeros(T,ncoords)
 
 
-@code_lowered for rbid in st.mvbodyindex
-    pindex = body2q[rbid]
-    q[pindex] .= rbs[rbid].state.coords.q
+@code_lowered for bodyid in st.mvbodyindex
+    pindex = body2q[bodyid]
+    q[pindex] .= rbs[bodyid].state.coords.q
 end
 
 st.mvbodyindex
-for rbid in st.mvbodyindex
-    pindex = body2q[rbid]
+for bodyid in st.mvbodyindex
+    pindex = body2q[bodyid]
     println(pindex)
-    q[pindex] .= rbs[rbid].state.coords.q
+    q[pindex] .= rbs[bodyid].state.coords.q
     println(q)
     println("next step")
 end
 
-for rbid in st.mvbodyindex
-    pindex = body2q[rbid]
-    q[pindex] .= rbs[rbid].state.coords.q
+for bodyid in st.mvbodyindex
+    pindex = body2q[bodyid]
+    q[pindex] .= rbs[bodyid].state.coords.q
     q[22] = -10
 end
 q

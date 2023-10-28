@@ -85,12 +85,12 @@ end
 固定约束构造子。
 $(TYPEDSIGNATURES)
 """
-function FixedBodyConstraint(rbs,mem2sysfull,rbid)
-    rb = rbs[rbid]
-    lncs = rb.state.cache.funcs.lncs
-    q_rb = rb.state.coords.q
+function FixedBodyConstraint(rbs,mem2sysfull,bodyid)
+    body = rbs[bodyid]
+    lncs = body.state.cache.funcs.lncs
+    q_rb = body.state.coords.q
     pres_idx = find_full_pres_indices(lncs,q_rb)
-    indices = body2q[rbid][pres_idx]
+    indices = body2q[bodyid][pres_idx]
     values = q_rb[pres_idx]
     FixedBodyConstraint(length(indices),indices,values)
 end
@@ -241,24 +241,24 @@ function PrototypeJoint(id,e2e,joint_type::Symbol)
     state_egg = egg.rbsig.state
     q_hen = NCF.rigidstate2naturalcoords(nmcs_hen,state_hen.ro,state_hen.R)
     q_egg = NCF.rigidstate2naturalcoords(nmcs_egg,state_egg.ro,state_egg.R)
-    R_hen = NCF.find_R(nmcs_hen,q_hen)
-    R_egg = NCF.find_R(nmcs_egg,q_egg)
+    R_hen = NCF.find_rotation(nmcs_hen,q_hen)
+    R_egg = NCF.find_rotation(nmcs_egg,q_egg)
     # translate     
     C_hen = hen.rbsig.state.cache.Cps[hen.pid]
     C_egg = egg.rbsig.state.cache.Cps[egg.pid]
     r_hen2egg = C_egg*q_egg .- C_hen*q_hen
     # translate on hen
-    axes_trl_hen = Axes(inv(R_hen)*get_orthonormal_axes(R_hen*hen.rbsig.prop.ās[hen.rotid])) 
+    axes_trl_hen = Axes(inv(R_hen)*get_orthonormal_axes(R_hen*hen.rbsig.prop.axes[hen.rotid])) 
     trl_hen_n = R_hen*axes_trl_hen.n
     trl_hen_t1 = R_hen*axes_trl_hen.t1
     trl_hen_t2 = R_hen*axes_trl_hen.t2
     # translate on egg
-    axes_trl_egg = Axes(inv(R_egg)*get_orthonormal_axes(R_egg*egg.rbsig.prop.ās[egg.trlid])) 
+    axes_trl_egg = Axes(inv(R_egg)*get_orthonormal_axes(R_egg*egg.rbsig.prop.axes[egg.trlid])) 
     trl_egg_n = R_egg*axes_trl_egg.n
     trl_egg_t1 = R_egg*axes_trl_egg.t1
     trl_egg_t2 = R_egg*axes_trl_egg.t2
     # rotate of egg
-    axes_rot_glb = get_orthonormal_axes(R_egg*egg.rbsig.prop.ās[egg.rotid])
+    axes_rot_glb = get_orthonormal_axes(R_egg*egg.rbsig.prop.axes[egg.rotid])
     axes_rot_egg = Axes(inv(R_egg)*axes_rot_glb)
     axes_rot_hen = Axes(inv(R_hen)*axes_rot_glb)
     rot_egg_n = R_egg*axes_rot_egg.n

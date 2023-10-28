@@ -26,19 +26,17 @@ function update_tensiles!(st, @eponymargs(connected,))
     (;cables) = st.tensiles
     foreach(connected) do scnt
         scable = cables[scnt.id]
-        state1 = scnt.hen.rbsig.state
-        state2 = scnt.egg.rbsig.state
-        pid1 = scnt.hen.pid
-        pid2 = scnt.egg.pid
-        p1 = state1.rps[pid1]
-        ṗ1 = state1.ṙps[pid1]
-        f1 = state1.fps[pid1]
-        p2 = state2.rps[pid2]
-        ṗ2 = state2.ṙps[pid2]
-        f2 = state2.fps[pid2]
-        update!(scable,p1,p2,ṗ1,ṗ2)
-        f1 .+= scable.state.force
-        f2 .-= scable.state.force
+        locus_state_hen = scnt.hen.rbsig.state.loci_states[scnt.hen.pid]
+        locus_state_egg = scnt.egg.rbsig.state.loci_states[scnt.egg.pid]
+        p_hen = locus_state_hen.position
+        ṗ_hen = locus_state_hen.velocity
+        f_hen = locus_state_hen.force
+        p_egg = locus_state_egg.position
+        ṗ_egg = locus_state_egg.velocity
+        f_egg = locus_state_egg.force
+        update!(scable,p_hen,p_egg,ṗ_hen,ṗ_egg)
+        f_hen .+= scable.state.force
+        f_egg .-= scable.state.force
     end
 end
 
@@ -51,9 +49,9 @@ function stretch_rigids!(st)
     (;bodies,state) = st
     (;mem2sys) = st.connectivity.numbered
     (;c) = state.system
-    foreach(bodies) do rb
-        rbid = rb.prop.id
-        stretch_rigid!(rb,c[mem2sys[rbid]])
+    foreach(bodies) do body
+        bodyid = body.prop.id
+        stretch_body!(body,c[mem2sys[bodyid]])
     end
 end
 
@@ -65,10 +63,10 @@ end
 
 function move_rigids!(st)
     (;bodies,state) = st
-    foreach(bodies) do rb
-        rbid = rb.prop.id
-        (;q,q̇) = state.parts[rbid]
-        move_rigid!(rb,q,q̇)
+    foreach(bodies) do body
+        bodyid = body.prop.id
+        (;q,q̇) = state.parts[bodyid]
+        move_body!(body,q,q̇)
     end
 end
 
@@ -90,12 +88,12 @@ end
 
 function update_rigids!(st)
     (;bodies,state) = st
-    foreach(bodies) do rb
-        rbid = rb.prop.id
-        (;q, q̇) = state.parts[rbid]
-        update_rigid!(rb,q,q̇)
-        update_transformations!(rb,q)
-        move_rigid!(rb,q,q̇)
+    foreach(bodies) do body
+        bodyid = body.prop.id
+        (;q, q̇) = state.parts[bodyid]
+        update_body!(body,q,q̇)
+        update_transformations!(body,q)
+        move_body!(body,q,q̇)
     end
 end
 
@@ -107,9 +105,9 @@ function generate_forces!(st::Structure)
     (;bodies,state) = st
     (;system,parts) = state
     system.F .= 0.0
-    foreach(bodies) do rb
-        (;F) = parts[rb.prop.id]
-        generalize_force!(F,rb.state)
+    foreach(bodies) do body
+        (;F) = parts[body.prop.id]
+        generalize_force!(F,body.state)
     end
     system.F̌
 end
@@ -129,7 +127,7 @@ $(TYPEDSIGNATURES)
 function apply_gravity!(st;factor=1)
     (;bodies) = st
     gravity_acceleration = factor*get_gravity(st)
-    foreach(bodies) do rb
-        rb.state.f .+= gravity_acceleration*rb.prop.mass
+    foreach(bodies) do body
+        body.state.mass_locus_state.force .+= gravity_acceleration*body.prop.mass
     end
 end

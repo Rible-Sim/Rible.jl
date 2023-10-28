@@ -139,7 +139,7 @@ function make_bai(meshes,质心,质量,惯量)
         end
         offset = ver_lengths_raw[i,1]
         ro = ri + SVector{2}(0.0,-offset)
-        r̄g = SVector{2}(质心[i])
+        mass_locus = SVector{2}(质心[i])
         m = 质量[i]
         inertia = 惯量[i]/2
         Ī = SMatrix{2,2}([
@@ -150,22 +150,22 @@ function make_bai(meshes,质心,质量,惯量)
         r̄p2 = SVector{2}(offset_fix, b,)
         r̄p3 = SVector{2}(-offset, 0.0)
         r̄p4 = SVector{2}(norm(rj-ri)-offset, 0.0)
-        r̄ps = [r̄p1,r̄p2,r̄p3,r̄p4]
-        nr̄p = length(r̄ps)
+        loci = [r̄p1,r̄p2,r̄p3,r̄p4]
+        nr̄p = length(loci)
         ṙo = zeros(2); ω = 0.0
         prop = RB.RigidBodyProperty(
             i,
             movable,
             m,
             Ī,
-            SVector{2}(r̄g),
-            r̄ps;
+            SVector{2}(mass_locus),
+            loci;
             constrained = constrained,
         )
         lncs, _ = RB.NCF.NC2P1V(ri, rj, ro, α, ṙo, ω)
         state = RB.RigidBodyState(prop, lncs, ro, α, ṙo, ω, ci, Φi)
         mesh_rigid = meshes[i]
-        rb = RB.RigidBody(prop, state, mesh_rigid)
+        body = RB.RigidBody(prop, state, mesh_rigid)
         rb
     end
     rbs = [

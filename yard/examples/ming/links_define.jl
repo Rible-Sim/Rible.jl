@@ -30,7 +30,7 @@ function spine(n,dis,rm,heating_law;k=1000.0,c=0.0)
 
 	mass = 1.6730422e-01 #kg
 	inertia = Matrix(Diagonal([7.7035410e-01,7.7035412e-01,1.1875254]))*1.e-3
-    r̄g = [0,0,-1.1037596].*1e-1
+    mass_locus = [0,0,-1.1037596].*1e-1
 
 	pp = Vector{Vector{Float64}}(undef,13)
 	pp[1] =  [ 16.7,    0,5]
@@ -56,7 +56,7 @@ function spine(n,dis,rm,heating_law;k=1000.0,c=0.0)
 
     props = [RB.RigidBodyProperty(i,movable[i],mass,
                 SMatrix{3,3}(inertia),
-                SVector{3}(r̄g),
+                SVector{3}(mass_locus),
                 aps;constrained=constrained[i]) for i = 1:n]
 
     rs_raw,Rs = bend(n,dis,rm)
@@ -75,7 +75,7 @@ function spine(n,dis,rm,heating_law;k=1000.0,c=0.0)
 			pres_idx = Int[]
 		end
         state = RB.RigidBodyState(prop,lncs,ro,R,ṙo,ω,q,q̇,pres_idx)
-        rb = RB.RigidBody(prop,state)
+        body = RB.RigidBody(prop,state)
     end
     rbs = [rigidbody(i,props[i],aps,rs[i],Rs[i],ṙs[i],ωs[i]) for i = 1:n]
 
@@ -151,7 +151,7 @@ function spine_true(n,dis,rm;
 
 	mass = 1.6730422e-01 #kg
 	inertia = Matrix(Diagonal([7.7035410e-01,7.7035412e-01,1.1875254]))*1.e-3
-    r̄g = [0,0,-1.1037596].*1e-1
+    mass_locus = [0,0,-1.1037596].*1e-1
 
 	pp = Vector{Vector{Float64}}(undef,4)
 	# pp[1] =  [ 16.7,    0,  5]
@@ -182,7 +182,7 @@ function spine_true(n,dis,rm;
 
     props = [RB.RigidBodyProperty(i,movable[i],mass,
                 SMatrix{3,3}(inertia),
-                SVector{3}(r̄g),
+                SVector{3}(mass_locus),
                 aps;constrained=constrained[i]) for i = 1:n]
 
     rs_raw,Rs = bend(n,dis,rm;o1,X1,dir)
@@ -206,7 +206,7 @@ function spine_true(n,dis,rm;
 			Φi = collect(1:6)
 		end
         state = RB.RigidBodyState(prop,lncs,ro,R,ṙo,ω,ci,Φi)
-        rb = RB.RigidBody(prop,state)
+        body = RB.RigidBody(prop,state)
     end
     rbs = [rigidbody(i,props[i],aps,rs[i],Rs[i],ṙs[i],ωs[i]) for i = 1:n]
 	rigdibodies = TypeSortedCollection(rbs)

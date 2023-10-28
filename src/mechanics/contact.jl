@@ -1,60 +1,9 @@
-struct Axes{N,T}
-    X::SMatrix{N,N,T}
-end
-
-
-function Base.getproperty(a::Axes{2}, p) 
-    if p == :n
-        return a.X[:,1]
-    elseif p == :t
-        return  a.X[:,2]
-    else # fallback to getfield
-        return getfield(a, p)
-    end
-end
-
-function Base.getproperty(a::Axes{3}, p::Symbol) 
-    if p == :n
-        return a.X[:,1]
-    elseif p == :t1
-        return  a.X[:,2]
-    elseif p == :t2
-        return  a.X[:,3]
-    else # fallback to getfield
-        return getfield(a, p)
-    end
-end
-
-
-function Axes(normal::AbstractVector)
-    Axes(get_orthonormal_basis(normal))
-end
-
-function get_orthonormal_axes(normal::AbstractVector)
-    normal /= norm(normal)
-    t1,t2 = NCF.HouseholderOrthogonalization(normal)
-    SMatrix{3,3}(
-        [normal t1 t2]
-    )
-end
-
-struct SpatialFrame{T}
-    n::SArray{Tuple{3},T,1,3}
-    t1::SArray{Tuple{3},T,1,3}
-    t2::SArray{Tuple{3},T,1,3}
-end
-
-function SpatialFrame(n)
-    n /= norm(n)
-    t1,t2 = NCF.HouseholderOrthogonalization(n)
-    SpatialFrame(SVector{3}(n),SVector{3}(t1),SVector{3}(t2))
-end
 
 mutable struct FrictionalContactState{T}
     active::Bool
     persistent::Bool
     gap::T
-    frame::SpatialFrame{T}
+    frame::Axes{3,T}
     v::SArray{Tuple{3},T,1,3}
     Λ::SArray{Tuple{3},T,1,3}
 end
@@ -73,7 +22,7 @@ function Contact(id,μ,e)
     o = zero(μ)
     gap = i
     n = SVector(i,o,o)
-    frame = SpatialFrame(n)
+    frame = spatial_frame(n)
     v = SVector(o,o,o)
     Λ = SVector(o,o,o)
     state = FrictionalContactState(active,persistent,gap,frame,v,Λ)
@@ -113,7 +62,7 @@ ApproxFrictionalImpulse{T}(m) where T = ApproxFrictionalImpulse(false,zero(T),ze
 struct ApproxFrictionalContact{T}
     ϵ::T
     μ::T
-    frame::SpatialFrame{T}
+    frame::Axes{3,T}
     m::Int
     e::Vector{T}
     d::Vector{SArray{Tuple{3},T,1,3}}
@@ -122,7 +71,7 @@ struct ApproxFrictionalContact{T}
 end
 
 function ApproxFrictionalContact(ϵ::T,μ::T,m::Int) where T
-    frame = SpatialFrame{T}()
+    frame = spatial_frame{T}()
     e = ones(m)
     d = [SVector{3,T}(cos(2π*i/m),sin(2π*i/m),0.0) for i = 0:m-1]
     D = Matrix{T}(undef,3,m)

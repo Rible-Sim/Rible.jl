@@ -51,9 +51,9 @@ r̄l5 = [35, 28, 15]; r̄l6 = [25, 27, 15]
 r̄l7 = [20, 21, 15]; r̄l8 = [20, 20, 15]
 r̄l9 = [20, 15, 15]; r̄l10 = [20, 15, 15]
 
-function Get_apsAB(r̄, r̄g)
+function Get_apsAB(r̄, mass_locus)
     ri = r̄
-    rj = r̄ + 2* [r̄g[2], r̄g[1]]
+    rj = r̄ + 2* [mass_locus[2], mass_locus[1]]
     aps = [[0.0, 0.0], 2r̄g, [15.1, 0.0]]
     return ri, rj, aps
 end
@@ -178,7 +178,7 @@ function rigidbody(i, rdsi, r̄si; rigidIndex=rigidIndex, barIndex=barIndex)
     ri, rj, aps = Get_aps(r̄si, rdsi.r̄l)
     u = rj - ri
     α = atan(u[2], u[1])
-    r̄g = rdsi.r̄g
+    mass_locus = rdsi.mass_locus
     m = rdsi.m*1e-3
     I = rdsi.i
     nrp = length(aps)
@@ -191,7 +191,7 @@ function rigidbody(i, rdsi, r̄si; rigidIndex=rigidIndex, barIndex=barIndex)
             I 0
             0 0
         ]),
-        SVector{2}(r̄g),
+        SVector{2}(mass_locus),
         [SVector{2}(aps[i]) for i in 1:nrp],
         constrained=constrained
     )
@@ -204,7 +204,7 @@ function rigidbody(i, rdsi, r̄si; rigidIndex=rigidIndex, barIndex=barIndex)
         # lncs, _ = RB.NCF.NC2P1V(SVector{2}(ri), SVector{2}(rj), ro, α, ṙo, ω)
     end
     state = RB.RigidBodyState(prop, lncs, ri, α, ṙo, ω, ci, Φi)
-    rb = RB.RigidBody(prop, state)
+    body = RB.RigidBody(prop, state)
 end
 
 rbs = [rigidbody(i, rds[i], r̄s[i]) for i in 1:nb]

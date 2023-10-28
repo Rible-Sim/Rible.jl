@@ -21,10 +21,10 @@ function make_3d_bar(
     v̂,ŵ = RB.NCF.HouseholderOrthogonalization(û)
     R = SMatrix{3,3}(hcat(û,v̂,ŵ))
 
-    r̄g  = SVector{3}([ bar_length/2,0,0])
+    mass_locus  = SVector{3}([ bar_length/2,0,0])
     r̄p1 = SVector{3}([          0.0,0,0])
     r̄p2 = SVector{3}([ bar_length,  0,0])
-    r̄ps = [r̄p1,r̄p2]
+    loci = [r̄p1,r̄p2]
     if mat_name isa Nothing
         mass = m
     else
@@ -58,15 +58,15 @@ function make_3d_bar(
             ]
         )
     )
-    ās = [SVector(1.0,0.0,0.0)]
+    axes = [SVector(1.0,0.0,0.0)]
     prop = RB.RigidBodyProperty(
         id,
         movable,
         mass,
         Īg,
-        r̄g,
-        r̄ps,
-        ās,;
+        mass_locus,
+        loci,
+        axes,;
         constrained=constrained
     )
     # @show prop.inertia
@@ -87,14 +87,14 @@ function make_3d_bar(
     else
         barmesh = endpoints2mesh(r̄p1,r̄p2;radius,)
     end
-    rb = RB.RigidBody(prop,state,barmesh)
-    # @show rb.state.cache.M
+    body = RB.RigidBody(prop,state,barmesh)
+    # @show body.state.cache.M
     rb
 end
 
 function make_3d_tri(
         id,
-        r̄ps,
+        loci,
         ro,
         R,
         ri,
@@ -122,28 +122,28 @@ function make_3d_tri(
         )
     )
     if id == 7
-        r̄g = [0,0,0.1562442983-0.1*√2]
+        mass_locus = [0,0,0.1562442983-0.1*√2]
     else
-        r̄g = [0,0,0.1562442983-0.1*√2-0.1*√2/2]
+        mass_locus = [0,0,0.1562442983-0.1*√2-0.1*√2/2]
     end
-    # @show m,diag(Īg),r̄g
+    # @show m,diag(Īg),mass_locus
 
-    ās = [
+    axes = [
         SVector(1.0,0,0)
-        for i = axes(r̄ps)
+        for i = axes(loci)
     ]
     prop = RB.RigidBodyProperty(
         id,
         movable,
         mass,Īg,
-        r̄g,r̄ps,ās;
+        mass_locus,loci,axes;
         constrained=constrained
     )
     ṙo = zero(ro)
     ω = zero(ro)
-    u = R*(r̄ps[2] - r̄ps[1])
-    v = R*(r̄ps[3] - r̄ps[1])
-    w = R*(r̄ps[4] - r̄ps[1])
+    u = R*(loci[2] - loci[1])
+    v = R*(loci[3] - loci[1])
+    w = R*(loci[4] - loci[1])
     if rj isa Nothing
         nmcs,_ = RB.NCF.NC1P3V(ri,ro,R,ṙo,ω)
     elseif rk isa Nothing
@@ -160,21 +160,21 @@ function make_3d_tri(
                 ("density", density),
                 ("mass", mass),
                 ("inertia", Īg),
-                ("mass center", r̄g),
-                ("r̄ps[1]", r̄ps[1]),
-                ("r̄ps[2]", r̄ps[2]),
-                ("r̄ps[3]", r̄ps[3]),
-                ("r̄ps[4]", r̄ps[4])
+                ("mass center", mass_locus),
+                ("loci[1]", loci[1]),
+                ("loci[2]", loci[2]),
+                ("loci[3]", loci[3]),
+                ("loci[4]", loci[4])
             ]
         )
     )
     # cf = RB.NCF.CoordinateFunctions(nmcs,q0,ci,uci)
     # @show typeof(nmcs)
-    # radius = norm(r̄ps[2]-r̄ps[1])/32
+    # radius = norm(loci[2]-loci[1])/32
     # @show radius
     trimesh = GB.merge(
         [
-            endpoints2mesh(r̄ps[i],r̄ps[j];
+            endpoints2mesh(loci[i],loci[j];
             radius,color)
             for (i,j) in [
                 [1,2],[1,3],[1,4],
@@ -183,7 +183,7 @@ function make_3d_tri(
         ]
     ) |> make_patch(;color = :darkslategrey)
     if loadmesh
-        platemesh = endpoints2mesh(SVector(0.0,0.0,-height/2),SVector(0.0,0.0,height/2);radius=norm(r̄ps[2]),n1=m,n2=2)
+        platemesh = endpoints2mesh(SVector(0.0,0.0,-height/2),SVector(0.0,0.0,height/2);radius=norm(loci[2]),n1=m,n2=2)
         trimesh = GB.merge(
             [
                 trimesh,
@@ -192,12 +192,12 @@ function make_3d_tri(
         )
     end
     state = RB.RigidBodyState(prop,nmcs,ro,R,ṙo,ω,ci,Φi)
-    rb = RB.RigidBody(prop,state,trimesh)
+    body = RB.RigidBody(prop,state,trimesh)
 end
 
 function make_3d_plate(
         id,
-        r̄ps,
+        loci,
         ro,
         R,
         ri,
@@ -254,7 +254,7 @@ function make_3d_plate(
             )
         )
     end
-    r̄g = SVector(0.0,0.0,0.0)
+    mass_locus = SVector(0.0,0.0,0.0)
     pretty_table(
         SortedDict(
             [
@@ -272,24 +272,24 @@ function make_3d_plate(
         )
     )
     
-    ās = [SVector(1.0,0.0,0.0)]
+    axes = [SVector(1.0,0.0,0.0)]
     prop = RB.RigidBodyProperty(
         id,
         movable,mass,Īg,
-        r̄g,
-        r̄ps,
-        ās,
+        mass_locus,
+        loci,
+        axes,
         ;
         constrained=constrained
     )
     ṙo = zero(ro)
     ω = zero(ro)
-    # u = R*(r̄ps[2] - r̄ps[1])
-    # v = R*(r̄ps[3] - r̄ps[1])
-    # w = R*(r̄ps[4] - r̄ps[1])
+    # u = R*(loci[2] - loci[1])
+    # v = R*(loci[3] - loci[1])
+    # w = R*(loci[4] - loci[1])
     nmcs,_ = RB.NCF.NC1P3V(ri,ro,R,ṙo,ω)
     state = RB.RigidBodyState(prop,nmcs,ro,R,ṙo,ω,ci,Φi)
-    rb = RB.RigidBody(prop,state,platemesh)
+    body = RB.RigidBody(prop,state,platemesh)
 end
 
 function tower3d(;
@@ -305,7 +305,7 @@ function tower3d(;
     θ =  γ - 2π/3
     @show rad2deg.([γ,θ])
     deg120 = deg2rad(120)
-    r̄pss = [
+    nodess = [
         SVector{3}.([
                [           0,           0,  h],
             r.*[           1,           0,  0],
@@ -315,7 +315,7 @@ function tower3d(;
         for r in [r1,r2,r1,r1,r1,r1]
     ]
     for i = 4:6
-        r̄pss[i] .-= Ref(r̄pss[i][1])
+        nodess[i] .-= Ref(nodess[i][1])
     end
     ro_by_rbid = [
         SVector(0.0,0.0, 0),
@@ -334,7 +334,7 @@ function tower3d(;
         SMatrix(RotZ(2θ)*RotX(π)*RotY(α)),
     ]
     rirjrkrl_by_rbid = [
-        Ref(ro_by_rbid[i]) .+ Ref(R_by_rbid[i]).*r̄pss[i] for i = 1:6
+        Ref(ro_by_rbid[i]) .+ Ref(R_by_rbid[i]).*nodess[i] for i = 1:6
     ]
     # @show rirjrkrl_by_rbid[1]
     cycle3 = [2,3,4,2]
@@ -344,22 +344,22 @@ function tower3d(;
                         rirjrkrl_by_rbid[2][cycle3[i+1]]; ci = [1,2,3]) for i = 1:3
     ]
 
-    # rb4 = make_3d_tri(4,r̄ps,ro_by_rbid[1],R_by_rbid[1],rirjrkrl_by_rbid[1][1])
-    # rb4 = make_3d_tri(4,r̄ps,ro_by_rbid[1],R_by_rbid[1],rirjrkrl_by_rbid[1][1:2]...)
-    # rb4 = make_3d_tri(4,r̄ps,ro_by_rbid[1],R_by_rbid[1],rirjrkrl_by_rbid[1][1:3]...)
-    # rb4 = make_3d_tri(4,r̄ps[2:4],ro_by_rbid[2],R_by_rbid[2],rirjrkrl_by_rbid[2][2:4]...)
+    # rb4 = make_3d_tri(4,loci,ro_by_rbid[1],R_by_rbid[1],rirjrkrl_by_rbid[1][1])
+    # rb4 = make_3d_tri(4,loci,ro_by_rbid[1],R_by_rbid[1],rirjrkrl_by_rbid[1][1:2]...)
+    # rb4 = make_3d_tri(4,loci,ro_by_rbid[1],R_by_rbid[1],rirjrkrl_by_rbid[1][1:3]...)
+    # rb4 = make_3d_tri(4,loci[2:4],ro_by_rbid[2],R_by_rbid[2],rirjrkrl_by_rbid[2][2:4]...)
     rb4_to_6 = [
         make_3d_bar(i+3,rirjrkrl_by_rbid[2][cycle3[i  ]],
                         rirjrkrl_by_rbid[3][cycle3[i+1]]; ci = Int[]) for i = 1:3
     ]
 
-    rb7  = make_3d_tri( 7,r̄pss[3],ro_by_rbid[3],R_by_rbid[3],rirjrkrl_by_rbid[3][1:4]...)
+    rb7  = make_3d_tri( 7,nodess[3],ro_by_rbid[3],R_by_rbid[3],rirjrkrl_by_rbid[3][1:4]...)
 
-    rb8  = make_3d_tri( 8,r̄pss[4],ro_by_rbid[4],R_by_rbid[4],rirjrkrl_by_rbid[4][1])
+    rb8  = make_3d_tri( 8,nodess[4],ro_by_rbid[4],R_by_rbid[4],rirjrkrl_by_rbid[4][1])
 
-    rb9  = make_3d_tri( 9,r̄pss[5],ro_by_rbid[5],R_by_rbid[5],rirjrkrl_by_rbid[5][1])
+    rb9  = make_3d_tri( 9,nodess[5],ro_by_rbid[5],R_by_rbid[5],rirjrkrl_by_rbid[5][1])
 
-    rb10 = make_3d_tri(10,r̄pss[6],ro_by_rbid[6],R_by_rbid[6],rirjrkrl_by_rbid[6][1:ijkl]...)
+    rb10 = make_3d_tri(10,nodess[6],ro_by_rbid[6],R_by_rbid[6],rirjrkrl_by_rbid[6][1:ijkl]...)
 
     rbs = TypeSortedCollection(vcat(rb1_to_3,rb4_to_6,[rb7,rb8,rb9,]))
     numberedpoints = RB.number(rbs)
@@ -531,15 +531,15 @@ function twotre3d(;
                 R = RotX(((id-1)*π))
             end
             ri = ro
-            r̄ps_raw = bps[1] |> Array
-            # r̄ps_ext = [
+            nodes_raw = bps[1] |> Array
+            # nodes_ext = [
             # 	SVector(3r̄p[1],3r̄p[2],0.0)
-            # 	for r̄p in r̄ps_raw
+            # 	for r̄p in nodes_raw
             # ]
-            r̄ps = vcat(r̄ps_raw,)
+            loci = vcat(nodes_raw,)
             make_3d_tri(
                 id,
-                r̄ps,ro,
+                loci,ro,
                 R,ri,;
                 # movable = true,
                 # constrained = false,
@@ -693,17 +693,17 @@ function prisms(;
     nb = nbars + 1
     
     ro = SVector(0.0,0.0,0.0)
-    r̄ps_raw = bps[1] |> Array
-    r̄ps = vcat(r̄ps_raw,)
-    # r̄ps_ext = [
+    nodes_raw = bps[1] |> Array
+    loci = vcat(nodes_raw,)
+    # nodes_ext = [
     # 	SVector(3r̄p[1],3r̄p[2],0.0)
-    # 	for r̄p in r̄ps_raw
+    # 	for r̄p in nodes_raw
     # ]
-    # r̄ps = vcat(r̄ps_raw,r̄ps_ext)
+    # loci = vcat(nodes_raw,nodes_ext)
     if hasplate
         plate = make_3d_plate(
             nb,
-            r̄ps,
+            loci,
             ro,
             RotZ(0.0),
             ro;
@@ -999,7 +999,7 @@ function prism_modules(;
     cable_dia_restlength = ustrip(Unitful.m,cable_dia_length)-17*1.1876290206261921/κ_dia
     # @show uconvert(Unitful.N/Unitful.m,κ),ustrip(Unitful.N/Unitful.m,κ)
     κs = typeof(κ_hor)[]
-    μs = typeof(cable_hor_restlength)[]
+    friction_coefficients = typeof(cable_hor_restlength)[]
     connecting_elas = ElasticArray{Int}(undef, nb, 0)
     for k = 1:p
         # # lower
@@ -1016,7 +1016,7 @@ function prism_modules(;
             row[ks+cm[i+1]] = -1
             append!(connecting_elas,row)
             push!(κs,κ_hor)
-            push!(μs,cable_hor_restlength)
+            push!(friction_coefficients,cable_hor_restlength)
         end
 
         for j = 0:n-1
@@ -1030,7 +1030,7 @@ function prism_modules(;
                     row[ks+is+cm[i-1]] = -2
                     append!(connecting_elas,row)
                     push!(κs,κ_dia)
-                    push!(μs,cable_dia_restlength)
+                    push!(friction_coefficients,cable_dia_restlength)
                 end
             else
                 for i = idx
@@ -1039,7 +1039,7 @@ function prism_modules(;
                     row[ks+is+cm[i  ]] =  1
                     append!(connecting_elas,row)
                     push!(κs,κ_dia)
-                    push!(μs,cable_dia_restlength)
+                    push!(friction_coefficients,cable_dia_restlength)
                 end
             end
 
@@ -1050,7 +1050,7 @@ function prism_modules(;
                 row[ks+is+cm[i-1]] = -2
                 append!(connecting_elas,row)
                 push!(κs,κ_hor)
-                push!(μs,cable_hor_restlength)
+                push!(friction_coefficients,cable_hor_restlength)
             end
         end
     end
@@ -1065,7 +1065,7 @@ function prism_modules(;
     cables_prism = [
         RB.Cable3D(
         i,
-        μs[i], #restlength  
+        friction_coefficients[i], #restlength  
         κs[i],
         0.0; #damping
         slack=true) 
@@ -1225,15 +1225,15 @@ function embed3d(;
             ro = SVector(0.0,0.0,(j-1)*2h)
             ri = ro
             R = RotZ(0.0)
-            r̄ps_raw = bps[1] |> Array
-            r̄ps_ext = [
+            nodes_raw = bps[1] |> Array
+            nodes_ext = [
                 SVector(3r̄p[1],3r̄p[2],0.0)
-                for r̄p in r̄ps_raw
+                for r̄p in nodes_raw
             ]
-            r̄ps = vcat(r̄ps_raw,r̄ps_ext)
+            loci = vcat(nodes_raw,nodes_ext)
             make_3d_plate(
                 id,
-                r̄ps,
+                loci,
                 ro,
                 R,
                 ri;
@@ -1553,8 +1553,8 @@ function plot_compose_tower3d(bot0,bot1;
     # foreach(bot0.st.connectivity.tensioned) do scnt
     # 	push!(bot0_rcs_by_cables,
     # 		(
-    # 			scnt.hen.rbsig.state.rps[scnt.hen.pid].+
-    # 			scnt.egg.rbsig.state.rps[scnt.egg.pid]
+    # 			scnt.hen.rbsig.state.loci_states[scnt.hen.pid].+
+    # 			scnt.egg.rbsig.state.loci_states[scnt.egg.pid]
     # 		)./2
     # 	)
     # end
@@ -1602,7 +1602,7 @@ function class1(;
     θ =  γ - 2π/3
     @show rad2deg.([γ,θ])
     deg120 = deg2rad(120)
-    r̄pss = [
+    nodess = [
         SVector{3}.([
                [           0,           0, 1.5h],
             r.*[           1,           0,  0],
@@ -1611,7 +1611,7 @@ function class1(;
         ])
         for r in [r1,r1]
     ]
-    r̄ps = r̄pss[1]
+    loci = nodess[1]
 
     ro_by_rbid = [
         SVector(0.0,0.0,0.0),
@@ -1622,17 +1622,17 @@ function class1(;
         SMatrix(R1),
     ]
     rirjrkrl_by_rbid = [
-        Ref(ro_by_rbid[i]) .+ Ref(R_by_rbid[i]).*r̄pss[i] for i = 1:2
+        Ref(ro_by_rbid[i]) .+ Ref(R_by_rbid[i]).*nodess[i] for i = 1:2
     ]
     
     cycle3 = [2,3,4,2]
-    rb1 = make_3d_tri(1,r̄ps,ro_by_rbid[1],R_by_rbid[1],rirjrkrl_by_rbid[1][1];			
+    rb1 = make_3d_tri(1,loci,ro_by_rbid[1],R_by_rbid[1],rirjrkrl_by_rbid[1][1];			
         constrained = true,
         ci = collect(1:12),
         Φi = Int[]
     )
 
-    rb2 = make_3d_tri(2,r̄ps,ro_by_rbid[2],R_by_rbid[2],rirjrkrl_by_rbid[2][1:ijkl]...)
+    rb2 = make_3d_tri(2,loci,ro_by_rbid[2],R_by_rbid[2],rirjrkrl_by_rbid[2][1:ijkl]...)
 
     rbs = TypeSortedCollection([rb1,rb2])
     numberedpoints = RB.number(rbs)
@@ -1681,7 +1681,7 @@ function spine3d(n;
     mass = 0.1 #kg
     #inertia = Matrix(Diagonal([45.174,45.174,25.787]))*1e-8 # N/m^2
     inertia = Matrix(Diagonal([45.174,45.174,25.787]))*1e-2
-    r̄g = [0.0, 0.0, 0.0]
+    mass_locus = [0.0, 0.0, 0.0]
 
     r̄p_x = cos(θ)*a
     r̄p_y = sin(θ)*a
@@ -1690,7 +1690,7 @@ function spine3d(n;
     r̄p3 = SVector{3}([  0.0, -r̄p_y,  r̄p_y])
     r̄p2 = SVector{3}([ r̄p_x,   0.0, -r̄p_y])
     r̄p1 = SVector{3}([-r̄p_x,   0.0, -r̄p_y])
-    r̄ps = [r̄p1,r̄p2,r̄p3,r̄p4,r̄p5]
+    loci = [r̄p1,r̄p2,r̄p3,r̄p4,r̄p5]
 
     movable = ones(Bool,n)
     movable[1] = false
@@ -1699,15 +1699,15 @@ function spine3d(n;
 
     props = [RB.RigidBodyProperty(i,movable[i],mass,
                 SMatrix{3,3}(inertia),
-                SVector{3}(r̄g),
-                r̄ps;constrained=constrained[i]) for i = 1:n]
+                SVector{3}(mass_locus),
+                loci;constrained=constrained[i]) for i = 1:n]
 
     rs = [[0.0,0.0,i*h] for i = 0:n-1]
     Rs = [Matrix(RR)^i for i = 0:n-1]
     ṙs = [zeros(3) for i = 0:n-1]
     ωs = [zeros(3) for i = 0:n-1]
 
-    function rigidbody(i,prop,r̄ps,r,R,ṙ,ω)
+    function rigidbody(i,prop,loci,r,R,ṙ,ω)
         if i == 1
             ci = collect(1:12)
             Φi = Int[]
@@ -1716,20 +1716,20 @@ function spine3d(n;
             Φi = collect(1:6)
         end
 
-        # ri,rj,rk,rl = [r+R*r̄p for r̄p in r̄ps]
+        # ri,rj,rk,rl = [r+R*r̄p for r̄p in loci]
         # nmcs,q,q̇ = RB.NCF.NC4P(ri,rj,rk,rl,r,R,ṙ,ω)
         # nmcs,q,q̇ = RB.NCF.NC3P1V(ri,rk,rl,r,R,ṙ,ω)
         # nmcs,q,q̇ = RB.NCF.NC2P2V(rk,rl,r,R,ṙ,ω)
         nmcs,_ = RB.NCF.NC1P3V(r,r,R,ṙ,ω)
         state = RB.RigidBodyState(prop,nmcs,r,R,ṙ,ω,ci,Φi)
-        radius = norm(r̄ps[1]-r̄ps[5])/25
+        radius = norm(loci[1]-loci[5])/25
         vertmesh = merge([
-            endpoints2mesh(r̄ps[i],r̄ps[5];radius)
+            endpoints2mesh(loci[i],loci[5];radius)
             for i in 1:4
         ])
-        rb = RB.RigidBody(prop,state,vertmesh)
+        body = RB.RigidBody(prop,state,vertmesh)
     end
-    rbs = [rigidbody(i,props[i],r̄ps,rs[i],Rs[i],ṙs[i],ωs[i]) for i = 1:n]
+    rbs = [rigidbody(i,props[i],loci,rs[i],Rs[i],ṙs[i],ωs[i]) for i = 1:n]
     rigdibodies = TypeSortedCollection(rbs)
     numberedpoints = RB.number(rigdibodies)
     indexedcoords = RB.index(rigdibodies)
@@ -1792,7 +1792,7 @@ function newspine3d(n;
     mass = 0.1 #kg
     #inertia = Matrix(Diagonal([45.174,45.174,25.787]))*1e-8 # N/m^2
     inertia = Matrix(Diagonal([45.174, 45.174, 25.787])) * 1e-2
-    r̄g = [0.0, 0.0, 0.0]
+    mass_locus = [0.0, 0.0, 0.0]
 
     r̄p_x = cos(θ) * a
     r̄p_y = sin(θ) * a
@@ -1801,7 +1801,7 @@ function newspine3d(n;
     r̄p3 = SVector(  0.0, -r̄p_x,  r̄p_y)
     r̄p2 = SVector( r̄p_x,   0.0, -r̄p_y)
     r̄p1 = SVector(-r̄p_x,   0.0, -r̄p_y)
-    r̄ps = [r̄p1, r̄p2, r̄p3, r̄p4, r̄p5]
+    loci = [r̄p1, r̄p2, r̄p3, r̄p4, r̄p5]
 
     movable = ones(Bool, n)
     movable[1] = false
@@ -1812,8 +1812,8 @@ function newspine3d(n;
         RB.RigidBodyProperty(
             i, movable[i], mass,
             SMatrix{3,3}(inertia),
-            SVector{3}(r̄g),
-            r̄ps; 
+            SVector{3}(mass_locus),
+            loci; 
             constrained=constrained[i]
         ) for i = 1:n
     ]
@@ -1823,7 +1823,7 @@ function newspine3d(n;
     ṙs = [zeros(3) for i = 0:n-1]
     ωs = [zeros(3) for i = 0:n-1]
 
-    function rigidbody(i, prop, r̄ps, r, R, ṙ, ω)
+    function rigidbody(i, prop, loci, r, R, ṙ, ω)
         if i == 1
             ci = collect(1:12)
             Φi = Int[]
@@ -1832,22 +1832,22 @@ function newspine3d(n;
             Φi = collect(1:6)
         end
 
-        # ri,rj,rk,rl = [r+R*r̄p for r̄p in r̄ps]
+        # ri,rj,rk,rl = [r+R*r̄p for r̄p in loci]
         # nmcs,q,q̇ = RB.NCF.NC4P(ri,rj,rk,rl,r,R,ṙ,ω)
         # nmcs,q,q̇ = RB.NCF.NC3P1V(ri,rk,rl,r,R,ṙ,ω)
         # nmcs,q,q̇ = RB.NCF.NC2P2V(rk,rl,r,R,ṙ,ω)
         nmcs, _ = RB.NCF.NC1P3V(r, r, R, ṙ, ω)
         state = RB.RigidBodyState(prop, nmcs, r, R, ṙ, ω, ci, Φi)
-        radius = norm(r̄ps[1] - r̄ps[5]) / 25
+        radius = norm(loci[1] - loci[5]) / 25
         vertmesh = merge([
-            endpoints2mesh(r̄ps[i], r̄ps[j]; radius)
+            endpoints2mesh(loci[i], loci[j]; radius)
             for (i,j) in [
                 (1,5),(2,5),(3,5),(4,5),(1,2),(3,4)
             ]
         ])
-        rb = RB.RigidBody(prop, state, vertmesh)
+        body = RB.RigidBody(prop, state, vertmesh)
     end
-    rbs = [rigidbody(i, props[i], r̄ps, rs[i], Rs[i], ṙs[i], ωs[i]) for i = 1:n]
+    rbs = [rigidbody(i, props[i], loci, rs[i], Rs[i], ṙs[i], ωs[i]) for i = 1:n]
     rigdibodies = TypeSortedCollection(rbs)
     numberedpoints = RB.number(rigdibodies)
     indexedcoords = RB.index(rigdibodies)
@@ -1902,7 +1902,7 @@ function newspine3d(n;
     bot = RB.Robot(st, hub)
 end
 
-function new_deck(id,r̄ps,ro,R,ri,box;
+function new_deck(id,loci,ro,R,ri,box;
         movable = true,
         constrained = false,
         ci = Int[],
@@ -1929,7 +1929,7 @@ function new_deck(id,r̄ps,ro,R,ri,box;
             )
         )
     )
-    r̄g = [0,0,0.0]
+    mass_locus = [0,0,0.0]
     pretty_table(
         SortedDict(
             [
@@ -1948,8 +1948,8 @@ function new_deck(id,r̄ps,ro,R,ri,box;
         movable,
         mass,
         Īg,
-        r̄g,
-        r̄ps;
+        mass_locus,
+        loci;
         constrained=constrained
     )
     ṙo = zero(ro)
@@ -2010,14 +2010,14 @@ function bridge3d(;
         for i = 1:n
     ]
     deckcenter = SVector(0.0,n/2*12,b)
-    r̄ps_deck = vcat(mid,[SVector(0.0,0.0,b)]).-Ref(deckcenter)
+    nodes_deck = vcat(mid,[SVector(0.0,0.0,b)]).-Ref(deckcenter)
     hei = 0.25
     box = Meshes.Box(
-        Meshes.Point(r̄ps_deck[begin]), 
-        Meshes.Point(r̄ps_deck[2n+2]+SVector(0,0,hei))
+        Meshes.Point(nodes_deck[begin]), 
+        Meshes.Point(nodes_deck[2n+2]+SVector(0,0,hei))
     )
     deck = new_deck(
-        2n+1,r̄ps_deck, # r̄ps
+        2n+1,nodes_deck, # loci
         deckcenter,#ro
         RotX(0.0),#R
         deckcenter,#ri

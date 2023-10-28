@@ -1,6 +1,6 @@
 
 function check_rbid_sanity(rbs)
-    ids,nb = get_rbids(rbs)
+    ids,nb = get_bodies_ids(rbs)
     @assert minimum(ids) == 1
     @assert maximum(ids) == nb
     @assert allunique(ids)
@@ -20,32 +20,32 @@ end
 
 function number(rbs)
     _,nb = check_rbid_sanity(rbs)
-    nr̄ps_by_mem = zeros(Int,nb)
+    nnodes_by_mem = zeros(Int,nb)
     nld_by_mem = zeros(Int,nb)
-    foreach(rbs) do rb
-        i = rb.prop.id
-        nr̄ps_by_mem[i] = rb.prop.r̄ps |> length
-        nld_by_mem[i] = get_nlocaldim(rb)
+    foreach(rbs) do body
+        i = body.prop.id
+        nnodes_by_mem[i] = body.prop.loci |> length
+        nld_by_mem[i] = get_nlocaldim(body)
     end
     mem2num = Vector{Int}[]
     num2ID = Vector{ID{Int,Int}}()
     num2sys = Vector{Int}[]
     is = 1
     js = 0
-    for rbid in 1:nb
+    for bodyid in 1:nb
         push!(mem2num,Int[])
-        nld = nld_by_mem[rbid]
-        for pid in 1:nr̄ps_by_mem[rbid]
-            push!(num2ID,ID(rbid,pid))
-            push!(mem2num[rbid],is)
+        nld = nld_by_mem[bodyid]
+        for pid in 1:nnodes_by_mem[bodyid]
+            push!(num2ID,ID(bodyid,pid))
+            push!(mem2num[bodyid],is)
             is += 1
             push!(num2sys,collect(1:nld).+js)
             js += nld
         end
     end
     mem2sys = [
-        reduce(vcat,num2sys[mem2num[rbid]])
-        for rbid = 1:nb
+        reduce(vcat,num2sys[mem2num[bodyid]])
+        for bodyid = 1:nb
     ]
     # @show mem2sys
     NumberedPoints(mem2num,num2sys,mem2sys,js)
@@ -71,9 +71,9 @@ function index_inconstraints(rbs)
     ids,nmem = check_rbid_sanity(rbs)
     nincst_by_mem = zeros(Int,nmem)
     ndof_by_mem = zeros(Int,nmem)
-    foreach(rbs) do rb
-        nincst_by_mem[rb.prop.id] = rb.state.cache.nΦ
-        ndof_by_mem[rb.prop.id] = get_ndof(rb)
+    foreach(rbs) do body
+        nincst_by_mem[body.prop.id] = body.state.cache.nΦ
+        ndof_by_mem[body.prop.id] = get_ndof(body)
     end
     ninconstraints = sum(nincst_by_mem)
     sysndof = sum(ndof_by_mem)
@@ -81,11 +81,11 @@ function index_inconstraints(rbs)
     mem2sysndof = Vector{Int}[]
     ilast = 0
     jlast = 0
-    for rbid = 1:nmem
-        nincst = nincst_by_mem[rbid]
+    for bodyid = 1:nmem
+        nincst = nincst_by_mem[bodyid]
         push!(mem2sysincst,collect(ilast+1:ilast+nincst))
         ilast += nincst
-        ndof = ndof_by_mem[rbid]
+        ndof = ndof_by_mem[bodyid]
         push!(mem2sysndof,collect(jlast+1:jlast+ndof))
         jlast += ndof 
     end
@@ -109,16 +109,16 @@ function index(rbs,sharing_input=Int[;;])
     ntotal_by_mem = zeros(Int,nmem)
     pres_idx_by_mem = Vector{Vector{Int}}(undef,nmem)
     free_idx_by_mem = Vector{Vector{Int}}(undef,nmem)
-    foreach(rbs) do rb
-        rbid = rb.prop.id
-        ntotal_by_mem[rbid] = get_nbodycoords(rb)
-        pres_idx_by_mem[rbid] = rb.state.cache.pres_idx
-        free_idx_by_mem[rbid] = rb.state.cache.free_idx
+    foreach(rbs) do body
+        bodyid = body.prop.id
+        ntotal_by_mem[bodyid] = get_nbodycoords(body)
+        pres_idx_by_mem[bodyid] = body.state.cache.pres_idx
+        free_idx_by_mem[bodyid] = body.state.cache.free_idx
     end
-    for rbid = 1:nmem
-        ntotal = ntotal_by_mem[rbid]
-        pres = pres_idx_by_mem[rbid]
-        free = free_idx_by_mem[rbid]
+    for bodyid = 1:nmem
+        ntotal = ntotal_by_mem[bodyid]
+        pres = pres_idx_by_mem[bodyid]
+        free = free_idx_by_mem[bodyid]
         npres = length(pres)
         nfree = ntotal - npres
         push!(mem2sysfull,fill(-1,ntotal))
@@ -128,34 +128,34 @@ function index(rbs,sharing_input=Int[;;])
         shared_indices = Int[]
         for row in eachrow(sharing)
             rbids = findall(!iszero,row)
-            if rbid in rbids[begin+1:end]
-                myindex = row[rbid]
+            if bodyid in rbids[begin+1:end]
+                myindex = row[bodyid]
                 formerid = first(rbids)
                 formerindex = row[formerid]
-                mem2sysfull[rbid][myindex] = mem2sysfull[formerid][formerindex]
+                mem2sysfull[bodyid][myindex] = mem2sysfull[formerid][formerindex]
                 push!(shared_indices,myindex)
             end
         end
         deleteat!(unshareds,shared_indices)
         nusi = length(unshareds)
-        mem2sysfull[rbid][unshareds] = collect(length(sysfull)+1:length(sysfull)+nusi)
-        append!(sysfull,mem2sysfull[rbid][unshareds])
+        mem2sysfull[bodyid][unshareds] = collect(length(sysfull)+1:length(sysfull)+nusi)
+        append!(sysfull,mem2sysfull[bodyid][unshareds])
         for i in unshareds
             if i in pres
                 # pres
-                push!(syspres,mem2sysfull[rbid][i])
+                push!(syspres,mem2sysfull[bodyid][i])
             else
                 # free
-                push!(sysfree,mem2sysfull[rbid][i])
+                push!(sysfree,mem2sysfull[bodyid][i])
             end
         end
         for i in free
-            freei = findfirst((x)->x==mem2sysfull[rbid][i],sysfree)
-            push!(mem2sysfree[rbid],freei)
+            freei = findfirst((x)->x==mem2sysfull[bodyid][i],sysfree)
+            push!(mem2sysfree[bodyid],freei)
         end
         for i in pres
-            presi = findfirst((x)->x==mem2sysfull[rbid][i],syspres)
-            push!(mem2syspres[rbid],presi)
+            presi = findfirst((x)->x==mem2sysfull[bodyid][i],syspres)
+            push!(mem2syspres[bodyid],presi)
         end
     end
     ninconstraints,mem2sysincst,sysndof,mem2sysndof = index_inconstraints(rbs)

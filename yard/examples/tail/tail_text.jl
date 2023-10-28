@@ -114,7 +114,7 @@ function rigidbody(i,CoM,m,inertia,ri,rj,aps)
                     aps;constrained=constrained
                     )
     state = RB.RigidBodyState(prop,ri,rj,pres_idx)
-    rb = RB.RigidBody(prop,state)
+    body = RB.RigidBody(prop,state)
 
 end
 

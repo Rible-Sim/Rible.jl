@@ -379,7 +379,7 @@ function nhsolve(prob,nq,nλ,nμ,nu,q0,q̇0;tspan,dt=0.01,ftol=1e-14,verbose=fal
     q̇s = [copy(q̇0) for i in 1:totalstep+1]
     ps = [M*copy(q̇0) for i in 1:totalstep+1]
     λs = [zeros(eltype(q0),nλ) for i in 1:totalstep+1]
-    μs = [zeros(eltype(q0),nμ) for i in 1:totalstep+1]
+    friction_coefficients = [zeros(eltype(q0),nμ) for i in 1:totalstep+1]
     Λs = [zeros(eltype(q0),nu) for i in 1:totalstep+1]
     invM = inv(M)
     # F⁺ = zero(q0)
@@ -406,7 +406,7 @@ function nhsolve(prob,nq,nλ,nμ,nu,q0,q̇0;tspan,dt=0.01,ftol=1e-14,verbose=fal
         q̇ᵏ⁻¹ = q̇s[timestep]
         pᵏ⁻¹ = ps[timestep]
         λᵏ⁻¹ = λs[timestep]
-        μᵏ⁻¹ = μs[timestep]
+        μᵏ⁻¹ = friction_coefficients[timestep]
         Λᵏ⁻¹ = Λs[timestep]
         tᵏ⁻¹ = ts[timestep]
         q̃ᵏ   = q̃s[timestep+1]
@@ -414,7 +414,7 @@ function nhsolve(prob,nq,nλ,nμ,nu,q0,q̇0;tspan,dt=0.01,ftol=1e-14,verbose=fal
         q̇ᵏ   = q̇s[timestep+1]
         pᵏ   = ps[timestep+1]
         λᵏ   = λs[timestep+1]
-        μᵏ   = μs[timestep+1]
+        μᵏ   = friction_coefficients[timestep+1]
         Λᵏ   = Λs[timestep+1]
         q̇ᵏ .= q̇ᵏ⁻¹
 
@@ -510,7 +510,7 @@ function nhsolve(prob,nq,nλ,nμ,nu,q0,q̇0;tspan,dt=0.01,ftol=1e-14,verbose=fal
         end
         next!(prog)
     end
-    ts,qs,q̇s,ps,λs,μs
+    ts,qs,q̇s,ps,λs,friction_coefficients
 end
 
 function snhsolve(prob,nq,nλ,nμ,nu,q0,q̇0;tspan,dt=0.01,ftol=1e-14,verbose=false,iterations=50,
@@ -526,7 +526,7 @@ function snhsolve(prob,nq,nλ,nμ,nu,q0,q̇0;tspan,dt=0.01,ftol=1e-14,verbose=fa
     q̇s = [copy(q̇0) for i in 1:totalstep+1]
     ps = [M*copy(q̇0) for i in 1:totalstep+1]
     λs = [zeros(eltype(q0),nλ) for i in 1:totalstep+1]
-    μs = [zeros(eltype(q0),nμ) for i in 1:totalstep+1]
+    friction_coefficients = [zeros(eltype(q0),nμ) for i in 1:totalstep+1]
     Λs = [zeros(eltype(q0),nu) for i in 1:totalstep+1]
     invM = inv(M)
     # F⁺ = zero(q0)
@@ -548,14 +548,14 @@ function snhsolve(prob,nq,nλ,nμ,nu,q0,q̇0;tspan,dt=0.01,ftol=1e-14,verbose=fa
         q̇ᵏ⁻¹ = q̇s[timestep]
         pᵏ⁻¹ = ps[timestep]
         λᵏ⁻¹ = λs[timestep]
-        μᵏ⁻¹ = μs[timestep]
+        μᵏ⁻¹ = friction_coefficients[timestep]
         Λᵏ⁻¹ = Λs[timestep]
         tᵏ⁻¹ = ts[timestep]
         qᵏ   = qs[timestep+1]
         q̇ᵏ   = q̇s[timestep+1]
         pᵏ   = ps[timestep+1]
         λᵏ   = λs[timestep+1]
-        μᵏ   = μs[timestep+1]
+        μᵏ   = friction_coefficients[timestep+1]
         Λᵏ   = Λs[timestep+1]
         q̇ᵏ .= q̇ᵏ⁻¹
 
@@ -624,7 +624,7 @@ function snhsolve(prob,nq,nλ,nμ,nu,q0,q̇0;tspan,dt=0.01,ftol=1e-14,verbose=fa
         end
         next!(prog)
     end
-    ts,qs,q̇s,ps,λs,μs
+    ts,qs,q̇s,ps,λs,friction_coefficients
 end
 
 function ipsolve(prob,nq,nλ,nμ,q0,q̇0;dt=0.01,ftol=1e-14,verbose=false,iterations=50,
@@ -641,7 +641,7 @@ function ipsolve(prob,nq,nλ,nμ,q0,q̇0;dt=0.01,ftol=1e-14,verbose=false,iterat
     q̇s = [copy(q̇0) for i in 1:totalstep+1]
     ps = [M*copy(q̇0) for i in 1:totalstep+1]
     λs = [zeros(eltype(q0),nλ) for i in 1:totalstep+1]
-    μs = [zeros(eltype(q0),nμ) for i in 1:totalstep+1]
+    friction_coefficients = [zeros(eltype(q0),nμ) for i in 1:totalstep+1]
     invM = inv(M)
     # F⁺ = zero(q0)
     step = 0
@@ -663,14 +663,14 @@ function ipsolve(prob,nq,nλ,nμ,q0,q̇0;dt=0.01,ftol=1e-14,verbose=false,iterat
         q̇ᵏ⁻¹ = q̇s[timestep]
         pᵏ⁻¹ = ps[timestep]
         λᵏ⁻¹ = λs[timestep]
-        μᵏ⁻¹ = μs[timestep]
+        μᵏ⁻¹ = friction_coefficients[timestep]
         tᵏ⁻¹ = ts[timestep]
         q̃ᵏ   = q̃s[timestep+1]
         qᵏ   = qs[timestep+1]
         q̇ᵏ   = q̇s[timestep+1]
         pᵏ   = ps[timestep+1]
         λᵏ   = λs[timestep+1]
-        μᵏ   = μs[timestep+1]
+        μᵏ   = friction_coefficients[timestep+1]
         q̇ᵏ .= q̇ᵏ⁻¹
 
         qˣ = qᵏ⁻¹ .+ dt./2 .*q̇ᵏ⁻¹
@@ -754,5 +754,5 @@ function ipsolve(prob,nq,nλ,nμ,q0,q̇0;dt=0.01,ftol=1e-14,verbose=false,iterat
         end
         next!(prog)
     end
-    ts,qs,q̇s,ps,λs,μs
+    ts,qs,q̇s,ps,λs,friction_coefficients
 end
