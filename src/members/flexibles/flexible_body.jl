@@ -110,14 +110,12 @@ function get_CoordinatesCache(
         ∂T∂qᵀ,So,Sg,Sps)
 end
 
-struct FlexibleBodyState{N,M,T,cacheType,contactType} <: AbstractFlexibleBodyState{N,T}
+struct FlexibleBodyState{N,M,T,cacheType} <: AbstractFlexibleBodyState{N,T}
     mass_locus_state::LocusState{N,M,T}
 	"Positions of anchor points"
     loci_states::Vector{LocusState{N,M,T}}
 	"Cache"
     cache::cacheType
-    "Contacts"
-    contacts::Vector{contactType}
 end
 
 function FlexibleBodyState(prop::FlexibleBodyProperty{N,T},
@@ -148,17 +146,11 @@ function FlexibleBodyState(prop::FlexibleBodyProperty{N,T},
         )
         for i in 1:num_of_loci
     ]
-    contacts = [
-        Contact(i,
-            loci[i].friction_coefficient,
-            loci[i].restitution_coefficient
-        ) 
-        for i in 1:num_of_loci
-    ]
     FlexibleBodyState(
         mass_locus_state,
         loci_states,
-        cache,contacts)
+        cache,
+    )
 end
 
 struct FlexibleBody{N,M,T,cacheType,meshType} <: AbstractFlexibleBody{N,T}

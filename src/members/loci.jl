@@ -99,13 +99,43 @@ function Locus(
     )
 end
 
+mutable struct FrictionalContactState{N,T}
+    active::Bool
+    persistent::Bool
+    gap::T
+    frame::Axes{N,T}
+    relative_velocity::SVector{N,T}
+    force::SVector{N,T}
+end
+
+function FrictionalContactState(normal::StaticArray{Tuple{N},T}) where {N,T}
+    active = false
+    persistent = true
+    gap = typemax(T)
+    frame = orthonormal_frame(normal)
+    relative_velocity = @SVector zeros(T,N)
+    force = @SVector zeros(T,N)
+    FrictionalContactState(
+        active,persistent,
+        gap,frame,
+        relative_velocity,force
+    )
+end
+
+function activate!(contact_state::FrictionalContactState,gap)
+    contact_state.gap = gap
+    pre_active = contact_state.active
+    contact_state.active = (gap<=0)
+    contact_state.persistent = (pre_active == contact_state.active)
+end
+
 mutable struct LocusState{N,M,T}
     position::MVector{N,T}
     velocity::MVector{N,T}
     axes::Axes{N,T}
-    frame::Axes{N,T}
     force::MVector{N,T}
     torque::MVector{M,T}
+    contact_state::FrictionalContactState{N,T}
 end
 
 function LocusState(
@@ -115,45 +145,62 @@ function LocusState(
     M = 2N-3
     normal = SVector{N}(ifelse(i==1,one(T),zero(T)) for i = 1:N)
     axes = orthonormal_frame(normal)
-    frame = deepcopy(axes)
     force = @MVector zeros(T,N)
     torque = @MVector zeros(T,M)
+    contact_state = FrictionalContactState(normal)
     LocusState(
         position,velocity,
-        axes,frame,
-        force,torque
+        axes,
+        force,torque,
+        contact_state
     )
 end
 
 function LocusState(
-        lo::Locus{N,T},
+        locus::Locus{N,T},
         origin_position,R,
         origin_velocity,ω,
         force,torque
     ) where {N,T}
-    relative_position = R*lo.position
+    relative_position = R*locus.position
     position = origin_position+relative_position
     velocity = origin_velocity+ω×relative_position
-    axes = R*lo.axes
-    frame = deepcopy(axes)
+    axes = R*locus.axes
+    contact_state = FrictionalContactState(axes.normal)
     LocusState(
         position,velocity,
-        axes,frame,
-        force,torque
+        axes,
+        force,torque,
+        contact_state
     )
 end
 
 function LocusState(
-        lo::Locus{N,T},
+        locus::Locus{N,T},
         origin_position,R,
         origin_velocity,ω::StaticArray{Tuple{M}}
     ) where {N,M,T}
     force = @MVector zeros(T,N)
     torque = @MVector zeros(T,M)
     LocusState(
-        lo,
+        locus,
         origin_position,R,
         origin_velocity,ω,
         force,torque
     )
+end
+
+activate!(locus_state::LocusState,gap) = activate!(locus_state.contact_state,gap)
+
+function update_contacts!(loci, loci_previous, v, Λ)
+    rel_vel_split = split_by_lengths(v,3)
+    forces_split = split_by_lengths(Λ,3)
+    for (ac,acp,va,Λa) in zip(loci, loci_previous, rel_vel_split,forces_split)
+        if acp.state.active
+            ac.state.persistent = true
+        end
+        ac.state.active = true
+        ac.state.relative_velocity = SVector{3}(va)
+        ac.state.force             = SVector{3}(Λa)
+    end
 end

@@ -118,23 +118,22 @@ function contact_dynfuncs(bot;
         foreach(st.bodies) do body
             (;prop,state) = body
             bid = prop.id
-            (;contacts,loci_states) = state
+            (;loci_states) = state
             contacts_bits[mem2num[bid]] .= false
             persistent_bits[mem2num[bid]] .= false
             if body isa RB.AbstractRigidBody
                 for pid in eachindex(loci_states)
-                    (;position) = loci_states[pid]
-                    contact = contacts[pid]
-                    (;e,μ) = contact
+                    locus_state = loci_states[pid]
+                    (;position,contact_state) = locus_state
                     gap = RB.signed_distance(position,flatplane)
                     if !checkpersist
-                        contact.state.active = false
+                        contact_state.active = false
                     end
-                    RB.activate!(contact,gap)
-                    if contact.state.active
+                    RB.activate!(contact_state,gap)
+                    if contact_state.active
                         contacts_bits[mem2num[bid][pid]] = true
-                        contact.state.frame = RB.spatial_frame(flatplane.n)
-                        if contact.state.persistent
+                        contact_state.frame = RB.spatial_frame(flatplane.n)
+                        if contact_state.persistent
                             persistent_bits[mem2num[bid][pid]] = true
                         end
                         na += 1
@@ -187,11 +186,12 @@ function contact_dynfuncs(bot;
         foreach(st.bodies) do body
             (;prop,state) = body
             bid = prop.id
-            (;contacts,loci_states) = state
-            for (pid,contact) in enumerate(contacts)
-                if contact.state.active
+            (;loci_states) = state
+            for (pid,locus_state) in enumerate(loci_states)
+                (;contact_state) = locus_state
+                if contact_state.active
                     (;position) = loci_states[pid]
-                    (;normal,tangent,bitangent) = contact.state.frame
+                    (;normal,tangent,bitangent) = contact_state.frame
                     C = state.cache.Cps[pid]
                     CT = C*RB.build_T(st,bid)
                     dm = hcat(normal,tangent,bitangent) |> transpose
@@ -210,7 +210,7 @@ function contact_dynfuncs(bot;
                         fi = dm'*Λi
                         ∂DᵀΛ∂q .+= transpose(Tbody)*∂Cᵀf∂x(Tbody*q,fi)*Tbody
                     end
-                    if contact.state.persistent
+                    if contact_state.persistent
                         Dper[epi,:] .= D[epi,:]
                     else
                         Dimp[epi,:] .= D[epi,:]
@@ -226,18 +226,19 @@ function contact_dynfuncs(bot;
         foreach(st.bodies) do body
             (;prop,state) = body
             bid = prop.id
-            (;contacts,loci_states) = state
+            (;loci) = prop
+            (;loci_states) = state
             active_idx = findall(!iszero,mem2act_idx[bid])
             na_body = length(active_idx)
             if na_body > 1
                 R = zeros(T,3na_body,6)
                 inv_μs_body = ones(T,3na_body)
                 for (i,pid) in enumerate(active_idx)
-                    (;position) = loci_states[pid]
-                    contact = contacts[pid]
-                    (;e,μ) = contact
-                    (;normal,tangent,bitangent) = contact.state.frame
-                    inv_μs_body[3(i-1)+1] = 1/μ
+                    locus_state = loci_states[pid]
+                    locus = loci[pid]
+                    (;position,contact_state) = locus_state
+                    (;normal,tangent,bitangent) = contact_state.frame
+                    inv_μs_body[3(i-1)+1] = 1/locus.friction_coefficient
                     dm = hcat(normal,tangent,bitangent) |> transpose
                     R[3(i-1)+1:3(i-1)+3,1:3] = dm
                     R[3(i-1)+1:3(i-1)+3,4:6] = dm*(-RB.skew(position))

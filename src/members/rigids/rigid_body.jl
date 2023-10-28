@@ -160,7 +160,7 @@ $(TYPEDEF)
 ---
 $(TYPEDFIELDS)
 """
-mutable struct RigidBodyState{N,M,T,cacheType,contactType} <: AbstractRigidBodyState{N,T}
+mutable struct RigidBodyState{N,M,T,cacheType} <: AbstractRigidBodyState{N,T}
     "Origin of local frame"
     origin_position::MVector{N,T}
     "Rotation Matrix of local frame"
@@ -173,11 +173,8 @@ mutable struct RigidBodyState{N,M,T,cacheType,contactType} <: AbstractRigidBodyS
     mass_locus_state::LocusState{N,M,T}
     "Positions of anchor points in global frame"
     loci_states::Vector{LocusState{N,M,T}}
-    "Velocities of anchor points in global frame"
     "Other cache"
     cache::cacheType
-    "Contacts"
-    contacts::Vector{contactType}
 end
 
 """
@@ -219,20 +216,12 @@ function RigidBodyState(prop::RigidBodyProperty{N,T},
     ]
     
     cache = get_CoordinatesCache(prop,lncs,pres_idx,Φ_mask)
-    contacts = [
-        Contact(i,
-            loci[i].friction_coefficient,
-            loci[i].restitution_coefficient
-        ) 
-        for i in 1:num_of_loci
-    ]
     RigidBodyState(
         origin_position,R,
         origin_velocity,ω,
         mass_locus_state,
         loci_states,
         cache,
-        contacts
     )
 end
 

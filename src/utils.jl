@@ -84,3 +84,23 @@ function get_orthonormal_axes(normal::AbstractVector)
         bitangent[1], bitangent[2], bitangent[3],
     )
 end
+
+
+function split_by_lengths(x::AbstractVector, n::AbstractVector{<:Int})
+    result = Vector{Vector{eltype(x)}}()
+    start = firstindex(x)
+    for len in n
+      push!(result, x[start:(start + len - 1)])
+      start += len
+    end
+    result
+end
+
+function split_by_lengths(x::AbstractVector{T}, len::Int) where {T}
+    num_of_segments, remainder = divrem(length(x),len)
+    istart = firstindex(x)
+    [
+        (@view x[istart+len*(i-1):istart+len*i-1])
+        for i = 1:num_of_segments
+    ]
+end

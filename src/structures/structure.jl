@@ -133,20 +133,6 @@ function Structure(bodies,tensiles,cnt::Connectivity)
         @warn "Non positive degree of freedom: $ndof."
     end
     state = StructureState(bodies,tensiles,cnt)
-
-    (;mem2num) = cnt.numbered
-    contacts = reduce(
-        vcat,
-        map(sort(bodies)) do body
-            (;prop,) = body
-            (;loci) = prop
-            bodyid = prop.id
-            [
-                Contact(id,lo.friction_coefficient,lo.restitution_coefficient)
-                for (id,lo) in  zip(mem2num[bodyid],loci)
-            ]
-        end
-    )
     st = Structure(
         ndim,ndof,nconstraints,
         nbodies,ntensiles,
@@ -169,7 +155,6 @@ function update!(st::AbstractStructure; gravity=false)
     stretch_rigids!(st)
     update_rigids!(st)
     update_tensiles!(st)
-    # update_clustercables_apply_forces!(st)
     if gravity
         apply_gravity!(st)
     end

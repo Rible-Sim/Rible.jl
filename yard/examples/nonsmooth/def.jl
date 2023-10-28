@@ -157,10 +157,7 @@ function quad(c=100.0;
     #
     cnt = RB.Connectivity(numberedpoints, indexedcoords, tensioned)
     # #
-
-    contacts = [RB.Contact(i,μ,e) for i = 1:4]
-
-    st = RB.Structure(rigdibodies, tensiles, cnt, contacts)
+    st = RB.Structure(rigdibodies, tensiles, cnt,)
     bot = RB.Robot(st, hub)
 end
 
@@ -403,9 +400,7 @@ function uni(c=100.0;
 
     cnt = RB.Connectivity(numberedpoints, indexedcoords, tensioned, jointed)
   
-    contacts = [RB.Contact(i,μ,e) for i = 1:2]
-
-    st = RB.Structure(rigdibodies, tensiles, cnt, contacts)
+    st = RB.Structure(rigdibodies, tensiles, cnt,)
     bot = RB.Robot(st, hub)
 end
 
@@ -529,10 +524,6 @@ function superball(c=0.0;
             jointed
             )
     end
-
-    # #
-
-    # contacts = [RB.Contact(i,μ,e) for i = 1:12]
 
     st = RB.Structure(rigdibodies, tensiles, cnt, )
     bot = RB.Robot(st, hub)

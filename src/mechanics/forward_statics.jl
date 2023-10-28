@@ -8,27 +8,6 @@ function initialize_sequence(nt,len=1)
     StructArray{typeof(nt)}(undef,len)
 end
 
-function split_by_lengths(x::AbstractVector, n::AbstractVector{<:Int})
-     result = Vector{Vector{eltype(x)}}()
-     start = firstindex(x)
-     for len in n
-       push!(result, x[start:(start + len - 1)])
-       start += len
-     end
-     result
-end
-
-function split_by_lengths(x::AbstractVector, len::Int)
-     result = Vector{Vector{eltype(x)}}()
-     start = firstindex(x)
-     last = lastindex(x)
-     while start+len-1 <= last
-       push!(result, x[start:(start+len-1)])
-       start += len
-     end
-     result
-end
-
 function check_and_retrieve(result,lens::AbstractVector{<:Int})
     # real_path_results = results(result; only_real=true,
     #                             only_nonsingular=true,

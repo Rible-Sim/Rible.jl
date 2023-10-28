@@ -1,18 +1,8 @@
-
-mutable struct FrictionalContactState{T}
-    active::Bool
-    persistent::Bool
-    gap::T
-    frame::Axes{3,T}
-    v::SArray{Tuple{3},T,1,3}
-    Λ::SArray{Tuple{3},T,1,3}
-end
-
 struct Contact{T}
     id::Int
     μ::T
     e::T
-    state::FrictionalContactState{T}
+    state::FrictionalContactState{3,T}
 end
 
 function Contact(id,μ,e)
@@ -27,28 +17,6 @@ function Contact(id,μ,e)
     Λ = SVector(o,o,o)
     state = FrictionalContactState(active,persistent,gap,frame,v,Λ)
     Contact(id,μ,e,state)
-end
-
-activate!(c::Contact,gap) = activate!(c.state,gap)
-
-function activate!(state::FrictionalContactState,gap)
-    state.gap = gap
-    pre_active = state.active
-    state.active = ifelse(gap<=0, true, false)
-    state.persistent = (pre_active == state.active)
-end
-
-function update_contacts!(contacts, contacts_previous, v, Λ)
-    vs = split_by_lengths(v,3)
-    Λs = split_by_lengths(Λ,3)
-    for (ac,acp,va,Λa) in zip(contacts, contacts_previous, vs,Λs)
-        if acp.state.active
-            ac.state.persistent = true
-        end
-        ac.state.active = true
-        ac.state.v = SVector{3}(va)
-        ac.state.Λ = SVector{3}(Λa)
-    end
 end
 
 mutable struct ApproxFrictionalImpulse{T}

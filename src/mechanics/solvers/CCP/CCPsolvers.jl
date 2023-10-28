@@ -167,8 +167,8 @@ end
 
 function IPM!(output,nu,nΛ,Λ,y,N,r;ftol=1e-14,Nmax=50)
     T = eltype(Λ)
-    e = [one(T),zero(T),zero(T)]
-    J = Diagonal([one(T),-one(T),-one(T)])
+    e = SVector(one(T),zero(T),zero(T))
+    J = Diagonal(SVector(one(T),-one(T),-one(T)))
     𝐞_split = [e for i = 1:nu]
     Λ_split = split_by_lengths(Λ,3)
     y_split = split_by_lengths(y,3)
@@ -192,6 +192,18 @@ function IPM!(output,nu,nΛ,Λ,y,N,r;ftol=1e-14,Nmax=50)
 
     𝐉[   1:n1,   1:n1] .=  N
     𝐉[   1:n1,n1+1:n2] .= -Matrix(1I,nΛ,nΛ)
+    Λp = zero(Λ)
+    yp = zero(y)
+    Δxp = zeros(T,nx)
+    ΔΛp = @view Δxp[   1:n1]
+    Δyp = @view Δxp[n1+1:n2]
+    ΔΛp_split = split_by_lengths(ΔΛp,3)
+    Δyp_split = split_by_lengths(Δyp,3)
+    Δxc = zeros(T,nx)
+    ΔΛc = @view Δxc[   1:n1]
+    Δyc = @view Δxc[n1+1:n2]
+    ΔΛc_split = split_by_lengths(ΔΛc,3)
+    Δyc_split = split_by_lengths(Δyc,3)
     for k = 1:Nmax
 
         𝐫𝐞𝐬[   1:n1] .= N*Λ .+ r .- y
@@ -213,11 +225,7 @@ function IPM!(output,nu,nΛ,Λ,y,N,r;ftol=1e-14,Nmax=50)
         # @show Λₛ,yₛ
         # η = 1.0
         lu𝐉 = lu(𝐉)
-        Δxp = lu𝐉\(-𝐫𝐞𝐬)
-        ΔΛp = @view Δxp[   1:n1]
-        Δyp = @view Δxp[n1+1:n2]
-        ΔΛp_split = split_by_lengths(ΔΛp,3)
-        Δyp_split = split_by_lengths(Δyp,3)
+        Δxp .= lu𝐉\(-𝐫𝐞𝐬)
         # @show ΔΛp, Δyp
         # @show z_split,W_blocks,Δyp_split,ΔΛp_split,J
         αp_Λ = find_cone_step_length(Λ_split,ΔΛp_split,J)
@@ -225,14 +233,12 @@ function IPM!(output,nu,nΛ,Λ,y,N,r;ftol=1e-14,Nmax=50)
         αpmax = min(αp_Λ,αp_y)
         # αpmax = find_cone_step_length(z_split,W_blocks,Δyp_split,ΔΛp_split,J)
         αp = min(one(αpmax),0.99αpmax)
-        # Λp_split = Λ_split .+ αp.*ΔΛp_split
-        # yp_split = y_split .+ αp.*Δyp_split
         # Λp_cone = [transpose(Λi)*J*Λi for Λi in Λp_split]
         # yp_cone = [transpose(yi)*J*yi for yi in yp_split]
         # @show Λp_cone
         # @show yp_cone
-        Λp = Λ .+ αp.*ΔΛp
-        yp = y .+ αp.*Δyp
+        Λp .= Λ .+ αp.*ΔΛp
+        yp .= y .+ αp.*Δyp
         μp = transpose(yp)*Λp/nΛ
         σ = (μp/μ)^3
         if σ == NaN || μ == 0
@@ -248,20 +254,14 @@ function IPM!(output,nu,nΛ,Λ,y,N,r;ftol=1e-14,Nmax=50)
         # res = norm(𝐫𝐞𝐬)
         # @show 𝐫𝐞𝐬
         # @show res
-        Δxc = lu𝐉\(-𝐫𝐞𝐬)
+        Δxc .= lu𝐉\(-𝐫𝐞𝐬)
         # η = exp(-0.1μ) + 0.9
-        ΔΛc = @view Δxc[   1:n1]
-        Δyc = @view Δxc[n1+1:n2]
-        ΔΛc_split = split_by_lengths(ΔΛc,3)
-        Δyc_split = split_by_lengths(Δyc,3)
         # αmax = find_cone_step_length(z_split,W_blocks,Δyc_split,ΔΛc_split,J)
         α_Λ = find_cone_step_length(Λ_split,ΔΛc_split,J)
         # @show Λ_split,ΔΛc_split
         α_y = find_cone_step_length(y_split,Δyc_split,J)
         αmax = min(α_Λ,α_y)
         α = min(1,0.99αmax)
-        Λ_split .+= α.*ΔΛc_split
-        y_split .+= α.*Δyc_split
         # @show ΔΛc_split, Δyc_split
         # Λ_cone = [transpose(Λi)*J*Λi for Λi in Λ_split]
         # y_cone = [transpose(yi)*J*yi for yi in y_split]

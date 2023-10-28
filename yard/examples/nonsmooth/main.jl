@@ -91,7 +91,6 @@ function new_pointmass(;
     connected = RB.connect(rbs,zeros(Int,0,0))
     tensioned = @eponymtuple(connected,)
     cnt = RB.Connectivity(numberedpoints,indexedcoords,tensioned)
-    contacts = [RB.Contact(i,μ,e) for i = [1]]
     st = RB.Structure(rbs,tensiles,cnt,)
     bot = RB.Robot(st)
 end
@@ -598,7 +597,6 @@ GM.activate!();with_theme(theme_pub;
     fig
 end
 
-
 topq_longtime = deepcopy(topq)
 RB.set_new_initial!(topq_longtime,topq.traj.q[end],topq.traj.q̇[end])
 RB.solve!(
@@ -971,58 +969,57 @@ end
 
 #--  painleve's Bar
 function make_bar(;
-     μ = 0.1,
-     e = 0.0
- )
- movable = true
- constrained = false
- m = 0.402
- l = 1.0
- Ixx = 1/12*m*l^2
- Ī = SMatrix{3,3}(Diagonal([Ixx,0.0,0.0]))
- mass_locus = SVector{3}(0.0,0.0,0.0)
- loci = SVector{3}.([
-     [ -l/2, 0.0, 0.0],
-     [  l/2, 0.0, 0.0]
- ])
- θ = π/4
- zoffset = 1e-6
- xoffset = 1e-6
- ri = [     0.0-xoffset,0.0,sin(θ)*l-zoffset]
- rj = [cos(θ)*l-xoffset,0.0,     0.0-zoffset]
- origin_position = (ri + rj)./2
- origin_velocity = zero(origin_position)
- ω = zero(origin_position)
- R = Matrix(RotY(θ))
+        μ = 0.1,
+        e = 0.0
+    )
+    movable = true
+    constrained = false
+    m = 0.402
+    l = 1.0
+    Ixx = 1/12*m*l^2
+    Ī = SMatrix{3,3}(Diagonal([Ixx,0.0,0.0]))
+    mass_locus = SVector{3}(0.0,0.0,0.0)
+    loci = SVector{3}.([
+        [ -l/2, 0.0, 0.0],
+        [  l/2, 0.0, 0.0]
+    ])
+    θ = π/4
+    zoffset = 1e-6
+    xoffset = 1e-6
+    ri = [     0.0-xoffset,0.0,sin(θ)*l-zoffset]
+    rj = [cos(θ)*l-xoffset,0.0,     0.0-zoffset]
+    origin_position = (ri + rj)./2
+    origin_velocity = zero(origin_position)
+    ω = zero(origin_position)
+    R = Matrix(RotY(θ))
 
- # b = l/2*ω[2]*sin(θ)-9.81
- # p⁺ = 1 + 3*cos(θ)^2-μ*cos(θ)*sin(θ)
- # @show b,p⁺
+    # b = l/2*ω[2]*sin(θ)-9.81
+    # p⁺ = 1 + 3*cos(θ)^2-μ*cos(θ)*sin(θ)
+    # @show b,p⁺
 
- prop = RB.RigidBodyProperty(1,movable,m,Ī,mass_locus,loci;constrained)
+    prop = RB.RigidBodyProperty(1,movable,m,Ī,mass_locus,loci;constrained)
 
- lncs, _ = RB.NCF.NC3D2P(ri,rj,origin_position,R,origin_velocity,ω)
- state = RB.RigidBodyState(prop,lncs,origin_position,R,origin_velocity,ω)
+    lncs, _ = RB.NCF.NC3D2P(ri,rj,origin_position,R,origin_velocity,ω)
+    state = RB.RigidBodyState(prop,lncs,origin_position,R,origin_velocity,ω)
 
- p1 = Meshes.Point(loci[1])
- p2 = Meshes.Point(loci[2])
- s = Meshes.Segment(p1,p2)
- cyl_bar = Meshes.Cylinder(Meshes.length(s)/40,s)
- cylsurf_bar = Meshes.boundary(cyl_bar)
- cyl_bar_simple = Meshes.triangulate(cylsurf_bar)
- cyl_bar_mesh = cyl_bar_simple |> simple2mesh
- rb1 = RB.RigidBody(prop,state,cyl_bar_mesh)
- rbs = TypeSortedCollection((rb1,))
- numberedpoints = RB.number(rbs)
- matrix_sharing = zeros(Int,0,0)
- indexedcoords = RB.index(rbs,matrix_sharing)
- ss = Int[]
- tensiles = (cables = ss,)
- connections = RB.connect(rbs,zeros(Int,0,0))
- contacts = [RB.Contact(i,μ,e) for i = 1:2]
- cnt = RB.Connectivity(numberedpoints,indexedcoords,connections)
- st = RB.Structure(rbs,tensiles,cnt,contacts)
- bot = RB.Robot(st)
+    p1 = Meshes.Point(loci[1])
+    p2 = Meshes.Point(loci[2])
+    s = Meshes.Segment(p1,p2)
+    cyl_bar = Meshes.Cylinder(Meshes.length(s)/40,s)
+    cylsurf_bar = Meshes.boundary(cyl_bar)
+    cyl_bar_simple = Meshes.triangulate(cylsurf_bar)
+    cyl_bar_mesh = cyl_bar_simple |> simple2mesh
+    rb1 = RB.RigidBody(prop,state,cyl_bar_mesh)
+    rbs = TypeSortedCollection((rb1,))
+    numberedpoints = RB.number(rbs)
+    matrix_sharing = zeros(Int,0,0)
+    indexedcoords = RB.index(rbs,matrix_sharing)
+    ss = Int[]
+    tensiles = (cables = ss,)
+    connections = RB.connect(rbs,zeros(Int,0,0))
+    cnt = RB.Connectivity(numberedpoints,indexedcoords,connections)
+    st = RB.Structure(rbs,tensiles,cnt,)
+    bot = RB.Robot(st)
 end
 
 bar = make_bar(;)
@@ -1030,61 +1027,6 @@ bar = make_bar(;)
 plot_traj!(bar;)
 
 function bar_contact_dynfuncs(bot)
- (;st) = bot
- function F!(F,q,q̇,t)
-     RB.clear_forces!(st)
-     RB.update_rigids!(st,q,q̇)
-     RB.update_cables_apply_forces!(st)
-     RB.apply_gravity!(st)
-     F .= RB.generate_forces!(st)
- end
- function Jac_F!(∂F∂q̌,∂F∂q̌̇,q,q̇,t)
-     ∂F∂q̌ .= 0
-     ∂F∂q̌̇ .= 0
-     RB.clear_forces!(st)
-     RB.update_rigids!(st,q,q̇)
-     RB.update_cables_apply_forces!(st)
-     RB.build_∂Q̌∂q̌!(∂F∂q̌,st)
-     RB.build_∂Q̌∂q̌̇!(∂F∂q̌̇,st)
- end
-
- rbs = RB.get_bodies(st)
- function prepare_contacts!(contacts, q)
-     RB.update_rigids!(st,q)
-     body = rbs[1]
-     dirs = [1,3]
-     for pid = 1:2
-         gap = body.state.loci[pid][dirs[pid]]
-         RB.activate!(contacts[pid],gap)
-     end
-     active_contacts = filter(contacts) do c
-         c.state.active
-     end
-     na = length(active_contacts)
-     D = Matrix{eltype(q)}(undef,3na,length(q))
-     inv_μ_vec = ones(eltype(q),3na)
-     for (i,ac) in enumerate(active_contacts)
-         (;id,state) = ac
-         n = float.(1:3 .== dirs[id])
-         state.frame = RB.spatial_frame(n)
-         (;n,t1,t2) = state.frame
-         bodyid = 1
-         C = rbs[bodyid].state.cache.Cps[id]
-         CT = C*RB.build_T(st,bodyid)
-         Dn = Matrix(transpose(n)*CT)
-         Dt1 = Matrix(transpose(t1)*CT)
-         Dt2 = Matrix(transpose(t2)*CT)
-         D[3(i-1)+1,:] = Dn
-         D[3(i-1)+2,:] = Dt1
-         D[3(i-1)+3,:] = Dt2
-         inv_μ_vec[3(i-1)+1] = 1/ac.μ
-     end
-     restitution_coefficients = [ac.e for ac in active_contacts]
-     gaps = [ac.state.gap for ac in active_contacts]
-     H = Diagonal(inv_μ_vec)
-     active_contacts, na, gaps, D, H, restitution_coefficients
- end
- F!,Jac_F!,prepare_contacts!
 end
 
 
@@ -2376,8 +2318,7 @@ function make_cube(origin_position = [0.0,0.0,0.5],
     connected = RB.connect(rbs,zeros(Int,0,0))
     tensioned = @eponymtuple(connected)
     cnt = RB.Connectivity(numberedpoints,indexedcoords,tensioned)
-    contacts = [RB.Contact(i,μ,e) for i = 1:8]
-    st = RB.Structure(rbs,tensiles,cnt,contacts)
+    st = RB.Structure(rbs,tensiles,cnt,)
     bot = RB.Robot(st,nothing)
 end
 
