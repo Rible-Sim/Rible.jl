@@ -71,7 +71,7 @@ function move_rigids!(st)
 end
 
 """
-Update Rigid Body State 。
+Update Rigid Body State.
 $(TYPEDSIGNATURES)
 """
 function update_rigids!(st,q)

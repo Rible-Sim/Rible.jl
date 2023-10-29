@@ -63,8 +63,8 @@ function forward_system(st,mode=PrimalMode();F̌=reshape(build_Ǧ(st),:,1))
     polyu = 1.0u .+ 0.0
     polyg = 1.0g .+ 0.0
     q0 = get_q(st)
-    Φ = make_Φ(st,q0)
-    A = make_A(st,q0)
+    Φ = make_constraints_function(st,q0)
+    A = make_constraints_jacobian(st,q0)
     Q̌ = make_Q̌(st,q0)
     S = make_S(st,q0)
 

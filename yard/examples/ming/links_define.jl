@@ -200,12 +200,12 @@ function spine_true(n,dis,rm;
 		lncs,q,q̇ = RB.NCF.NC1P3V(ri,ro,R,ṙo,ω)
 		if i == 1
 			ci = RB.find_full_pres_indices(lncs,q)
-			Φi = collect(1:6)
+			constraints_indices = collect(1:6)
 		else
 			ci = Int[]
-			Φi = collect(1:6)
+			constraints_indices = collect(1:6)
 		end
-        state = RB.RigidBodyState(prop,lncs,ro,R,ṙo,ω,ci,Φi)
+        state = RB.RigidBodyState(prop,lncs,ro,R,ṙo,ω,ci,constraints_indices)
         body = RB.RigidBody(prop,state)
     end
     rbs = [rigidbody(i,props[i],aps,rs[i],Rs[i],ṙs[i],ωs[i]) for i = 1:n]

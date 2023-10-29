@@ -61,13 +61,13 @@ function EmptyConstraint(values=Vector{Float64}())
     EmptyConstraint(0,Vector{Int64}(),values)
 end
 
-function make_Φ(::EmptyConstraint)
+function make_constraints_function(::EmptyConstraint)
     inner_Φ(q) = Vector{eltype(q)}()
     inner_Φ(q,d) = Vector{eltype(q)}()
     inner_Φ
 end
 
-function make_A(::EmptyConstraint)
+function make_constraints_jacobian(::EmptyConstraint)
     inner_A(q) = Array{eltype(q)}(undef,0,length(q))
 end
 
@@ -95,14 +95,14 @@ function FixedBodyConstraint(rbs,mem2sysfull,bodyid)
     FixedBodyConstraint(length(indices),indices,values)
 end
 
-function make_Φ(cst::FixedBodyConstraint)
+function make_constraints_function(cst::FixedBodyConstraint)
     (;indices, values) = cst
     @inline @inbounds inner_Φ(q)   = q[indices]-values
     @inline @inbounds inner_Φ(q,d) = q[indices]-d
     inner_Φ
 end
 
-function make_A(cst::FixedBodyConstraint)
+function make_constraints_jacobian(cst::FixedBodyConstraint)
     nΦ = cst.nconstraints
     indices = cst.indices
     @inline @inbounds function inner_A(q)
@@ -134,14 +134,14 @@ function FixedIndicesConstraint(id,indices,values)
     FixedIndicesConstraint(id,length(indices),indices,values)
 end
 
-function make_Φ(cst::FixedIndicesConstraint,st)
+function make_constraints_function(cst::FixedIndicesConstraint,st)
     @unpack indices, values = cst
     @inline @inbounds inner_Φ(q)   = q[indices]-values
     @inline @inbounds inner_Φ(q,d) = q[indices]-d
     inner_Φ
 end
 
-function make_A(cst::FixedIndicesConstraint,st)
+function make_constraints_jacobian(cst::FixedIndicesConstraint,st)
     (;indexed,numbered) = st.connectivity
     nΦ = cst.nconstraints
     indices = cst.indices
@@ -178,7 +178,7 @@ function LinearJoint(A,values)
     LinearJoint(id,nΦ,values,A)
 end
 
-function make_Φ(cst::LinearJoint,indexed,numbered)
+function make_constraints_function(cst::LinearJoint,indexed,numbered)
     (;mem2sysfull) = indexed
     (;nconstraints,values,A) = cst
     function _inner_Φ(q,d)
@@ -191,7 +191,7 @@ function make_Φ(cst::LinearJoint,indexed,numbered)
     inner_Φ
 end
 
-function make_A(cst::LinearJoint,indexed,numbered)
+function make_constraints_jacobian(cst::LinearJoint,indexed,numbered)
     (;sysfree,nfree) = indexed
     (;nconstraints,values,A) = cst
     function _inner_A(q,c)

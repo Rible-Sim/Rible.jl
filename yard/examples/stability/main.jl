@@ -58,7 +58,7 @@ function compute_evs(bot,friction_coefficients,Ň)
 			RB.set_restlen!(st,μ)
 			RB.update!(st)
 			ini = RB.get_initial(st)			
-			# A = RB.make_A(st,ini.q)
+			# A = RB.make_constraints_jacobian(st,ini.q)
 			# Ň(ini.q̌)
 			# A(ini.q̌)*Ň(ini.q̌)
 			rb2 = RB.get_bodies(st)[2]
@@ -358,7 +358,7 @@ N(RB.get_q̌(man1.st))
 
 Ň = make_Ň(man1.st,q0)
 Ň(RB.get_q̌(man1.st),RB.get_c(man1.st))
-A = RB.make_A(man1.st,q0)
+A = RB.make_constraints_jacobian(man1.st,q0)
 A(RB.get_q̌(man1.st))*Ň(RB.get_q̌(man1.st),RB.get_c(man1.st)) |> norm
 
 B,F̃ = RB.build_inverse_statics_for_restlength(man1.st,man1.st)
@@ -437,7 +437,7 @@ function forward_bi(bot;
 					stptrc = RB.recover(stpt,botfor.st)
 					(;q,q̌,s,λ,d,c,k,u,g) = stptrc
 					Q̌ = RB.make_Q̌(botfor.st,q)(q̌,s,u,k,c)
-					A = RB.make_A(botfor.st,q)(q̌,c)
+					A = RB.make_constraints_jacobian(botfor.st,q)(q̌,c)
 					# @show Q̌+transpose(A)*λ |> norm
 					# @show stptrc.c[num2sys[cidx]]
 					gěneralized_forces = Q̌
@@ -594,7 +594,7 @@ GM.activate!(); plot_traj!(tggriper_plot; sup! = sup_ggriper!)
 # _,λ = RB.check_static_equilibrium_output_multipliers(tggriper.st)
 
 Ň = make_halftggriper_nullspace(tggriper,RB.get_q̌(tggriper.st))
-A = RB.make_A(tggriper)
+A = RB.make_constraints_jacobian(tggriper)
 
 A(RB.get_q(tggriper.st))*Ň(RB.get_q̌(tggriper.st),RB.get_c(tggriper.st)) |> norm
 
@@ -809,7 +809,7 @@ function forward_bi_gripper(bot;
 					stptrc = RB.recover(stpt,botfor.st)
 					(;q,q̌,s,λ,d,c,k,u,g) = stptrc
 					Q̌ = RB.make_Q̌(botfor.st,q)(q̌,s,u,k,c)
-					A = RB.make_A(botfor.st,q)(q̌,c)
+					A = RB.make_constraints_jacobian(botfor.st,q)(q̌,c)
 					# @show Q̌+transpose(A)*λ |> norm
 					# @show stptrc.c[num2sys[cidx]]
 					gěneralized_forces = Q̌

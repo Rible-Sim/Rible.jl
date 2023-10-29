@@ -54,8 +54,8 @@ function dynfuncs(bot)
     nμ = 2
     nu = 2
     M = Matrix(RB.build_M(st))
-    Φ = RB.make_Φ(st)
-    A = RB.make_A(st)
+    Φ = RB.make_constraints_function(st)
+    A = RB.make_constraints_jacobian(st)
     R = 1.0
     function Cc(q)
         x,y,u1,u2,v1,v2 = q

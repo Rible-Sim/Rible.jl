@@ -12,7 +12,7 @@ function get_λ(st::Structure)
 end
 
 """
-Return System Initial State 。
+Return System Initial State.
 $(TYPEDSIGNATURES)
 """
 function get_initial(st::Structure)
@@ -62,7 +62,7 @@ end
 get_c(st::Structure) = copy(st.state.system.c)
 
 function get_c(bodies,numbered::NumberedPoints)
-    ndim = get_ndim(bodies)
+    ndim = get_num_of_dims(bodies)
     T = get_numbertype(bodies)
     (;mem2num,num2sys,nc) = numbered
     ret = zeros(T,nc)
@@ -123,13 +123,13 @@ end
 Return System 维度。
 $(TYPEDSIGNATURES)
 """
-get_ndim(bot::Robot) = get_ndim(bot.st)
-get_ndim(st::AbstractStructure) = get_ndim(st.bodies)
-get_ndim(bodies::AbstractVector{<:AbstractBody}) = get_ndim(eltype(bodies))
-get_ndim(bodies::TypeSortedCollection) = get_ndim(eltype(bodies.data[1]))
-get_ndim(body::AbstractBody) = get_ndim(typeof(body))
-get_ndim(::Type{<:AbstractBody{N,T}}) where {N,T} = N
-get_ndim(::AbstractBodyProperty{N}) where {N} = N
+get_num_of_dims(bot::Robot) = get_num_of_dims(bot.st)
+get_num_of_dims(st::AbstractStructure) = get_num_of_dims(st.bodies)
+get_num_of_dims(bodies::AbstractVector{<:AbstractBody}) = get_num_of_dims(eltype(bodies))
+get_num_of_dims(bodies::TypeSortedCollection) = get_num_of_dims(eltype(bodies.data[1]))
+get_num_of_dims(body::AbstractBody) = get_num_of_dims(typeof(body))
+get_num_of_dims(::Type{<:AbstractBody{N,T}}) where {N,T} = N
+get_num_of_dims(::AbstractBodyProperty{N}) where {N} = N
 
 get_numbertype(bot::Robot) = get_numbertype(bot.st)
 get_numbertype(st::AbstractStructure) = get_numbertype(st.bodies)
@@ -143,38 +143,38 @@ get_numbertype(::AbstractBodyProperty{N,T}) where {N,T} = T
 Return System 约束数量。
 $(TYPEDSIGNATURES)
 """
-get_nconstraints(st::Structure) = st.nconstraints
+get_num_of_constraints(st::Structure) = st.nconstraints
 
-function get_nconstraints(rbs::TypeSortedCollection)
+function get_num_of_constraints(rbs::TypeSortedCollection)
     ninconstraints = mapreduce(get_ninconstraints,+,rbs,init=0)
 end
-get_ninconstraints(body::AbstractRigidBody) = get_nconstraints(body.state.cache.funcs.nmcs)
+get_ninconstraints(body::AbstractRigidBody) = get_num_of_constraints(body.state.cache.funcs.nmcs)
 get_nbodycoords(body::AbstractRigidBody) = get_nbodycoords(body.state.cache.funcs.nmcs)
-get_ndof(body::AbstractRigidBody) = get_ndof(body.state.cache.funcs.nmcs)
-get_nlocaldim(body::AbstractRigidBody) = get_nlocaldim(body.state.cache)
-get_nlocaldim(cache::NonminimalCoordinatesCache) = get_nlocaldim(cache.funcs.nmcs)
+get_num_of_dof(body::AbstractRigidBody) = get_num_of_dof(body.state.cache.funcs.nmcs)
+get_num_of_local_dims(body::AbstractRigidBody) = get_num_of_local_dims(body.state.cache)
+get_num_of_local_dims(cache::NonminimalCoordinatesCache) = get_num_of_local_dims(cache.funcs.nmcs)
 
-get_ninconstraints(fb::AbstractFlexibleBody) = get_nconstraints(fb.state.cache.funcs.ancs)
+get_ninconstraints(fb::AbstractFlexibleBody) = get_num_of_constraints(fb.state.cache.funcs.ancs)
 get_nbodycoords(fb::AbstractFlexibleBody) = get_nbodycoords(fb.state.cache.funcs.ancs)
-get_ndof(body::AbstractFlexibleBody) = get_ndof(body.state.cache.funcs.ancs)
-get_nlocaldim(fb::AbstractFlexibleBody) = get_nlocaldim(fb.state.cache)
-get_nlocaldim(cache::FlexibleBodyCoordinatesCache) = get_nlocaldim(cache.funcs.ancs)
+get_num_of_dof(body::AbstractFlexibleBody) = get_num_of_dof(body.state.cache.funcs.ancs)
+get_num_of_local_dims(fb::AbstractFlexibleBody) = get_num_of_local_dims(fb.state.cache)
+get_num_of_local_dims(cache::FlexibleBodyCoordinatesCache) = get_num_of_local_dims(cache.funcs.ancs)
 
-get_nconstraints(nmcs::NCF.LNC) = NCF.get_nconstraints(nmcs)
-get_nbodycoords(nmcs::NCF.LNC) = NCF.get_ncoords(nmcs)
-get_ndof(nmcs::NCF.LNC) = NCF.get_ndof(nmcs)
-get_nlocaldim(nmcs::NCF.LNC) = NCF.get_nlocaldim(nmcs)
+get_num_of_constraints(nmcs::NCF.LNC) = NCF.get_num_of_constraints(nmcs)
+get_nbodycoords(nmcs::NCF.LNC) = NCF.get_num_of_coordinates(nmcs)
+get_num_of_dof(nmcs::NCF.LNC) = NCF.get_num_of_dof(nmcs)
+get_num_of_local_dims(nmcs::NCF.LNC) = NCF.get_num_of_local_dims(nmcs)
 
-get_nconstraints(nmcs::QBF.QC) = QBF.get_nconstraints(nmcs)
-get_nbodycoords(nmcs::QBF.QC) = QBF.get_ncoords(nmcs)
-get_ndof(nmcs::QBF.QC) = QBF.get_ndof(nmcs)
-get_nlocaldim(nmcs::QBF.QC) = QBF.get_nlocaldim(nmcs)
+get_num_of_constraints(nmcs::QBF.QC) = QBF.get_num_of_constraints(nmcs)
+get_nbodycoords(nmcs::QBF.QC) = QBF.get_num_of_coordinates(nmcs)
+get_num_of_dof(nmcs::QBF.QC) = QBF.get_num_of_dof(nmcs)
+get_num_of_local_dims(nmcs::QBF.QC) = QBF.get_num_of_local_dims(nmcs)
 
 
-get_nconstraints(ancs::ANCF.ANC) = ANCF.get_nconstraints(ancs)
-get_nbodycoords(ancs::ANCF.ANC) = ANCF.get_ncoords(ancs)
-get_ndof(ancs::ANCF.ANC) = ANCF.get_ndof(ancs)
-get_nlocaldim(ancs::ANCF.ANC) = ANCF.get_nlocaldim(ancs)
+get_num_of_constraints(ancs::ANCF.ANC) = ANCF.get_num_of_constraints(ancs)
+get_nbodycoords(ancs::ANCF.ANC) = ANCF.get_num_of_coordinates(ancs)
+get_num_of_dof(ancs::ANCF.ANC) = ANCF.get_num_of_dof(ancs)
+get_num_of_local_dims(ancs::ANCF.ANC) = ANCF.get_num_of_local_dims(ancs)
 
 
 """
@@ -228,7 +228,7 @@ function get_cables_stiffness(st::Structure)
 end
 
 """
-Return System Cable 当前Length 。
+Return System Cable 当前Length.
 $(TYPEDSIGNATURES)
 """
 function get_cables_len(st::Structure)
@@ -256,7 +256,7 @@ function get_cables_restlen(st::Structure)
 end
 
 """
-Return System Cable Tension 。
+Return System Cable Tension.
 $(TYPEDSIGNATURES)
 """
 function get_cables_tension(st::Structure)
@@ -283,7 +283,7 @@ function get_cables_force_density(st::Structure)
 end
 
 """
-Return System Cable Initial Length 。
+Return System Cable Initial Length.
 $(TYPEDSIGNATURES)
 """
 function get_original_restlen(botinput::Robot)

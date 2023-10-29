@@ -34,6 +34,8 @@ using JET
 using TypedTables
 using Revise
 using AbbreviatedStackTraces
+ENV["JULIA_STACKTRACE_ABBREVIATED"] = true
+ENV["JULIA_STACKTRACE_MINIMAL"] = true
 import Rible as RB
 import Meshes
 cd(@__DIR__)
@@ -78,8 +80,8 @@ function new_pointmass(;
     loci = Ref(origin_position) .+ Ref(R).*loci
     lncs, _ = RB.NCF.NC3D1P(loci[1],)
     ci = Int[]
-    Φi = Int[]
-    state = RB.RigidBodyState(prop,lncs,origin_position,R,origin_velocity,ω,ci,Φi)
+    constraints_indices = Int[]
+    state = RB.RigidBodyState(prop,lncs,origin_position,R,origin_velocity,ω,ci,constraints_indices)
     rb1 = RB.RigidBody(prop,state)
 
     rbs = TypeSortedCollection((rb1,))

@@ -21,15 +21,15 @@ function rigidbody(i,m,Ia,ri,rj,aps)
 		constrained = true
 		if i == 1
 			ci = collect(1:6)
-			Φi = Int[]
+			constraints_indices = Int[]
 		else
 			ci = [2]
-			Φi = collect(1:3)
+			constraints_indices = collect(1:3)
 		end
 	else
 		constrained = false
 		ci = Int[]
-		Φi = collect(1:3)
+		constraints_indices = collect(1:3)
 	end
 	prop = RB.RigidBodyProperty(
 				i,movable,m,
@@ -40,7 +40,7 @@ function rigidbody(i,m,Ia,ri,rj,aps)
 				)
 	lncs, q, _ = RB.NCF.NC2P1V(SVector{2}(ri), SVector{2}(rj), ro, α, ṙo, ω)
 
-	state = RB.RigidBodyState(prop, lncs, ri, α, ṙo, ω, ci, Φi)
+	state = RB.RigidBodyState(prop, lncs, ri, α, ṙo, ω, ci, constraints_indices)
 
 	body = RB.RigidBody(prop,state)
 end
@@ -187,7 +187,7 @@ function sup_ggriper!(ax,tgob,sgi;
 				0 -1]
 	bars = @lift begin
 		rbs = RB.get_bodies($tgob)
-		ndim = RB.get_ndim($tgob)
+		ndim = RB.get_num_of_dims($tgob)
         T = RB.get_numbertype($tgob)
         ret = Vector{Pair{Point{ndim,T},Point{ndim,T}}}()
 		push!(ret,
@@ -239,12 +239,12 @@ function make_spine(n,θ=0.0)
             movable = false
             constrained = true
             ci = collect(1:6)
-			Φi = Int[]
+			constraints_indices = Int[]
         else
             movable = true
             constrained = false
             ci = Int[]
-			Φi = collect(1:3)
+			constraints_indices = collect(1:3)
 	        # ap1 = b*[cos( α),sin( α)]
 	        # ap2 = b*[cos( α),sin( α)]
 	        # ap3 = b*[cos(-α),sin(-α)]
@@ -269,7 +269,7 @@ function make_spine(n,θ=0.0)
         ω = 0.0
         ṙo = @SVector zeros(2)
         lncs,_,_ = RB.NCF.NC1P2V(ri,ro,θ,ṙo,ω)
-        state = RB.RigidBodyState(prop,lncs,ro,θ,ṙo,ω, ci, Φi)
+        state = RB.RigidBodyState(prop,lncs,ro,θ,ṙo,ω, ci, constraints_indices)
         RB.RigidBody(prop,state)
     end
 
@@ -309,7 +309,7 @@ end
 
 function sup_spine2d!(ax,tgob,sgi)
 	bars = @lift begin
-		ndim = RB.get_ndim($tgob)
+		ndim = RB.get_num_of_dims($tgob)
         T = RB.get_numbertype($tgob)
         ret = Vector{Pair{Point{ndim,T},Point{ndim,T}}}()
 		foreach($tgob.rigidbodies) do body
@@ -385,11 +385,11 @@ function dualtri(ndof,onedir=[1.0,0.0];θ=0.0,k=400.0,c=0.0,restlen=0.16)
         if i == 1
 			constrained = true
 			ci = collect(1:6)
-			Φi = Int[]
+			constraints_indices = Int[]
 		else
 			constrained = false
 			ci = Int[]
-			Φi = collect(1:3)
+			constraints_indices = collect(1:3)
 		end
 		
 		ω = 0.0
@@ -406,7 +406,7 @@ function dualtri(ndof,onedir=[1.0,0.0];θ=0.0,k=400.0,c=0.0,restlen=0.16)
 
 		lncs, q, _ = RB.NCF.NC1P2V(SVector{2}(ri), ro, α, ṙo, ω)
 
-		state = RB.RigidBodyState(prop, lncs, ri, α, ṙo, ω, ci, Φi)
+		state = RB.RigidBodyState(prop, lncs, ri, α, ṙo, ω, ci, constraints_indices)
 
         body = RB.RigidBody(prop,state)
     end
@@ -485,7 +485,7 @@ function sup_dualtri!(ax,tgob;
 		linewidth = 10
 	)
 	bars = @lift begin
-		ndim = RB.get_ndim($tgob)
+		ndim = RB.get_num_of_dims($tgob)
         T = RB.get_numbertype($tgob)
         ret = Vector{Pair{Point{ndim,T},Point{ndim,T}}}()
 		foreach($tgob.rigidbodies) do body

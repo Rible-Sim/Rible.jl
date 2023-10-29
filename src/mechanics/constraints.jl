@@ -1,5 +1,5 @@
 
-function make_Φ(cst::PrototypeJoint,st::Structure)
+function make_constraints_function(cst::PrototypeJoint,st::Structure)
     (;indexed,numbered) = st.connectivity
     (;mem2sysfull) = indexed
     (;num2sys,mem2num) = numbered
@@ -81,7 +81,7 @@ function make_Φ(cst::PrototypeJoint,st::Structure)
     inner_Φ
 end
 
-function make_A(cst::PrototypeJoint,st::Structure)
+function make_constraints_jacobian(cst::PrototypeJoint,st::Structure)
     (;indexed,numbered) = st.connectivity
     (;mem2sysfree,mem2sysfull,nfree) = indexed
     (;num2sys,mem2num) = numbered
@@ -212,7 +212,7 @@ function make_A(cst::PrototypeJoint,st::Structure)
     inner_A
 end
 
-function make_Φqᵀq(cst::PrototypeJoint,st::Structure)
+function make_constraints_functionqᵀq(cst::PrototypeJoint,st::Structure)
     (;numbered) = st.connectivity
     (;mem2num,num2sys) = numbered
     (;
@@ -225,12 +225,12 @@ function make_Φqᵀq(cst::PrototypeJoint,st::Structure)
     id_egg = egg.rbsig.prop.id
     nmcs_hen = hen.rbsig.state.cache.funcs.nmcs
     nmcs_egg = egg.rbsig.state.cache.funcs.nmcs
-    nld_hen = NCF.get_nlocaldim(nmcs_hen)
-    nld_egg = NCF.get_nlocaldim(nmcs_egg)
+    nld_hen = NCF.get_num_of_local_dims(nmcs_hen)
+    nld_egg = NCF.get_num_of_local_dims(nmcs_egg)
     Y_hen = NCF.get_conversion(nmcs_hen)
     Y_egg = NCF.get_conversion(nmcs_egg)
     cv = BlockDiagonal([Y_hen,Y_egg])
-    ndim = NCF.get_ndim(nmcs_hen)
+    ndim = NCF.get_num_of_dims(nmcs_hen)
     T = get_numbertype(cst)
     I_Int = NCF.make_I(Int,ndim)
     # translate
@@ -370,9 +370,9 @@ function get_jointed_free_idx(cst)
     (;hen,egg) = e2e
     uci_hen = hen.rbsig.state.cache.free_idx
     uci_egg = egg.rbsig.state.cache.free_idx
-    ncoords1 = NCF.get_ncoords(hen.rbsig.state.cache.funcs.nmcs)
-    # ncoords2 = NCF.get_ncoords(egg.rbsig.state.cache.nmcs)
-    uci = vcat(
+    ncoords1 = NCF.get_num_of_coordinates(hen.rbsig.state.cache.funcs.nmcs)
+    # ncoords2 = NCF.get_num_of_coordinates(egg.rbsig.state.cache.nmcs)
+    unconstrained_indices = vcat(
         uci_hen,
         uci_egg .+ ncoords1
     )
@@ -394,12 +394,12 @@ end
 
 function make_∂Aᵀλ∂q(cst,st)
     (;nconstraints) = cst
-    uci = get_jointed_free_idx(cst)
-    Φqᵀq = make_Φqᵀq(cst,st)
+    unconstrained_indices = get_jointed_free_idx(cst)
+    Φqᵀq = make_constraints_functionqᵀq(cst,st)
     function ∂Aᵀλ∂q(λ)
         ret = [
             begin
-                a = Φqᵀq[i][uci,uci] .* λ[i]
+                a = Φqᵀq[i][unconstrained_indices,unconstrained_indices] .* λ[i]
                 # display(a)
                 a 
             end
@@ -410,7 +410,7 @@ function make_∂Aᵀλ∂q(cst,st)
 end
 
 function get_jointed_free_idx(cst::LinearJoint)
-    uci = collect(1:size(cst.A,2))
+    unconstrained_indices = collect(1:size(cst.A,2))
 end
 
 function get_jointed_free(cst::LinearJoint,indexed)
@@ -418,9 +418,9 @@ function get_jointed_free(cst::LinearJoint,indexed)
 end
 
 function make_∂Aᵀλ∂q(cst::LinearJoint,st)
-    uci = get_jointed_free_idx(cst)
+    unconstrained_indices = get_jointed_free_idx(cst)
     function ∂Aᵀλ∂q(λ)
-        zeros(eltype(λ),length(uci),length(uci))
+        zeros(eltype(λ),length(unconstrained_indices),length(unconstrained_indices))
     end
 end
 

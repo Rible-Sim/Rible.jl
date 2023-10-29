@@ -5,7 +5,7 @@ function man_nd1(k=0.0,c=0.0;ratio=0.8)
 		movable = false
 		constrained = true
 		ci = collect(1:6)
-		Φi = Int[]
+		constraints_indices = Int[]
 		h1 = 0.1
 		b1 = 0.1
 		a = 0.2
@@ -25,7 +25,7 @@ function man_nd1(k=0.0,c=0.0;ratio=0.8)
 		ro = ri
 		ṙo = zero(ro)
 		lncs,_ = RB.NCF.NC1P2V(ri,ro,α,ṙo,ω)
-		state = RB.RigidBodyState(prop,lncs,ro,α,ṙo,ω,ci,Φi)
+		state = RB.RigidBodyState(prop,lncs,ro,α,ṙo,ω,ci,constraints_indices)
 	    body = RB.RigidBody(prop,state)
 	end
 

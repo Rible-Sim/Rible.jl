@@ -45,37 +45,37 @@ const I3 = make_I(Bool,3)
 Return 空间维数。
 $(TYPEDSIGNATURES)
 """
-get_ndim(::ANC2D) = 2
-get_ndim(::ANC3D) = 3
+get_num_of_dims(::ANC2D) = 2
+get_num_of_dims(::ANC3D) = 3
 """
 Return Absolute Nodal Coordinates所构成的坐标系的维数。
 $(TYPEDSIGNATURES)
 """
-get_nlocaldim(::ANC2D4C) = 1
-get_nlocaldim(::ANC2D6C) = 2
-get_nlocaldim(::ANC3D6C) = 1
-get_nlocaldim(::ANC3D12C) = 1
+get_num_of_local_dims(::ANC2D4C) = 1
+get_num_of_local_dims(::ANC2D6C) = 2
+get_num_of_local_dims(::ANC3D6C) = 1
+get_num_of_local_dims(::ANC3D12C) = 1
 """
 Return 坐标个数。
 $(TYPEDSIGNATURES)
 """
-get_ncoords(::ANC2D4C) = 4
-get_ncoords(::ANC2D6C) = 6
-get_ncoords(::ANC3D6C) = 6
-get_ncoords(::ANC3D12C) = 12
+get_num_of_coordinates(::ANC2D4C) = 4
+get_num_of_coordinates(::ANC2D6C) = 6
+get_num_of_coordinates(::ANC3D6C) = 6
+get_num_of_coordinates(::ANC3D12C) = 12
 """
 Return 约束方程个数。
 $(TYPEDSIGNATURES)
 """
-get_nconstraints(::ANC2D4C) = 0
-get_nconstraints(::ANC2D6C) = 0
-get_nconstraints(::ANC3D6C) = 0
-get_nconstraints(::ANC3D12C) = 0
+get_num_of_constraints(::ANC2D4C) = 0
+get_num_of_constraints(::ANC2D6C) = 0
+get_num_of_constraints(::ANC3D6C) = 0
+get_num_of_constraints(::ANC3D12C) = 0
 """
 Return 自由度数。
 $(TYPEDSIGNATURES)
 """
-get_ndof(ancs::ANC) =  get_ncoords(ancs) - get_nconstraints(ancs)
+get_num_of_dof(ancs::ANC) =  get_num_of_coordinates(ancs) - get_num_of_constraints(ancs)
 
 
 """
@@ -380,18 +380,18 @@ Return 未约束的Absolute Nodal Coordinates编号。
 $(TYPEDSIGNATURES)
 """
 function get_unconstrained_indices(ancs::ANC,pres_idx)
-    deleteat!(collect(1:get_ncoords(ancs)),pres_idx)
+    deleteat!(collect(1:get_num_of_coordinates(ancs)),pres_idx)
 end
 
 """
 封装有函数的Absolute Nodal Coordinates类构造子。
 $(TYPEDSIGNATURES)
 """
-function CoordinateFunctions(ancs,uci)
+function CoordinateFunctions(ancs,unconstrained_indices)
     ξ = find_ξ(ancs)
     S = make_S(ancs)
-    nq = get_ncoords(ancs)
-    nuc = length(uci)
+    nq = get_num_of_coordinates(ancs)
+    nuc = length(unconstrained_indices)
     CoordinateFunctions(ancs,ξ,S)
 end
 

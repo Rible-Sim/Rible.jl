@@ -75,21 +75,21 @@ function RigidBodyProperty(
     )
 end
 
-struct NonminimalCoordinatesCache{fT,MT,JT,VT,ArrayT}
+struct NonminimalCoordinatesCache{FuncsType,MassMatrixType,JacobianType,GenForceType,TransformMatrixType}
     pres_idx::Vector{Int}
     free_idx::Vector{Int}
     Φ_mask::Vector{Int}
     nΦ::Int
-    funcs::fT
-    M::MT
-    M⁻¹::MT
-    ∂Mq̇∂q::JT
-    ∂M⁻¹p∂q::JT
-    Ṁq̇::VT
-    ∂T∂qᵀ::VT
-    Co::ArrayT
-    Cg::ArrayT
-    Cps::Vector{ArrayT}
+    funcs::FuncsType
+    M::MassMatrixType
+    M⁻¹::MassMatrixType
+    ∂Mq̇∂q::JacobianType
+    ∂M⁻¹p∂q::JacobianType
+    Ṁq̇::GenForceType
+    ∂T∂qᵀ::GenForceType
+    Co::TransformMatrixType
+    Cg::TransformMatrixType
+    Cps::Vector{TransformMatrixType}
 end
 
 function get_CoordinatesCache(prop::RigidBodyProperty{N,T},
@@ -155,7 +155,7 @@ function get_CoordinatesCache(prop::RigidBodyProperty{N,T},
 end
 
 """
-Rigid Body State mutableType 。所有坐标在同一个惯性系中表达。
+Rigid Body State mutableType.所有坐标在同一个惯性系中表达。
 $(TYPEDEF)
 ---
 $(TYPEDFIELDS)
@@ -214,7 +214,6 @@ function RigidBodyState(prop::RigidBodyProperty{N,T},
         )
         for lo in loci
     ]
-    
     cache = get_CoordinatesCache(prop,lncs,pres_idx,Φ_mask)
     RigidBodyState(
         origin_position,R,
@@ -245,16 +244,16 @@ RigidBody(prop,state) = RigidBody(prop,state,nothing)
 
 function body2coordinates(body::RigidBody)
     (;origin_position,R,origin_velocity,ω,cache) = body.state
-    rigidState2coordinates(cache.funcs.nmcs,origin_position,R,origin_velocity,ω)
+    rigid_state2coordinates(cache.funcs.nmcs,origin_position,R,origin_velocity,ω)
 end
 
 
-function rigidState2coordinates(nmcs::NCF.LNC,origin_position,R,origin_velocity,ω)
+function rigid_state2coordinates(nmcs::NCF.LNC,origin_position,R,origin_velocity,ω)
     NCF.rigidstate2naturalcoords(nmcs,origin_position,R,origin_velocity,ω)
 end
 
-function rigidState2coordinates(nmcs::QBF.QC,origin_position,R,origin_velocity,ω)
-    QBF.rigidState2coordinates(origin_position,R,origin_velocity,ω)
+function rigid_state2coordinates(nmcs::QBF.QC,origin_position,R,origin_velocity,ω)
+    QBF.rigid_state2coordinates(origin_position,R,origin_velocity,ω)
 end
 
 function update_body!(state::RigidBodyState,
@@ -301,7 +300,7 @@ function stretch_body!(cache::NonminimalCoordinatesCache{<:NCF.CoordinateFunctio
                     prop::RigidBodyProperty,c)
     (;loci) = prop
     (;Cps,funcs) = cache
-    nlocaldim = get_nlocaldim(cache)
+    nlocaldim = get_num_of_local_dims(cache)
     for pid in eachindex(loci)
         Cps[pid] = funcs.C(c[nlocaldim*(pid-1)+1:nlocaldim*pid])
     end
@@ -388,7 +387,7 @@ Return 约束方程编号。
 $(TYPEDSIGNATURES)
 """
 function get_Φ_mask(lncs::NCF.LNC)
-    nΦ = NCF.get_nconstraints(lncs)
+    nΦ = NCF.get_num_of_constraints(lncs)
     collect(1:nΦ)
 end
 
@@ -397,7 +396,7 @@ get_Φ_mask(::QBF.QC) = collect(1:1)
 
 # operations on rigid body
 """
-Return Rigid Body translational kinetic energy 。
+Return Rigid Body translational kinetic energy.
 $(TYPEDSIGNATURES)
 """
 function kinetic_energy_translation(body::AbstractRigidBody)
@@ -407,7 +406,7 @@ function kinetic_energy_translation(body::AbstractRigidBody)
 end
 
 """
-Return Rigid Body rotational kinetic energy 。
+Return Rigid Body rotational kinetic energy.
 $(TYPEDSIGNATURES)
 """
 function kinetic_energy_rotation(body::AbstractRigidBody)
@@ -418,7 +417,7 @@ function kinetic_energy_rotation(body::AbstractRigidBody)
 end
 
 """
-Return Rigid Body gravity potential energy 。
+Return Rigid Body gravity potential energy.
 $(TYPEDSIGNATURES)
 """
 function potential_energy_gravity(body::AbstractRigidBody)
@@ -429,7 +428,7 @@ function potential_energy_gravity(body::AbstractRigidBody)
 end
 
 """
-Return Rigid Body Strain potential energy 。
+Return Rigid Body Strain potential energy.
 $(TYPEDSIGNATURES)
 """
 function potential_energy_strain(body::AbstractRigidBody)

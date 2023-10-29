@@ -9,8 +9,8 @@ function generate_cache(::ZhongCCP,intor;dt,kargs...)
     (;bot,dynfuncs) = prob
     (;st) = bot
     M = Matrix(build_M(st))
-    Φ = make_Φ(bot)
-    A = make_A(bot)
+    Φ = make_constraints_function(bot)
+    A = make_constraints_jacobian(bot)
 
     nq = size(M,2)
     T = get_numbertype(bot)

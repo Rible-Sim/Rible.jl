@@ -37,10 +37,10 @@ function spine3d(n;c=0.0)
     function rigidbody(i,prop,aps,r,R,ṙ,ω)
         if i == 1
             ci = collect(1:12)
-            Φi = Int[]
+            constraints_indices = Int[]
         else
             ci = Int[]
-			Φi = collect(1:6)
+			constraints_indices = collect(1:6)
         end
 
         # ri,rj,rk,rl = [r+R*ap for ap in aps]
@@ -48,7 +48,7 @@ function spine3d(n;c=0.0)
         # lncs,q,q̇ = RB.NCF.NC3P1V(ri,rk,rl,r,R,ṙ,ω)
         # lncs,q,q̇ = RB.NCF.NC2P2V(rk,rl,r,R,ṙ,ω)
         lncs,_ = RB.NCF.NC1P3V(r,r,R,ṙ,ω)
-        state = RB.RigidBodyState(prop,lncs,r,R,ṙ,ω,ci,Φi)
+        state = RB.RigidBodyState(prop,lncs,r,R,ṙ,ω,ci,constraints_indices)
         body = RB.RigidBody(prop,state)
     end
     rbs = [rigidbody(i,props[i],aps,rs[i],Rs[i],ṙs[i],ωs[i]) for i = 1:n]

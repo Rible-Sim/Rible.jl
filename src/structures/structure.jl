@@ -2,7 +2,7 @@ abstract type AbstractStructure end
 
 
 """
-Rigid Body Natural Coordinates State Type 。
+Rigid Body Natural Coordinates State Type.
 $(TYPEDEF)
 """
 mutable struct NonminimalCoordinatesState{T,qT,qviewT}
@@ -23,7 +23,7 @@ mutable struct NonminimalCoordinatesState{T,qT,qviewT}
 end
 
 """
-Natural Coordinates State Constructor 。
+Natural Coordinates State Constructor.
 $(TYPEDSIGNATURES)
 """
 function NonminimalCoordinatesState(t,q,q̇,q̈,F,λ,freei,presi,c)
@@ -39,7 +39,7 @@ end
 
 
 """
-State Type 。
+State Type.
 $(TYPEDEF)
 """
 struct StructureState{sysT, msT}
@@ -48,7 +48,7 @@ struct StructureState{sysT, msT}
 end
 
 """
-State Constructor 。
+State Constructor.
 $(TYPEDSIGNATURES)
 """
 function StructureState(bodies,tensiles,cnt::Connectivity{<:Any,<:Any,<:NamedTuple{(:connected, )},<:Any})
@@ -102,7 +102,7 @@ end
 
 
 """
-Structure Type 。
+Structure Type.
 $(TYPEDEF)
 """
 struct Structure{BodyType,TenType,CntType,StateType} <: AbstractStructure
@@ -118,11 +118,11 @@ struct Structure{BodyType,TenType,CntType,StateType} <: AbstractStructure
 end
 
 """
-Structure Constructor 。
+Structure Constructor.
 $(TYPEDSIGNATURES)
 """
 function Structure(bodies,tensiles,cnt::Connectivity)
-    ndim = get_ndim(bodies)
+    ndim = get_num_of_dims(bodies)
     nbodies = length(bodies)
     ntensiles = sum(map(length,tensiles))
     (;nfree,ninconstraints) = cnt.indexed
@@ -261,7 +261,7 @@ function build_∂T∂qᵀ(st::AbstractStructure)
 end
 
 
-function make_Φ(st::AbstractStructure,q0::AbstractVector)
+function make_constraints_function(st::AbstractStructure,q0::AbstractVector)
     (;bodies,nconstraints) = st
     (;numbered,indexed,jointed) = st.connectivity
     (;nfree,nfull,syspres,sysfree,mem2sysfull,mem2syspres,mem2sysfree,ninconstraints,mem2sysincst) = indexed
@@ -283,7 +283,7 @@ function make_Φ(st::AbstractStructure,q0::AbstractVector)
         is = Ref(ninconstraints)
         foreach(jointed.joints) do joint
             nc = joint.nconstraints
-            ret[is[]+1:is[]+nc] .= make_Φ(joint,st)(q,d[is[]+1:is[]+nc],c)
+            ret[is[]+1:is[]+nc] .= make_constraints_function(joint,st)(q,d[is[]+1:is[]+nc],c)
             is[] += nc
         end
         ret
@@ -302,7 +302,7 @@ function make_Φ(st::AbstractStructure,q0::AbstractVector)
     inner_Φ
 end
 
-function make_Φ(st::AbstractStructure)
+function make_constraints_function(st::AbstractStructure)
     (;bodies,nconstraints) = st
     (;indexed,jointed,numbered) = st.connectivity
     (;nfree,mem2sysfull,mem2sysfree,ninconstraints,mem2sysincst) = indexed
@@ -320,7 +320,7 @@ function make_Φ(st::AbstractStructure)
         end
         foreach(jointed.joints) do joint
             nc = joint.nconstraints
-            ret[is[]+1:is[]+nc] .= make_Φ(joint,st)(q)
+            ret[is[]+1:is[]+nc] .= make_constraints_function(joint,st)(q)
             is[] += nc
         end
         ret
@@ -329,7 +329,7 @@ function make_Φ(st::AbstractStructure)
 end
 
 
-function make_A(st::AbstractStructure,q0::AbstractVector)
+function make_constraints_jacobian(st::AbstractStructure,q0::AbstractVector)
     (;bodies,nconstraints) = st
     (;numbered,indexed,jointed) = st.connectivity
     (;nfull,nfree,syspres,sysfree,mem2sysfull,mem2sysfree,ninconstraints,mem2sysincst) = indexed
@@ -351,7 +351,7 @@ function make_A(st::AbstractStructure,q0::AbstractVector)
         is = Ref(ninconstraints)
         foreach(jointed.joints) do joint
             nc = joint.nconstraints
-            ret[is[]+1:is[]+nc,:] .= make_A(joint,st)(q,c)
+            ret[is[]+1:is[]+nc,:] .= make_constraints_jacobian(joint,st)(q,c)
             is[] += nc
         end
         ret
@@ -365,7 +365,7 @@ function make_A(st::AbstractStructure,q0::AbstractVector)
     inner_A
 end
 
-function make_A(st::AbstractStructure)
+function make_constraints_jacobian(st::AbstractStructure)
     (;bodies,nconstraints) = st
     (;numbered,indexed,jointed) = st.connectivity
     (;nfree,mem2sysfull,mem2sysfree,ninconstraints,mem2sysincst) = indexed
@@ -383,7 +383,7 @@ function make_A(st::AbstractStructure)
         end
         foreach(jointed.joints) do joint
             nc = joint.nconstraints
-            ret[is[]+1:is[]+nc,:] .= make_A(joint,st)(q)
+            ret[is[]+1:is[]+nc,:] .= make_constraints_jacobian(joint,st)(q)
             is[] += nc
         end
         ret
@@ -398,8 +398,8 @@ function build_F̌(st,bodyid,pid,f)
         if body.prop.id == bodyid
             C = body.state.cache.Cps[pid]
             memfree = mem2sysfree[bodyid]
-            uci = body.state.cache.free_idx
-            F̌[memfree] = (transpose(C)*f)[uci,:]
+            unconstrained_indices = body.state.cache.free_idx
+            F̌[memfree] = (transpose(C)*f)[unconstrained_indices,:]
         end
     end
     reshape(F̌,:,1)
@@ -413,7 +413,7 @@ $(TYPEDSIGNATURES)
 function check_jacobian_singularity(st)
     (;bodies,state) = st
     q = get_q(st)
-    A = make_A(st)
+    A = make_constraints_jacobian(st)
     Aq = A(q)
     sys_rank = rank(Aq)
     if sys_rank < minimum(size(Aq))
@@ -421,7 +421,7 @@ function check_jacobian_singularity(st)
     end
     foreach(bodies) do body
         bodyid = body.prop.id
-        uci = body.state.cache.free_idx
+        unconstrained_indices = body.state.cache.free_idx
         q_rb = state.parts[bodyid].q
         Aq_rb = body.state.cache.funcs.Φq(q_rb)
         rb_rank = rank(Aq_rb)

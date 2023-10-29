@@ -33,8 +33,8 @@ function initialize_GDR(st,F::Nothing;gravity=true)
         # @show abs.(F-Q) |> maximum
         -F
     end
-    𝐛 = make_Φ(st)
-    𝐉 = make_A(st)
+    𝐛 = make_constraints_function(st)
+    𝐉 = make_constraints_jacobian(st)
     x0 = st.state.system.q
     x̌0 = st.state.system.q̌
     x0,x̌0,𝛚,𝐛,𝐉

@@ -1,7 +1,7 @@
 function get_trajectory!(bot::Robot,bodyid::Int,pid::Int,step_range=:)
     (; st, traj)= bot
 	T = get_numbertype(bot)
-    N = get_ndim(bot)
+    N = get_num_of_dims(bot)
     position_traj = [
         zeros(T,N)
         for _ in eachindex(traj)
@@ -23,7 +23,7 @@ end
 function get_velocity!(bot::Robot,bodyid::Int,pid::Int,step_range=:)
     (; st, traj)= bot
 	T = get_numbertype(bot)
-    N = get_ndim(bot)
+    N = get_num_of_dims(bot)
     velocity_traj = [
         zeros(T,N)
         for _ in eachindex(traj)

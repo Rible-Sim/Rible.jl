@@ -125,7 +125,7 @@ end
 verify_lambda(bot.st)
 q = RB.get_q(bot.st)
 q̌ = RB.get_q̌(bot.st)
-Ǎ = RB.make_A(bot.st)(q)
+Ǎ = RB.make_constraints_jacobian(bot.st)(q)
 # Ň_ = RB.nullspace(Ǎ)
 # Ň = modified_gram_schmidt(Ň_)
 Ň = build_Ň(bot.st)
@@ -501,7 +501,7 @@ end
 
 q = RB.get_q(bot.st)
 q̌ = RB.get_q̌(bot.st)
-Ǎ = RB.make_A(bot.st)(q)
+Ǎ = RB.make_constraints_jacobian(bot.st)(q)
 # Ň_ = RB.nullspace(Ǎ)
 # Ň = RB.modified_gram_schmidt(Ň_)
 Nin,Nex,Ň = build_Ň(bot.st)
@@ -605,7 +605,7 @@ GM.activate!();with_theme(theme_pub;
                 )
             rcs_by_cables = @lift begin
                 (;tensioned) = $tgob.connectivity
-                ndim = RB.get_ndim($tgob)
+                ndim = RB.get_num_of_dims($tgob)
                 T = RB.get_numbertype($tgob)
                 ret = Vector{MVector{ndim,T}}()
                 mapreduce(
@@ -968,7 +968,7 @@ function make_Ň(st)
         sysfree,
         reduce(vcat,mem2sysndof[2:end])
     ][:,end]
-    # I2 = RB.NCF.I2_Int
+    # I2 = RB.NCF.I2_Bool
     # O2 = zero(I2)
     # o2 = O2[:,1]
     # ret = N*[
@@ -988,7 +988,7 @@ end
 
 q = RB.get_q(bot.st)
 q̌ = RB.get_q̌(bot.st)
-Ǎ = RB.make_A(bot.st)(q)
+Ǎ = RB.make_constraints_jacobian(bot.st)(q)
 Ň_ = RB.nullspace(Ǎ)
 Ň = RB.modified_gram_schmidt(Ň_)
 # Ň = Ň_
@@ -1091,7 +1091,7 @@ GM.activate!();with_theme(theme_pub;
                 )
             rcs_by_cables = @lift begin
                 (;tensioned) = $tgob.connectivity
-                ndim = RB.get_ndim($tgob)
+                ndim = RB.get_num_of_dims($tgob)
                 T = RB.get_numbertype($tgob)
                 ret = Vector{MVector{ndim,T}}()
                 mapreduce(
@@ -1235,7 +1235,7 @@ plot_traj!(bot;showground=false)
 
 q = RB.get_q(bot.st)
 q̌ = RB.get_q̌(bot.st)
-Ǎ = RB.make_A(bot.st)(q)
+Ǎ = RB.make_constraints_jacobian(bot.st)(q)
 Ň_ = RB.nullspace(Ǎ)
 Ň = RB.modified_gram_schmidt(Ň_)
 # Ň = build_Ň(bot.st)
@@ -1439,7 +1439,7 @@ end
 
 q = RB.get_q(bot.st)
 q̌ = RB.get_q̌(bot.st)
-Ǎ = RB.make_A(bot.st)(q)
+Ǎ = RB.make_constraints_jacobian(bot.st)(q)
 # Ň_ = RB.nullspace(Ǎ)
 # Ň = RB.modified_gram_schmidt(Ň_)
 Ň = build_Ň(bot.st)
@@ -1545,7 +1545,7 @@ GM.activate!();with_theme(theme_pub;
                 )
             rcs_by_cables = @lift begin
                 (;tensioned) = $tgob.connectivity
-                ndim = RB.get_ndim($tgob)
+                ndim = RB.get_num_of_dims($tgob)
                 T = RB.get_numbertype($tgob)
                 ret = Vector{MVector{ndim,T}}()
                 mapreduce(
@@ -1838,7 +1838,7 @@ function make_Ň(st)
         sysfree,
         reduce(vcat,mem2sysndof[2:end])
     ]
-    I3 = RB.NCF.I3_Int
+    I3 = RB.NCF.I3_Bool
     O3 = zero(I3)
     o3 = O3[:,1]
     qbar = q[mem2sysfull[4]]
@@ -1868,7 +1868,7 @@ end
 
 q = RB.get_q(bot.st)
 q̌ = RB.get_q̌(bot.st)
-Ǎ = RB.make_A(bot.st)(q)
+Ǎ = RB.make_constraints_jacobian(bot.st)(q)
 Ň_ = RB.nullspace(Ǎ)
 Ň = RB.modified_gram_schmidt(Ň_)
 
@@ -1980,7 +1980,7 @@ GM.activate!();with_theme(theme_pub;
                 )
             rcs_by_cables = @lift begin
                 (;tensioned) = $tgob.connectivity
-                ndim = RB.get_ndim($tgob)
+                ndim = RB.get_num_of_dims($tgob)
                 T = RB.get_numbertype($tgob)
                 ret = Vector{MVector{ndim,T}}()
                 mapreduce(
@@ -2112,7 +2112,7 @@ RB.check_static_equilibrium_output_multipliers(bot.st)
 
 q = RB.get_q(bot.st)
 q̌ = RB.get_q̌(bot.st)
-Ǎ = RB.make_A(bot.st)(q)
+Ǎ = RB.make_constraints_jacobian(bot.st)(q)
 Ň_ = RB.nullspace(Ǎ)
 Ň = RB.modified_gram_schmidt(Ň_)
 
@@ -2223,7 +2223,7 @@ GM.activate!();with_theme(theme_pub;
                 )
             rcs_by_cables = @lift begin
                 (;tensioned) = $tgob.connectivity
-                ndim = RB.get_ndim($tgob)
+                ndim = RB.get_num_of_dims($tgob)
                 T = RB.get_numbertype($tgob)
                 ret = Vector{MVector{ndim,T}}()
                 mapreduce(

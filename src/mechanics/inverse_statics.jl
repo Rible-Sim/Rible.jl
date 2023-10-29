@@ -23,7 +23,7 @@ function build_Q̃(st)
     ncables = length(cables)
     (;nfree,mem2sysfree) = indexed
     T = get_numbertype(st)
-    ndim = get_ndim(st)
+    ndim = get_num_of_dims(st)
     Q̃ = zeros(T,nfree,ndim*ncables)
 
     foreach(connected) do cc
@@ -287,7 +287,7 @@ function build_inverse_statics_core(tginput,tgref::Structure,Fˣ=nothing;gravity
 end
 
 function build_inverse_statics_core(st,q::AbstractVector,F)
-    A = make_A(st)
+    A = make_constraints_jacobian(st)
     Nᵀ = transpose(nullspace(A(q)))
     Q̃ = build_Q̃(st)
     st,Nᵀ,Q̃,F
@@ -462,7 +462,7 @@ function check_static_equilibrium(tg_input,q,λ,F=nothing;gravity=false)
     if !isnothing(F)
         generalized_forces .+= F[:]
     end
-    constraint_forces = transpose(make_A(st)(q))*λ
+    constraint_forces = transpose(make_constraints_jacobian(st)(q))*λ
     static_equilibrium = constraint_forces ≈ generalized_forces
     @debug "Res. forces = $(generalized_forces-constraint_forces)"
     if !static_equilibrium
@@ -500,7 +500,7 @@ function check_static_equilibrium_output_multipliers!(st,q,F=nothing;
     q = get_q(st)
     c = get_c(st)
     q̌ = get_q̌(st)
-    A = make_A(st,q)(q̌,c)
+    A = make_constraints_jacobian(st,q)(q̌,c)
     # # @show A
     # s = get_s(st)
     # u = get_cables_restlen(st)

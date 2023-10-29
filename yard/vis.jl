@@ -192,7 +192,7 @@ function plot_traj!(bot::RB.Robot;
         kargs...
     )
     (;st,traj) = bot
-    ndim = RB.get_ndim(st)
+    ndim = RB.get_num_of_dims(st)
     st.state.system.q .= traj.q[begin]
     RB.update!(st)
     tgobini = Observable(deepcopy(st))
@@ -631,7 +631,7 @@ end
 function get3Dstate(body)
     (;state) = body
     (;origin_position,R,origin_velocity,ω) = state
-    ndim = RB.get_ndim(body)
+    ndim = RB.get_num_of_dims(body)
     T = RB.get_numbertype(body)
     o = zero(T)
     i = one(T)
@@ -655,7 +655,7 @@ end
 function get_linesegs_cables(st;slackonly=false,noslackonly=false)
     (;connected) = st.connectivity.tensioned
     (;cables) = st.tensiles
-    ndim = RB.get_ndim(st)
+    ndim = RB.get_num_of_dims(st)
     T = RB.get_numbertype(st)
     linesegs_cables = Vector{Tuple{Point{ndim,T},Point{ndim,T}}}()
     foreach(connected) do scnt
@@ -1068,7 +1068,7 @@ function plot_self_stress_states(
                     )
                 rcs_by_cables = @lift begin
                     (;tensioned) = $tgob.connectivity
-                    ndim = RB.get_ndim($tgob)
+                    ndim = RB.get_num_of_dims($tgob)
                     T = RB.get_numbertype($tgob)
                     ret = Vector{MVector{ndim,T}}()
                     mapreduce(

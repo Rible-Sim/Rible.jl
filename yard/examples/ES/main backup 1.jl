@@ -1944,7 +1944,7 @@ newembed1 = embed3d(;
 )
 
 q = RB.get_q(newembed1.st)
-Φ = RB.make_Φ(newembed1.st)
+Φ = RB.make_constraints_function(newembed1.st)
 Φ(q) |> norm
 
 μ1 = RB.inverse_for_restlength(

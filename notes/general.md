@@ -1,3 +1,14 @@
+# Body & Coordinates
+Immutable properties, and coordinates type informations.
+passed around with no allocations.
+
+Mutable states, and coordinates cache.
+
+Typical calling methods: use the properties and coordinates type to mutate state and cache.
+
+Question: what about joints? can it be fully immutable?
+Or immutable/mutable pairs?
+
 # Heterogeneous collection 
 
 type-stable code unavoidably requires `generated` functions.
@@ -36,3 +47,6 @@ more than necessary, but not redundant
 - [ ] joint constraints, quadratic forms
 - [x] put contacts into loci
 - [ ] local distribution law
+- [ ] try SNAKE/RATTLE scheme
+- [ ] visualize Locus/LocusState
+- [ ] investigate scaling, may be scale relative velocity to position?

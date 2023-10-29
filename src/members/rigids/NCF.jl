@@ -1,27 +1,28 @@
 module NCF
 using LinearAlgebra
 using StaticArrays
-using Parameters
+using SparseArrays
+using LuxurySparse
 using ForwardDiff
 using DocStringExtensions
 using SymmetricFormats
 
 import ..Rible: HouseholderOrthogonalization
 
-export get_nconstraints, get_ncoords, get_ndof, get_nlocaldim
+export get_num_of_constraints, get_num_of_coordinates, get_num_of_dof, get_num_of_local_dims
 
 """
-local natural coordinates abstract type 。
+local natural coordinates abstract type.
 """
 abstract type LNC{T} end
 
 """
-2D local natural coordinates abstract type 。
+2D local natural coordinates abstract type.
 """
 abstract type LNC2D{T} <: LNC{T} end
 
 """
-3D local natural coordinates abstract type 。
+3D local natural coordinates abstract type.
 """
 abstract type LNC3D{T} <: LNC{T} end
 
@@ -68,47 +69,46 @@ function LNCData(r̄i::SVector,X̄::SMatrix)
     LNCData(r̄i,X̄,(pinv(X̄)))
 end
 
-make_I(T,N) = SMatrix{N,N}(one(T)*I)
-const I2_Int = make_I(Int,2)
-const I3_Int = make_I(Int,3)
+const I2_Bool = IMatrix(2)
+const I3_Bool = IMatrix(3)
 
 """
-Return 空间dimension。
+Return the dimension of space.
 $(TYPEDSIGNATURES)
 """
-get_ndim(nmcs::LNC) = get_ndim(nmcs.data)
-get_ndim(::LNCData{N,M,T,L}) where {N,M,T,L} = N
+get_num_of_dims(nmcs::LNC) = get_num_of_dims(nmcs.data)
+get_num_of_dims(::LNCData{N,M,T,L}) where {N,M,T,L} = N
 
 """
-Return natural coodinates 所构成的坐标系的dimension。
+Return local dimension of natural coodinates.
 $(TYPEDSIGNATURES)
 """
-get_nlocaldim(nmcs::LNC) = get_nlocaldim(nmcs.data)
-get_nlocaldim(::LNCData{N,M,T,L}) where {N,M,T,L} = M
+get_num_of_local_dims(nmcs::LNC) = get_num_of_local_dims(nmcs.data)
+get_num_of_local_dims(::LNCData{N,M,T,L}) where {N,M,T,L} = M
 
 """
-Return 坐标个数。
+Return the number of coordinates。
 $(TYPEDSIGNATURES)
 """
-get_ncoords(nmcs::LNC) = get_ncoords(nmcs.data)
-get_ncoords(::LNCData{N,M,T,L}) where {N,M,T,L} = N+L
+get_num_of_coordinates(nmcs::LNC) = get_num_of_coordinates(nmcs.data)
+get_num_of_coordinates(::LNCData{N,M,T,L}) where {N,M,T,L} = N+L
 
 """
 Return 约束方程个数。
 $(TYPEDSIGNATURES)
 """
-get_nconstraints(::LNC2D2C) = 0
-get_nconstraints(::LNC3D3C) = 0
-get_nconstraints(::LNC2D4C) = 1
-get_nconstraints(::LNC2D6C) = 3
-get_nconstraints(::LNC3D6C) = 1
-get_nconstraints(::LNC3D12C) = 6
+get_num_of_constraints(::LNC2D2C) = 0
+get_num_of_constraints(::LNC3D3C) = 0
+get_num_of_constraints(::LNC2D4C) = 1
+get_num_of_constraints(::LNC2D6C) = 3
+get_num_of_constraints(::LNC3D6C) = 1
+get_num_of_constraints(::LNC3D12C) = 6
 
 """
 Return 自由度数。
 $(TYPEDSIGNATURES)
 """
-get_ndof(nmcs::LNC) =  get_ncoords(nmcs) - get_nconstraints(nmcs)
+get_num_of_dof(nmcs::LNC) =  get_num_of_coordinates(nmcs) - get_num_of_constraints(nmcs)
 
 function Base.getproperty(nmcs::LNC,p::Symbol)
     if (p == :r̄i) 
@@ -136,220 +136,141 @@ end
 
 
 """
-2D or 3D local natural coordinates ，用于任意一列点。
+3D local natural coordinates of a  point mass.
 $(TYPEDEF)
 """
 struct LNC3D1P{T} <: LNC3D3C{T}
     data::LNCData{3,0,T,0}
-end
-
-struct LNC2D1P{T} <: LNC2D2C{T}
-    data::LNCData{2,0,T,0}
+    conversion::SparseMatrixCSC{Int64,Int64}
 end
 
 """
-4 coordinates 2D local natural coordinates ，使用2个基本点。
+2D local natural coordinates of a  point mass.
+$(TYPEDEF)
+"""
+struct LNC2D1P{T} <: LNC2D2C{T}
+    data::LNCData{2,0,T,0}
+    conversion::SparseMatrixCSC{Int64,Int64}
+end
+
+"""
+4 coordinates 2D local natural coordinates, using 2 basic points.
 $(TYPEDEF)
 """
 struct LNC2D2P{T} <: LNC2D4C{T}
     data::LNCData{2,1,T,2}
-end
-
-struct LNC2D1P1V{T} <: LNC2D4C{T}
-    data::LNCData{2,1,T,2}
+    conversion::SparseMatrixCSC{Int64,Int64}
 end
 
 """
-6 coordinates 3D local natural coordinates ，使用2个基本点。
+4 coordinates 2D local natural coordinates, using 1 basic point and 1 base vector.
+$(TYPEDEF)
+"""
+struct LNC2D1P1V{T} <: LNC2D4C{T}
+    data::LNCData{2,1,T,2}
+    conversion::SparseMatrixCSC{Int64,Int64}
+end
+
+"""
+6 coordinates 3D local natural coordinates, using 2 basic points.
 $(TYPEDEF)
 """
 struct LNC3D2P{T} <: LNC3D6C{T}
     data::LNCData{3,1,T,3}
+    conversion::SparseMatrixCSC{Int64,Int64}
 end
 
+"""
+6 coordinates 3D local natural coordinates, using 1 basic point and 1 base vector.
+$(TYPEDEF)
+"""
 struct LNC3D1P1V{T} <: LNC3D6C{T}
     data::LNCData{3,1,T,3}
+    conversion::SparseMatrixCSC{Int64,Int64}
 end
 
 
 """
-6 coordinates 2D local natural coordinates ，使用1个基本点、2个基本向量。
+6 coordinates 2D local natural coordinates, using 1 basic point and 2 base vectors.
 $(TYPEDEF)
 """
 struct LNC1P2V{T} <: LNC2D6C{T}
     data::LNCData{2,2,T,4}
+    conversion::SparseMatrixCSC{Int64,Int64}
 end
 
 """
-6 coordinates 2D local natural coordinates ，使用2个基本点、1个基本向量。
+6 coordinates 2D local natural coordinates, using 2 basic points and 1 base vector.
 $(TYPEDEF)
 """
 struct LNC2P1V{T} <: LNC2D6C{T}
     data::LNCData{2,2,T,4}
+    conversion::SparseMatrixCSC{Int64,Int64}
 end
 
 """
-6 coordinates 2D local natural coordinates ，使用3个基本点。
+6 coordinates 2D local natural coordinates, using 3 basic points.
 $(TYPEDEF)
 """
 struct LNC3P{T} <: LNC2D6C{T}
     data::LNCData{2,2,T,4}
+    conversion::SparseMatrixCSC{Int64,Int64}
 end
 
 """
-12 coordinates 3D local natural coordinates ，使用1个基本点、3个基本向量。
+12 coordinates 3D local natural coordinates, using 1 basic point and 3 base vectors.
 $(TYPEDEF)
 """
 struct LNC1P3V{T} <: LNC3D12C{T}
     data::LNCData{3,3,T,9}
+    conversion::SparseMatrixCSC{Int64,Int64}
 end
 
 """
-12 coordinates 3D local natural coordinates ，使用2个基本点、2个基本向量。
+12 coordinates 3D local natural coordinates, using 2 basic points and 2 base vectors.
 $(TYPEDEF)
 """
 struct LNC2P2V{T} <: LNC3D12C{T}
     data::LNCData{3,3,T,9}
+    conversion::SparseMatrixCSC{Int64,Int64}
 end
 
 """
-12 coordinates 3D local natural coordinates ，使用3个基本点、1个基本向量。
+12 coordinates 3D local natural coordinates, using 3 basic points and 1 base vector.
 $(TYPEDEF)
 """
 struct LNC3P1V{T} <: LNC3D12C{T}
     data::LNCData{3,3,T,9}
+    conversion::SparseMatrixCSC{Int64,Int64}
 end
 
 """
-12 coordinates 3D local natural coordinates ，使用4个基本点。
+12 coordinates 3D local natural coordinates, using 4 basic points.
 $(TYPEDEF)
 """
 struct LNC4P{T} <: LNC3D12C{T}
     data::LNCData{3,3,T,9}
+    conversion::SparseMatrixCSC{Int64,Int64}
 end
 
 """
 ！！！！！！！！！
 $(TYPEDSIGNATURES)
 """
-
-function get_conversion(nmcs::Union{LNC2D1P,LNC3D1P})
-    ndim = get_ndim(nmcs)
+function get_conversion(ndim,np,nv)
+    nb = np+nv
+    B = Matrix(1I,nb,nb)
+    for i = 2:np
+        B[i,1] = -1
+    end
     kron(
-        [ 1;],
-        make_I(Int,ndim)
+        sparse(B),
+        IMatrix(ndim)
     )
 end
 
-function get_conversion(nmcs::Union{LNC2D1P1V,LNC3D1P1V})
-    ndim = get_ndim(nmcs)
-    kron(
-        [ 1 0;
-          0 1],
-        make_I(Int,ndim)
-    )
-end
-
-function get_conversion(nmcs::Union{LNC2D2P,LNC3D2P})
-    ndim = get_ndim(nmcs)
-    kron(
-        [ 1 0;
-         -1 1],
-        make_I(Int,ndim)
-    )
-end
-
-get_conversion(::LNC1P2V) = kron(
-    [ 1 0 0;
-      0 1 0;
-      0 0 1],
-    I2_Int
-)
-
-get_conversion(::LNC2P1V) = kron(
-    [ 1 0 0;
-     -1 1 0;
-      0 0 1],
-    I2_Int
-)
-
-get_conversion(::LNC3P) = kron(
-    [ 1 0 0;
-     -1 1 0;
-     -1 0 1],
-    I2_Int
-)
-
-get_conversion(::LNC1P3V) = kron(
-    [ 1 0 0 0;
-      0 1 0 0;
-      0 0 1 0;
-      0 0 0 1],
-    I3_Int
-)
-
-get_conversion(::LNC2P2V) = kron(
-    [ 1 0 0 0;
-     -1 1 0 0;
-      0 0 1 0;
-      0 0 0 1],
-    I3_Int
-)
-
-get_conversion(::LNC3P1V) = kron(
-    [ 1 0 0 0;
-     -1 1 0 0;
-     -1 0 1 0;
-      0 0 0 1],
-    I3_Int
-)
-
-get_conversion(::LNC4P) = kron(
-    [ 1 0 0 0;
-     -1 1 0 0;
-     -1 0 1 0;
-     -1 0 0 1],
-    I3_Int
-)
-
 """
-Return rigid body natural coodinates 
-$(TYPEDSIGNATURES)
-"""
-function rigidstate2naturalcoords(nmcs::Union{LNC2D2C,LNC3D3C},origin_position,R)
-    origin_position
-end
-
-function rigidstate2naturalcoords(nmcs::Union{LNC2D2C,LNC3D3C},origin_position,R,origin_velocity,ω)
-    origin_position,origin_velocity
-end
-
-function rigidstate2naturalcoords(nmcs,origin_position,R)
-    (;r̄i,X̄) = nmcs
-    ri = origin_position + R*r̄i
-    X = R*X̄
-    qstd = vcat(ri,vec(X))
-    Y = get_conversion(nmcs)
-    q = Y\qstd
-    q
-end
-
-function rigidstate2naturalcoords(nmcs,origin_position,R,origin_velocity,ω)
-    (;r̄i,X̄) = nmcs
-    ri = origin_position + R*r̄i
-    ṙi = origin_velocity + ω×(ri-origin_position)
-    X = R*X̄
-    Ẋ = reduce(hcat,Ref(ω) .× eachcol(X))
-    qstd = vcat(ri,vec(X))
-    q̇std = vcat(ṙi,vec(Ẋ))
-    Y = get_conversion(nmcs)
-    q = Y\qstd
-    q̇ = Y\q̇std
-    q,q̇
-end
-
-"""
-Return 2D rigid bar natural coodinates 。
+Return 3D point mass natural coodinates.
 $(TYPEDSIGNATURES)
 """
 function NC3D1P(ri::AbstractVector{T}) where T
@@ -358,25 +279,31 @@ function NC3D1P(ri::AbstractVector{T}) where T
         LNCData(
             SVector{3}(r̄i),
             SMatrix{3,0,T}()
-        )
+        ),
+        get_conversion(3,1,0)
     )
     nmcs,ri
 end
 
+"""
+Return 2D point mass natural coodinates.
+$(TYPEDSIGNATURES)
+"""
 function NC2D1P(ri::AbstractVector{T}) where T
     r̄i = @SVector zeros(T,2)
     nmcs = LNC2D1P(
         LNCData(
             SVector{2}(r̄i),
             SMatrix{2,0,T}()
-        )
+        ),
+        get_conversion(2,1,0)
     )
     nmcs,ri
 end
 
 
 """
-Return 2D rigid bar natural coodinates 。
+Return 2D rigid bar natural coodinates.
 $(TYPEDSIGNATURES)
 """
 function NC2D1P1V(ri::AbstractVector{T},u::AbstractVector{T},
@@ -390,7 +317,8 @@ function NC2D1P1V(ri::AbstractVector{T},u::AbstractVector{T},
         LNCData(
             SVector{2}(r̄i),
             SMatrix{2,1}(X̄)
-        )
+        ),
+        get_conversion(2,1,1)
     )
     q = vcat(ri,u)
     nmcs,q
@@ -417,7 +345,8 @@ function NC2D2P(ri::AbstractVector{T},rj::AbstractVector{T},
         LNCData(
             SVector{2}(r̄i),
             SMatrix{2,1}(X̄)
-        )
+        ),
+        get_conversion(3,2,2)
     )
     q = vcat(ri,rj)
     nmcs,q
@@ -433,7 +362,7 @@ function NC2D2P(ri,rj,origin_position,θ::Number,origin_velocity,ω)
 end
 
 """
-Return 3D rigid bar natural coodinates 。
+Return 3D rigid bar natural coodinates.
 $(TYPEDSIGNATURES)
 """
 function NC3D1P1V(ri::AbstractVector{T},u::AbstractVector{T},
@@ -447,7 +376,8 @@ function NC3D1P1V(ri::AbstractVector{T},u::AbstractVector{T},
         LNCData(
             SVector{3}(r̄i),
             SMatrix{3,1}(X̄)
-        )
+        ),
+        get_conversion(3,1,1)
     )
     q = vcat(ri,u)
     nmcs,q
@@ -473,7 +403,8 @@ function NC3D2P(ri::AbstractVector{T},rj::AbstractVector{T},
         LNCData(
             SVector{3}(r̄i),
             SMatrix{3,1}(X̄)
-        )
+        ),
+        get_conversion(3,2,0)
     )
     q = vcat(ri,rj)
     nmcs,q
@@ -488,7 +419,7 @@ function NC3D2P(ri,rj,origin_position,R::AbstractMatrix,origin_velocity,ω)
 end
 
 """
-Return 2D rigid bodies natural coodinates ，使用1个基本点、2个基本向量。
+Return 2D rigid bodies natural coodinates, using 1 basic point and 2 base vectors.
 $(TYPEDSIGNATURES)
 """
 function NC1P2V(ri::AbstractVector{T},
@@ -507,7 +438,8 @@ function NC1P2V(ri::AbstractVector{T},
         LNCData(
             SVector{2}(r̄i),
             SMatrix{2,2}(X̄)
-        )
+        ),
+        get_conversion(2,1,2)
     )
     q = vcat(ri,u,v)
     nmcs,q
@@ -524,7 +456,7 @@ function NC1P2V(ri,origin_position,θ,origin_velocity,ω)
 end
 
 """
-Return 2D rigid bodies natural coodinates ，使用2个基本点、1个基本向量。
+Return 2D rigid bodies natural coodinates, using 2 basic points and 1 base vector.
 $(TYPEDSIGNATURES)
 """
 function NC2P1V(ri::AbstractVector{T},rj::AbstractVector{T},
@@ -540,7 +472,8 @@ function NC2P1V(ri::AbstractVector{T},rj::AbstractVector{T},
         LNCData(
             SVector{2}(r̄i),
             SMatrix{2,2}(X̄)
-        )
+        ),
+        get_conversion(2,2,1)
     )
     q = vcat(ri,rj,v)
     nmcs,q
@@ -557,7 +490,7 @@ function NC2P1V(ri,rj,origin_position,θ,origin_velocity,ω)
 end
 
 """
-Return 2D rigid bodies natural coodinates ，使用3个基本点。
+Return 2D rigid bodies natural coodinates, using 3 basic points
 $(TYPEDSIGNATURES)
 """
 function NC3P(ri::AbstractVector{T},rj::AbstractVector{T},rk::AbstractVector{T},
@@ -573,11 +506,13 @@ function NC3P(ri::AbstractVector{T},rj::AbstractVector{T},rk::AbstractVector{T},
         LNCData(
             SVector{2}(r̄i),
             SMatrix{2,2}(X̄)
-        )
+        ),
+        get_conversion(2,3,0)
     )
     q = vcat(ri,rj,rk)
     nmcs,q
 end
+
 function NC3P(ri,rj,rk,origin_position,θ,origin_velocity,ω)
     R = rotation_matrix(θ)
     nmcs,q = NC3P(ri,rj,rk,origin_position,R)
@@ -590,7 +525,7 @@ end
 
 ## 3D Rigid body
 """
-Return 3D rigid bodies natural coodinates ，使用1个基本点、3个基本向量。
+Return 3D rigid bodies natural coodinates, using 1 basic point and 3 base vectors
 $(TYPEDSIGNATURES)
 """
 function NC1P3V(ri::AbstractVector{T},
@@ -611,11 +546,13 @@ function NC1P3V(ri::AbstractVector{T},
         LNCData(
             SVector{3}(r̄i),
             SMatrix{3,3}(X̄)
-        )
+        ),
+        get_conversion(3,1,3)
     )
     q = vcat(ri,u,v,w)
     nmcs,q
 end
+
 function NC1P3V(ri::AbstractVector{T},u::AbstractVector{T},v::AbstractVector{T},w::AbstractVector{T},
                 origin_position=zeros(T,3),R=Matrix(one(T)*I,3,3)
                 ) where T
@@ -631,7 +568,8 @@ function NC1P3V(ri::AbstractVector{T},u::AbstractVector{T},v::AbstractVector{T},
         LNCData(
             SVector{3}(r̄i),
             SMatrix{3,3}(X̄)
-        )
+        ),
+        get_conversion(3,1,3)
     )
     q = vcat(ri,u,v,w)
     nmcs,q
@@ -658,7 +596,7 @@ function NC1P3V(ri,u,v,w,origin_position,R,origin_velocity,ω)
 end
 
 """
-Return 3D rigid bodies natural coodinates ，使用2个基本点、2个基本向量。
+Return 3D rigid bodies natural coodinates, using 2 basic points and 2 base vectors.
 $(TYPEDSIGNATURES)
 """
 function NC2P2V(ri::AbstractVector{T},rj::AbstractVector{T},
@@ -677,7 +615,8 @@ function NC2P2V(ri::AbstractVector{T},rj::AbstractVector{T},
         LNCData(
             SVector{3}(r̄i),
             SMatrix{3,3}(X̄)
-        )
+        ),
+        get_conversion(3,2,2)
     )
     q = vcat(ri,rj,v,w)
     nmcs,q
@@ -699,7 +638,8 @@ function NC2P2V(ri::AbstractVector{T},rj::AbstractVector{T},
         LNCData(
             SVector{3}(r̄i),
             SMatrix{3,3}(X̄)
-        )
+        ),
+        get_conversion(3,2,2)
     )
     q = vcat(ri,rj,v,w)
     nmcs,q
@@ -726,7 +666,7 @@ function NC2P2V(ri,rj,v,w,origin_position,R,origin_velocity,ω)
 end
 
 """
-Return 3D rigid bodies natural coodinates ，使用3个基本点、1个基本向量。
+Return 3D rigid bodies natural coodinates, using 3 basic points and 1 base vector.
 $(TYPEDSIGNATURES)
 """
 function NC3P1V(ri::AbstractVector{T},rj::AbstractVector{T},
@@ -748,7 +688,8 @@ function NC3P1V(ri::AbstractVector{T},rj::AbstractVector{T},
         LNCData(
             SVector{3}(r̄i),
             SMatrix{3,3}(X̄)
-        )
+        ),
+        get_conversion(3,3,1)
     )
     q = vcat(ri,rj,rk,w)
     nmcs,q
@@ -765,7 +706,7 @@ function NC3P1V(ri,rj,rk,origin_position,R,origin_velocity,ω)
 end
 
 """
-Return 3D rigid bodies natural coodinates ，使用4个基本点。
+Return 3D rigid bodies natural coodinates, using 4 basic points
 $(TYPEDSIGNATURES)
 """
 function NC4P(ri::AbstractVector{T},rj::AbstractVector{T},
@@ -785,7 +726,8 @@ function NC4P(ri::AbstractVector{T},rj::AbstractVector{T},
         LNCData(
             SVector{3}(r̄i),
             SMatrix{3,3}(X̄)
-        )
+        ),
+        get_conversion(3,4,0)
     )
     q = vcat(ri,rj,rk,rl)
     nmcs,q
@@ -802,7 +744,7 @@ function NC4P(ri,rj,rk,rl,origin_position,R,origin_velocity,ω)
 end
 
 # """
-# Return 2D or 3D local natural coordinates 的变形量for rigid bars。
+# Return 2D or 3D local natural coordinates deformations for rigid bars。
 # $(TYPEDSIGNATURES)
 # """
 @inline @inbounds get_deform(ū::AbstractVector) = sqrt(ū⋅ū)
@@ -812,42 +754,26 @@ end
     get_deform(r̄i)
 end
 
-@inline @inbounds function get_deform(nmcs::Union{LNC2D1P1V,LNC3D1P1V})
+@inline @inbounds function get_deform(nmcs::Union{LNC2D1P1V,LNC3D1P1V,LNC2D2P,LNC3D2P})
     (;ū) = nmcs
     get_deform(ū)
 end
 
-@inline @inbounds function get_deform(nmcs::Union{LNC2D2P,LNC3D2P})
-    (;r̄i,r̄j) = nmcs
-    ū = r̄j-r̄i
-    get_deform(ū)
-end
-
 # """
-# Return 2D natural coodinates 的变形量, for rigid bodies。
+# Return 2D natural coodinates deformations , for rigid bodies。
 # $(TYPEDSIGNATURES)
 # """
 @inline @inbounds function get_deform(ū,v̄)
     sqrt(ū⋅ū),sqrt(v̄⋅v̄),ū⋅v̄
 end
-@inline @inbounds function get_deform(nmcs::LNC1P2V)
-    @unpack ū,v̄ = nmcs
-    get_deform(ū,v̄)
-end
-@inline @inbounds function get_deform(nmcs::LNC2P1V)
-    @unpack r̄i,r̄j,v̄ = nmcs
-    ū = r̄j-r̄i
-    get_deform(ū,v̄)
-end
-@inline @inbounds function get_deform(nmcs::LNC3P)
-    @unpack r̄i,r̄j,r̄k = nmcs
-    ū = r̄j-r̄i
-    v̄ = r̄k-r̄i
+
+@inline @inbounds function get_deform(nmcs::LNC2D6C)
+    (;ū,v̄) = nmcs
     get_deform(ū,v̄)
 end
 
 # """
-# Return 3D natural coodinates 的变形量, for rigid bodies。
+# Return 3D natural coodinates deformations , for rigid bodies。
 # $(TYPEDSIGNATURES)
 # """
 @inline @inbounds function get_deform(ū,v̄,w̄)
@@ -859,26 +785,9 @@ end
     uv = ū⋅v̄
     u_sqrt,v_sqrt,w_sqrt,vw,uw,uv
 end
-@inline @inbounds function get_deform(nmcs::LNC1P3V)
-    @unpack ū,v̄,w̄ = nmcs
-    get_deform(ū,v̄,w̄)
-end
-@inline @inbounds function get_deform(nmcs::LNC2P2V)
-    @unpack r̄i,r̄j,v̄,w̄ = nmcs
-    ū = r̄j-r̄i
-    get_deform(ū,v̄,w̄)
-end
-@inline @inbounds function get_deform(nmcs::LNC3P1V)
-    @unpack r̄i,r̄j,r̄k,w̄ = nmcs
-    ū = r̄j-r̄i
-    v̄ = r̄k-r̄i
-    get_deform(ū,v̄,w̄)
-end
-@inline @inbounds function get_deform(nmcs::LNC4P)
-    @unpack r̄i,r̄j,r̄k,r̄l = nmcs
-    ū = r̄j-r̄i
-    v̄ = r̄k-r̄i
-    w̄ = r̄l-r̄i
+
+@inline @inbounds function get_deform(nmcs::LNC3D12C)
+    (;ū,v̄,w̄) = nmcs
     get_deform(ū,v̄,w̄)
 end
 
@@ -888,9 +797,9 @@ end
 Return 2D or 3D intrinsic constraint(s) ，用于Dispatch。
 $(TYPEDSIGNATURES)
 """
-function make_Φ(nmcs::LNC,Φi)
+function make_constraints_function(nmcs::LNC,constraints_indices)
     deforms = get_deform(nmcs::LNC)
-    make_Φ(nmcs,Φi,deforms)
+    make_constraints_function(nmcs,constraints_indices,deforms)
 end
 
 function make_inner_Φ(func,deforms)
@@ -907,7 +816,7 @@ end
 Return 2D or 3D intrinsic constraint(s) for point mass。
 $(TYPEDSIGNATURES)
 """
-function make_Φ(nmcs::Union{LNC2D2C,LNC3D3C},Φi,deforms)
+function make_constraints_function(nmcs::Union{LNC2D2C,LNC3D3C},constraints_indices,deforms)
     @inline @inbounds function _inner_Φ(q,d)
         nothing
     end
@@ -918,14 +827,14 @@ end
 Return 2D or 3D intrinsic constraint(s) for rigid bars。
 $(TYPEDSIGNATURES)
 """
-function make_Φ(nmcs::Union{LNC2D4C,LNC3D6C},Φi,deforms)
-    ndim = get_ndim(nmcs)
-    cv = get_conversion(nmcs)
+function make_constraints_function(nmcs::Union{LNC2D4C,LNC3D6C},constraints_indices,deforms)
+    ndim = get_num_of_dims(nmcs)
+    cv = nmcs.conversion
     @inline @inbounds function _inner_Φ(q,d)
         qstd = cv*q
         u = @view qstd[ndim+1:2ndim]
         all = [u⋅u - d^2]
-        all[Φi]
+        all[constraints_indices]
     end
     make_inner_Φ(_inner_Φ,deforms)
 end
@@ -934,8 +843,8 @@ end
 Return 2D intrinsic constraint(s) , for rigid bodies。
 $(TYPEDSIGNATURES)
 """
-function make_Φ(nmcs::LNC2D6C,Φi,deforms)
-    cv = get_conversion(nmcs)
+function make_constraints_function(nmcs::LNC2D6C,constraints_indices,deforms)
+    cv = nmcs.conversion
     @inline @inbounds function _inner_Φ(q,d)
         qstd = cv*q
         u = @view qstd[3:4]
@@ -945,7 +854,7 @@ function make_Φ(nmcs::LNC2D6C,Φi,deforms)
             (v⋅v - d[2]^2), 
             (u⋅v - d[3])
         ]
-        all[Φi]
+        all[constraints_indices]
     end
     make_inner_Φ(_inner_Φ,deforms)
 end
@@ -955,8 +864,8 @@ end
 Return 3D intrinsic constraint(s) , for rigid bodies。
 $(TYPEDSIGNATURES)
 """
-function make_Φ(nmcs::LNC3D12C,Φi,deforms)
-    cv = get_conversion(nmcs)
+function make_constraints_function(nmcs::LNC3D12C,constraints_indices,deforms)
+    cv = nmcs.conversion
     @inline @inbounds function _inner_Φ(q,d)
         qstd = cv*q
         u = @view qstd[4:6]
@@ -970,7 +879,7 @@ function make_Φ(nmcs::LNC3D12C,Φi,deforms)
             u⋅w - d[5], 
             u⋅v - d[6]
         ]
-        @view all[Φi]
+        @view all[constraints_indices]
     end
     make_inner_Φ(_inner_Φ,deforms)
 end
@@ -982,7 +891,7 @@ end
 Return 2D or 3D Jacobian matrix for rigid bars。
 $(TYPEDSIGNATURES)
 """
-function make_Φq(nmcs::Union{LNC2D2C,LNC3D3C},uci,Φi)
+function make_constraints_jacobian(nmcs::Union{LNC2D2C,LNC3D3C},unconstrained_indices,constraints_indices)
     @inline @inbounds function inner_Φq(q)
         nothing
     end
@@ -992,15 +901,15 @@ end
 Return 2D or 3D Jacobian matrix for rigid bars。
 $(TYPEDSIGNATURES)
 """
-function make_Φq(nmcs::Union{LNC2D4C,LNC3D6C},uci,Φi)
-    ndim = get_ndim(nmcs)
-    cv = get_conversion(nmcs)
+function make_constraints_jacobian(nmcs::Union{LNC2D4C,LNC3D6C},unconstrained_indices,constraints_indices)
+    ndim = get_num_of_dims(nmcs)
+    cv = nmcs.conversion
     @inline @inbounds function inner_Φq(q)
         qstd = cv*q
         u = @view qstd[ndim+1:2ndim]
         ret = zeros(eltype(q),1,2ndim)
         ret[ndim+1:2ndim] = 2u
-        @view (ret*cv)[Φi,uci]
+        @view (ret*cv)[constraints_indices,unconstrained_indices]
     end
 end
 
@@ -1008,8 +917,8 @@ end
 Return 2D Jacobian matrix , for rigid bodies。
 $(TYPEDSIGNATURES)
 """
-function make_Φq(nmcs::LNC2D6C,uci,Φi)
-    cv = get_conversion(nmcs)
+function make_constraints_jacobian(nmcs::LNC2D6C,unconstrained_indices,constraints_indices)
+    cv = nmcs.conversion
     @inline @inbounds function inner_Φq(q)
         qstd = cv*q
         u = @view qstd[3:4]
@@ -1019,15 +928,15 @@ function make_Φq(nmcs::LNC2D6C,uci,Φi)
         ret[2,5:6] = 2v
         ret[3,3:4] =  v
         ret[3,5:6] =  u
-        @view (ret*cv)[Φi,uci]
+        @view (ret*cv)[constraints_indices,unconstrained_indices]
     end
 end
 """
 Return 3D Jacobian matrix , for rigid bodies。
 $(TYPEDSIGNATURES)
 """
-function make_Φq(nmcs::LNC3D12C,uci,Φi)
-    cv = get_conversion(nmcs)
+function make_constraints_jacobian(nmcs::LNC3D12C,unconstrained_indices,constraints_indices)
+    cv = nmcs.conversion
     @inline @inbounds function inner_Φq(q)
         qstd = cv*q
         u  = @view qstd[4:6]
@@ -1047,7 +956,7 @@ function make_Φq(nmcs::LNC3D12C,uci,Φi)
         ret[6,4:6] =  v
         ret[6,7:9] =  u
 
-        @view (ret*cv)[Φi,uci]
+        @view (ret*cv)[constraints_indices,unconstrained_indices]
     end
 end
 
@@ -1056,13 +965,13 @@ Return nullspace matrix
 $(TYPEDSIGNATURES)
 """
 function make_N(nmcs::LNC2D4C)
-    cv = get_conversion(nmcs)
-    O2 = zero(I2_Int)
+    cv = nmcs.conversion
+    O2 = zero(I2_Bool)
     @inline @inbounds function inner_N(q)
         u,v = get_uv(nmcs,q)
         o2 = zero(u)
         ret = [
-            I2_Int  o2;
+            I2_Bool  o2;
             O2       v;
         ]
         inv(cv)*ret
@@ -1070,13 +979,13 @@ function make_N(nmcs::LNC2D4C)
 end
 
 function make_N(nmcs::LNC2D6C)
-    cv = get_conversion(nmcs)
-    O2 = zero(I2_Int)
+    cv = nmcs.conversion
+    O2 = zero(I2_Bool)
     @inline @inbounds function inner_N(q)
         u,v = get_uv(nmcs,q)
         o2 = zero(u)
         ret = [
-            I2_Int    o2;
+            I2_Bool    o2;
             O2         v;
             O2        -u;
         ]
@@ -1085,13 +994,13 @@ function make_N(nmcs::LNC2D6C)
 end
 
 function make_N(nmcs::LNC3D6C)
-    cv = get_conversion(nmcs)
-    O3 = zero(I3_Int)
+    cv = nmcs.conversion
+    O3 = zero(I3_Bool)
     @inline @inbounds function inner_N(q)
         u,v,w = get_uvw(nmcs,q)
         o3 = zero(u)
         ret = [
-            I3_Int  o3 o3;
+            I3_Bool  o3 o3;
             O3      -w v;
         ]
         inv(cv)*ret
@@ -1099,19 +1008,19 @@ function make_N(nmcs::LNC3D6C)
 end
 
 function make_N(nmcs::LNC3D12C)
-    cv = get_conversion(nmcs)
-    O3 = zero(I3_Int)
+    cv = nmcs.conversion
+    O3 = zero(I3_Bool)
     @inline @inbounds function inner_N(q)
         u,v,w = get_uvw(nmcs,q)
         # ret = [
-        #     I3_Int   O3;
+        #     I3_Bool   O3;
         #     O3 -skew(u);
         #     O3 -skew(v);
         #     O3 -skew(w);
         # ]
         o3 = zero(u)
         ret = [
-            I3_Int    O3;
+            I3_Bool    O3;
             O3  o3  -w  v;
             O3   w  o3 -u;
             O3  -v   u o3;
@@ -1124,26 +1033,26 @@ end
 Return 转换矩阵C。
 $(TYPEDSIGNATURES)
 """
-function make_c(nmcs)
+function to_local_coordinates(nmcs)
     (;r̄i,invX̄) = nmcs
     function c(r̄)
         invX̄*(r̄-r̄i)
     end
 end
 
-function make_C(nmcs::LNC)
+function to_transformation(nmcs::LNC)
     function C(c)
-        ndim = get_ndim(nmcs)
-        ncoords = get_ncoords(nmcs)
-        conversion = get_conversion(nmcs)
+        ndim = get_num_of_dims(nmcs)
+        ncoords = get_num_of_coordinates(nmcs)
+        conversion = nmcs.conversion
         C_raw = hcat(1,transpose(c))
-        SMatrix{ndim,ncoords}(kron(C_raw,make_I(Int,ndim))*conversion)
+        SMatrix{ndim,ncoords}(kron(C_raw,IMatrix(ndim))*conversion)
     end
 end
 
 # CoordinateFunctions
 """
-封装有函数的natural coodinates 。
+封装有函数的natural coodinates.
 $(TYPEDEF)
 """
 struct CoordinateFunctions{nmcsType,
@@ -1180,10 +1089,10 @@ get_idx(nmcs::LNC3D12C) = [
 
 #todo cache Φqᵀq
 function make_Φqᵀq(nmcs::LNC)
-    cv = get_conversion(nmcs)
-    nld = get_nlocaldim(nmcs)
-    ndim = get_ndim(nmcs)
-    I_int = make_I(Int,ndim)
+    cv = nmcs.conversion
+    nld = get_num_of_local_dims(nmcs)
+    ndim = get_num_of_dims(nmcs)
+    I_Bool = IMatrix(ndim)
     idx = get_idx(nmcs)
     Φqᵀq = [
         begin
@@ -1191,51 +1100,51 @@ function make_Φqᵀq(nmcs::LNC)
             for ij in id
                 ret_raw[ij] += 1
             end
-            SymmetricPacked(transpose(cv)*kron(ret_raw,I_int)*cv)
+            SymmetricPacked(transpose(cv)*kron(ret_raw,I_Bool)*cv)
         end
         for id in idx
     ]
 end
 
 #todo use SymmetricPacked to the end
-function make_∂Aᵀλ∂q(nmcs::Union{LNC2D2C,LNC3D3C},uci,Φi)
+function make_∂Aᵀλ∂q(nmcs::Union{LNC2D2C,LNC3D3C},unconstrained_indices,constraints_indices)
     function ∂Aᵀλ∂q(λ)
         nothing
     end
 end
 
-function make_∂Aᵀλ∂q(nmcs::LNC,uci,Φi)
+function make_∂Aᵀλ∂q(nmcs::LNC,unconstrained_indices,constraints_indices)
     Φqᵀq = make_Φqᵀq(nmcs)
     function ∂Aᵀλ∂q(λ)
         ret = [
             begin
-                a = Φqᵀq[j][uci,uci] .* λ[i]
+                a = Φqᵀq[j][unconstrained_indices,unconstrained_indices] .* λ[i]
                 # display(a)
                 a 
             end
-            for (i,j) in enumerate(Φi)
+            for (i,j) in enumerate(constraints_indices)
         ]
         sum(ret)
     end
 end
 
-function make_∂Aq̇∂q(nmcs::Union{LNC2D2C,LNC3D3C},uci,Φi)
+function make_∂Aq̇∂q(nmcs::Union{LNC2D2C,LNC3D3C},unconstrained_indices,constraints_indices)
     function ∂Aq̇∂q(q̇)
         nothing
     end
 end
 
-function make_∂Aq̇∂q(nmcs::LNC,uci,Φi)
+function make_∂Aq̇∂q(nmcs::LNC,unconstrained_indices,constraints_indices)
     Φqᵀq = make_Φqᵀq(nmcs)
     function ∂Aq̇∂q(q̇)
-        q̇uc = @view q̇[uci]
+        q̇uc = @view q̇[unconstrained_indices]
         ret = [
             begin
-                a = transpose(q̇uc)*Φqᵀq[j][uci,uci]
+                a = transpose(q̇uc)*Φqᵀq[j][unconstrained_indices,unconstrained_indices]
                 # display(a)
                 a 
             end
-            for j in Φi
+            for j in constraints_indices
         ]
         sum(ret)
     end
@@ -1276,25 +1185,25 @@ Return 未约束的natural coodinates 编号。
 $(TYPEDSIGNATURES)
 """
 function get_free_idx(nmcs::LNC,pres_idx)
-    deleteat!(collect(1:get_ncoords(nmcs)),pres_idx)
+    deleteat!(collect(1:get_num_of_coordinates(nmcs)),pres_idx)
 end
 
 """
 封装有函数的natural coodinates 构造子。
 $(TYPEDSIGNATURES)
 """
-function CoordinateFunctions(nmcs,uci,Φi)
-    c = make_c(nmcs)
-    C = make_C(nmcs)
-    Φ = make_Φ(nmcs,Φi)
-    Φq = make_Φq(nmcs,uci,Φi)
-    nq = get_ncoords(nmcs)
-    nuc = length(uci)
-    nΦ = length(Φi)
+function CoordinateFunctions(nmcs,unconstrained_indices,constraints_indices)
+    c = to_local_coordinates(nmcs)
+    C = to_transformation(nmcs)
+    Φ = make_constraints_function(nmcs,constraints_indices)
+    Φq = make_constraints_jacobian(nmcs,unconstrained_indices,constraints_indices)
+    nq = get_num_of_coordinates(nmcs)
+    nuc = length(unconstrained_indices)
+    nΦ = length(constraints_indices)
     # ∂Aᵀλ∂q = make_∂Aᵀλ∂q_forwarddiff(Φq,nq,nuc)
-    ∂Aᵀλ∂q = make_∂Aᵀλ∂q(nmcs,uci,Φi)
+    ∂Aᵀλ∂q = make_∂Aᵀλ∂q(nmcs,unconstrained_indices,constraints_indices)
     # ∂Aq̇∂q = make_∂Aq̇∂q_forwarddiff(Φq,nuc,nΦ)
-    ∂Aq̇∂q = make_∂Aq̇∂q(nmcs,uci,Φi)
+    ∂Aq̇∂q = make_∂Aq̇∂q(nmcs,unconstrained_indices,constraints_indices)
     CoordinateFunctions(nmcs,c,C,Φ,Φq,∂Aᵀλ∂q,∂Aq̇∂q)
 end
 
@@ -1317,26 +1226,26 @@ end
 ## Mass matrices: standard
 function make_M(cf::CoordinateFunctions,m::T,Īg,mass_locus) where {T} # ami (area moment of inertia tensor)
     (;nmcs) = cf
-    ndim = get_ndim(nmcs)
-    nld = get_nlocaldim(nmcs)
-    ncoords = get_ncoords(nmcs)
+    ndim = get_num_of_dims(nmcs)
+    nld = get_num_of_local_dims(nmcs)
+    ncoords = get_num_of_coordinates(nmcs)
     a,z = Īg2az(nmcs,m,Īg,mass_locus)
     M_raw = zeros(T,1+nld,1+nld)
     M_raw[1,1] = m
     M_raw[2:1+nld,1] = m*a
     M_raw[1,2:1+nld] = M_raw[2:1+nld,1]
     M_raw[2:1+nld,2:1+nld] .= z
-    M_std = kron(M_raw,make_I(T,ndim))
-    Y_nonstd = get_conversion(nmcs)
+    M_std = kron(M_raw,IMatrix(ndim))
+    Y_nonstd = nmcs.conversion
     M = SMatrix{ncoords,ncoords}(transpose(Y_nonstd)*M_std*Y_nonstd)
 end
 
 make_X(q::AbstractVector,nmcs::LNC) = make_X(nmcs,q)
 
 function make_X(nmcs::LNC,q::AbstractVector)
-    Y = get_conversion(nmcs)
+    Y = nmcs.conversion
     qstd = Y*q
-    ndim = get_ndim(nmcs)
+    ndim = get_num_of_dims(nmcs)
     X = reshape(qstd[ndim+1:end],ndim,:)
     if (nmcs isa LNC2D2C) || (nmcs isa LNC3D3C)
         return X
@@ -1351,7 +1260,7 @@ end
 find_rotation(q::AbstractVector, nmcs::LNC) = find_rotation(nmcs,q)
 function find_rotation(nmcs::LNC,q::AbstractVector)
     (;invX̄) = nmcs
-    ndim = get_ndim(nmcs)
+    ndim = get_num_of_dims(nmcs)
     if nmcs isa LNC2D4C
         (;r̄i,X̄) = nmcs
         ū,v̄ = get_uv(nmcs,vcat(r̄i,vec(X̄)))
@@ -1374,7 +1283,7 @@ find_angular_velocity(q::AbstractVector,q̇::AbstractVector,nmcs::LNC3D) = find_
 function find_angular_velocity(nmcs::LNC,q::AbstractVector,q̇::AbstractVector)
     Ẋ = make_X(nmcs,q̇)
     X = make_X(nmcs,q)
-    ndim = get_ndim(nmcs)
+    ndim = get_num_of_dims(nmcs)
     if ndim == 2
         u = X[:,1]
         u̇ = Ẋ[:,1]
@@ -1386,7 +1295,7 @@ function find_angular_velocity(nmcs::LNC,q::AbstractVector,q̇::AbstractVector)
 end
 
 function get_uvw(nmcs::LNC3D,q)
-    if nmcs isa LNC1P3V
+    if     nmcs isa LNC1P3V
         u = @view q[4:6]
         v = @view q[7:9]
         w = @view q[10:12]
@@ -1425,7 +1334,7 @@ function get_uvw(nmcs::LNC3D,q)
 end
 
 function get_uv(nmcs::LNC2D,q)
-    if nmcs isa LNC1P2V
+    if     nmcs isa LNC1P2V
         u = @view q[3:4]
         v = @view q[5:6]
     elseif nmcs isa LNC2P1V
@@ -1439,7 +1348,7 @@ function get_uv(nmcs::LNC2D,q)
         rk = @view q[5:6]
         u = rj - ri
         v = rk - ri
-    elseif nmcs isa LNC2D2P
+    elseif nmcs isa LNC2D1P1V
         u = @view q[3:4]
         v = rotation_matrix(π/2)*u
     elseif nmcs isa LNC2D2P
@@ -1450,5 +1359,42 @@ function get_uv(nmcs::LNC2D,q)
     end
     SVector{2}(u),SVector{2}(v)
 end
+
+"""
+Return rigid body natural coodinates 
+$(TYPEDSIGNATURES)
+"""
+function rigidstate2naturalcoords(nmcs::Union{LNC2D2C,LNC3D3C},origin_position,R)
+    origin_position
+end
+
+function rigidstate2naturalcoords(nmcs::Union{LNC2D2C,LNC3D3C},origin_position,R,origin_velocity,ω)
+    origin_position,origin_velocity
+end
+
+function rigidstate2naturalcoords(nmcs,origin_position,R)
+    (;r̄i,X̄) = nmcs
+    ri = origin_position + R*r̄i
+    X = R*X̄
+    qstd = vcat(ri,vec(X))
+    Y = nmcs.conversion
+    q = Y\qstd
+    q
+end
+
+function rigidstate2naturalcoords(nmcs,origin_position,R,origin_velocity,ω)
+    (;r̄i,X̄) = nmcs
+    ri = origin_position + R*r̄i
+    ṙi = origin_velocity + ω×(ri-origin_position)
+    X = R*X̄
+    Ẋ = reduce(hcat,Ref(ω) .× eachcol(X))
+    qstd = vcat(ri,vec(X))
+    q̇std = vcat(ṙi,vec(Ẋ))
+    Y = nmcs.conversion
+    q = Y\qstd
+    q̇ = Y\q̇std
+    q,q̇
+end
+
 
 end

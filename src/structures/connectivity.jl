@@ -25,7 +25,7 @@ function number(rbs)
     foreach(rbs) do body
         i = body.prop.id
         nnodes_by_mem[i] = body.prop.loci |> length
-        nld_by_mem[i] = get_nlocaldim(body)
+        nld_by_mem[i] = get_num_of_local_dims(body)
     end
     mem2num = Vector{Int}[]
     num2ID = Vector{ID{Int,Int}}()
@@ -73,7 +73,7 @@ function index_inconstraints(rbs)
     ndof_by_mem = zeros(Int,nmem)
     foreach(rbs) do body
         nincst_by_mem[body.prop.id] = body.state.cache.nΦ
-        ndof_by_mem[body.prop.id] = get_ndof(body)
+        ndof_by_mem[body.prop.id] = get_num_of_dof(body)
     end
     ninconstraints = sum(nincst_by_mem)
     sysndof = sum(ndof_by_mem)
@@ -270,7 +270,7 @@ function connect_and_cluster(rbs, cm_input, cm2_input)
 end
 
 """
-Rigid Body Connectivity Type 。
+Rigid Body Connectivity Type.
 $(TYPEDEF)
 """
 struct Connectivity{numberType,indexType,tensionType,jointType}
@@ -281,7 +281,7 @@ struct Connectivity{numberType,indexType,tensionType,jointType}
 end
 
 """
-Connectivity Constructor 。
+Connectivity Constructor.
 $(TYPEDSIGNATURES)
 """
 function Connectivity(numbered,indexed,tensioned)

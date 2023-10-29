@@ -55,11 +55,11 @@ function dualtri(ndof,;onedir=[1.0,0.0],θ=0.0,k=400.0,c=0.0,restlen=0.16)
         if i == 1
             constrained = true
             ci = collect(1:6)
-            Φi = Int[]
+            constraints_indices = Int[]
         else
             constrained = false
             ci = Int[]
-            Φi = collect(1:3)
+            constraints_indices = collect(1:3)
         end
         
         ω = 0.0
@@ -77,7 +77,7 @@ function dualtri(ndof,;onedir=[1.0,0.0],θ=0.0,k=400.0,c=0.0,restlen=0.16)
 
         lncs, q, _ = RB.NCF.NC1P2V(SVector{2}(ri), ro, α, ṙo, ω)
 
-        state = RB.RigidBodyState(prop, lncs, ri, α, ṙo, ω, ci, Φi)
+        state = RB.RigidBodyState(prop, lncs, ri, α, ṙo, ω, ci, constraints_indices)
 
         body = RB.RigidBody(prop,state)
     end
@@ -173,7 +173,7 @@ function Tbars(;θ = 0)
         m = 1.0
         Ī = SMatrix{3,3}(Matrix(1.0I,3,3))
         ci = collect(1:12)
-        Φi = Int[]    
+        constraints_indices = Int[]    
         R = RotZ(0.0)    
         ω = SVo3
         ri = SVo3
@@ -191,7 +191,7 @@ function Tbars(;θ = 0)
 
         lncs, _, _ = RB.NCF.NC1P3V(ri, ro, R, ṙo, ω)
 
-        state = RB.RigidBodyState(prop, lncs, ri, R, ṙo, ω, ci, Φi)
+        state = RB.RigidBodyState(prop, lncs, ri, R, ṙo, ω, ci, constraints_indices)
         basemesh = load("装配体1.STL") |> make_patch(;
             # trans=[-1.0,0,0],
             rot = RotZ(π),
@@ -326,7 +326,7 @@ function planar_parallel()
         m = 1.0
         Ī = SMatrix{3,3}(Matrix(1.0I,3,3))
         ci = collect(1:12)
-        Φi = Int[]    
+        constraints_indices = Int[]    
         R = RotZ(0.0)    
         ω = SVo3
         ri = SVo3
@@ -344,7 +344,7 @@ function planar_parallel()
 
         lncs, _, _ = RB.NCF.NC1P3V(ri, ro, R, ṙo, ω)
 
-        state = RB.RigidBodyState(prop, lncs, ri, R, ṙo, ω, ci, Φi)
+        state = RB.RigidBodyState(prop, lncs, ri, R, ṙo, ω, ci, constraints_indices)
 
         RB.RigidBody(prop,state)
     end

@@ -62,12 +62,12 @@ struct FlexibleBodyCoordinatesCache{fT,MT,JT,VT,eT,ArrayT,N,M}
 end
 
 function get_Φ_mask(ancs::ANCF.ANC)
-	nΦ = ANCF.get_nconstraints(ancs)
+	nΦ = ANCF.get_num_of_constraints(ancs)
 	@SVector ones(Bool,nΦ)
 end
 
 function get_idx_mask(ancs::ANCF.ANC,pres_idx)
-    ne = ANCF.get_ncoords(ancs)
+    ne = ANCF.get_num_of_coordinates(ancs)
     pres_idx_mask = SVector{ne}(i in pres_idx for i = 1:ne)
     free_idx_mask = .!pres_idx_mask
     free_idx_mask, pres_idx_mask
@@ -126,7 +126,7 @@ function FlexibleBodyState(prop::FlexibleBodyProperty{N,T},
         Φ_mask=get_Φ_mask(ancs)) where {N,T}
     (;mass_locus,loci) = prop
     num_of_loci = length(loci)
-    nc = ANCF.get_ncoords(ancs)
+    nc = ANCF.get_num_of_coordinates(ancs)
     cache = get_CoordinatesCache(
         prop,
         ancs,

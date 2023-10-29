@@ -42,8 +42,8 @@ function generate_cache(solver::AlphaCCP,intor;dt,kargs...)
     # mm = RB.build_MassMatrices(bot)
     M = Matrix(build_M(st))
     # (;M) = mm
-    A = make_A(bot)
-    Φ = make_Φ(bot)
+    A = make_constraints_jacobian(bot)
+    Φ = make_constraints_function(bot)
 
     nq = length(q)
     T = eltype(q)

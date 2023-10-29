@@ -28,8 +28,8 @@ function generate_cache(solver::Alpha,intor;dt,kargs...)
     # F!,_ = dynfuncs
     mm = build_MassMatrices(bot)
     # (;M) = mm
-    A = make_A(bot)
-    Φ = make_Φ(bot)
+    A = make_constraints_jacobian(bot)
+    Φ = make_constraints_function(bot)
     ∂Ǎᵀλ∂q̌ = (q,λ)->∂Aᵀλ∂q̌(bot.st,λ)
     funcs = @eponymtuple(A,Φ,∂Ǎᵀλ∂q̌)
     h = dt

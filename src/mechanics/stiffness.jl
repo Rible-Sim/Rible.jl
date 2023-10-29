@@ -197,7 +197,7 @@ end
 # function super_stability(bot)
 #     q = RB.get_q(bot.st)
 #     # q̌ = RB.get_q̌(bot.st)
-#     Ǎ = RB.make_A(bot.st)(q)
+#     Ǎ = RB.make_constraints_jacobian(bot.st)(q)
 #     Ň_ = RB.nullspace(Ǎ)
 #     Ň = modified_gram_schmidt(Ň_)
 #     Q̃ = RB.build_Q̃(bot.st)

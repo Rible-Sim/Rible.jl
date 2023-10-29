@@ -127,7 +127,7 @@ function man_ndof(ndof,onedir=[1.0,0.0];θ=0.0,k=0.0,c=0.0,unit="mks",restlen=0.
 
 		constrained = false
 		ci = Int[]
-		Φi =  collect(1:3)
+		constraints_indices =  collect(1:3)
 		prop = RB.RigidBodyProperty(
 					i,movable,m,
 					Ī,
@@ -146,7 +146,7 @@ function man_ndof(ndof,onedir=[1.0,0.0];θ=0.0,k=0.0,c=0.0,unit="mks",restlen=0.
 				ci = [1]
 			end
 		end
-		state = RB.RigidBodyState(prop, lncs, ri, α, ṙo, ω, ci, Φi)
+		state = RB.RigidBodyState(prop, lncs, ri, α, ṙo, ω, ci, constraints_indices)
 
         body = RB.RigidBody(prop,state)
     end

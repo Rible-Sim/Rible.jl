@@ -128,12 +128,12 @@ function man_ndof(ndof,onedir=[0.0,-1.0];θ=0.0,k=0.0,c=0.0,unit="mks",restlen=0
         lncs, q0, _ = RB.NCF.NC1P2V(ri,ro,α,ṙo,ω)
 		if i == 1
 			ci = collect(1:6)
-			Φi = Int[]
+			constraints_indices = Int[]
 		else
 			ci = Int[]
-			Φi = collect(1:3)
+			constraints_indices = collect(1:3)
 		end
-        state = RB.RigidBodyState(prop,lncs,ro,α,ṙo,ω,ci,Φi)
+        state = RB.RigidBodyState(prop,lncs,ro,α,ṙo,ω,ci,constraints_indices)
 
         body = RB.RigidBody(prop,state)
     end
@@ -308,15 +308,15 @@ function man_ndof_2022(ndof,onedir=[1.0,0.0];θ=0.0,k=1250.0,c=0.0,unit="mks")
             constrained = true
 			# edi == 1 ? ci = [1,3,4] : ci = [1,2,4]
 			ci = collect(1:6)
-			Φi = Int[]
+			constraints_indices = Int[]
 		elseif i == 2
             constrained = true
 			ci = collect(1:2)
-			Φi = collect(1:3)
+			constraints_indices = collect(1:3)
         else
             constrained = false
             ci = Int[]
-			Φi = collect(1:3)
+			constraints_indices = collect(1:3)
         end
 
 		sti_l = 0.01832 #弹簧偏移顶点的量
@@ -439,7 +439,7 @@ function man_ndof_2022(ndof,onedir=[1.0,0.0];θ=0.0,k=1250.0,c=0.0,unit="mks")
 
         lncs, q0, _ = RB.NCF.NC2P1V(ri,rj,ro,α,ṙo,ω)
 
-        state = RB.RigidBodyState(prop,lncs,ro,α,ṙo,ω,ci,Φi)
+        state = RB.RigidBodyState(prop,lncs,ro,α,ṙo,ω,ci,constraints_indices)
 
         body = RB.RigidBody(prop,state)
 

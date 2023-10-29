@@ -48,8 +48,8 @@ end
 
 function find_full_pres_indices(lncs,q)
     cf = NCF.CoordinateFunctions(lncs,
-            collect(1:NCF.get_ncoords(lncs)),
-            collect(1:NCF.get_nconstraints(lncs))
+            collect(1:NCF.get_num_of_coordinates(lncs)),
+            collect(1:NCF.get_num_of_constraints(lncs))
         )
     Aq = cf.Φq(q)
     col_index = GECP(Aq)
@@ -72,7 +72,7 @@ function ∂Aᵀλ∂q̌(st::AbstractStructure,λ)
         end
     end
     #todo skip 2D for now
-    if get_ndim(st) == 3
+    if get_num_of_dims(st) == 3
         foreach(joints) do joint
             jointexcst = joint2sysexcst[joint.id]
             jointfree = get_jointed_free(joint,indexed)
@@ -93,9 +93,9 @@ function ∂Aq̇∂q(st,q̇)
         memfree = mem2sysfree[bodyid]
         memincst = mem2sysincst[bodyid]
         free_idx = body.state.cache.free_idx
-        Φi = body.state.cache.Φi
+        constraints_indices = body.state.cache.constraints_indices
         if !isempty(memincst)
-            ret[memincst,memfree] .+= body.state.cache.funcs.∂Aq̇∂q(q̇[memfree])[Φi,free_idx]
+            ret[memincst,memfree] .+= body.state.cache.funcs.∂Aq̇∂q(q̇[memfree])[constraints_indices,free_idx]
         end
     end
     ret
@@ -424,7 +424,7 @@ function build_∂Q̌∂q̌(st,@eponymargs(connected,))
     (;indexed) = st.connectivity
     (;nfull,nfree,sysfree,mem2sysfree,mem2sysfull) = indexed
     T = get_numbertype(st)
-    ndim = get_ndim(st)
+    ndim = get_num_of_dims(st)
     ∂Q̌∂q̌ = zeros(T,nfree,nfree)
     D = @MMatrix zeros(T,ndim,ndim)
     Im = Symmetric(SMatrix{ndim,ndim}(one(T)*I))
@@ -469,7 +469,7 @@ function build_∂Q̌∂q̌(st,@eponymargs(clustered))
     (;indexed) = st.connectivity
     (;nfull,nfree,sysfree,mem2sysfree,mem2sysfull) = indexed
     T = get_numbertype(st)
-    ndim = get_ndim(st)
+    ndim = get_num_of_dims(st)
     ∂Q̌∂q̌ = zeros(T,nfree,nfree)
     D = @MMatrix zeros(T,ndim,ndim)
     Im = Symmetric(SMatrix{ndim,ndim}(one(T)*I))
@@ -516,7 +516,7 @@ function build_∂Q̌∂q̌!(∂Q̌∂q̌,st)
     (;connected) = tensioned
     (;nfull,nfree,sysfree,mem2sysfree,mem2sysfull) = indexed
     T = get_numbertype(st)
-    ndim = get_ndim(st)
+    ndim = get_num_of_dims(st)
     # ∂Q̌∂q̌ = zeros(T,nfree,nfree)
     D = @MMatrix zeros(T,ndim,ndim)
     Im = Symmetric(SMatrix{ndim,ndim}(one(T)*I))
@@ -586,7 +586,7 @@ function build_∂Q̌∂q̌̇(st, @eponymargs(connected, ))
     (;indexed) = st.connectivity
     (;nfull,nfree,sysfree,mem2sysfree,mem2sysfull) = indexed
     T = get_numbertype(st)
-    ndim = get_ndim(st)
+    ndim = get_num_of_dims(st)
     ∂Q̌∂q̌̇ = zeros(T,nfree,nfree)
     D = @MMatrix zeros(T,ndim,ndim)
     Im = Symmetric(SMatrix{ndim,ndim}(one(T)*I))
@@ -629,7 +629,7 @@ function build_∂Q̌∂q̌̇(st, @eponymargs(clustered, ))
     (;indexed) = st.connectivity
     (;nfull,nfree,sysfree,mem2sysfree,mem2sysfull) = indexed
     T = get_numbertype(st)
-    ndim = get_ndim(st)
+    ndim = get_num_of_dims(st)
     ∂Q̌∂q̌̇ = zeros(T,nfree,nfree)
     D = @MMatrix zeros(T,ndim,ndim)
     Im = Symmetric(SMatrix{ndim,ndim}(one(T)*I))
@@ -673,7 +673,7 @@ function build_∂Q̌∂q̌̇!(∂Q̌∂q̌̇,st)
     (;cables) = st.tensiles
     (;nfull,nfree,sysfree,mem2sysfree,mem2sysfull) = indexed
     T = get_numbertype(st)
-    ndim = get_ndim(st)
+    ndim = get_num_of_dims(st)
     # ∂Q̌∂q̌̇ = zeros(T,nfree,nfree)
     D = @MMatrix zeros(T,ndim,ndim)
     Im = Symmetric(SMatrix{ndim,ndim}(one(T)*I))
@@ -717,7 +717,7 @@ function build_∂Q̌∂s̄(st)
     (;nfull,nfree,sysfree,mem2sysfree,mem2sysfull) = indexed
     ns = sum([length(clustercables[i].sps) for i in 1:nclustercables])
     T = get_numbertype(st)
-    ndim = get_ndim(st)
+    ndim = get_num_of_dims(st)
     ∂Q̌∂s̄ = zeros(T,2ns,nfree)
     D = zeros(T, ndim)
     lkn = zeros(T, 2ns, ndim)
@@ -798,7 +798,7 @@ function undamped_eigen(st;gravity=false)
     q̌ = get_q̌(st)
     M̌ = build_M̌(st)
     Ǩ = build_Ǩ(st,λ)
-    Ǎ = make_A(st)(q)
+    Ǎ = make_constraints_jacobian(st)(q)
     Ň = nullspace(Ǎ)
     ℳ = transpose(Ň)*M̌*Ň
     𝒦 = transpose(Ň)*Ǩ*Ň
@@ -938,7 +938,7 @@ end
 function check_stability(st::Structure,λ;verbose=false)
     q = get_q(st)
     c = get_c(st)
-    A = make_A(st,q)
+    A = make_constraints_jacobian(st,q)
     Ň(q̌,c) = nullspace(A(q̌))
     check_stability(st,λ,Ň;verbose)
 end
@@ -1032,8 +1032,8 @@ function get_poly(bot_input;
     # ncables = length(cables)
     # nλ = nconstraints
     gue = get_initial(st)
-    Φ = make_Φ(st,gue.q)
-    A = make_A(st,gue.q)
+    Φ = make_constraints_function(st,gue.q)
+    A = make_constraints_jacobian(st,gue.q)
     Q̌ = make_Q̌(st,gue.q)
     S = make_S(st,gue.q)
     Ǩm_Ǩg = make_Ǩm_Ǩg(st,gue.q)

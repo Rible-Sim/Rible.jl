@@ -6,7 +6,7 @@ using StaticArrays
 using ForwardDiff
 using DocStringExtensions
 
-export get_nconstraints, get_ncoords, get_ndof, get_nlocaldim
+export get_num_of_constraints, get_num_of_coordinates, get_num_of_dof, get_num_of_local_dims
 
 vec(q::Quaternion) = SA[q.s, q.v1, q.v2, q.v3]
 
@@ -133,19 +133,19 @@ function QC(m::T,J::AbstractMatrix{T};γ=maximum(diag(J))) where {T}
     QC(m,m⁻¹,γ,Jγ,γ⁻¹,J⁻¹γ)
 end
 
-get_nconstraints(::QC) = 1
-get_ncoords(::QC) = 7
-get_ndof(::QC) = 6
-get_nlocaldim(::QC) = 3
+get_num_of_constraints(::QC) = 1
+get_num_of_coordinates(::QC) = 7
+get_num_of_dof(::QC) = 6
+get_num_of_local_dims(::QC) = 3
 
-function make_Φ()
+function make_constraints_function()
     function inner_Φ(x::AbstractVector)
         q = @view x[4:7]
         (transpose(q)*q - 1)/2
     end
 end
 
-function make_Φq()
+function make_constraints_jacobian()
     function inner_Φq(x::AbstractVector)
         q = @view x[4:7]
         o = zero(eltype(q))
@@ -169,7 +169,7 @@ function skew(w)
     ]
 end
 
-function make_C(c)
+function to_transformation(c)
     ĉ = skew(c)
     function inner_C(x)
         q = @view x[4:7]
@@ -332,7 +332,7 @@ function make_∂T∂xᵀ∂x(qcs::QC)
     end
 end
 
-function rigidState2coordinates(origin_position,R,origin_velocity,ω)
+function rigid_state2coordinates(origin_position,R,origin_velocity,ω)
     Rmat = RotMatrix(R)
     q = QuatRotation(Rmat).q |> vec
     Ω = inv(Rmat)*ω
@@ -389,8 +389,8 @@ function CoordinateFunctions(qcs)
     build_∂M⁻¹y∂x = make_∂M⁻¹y∂x(qcs)
     build_∂T∂xᵀ = make_∂T∂xᵀ(qcs)
     build_∂T∂xᵀ∂x = make_∂T∂xᵀ∂x(qcs)    
-    Φ = make_Φ()
-    Φq = make_Φq()
+    Φ = make_constraints_function()
+    Φq = make_constraints_jacobian()
     c(x) = x
     CoordinateFunctions(
         qcs,

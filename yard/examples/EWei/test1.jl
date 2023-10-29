@@ -25,20 +25,20 @@ function rigidbody(i, rij, apss, rg)
         movable = false
         constrained = true
         ci = collect(1:6)
-        Φi = Int[]
+        constraints_indices = Int[]
     else
         movable = true
         if i == 2
             constrained = true
             ci = collect(1:2)
-            Φi = [1]
+            constraints_indices = [1]
         else
             constrained = false
             ci = Int[]
             if i == 4
-                Φi = [1]
+                constraints_indices = [1]
             else
-                Φi = collect(1:3)
+                constraints_indices = collect(1:3)
             end
         end
     end
@@ -69,7 +69,7 @@ function rigidbody(i, rij, apss, rg)
     else
         lncs, _ = RB.NCF.NC2D2P(SVector{2}(ri), SVector{2}(rj), ro, α, ṙo, ω)
     end
-    state = RB.RigidBodyState(prop, lncs, ri, α, ṙo, ω, ci, Φi)
+    state = RB.RigidBodyState(prop, lncs, ri, α, ṙo, ω, ci, constraints_indices)
     body = RB.RigidBody(prop, state)
 end
 rij = [[[0.0, 0.0], [1.0, 0.0]],

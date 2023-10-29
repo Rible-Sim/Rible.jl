@@ -103,17 +103,17 @@ function make_bai(meshes,质心,质量,惯量)
             movable = false
             constrained = true
             ci = collect(1:6)
-            Φi = Int[]
+            constraints_indices = Int[]
         elseif i in [2,nb]
             movable = true
             constrained = true
             ci = collect(1:2)
-            Φi = collect(1:3)
+            constraints_indices = collect(1:3)
         else
             movable = true
             constrained = false
             ci = Int[]
-            Φi = collect(1:3)
+            constraints_indices = collect(1:3)
         end
         α = -π/2
         if i == 1
@@ -163,7 +163,7 @@ function make_bai(meshes,质心,质量,惯量)
             constrained = constrained,
         )
         lncs, _ = RB.NCF.NC2P1V(ri, rj, ro, α, ṙo, ω)
-        state = RB.RigidBodyState(prop, lncs, ro, α, ṙo, ω, ci, Φi)
+        state = RB.RigidBodyState(prop, lncs, ro, α, ṙo, ω, ci, constraints_indices)
         mesh_rigid = meshes[i]
         body = RB.RigidBody(prop, state, mesh_rigid)
         rb

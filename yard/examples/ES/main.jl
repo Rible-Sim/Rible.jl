@@ -49,22 +49,14 @@ ENV["JULIA_STACKTRACE_ABBREVIATED"] = true
 ENV["JULIA_STACKTRACE_MINIMAL"] = true
 using Revise
 import Rible as RB
-cd("examples/ES")
-include("../vis.jl")
-include("../analysis.jl")
-include("../dyn.jl")
-include("dyn.jl")
-include("def.jl")
-include("def3d.jl")
-include("../bridge/bridge.jl")
+cd(@__DIR__)
+include("../../vis.jl"); includet("../../vis.jl")
+include("../../dyn.jl"); includet("../../dyn.jl")
+include("dyn.jl"); includet("dyn.jl")
+include("def.jl"); includet("def.jl")
+include("def3d.jl"); includet("def3d.jl")
+include("../bridge/bridge.jl"); includet("../bridge/bridge.jl")
 
-includet("../vis.jl")
-includet("../analysis.jl")
-includet("../dyn.jl")
-includet("dyn.jl")
-includet("def.jl")
-includet("def3d.jl")
-includet("../bridge/bridge.jl")
 figdir::String = ""
 if Sys.iswindows()
     figdir::String = raw"C:\Users\luo22\OneDrive\Papers\DynamicTensegrity\ES"
@@ -346,7 +338,7 @@ end
 GM.activate!(); plot_comparison_and_energy(ode_sol,ode_M,obot,obot_zhong,obot_alpha,)
 CM.activate!(); plot_comparison_and_energy(ode_sol,ode_M,obot,obot_zhong,obot_alpha,"comparison_and_energy")
 
-## simple
+#---- simple
 gravity = false
 c = 0.0
 z0 = 0.2
@@ -2298,7 +2290,7 @@ l = RB.get_cables_len(bot.st)
 f = RB.get_cables_tension(bot)
 q = RB.get_q(bot.st)
 q̌ = RB.get_q̌(bot.st)
-Ǎ = RB.make_A(bot.st)(q)
+Ǎ = RB.make_constraints_jacobian(bot.st)(q)
 # Ň_ = RB.nullspace(Ǎ)
 # Ň = RB.modified_gram_schmidt(Ň_)
 Ň = RB.make_intrinsic_nullspace(bot.st,q)

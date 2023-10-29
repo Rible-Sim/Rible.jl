@@ -44,7 +44,7 @@ end
 
 function get_cables(st)
     (;tensioned) = st.connectivity
-    ndim = RB.get_ndim(st)
+    ndim = RB.get_num_of_dims(st)
     T = RB.get_numbertype(st)
     ret = Vector{Pair{Point{ndim,T},Point{ndim,T}}}()
     mapreduce(

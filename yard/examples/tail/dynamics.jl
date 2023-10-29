@@ -39,20 +39,20 @@ function make_new_tail(n)
             movable = false
             constrained = true
             ci = collect(1:6)
-            Φi = Int[]
+            constraints_indices = Int[]
         else
             movable = true
             if i == 2
                 constrained = true
                 ci = collect(1:2)
-                Φi = [1]
+                constraints_indices = [1]
             else
                 constrained = false
                 ci = Int[]
                 if isodd(pos)
-                    Φi = collect(1:3)
+                    constraints_indices = collect(1:3)
                 else
-                    Φi = [1]
+                    constraints_indices = [1]
                 end
             end
         end
@@ -102,7 +102,7 @@ function make_new_tail(n)
         else
             lncs, _ = RB.NCF.NC2D2P(ri, rj, ro, α, ṙo, ω)
         end
-        state = RB.RigidBodyState(prop, lncs, ri, α, ṙo, ω, ci, Φi)
+        state = RB.RigidBodyState(prop, lncs, ri, α, ṙo, ω, ci, constraints_indices)
         body = RB.RigidBody(prop, state)
     end
     rbs = [

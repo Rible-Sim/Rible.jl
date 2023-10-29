@@ -1,6 +1,6 @@
 
 """
-Robot Type 。
+Robot Type.
 $(TYPEDEF)
 """
 struct Robot{tgT,hubT,trajT,contacts_trajT}
@@ -12,7 +12,7 @@ end
 
 
 """
-Robot Type Constructor 。
+Robot Type Constructor.
 $(TYPEDSIGNATURES)
 """
 function Robot(st,hub=nothing)
@@ -39,8 +39,8 @@ function Robot(st,hub=nothing)
 end
 
 
-make_A(bot::Robot) = make_A(bot.st)
-make_Φ(bot::Robot) = make_Φ(bot.st)
+make_constraints_jacobian(bot::Robot) = make_constraints_jacobian(bot.st)
+make_constraints_function(bot::Robot) = make_constraints_function(bot.st)
 
 """
 Return System 质量矩阵。
@@ -82,7 +82,7 @@ function build_Y(bot)
 end
 
 """
-重置System State 。
+重置System State.
 $(TYPEDSIGNATURES)
 """
 function reset!(bot::Robot)
@@ -106,7 +106,7 @@ function set_new_initial!(bot::Robot,q,q̇=zero(q))
 end
 
 """
-Update System 到指定时间步State 。
+Update System 到指定时间步State.
 $(TYPEDSIGNATURES)
 """
 function goto_step!(bot::Robot,that_step;actuate=false)
