@@ -266,7 +266,7 @@ function make_constraints_function(st::AbstractStructure,q0::AbstractVector)
     (;numbered,indexed,jointed) = st.connectivity
     (;nfree,nfull,syspres,sysfree,mem2sysfull,mem2syspres,mem2sysfree,ninconstraints,mem2sysincst) = indexed
 
-    function _inner_Φ(q̌,d,c)
+    function _inner_constraints_function(q̌,d,c)
         q = Vector{eltype(q̌)}(undef,nfull)
         q[syspres] .= q0[syspres]
         q[sysfree] .= q̌
@@ -289,24 +289,24 @@ function make_constraints_function(st::AbstractStructure,q0::AbstractVector)
         ret
     end
 
-    function inner_Φ(q̌)
-        _inner_Φ(q̌,get_d(st),get_c(st))
+    function inner_constraints_function(q̌)
+        _inner_constraints_function(q̌,get_d(st),get_c(st))
     end
-    function inner_Φ(q̌,d)
-        _inner_Φ(q̌,d,get_c(st))
+    function inner_constraints_function(q̌,d)
+        _inner_constraints_function(q̌,d,get_c(st))
     end
-    function inner_Φ(q̌,d,c)
-        _inner_Φ(q̌,d,c)
+    function inner_constraints_function(q̌,d,c)
+        _inner_constraints_function(q̌,d,c)
     end
 
-    inner_Φ
+    inner_constraints_function
 end
 
 function make_constraints_function(st::AbstractStructure)
     (;bodies,nconstraints) = st
     (;indexed,jointed,numbered) = st.connectivity
     (;nfree,mem2sysfull,mem2sysfree,ninconstraints,mem2sysincst) = indexed
-    @inline @inbounds function inner_Φ(q)
+    @inline @inbounds function inner_constraints_function(q)
         ret = Vector{eltype(q)}(undef,nconstraints)
         is = Ref(ninconstraints)
         foreach(bodies) do body
@@ -325,7 +325,7 @@ function make_constraints_function(st::AbstractStructure)
         end
         ret
     end
-    inner_Φ
+    inner_constraints_function
 end
 
 

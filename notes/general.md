@@ -50,3 +50,4 @@ more than necessary, but not redundant
 - [ ] try SNAKE/RATTLE scheme
 - [ ] visualize Locus/LocusState
 - [ ] investigate scaling, may be scale relative velocity to position?
+- [ ] A (moving) frame type for (origin_position,R,origin_velocity,ω) ? quaternion?

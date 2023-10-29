@@ -65,11 +65,11 @@ function rigidbody(i, rij, apss, rg)
     )
     ro = SVector{2}(ri)
     if isodd(i)
-        lncs, _ = RB.NCF.NC2P1V(SVector{2}(ri), SVector{2}(rj), ro, α, ṙo, ω)
+        nmcs = RB.NCF.NC2P1V(SVector{2}(ri), SVector{2}(rj), ro, α, ṙo, ω)
     else
-        lncs, _ = RB.NCF.NC2D2P(SVector{2}(ri), SVector{2}(rj), ro, α, ṙo, ω)
+        nmcs = RB.NCF.NC2D2P(SVector{2}(ri), SVector{2}(rj), ro, α, ṙo, ω)
     end
-    state = RB.RigidBodyState(prop, lncs, ri, α, ṙo, ω, ci, constraints_indices)
+    state = RB.RigidBodyState(prop, nmcs, ri, α, ṙo, ω, ci, constraints_indices)
     body = RB.RigidBody(prop, state)
 end
 rij = [[[0.0, 0.0], [1.0, 0.0]],

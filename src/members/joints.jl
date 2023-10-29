@@ -62,9 +62,9 @@ function EmptyConstraint(values=Vector{Float64}())
 end
 
 function make_constraints_function(::EmptyConstraint)
-    inner_Φ(q) = Vector{eltype(q)}()
-    inner_Φ(q,d) = Vector{eltype(q)}()
-    inner_Φ
+    inner_constraints_function(q) = Vector{eltype(q)}()
+    inner_constraints_function(q,d) = Vector{eltype(q)}()
+    inner_constraints_function
 end
 
 function make_constraints_jacobian(::EmptyConstraint)
@@ -87,9 +87,9 @@ $(TYPEDSIGNATURES)
 """
 function FixedBodyConstraint(rbs,mem2sysfull,bodyid)
     body = rbs[bodyid]
-    lncs = body.state.cache.funcs.lncs
+    nmcs = body.state.cache.funcs.nmcs
     q_rb = body.state.coords.q
-    pres_idx = find_full_pres_indices(lncs,q_rb)
+    pres_idx = find_full_pres_indices(nmcs,q_rb)
     indices = body2q[bodyid][pres_idx]
     values = q_rb[pres_idx]
     FixedBodyConstraint(length(indices),indices,values)
@@ -97,9 +97,9 @@ end
 
 function make_constraints_function(cst::FixedBodyConstraint)
     (;indices, values) = cst
-    @inline @inbounds inner_Φ(q)   = q[indices]-values
-    @inline @inbounds inner_Φ(q,d) = q[indices]-d
-    inner_Φ
+    @inline @inbounds inner_constraints_function(q)   = q[indices]-values
+    @inline @inbounds inner_constraints_function(q,d) = q[indices]-d
+    inner_constraints_function
 end
 
 function make_constraints_jacobian(cst::FixedBodyConstraint)
@@ -136,9 +136,9 @@ end
 
 function make_constraints_function(cst::FixedIndicesConstraint,st)
     @unpack indices, values = cst
-    @inline @inbounds inner_Φ(q)   = q[indices]-values
-    @inline @inbounds inner_Φ(q,d) = q[indices]-d
-    inner_Φ
+    @inline @inbounds inner_constraints_function(q)   = q[indices]-values
+    @inline @inbounds inner_constraints_function(q,d) = q[indices]-d
+    inner_constraints_function
 end
 
 function make_constraints_jacobian(cst::FixedIndicesConstraint,st)
@@ -181,14 +181,14 @@ end
 function make_constraints_function(cst::LinearJoint,indexed,numbered)
     (;mem2sysfull) = indexed
     (;nconstraints,values,A) = cst
-    function _inner_Φ(q,d)
+    function _inner_constraints_function(q,d)
         ret = zeros(eltype(q),nconstraints)
         ret .= A*q .- d
         ret
     end
-    inner_Φ(q)   = _inner_Φ(q,values)
-    inner_Φ(q,d) = _inner_Φ(q,d)
-    inner_Φ
+    inner_constraints_function(q)   = _inner_constraints_function(q,values)
+    inner_constraints_function(q,d) = _inner_constraints_function(q,d)
+    inner_constraints_function
 end
 
 function make_constraints_jacobian(cst::LinearJoint,indexed,numbered)

@@ -51,8 +51,8 @@ function quad(c=100.0;
             loci;
             constrained = constrained,
         )
-        lncs, _ = RB.NCF.NC1P3V(ri, ro, R, ṙo, ω)
-        state = RB.RigidBodyState(prop, lncs, ri, R, ṙo, ω, ci, constraints_indices)
+        nmcs = RB.NCF.NC1P3V(ri, ro, R, ṙo, ω)
+        state = RB.RigidBodyState(prop, nmcs, ri, R, ṙo, ω, ci, constraints_indices)
         trunk_mesh = load("身体.STL")
         body = RB.RigidBody(prop, state, trunk_mesh)
     end
@@ -93,8 +93,8 @@ function quad(c=100.0;
             loci;
             constrained = constrained,
         )
-        lncs, _ = RB.NCF.NC3D2P(ri, rj, ro, R, ṙo, ω)
-        state = RB.RigidBodyState(prop, lncs, ro, R, ṙo, ω, ci, constraints_indices)
+        nmcs = RB.NCF.NC3D2P(ri, rj, ro, R, ṙo, ω)
+        state = RB.RigidBodyState(prop, nmcs, ro, R, ṙo, ω, ci, constraints_indices)
         leg_mesh = load("400杆.STL")
         body = RB.RigidBody(prop, state, leg_mesh)
     end
@@ -219,14 +219,14 @@ function rigidbar(i,
     )
     if isbody
         @show isbody
-        lncs, _ = RB.NCF.NC1P3V(ri, ro, R)
+        nmcs = RB.NCF.NC1P3V(ri, ro, R)
         ω = zero(ṙo)
     else
-        lncs, _ = RB.NCF.NC3D1P1V(ri, u, ro, R)
-        ω = RB.NCF.find_angular_velocity(lncs,vcat(ri,u),vcat(ṙi,u̇))
+        nmcs = RB.NCF.NC3D1P1V(ri, u, ro, R)
+        ω = RB.NCF.find_angular_velocity(nmcs,vcat(ri,u),vcat(ṙi,u̇))
         # @show ω, ṙi, u̇
     end
-    state = RB.RigidBodyState(prop, lncs, ro, R, ṙo, ω, ci, constraints_indices)
+    state = RB.RigidBodyState(prop, nmcs, ro, R, ṙo, ω, ci, constraints_indices)
     # leg_mesh = load("400杆.STL")
     if loadmesh
         barmesh = load(joinpath(assetdir,"BZ.STL")) |> make_patch(;
@@ -298,8 +298,8 @@ function uni(c=100.0;
             axes;
             constrained = constrained,
         )
-        lncs, _ = RB.NCF.NC1P3V(ri, ro, R, ṙo, ω)
-        state = RB.RigidBodyState(prop, lncs, ri, R, ṙo, ω, ci, constraints_indices)
+        nmcs = RB.NCF.NC1P3V(ri, ro, R, ṙo, ω)
+        state = RB.RigidBodyState(prop, nmcs, ri, R, ṙo, ω, ci, constraints_indices)
         trimesh = load("BASE.STL") |> make_patch(;
             scale=1/1000,
             trans = [0,0,0.005],

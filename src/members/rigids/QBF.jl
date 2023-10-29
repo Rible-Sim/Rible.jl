@@ -139,14 +139,14 @@ get_num_of_dof(::QC) = 6
 get_num_of_local_dims(::QC) = 3
 
 function make_constraints_function()
-    function inner_Φ(x::AbstractVector)
+    function inner_constraints_function(x::AbstractVector)
         q = @view x[4:7]
         (transpose(q)*q - 1)/2
     end
 end
 
 function make_constraints_jacobian()
-    function inner_Φq(x::AbstractVector)
+    function inner_constraints_jacobian(x::AbstractVector)
         q = @view x[4:7]
         o = zero(eltype(q))
         SA[

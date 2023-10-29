@@ -75,9 +75,9 @@ function dualtri(ndof,;onedir=[1.0,0.0],θ=0.0,k=400.0,c=0.0,restlen=0.16)
                     constrained=constrained
                     )
 
-        lncs, q, _ = RB.NCF.NC1P2V(SVector{2}(ri), ro, α, ṙo, ω)
+        nmcs = RB.NCF.NC1P2V(SVector{2}(ri), ro, α, ṙo, ω)
 
-        state = RB.RigidBodyState(prop, lncs, ri, α, ṙo, ω, ci, constraints_indices)
+        state = RB.RigidBodyState(prop, nmcs, ri, α, ṙo, ω, ci, constraints_indices)
 
         body = RB.RigidBody(prop,state)
     end
@@ -189,9 +189,9 @@ function Tbars(;θ = 0)
                     constrained
                     )
 
-        lncs, _, _ = RB.NCF.NC1P3V(ri, ro, R, ṙo, ω)
+        nmcs = RB.NCF.NC1P3V(ri, ro, R, ṙo, ω)
 
-        state = RB.RigidBodyState(prop, lncs, ri, R, ṙo, ω, ci, constraints_indices)
+        state = RB.RigidBodyState(prop, nmcs, ri, R, ṙo, ω, ci, constraints_indices)
         basemesh = load("装配体1.STL") |> make_patch(;
             # trans=[-1.0,0,0],
             rot = RotZ(π),
@@ -222,12 +222,12 @@ function Tbars(;θ = 0)
             constrained
         )
 
-        lncs, q, _ = RB.NCF.NC1P3V(ri, ro, R, ṙo, ω)
+        nmcs = RB.NCF.NC1P3V(ri, ro, R, ṙo, ω)
         @show q[1:3]
         @show q[4:6]
         @show q[7:9]
         @show q[10:12]
-        state = RB.RigidBodyState(prop, lncs, ri, R, ṙo, ω)
+        state = RB.RigidBodyState(prop, nmcs, ri, R, ṙo, ω)
         slidermesh = load("装配体2.2.STL") |> make_patch(;
             # trans=[-1.0,0,0],
             rot = begin
@@ -342,9 +342,9 @@ function planar_parallel()
                     constrained
                     )
 
-        lncs, _, _ = RB.NCF.NC1P3V(ri, ro, R, ṙo, ω)
+        nmcs = RB.NCF.NC1P3V(ri, ro, R, ṙo, ω)
 
-        state = RB.RigidBodyState(prop, lncs, ri, R, ṙo, ω, ci, constraints_indices)
+        state = RB.RigidBodyState(prop, nmcs, ri, R, ṙo, ω, ci, constraints_indices)
 
         RB.RigidBody(prop,state)
     end
@@ -372,8 +372,8 @@ function planar_parallel()
                     constrained
                     )
 
-        lncs, q, _ = RB.NCF.NC1P3V(ri, ro, R, ṙo, ω)
-        state = RB.RigidBodyState(prop, lncs, ri, R, ṙo, ω)
+        nmcs = RB.NCF.NC1P3V(ri, ro, R, ṙo, ω)
+        state = RB.RigidBodyState(prop, nmcs, ri, R, ṙo, ω)
 
         RB.RigidBody(prop,state)
     end

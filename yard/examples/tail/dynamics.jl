@@ -98,11 +98,11 @@ function make_new_tail(n)
         )
         ro = ri
         if isodd(pos)
-            lncs, _ = RB.NCF.NC2P1V(ri, rj, ro, α, ṙo, ω)
+            nmcs = RB.NCF.NC2P1V(ri, rj, ro, α, ṙo, ω)
         else
-            lncs, _ = RB.NCF.NC2D2P(ri, rj, ro, α, ṙo, ω)
+            nmcs = RB.NCF.NC2D2P(ri, rj, ro, α, ṙo, ω)
         end
-        state = RB.RigidBodyState(prop, lncs, ri, α, ṙo, ω, ci, constraints_indices)
+        state = RB.RigidBodyState(prop, nmcs, ri, α, ṙo, ω, ci, constraints_indices)
         body = RB.RigidBody(prop, state)
     end
     rbs = [

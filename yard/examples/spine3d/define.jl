@@ -44,11 +44,11 @@ function spine3d(n;c=0.0)
         end
 
         # ri,rj,rk,rl = [r+R*ap for ap in aps]
-        # lncs,q,q̇ = RB.NCF.NC4P(ri,rj,rk,rl,r,R,ṙ,ω)
-        # lncs,q,q̇ = RB.NCF.NC3P1V(ri,rk,rl,r,R,ṙ,ω)
-        # lncs,q,q̇ = RB.NCF.NC2P2V(rk,rl,r,R,ṙ,ω)
-        lncs,_ = RB.NCF.NC1P3V(r,r,R,ṙ,ω)
-        state = RB.RigidBodyState(prop,lncs,r,R,ṙ,ω,ci,constraints_indices)
+        # nmcs = RB.NCF.NC4P(ri,rj,rk,rl,r,R,ṙ,ω)
+        # nmcs = RB.NCF.NC3P1V(ri,rk,rl,r,R,ṙ,ω)
+        # nmcs = RB.NCF.NC2P2V(rk,rl,r,R,ṙ,ω)
+        nmcs = RB.NCF.NC1P3V(r,r,R,ṙ,ω)
+        state = RB.RigidBodyState(prop,nmcs,r,R,ṙ,ω,ci,constraints_indices)
         body = RB.RigidBody(prop,state)
     end
     rbs = [rigidbody(i,props[i],aps,rs[i],Rs[i],ṙs[i],ωs[i]) for i = 1:n]

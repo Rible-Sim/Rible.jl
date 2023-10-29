@@ -13,7 +13,7 @@ function make_constraints_function(cst::PrototypeJoint,st::Structure)
     nmcs_egg = egg.rbsig.state.cache.funcs.nmcs
     id_hen = hen.rbsig.prop.id
     id_egg = egg.rbsig.prop.id
-    function _inner_Φ(q,d,c)
+    function _inner_constraints_function(q,d,c)
         ret = zeros(eltype(q),nconstraints)
         q_hen = @view q[mem2sysfull[id_hen]]
         q_egg = @view q[mem2sysfull[id_egg]]
@@ -70,15 +70,15 @@ function make_constraints_function(cst::PrototypeJoint,st::Structure)
         ) .- values
         ret
     end
-    function inner_Φ(q,d,c)
-        _inner_Φ(q,d,c)
+    function inner_constraints_function(q,d,c)
+        _inner_constraints_function(q,d,c)
     end
-    function inner_Φ(q)
+    function inner_constraints_function(q)
         d = get_d(st)
         c = get_c(st)
-        _inner_Φ(q,d,c)
+        _inner_constraints_function(q,d,c)
     end
-    inner_Φ
+    inner_constraints_function
 end
 
 function make_constraints_jacobian(cst::PrototypeJoint,st::Structure)
@@ -240,7 +240,7 @@ function make_constraints_functionqᵀq(cst::PrototypeJoint,st::Structure)
     C_hen = hen.rbsig.state.cache.funcs.C(c_hen)
     C_egg = egg.rbsig.state.cache.funcs.C(c_egg)
     # first
-    Φqᵀq_1st =[
+    constraints_hessian_1st =[
         begin
             ret = kron(
                 zeros(
@@ -253,7 +253,7 @@ function make_constraints_functionqᵀq(cst::PrototypeJoint,st::Structure)
         end
         for i = 1:3
     ]
-    Φqᵀq_3rd_hen = [
+    constraints_hessian_3rd_hen = [
         begin
             d̄ = axes_trl_hen.X[:,i]
             ret_raw = zeros(
@@ -275,7 +275,7 @@ function make_constraints_functionqᵀq(cst::PrototypeJoint,st::Structure)
         end
         for i = 1:3
     ]
-    Φqᵀq_3rd_egg = [
+    constraints_hessian_3rd_egg = [
         begin
             ret_raw = zeros(
                 T,
@@ -297,7 +297,7 @@ function make_constraints_functionqᵀq(cst::PrototypeJoint,st::Structure)
         end
         for i = 1:3
     ]
-    Φqᵀq_2nd = [
+    constraints_hessian_2nd = [
         begin
             ret_raw = zeros(
                 T,
@@ -338,7 +338,7 @@ function make_constraints_functionqᵀq(cst::PrototypeJoint,st::Structure)
             ret
         end,
     ]    
-    Φqᵀq_4th = [
+    constraints_hessian_4th = [
         begin
             ret = kron(
                 zeros(
@@ -355,14 +355,14 @@ function make_constraints_functionqᵀq(cst::PrototypeJoint,st::Structure)
             ret
         end
     ]
-    Φqᵀq = vcat(
-        Φqᵀq_4th[mask_4th],
-        Φqᵀq_3rd_hen[mask_3rd_hen],
-        Φqᵀq_3rd_egg[mask_3rd_egg],
-        Φqᵀq_1st[mask_1st],
-        Φqᵀq_2nd[mask_2nd],
+    constraints_hessian = vcat(
+        constraints_hessian_4th[mask_4th],
+        constraints_hessian_3rd_hen[mask_3rd_hen],
+        constraints_hessian_3rd_egg[mask_3rd_egg],
+        constraints_hessian_1st[mask_1st],
+        constraints_hessian_2nd[mask_2nd],
     )
-    Φqᵀq
+    constraints_hessian
 end
 
 function get_jointed_free_idx(cst)
@@ -395,11 +395,11 @@ end
 function make_∂Aᵀλ∂q(cst,st)
     (;nconstraints) = cst
     unconstrained_indices = get_jointed_free_idx(cst)
-    Φqᵀq = make_constraints_functionqᵀq(cst,st)
+    constraints_hessian = make_constraints_functionqᵀq(cst,st)
     function ∂Aᵀλ∂q(λ)
         ret = [
             begin
-                a = Φqᵀq[i][unconstrained_indices,unconstrained_indices] .* λ[i]
+                a = constraints_hessian[i][unconstrained_indices,unconstrained_indices] .* λ[i]
                 # display(a)
                 a 
             end

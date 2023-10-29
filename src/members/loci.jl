@@ -50,6 +50,14 @@ function (Base.:*)(R::StaticArray,axes::Axes{N}) where N
     Axes(SMatrix{N,N}(R*axes.X))
 end
 
+struct CartesianFrame{N,M,T}
+    position::SVector{N,T}
+    axes::Axes{N,N,T}
+    velocity::SVector{N,T}
+    angular_velocity::SVector{M,T}
+    local_angular_velocity::SVector{M,T}
+end
+
 struct Locus{N,T}
     position::SVector{N,T}
     axes::Axes{N,T}

@@ -69,7 +69,7 @@ function StructureState(bodies,tensiles,cnt::Connectivity{<:Any,<:Any,<:NamedTup
     ]
     foreach(bodies) do body
         (;ro,R,ṙo,ω,cache) = body.state
-        q,q̇ = NCF.rigidstate2naturalcoords(cache.funcs.lncs,ro,R,ṙo,ω)
+        q,q̇ = NCF.rigidstate2naturalcoords(cache.funcs.nmcs,ro,R,ṙo,ω)
         parts[body.prop.id].q .= q
         parts[body.prop.id].q̇ .= q̇
     end

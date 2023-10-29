@@ -24,8 +24,8 @@ function man_nd1(k=0.0,c=0.0;ratio=0.8)
 		α = 0.0; ω = 0.0
 		ro = ri
 		ṙo = zero(ro)
-		lncs,_ = RB.NCF.NC1P2V(ri,ro,α,ṙo,ω)
-		state = RB.RigidBodyState(prop,lncs,ro,α,ṙo,ω,ci,constraints_indices)
+		nmcs = RB.NCF.NC1P2V(ri,ro,α)
+		state = RB.RigidBodyState(prop,nmcs,ro,α,ṙo,ω,ci,constraints_indices)
 	    body = RB.RigidBody(prop,state)
 	end
 
@@ -51,8 +51,8 @@ function man_nd1(k=0.0,c=0.0;ratio=0.8)
 		ω = 0.0
 		ro = ri
 		ṙo = zero(ro)
-		lncs,_ = RB.NCF.NC2P1V(ri,rj,ro,α,ṙo,ω)
-		state = RB.RigidBodyState(prop,lncs,ro,α,ṙo,ω,pres_idx)
+		nmcs = RB.NCF.NC2P1V(ri,rj,ro,α)
+		state = RB.RigidBodyState(prop,nmcs,ro,α,ṙo,ω,pres_idx)
 	    body = RB.RigidBody(prop,state)
 	end
 
@@ -77,8 +77,8 @@ function man_nd1(k=0.0,c=0.0;ratio=0.8)
 		ω = 0.0
 		ro = ri
 		ṙo = zero(ro)
-		lncs,_ = RB.NCF.NC2D2P(ri,rj,ro,α,ṙo,ω)
-		state = RB.RigidBodyState(prop,lncs,ro,α,ṙo,ω,pres_idx)
+		nmcs = RB.NCF.NC2D2P(ri,rj,ro,α)
+		state = RB.RigidBodyState(prop,nmcs,ro,α,ṙo,ω,pres_idx)
 	    body = RB.RigidBody(prop,state)
 	end
 
@@ -103,8 +103,8 @@ function man_nd1(k=0.0,c=0.0;ratio=0.8)
 		ω = 0.0
 		ro = ri
 		ṙo = zero(ro)
-		lncs,_ = RB.NCF.NC1P2V(ri,ro,α,ṙo,ω)
-		state = RB.RigidBodyState(prop,lncs,ro,α,ṙo,ω)
+		nmcs = RB.NCF.NC1P2V(ri,ro,α)
+		state = RB.RigidBodyState(prop,nmcs,ro,α,ṙo,ω)
 	    body = RB.RigidBody(prop,state)
 	end
 

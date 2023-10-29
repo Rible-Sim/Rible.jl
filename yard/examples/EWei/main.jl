@@ -35,7 +35,7 @@ RB.update!(bot1.st)
 RB.update_orientations!(bot1.st)
 rbs = RB.get_bodies(bot1.st)
 rbs[5].state.R
-rbs[5].state.cache.funcs.lncs
+rbs[5].state.cache.funcs.nmcs
 plot_rigid(rbs[2];showmesh=true,showupdatemesh=false)
 
 # linearized dynamics

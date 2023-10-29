@@ -25,8 +25,8 @@ function build_2d_bar(id,ri,rj;α = 0.0, ci = Int[])
 	ω = 0.0
 	ro = ri
 	ṙo = zero(ro)
-	lncs,q0,q̇0 = RB.NCF.NC2D2P(ri,rj,ro,α,ṙo,ω)
-	state = RB.RigidBodyState(prop,lncs,ro,α,ṙo,ω,ci)
+	nmcs = RB.NCF.NC2D2P(ri,rj,ro,α)
+	state = RB.RigidBodyState(prop,nmcs,ro,α,ṙo,ω,ci)
 	body = RB.RigidBody(prop,state)
 end
 
@@ -87,11 +87,11 @@ function build_2d_tri(id,ri,rj=nothing,rk=nothing;
 		ṙo = SVector(0.0,0.0001)
 	end
 	if rj isa Nothing
-		lncs,q0,q̇0 = RB.NCF.NC1P2V(ri,ro,α,ṙo,ω)
+		nmcs = RB.NCF.NC1P2V(ri,ro,α)
 	elseif rk isa Nothing
-		lncs,q0,q̇0 = RB.NCF.NC2P1V(ri,rj,ro,α,ṙo,ω)
+		nmcs = RB.NCF.NC2P1V(ri,rj,ro,α)
 	else
-		lncs,q0,q̇0 = RB.NCF.NC3P(ri,rj,rk,ro,α,ṙo,ω)
+		nmcs = RB.NCF.NC3P(ri,rj,rk,ro,α)
 	end
 	trimesh = begin
 		if id == 1
@@ -100,7 +100,7 @@ function build_2d_tri(id,ri,rj=nothing,rk=nothing;
 			load("零件1.STL") |> make_patch(;scale=1/1000,color=:slategray4)
 		end
 	end
-	state = RB.RigidBodyState(prop,lncs,ro,α,ṙo,ω,ci,constraints_indices)
+	state = RB.RigidBodyState(prop,nmcs,ro,α,ṙo,ω,ci,constraints_indices)
 	body = RB.RigidBody(prop,state,trimesh)
 end
 
@@ -127,14 +127,14 @@ function build_2d_ground(id)
 	ro = zeros(2)
 	ṙo = zero(ro)
 	loci_states = Ref(ro) .+ Ref(R).*loci
-	lncs,q0 = RB.NCF.NCMP(loci_states,ro,R,ṙo,ω)
-	# cf = RB.NCF.CoordinateFunctions(lncs,q0,ci,unconstrained_indices)
-	# @show typeof(lncs)
+	nmcs = RB.NCF.NCMP(loci_states,ro,R)
+	# cf = RB.NCF.CoordinateFunctions(nmcs,q0,ci,unconstrained_indices)
+	# @show typeof(nmcs)
 	nq = length(q0)
 	ci = collect(1:nq)
 	unconstrained_indices = Int[]
 	constraints_indices = Int[]
-	state = RB.RigidBodyState(prop,lncs,ro,α,ṙo,ω,ci,constraints_indices)
+	state = RB.RigidBodyState(prop,nmcs,ro,α,ṙo,ω,ci,constraints_indices)
 	body = RB.RigidBody(prop,state)
 end
 
@@ -694,8 +694,8 @@ function trapezoid(id,ri,ro=ri,
 	ω = 0.0
 	# ṙo = [0.0,0.0001]
 	ṙo = zero(ro)
-	lncs,q0,q̇0 = RB.NCF.NC1P2V(ri,ro,α,ṙo,ω)
-	state = RB.RigidBodyState(prop,lncs,ro,α,ṙo,ω,ci,constraints_indices)
+	nmcs = RB.NCF.NC1P2V(ri,ro,α)
+	state = RB.RigidBodyState(prop,nmcs,ro,α,ṙo,ω,ci,constraints_indices)
 	body = RB.RigidBody(prop,state)
 
 end

@@ -90,8 +90,8 @@ function links(n,a1=0.0,a2=0.0,α=0.0)
 
     function rigidbody(prop,aps,r,R,ṙ,ω)
         ri,rj,rk,rl = [r+R*ap for ap in aps]
-        lncs,q,q̇ = RB.NCF.BP4P(ri,rj,rk,rl,r,R,ṙ,ω)
-        state = RB.RigidBodyState(prop,lncs,r,R,ṙ,ω,q,q̇)
+        nmcs,q,q̇ = RB.NCF.BP4P(ri,rj,rk,rl,r,R,ṙ,ω)
+        state = RB.RigidBodyState(prop,nmcs,r,R,ṙ,ω,q,q̇)
         @show R
         body = RB.RigidBody(prop,state)
     end

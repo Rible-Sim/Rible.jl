@@ -62,16 +62,16 @@ function links(n,di,rm;k=3e1,c=0.0)
 
     function rigidbody(i,prop,aps,ro,R,ṙo,ω)
         ri,rj,rk,rl = [ro+R*ap for ap in aps]
-        # lncs,q,q̇ = RB.NCF.NC4P(ri,rj,rk,rl,ro,R,ṙo,ω)
-        # lncs,q,q̇ = RB.NCF.NC3P1V(ri,rj,rk,ro,R,ṙo,ω)
-		# lncs,q,q̇ = RB.NCF.NC2P2V(ri,rj,rk-ri,rl-ri,ro,R,ṙo,ω)
-		lncs,q,q̇ = RB.NCF.NC1P3V(ri,ro,R,ṙo,ω)
+        # nmcs = RB.NCF.NC4P(ri,rj,rk,rl,ro,R)
+        # nmcs = RB.NCF.NC3P1V(ri,rj,rk,ro,R)
+		# nmcs = RB.NCF.NC2P2V(ri,rj,rk-ri,rl-ri,ro,R)
+		nmcs = RB.NCF.NC1P3V(ri,ro,R)
 		if i == 1
-			pres_idx = RB.find_full_pres_indices(lncs,q)
+			pres_idx = RB.find_full_pres_indices(nmcs,q)
 		else
 			pres_idx = Int[]
 		end
-        state = RB.RigidBodyState(prop,lncs,ro,R,ṙo,ω,q,q̇,pres_idx)
+        state = RB.RigidBodyState(prop,nmcs,ro,R,ṙo,ω,q,q̇,pres_idx)
         body = RB.RigidBody(prop,state)
     end
     rbs = [rigidbody(i,props[i],aps,rs[i],Rs[i],ṙs[i],ωs[i]) for i = 1:n]

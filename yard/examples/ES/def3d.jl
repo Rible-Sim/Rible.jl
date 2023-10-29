@@ -72,7 +72,7 @@ function make_3d_bar(
     # @show prop.inertia
     ṙo = zero(ri)
     ω = zero(ri)
-    nmcs,q0,q̇0 = RB.NCF.NC3D1P1V(ri,û,ri,R,ṙo,ω)
+    nmcs = RB.NCF.NC3D1P1V(ri,û,ri,R)
     @myshow id,û
     # @show ri,rj,q0
     # cf = RB.NCF.CoordinateFunctions(nmcs,q0,ci,unconstrained_indices)
@@ -145,13 +145,13 @@ function make_3d_tri(
     v = R*(nodes_positions[3] - nodes_positions[1])
     w = R*(nodes_positions[4] - nodes_positions[1])
     if rj isa Nothing
-        nmcs,_ = RB.NCF.NC1P3V(ri,ro,R,ṙo,ω)
+        nmcs = RB.NCF.NC1P3V(ri,ro,R)
     elseif rk isa Nothing
-        nmcs,_ = RB.NCF.NC2P2V(ri,rj,ro,R,ṙo,ω)
+        nmcs = RB.NCF.NC2P2V(ri,rj,ro,R)
     elseif rl isa Nothing
-        nmcs,_ = RB.NCF.NC3P1V(ri,rj,rk,ro,R,ṙo,ω)
+        nmcs = RB.NCF.NC3P1V(ri,rj,rk,ro,R)
     else
-        nmcs,_ = RB.NCF.NC4P(ri,rj,rk,rl,ro,R,ṙo,ω)
+        nmcs = RB.NCF.NC4P(ri,rj,rk,rl,ro,R)
     end
     pretty_table(
         SortedDict(
@@ -287,7 +287,7 @@ function make_3d_plate(
     # u = R*(nodes_positions[2] - nodes_positions[1])
     # v = R*(nodes_positions[3] - nodes_positions[1])
     # w = R*(nodes_positions[4] - nodes_positions[1])
-    nmcs,_ = RB.NCF.NC1P3V(ri,ro,R,ṙo,ω)
+    nmcs = RB.NCF.NC1P3V(ri,ro,R)
     state = RB.RigidBodyState(prop,nmcs,ro,R,ṙo,ω,ci,constraints_indices)
     body = RB.RigidBody(prop,state,platemesh)
 end
@@ -1717,10 +1717,10 @@ function spine3d(n;
         end
 
         # ri,rj,rk,rl = [r+R*r̄p for r̄p in loci]
-        # nmcs,q,q̇ = RB.NCF.NC4P(ri,rj,rk,rl,r,R,ṙ,ω)
-        # nmcs,q,q̇ = RB.NCF.NC3P1V(ri,rk,rl,r,R,ṙ,ω)
-        # nmcs,q,q̇ = RB.NCF.NC2P2V(rk,rl,r,R,ṙ,ω)
-        nmcs,_ = RB.NCF.NC1P3V(r,r,R,ṙ,ω)
+        # nmcs = RB.NCF.NC4P(ri,rj,rk,rl,r,R,ṙ,ω)
+        # nmcs = RB.NCF.NC3P1V(ri,rk,rl,r,R,ṙ,ω)
+        # nmcs = RB.NCF.NC2P2V(rk,rl,r,R,ṙ,ω)
+        nmcs = RB.NCF.NC1P3V(r,r,R,ṙ,ω)
         state = RB.RigidBodyState(prop,nmcs,r,R,ṙ,ω,ci,constraints_indices)
         radius = norm(loci[1]-loci[5])/25
         vertmesh = merge([
@@ -1833,10 +1833,10 @@ function newspine3d(n;
         end
 
         # ri,rj,rk,rl = [r+R*r̄p for r̄p in loci]
-        # nmcs,q,q̇ = RB.NCF.NC4P(ri,rj,rk,rl,r,R,ṙ,ω)
-        # nmcs,q,q̇ = RB.NCF.NC3P1V(ri,rk,rl,r,R,ṙ,ω)
-        # nmcs,q,q̇ = RB.NCF.NC2P2V(rk,rl,r,R,ṙ,ω)
-        nmcs, _ = RB.NCF.NC1P3V(r, r, R, ṙ, ω)
+        # nmcs = RB.NCF.NC4P(ri,rj,rk,rl,r,R,ṙ,ω)
+        # nmcs = RB.NCF.NC3P1V(ri,rk,rl,r,R,ṙ,ω)
+        # nmcs = RB.NCF.NC2P2V(rk,rl,r,R,ṙ,ω)
+        nmcs = RB.NCF.NC1P3V(r, r, R, ṙ, ω)
         state = RB.RigidBodyState(prop, nmcs, r, R, ṙ, ω, ci, constraints_indices)
         radius = norm(loci[1] - loci[5]) / 25
         vertmesh = merge([
@@ -1954,7 +1954,7 @@ function new_deck(id,loci,ro,R,ri,box;
     )
     ṙo = zero(ro)
     ω = zero(ro)
-    nmcs,_ = RB.NCF.NC1P3V(ri,ro,R,ṙo,ω)
+    nmcs = RB.NCF.NC1P3V(ri,ro,R)
     # cf = RB.NCF.CoordinateFunctions(nmcs,q0,ci,unconstrained_indices)
     # @show typeof(nmcs)
     boxmesh = Meshes.boundary(box) |> simple2mesh

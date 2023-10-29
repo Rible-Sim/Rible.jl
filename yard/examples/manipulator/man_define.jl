@@ -110,7 +110,7 @@ function man_ndof(ndof,onedir=[1.0,0.0];θ=0.0,k=0.0,c=0.0,unit="mks",restlen=0.
 			0.99Ia 0
 			0 0.01Ia
 		])
-		# only to get lncs
+		# only to get nmcs
 		constrained = false
         ci = Int[]
         prop = RB.RigidBodyProperty(
@@ -135,18 +135,18 @@ function man_ndof(ndof,onedir=[1.0,0.0];θ=0.0,k=0.0,c=0.0,unit="mks",restlen=0.
 					aps;
 					constrained=ifelse(i in [1,2],true,false)
 					)
-		lncs, q, _ = RB.NCF.NC2P1V(SVector{2}(ri), SVector{2}(rj), ro, α, ṙo, ω)
+		nmcs = RB.NCF.NC2P1V(SVector{2}(ri), SVector{2}(rj), ro, α, ṙo, ω)
 
         if i in [1,2]
 			constrained = true
 			if i == 1
-            	ci = RB.find_full_pres_indices(lncs, q)
+            	ci = RB.find_full_pres_indices(nmcs, q)
 				display(ci)
 			else
 				ci = [1]
 			end
 		end
-		state = RB.RigidBodyState(prop, lncs, ri, α, ṙo, ω, ci, constraints_indices)
+		state = RB.RigidBodyState(prop, nmcs, ri, α, ṙo, ω, ci, constraints_indices)
 
         body = RB.RigidBody(prop,state)
     end

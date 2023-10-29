@@ -301,7 +301,6 @@ function NC2D1P(ri::AbstractVector{T}) where T
     nmcs,ri
 end
 
-
 """
 Return 2D rigid bar natural coodinates.
 $(TYPEDSIGNATURES)
@@ -321,16 +320,7 @@ function NC2D1P1V(ri::AbstractVector{T},u::AbstractVector{T},
         get_conversion(2,1,1)
     )
     q = vcat(ri,u)
-    nmcs,q
-end
-
-function NC2D1P1V(ri,u,origin_position,θ::Number,origin_velocity,ω)
-    R = rotation_matrix(θ)
-    nmcs,q = NC2D1P1V(ri,u,origin_position,R)
-    ṙi = origin_velocity + ω×(ri-origin_position)
-    u̇ = origin_velocity + ω×u
-    q̇ = vcat(ṙi,u̇)
-    nmcs,SVector{4}(q),SVector{4}(q̇)
+    nmcs
 end
 
 function NC2D2P(ri::AbstractVector{T},rj::AbstractVector{T},
@@ -349,17 +339,9 @@ function NC2D2P(ri::AbstractVector{T},rj::AbstractVector{T},
         get_conversion(3,2,2)
     )
     q = vcat(ri,rj)
-    nmcs,q
+    nmcs
 end
 
-function NC2D2P(ri,rj,origin_position,θ::Number,origin_velocity,ω)
-    R = rotation_matrix(θ)
-    nmcs,q = NC2D2P(ri,rj,origin_position,R)
-    ṙi = origin_velocity + ω×(ri-origin_position)
-    ṙj = origin_velocity + ω×(rj-origin_position)
-    q̇ = vcat(ṙi,ṙj)
-    nmcs,SVector{4}(q),SVector{4}(q̇)
-end
 
 """
 Return 3D rigid bar natural coodinates.
@@ -380,15 +362,7 @@ function NC3D1P1V(ri::AbstractVector{T},u::AbstractVector{T},
         get_conversion(3,1,1)
     )
     q = vcat(ri,u)
-    nmcs,q
-end
-
-function NC3D1P1V(ri,u,origin_position,R::AbstractMatrix,origin_velocity,ω)
-    nmcs,q = NC3D1P1V(ri,u,origin_position,R)
-    ṙi = origin_velocity + ω×(ri-origin_position)
-    u̇ = origin_velocity + ω×u
-    q̇ = vcat(ṙi,u̇)
-    nmcs,SVector{6}(q),SVector{6}(q̇)
+    nmcs
 end
 
 function NC3D2P(ri::AbstractVector{T},rj::AbstractVector{T},
@@ -407,16 +381,9 @@ function NC3D2P(ri::AbstractVector{T},rj::AbstractVector{T},
         get_conversion(3,2,0)
     )
     q = vcat(ri,rj)
-    nmcs,q
+    nmcs
 end
 
-function NC3D2P(ri,rj,origin_position,R::AbstractMatrix,origin_velocity,ω)
-    nmcs,q = NC3D2P(ri,rj,origin_position,R)
-    ṙi = origin_velocity + ω×(ri-origin_position)
-    ṙj = origin_velocity + ω×(rj-origin_position)
-    q̇ = vcat(ṙi,ṙj)
-    nmcs,SVector{6}(q),SVector{6}(q̇)
-end
 
 """
 Return 2D rigid bodies natural coodinates, using 1 basic point and 2 base vectors.
@@ -442,17 +409,7 @@ function NC1P2V(ri::AbstractVector{T},
         get_conversion(2,1,2)
     )
     q = vcat(ri,u,v)
-    nmcs,q
-end
-
-function NC1P2V(ri,origin_position,θ,origin_velocity,ω)
-    R = rotation_matrix(θ)
-    nmcs,q = NC1P2V(ri,origin_position,R)
-    ṙi = origin_velocity + ω×(ri-origin_position)
-    u̇ = ω×q[3:4]
-    v̇ = ω×q[5:6]
-    q̇ = vcat(ṙi,u̇,v̇)
-    nmcs,SVector{6}(q),SVector{6}(q̇)
+    nmcs
 end
 
 """
@@ -476,17 +433,7 @@ function NC2P1V(ri::AbstractVector{T},rj::AbstractVector{T},
         get_conversion(2,2,1)
     )
     q = vcat(ri,rj,v)
-    nmcs,q
-end
-
-function NC2P1V(ri,rj,origin_position,θ,origin_velocity,ω)
-    R = rotation_matrix(θ)
-    nmcs,q = NC2P1V(ri,rj,origin_position,R)
-    ṙi = origin_velocity + ω×(ri-origin_position)
-    ṙj = origin_velocity + ω×(rj-origin_position)
-    v̇ = ω×q[5:6]
-    q̇ = vcat(ṙi,ṙj,v̇)
-    nmcs,SVector{6}(q),SVector{6}(q̇)
+    nmcs
 end
 
 """
@@ -510,17 +457,7 @@ function NC3P(ri::AbstractVector{T},rj::AbstractVector{T},rk::AbstractVector{T},
         get_conversion(2,3,0)
     )
     q = vcat(ri,rj,rk)
-    nmcs,q
-end
-
-function NC3P(ri,rj,rk,origin_position,θ,origin_velocity,ω)
-    R = rotation_matrix(θ)
-    nmcs,q = NC3P(ri,rj,rk,origin_position,R)
-    ṙi = origin_velocity + ω×(ri-origin_position)
-    ṙj = origin_velocity + ω×(rj-origin_position)
-    ṙk = origin_velocity + ω×(rk-origin_position)
-    q̇ = vcat(ṙi,ṙj,ṙk)
-    nmcs,SVector{6}(q),SVector{6}(q̇)
+    nmcs
 end
 
 ## 3D Rigid body
@@ -550,7 +487,7 @@ function NC1P3V(ri::AbstractVector{T},
         get_conversion(3,1,3)
     )
     q = vcat(ri,u,v,w)
-    nmcs,q
+    nmcs
 end
 
 function NC1P3V(ri::AbstractVector{T},u::AbstractVector{T},v::AbstractVector{T},w::AbstractVector{T},
@@ -572,27 +509,7 @@ function NC1P3V(ri::AbstractVector{T},u::AbstractVector{T},v::AbstractVector{T},
         get_conversion(3,1,3)
     )
     q = vcat(ri,u,v,w)
-    nmcs,q
-end
-
-function NC1P3V(ri,origin_position,R,origin_velocity,ω)
-    nmcs,q = NC1P3V(ri,origin_position,R)
-    ṙi = origin_velocity + ω×(ri-origin_position)
-    u̇ = ω×q[4:6]
-    v̇ = ω×q[7:9]
-    ẇ = ω×q[10:12]
-    q̇ = vcat(ṙi,u̇,v̇,ẇ)
-    nmcs,SVector{12}(q),SVector{12}(q̇)
-end
-
-function NC1P3V(ri,u,v,w,origin_position,R,origin_velocity,ω)
-    nmcs,q = NC1P3V(ri,u,v,w,origin_position,R)
-    ṙi = origin_velocity + ω×(ri-origin_position)
-    u̇ = ω×u
-    v̇ = ω×v
-    ẇ = ω×w
-    q̇ = vcat(ṙi,u̇,v̇,ẇ)
-    nmcs,SVector{12}(q),SVector{12}(q̇)
+    nmcs
 end
 
 """
@@ -619,7 +536,7 @@ function NC2P2V(ri::AbstractVector{T},rj::AbstractVector{T},
         get_conversion(3,2,2)
     )
     q = vcat(ri,rj,v,w)
-    nmcs,q
+    nmcs
 end
 
 function NC2P2V(ri::AbstractVector{T},rj::AbstractVector{T},
@@ -642,28 +559,9 @@ function NC2P2V(ri::AbstractVector{T},rj::AbstractVector{T},
         get_conversion(3,2,2)
     )
     q = vcat(ri,rj,v,w)
-    nmcs,q
+    nmcs
 end
 
-function NC2P2V(ri,rj,origin_position,R,origin_velocity,ω)
-    nmcs,q = NC2P2V(ri,rj,origin_position,R)
-    ṙi = origin_velocity + ω×(ri-origin_position)
-    ṙj = origin_velocity + ω×(rj-origin_position)
-    v̇ = ω×q[7:9]
-    ẇ = ω×q[10:12]
-    q̇ = vcat(ṙi,ṙj,v̇,ẇ)
-    nmcs,SVector{12}(q),SVector{12}(q̇)
-end
-
-function NC2P2V(ri,rj,v,w,origin_position,R,origin_velocity,ω)
-    nmcs,q = NC2P2V(ri,rj,v,w,origin_position,R)
-    ṙi = origin_velocity + ω×(ri-origin_position)
-    ṙj = origin_velocity + ω×(rj-origin_position)
-    v̇ = ω×v
-    ẇ = ω×w
-    q̇ = vcat(ṙi,ṙj,v̇,ẇ)
-    nmcs,SVector{12}(q),SVector{12}(q̇)
-end
 
 """
 Return 3D rigid bodies natural coodinates, using 3 basic points and 1 base vector.
@@ -692,17 +590,7 @@ function NC3P1V(ri::AbstractVector{T},rj::AbstractVector{T},
         get_conversion(3,3,1)
     )
     q = vcat(ri,rj,rk,w)
-    nmcs,q
-end
-
-function NC3P1V(ri,rj,rk,origin_position,R,origin_velocity,ω)
-    nmcs,q = NC3P1V(ri,rj,rk,origin_position,R)
-    ṙi = origin_velocity + ω×(ri-origin_position)
-    ṙj = origin_velocity + ω×(rj-origin_position)
-    ṙk = origin_velocity + ω×(rk-origin_position)
-    ẇ = ω×q[10:12]
-    q̇ = vcat(ṙi,ṙj,ṙk,ẇ)
-    nmcs,SVector{12}(q),SVector{12}(q̇)
+    nmcs
 end
 
 """
@@ -730,17 +618,33 @@ function NC4P(ri::AbstractVector{T},rj::AbstractVector{T},
         get_conversion(3,4,0)
     )
     q = vcat(ri,rj,rk,rl)
-    nmcs,q
+    nmcs
 end
 
-function NC4P(ri,rj,rk,rl,origin_position,R,origin_velocity,ω)
-    nmcs,q = NC4P(ri,rj,rk,rl,origin_position,R)
-    ṙi = origin_velocity + ω×(ri-origin_position)
-    ṙj = origin_velocity + ω×(rj-origin_position)
-    ṙk = origin_velocity + ω×(rk-origin_position)
-    ṙl = origin_velocity + ω×(rl-origin_position)
-    q̇ = vcat(ṙi,ṙj,ṙk,ṙl)
-    nmcs,SVector{12}(q),SVector{12}(q̇)
+function get_uvw(nmcs::LNC3D,q)
+    qstd = nmcs.conversion*q
+    if     nmcs isa LNC3D12C
+        u = @view qstd[4:6]
+        v = @view qstd[7:9]
+        w = @view qstd[10:12]
+    elseif nmcs isa LNC3D6C
+        u = @view qstd[4:6]
+        u /= norm(u)
+        v,w = HouseholderOrthogonalization(u)
+    end
+    SVector{3}(u),SVector{3}(v),SVector{3}(w)
+end
+
+function get_uv(nmcs::LNC2D,q)
+    qstd = nmcs.conversion*q
+    if     nmcs isa LNC2D6C
+        u = @view qstd[3:4]
+        v = @view qstd[5:6]
+    elseif nmcs isa LNC2D4C
+        u = @view qstd[3:4]
+        v = rotation_matrix(π/2)*u
+    end
+    SVector{2}(u),SVector{2}(v)
 end
 
 # """
@@ -802,7 +706,7 @@ function make_constraints_function(nmcs::LNC,constraints_indices)
     make_constraints_function(nmcs,constraints_indices,deforms)
 end
 
-function make_inner_Φ(func,deforms)
+function make_inner_constraints_function(func,deforms)
     @inline @inbounds function ret_func(q)
         func(q,deforms)
     end
@@ -817,10 +721,10 @@ Return 2D or 3D intrinsic constraint(s) for point mass。
 $(TYPEDSIGNATURES)
 """
 function make_constraints_function(nmcs::Union{LNC2D2C,LNC3D3C},constraints_indices,deforms)
-    @inline @inbounds function _inner_Φ(q,d)
+    @inline @inbounds function _inner_constraints_function(q,d)
         nothing
     end
-    make_inner_Φ(_inner_Φ,deforms)
+    make_inner_constraints_function(_inner_constraints_function,deforms)
 end
 
 """
@@ -830,13 +734,13 @@ $(TYPEDSIGNATURES)
 function make_constraints_function(nmcs::Union{LNC2D4C,LNC3D6C},constraints_indices,deforms)
     ndim = get_num_of_dims(nmcs)
     cv = nmcs.conversion
-    @inline @inbounds function _inner_Φ(q,d)
+    @inline @inbounds function _inner_constraints_function(q,d)
         qstd = cv*q
         u = @view qstd[ndim+1:2ndim]
         all = [u⋅u - d^2]
         all[constraints_indices]
     end
-    make_inner_Φ(_inner_Φ,deforms)
+    make_inner_constraints_function(_inner_constraints_function,deforms)
 end
 
 """
@@ -845,7 +749,7 @@ $(TYPEDSIGNATURES)
 """
 function make_constraints_function(nmcs::LNC2D6C,constraints_indices,deforms)
     cv = nmcs.conversion
-    @inline @inbounds function _inner_Φ(q,d)
+    @inline @inbounds function _inner_constraints_function(q,d)
         qstd = cv*q
         u = @view qstd[3:4]
         v = @view qstd[5:6]
@@ -856,7 +760,7 @@ function make_constraints_function(nmcs::LNC2D6C,constraints_indices,deforms)
         ]
         all[constraints_indices]
     end
-    make_inner_Φ(_inner_Φ,deforms)
+    make_inner_constraints_function(_inner_constraints_function,deforms)
 end
 
 
@@ -866,7 +770,7 @@ $(TYPEDSIGNATURES)
 """
 function make_constraints_function(nmcs::LNC3D12C,constraints_indices,deforms)
     cv = nmcs.conversion
-    @inline @inbounds function _inner_Φ(q,d)
+    @inline @inbounds function _inner_constraints_function(q,d)
         qstd = cv*q
         u = @view qstd[4:6]
         v = @view qstd[7:9]
@@ -881,7 +785,7 @@ function make_constraints_function(nmcs::LNC3D12C,constraints_indices,deforms)
         ]
         @view all[constraints_indices]
     end
-    make_inner_Φ(_inner_Φ,deforms)
+    make_inner_constraints_function(_inner_constraints_function,deforms)
 end
 
 ## Jacobians
@@ -892,7 +796,7 @@ Return 2D or 3D Jacobian matrix for rigid bars。
 $(TYPEDSIGNATURES)
 """
 function make_constraints_jacobian(nmcs::Union{LNC2D2C,LNC3D3C},unconstrained_indices,constraints_indices)
-    @inline @inbounds function inner_Φq(q)
+    @inline @inbounds function inner_constraints_jacobian(q)
         nothing
     end
 end
@@ -904,7 +808,7 @@ $(TYPEDSIGNATURES)
 function make_constraints_jacobian(nmcs::Union{LNC2D4C,LNC3D6C},unconstrained_indices,constraints_indices)
     ndim = get_num_of_dims(nmcs)
     cv = nmcs.conversion
-    @inline @inbounds function inner_Φq(q)
+    @inline @inbounds function inner_constraints_jacobian(q)
         qstd = cv*q
         u = @view qstd[ndim+1:2ndim]
         ret = zeros(eltype(q),1,2ndim)
@@ -919,7 +823,7 @@ $(TYPEDSIGNATURES)
 """
 function make_constraints_jacobian(nmcs::LNC2D6C,unconstrained_indices,constraints_indices)
     cv = nmcs.conversion
-    @inline @inbounds function inner_Φq(q)
+    @inline @inbounds function inner_constraints_jacobian(q)
         qstd = cv*q
         u = @view qstd[3:4]
         v = @view qstd[5:6]
@@ -937,7 +841,7 @@ $(TYPEDSIGNATURES)
 """
 function make_constraints_jacobian(nmcs::LNC3D12C,unconstrained_indices,constraints_indices)
     cv = nmcs.conversion
-    @inline @inbounds function inner_Φq(q)
+    @inline @inbounds function inner_constraints_jacobian(q)
         qstd = cv*q
         u  = @view qstd[4:6]
         v  = @view qstd[7:9]
@@ -1028,12 +932,13 @@ function make_N(nmcs::LNC3D12C)
         inv(cv)*ret
     end
 end
+
 # Transformations
 """
 Return 转换矩阵C。
 $(TYPEDSIGNATURES)
 """
-function to_local_coordinates(nmcs)
+function to_local_coordinates(nmcs::LNC)
     (;r̄i,invX̄) = nmcs
     function c(r̄)
         invX̄*(r̄-r̄i)
@@ -1087,14 +992,14 @@ get_idx(nmcs::LNC3D12C) = [
     [CartesianIndex(2,3),CartesianIndex(3,2)]
 ]
 
-#todo cache Φqᵀq
-function make_Φqᵀq(nmcs::LNC)
+#todo cache constraints_hessian
+function make_constraints_hessian(nmcs::LNC)
     cv = nmcs.conversion
     nld = get_num_of_local_dims(nmcs)
     ndim = get_num_of_dims(nmcs)
     I_Bool = IMatrix(ndim)
     idx = get_idx(nmcs)
-    Φqᵀq = [
+    constraints_hessian = [
         begin
             ret_raw = zeros(Int,nld+1,nld+1)
             for ij in id
@@ -1114,11 +1019,11 @@ function make_∂Aᵀλ∂q(nmcs::Union{LNC2D2C,LNC3D3C},unconstrained_indices,c
 end
 
 function make_∂Aᵀλ∂q(nmcs::LNC,unconstrained_indices,constraints_indices)
-    Φqᵀq = make_Φqᵀq(nmcs)
+    constraints_hessian = make_constraints_hessian(nmcs)
     function ∂Aᵀλ∂q(λ)
         ret = [
             begin
-                a = Φqᵀq[j][unconstrained_indices,unconstrained_indices] .* λ[i]
+                a = constraints_hessian[j][unconstrained_indices,unconstrained_indices] .* λ[i]
                 # display(a)
                 a 
             end
@@ -1135,12 +1040,12 @@ function make_∂Aq̇∂q(nmcs::Union{LNC2D2C,LNC3D3C},unconstrained_indices,con
 end
 
 function make_∂Aq̇∂q(nmcs::LNC,unconstrained_indices,constraints_indices)
-    Φqᵀq = make_Φqᵀq(nmcs)
+    constraints_hessian = make_constraints_hessian(nmcs)
     function ∂Aq̇∂q(q̇)
         q̇uc = @view q̇[unconstrained_indices]
         ret = [
             begin
-                a = transpose(q̇uc)*Φqᵀq[j][unconstrained_indices,unconstrained_indices]
+                a = transpose(q̇uc)*constraints_hessian[j][unconstrained_indices,unconstrained_indices]
                 # display(a)
                 a 
             end
@@ -1212,32 +1117,32 @@ end
 Ī2J̄(::Union{LNC2D2C,LNC3D3C,LNC2D6C,LNC3D6C},Ī)  = Ī
 Ī2J̄(::LNC3D12C,Ī) = 1/2*tr(Ī)*I-Ī
 
-function Īg2az(nmcs,m,Īg,mass_locus)
+function Īg2az(nmcs,m,Īg,mass_center)
     (;r̄i,invX̄) = nmcs
-    a = invX̄*(mass_locus-r̄i)
+    a = invX̄*(mass_center-r̄i)
     J̄g = Ī2J̄(nmcs,Īg)
-    J̄o = J̄g + m*mass_locus*transpose(mass_locus)
-    J̄i = J̄o - m*r̄i*transpose(mass_locus) - m*mass_locus*transpose(r̄i) + m*r̄i*transpose(r̄i)
+    J̄o = J̄g + m*mass_center*transpose(mass_center)
+    J̄i = J̄o - m*r̄i*transpose(mass_center) - m*mass_center*transpose(r̄i) + m*r̄i*transpose(r̄i)
     z = invX̄*J̄i*transpose(invX̄)
     #@assert issymmetric(z)
     a,Symmetric(z)
 end
 
 ## Mass matrices: standard
-function make_M(cf::CoordinateFunctions,m::T,Īg,mass_locus) where {T} # ami (area moment of inertia tensor)
+function make_M(cf::CoordinateFunctions,m::T,Īg,mass_center) where {T} # ami (area moment of inertia tensor)
     (;nmcs) = cf
     ndim = get_num_of_dims(nmcs)
     nld = get_num_of_local_dims(nmcs)
     ncoords = get_num_of_coordinates(nmcs)
-    a,z = Īg2az(nmcs,m,Īg,mass_locus)
+    a,z = Īg2az(nmcs,m,Īg,mass_center)
     M_raw = zeros(T,1+nld,1+nld)
     M_raw[1,1] = m
     M_raw[2:1+nld,1] = m*a
     M_raw[1,2:1+nld] = M_raw[2:1+nld,1]
     M_raw[2:1+nld,2:1+nld] .= z
     M_std = kron(M_raw,IMatrix(ndim))
-    Y_nonstd = nmcs.conversion
-    M = SMatrix{ncoords,ncoords}(transpose(Y_nonstd)*M_std*Y_nonstd)
+    cv = nmcs.conversion
+    M = SMatrix{ncoords,ncoords}(transpose(cv)*M_std*cv)
 end
 
 make_X(q::AbstractVector,nmcs::LNC) = make_X(nmcs,q)
@@ -1292,72 +1197,6 @@ function find_angular_velocity(nmcs::LNC,q::AbstractVector,q̇::AbstractVector)
         Ω = Ẋ*pinv(X)
         ω = SVector{3}(Ω[3,2],Ω[1,3],Ω[2,1])
     end
-end
-
-function get_uvw(nmcs::LNC3D,q)
-    if     nmcs isa LNC1P3V
-        u = @view q[4:6]
-        v = @view q[7:9]
-        w = @view q[10:12]
-    elseif nmcs isa LNC2P2V
-        ri = @view q[1:3]
-        rj = @view q[4:6]
-        v = @view q[7:9]
-        w = @view q[10:12]
-        u = rj - ri
-    elseif nmcs isa LNC3P1V
-        ri = @view q[1:3]
-        rj = @view q[4:6]
-        rk = @view q[7:9]
-        w = @view q[10:12]
-        u = rj - ri
-        v = rk - ri
-    elseif nmcs isa LNC4P
-        ri = @view q[1:3]
-        rj = @view q[4:6]
-        rk = @view q[7:9]
-        rl = @view q[10:12]
-        u = rj - ri
-        v = rk - ri
-        w = rl - ri
-    elseif nmcs isa LNC3D1P1V
-        u = @view q[4:6]
-        v,w = HouseholderOrthogonalization(u)
-    elseif nmcs isa LNC3D2P
-        ri = @view q[1:3]
-        rj = @view q[4:6]
-        u = rj -ri
-        u ./= norm(u)
-        v,w = HouseholderOrthogonalization(u)
-    end
-    SVector{3}(u),SVector{3}(v),SVector{3}(w)
-end
-
-function get_uv(nmcs::LNC2D,q)
-    if     nmcs isa LNC1P2V
-        u = @view q[3:4]
-        v = @view q[5:6]
-    elseif nmcs isa LNC2P1V
-        ri = @view q[1:2]
-        rj = @view q[3:4]
-        v = @view q[5:6]
-        u = rj - ri
-    elseif nmcs isa LNC3P
-        ri = @view q[1:2]
-        rj = @view q[3:4]
-        rk = @view q[5:6]
-        u = rj - ri
-        v = rk - ri
-    elseif nmcs isa LNC2D1P1V
-        u = @view q[3:4]
-        v = rotation_matrix(π/2)*u
-    elseif nmcs isa LNC2D2P
-        ri = @view q[1:2]
-        rj = @view q[3:4]
-        u = rj - ri
-        v = rotation_matrix(π/2)*u
-    end
-    SVector{2}(u),SVector{2}(v)
 end
 
 """

@@ -93,15 +93,15 @@ struct NonminimalCoordinatesCache{FuncsType,MassMatrixType,JacobianType,GenForce
 end
 
 function get_CoordinatesCache(prop::RigidBodyProperty{N,T},
-                                 lncs::NCF.LNC,
+                                 nmcs::NCF.LNC,
                                  pres_idx=Int[],
-                                 Φ_mask=get_Φ_mask(lncs)) where {N,T}
+                                 Φ_mask=get_Φ_mask(nmcs)) where {N,T}
     (;mass,inertia,mass_locus,loci) = prop
     mass_center = mass_locus.position
     num_of_loci = length(loci)
-    free_idx = NCF.get_free_idx(lncs,pres_idx)
+    free_idx = NCF.get_free_idx(nmcs,pres_idx)
     nΦ = length(Φ_mask)
-    cf = NCF.CoordinateFunctions(lncs,free_idx,Φ_mask)
+    cf = NCF.CoordinateFunctions(nmcs,free_idx,Φ_mask)
     mass_matrix = NCF.make_M(cf,mass,inertia,mass_center)
     M⁻¹ = inv(mass_matrix)
     ∂Mq̇∂q = zero(mass_matrix)
@@ -185,10 +185,10 @@ $(TYPEDSIGNATURES)
 `Φ_mask`为约束方程的索引。
 """
 function RigidBodyState(prop::RigidBodyProperty{N,T},
-                        lncs,
+                        nmcs,
                         r_input,rotation_input,ṙ_input,ω_input,
                         pres_idx=Int[],
-                        Φ_mask=get_Φ_mask(lncs)) where {N,T}
+                        Φ_mask=get_Φ_mask(nmcs)) where {N,T}
     (;mass_locus,loci) = prop
     num_of_loci = length(loci)
     origin_position = MVector{N}(r_input)
@@ -214,7 +214,7 @@ function RigidBodyState(prop::RigidBodyProperty{N,T},
         )
         for lo in loci
     ]
-    cache = get_CoordinatesCache(prop,lncs,pres_idx,Φ_mask)
+    cache = get_CoordinatesCache(prop,nmcs,pres_idx,Φ_mask)
     RigidBodyState(
         origin_position,R,
         origin_velocity,ω,
@@ -386,8 +386,8 @@ end
 Return 约束方程编号。
 $(TYPEDSIGNATURES)
 """
-function get_Φ_mask(lncs::NCF.LNC)
-    nΦ = NCF.get_num_of_constraints(lncs)
+function get_Φ_mask(nmcs::NCF.LNC)
+    nΦ = NCF.get_num_of_constraints(nmcs)
     collect(1:nΦ)
 end
 

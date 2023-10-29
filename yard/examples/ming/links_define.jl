@@ -65,16 +65,16 @@ function spine(n,dis,rm,heating_law;k=1000.0,c=0.0)
 	rs = map((r)->r+=[0,0,124.2/1000],rs_raw)
     function rigidbody(i,prop,aps,ro,R,ṙo,ω)
         ri,rj,rk,rl = [ro+R*ap for ap in [aps[13],aps[10],aps[11],aps[12]]]
-        # lncs,q,q̇ = RB.NCF.NC4P(ri,rj,rk,rl,ro,R,ṙo,ω)
-		# lncs,q,q̇ = RB.NCF.NC3P1V(ri,rj,rk,ro,R,ṙo,ω)
-		# lncs,q,q̇ = RB.NCF.NC2P2V(ri,rk,ro,R,ṙo,ω)
-		lncs,q,q̇ = RB.NCF.NC1P3V(ri,ro,R,ṙo,ω)
+        # nmcs = RB.NCF.NC4P(ri,rj,rk,rl,ro,R)
+		# nmcs = RB.NCF.NC3P1V(ri,rj,rk,ro,R)
+		# nmcs = RB.NCF.NC2P2V(ri,rk,ro,R)
+		nmcs = RB.NCF.NC1P3V(ri,ro,R)
 		if i == 1
-			pres_idx = RB.find_full_pres_indices(lncs,q)
+			pres_idx = RB.find_full_pres_indices(nmcs,q)
 		else
 			pres_idx = Int[]
 		end
-        state = RB.RigidBodyState(prop,lncs,ro,R,ṙo,ω,q,q̇,pres_idx)
+        state = RB.RigidBodyState(prop,nmcs,ro,R,ṙo,ω,q,q̇,pres_idx)
         body = RB.RigidBody(prop,state)
     end
     rbs = [rigidbody(i,props[i],aps,rs[i],Rs[i],ṙs[i],ωs[i]) for i = 1:n]
@@ -194,18 +194,18 @@ function spine_true(n,dis,rm;
         # ri,rj,rk,rl = [ro+R*ap for ap in [aps[1],aps[10],aps[11],aps[12]]]
 		ri = copy(ro)
 		# @show ri
-        # lncs,q,q̇ = RB.NCF.NC4P(ri,rj,rk,rl,ro,R,ṙo,ω)
-		# lncs,q,q̇ = RB.NCF.NC3P1V(ri,rj,rk,ro,R,ṙo,ω)
-		# lncs,q,q̇ = RB.NCF.NC2P2V(ri,rk,ro,R,ṙo,ω)
-		lncs,q,q̇ = RB.NCF.NC1P3V(ri,ro,R,ṙo,ω)
+        # nmcs = RB.NCF.NC4P(ri,rj,rk,rl,ro,R)
+		# nmcs = RB.NCF.NC3P1V(ri,rj,rk,ro,R)
+		# nmcs = RB.NCF.NC2P2V(ri,rk,ro,R)
+		nmcs = RB.NCF.NC1P3V(ri,ro,R)
 		if i == 1
-			ci = RB.find_full_pres_indices(lncs,q)
+			ci = RB.find_full_pres_indices(nmcs,q)
 			constraints_indices = collect(1:6)
 		else
 			ci = Int[]
 			constraints_indices = collect(1:6)
 		end
-        state = RB.RigidBodyState(prop,lncs,ro,R,ṙo,ω,ci,constraints_indices)
+        state = RB.RigidBodyState(prop,nmcs,ro,R,ṙo,ω,ci,constraints_indices)
         body = RB.RigidBody(prop,state)
     end
     rbs = [rigidbody(i,props[i],aps,rs[i],Rs[i],ṙs[i],ωs[i]) for i = 1:n]

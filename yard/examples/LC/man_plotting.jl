@@ -9,8 +9,8 @@ function get_cables(st)
 end
 
 function rb_bars(body)
-    (;lncs) = body.state.cache.funcs
-    if lncs isa RB.NCF.LocalNCF2D2P
+    (;nmcs) = body.state.cache.funcs
+    if nmcs isa RB.NCF.LocalNCF2D2P
         return [
             Point(body.state.loci_states[1]) => Point(body.state.loci_states[2]);
         ]

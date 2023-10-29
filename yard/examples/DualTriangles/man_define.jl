@@ -113,7 +113,7 @@ function man_ndof(ndof,onedir=[0.0,-1.0];θ=0.0,k=0.0,c=0.0,unit="mks",restlen=0
 		ap8 = SVector{2}([ap8_x,ap8_y])
         aps = [ap1,ap2,ap3,ap4,ap5,ap6,ap7,ap8]
 
-		# only to get lncs
+		# only to get nmcs
         prop = RB.RigidBodyProperty(
 					i,movable,m,
 					Ī,
@@ -125,7 +125,7 @@ function man_ndof(ndof,onedir=[0.0,-1.0];θ=0.0,k=0.0,c=0.0,unit="mks",restlen=0
         ω = 0.0
         ṙo = @SVector zeros(2)
 		α = get_angle([1.0,0.0],rj-ri)
-        lncs, q0, _ = RB.NCF.NC1P2V(ri,ro,α,ṙo,ω)
+        nmcs = RB.NCF.NC1P2V(ri,ro,α)
 		if i == 1
 			ci = collect(1:6)
 			constraints_indices = Int[]
@@ -133,7 +133,7 @@ function man_ndof(ndof,onedir=[0.0,-1.0];θ=0.0,k=0.0,c=0.0,unit="mks",restlen=0
 			ci = Int[]
 			constraints_indices = collect(1:3)
 		end
-        state = RB.RigidBodyState(prop,lncs,ro,α,ṙo,ω,ci,constraints_indices)
+        state = RB.RigidBodyState(prop,nmcs,ro,α,ṙo,ω,ci,constraints_indices)
 
         body = RB.RigidBody(prop,state)
     end
@@ -437,9 +437,9 @@ function man_ndof_2022(ndof,onedir=[1.0,0.0];θ=0.0,k=1250.0,c=0.0,unit="mks")
 		ro = ri
 		ṙo = zero(ro)
 
-        lncs, q0, _ = RB.NCF.NC2P1V(ri,rj,ro,α,ṙo,ω)
+        nmcs = RB.NCF.NC2P1V(ri,rj,ro,α)
 
-        state = RB.RigidBodyState(prop,lncs,ro,α,ṙo,ω,ci,constraints_indices)
+        state = RB.RigidBodyState(prop,nmcs,ro,α,ṙo,ω,ci,constraints_indices)
 
         body = RB.RigidBody(prop,state)
 

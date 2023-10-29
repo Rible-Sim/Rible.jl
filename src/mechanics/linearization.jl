@@ -46,10 +46,10 @@ function GECP(A_input)
     col_index
 end
 
-function find_full_pres_indices(lncs,q)
-    cf = NCF.CoordinateFunctions(lncs,
-            collect(1:NCF.get_num_of_coordinates(lncs)),
-            collect(1:NCF.get_num_of_constraints(lncs))
+function find_full_pres_indices(nmcs,q)
+    cf = NCF.CoordinateFunctions(nmcs,
+            collect(1:NCF.get_num_of_coordinates(nmcs)),
+            collect(1:NCF.get_num_of_constraints(nmcs))
         )
     Aq = cf.Φq(q)
     col_index = GECP(Aq)
@@ -998,18 +998,18 @@ function make_N(st::Structure,q0::AbstractVector)
         ret = zeros(T,nfree,nfree-ninconstraints)
         foreach(bodies) do body
             bodyid = body.prop.id
-            (;lncs) = body.state.cache.funcs
+            (;nmcs) = body.state.cache.funcs
 			memfree = mem2sysfree[bodyid]
             if !isempty(mem2sysincst[bodyid])
-                if lncs isa NCF.LNC3D12C
-                        u,v,w = NCF.get_uvw(lncs,q̌[memfree])
+                if nmcs isa NCF.LNC3D12C
+                        u,v,w = NCF.get_uvw(nmcs,q̌[memfree])
                         N = @view ret[mem2sysfree[bodyid],mem2sysincst[bodyid]]
                         N[1:3,1:3]   .= Matrix(1I,3,3)
                         N[4:6,4:6]   .= -skew(u)
                         N[7:9,4:6]   .= -skew(v)
                         N[10:12,4:6] .= -skew(w)
-                elseif lncs isa NCF.LNC2D6C                    
-                        u,v = NCF.get_uv(lncs,q̌[memfree])
+                elseif nmcs isa NCF.LNC2D6C                    
+                        u,v = NCF.get_uv(nmcs,q̌[memfree])
                         N = @view ret[mem2sysfree[bodyid],mem2sysincst[bodyid]]
                         N[1:2,1:2] .= Matrix(1I,2,2)
                         N[3:4,3] .= -skew(u)

@@ -78,10 +78,10 @@ function new_pointmass(;
     ω = zero(origin_position)
     R = RotX(0.0)
     loci = Ref(origin_position) .+ Ref(R).*loci
-    lncs, _ = RB.NCF.NC3D1P(loci[1],)
+    nmcs = RB.NCF.NC3D1P(loci[1],)
     ci = Int[]
     constraints_indices = Int[]
-    state = RB.RigidBodyState(prop,lncs,origin_position,R,origin_velocity,ω,ci,constraints_indices)
+    state = RB.RigidBodyState(prop,nmcs,origin_position,R,origin_velocity,ω,ci,constraints_indices)
     rb1 = RB.RigidBody(prop,state)
 
     rbs = TypeSortedCollection((rb1,))
@@ -411,7 +411,7 @@ function make_top(origin_position = [0.0,0.0,0.0],
     if cT == RB.QBF.QC
         nmcs = RB.QBF.QC(m,Ī)
     else
-        nmcs, _ = RB.NCF.NC1P3V(ri,origin_position,R,origin_velocity,ω)
+        nmcs = RB.NCF.NC1P3V(ri,origin_position,R,origin_velocity,ω)
     end
     state = RB.RigidBodyState(prop,nmcs,origin_position,R,origin_velocity,ω,pres_idx)
     rb1 = RB.RigidBody(prop,state,topmesh)
@@ -1001,8 +1001,8 @@ function make_bar(;
 
     prop = RB.RigidBodyProperty(1,movable,m,Ī,mass_locus,loci;constrained)
 
-    lncs, _ = RB.NCF.NC3D2P(ri,rj,origin_position,R,origin_velocity,ω)
-    state = RB.RigidBodyState(prop,lncs,origin_position,R,origin_velocity,ω)
+    nmcs = RB.NCF.NC3D2P(ri,rj,origin_position,R,origin_velocity,ω)
+    state = RB.RigidBodyState(prop,nmcs,origin_position,R,origin_velocity,ω)
 
     p1 = Meshes.Point(loci[1])
     p2 = Meshes.Point(loci[2])
@@ -1112,22 +1112,22 @@ function make_hammer(id,r̄ijkl,origin_position,R,ri,rj=nothing,rk=nothing,rl=no
                 )
     origin_velocity = zero(origin_position)
     if rj isa Nothing
-        lncs,_ = RB.NCF.NC1P3V(ri,origin_position,R,origin_velocity,ω)
+        nmcs = RB.NCF.NC1P3V(ri,origin_position,R,origin_velocity,ω)
     elseif rk isa Nothing
-        lncs,_ = RB.NCF.NC2P2V(ri,rj,origin_position,R,origin_velocity,ω)
+        nmcs = RB.NCF.NC2P2V(ri,rj,origin_position,R,origin_velocity,ω)
     elseif rl isa Nothing
-        lncs,_ = RB.NCF.NC3P1V(ri,rj,rk,origin_position,R,origin_velocity,ω)
+        nmcs = RB.NCF.NC3P1V(ri,rj,rk,origin_position,R,origin_velocity,ω)
     else
-        lncs,_ = RB.NCF.NC4P(ri,rj,rk,rl,origin_position,R,origin_velocity,ω)
+        nmcs = RB.NCF.NC4P(ri,rj,rk,rl,origin_position,R,origin_velocity,ω)
     end
-    # cf = RB.NCF.CoordinateFunctions(lncs,q0,pres_idx,free_idx)
-    # @show typeof(lncs)
+    # cf = RB.NCF.CoordinateFunctions(nmcs,q0,pres_idx,free_idx)
+    # @show typeof(nmcs)
        # trimesh = Meshes.discretize(box,) |> simple2mesh
     meteormesh = load(joinpath(RB.assetpath("流星锤.STL"))) |> make_patch(;
         scale = 1/400,
         trans = [-0.20,0,0],
     )
-    state = RB.RigidBodyState(prop,lncs,origin_position,R,origin_velocity,ω,pres_idx,Φ_mask)
+    state = RB.RigidBodyState(prop,nmcs,origin_position,R,origin_velocity,ω,pres_idx,Φ_mask)
     body = RB.RigidBody(prop,state,meteormesh)
 end
 
@@ -2306,8 +2306,8 @@ function make_cube(origin_position = [0.0,0.0,0.5],
         friction_coefficients,restitution_coefficients,
         )
     ri = copy(origin_position)
-    lncs,q,q̇ = RB.NCF.NC1P3V(ri,origin_position,R,origin_velocity,ω)
-    state = RB.RigidBodyState(prop,lncs,origin_position,R,origin_velocity,ω)
+    nmcs = RB.NCF.NC1P3V(ri,origin_position,R,origin_velocity,ω)
+    state = RB.RigidBodyState(prop,nmcs,origin_position,R,origin_velocity,ω)
     rb1 = RB.RigidBody(prop,state,cube_mesh)
     rbs = TypeSortedCollection((rb1,))
     numberedpoints = RB.number(rbs)
