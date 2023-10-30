@@ -56,7 +56,7 @@ function find_full_pres_indices(nmcs,q)
     col_index[size(Aq,1)+1:end] |> sort
 end
 
-function ∂Aᵀλ∂q̌(st::AbstractStructure,λ)
+function constraint_forces_on_free_jacobian(st::AbstractStructure,λ)
     (;numbered,indexed,jointed) = st.connectivity
     (;nfree,ninconstraints,mem2sysfree,mem2sysincst) = indexed
     (;njoints,nexconstraints,joints,joint2sysexcst) = jointed
@@ -68,7 +68,10 @@ function ∂Aᵀλ∂q̌(st::AbstractStructure,λ)
         memincst = mem2sysincst[bodyid]
         free_idx = body.state.cache.free_idx
         if !isempty(memincst)
-            ret[memfree,memfree] .+= body.state.cache.funcs.∂Aᵀλ∂q(λ[memincst])#[:,free_idx]
+            ret[memfree,memfree] .+= make_constraint_forces_jacobian(
+                body.state.cache.funcs,
+                body.state.cache.constraints_hessians
+            )(λ[memincst])#[:,free_idx]
         end
     end
     #todo skip 2D for now
@@ -76,7 +79,7 @@ function ∂Aᵀλ∂q̌(st::AbstractStructure,λ)
         foreach(joints) do joint
             jointexcst = joint2sysexcst[joint.id]
             jointfree = get_jointed_free(joint,indexed)
-            ret[jointfree,jointfree] .+= make_∂Aᵀλ∂q(joint,st)(λ[jointexcst])
+            ret[jointfree,jointfree] .+= make_constraint_forces_jacobian(joint,st)(λ[jointexcst])
         end
     end
     ret
@@ -135,7 +138,7 @@ function linearize(tginput,λ,u,q,q̇=zero(q))
     Ĉ[1:ncoords,1:ncoords] .= -Q̃*∂L∂q̇
 
     # fjac = test_fvector(st,q)
-    K̂[1:ncoords,1:ncoords] .= -Q̃*∂L∂q .+ ∂Aᵀλ∂q(st,λ)
+    K̂[1:ncoords,1:ncoords] .= -Q̃*∂L∂q .+ constraint_forces_jacobian(st,λ)
     Aq = A(q)
     c = maximum(abs.(K̂[1:ncoords,1:ncoords]))
     K̂[1:ncoords,ncoords+1:nz] .= c.*transpose(Aq)
@@ -153,7 +156,7 @@ function make_intrinsic_nullspace(st,q)
         bodyid = body.prop.id
         (;nmcs) = body.state.cache.funcs
         mem2full = mem2sysfull[bodyid]
-        ret[mem2full,mem2sysndof[bodyid]] = NCF.make_N(nmcs)(q[mem2full])
+        ret[mem2full,mem2sysndof[bodyid]] = NCF.make_nullspace(nmcs)(q[mem2full])
     end
     ret
 end
@@ -197,7 +200,7 @@ function build_Ǩ(st)
     build_Ǩ(st,λ)
 end
 
-function build_Ǩm!(st::Structure,q,k)
+function build_material_stiffness_matrix_on_free!(st::Structure,q,k)
     (;ndim) = st
     (;indexed,tensioned) = st.connectivity
     (;nfull,nfree,sysfree,mem2sysfull) = indexed
@@ -230,7 +233,7 @@ function build_Ǩm!(st::Structure,q,k)
     retǨm
 end
 
-function build_Ǩg!(st::Structure,q,f)
+function build_geometric_stiffness_matrix_on_free!(st::Structure,q,f)
     (;ndim) = st
     (;indexed,tensioned) = st.connectivity
     (;nfull,nfree,sysfree,mem2sysfull) = indexed
@@ -777,7 +780,7 @@ function build_Ǩ(st,λ)
     (;nfree) = st.connectivity.indexed
     T = get_numbertype(st)
     # Ǩ = zeros(T,nfree,nfree)
-    Ǩ = -build_∂Q̌∂q̌(st) .- ∂Aᵀλ∂q̌(st,λ)
+    Ǩ = -build_∂Q̌∂q̌(st) .- constraint_forces_on_free_jacobian(st,λ)
     # Ǩ .= Ǩ
     Ǩ
 end
@@ -794,8 +797,8 @@ end
 
 function undamped_eigen(st;gravity=false)
     _,λ = check_static_equilibrium_output_multipliers(st;gravity)
-    q = get_q(st)
-    q̌ = get_q̌(st)
+    q = get_coordinates(st)
+    q̌ = get_free_coordinates(st)
     M̌ = build_M̌(st)
     Ǩ = build_Ǩ(st,λ)
     Ǎ = make_constraints_jacobian(st)(q)
@@ -826,7 +829,7 @@ end
 
 function undamped_eigen!(bot::Robot;gravity=false,scaling=0.01)
     (;st,traj) = bot
-    q̌ = get_q̌(st)
+    q̌ = get_free_coordinates(st)
     ω²,δq̌ = undamped_eigen(st;gravity)
     neg_indices = findall(ω².<=0)
     if !isempty(neg_indices)
@@ -936,16 +939,16 @@ function check_stability(st::Structure;F̌=nothing,verbose=false)
 end
 
 function check_stability(st::Structure,λ;verbose=false)
-    q = get_q(st)
-    c = get_c(st)
+    q = get_coordinates(st)
+    c = get_local_coordinates(st)
     A = make_constraints_jacobian(st,q)
     Ň(q̌,c) = nullspace(A(q̌))
     check_stability(st,λ,Ň;verbose)
 end
 
 function check_stability(st::Structure,λ,Ň;verbose=false)
-    q̌ = get_q̌(st)
-    c = get_c(st)
+    q̌ = get_free_coordinates(st)
+    c = get_local_coordinates(st)
     Ǩ0 = build_Ǩ(st,λ)
     Ň0 = Ň(q̌,c)
     𝒦0 = transpose(Ň0)*Ǩ0*Ň0
@@ -968,7 +971,7 @@ function check_stability!(bot::Robot,Ň;
     (;st,traj) = bot
     static_equilibrium,λ = check_static_equilibrium_output_multipliers(st)
     @assert static_equilibrium
-    q̌ = get_q̌(st)
+    q̌ = get_free_coordinates(st)
     _, Ň0, er = check_stability(bot.st,λ,Ň;verbose=true)
     resize!(traj,1)
     for i in 1:length(er.values)
@@ -987,10 +990,10 @@ function check_stability!(bot::Robot,Ň;
     bot
 end
 
-function make_N(st::Structure,q0::AbstractVector)
+function make_nullspace(st::Structure,q0::AbstractVector)
 	(;bodies,connectivity) = st
     (;nfree,nfull,syspres,sysfree,mem2sysfree,mem2sysincst,ninconstraints) = connectivity.indexed
-    function inner_N(q̌)
+    function inner_nullspace(q̌)
         T = eltype(q̌)
 		q = Vector{T}(undef,nfull)
 		q[syspres] .= q0[syspres]

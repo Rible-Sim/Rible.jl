@@ -7,9 +7,16 @@ using ForwardDiff
 using DocStringExtensions
 using SymmetricFormats
 
-import ..Rible: HouseholderOrthogonalization
+import ..Rible: HouseholderOrthogonalization, skew
 
-export get_num_of_constraints, get_num_of_coordinates, get_num_of_dof, get_num_of_local_dims
+export get_num_of_constraints, get_num_of_coordinates
+export get_num_of_dof, get_num_of_local_dims
+export to_local_coordinates, to_transformation
+
+export make_constraints_function
+export make_constraints_jacobian
+export make_constraints_hessians
+export make_constraint_forces_jacobian
 
 """
 local natural coordinates abstract type.
@@ -795,7 +802,7 @@ end
 Return 2D or 3D Jacobian matrix for rigid bars。
 $(TYPEDSIGNATURES)
 """
-function make_constraints_jacobian(nmcs::Union{LNC2D2C,LNC3D3C},unconstrained_indices,constraints_indices)
+function make_constraints_jacobian(nmcs::Union{LNC2D2C,LNC3D3C},free_coordinates_indices,constraints_indices)
     @inline @inbounds function inner_constraints_jacobian(q)
         nothing
     end
@@ -805,7 +812,7 @@ end
 Return 2D or 3D Jacobian matrix for rigid bars。
 $(TYPEDSIGNATURES)
 """
-function make_constraints_jacobian(nmcs::Union{LNC2D4C,LNC3D6C},unconstrained_indices,constraints_indices)
+function make_constraints_jacobian(nmcs::Union{LNC2D4C,LNC3D6C},free_coordinates_indices,constraints_indices)
     ndim = get_num_of_dims(nmcs)
     cv = nmcs.conversion
     @inline @inbounds function inner_constraints_jacobian(q)
@@ -813,7 +820,7 @@ function make_constraints_jacobian(nmcs::Union{LNC2D4C,LNC3D6C},unconstrained_in
         u = @view qstd[ndim+1:2ndim]
         ret = zeros(eltype(q),1,2ndim)
         ret[ndim+1:2ndim] = 2u
-        @view (ret*cv)[constraints_indices,unconstrained_indices]
+        @view (ret*cv)[constraints_indices,free_coordinates_indices]
     end
 end
 
@@ -821,31 +828,25 @@ end
 Return 2D Jacobian matrix , for rigid bodies。
 $(TYPEDSIGNATURES)
 """
-function make_constraints_jacobian(nmcs::LNC2D6C,unconstrained_indices,constraints_indices)
-    cv = nmcs.conversion
+function make_constraints_jacobian(nmcs::LNC2D6C,free_coordinates_indices,constraints_indices)
     @inline @inbounds function inner_constraints_jacobian(q)
-        qstd = cv*q
-        u = @view qstd[3:4]
-        v = @view qstd[5:6]
+        u,v = get_uv(nmcs,q)
         ret = zeros(eltype(q),3,6)
         ret[1,3:4] = 2u
         ret[2,5:6] = 2v
         ret[3,3:4] =  v
         ret[3,5:6] =  u
-        @view (ret*cv)[constraints_indices,unconstrained_indices]
+        @view (ret*cv)[constraints_indices,free_coordinates_indices]
     end
 end
 """
 Return 3D Jacobian matrix , for rigid bodies。
 $(TYPEDSIGNATURES)
 """
-function make_constraints_jacobian(nmcs::LNC3D12C,unconstrained_indices,constraints_indices)
-    cv = nmcs.conversion
+function make_constraints_jacobian(nmcs::LNC3D12C,free_coordinates_indices,constraints_indices)
     @inline @inbounds function inner_constraints_jacobian(q)
-        qstd = cv*q
-        u  = @view qstd[4:6]
-        v  = @view qstd[7:9]
-        w  = @view qstd[10:12]
+        u,v,w = get_uvw(nmcs,q)
+        cv = nmcs.conversion
         ret = zeros(eltype(q), 6, 12)
         ret[1,4:6]   = 2u
         ret[2,7:9]   = 2v
@@ -860,7 +861,7 @@ function make_constraints_jacobian(nmcs::LNC3D12C,unconstrained_indices,constrai
         ret[6,4:6] =  v
         ret[6,7:9] =  u
 
-        @view (ret*cv)[constraints_indices,unconstrained_indices]
+        @view (ret*cv)[constraints_indices,free_coordinates_indices]
     end
 end
 
@@ -868,110 +869,87 @@ end
 Return nullspace matrix
 $(TYPEDSIGNATURES)
 """
-function make_N(nmcs::LNC2D4C)
+function make_nullspace(nmcs::LNC2D4C)
     cv = nmcs.conversion
-    O2 = zero(I2_Bool)
-    @inline @inbounds function inner_N(q)
+    @inline @inbounds function inner_nullspace(q)
         u,v = get_uv(nmcs,q)
         o2 = zero(u)
         ret = [
             I2_Bool  o2;
-            O2       v;
+            o2 o2     v;
         ]
-        inv(cv)*ret
+        cv\ret
     end
 end
 
-function make_N(nmcs::LNC2D6C)
+function make_nullspace(nmcs::LNC2D6C)
     cv = nmcs.conversion
-    O2 = zero(I2_Bool)
-    @inline @inbounds function inner_N(q)
+    @inline @inbounds function inner_nullspace(q)
         u,v = get_uv(nmcs,q)
         o2 = zero(u)
         ret = [
             I2_Bool    o2;
-            O2         v;
-            O2        -u;
+            o2 o2       v;
+            o2 o2      -u;
         ]
-        inv(cv)*ret
+        cv\ret
     end
 end
 
-function make_N(nmcs::LNC3D6C)
+function make_nullspace(nmcs::LNC3D6C)
     cv = nmcs.conversion
-    O3 = zero(I3_Bool)
-    @inline @inbounds function inner_N(q)
+    @inline @inbounds function inner_nullspace(q)
         u,v,w = get_uvw(nmcs,q)
         o3 = zero(u)
+        O3 = [o3 o3 o3;]
         ret = [
             I3_Bool  o3 o3;
-            O3      -w v;
+            O3       -w  v;
         ]
-        inv(cv)*ret
+        cv\ret
     end
 end
 
-function make_N(nmcs::LNC3D12C)
+function make_nullspace(nmcs::LNC3D12C)
     cv = nmcs.conversion
-    O3 = zero(I3_Bool)
-    @inline @inbounds function inner_N(q)
+    @inline @inbounds function inner_nullspace(q)
         u,v,w = get_uvw(nmcs,q)
+        o3 = zero(u)
+        O3 = [o3 o3 o3;]
         # ret = [
         #     I3_Bool   O3;
         #     O3 -skew(u);
         #     O3 -skew(v);
         #     O3 -skew(w);
         # ]
-        o3 = zero(u)
         ret = [
             I3_Bool    O3;
             O3  o3  -w  v;
             O3   w  o3 -u;
             O3  -v   u o3;
         ]
-        inv(cv)*ret
+        cv\ret
     end
 end
 
 # Transformations
 """
-Return 转换矩阵C。
+Return transformation matrix。
 $(TYPEDSIGNATURES)
 """
-function to_local_coordinates(nmcs::LNC)
+function to_local_coordinates(nmcs::LNC,r̄)
     (;r̄i,invX̄) = nmcs
-    function c(r̄)
-        invX̄*(r̄-r̄i)
-    end
+    invX̄*(r̄-r̄i)
 end
 
-function to_transformation(nmcs::LNC)
-    function C(c)
-        ndim = get_num_of_dims(nmcs)
-        ncoords = get_num_of_coordinates(nmcs)
-        conversion = nmcs.conversion
-        C_raw = hcat(1,transpose(c))
-        SMatrix{ndim,ncoords}(kron(C_raw,IMatrix(ndim))*conversion)
-    end
+function to_transformation(nmcs::LNC,c)
+    ndim = get_num_of_dims(nmcs)
+    ncoords = get_num_of_coordinates(nmcs)
+    conversion = nmcs.conversion
+    C_raw = hcat(1,transpose(c))
+    SMatrix{ndim,ncoords}(kron(C_raw,IMatrix(ndim))*conversion)
 end
 
-# CoordinateFunctions
-"""
-封装有函数的natural coodinates.
-$(TYPEDEF)
-"""
-struct CoordinateFunctions{nmcsType,
-                    cT<:Function,CT<:Function,
-                    ΦT<:Function,ΦqT<:Function,
-                    ∂Aᵀλ∂qT,∂Aq̇∂qT}
-    nmcs::nmcsType
-    c::cT
-    C::CT
-    Φ::ΦT
-    Φq::ΦqT
-    ∂Aᵀλ∂q::∂Aᵀλ∂qT
-    ∂Aq̇∂q::∂Aq̇∂qT
-end
 
 get_idx(nmcs::Union{LNC2D4C,LNC3D6C}) = [
     [CartesianIndex(2,2),CartesianIndex(2,2)],
@@ -992,14 +970,14 @@ get_idx(nmcs::LNC3D12C) = [
     [CartesianIndex(2,3),CartesianIndex(3,2)]
 ]
 
-#todo cache constraints_hessian
-function make_constraints_hessian(nmcs::LNC)
+#todo cache constraints_hessians
+function make_constraints_hessians(nmcs::LNC)
     cv = nmcs.conversion
     nld = get_num_of_local_dims(nmcs)
     ndim = get_num_of_dims(nmcs)
     I_Bool = IMatrix(ndim)
     idx = get_idx(nmcs)
-    constraints_hessian = [
+    constraints_hessians = [
         begin
             ret_raw = zeros(Int,nld+1,nld+1)
             for ij in id
@@ -1012,18 +990,60 @@ function make_constraints_hessian(nmcs::LNC)
 end
 
 #todo use SymmetricPacked to the end
-function make_∂Aᵀλ∂q(nmcs::Union{LNC2D2C,LNC3D3C},unconstrained_indices,constraints_indices)
-    function ∂Aᵀλ∂q(λ)
+function make_constraint_forces_jacobian(nmcs::Union{LNC2D2C,LNC3D3C},free_coordinates_indices,constraints_indices)
+    function constraint_forces_jacobian(λ)
         nothing
     end
 end
 
-function make_∂Aᵀλ∂q(nmcs::LNC,unconstrained_indices,constraints_indices)
-    constraints_hessian = make_constraints_hessian(nmcs)
-    function ∂Aᵀλ∂q(λ)
+# CoordinateFunctions
+"""
+封装有函数的natural coodinates.
+$(TYPEDEF)
+"""
+struct CoordinateFunctions{nmcsType,IndicesType}
+    nmcs::nmcsType
+    free_coordinates_indices::IndicesType
+    constraints_indices::IndicesType
+end
+
+"""
+封装有函数的natural coodinates 构造子。
+$(TYPEDSIGNATURES)
+"""
+function CoordinateFunctions(nmcs,free_coordinates_indices,constraints_indices)
+    # # constraint_forces_jacobian = make_constraint_forces_jacobian_forwarddiff(Φq,nq,nuc)
+    # constraint_forces_jacobian = make_constraint_forces_jacobian(nmcs,free_coordinates_indices,constraints_indices)
+    # # ∂Aq̇∂q = make_∂Aq̇∂q_forwarddiff(Φq,nuc,num_of_constraints)
+    # ∂Aq̇∂q = make_∂Aq̇∂q(nmcs,free_coordinates_indices,constraints_indices)
+    CoordinateFunctions(
+        nmcs,
+        free_coordinates_indices,
+        constraints_indices
+    )
+end
+
+function make_constraints_function(cf::CoordinateFunctions)
+    make_constraints_function(cf.nmcs,cf.constraints_indices)
+end
+
+function make_constraints_jacobian(cf::CoordinateFunctions)
+    make_constraints_jacobian(
+        cf.nmcs,
+        cf.free_coordinates_indices,
+        cf.constraints_indices,
+    )
+end
+
+function make_constraint_forces_jacobian(
+        cf::CoordinateFunctions,
+        constraints_hessians
+    )
+    (;nmcs::LNC,free_coordinates_indices,constraints_indices) = cf
+    function constraint_forces_jacobian(λ)
         ret = [
             begin
-                a = constraints_hessian[j][unconstrained_indices,unconstrained_indices] .* λ[i]
+                a = constraints_hessians[j][free_coordinates_indices,free_coordinates_indices] .* λ[i]
                 # display(a)
                 a 
             end
@@ -1033,19 +1053,20 @@ function make_∂Aᵀλ∂q(nmcs::LNC,unconstrained_indices,constraints_indices)
     end
 end
 
-function make_∂Aq̇∂q(nmcs::Union{LNC2D2C,LNC3D3C},unconstrained_indices,constraints_indices)
+function make_∂Aq̇∂q(nmcs::Union{LNC2D2C,LNC3D3C},free_coordinates_indices,constraints_indices)
     function ∂Aq̇∂q(q̇)
         nothing
     end
 end
 
-function make_∂Aq̇∂q(nmcs::LNC,unconstrained_indices,constraints_indices)
-    constraints_hessian = make_constraints_hessian(nmcs)
+# this is wrong
+function make_∂Aq̇∂q(nmcs::LNC,free_coordinates_indices,constraints_indices)
+    constraints_hessians = make_constraints_hessians(nmcs)
     function ∂Aq̇∂q(q̇)
-        q̇uc = @view q̇[unconstrained_indices]
+        q̇uc = @view q̇[free_coordinates_indices]
         ret = [
             begin
-                a = transpose(q̇uc)*constraints_hessian[j][unconstrained_indices,unconstrained_indices]
+                a = transpose(q̇uc)*constraints_hessians[j][free_coordinates_indices,free_coordinates_indices]
                 # display(a)
                 a 
             end
@@ -1054,12 +1075,13 @@ function make_∂Aq̇∂q(nmcs::LNC,unconstrained_indices,constraints_indices)
         sum(ret)
     end
 end
+
 """
-Return ∂Aᵀλ∂q的前向自动微分结果。
+Return constraint_forces_jacobian的前向自动微分结果。
 $(TYPEDSIGNATURES)
 """
-function make_∂Aᵀλ∂q_forwarddiff(Φq,nq,nuc)
-    function ∂Aᵀλ∂q(λ)
+function make_constraint_forces_jacobian_forwarddiff(Φq,nq,nuc)
+    function constraint_forces_jacobian(λ)
         function ATλ(q)
             transpose(Φq(q))*λ
         end
@@ -1091,25 +1113,6 @@ $(TYPEDSIGNATURES)
 """
 function get_free_idx(nmcs::LNC,pres_idx)
     deleteat!(collect(1:get_num_of_coordinates(nmcs)),pres_idx)
-end
-
-"""
-封装有函数的natural coodinates 构造子。
-$(TYPEDSIGNATURES)
-"""
-function CoordinateFunctions(nmcs,unconstrained_indices,constraints_indices)
-    c = to_local_coordinates(nmcs)
-    C = to_transformation(nmcs)
-    Φ = make_constraints_function(nmcs,constraints_indices)
-    Φq = make_constraints_jacobian(nmcs,unconstrained_indices,constraints_indices)
-    nq = get_num_of_coordinates(nmcs)
-    nuc = length(unconstrained_indices)
-    nΦ = length(constraints_indices)
-    # ∂Aᵀλ∂q = make_∂Aᵀλ∂q_forwarddiff(Φq,nq,nuc)
-    ∂Aᵀλ∂q = make_∂Aᵀλ∂q(nmcs,unconstrained_indices,constraints_indices)
-    # ∂Aq̇∂q = make_∂Aq̇∂q_forwarddiff(Φq,nuc,nΦ)
-    ∂Aq̇∂q = make_∂Aq̇∂q(nmcs,unconstrained_indices,constraints_indices)
-    CoordinateFunctions(nmcs,c,C,Φ,Φq,∂Aᵀλ∂q,∂Aq̇∂q)
 end
 
 

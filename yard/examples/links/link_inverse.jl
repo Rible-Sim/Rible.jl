@@ -276,7 +276,7 @@ function inverse_with_energy_3(tr,reftr,Y,epes)
     λ_result = x_result[1:acttg.nconstraint].*c
     a_result = x_result[acttg.nconstraint+1:end]
     RB.actuation_check(acttr,Y,a_result)
-    refq,_ = RB.get_q(reftr.st)
+    refq,_ = RB.get_coordinates(reftr.st)
     RB.actuate!(acttr,a_result)
     @assert RB.check_static_equilibrium(acttg,refq,λ_result)
     u0 = RB.get_original_restlen(acttr)

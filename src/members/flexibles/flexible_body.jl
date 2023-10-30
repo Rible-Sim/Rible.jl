@@ -45,8 +45,8 @@ struct FlexibleBodyCoordinatesCache{fT,MT,JT,VT,eT,ArrayT,N,M}
     free_idx::Vector{Int}
     pres_idx_mask::SVector{N,Bool}
     free_idx_mask::SVector{N,Bool}
-	Φ_mask::SVector{M,Bool}
-    nΦ::Int
+	constraints_indices::SVector{M,Bool}
+    num_of_constraints::Int
     funcs::fT
     e::eT
     ė::eT
@@ -61,9 +61,9 @@ struct FlexibleBodyCoordinatesCache{fT,MT,JT,VT,eT,ArrayT,N,M}
     Sps::Vector{ArrayT}
 end
 
-function get_Φ_mask(ancs::ANCF.ANC)
-	nΦ = ANCF.get_num_of_constraints(ancs)
-	@SVector ones(Bool,nΦ)
+function get_constraints_indices(ancs::ANCF.ANC)
+	num_of_constraints = ANCF.get_num_of_constraints(ancs)
+	@SVector ones(Bool,num_of_constraints)
 end
 
 function get_idx_mask(ancs::ANCF.ANC,pres_idx)
@@ -79,15 +79,15 @@ function get_CoordinatesCache(
         e::AbstractVector,
         ė=zero(e);
         pres_idx=Int[],
-        Φ_mask=get_Φ_mask(ancs)
+        constraints_indices=get_constraints_indices(ancs)
     ) where {N,T}
     (;mass,loci) = prop
     num_of_loci = length(loci)
-    nΦ = sum(Φ_mask)
+    num_of_constraints = sum(constraints_indices)
     free_idx_mask, pres_idx_mask = get_idx_mask(ancs,pres_idx)
     pres_idx = findall(pres_idx_mask)
     free_idx = findall(free_idx_mask)
-    cf = ANCF.CoordinateFunctions(ancs,free_idx_mask,Φ_mask)
+    cf = ANCF.CoordinateFunctions(ancs,free_idx_mask,constraints_indices)
     M = ANCF.build_M(ancs)
     M⁻¹ = inv(M)
     ∂Mq̇∂q = zero(M)
@@ -103,7 +103,7 @@ function get_CoordinatesCache(
         free_idx,
         pres_idx_mask,
         free_idx_mask,
-        Φ_mask,nΦ,
+        constraints_indices,num_of_constraints,
         cf,e,ė,
         M,M⁻¹,
         ∂Mq̇∂q,∂M⁻¹p∂q,Ṁq̇,
@@ -123,7 +123,7 @@ function FlexibleBodyState(prop::FlexibleBodyProperty{N,T},
         e::AbstractVector,
         ė=zero(e);
         pres_idx=Int[],
-        Φ_mask=get_Φ_mask(ancs)) where {N,T}
+        constraints_indices=get_constraints_indices(ancs)) where {N,T}
     (;mass_locus,loci) = prop
     num_of_loci = length(loci)
     nc = ANCF.get_num_of_coordinates(ancs)
@@ -132,7 +132,7 @@ function FlexibleBodyState(prop::FlexibleBodyProperty{N,T},
         ancs,
         MVector{nc}(e),
         MVector{nc}(ė);
-        pres_idx,Φ_mask
+        pres_idx,constraints_indices
     )
     (;Sg,Sps) = cache
     mass_locus_state = LocusState(

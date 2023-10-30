@@ -37,7 +37,7 @@ const figdir=raw"C:\Users\luo22\OneDrive\Papers\Ph.D.Thesis\ff"
 spine2 = spine_true(2,0.105,RotY(0.0))
 # @code_warntype spine_true(2,0.105,RotY(0.0))
 # Φ = RB.build_Φ(spine2.st)
-# q, _ = RB.get_q(spine2.st)
+# q, _ = RB.get_coordinates(spine2.st)
 # Φ(q)
 # @code_warntype Φ(q)
 # A = RB.build_A(spine2.st)

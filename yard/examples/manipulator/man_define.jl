@@ -135,7 +135,7 @@ function man_ndof(ndof,onedir=[1.0,0.0];θ=0.0,k=0.0,c=0.0,unit="mks",restlen=0.
 					aps;
 					constrained=ifelse(i in [1,2],true,false)
 					)
-		nmcs = RB.NCF.NC2P1V(SVector{2}(ri), SVector{2}(rj), ro, α, ṙo, ω)
+		nmcs = RB.NCF.NC2P1V(SVector{2}(ri), SVector{2}(rj), ro, α)
 
         if i in [1,2]
 			constrained = true

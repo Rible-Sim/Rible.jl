@@ -7,6 +7,51 @@
 					"line": 0,
 					"column": 17,
 					"label": ""
+				},
+				{
+					"line": 82,
+					"column": 10,
+					"label": ""
+				},
+				{
+					"line": 449,
+					"column": 15,
+					"label": ""
+				},
+				{
+					"line": 956,
+					"column": 17,
+					"label": ""
+				},
+				{
+					"line": 1232,
+					"column": 11,
+					"label": ""
+				},
+				{
+					"line": 1408,
+					"column": 14,
+					"label": ""
+				},
+				{
+					"line": 1752,
+					"column": 10,
+					"label": ""
+				},
+				{
+					"line": 2090,
+					"column": 17,
+					"label": ""
+				},
+				{
+					"line": 2485,
+					"column": 16,
+					"label": ""
+				},
+				{
+					"line": 2489,
+					"column": 16,
+					"label": ""
 				}
 			]
 		},
@@ -55,16 +100,6 @@
 			"bookmarks": [
 				{
 					"line": 0,
-					"column": 17,
-					"label": ""
-				},
-				{
-					"line": 340,
-					"column": 5,
-					"label": ""
-				},
-				{
-					"line": 2269,
 					"column": 17,
 					"label": ""
 				}

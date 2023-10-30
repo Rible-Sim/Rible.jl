@@ -51,7 +51,7 @@ function quad(c=100.0;
             loci;
             constrained = constrained,
         )
-        nmcs = RB.NCF.NC1P3V(ri, ro, R, ṙo, ω)
+        nmcs = RB.NCF.NC1P3V(ri, ro, R)
         state = RB.RigidBodyState(prop, nmcs, ri, R, ṙo, ω, ci, constraints_indices)
         trunk_mesh = load("身体.STL")
         body = RB.RigidBody(prop, state, trunk_mesh)
@@ -93,7 +93,7 @@ function quad(c=100.0;
             loci;
             constrained = constrained,
         )
-        nmcs = RB.NCF.NC3D2P(ri, rj, ro, R, ṙo, ω)
+        nmcs = RB.NCF.NC3D2P(ri, rj, ro, R)
         state = RB.RigidBodyState(prop, nmcs, ro, R, ṙo, ω, ci, constraints_indices)
         leg_mesh = load("400杆.STL")
         body = RB.RigidBody(prop, state, leg_mesh)
@@ -298,7 +298,7 @@ function uni(c=100.0;
             axes;
             constrained = constrained,
         )
-        nmcs = RB.NCF.NC1P3V(ri, ro, R, ṙo, ω)
+        nmcs = RB.NCF.NC1P3V(ri, ro, R)
         state = RB.RigidBodyState(prop, nmcs, ri, R, ṙo, ω, ci, constraints_indices)
         trimesh = load("BASE.STL") |> make_patch(;
             scale=1/1000,
@@ -373,7 +373,7 @@ function uni(c=100.0;
     tensioned = @eponymtuple(connected,)
     
     # uj = RB.PinJoint(1,
-    #     RB.End2End(
+    #     RB.Hen2Egg(
     #         1,
     #         RB.ID(rb2,4,4),
     #         RB.ID(rb1,3,3),
@@ -381,7 +381,7 @@ function uni(c=100.0;
     # )
 
     # uj = RB.UniversalJoint(1,
-    #     RB.End2End(
+    #     RB.Hen2Egg(
     #         1,
     #         RB.ID(rb2,4,4),
     #         RB.ID(rb1,3,3),
@@ -389,7 +389,7 @@ function uni(c=100.0;
     # )
 
     uj = RB.UniversalPrismaticJoint(1,
-        RB.End2End(
+        RB.Hen2Egg(
             1,
             RB.ID(rb2,4,4),
             RB.ID(rb1,3,3),

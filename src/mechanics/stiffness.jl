@@ -195,8 +195,8 @@ function optimize_zero_stiffness_Clarabel(mat𝒦ps,vec𝒦m,vecI,Aeq,beq,nx,x_0
 end
 
 # function super_stability(bot)
-#     q = RB.get_q(bot.st)
-#     # q̌ = RB.get_q̌(bot.st)
+#     q = RB.get_coordinates(bot.st)
+#     # q̌ = RB.get_free_coordinates(bot.st)
 #     Ǎ = RB.make_constraints_jacobian(bot.st)(q)
 #     Ň_ = RB.nullspace(Ǎ)
 #     Ň = modified_gram_schmidt(Ň_)
@@ -219,7 +219,7 @@ end
 #         # μ = l .- (f./k)
 #         λ = inv(Ǎ*transpose(Ǎ))*Ǎ*Bᵀ*f
 #         # @show f,λ
-#         Ǩa = - RB.∂Aᵀλ∂q̌(bot.st,λ)
+#         Ǩa = - RB.constraint_forces_on_free_jacobian(bot.st,λ)
 #         𝒦a = transpose(Ň)*Ǩa*Ň |> sparse
 #         D_𝒦a = ldl(𝒦a).D.diag |> sort
 

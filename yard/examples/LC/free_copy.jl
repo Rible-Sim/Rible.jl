@@ -64,7 +64,7 @@ plotstructure(manipulator)
 
 
 manipulator = man_nd1(k,c;ratio=0.85)
-q0,_ = RB.get_q(manipulator.st)
+q0,_ = RB.get_coordinates(manipulator.st)
 A = RB.build_A(manipulator.st)
 Q̃ = RB.build_Q̃(manipulator.st)
 Γ = RB.build_Γ(manipulator.st)

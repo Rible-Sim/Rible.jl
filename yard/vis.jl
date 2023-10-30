@@ -660,8 +660,8 @@ function get_linesegs_cables(st;slackonly=false,noslackonly=false)
     linesegs_cables = Vector{Tuple{Point{ndim,T},Point{ndim,T}}}()
     foreach(connected) do scnt
         scable = cables[scnt.id]
-        ret = (Point(scnt.hen.rbsig.state.loci_states[scnt.hen.pid]),
-                Point(scnt.egg.rbsig.state.loci_states[scnt.egg.pid]))
+        ret = (Point(scnt.hen.rbsig.state.loci_states[scnt.hen.pid].position),
+                Point(scnt.egg.rbsig.state.loci_states[scnt.egg.pid].position))
         slacking = scable.state.tension <= 0
         if (slackonly && slacking) ||
            (noslackonly && !slacking) ||
@@ -1032,7 +1032,7 @@ function plot_self_stress_states(
         botinput,
         S;
         rtol = 1e-14
-        # Ň = build_Ň(bot.st)
+        # Ň = build_nullspace_on_free(bot.st)
     )
     bot = deepcopy(botinput)
     @myshow S
@@ -1108,7 +1108,7 @@ function plot_kinematic_indeterminacy(
         botinput,
         D,
         Ň,
-        # Ň = build_Ň(bot.st)
+        # Ň = build_nullspace_on_free(bot.st)
     )
     bot = deepcopy(botinput)
     nk = size(D,2)

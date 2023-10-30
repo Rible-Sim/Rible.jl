@@ -197,11 +197,11 @@ function rigidbody(i, rdsi, r̄si; rigidIndex=rigidIndex, barIndex=barIndex)
     )
     ro = SVector{2}(ri)
     if i in rigidIndex
-        nmcs = RB.NCF.NC2P1V(SVector{2}(ri), SVector{2}(rj), ro, α, ṙo, ω)
-        # nmcs = RB.NCF.NC2D2P(SVector{2}(ri), SVector{2}(rj), ro, α, ṙo, ω)
+        nmcs = RB.NCF.NC2P1V(SVector{2}(ri), SVector{2}(rj), ro, α)
+        # nmcs = RB.NCF.NC2D2P(SVector{2}(ri), SVector{2}(rj), ro, α)
     else
-        nmcs = RB.NCF.NC2D2P(SVector{2}(ri), SVector{2}(rj), ro, α, ṙo, ω)
-        # nmcs = RB.NCF.NC2P1V(SVector{2}(ri), SVector{2}(rj), ro, α, ṙo, ω)
+        nmcs = RB.NCF.NC2D2P(SVector{2}(ri), SVector{2}(rj), ro, α)
+        # nmcs = RB.NCF.NC2P1V(SVector{2}(ri), SVector{2}(rj), ro, α)
     end
     state = RB.RigidBodyState(prop, nmcs, ri, α, ṙo, ω, ci, constraints_indices)
     body = RB.RigidBody(prop, state)
@@ -346,7 +346,7 @@ _,λ0 = RB.check_static_equilibrium_output_multipliers(bot.st,gravity=false)
 @show ω = [sqrt(ωi) for ωi in ω²[1:end]]
 
 # bot_plot = deepcopy(bot)
-# q = RB.get_q(bot_plot.st)
+# q = RB.get_coordinates(bot_plot.st)
 # (;sysfree) = bot_plot.st.connectivity.indexed
 # bot_plot.traj[1].q[sysfree] .+= 10 * δq̌[1]
 # plot_traj!(bot_plot)

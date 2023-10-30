@@ -147,4 +147,4 @@ tr = RB.Robot(st,hub)
 
 Figur=plotstructure(tr)
 save("figure.png", Figur)
-q,_ = RB.get_q(st)
+q,_ = RB.get_coordinates(st)

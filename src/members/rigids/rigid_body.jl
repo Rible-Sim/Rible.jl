@@ -75,12 +75,13 @@ function RigidBodyProperty(
     )
 end
 
-struct NonminimalCoordinatesCache{FuncsType,MassMatrixType,JacobianType,GenForceType,TransformMatrixType}
+struct NonminimalCoordinatesCache{FuncsType,MassMatrixType,JacobianType,HessianType,GenForceType,TransformMatrixType}
     pres_idx::Vector{Int}
     free_idx::Vector{Int}
-    Φ_mask::Vector{Int}
-    nΦ::Int
+    constraints_indices::Vector{Int}
+    num_of_constraints::Int
     funcs::FuncsType
+    constraints_hessians::Vector{HessianType}
     M::MassMatrixType
     M⁻¹::MassMatrixType
     ∂Mq̇∂q::JacobianType
@@ -95,20 +96,23 @@ end
 function get_CoordinatesCache(prop::RigidBodyProperty{N,T},
                                  nmcs::NCF.LNC,
                                  pres_idx=Int[],
-                                 Φ_mask=get_Φ_mask(nmcs)) where {N,T}
+                                 constraints_indices=get_constraints_indices(nmcs)) where {N,T}
     (;mass,inertia,mass_locus,loci) = prop
     mass_center = mass_locus.position
     num_of_loci = length(loci)
     free_idx = NCF.get_free_idx(nmcs,pres_idx)
-    nΦ = length(Φ_mask)
-    cf = NCF.CoordinateFunctions(nmcs,free_idx,Φ_mask)
+    num_of_constraints = length(constraints_indices)
+    cf = NCF.CoordinateFunctions(nmcs,free_idx,constraints_indices)
+    constraints_hessians = make_constraints_hessians(nmcs)
     mass_matrix = NCF.make_M(cf,mass,inertia,mass_center)
     M⁻¹ = inv(mass_matrix)
     ∂Mq̇∂q = zero(mass_matrix)
     ∂M⁻¹p∂q = zero(mass_matrix)
     Ṁq̇ = @MVector zeros(T,size(mass_matrix,2))
     ∂T∂qᵀ = @MVector zeros(T,size(mass_matrix,2))
-    (;C,c) = cf
+    # (;C,c) = cf
+    c(x) = NCF.to_local_coordinates(nmcs,x)
+    C(c) = NCF.to_transformation(nmcs,c)
     Co = C(c(zero(mass_center)))
     Cg = C(c(mass_center))
     Cps = [typeof(Cg)(C(c(loci[i].position))) for i in 1:num_of_loci]
@@ -119,18 +123,26 @@ function get_CoordinatesCache(prop::RigidBodyProperty{N,T},
             @error "Rigid body not constrained. No index should be specified."
         end
     end
-    NonminimalCoordinatesCache(pres_idx,free_idx,Φ_mask,nΦ,cf,mass_matrix,M⁻¹,∂Mq̇∂q,∂M⁻¹p∂q,Ṁq̇,∂T∂qᵀ,Co,Cg,Cps)
+    NonminimalCoordinatesCache(
+        pres_idx,free_idx,
+        constraints_indices,num_of_constraints,
+        cf,constraints_hessians,
+        mass_matrix,M⁻¹,
+        ∂Mq̇∂q,∂M⁻¹p∂q,Ṁq̇,
+        ∂T∂qᵀ,
+        Co,Cg,Cps
+    )
 end
 
 function get_CoordinatesCache(prop::RigidBodyProperty{N,T},
                                 qcs::QBF.QC,
                                 pres_idx=Int[],
-                                Φ_mask=get_Φ_mask(qcs)) where {N,T}
+                                constraints_indices=get_constraints_indices(qcs)) where {N,T}
     (;mass,inertia,mass_locus,loci) = prop
     mass_center = mass_locus.position
     num_of_loci = length(loci)
     free_idx = deleteat!(collect(1:7),pres_idx)
-    nΦ = length(Φ_mask)
+    num_of_constraints = length(constraints_indices)
     cf = QBF.CoordinateFunctions(qcs)
     mass_matrix = MMatrix{7,7}(Matrix(one(T)*I,7,7))
     M⁻¹ = MMatrix{7,7}(Matrix(one(T)*I,7,7))
@@ -151,7 +163,7 @@ function get_CoordinatesCache(prop::RigidBodyProperty{N,T},
             @error "Rigid body not constrained. No index should be specified."
         end
     end
-    NonminimalCoordinatesCache(pres_idx,free_idx,Φ_mask,nΦ,cf,mass_matrix,M⁻¹,∂Mq̇∂q,∂M⁻¹p∂q,Ṁq̇,∂T∂qᵀ,Co,Cg,Cps)
+    NonminimalCoordinatesCache(pres_idx,free_idx,constraints_indices,num_of_constraints,cf,mass_matrix,M⁻¹,∂Mq̇∂q,∂M⁻¹p∂q,Ṁq̇,∂T∂qᵀ,Co,Cg,Cps)
 end
 
 """
@@ -182,17 +194,20 @@ Rigid Body State Constructor
 $(TYPEDSIGNATURES)
 ---
 `pres_idx`为约束坐标的索引。
-`Φ_mask`为约束方程的索引。
+`constraints_indices`为约束方程的索引。
 """
 function RigidBodyState(prop::RigidBodyProperty{N,T},
                         nmcs,
-                        r_input,rotation_input,ṙ_input,ω_input,
+                        origin_position_input,
+                        rotation_input,
+                        origin_velocity_input,
+                        angular_velocity_input,
                         pres_idx=Int[],
-                        Φ_mask=get_Φ_mask(nmcs)) where {N,T}
+                        constraints_indices=get_constraints_indices(nmcs)) where {N,T}
     (;mass_locus,loci) = prop
     num_of_loci = length(loci)
-    origin_position = MVector{N}(r_input)
-    origin_velocity = MVector{N}(ṙ_input)
+    origin_position = MVector{N}(origin_position_input)
+    origin_velocity = MVector{N}(origin_velocity_input)
     if rotation_input isa Number
         rotation = rotation_matrix(rotation_input)
     else
@@ -200,7 +215,7 @@ function RigidBodyState(prop::RigidBodyProperty{N,T},
     end
     R = MMatrix{N,N,T}(rotation)
     M = 2N-3
-    ω = MVector{M}(ω_input)
+    ω = MVector{M}(angular_velocity_input)
     mass_locus_state = LocusState(
         mass_locus,
         origin_position,R,
@@ -214,7 +229,7 @@ function RigidBodyState(prop::RigidBodyProperty{N,T},
         )
         for lo in loci
     ]
-    cache = get_CoordinatesCache(prop,nmcs,pres_idx,Φ_mask)
+    cache = get_CoordinatesCache(prop,nmcs,pres_idx,constraints_indices)
     RigidBodyState(
         origin_position,R,
         origin_velocity,ω,
@@ -302,7 +317,7 @@ function stretch_body!(cache::NonminimalCoordinatesCache{<:NCF.CoordinateFunctio
     (;Cps,funcs) = cache
     nlocaldim = get_num_of_local_dims(cache)
     for pid in eachindex(loci)
-        Cps[pid] = funcs.C(c[nlocaldim*(pid-1)+1:nlocaldim*pid])
+        Cps[pid] = NCF.to_transformation(funcs.nmcs,c[nlocaldim*(pid-1)+1:nlocaldim*pid])
     end
 end
 
@@ -386,12 +401,12 @@ end
 Return 约束方程编号。
 $(TYPEDSIGNATURES)
 """
-function get_Φ_mask(nmcs::NCF.LNC)
-    nΦ = NCF.get_num_of_constraints(nmcs)
-    collect(1:nΦ)
+function get_constraints_indices(nmcs::NCF.LNC)
+    num_of_constraints = NCF.get_num_of_constraints(nmcs)
+    collect(1:num_of_constraints)
 end
 
-get_Φ_mask(::QBF.QC) = collect(1:1)
+get_constraints_indices(::QBF.QC) = collect(1:1)
 ##
 
 # operations on rigid body

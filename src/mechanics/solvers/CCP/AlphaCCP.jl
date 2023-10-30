@@ -52,17 +52,17 @@ function generate_cache(solver::AlphaCCP,intor;dt,kargs...)
     B(q) = Matrix{T}(undef,0,nq)
 
     # ∂𝐌𝐚∂𝐪(q,a) = zeros(T,nq,nq)
-    ∂Aᵀλ∂q(q,λ) = ∂Aᵀλ∂q̌(st,λ)
+    constraint_forces_jacobian(q,λ) = constraint_forces_on_free_jacobian(st,λ)
     # ∂𝚽𝐪𝐯∂𝒒(q,v) = RB.∂Aq̇∂q(st,v)
     ∂Bᵀμ∂q(q,μ) = zeros(T,nq,nq)
-    cache = @eponymtuple(M,Φ,A,Ψ,B,∂Ψ∂q,∂Aᵀλ∂q,∂Bᵀμ∂q,coeffs)
+    cache = @eponymtuple(M,Φ,A,Ψ,B,∂Ψ∂q,constraint_forces_jacobian,∂Bᵀμ∂q,coeffs)
     AlphaCCPCache(cache)
 end
 
 function update_nonsmooth!(Res,Jac,nq,nλ,na,xe,vₛ,gₙ,Dₛ₊₁,H,restitution_coefficients,t,p,h,scaling,dynfuncs,cache)
     qₛ₊₁, vₛ₊₁, ṽₛ₊₁, ṽ̇ₛ₊₁, 𝛌bₛ₊₁, 𝚲uₛ₊₁ = xe
     F!,Jac_F!,_ = dynfuncs
-    (;M,Φ,A,Ψ,B,∂Ψ∂q,∂Aᵀλ∂q,∂Bᵀμ∂q) = cache
+    (;M,Φ,A,Ψ,B,∂Ψ∂q,constraint_forces_jacobian,∂Bᵀμ∂q) = cache
     # 𝐠,get_indices,get_D = contact_funcs
 
     (;αm,αf,γ,β,βₜ,γₜ) = p
@@ -76,7 +76,7 @@ function update_nonsmooth!(Res,Jac,nq,nλ,na,xe,vₛ,gₙ,Dₛ₊₁,H,restituti
     Jac_F!(Fqₛ₊₁,Fvₛ₊₁,qₛ₊₁,vₛ₊₁,t)
     Φₛ₊₁ = Φ(qₛ₊₁)
     Φqₛ₊₁ = A(qₛ₊₁)
-    ∂Aᵀλ∂qₛ₊₁ = ∂Aᵀλ∂q(qₛ₊₁,𝛌bₛ₊₁)
+    constraint_forces_jacobianₛ₊₁ = constraint_forces_jacobian(qₛ₊₁,𝛌bₛ₊₁)
     # D̃ₛ₊₁ = D̃(qₛ₊₁)
     # D̃qₛ₊₁ = D̃q(qₛ₊₁)
     # D̂qₛ₊₁ = D̂q(qₛ₊₁)
@@ -91,7 +91,7 @@ function update_nonsmooth!(Res,Jac,nq,nλ,na,xe,vₛ,gₙ,Dₛ₊₁,H,restituti
         scaling.*Φₛ₊₁
     )
 
-    Kₜ = scaling.*∂Aᵀλ∂qₛ₊₁ .- Fqₛ₊₁
+    Kₜ = scaling.*constraint_forces_jacobianₛ₊₁ .- Fqₛ₊₁
     Jac .= [
         γₜ.*Mₛ₊₁.+βₜ.*Kₜ (h/2).*(Kₜ.-Fvₛ₊₁) scaling.*transpose(Φqₛ₊₁);
          -Mₛ₊₁          Mₛ₊₁      zeros(T,nq,nλ);
@@ -140,7 +140,7 @@ function solve!(intor::Integrator,solvercache::AlphaCCPCache;
     # @unpack t,q,q̇,tprev,qprev,q̇prev = state
     F!, Jac_F!, (contacts, prepare_contacts!, update_contacts!) = dynfuncs
     (;cache) = solvercache
-    (;M,Φ,A,Ψ,B,∂Ψ∂q,∂Aᵀλ∂q,∂Bᵀμ∂q,coeffs) = cache
+    (;M,Φ,A,Ψ,B,∂Ψ∂q,constraint_forces_jacobian,∂Bᵀμ∂q,coeffs) = cache
     (;αm,αf,γ,β,γₜ,βₜ)= coeffs
     contacts_traj = [deepcopy(contacts) for i in 1:totalstep]
     q0 = traj.q[begin]

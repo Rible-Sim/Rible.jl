@@ -70,7 +70,7 @@ function locate_bifurcation_point(bot,γ0)
     ns = ncables
     nd = ndof
     nλ = nconstraint
-    c_val = RB.get_c(st)
+    c_val = RB.get_local_coordinates(st)
     s_val = RB.get_s(st)
     ℓ_val = RB.get_cables_len(st)
     k_val = RB.get_cables_stiffness(st)

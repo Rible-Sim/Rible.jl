@@ -75,11 +75,11 @@ function make_3d_bar(
     nmcs = RB.NCF.NC3D1P1V(ri,û,ri,R)
     @myshow id,û
     # @show ri,rj,q0
-    # cf = RB.NCF.CoordinateFunctions(nmcs,q0,ci,unconstrained_indices)
+    # cf = RB.NCF.CoordinateFunctions(nmcs,q0,ci,free_coordinates_indices)
     # @show typeof(nmcs)
     state = RB.RigidBodyState(prop,nmcs,ri,R,ṙo,ω,ci)
     if loadmesh
-        barmesh = load("装配体3.STL") |> make_patch(;
+        barmesh = load(RB.assetpath("装配体3.STL")) |> make_patch(;
             trans=[0,0,0.025],
             scale=1/500,
             color=:palegreen3,
@@ -109,7 +109,7 @@ function make_3d_tri(
         loadmesh = false,
         m = 3,
     )
-    # unconstrained_indices = collect(1:6)
+    # free_coordinates_indices = collect(1:6)
     mass = 0.2999233976
     Īg = SMatrix{3,3}(
         Matrix(Diagonal([
@@ -168,7 +168,7 @@ function make_3d_tri(
             ]
         )
     )
-    # cf = RB.NCF.CoordinateFunctions(nmcs,q0,ci,unconstrained_indices)
+    # cf = RB.NCF.CoordinateFunctions(nmcs,q0,ci,free_coordinates_indices)
     # @show typeof(nmcs)
     # radius = norm(loci[2]-loci[1])/32
     # @show radius
@@ -213,7 +213,7 @@ function make_3d_plate(
         loadmesh = true,
         meshvisible = true,
     )
-    # unconstrained_indices = collect(1:6)	
+    # free_coordinates_indices = collect(1:6)	
     constrained = ci != Int[]
     mat = filter(
         row -> row.name == "Teak", 
@@ -464,9 +464,9 @@ function tower3d(;
     connected = RB.connect(rbs,cnt_matrix_cables[begin:end,begin:end-1])
     #
     #
-    # cst1 = RB.PinJoint(RB.End2End(1,RB.ID(rb1_to_3[1],2),RB.ID(rb4,1)))
-    # cst2 = RB.PinJoint(RB.End2End(2,RB.ID(rb1_to_3[2],2),RB.ID(rb4,2)))
-    # cst3 = RB.PinJoint(RB.End2End(3,RB.ID(rb1_to_3[3],2),RB.ID(rb4,3)))
+    # cst1 = RB.PinJoint(RB.Hen2Egg(1,RB.ID(rb1_to_3[1],2),RB.ID(rb4,1)))
+    # cst2 = RB.PinJoint(RB.Hen2Egg(2,RB.ID(rb1_to_3[2],2),RB.ID(rb4,2)))
+    # cst3 = RB.PinJoint(RB.Hen2Egg(3,RB.ID(rb1_to_3[3],2),RB.ID(rb4,3)))
     # jointedmembers = RB.join((cst1,cst2,cst3),indexedcoords)
     #
     cnt = RB.Connectivity(numberedpoints,indexedcoords,@eponymtuple(connected,))
@@ -761,12 +761,12 @@ function prisms(;
         is = m*j
         
         # # lower
-        for i = 1:m
-            row = zeros(Int,nb)
-            row[is+cm[i  ]] =  1
-            row[is+cm[i+1]] = -1
-            append!(connecting_elas,row)
-        end
+        # for i = 1:m
+        #     row = zeros(Int,nb)
+        #     row[is+cm[i  ]] =  1
+        #     row[is+cm[i+1]] = -1
+        #     append!(connecting_elas,row)
+        # end
 
         # cross
         if j |> iseven
@@ -814,7 +814,7 @@ function prisms(;
 
     ncables = size(connecting,1)
     # @assert ncables == ncables_prism + ncables_outer
-
+    @show ncables
     mat_cable = filter(
         row->row.name == "Nylon 66",
         material_properties
@@ -838,14 +838,20 @@ function prisms(;
 
     
     csts_bar2bar = [
-        RB.PinJoint(
-            i+m*(j-1),
-            RB.End2End(
+        begin 
+            hen = bars[j+1][cm[i+2]]
+            @show hen.prop.id
+            egg = bars[j][cm[i]]  
+            @show egg.prop.id
+            RB.PinJoint(
                 i+m*(j-1),
-                RB.ID(bars[j][cm[i+1]],1,1),
-                RB.ID(bars[j][cm[i]]  ,2,1)
+                RB.Hen2Egg(
+                    i+m*(j-1),
+                    RB.ID(hen,1,1),
+                    RB.ID(egg,2,1)
+                )
             )
-        )
+        end
         for j = 1:d for i = 1:m
     ]
 
@@ -853,7 +859,7 @@ function prisms(;
         csts_bar2plate = [
             RB.PinJoint(
                 m*d+i,
-                RB.End2End(
+                RB.Hen2Egg(
                     m*d+i,
                     RB.ID(plate,i,1),
                     RB.ID(bars[1][cm[i]],1,1),
@@ -1086,7 +1092,7 @@ function prism_modules(;
     # csts_bar2bar = [
     #     RB.PinJoint(
     #         i+m*(j-1),
-    #         RB.End2End(
+    #         RB.Hen2Egg(
     #             i+m*(j-1),
     #             RB.ID(bars[j][cm[i+1]],1,1),
     #             RB.ID(bars[j][cm[i]]  ,2,1)
@@ -1097,45 +1103,45 @@ function prism_modules(;
     if p == 3
         csts_bar2bar = [
             # one to two
-            RB.PinJoint(1,RB.End2End(1,
+            RB.PinJoint(1,RB.Hen2Egg(1,
                     RB.ID(bars[    1][cm[4]],1),
                     RB.ID(bars[n+1][cm[8]],1)
             )),
-            RB.PinJoint(2,RB.End2End(2,
+            RB.PinJoint(2,RB.Hen2Egg(2,
                     RB.ID(bars[    1][cm[5]],1),
                     RB.ID(bars[n+1][cm[7]],1)
             )),
-            RB.PinJoint(3,RB.End2End(3,
+            RB.PinJoint(3,RB.Hen2Egg(3,
                     RB.ID(bars[    1][cm[3]],2),
                     RB.ID(bars[n+1][cm[11]],2)
             )),
-            RB.PinJoint(4,RB.End2End(4,
+            RB.PinJoint(4,RB.Hen2Egg(4,
                     RB.ID(bars[    1][cm[2]],2),
                     RB.ID(bars[n+1][cm[12]],2)
             )),
             # one to three
-            RB.PinJoint(5,RB.End2End(5,
+            RB.PinJoint(5,RB.Hen2Egg(5,
                     RB.ID(bars[     1][cm[ 3]],1),
                     RB.ID(bars[2n+1][cm[13]],1)
             )),
-            RB.PinJoint(6,RB.End2End(6,
+            RB.PinJoint(6,RB.Hen2Egg(6,
                     RB.ID(bars[     1][cm[ 4]],1),
                     RB.ID(bars[2n+1][cm[18]],1)
             )),
-            RB.PinJoint(7,RB.End2End(7,
+            RB.PinJoint(7,RB.Hen2Egg(7,
                     RB.ID(bars[     1][cm[ 1]],2),
                     RB.ID(bars[2n+1][cm[17]],2)
             )),
-            RB.PinJoint(8,RB.End2End(8,
+            RB.PinJoint(8,RB.Hen2Egg(8,
                     RB.ID(bars[     1][cm[ 2]],2),
                     RB.ID(bars[2n+1][cm[16]],2)
             )),
             # two to three
-            RB.PinJoint(9,RB.End2End(9,
+            RB.PinJoint(9,RB.Hen2Egg(9,
                     RB.ID(bars[ n+1][cm[ 9]],1),
                     RB.ID(bars[2n+1][cm[17]],1)
             )),
-            RB.PinJoint(10,RB.End2End(10,
+            RB.PinJoint(10,RB.Hen2Egg(10,
                     RB.ID(bars[ n+1][cm[ 7]],2),
                     RB.ID(bars[2n+1][cm[15]],2)
             )),
@@ -1400,7 +1406,7 @@ function embed3d(;
     hub = (actuators = acs,)
     
     csts = [
-        RB.PinJoint(i+m*(j-1),RB.End2End(i,RB.ID(bars[j][m+cm[i]],2),RB.ID(plates[j+1],cm[i-1])))
+        RB.PinJoint(i+m*(j-1),RB.Hen2Egg(i,RB.ID(bars[j][m+cm[i]],2),RB.ID(plates[j+1],cm[i-1])))
          for j = 1:n for i = 1:m
     ]
 
@@ -1955,7 +1961,7 @@ function new_deck(id,loci,ro,R,ri,box;
     ṙo = zero(ro)
     ω = zero(ro)
     nmcs = RB.NCF.NC1P3V(ri,ro,R)
-    # cf = RB.NCF.CoordinateFunctions(nmcs,q0,ci,unconstrained_indices)
+    # cf = RB.NCF.CoordinateFunctions(nmcs,q0,ci,free_coordinates_indices)
     # @show typeof(nmcs)
     boxmesh = Meshes.boundary(box) |> simple2mesh
     state = RB.RigidBodyState(prop,nmcs,ro,R,ṙo,ω,ci,constraints_indices)
@@ -2196,9 +2202,9 @@ function bridge3d(;
     # connected = RB.connect(rbs,zeros(Int,0,0))
     # #
     #
-    # cst1 = RB.PinJoint(RB.End2End(1,RB.ID(rb1_to_3[1],2),RB.ID(rb4,1)))
-    # cst2 = RB.PinJoint(RB.End2End(2,RB.ID(rb1_to_3[2],2),RB.ID(rb4,2)))
-    # cst3 = RB.PinJoint(RB.End2End(3,RB.ID(rb1_to_3[3],2),RB.ID(rb4,3)))
+    # cst1 = RB.PinJoint(RB.Hen2Egg(1,RB.ID(rb1_to_3[1],2),RB.ID(rb4,1)))
+    # cst2 = RB.PinJoint(RB.Hen2Egg(2,RB.ID(rb1_to_3[2],2),RB.ID(rb4,2)))
+    # cst3 = RB.PinJoint(RB.Hen2Egg(3,RB.ID(rb1_to_3[3],2),RB.ID(rb4,3)))
     # jointedmembers = RB.join((cst1,cst2,cst3),indexedcoords)
     #
     cnt = RB.Connectivity(numberedpoints,indexedcoords,@eponymtuple(connected,))
@@ -2308,9 +2314,9 @@ function lander(;k=nothing)
     connected = RB.connect(rbs,cnt_matrix)
     # #
     #
-    # cst1 = RB.PinJoint(RB.End2End(1,RB.ID(rb1_to_3[1],2),RB.ID(rb4,1)))
-    # cst2 = RB.PinJoint(RB.End2End(2,RB.ID(rb1_to_3[2],2),RB.ID(rb4,2)))
-    # cst3 = RB.PinJoint(RB.End2End(3,RB.ID(rb1_to_3[3],2),RB.ID(rb4,3)))
+    # cst1 = RB.PinJoint(RB.Hen2Egg(1,RB.ID(rb1_to_3[1],2),RB.ID(rb4,1)))
+    # cst2 = RB.PinJoint(RB.Hen2Egg(2,RB.ID(rb1_to_3[2],2),RB.ID(rb4,2)))
+    # cst3 = RB.PinJoint(RB.Hen2Egg(3,RB.ID(rb1_to_3[3],2),RB.ID(rb4,3)))
     # jointedmembers = RB.join((cst1,cst2,cst3),indexedcoords)
     #
 
@@ -2431,7 +2437,7 @@ function tower(;k=nothing)
 
     cst1 = RB.PinJoint(
         1,
-        RB.End2End(
+        RB.Hen2Egg(
             1,
             RB.ID(base,1),
             RB.ID(bar,1),
@@ -2440,7 +2446,7 @@ function tower(;k=nothing)
     
     cst2 = RB.PinJoint(
         2,
-        RB.End2End(
+        RB.Hen2Egg(
             2,
             RB.ID(bar,2),
             RB.ID(top,1)

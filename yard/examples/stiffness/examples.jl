@@ -30,7 +30,7 @@ function dualtri(ndof,;onedir=[1.0,0.0],θ=0.0,k=400.0,c=0.0,restlen=0.16)
 
     function rigidbody(i,m,a,Ia,ri,α)
         movable = true
-        mass_locus = SVector{2}([0.0,0.0])
+        mass_center_position = SVector{2}([0.0,0.0])
 
         r̄p1 = SVector{2}([-a/2,0.0])
         r̄p2 = SVector{2}([ a/2,0.0])
@@ -44,7 +44,7 @@ function dualtri(ndof,;onedir=[1.0,0.0],θ=0.0,k=400.0,c=0.0,restlen=0.16)
             r̄p5 = r̄p3 .- SVector{2}([ a/2,tan(deg2rad(45))])
         end
 
-        loci = [r̄p1,r̄p2,r̄p3,r̄p4,r̄p5]
+        nodes_positions = [r̄p1,r̄p2,r̄p3,r̄p4,r̄p5]
 
         axes = [SVector{2}([1.0,0.0]),]
         Ī = SMatrix{2, 2}([
@@ -69,13 +69,13 @@ function dualtri(ndof,;onedir=[1.0,0.0],θ=0.0,k=400.0,c=0.0,restlen=0.16)
         prop = RB.RigidBodyProperty(
                     i,movable,m,
                     Ī,
-                    mass_locus,
-                    loci,
+                    mass_center_position,
+                    nodes_positions,
                     axes;
                     constrained=constrained
                     )
 
-        nmcs = RB.NCF.NC1P2V(SVector{2}(ri), ro, α, ṙo, ω)
+        nmcs = RB.NCF.NC1P2V(SVector{2}(ri), ro, α)
 
         state = RB.RigidBodyState(prop, nmcs, ri, α, ṙo, ω, ci, constraints_indices)
 
@@ -139,7 +139,7 @@ function dualtri(ndof,;onedir=[1.0,0.0],θ=0.0,k=400.0,c=0.0,restlen=0.16)
                            ganged_act(i,2i,2(i-1)+1,original_restlens)) for i = 1:nbodies-1]
     hub = (actuators=acs,)
     pjs = [
-        RB.PinJoint(i,RB.End2End(i,RB.ID(rbs[i],2,1),RB.ID(rbs[i+1],1)))
+        RB.PinJoint(i,RB.Hen2Egg(i,RB.ID(rbs[i],2,1),RB.ID(rbs[i+1],1)))
         for i = 1:nbodies-1
     ]
     jointed = RB.join(pjs,indexed)
@@ -157,7 +157,7 @@ function Tbars(;θ = 0)
     function make_base(i)
         movable = true
         constrained = true
-        mass_locus = SVo3
+        mass_center_position = SVo3
         r̄p1 = SVector{3}([ -a, b,c])
         r̄p2 = SVector{3}([ -a,-b,c])
         r̄p3 = SVector{3}([0.0, b,c])
@@ -165,9 +165,14 @@ function Tbars(;θ = 0)
         r̄p5 = SVo3
         r̄p6 = SVector{3}([-2a,0.0,c])
         r̄p7 = SVector{3}([  a,0.0,c])
-        loci = [r̄p1,r̄p2,r̄p3,r̄p4,r̄p5,r̄p6,r̄p7]
+        nodes_positions = [r̄p1,r̄p2,r̄p3,r̄p4,r̄p5,r̄p6,r̄p7]
         axes = [
             SVector{3}([1.0,0.0,0.0]),
+            SVector{3}([0.0,1.0,0.0]),
+            SVector{3}([0.0,1.0,0.0]),
+            SVector{3}([0.0,1.0,0.0]),
+            SVector{3}([0.0,1.0,0.0]),
+            SVector{3}([0.0,1.0,0.0]),
             SVector{3}([0.0,1.0,0.0]),
         ]
         m = 1.0
@@ -183,16 +188,16 @@ function Tbars(;θ = 0)
         prop = RB.RigidBodyProperty(
                     i,movable,m,
                     Ī,
-                    mass_locus,
-                    loci,
+                    mass_center_position,
+                    nodes_positions,
                     axes;
                     constrained
                     )
 
-        nmcs = RB.NCF.NC1P3V(ri, ro, R, ṙo, ω)
+        nmcs = RB.NCF.NC1P3V(ri, ro, R)
 
         state = RB.RigidBodyState(prop, nmcs, ri, R, ṙo, ω, ci, constraints_indices)
-        basemesh = load("装配体1.STL") |> make_patch(;
+        basemesh = load(RB.assetpath("装配体1.STL")) |> make_patch(;
             # trans=[-1.0,0,0],
             rot = RotZ(π),
             scale=1/500,
@@ -203,9 +208,9 @@ function Tbars(;θ = 0)
     function make_slider(i;ri=SVo3,R=RotZ(0.0),)
         movable = true
         constrained = false
-        mass_locus = SVo3
+        mass_center_position = SVo3
         r̄p1 = SVector(0.0,0.0,c)
-        loci = [r̄p1,]
+        nodes_positions = [r̄p1,]
         axes = [SVector{3}([1.0,0.0,0.0]),]
         Ī = SMatrix{3,3}(Matrix(1.0I,3,3))
         ω = SVo3
@@ -216,19 +221,22 @@ function Tbars(;θ = 0)
         prop = RB.RigidBodyProperty(
             i,movable,m,
             Ī,
-            mass_locus,
-            loci,
+            mass_center_position,
+            nodes_positions,
             axes;
             constrained
         )
 
-        nmcs = RB.NCF.NC1P3V(ri, ro, R, ṙo, ω)
+        nmcs = RB.NCF.NC1P3V(ri, ro, R)
         @show q[1:3]
         @show q[4:6]
         @show q[7:9]
         @show q[10:12]
+        ro = ri
+        ṙo = zero(ro)
+        ω = zero(ro)
         state = RB.RigidBodyState(prop, nmcs, ri, R, ṙo, ω)
-        slidermesh = load("装配体2.2.STL") |> make_patch(;
+        slidermesh = load(RB.assetpath("装配体2.2.STL")) |> make_patch(;
             # trans=[-1.0,0,0],
             rot = begin
                 if i == 2
@@ -288,11 +296,11 @@ function Tbars(;θ = 0)
     connected = RB.connect(rigdibodies, cm)
     tensioned = @eponymtuple(connected,)
 
-    j1 = RB.PrismaticJoint(1,RB.End2End(1,RB.ID(base,5,1),RB.ID(slider1,1,1)))
-    j2 = RB.PrismaticJoint(2,RB.End2End(2,RB.ID(base,5,2),RB.ID(slider2,1,1)))
+    j1 = RB.PrismaticJoint(1,RB.Hen2Egg(1,RB.ID(base,5,1),RB.ID(slider1,1,1)))
+    j2 = RB.PrismaticJoint(2,RB.Hen2Egg(2,RB.ID(base,5,2),RB.ID(slider2,1,1)))
 
-    j3 = RB.PinJoint(3,RB.End2End(3,RB.ID(bar,1,1),RB.ID(slider1,1,1)))
-    j4 = RB.PinJoint(4,RB.End2End(4,RB.ID(bar,2,1),RB.ID(slider2,1,1)))
+    j3 = RB.PinJoint(3,RB.Hen2Egg(3,RB.ID(bar,1,1),RB.ID(slider1,1,1)))
+    j4 = RB.PinJoint(4,RB.Hen2Egg(4,RB.ID(bar,2,1),RB.ID(slider2,1,1)))
 
 
     js = [
@@ -314,14 +322,14 @@ function planar_parallel()
     function make_base(i)
         movable = true
         constrained = true
-        mass_locus = SVo3
+        mass_center_position = SVo3
         r̄p1 = SVector{3}([0.0, a,0.0])
         r̄p2 = RotZ( θ)*r̄p1
         r̄p3 = RotZ(-θ)*r̄p1
-        loci = [r̄p1,r̄p2,r̄p3,]
+        nodes_positions = [r̄p1,r̄p2,r̄p3,]
         axes = [
-            SVector{3}([1.0,0.0,0.0]),
-            # SVector{3}([0.0,1.0,0.0]),
+            SVector{3}([1.0,0.0,0.0])
+            for i in eachindex(nodes_positions)
         ]
         m = 1.0
         Ī = SMatrix{3,3}(Matrix(1.0I,3,3))
@@ -336,13 +344,13 @@ function planar_parallel()
         prop = RB.RigidBodyProperty(
                     i,movable,m,
                     Ī,
-                    mass_locus,
-                    loci,
+                    mass_center_position,
+                    nodes_positions,
                     axes;
                     constrained
                     )
 
-        nmcs = RB.NCF.NC1P3V(ri, ro, R, ṙo, ω)
+        nmcs = RB.NCF.NC1P3V(ri, ro, R)
 
         state = RB.RigidBodyState(prop, nmcs, ri, R, ṙo, ω, ci, constraints_indices)
 
@@ -351,11 +359,11 @@ function planar_parallel()
     function make_platform(i;ri=SVo3,R=RotZ(0.0),)
         movable = true
         constrained = false
-        mass_locus = SVo3
+        mass_center_position = SVo3
         r̄p1 = SVector{3}([0.0, b,0.0])
         r̄p2 = RotZ( θ)*r̄p1
         r̄p3 = RotZ(-θ)*r̄p1
-        loci = [r̄p1,r̄p2,r̄p3]
+        nodes_positions = [r̄p1,r̄p2,r̄p3]
         axes = [SVector{3}([1.0,0.0,0.0]),]
         Ī = SMatrix{3,3}(Matrix(1.0I,3,3))
         ω = SVo3
@@ -366,14 +374,14 @@ function planar_parallel()
         prop = RB.RigidBodyProperty(
                     i,movable,m,
                     Ī,
-                    mass_locus,
-                    loci,
+                    mass_center_position,
+                    nodes_positions,
                     axes;
                     constrained
                     )
 
-        nmcs = RB.NCF.NC1P3V(ri, ro, R, ṙo, ω)
-        state = RB.RigidBodyState(prop, nmcs, ri, R, ṙo, ω)
+        nmcs = RB.NCF.NC1P3V(ri, ro, R)
+        state = RB.RigidBodyState(prop, nmcs, ri, R)
 
         RB.RigidBody(prop,state)
     end
@@ -422,8 +430,8 @@ function planar_parallel()
     connected = RB.connect(rigdibodies, cm)
     tensioned = @eponymtuple(connected,)
 
-    # j1 = RB.PrismaticJoint(1,RB.End2End(1,RB.ID(base,5,1),RB.ID(slider1,1,1)))
-    # j2 = RB.PrismaticJoint(2,RB.End2End(2,RB.ID(base,5,2),RB.ID(slider2,1,1)))
+    # j1 = RB.PrismaticJoint(1,RB.Hen2Egg(1,RB.ID(base,5,1),RB.ID(slider1,1,1)))
+    # j2 = RB.PrismaticJoint(2,RB.Hen2Egg(2,RB.ID(base,5,2),RB.ID(slider2,1,1)))
 
     # js = [
     #     j1,j2

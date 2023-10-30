@@ -38,7 +38,7 @@ function rigidbody(i,m,Ia,ri,rj,aps)
 				aps;
 				constrained
 				)
-	nmcs = RB.NCF.NC2P1V(SVector{2}(ri), SVector{2}(rj), ro, α, ṙo, ω)
+	nmcs = RB.NCF.NC2P1V(SVector{2}(ri), SVector{2}(rj), ro, α)
 
 	state = RB.RigidBodyState(prop, nmcs, ri, α, ṙo, ω, ci, constraints_indices)
 
@@ -404,7 +404,7 @@ function dualtri(ndof,onedir=[1.0,0.0];θ=0.0,k=400.0,c=0.0,restlen=0.16)
 					constrained=constrained
                     )
 
-		nmcs = RB.NCF.NC1P2V(SVector{2}(ri), ro, α, ṙo, ω)
+		nmcs = RB.NCF.NC1P2V(SVector{2}(ri), ro, α)
 
 		state = RB.RigidBodyState(prop, nmcs, ri, α, ṙo, ω, ci, constraints_indices)
 
@@ -469,7 +469,7 @@ function dualtri(ndof,onedir=[1.0,0.0];θ=0.0,k=400.0,c=0.0,restlen=0.16)
 						   ganged_act(i,2i,2(i-1)+1,original_restlens)) for i = 1:nbodies-1]
 	hub = (actuators=acs,)
 	pjs = [
-		RB.PinJoint(RB.End2End(i,RB.ID(rbs[i],2),RB.ID(rbs[i+1],1)))
+		RB.PinJoint(RB.Hen2Egg(i,RB.ID(rbs[i],2),RB.ID(rbs[i+1],1)))
 		for i = 1:nbodies-1
 	]
 	jointed = RB.join(pjs,indexed)

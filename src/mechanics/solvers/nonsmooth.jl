@@ -467,7 +467,7 @@ function robustnsga(n,c,ū,q0,v0,t,p,h,𝒞,𝒰c,𝐞,dyfuncs,tspan;tol=1e-14,
             if  norm(𝐫ˢ) < tol
                 break
             elseif i == imax
-                @error "Reach max iteration $i, err=$norm_𝐫ˢ for the 1st subproblem"
+                @error "Reach max iteration $i, err=$norm_𝐫ˢ for the first subproblem"
                 @show abs.(𝐫ˢ) .> tol
             end
             Sₜˢ = compute_Sₜˢ(n,c,ū,xe,t,p,h,active_sets,dyfuncs)
@@ -486,7 +486,7 @@ function robustnsga(n,c,ū,q0,v0,t,p,h,𝒞,𝒰c,𝐞,dyfuncs,tspan;tol=1e-14,
             if  norm(𝐫ᵖ) < tol
                 break
             elseif i == imax
-                @error "Reach max iteration $i, err=$norm_𝐫ᵖ for the 1st subproblem"
+                @error "Reach max iteration $i, err=$norm_𝐫ᵖ for the first subproblem"
                 @show abs.(𝐫ᵖ) .> tol
             end
             Sₜᵖ = compute_Sₜᵖ(n,c,ū,xe,t,p,h,active_sets,dyfuncs)
@@ -504,7 +504,7 @@ function robustnsga(n,c,ū,q0,v0,t,p,h,𝒞,𝒰c,𝐞,dyfuncs,tspan;tol=1e-14,
             if  norm(𝐫ᵛ) < tol
                 break
             elseif i == imax
-                @error "Reach max iteration $i, err=$norm_𝐫ᵛ for the 1st subproblem"
+                @error "Reach max iteration $i, err=$norm_𝐫ᵛ for the first subproblem"
                 @show abs.(𝐫ᵛ) .> tol
             end
             Sₜᵛ = compute_Sₜᵛ(n,c,ū,xe,t,p,h,active_sets,dyfuncs)

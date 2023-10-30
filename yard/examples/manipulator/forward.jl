@@ -293,7 +293,7 @@ plotstructure(man_inv)
 function get_actuate_seqs(bot,g=0.0)
     # plotstructure(man_inv)
     Y = RB.build_Y(bot)
-    # q,_ = RB.get_q(bot.st)
+    # q,_ = RB.get_coordinates(bot.st)
     # λ,u,a = RB.inverse(bot,deepcopy(bot),Y)
     start_sol,parameters0 = RB.get_start_system(bot,Y)
     # start_sol

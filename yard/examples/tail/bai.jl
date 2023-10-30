@@ -162,7 +162,7 @@ function make_bai(meshes,质心,质量,惯量)
             loci;
             constrained = constrained,
         )
-        nmcs = RB.NCF.NC2P1V(ri, rj, ro, α, ṙo, ω)
+        nmcs = RB.NCF.NC2P1V(ri, rj, ro, α)
         state = RB.RigidBodyState(prop, nmcs, ro, α, ṙo, ω, ci, constraints_indices)
         mesh_rigid = meshes[i]
         body = RB.RigidBody(prop, state, mesh_rigid)

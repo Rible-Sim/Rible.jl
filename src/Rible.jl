@@ -51,6 +51,11 @@ using .QBF
 include("members/rigids/NCF.jl")
 using .NCF
 
+import .NCF: make_constraints_function
+import .NCF: make_constraints_jacobian
+import .NCF: make_constraints_hessians
+import .NCF: make_constraint_forces_jacobian
+
 include("members/rigids/rigid_body.jl")
 
 include("members/flexibles/cables.jl")

@@ -33,7 +33,7 @@ c = 0.0
 man = man_ndof(ndof;θ=0.0,k,c)
 function initialize_RRT(tr)
     @unpack st = tr
-    q0,q̇0 = RB.get_q(st)
+    q0,q̇0 = RB.get_coordinates(st)
     chart0 = RB.Chart(st,q0,q̇0)
     x0 = chart0.xc
 

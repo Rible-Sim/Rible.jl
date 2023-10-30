@@ -219,7 +219,7 @@ function man_wend(n,tgstruct)
     nexconstraint = 3nfixbody
     nconstraint = ninconstraint + nexconstraint
     nq = tgstruct.ncoords
-    q0,q̇0 = R2.get_q(tgstruct)
+    q0,q̇0 = R2.get_coordinates(tgstruct)
 
     M = R2.build_massmatrix(rbs,body2q)
 
@@ -272,7 +272,7 @@ function initial(n,tgstruct)
     cnt = tgstruct.connectivity
     @unpack nbodies,nfixbodies = tgstruct
     nq = cnt.body2q[end][end]
-    q0,q̇0 = get_q(tgstruct)
+    q0,q̇0 = get_coordinates(tgstruct)
     #q̇0[end] = 0.01
     #q̇0[end-1:end] .= [0.0,0.001]
     ninconstraint = nbodies

@@ -26,13 +26,13 @@ function generate_cache(::ZhongQCCP,intor;dt,kargs...)
     B(q) = Matrix{T}(undef,0,nq)
 
     # ∂𝐌𝐚∂𝐪(q,a) = zeros(T,nq,nq)
-    ∂Aᵀλ∂q(q,λ) = ∂Aᵀλ∂q̌(st,λ)
+    constraint_forces_jacobian(q,λ) = constraint_forces_on_free_jacobian(st,λ)
     # ∂𝚽𝐪𝐯∂𝒒(q,v) = RB.∂Aq̇∂q(st,v)
     ∂Bᵀμ∂q(q,μ) = zeros(T,nq,nq)
     cache = @eponymtuple(
         M,M⁻¹,∂Mq̇∂q,∂M⁻¹p∂q,
         M!,Jac_M!,M⁻¹!,Jac_M⁻¹!,
-        Φ,A,Ψ,B,∂Ψ∂q,∂Aᵀλ∂q,∂Bᵀμ∂q,∂F∂q,∂F∂q̇)
+        Φ,A,Ψ,B,∂Ψ∂q,constraint_forces_jacobian,∂Bᵀμ∂q,∂F∂q,∂F∂q̇)
     ZhongQCCPCache(cache)
 end
 
@@ -48,7 +48,7 @@ function make_zhongccp_ns_stepk(
         F!,Jac_F!,get_directions_and_positions!,
         cache,h,scaling,persistent_indices,mem2act_idx
     )
-    (;M!,Jac_M!,M⁻¹!,Jac_M⁻¹!,Φ,A,∂Aᵀλ∂q) = cache
+    (;M!,Jac_M!,M⁻¹!,Jac_M⁻¹!,Φ,A,constraint_forces_jacobian) = cache
     T = eltype(qₖ₋₁)
     Fₘ = zeros(T,nq)
     ∂Fₘ∂qₘ = cache.∂F∂q
@@ -100,7 +100,7 @@ function make_zhongccp_ns_stepk(
             M⁻¹!(M⁻¹ₘ,qₘ)
             Jac_M!(∂Mₘq̇ₘ∂qₘ,qₘ,q̇ₘ)
             Jac_M⁻¹!(∂M⁻¹ₖpₖ∂qₖ,qₖ,pₖ)
-            ∂Aᵀₖλₘ∂qₖ = ∂Aᵀλ∂q(qₖ,λₘ)
+            ∂Aᵀₖλₘ∂qₖ = constraint_forces_jacobian(qₖ,λₘ)
             get_directions_and_positions!(Dₖ,Dper, Dimp, ∂Dₖvₖ∂qₖ, ∂DᵀₖHΛₘ∂qₖ,ŕₖ,qₖ, vₖ, H*Λₘ,mem2act_idx)
             ∂pₖ∂qₖ = 2/h.*Mₘ + 
                     ∂Mₘq̇ₘ∂qₘ .+

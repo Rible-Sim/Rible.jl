@@ -79,7 +79,7 @@ function make_control_lyapunov(bot)
         st = manipulator.st
         M = RB.build_massmatrix(st)
         invM = inv(M)
-        q,q̇ = RB.get_q(st)
+        q,q̇ = RB.get_coordinates(st)
         A = RB.build_A(st)
         Ak = A(q)
         Ȧk = A(q̇)
@@ -513,7 +513,7 @@ using RowEchelon
 A = RB.build_A(manipulator.st)
 Q̃ = RB.build_Q̃(manipulator.st)
 L̂ = RB.build_L̂(manipulator.st)
-q,_ = RB.get_q(manipulator.st)
+q,_ = RB.get_coordinates(manipulator.st)
 A(q)
 rref(hcat(transpose(A(q)),-Q̃*L̂))
 

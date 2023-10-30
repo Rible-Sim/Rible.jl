@@ -52,7 +52,7 @@ end
 
 struct CartesianFrame{N,M,T}
     position::SVector{N,T}
-    axes::Axes{N,N,T}
+    axes::Axes{N,T}
     velocity::SVector{N,T}
     angular_velocity::SVector{M,T}
     local_angular_velocity::SVector{M,T}

@@ -368,7 +368,7 @@ struct CoordinateFunctions{ancsType,xT<:Function,ST<:Function}
     S::ST
 end
 
-function CoordinateFunctions(ancs,free_idx_mask,Φ_mask)
+function CoordinateFunctions(ancs,free_idx_mask,constraints_indices)
     _x = make_x(ancs)
     _S = make_S(ancs)
     CoordinateFunctions(ancs,_x,_S)
@@ -387,11 +387,11 @@ end
 封装有函数的Absolute Nodal Coordinates类构造子。
 $(TYPEDSIGNATURES)
 """
-function CoordinateFunctions(ancs,unconstrained_indices)
+function CoordinateFunctions(ancs,free_coordinates_indices)
     ξ = find_ξ(ancs)
     S = make_S(ancs)
     nq = get_num_of_coordinates(ancs)
-    nuc = length(unconstrained_indices)
+    nuc = length(free_coordinates_indices)
     CoordinateFunctions(ancs,ξ,S)
 end
 

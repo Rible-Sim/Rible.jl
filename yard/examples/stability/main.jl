@@ -70,7 +70,7 @@ function compute_evs(bot,friction_coefficients,Ň)
 			# Ň0 = Ň(ini.q̌)
 			Ǩm_Ǩg = RB.make_Ǩm_Ǩg(st,ini.q)
 			Ǩm0, Ǩg0 = Ǩm_Ǩg(ini.q̌,ini.s,ini.μ,ini.k,ini.c)
-			Ǩa0 = - RB.∂Aᵀλ∂q̌(st,ini.λ)
+			Ǩa0 = - RB.constraint_forces_on_free_jacobian(st,ini.λ)
 			𝒦m0 = transpose(Ň0)*Ǩm0*Ň0
 			𝒦g0 = transpose(Ň0)*Ǩg0*Ň0
 			𝒦a0 = transpose(Ň0)*Ǩa0*Ň0
@@ -198,7 +198,7 @@ nb
 μ = friction_coefficients[end]
 @show σs |> extrema
 
-Ň = (q̌,c)-> RB.make_N(spine2d2.st,RB.get_q(spine2d2.st))(q̌)
+Ň = (q̌,c)-> RB.make_nullspace(spine2d2.st,RB.get_coordinates(spine2d2.st))(q̌)
 
 evs = compute_evs(spine2d2,friction_coefficients,Ň)
 
@@ -276,7 +276,7 @@ f[1]/f[4]
 
 @show σs |> extrema
 
-Ň = (q̌,c) -> RB.make_N(spine3d2.st,RB.get_q(spine3d2.st))(q̌)
+Ň = (q̌,c) -> RB.make_nullspace(spine3d2.st,RB.get_coordinates(spine3d2.st))(q̌)
 
 evs = compute_evs(spine3d2,friction_coefficients,Ň)
 @show evs.δVa |> extrema
@@ -324,12 +324,12 @@ GM.activate!(); with_theme(theme_pub;
 end
 
 # Manipulator
-function make_Ň(st,q)
+function make_nullspace_on_free(st,q)
 	(;ndof,connectivity) = st
 	(;indexed,numbered) = connectivity
 	(;nfree,mem2sysfree) = indexed
 	(;mem2num,num2sys) = numbered
-	N = RB.make_N(st,q)
+	N = RB.make_nullspace(st,q)
 	function inner_Ň(q̌,c)
 		# ret = zeros(eltype(q̌),nfree,ndof)
 		bodyid = 2
@@ -350,16 +350,16 @@ end
 man1 = dualtri(1;θ=deg2rad(0))
 man1.st.ndof
 # plot_traj!(man1;)  
-q0 = RB.get_q(man1.st)
+q0 = RB.get_coordinates(man1.st)
 
-N = RB.make_N(man1.st,q0)
-N(RB.get_q̌(man1.st))
+N = RB.make_nullspace(man1.st,q0)
+N(RB.get_free_coordinates(man1.st))
 
 
-Ň = make_Ň(man1.st,q0)
-Ň(RB.get_q̌(man1.st),RB.get_c(man1.st))
+Ň = make_nullspace_on_free(man1.st,q0)
+Ň(RB.get_free_coordinates(man1.st),RB.get_local_coordinates(man1.st))
 A = RB.make_constraints_jacobian(man1.st,q0)
-A(RB.get_q̌(man1.st))*Ň(RB.get_q̌(man1.st),RB.get_c(man1.st)) |> norm
+A(RB.get_free_coordinates(man1.st))*Ň(RB.get_free_coordinates(man1.st),RB.get_local_coordinates(man1.st)) |> norm
 
 B,F̃ = RB.build_inverse_statics_for_restlength(man1.st,man1.st)
 
@@ -593,10 +593,10 @@ GM.activate!(); plot_traj!(tggriper_plot; sup! = sup_ggriper!)
 
 # _,λ = RB.check_static_equilibrium_output_multipliers(tggriper.st)
 
-Ň = make_halftggriper_nullspace(tggriper,RB.get_q̌(tggriper.st))
+Ň = make_halftggriper_nullspace(tggriper,RB.get_free_coordinates(tggriper.st))
 A = RB.make_constraints_jacobian(tggriper)
 
-A(RB.get_q(tggriper.st))*Ň(RB.get_q̌(tggriper.st),RB.get_c(tggriper.st)) |> norm
+A(RB.get_coordinates(tggriper.st))*Ň(RB.get_free_coordinates(tggriper.st),RB.get_local_coordinates(tggriper.st)) |> norm
 
 plot_traj!(tggriper)
 
@@ -696,7 +696,7 @@ function pinpoint_gripper(Ň)
 	bots = [	
 		begin
 			bot = new_gripper(;guess...)
-			# c = RB.get_c(bot.st)
+			# c = RB.get_local_coordinates(bot.st)
 			# # c[7] -= 0.1
 			# RB.update_points!(bot.st,c)
 			polyP, poly𝒦, ini, pv  = RB.pinpoint(bot;Ň)

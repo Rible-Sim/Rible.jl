@@ -37,7 +37,7 @@ function simulate_linkn(;dt=0.01,k=3e1,c=0.0,tend=10.0,verbose=false)
     h = 6.0e-2
     R = RotY(0.0)
     linkn = links(n,h,R;k,c)
-    # q0,q̇0= RB.get_q(linkn)
+    # q0,q̇0= RB.get_coordinates(linkn)
     # _,_,a = inverse_with_energy(linkn,deepcopy(linkn),build_Y(linkn),0.05)
     # RB.actuate!(linkn,a)
 

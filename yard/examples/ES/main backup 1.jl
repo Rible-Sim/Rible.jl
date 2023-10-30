@@ -75,7 +75,7 @@ tw = 469 |> pt2px
 # cw = lw = tw = 455.24411 |> pt2px
 
 
-## 1st example, validation and verification
+## first example, validation and verification
 ## comparison with Adams
 obot = one_bar_one_tri()
 
@@ -1853,7 +1853,7 @@ bridge_deploy = RB.Robot(
 )
     
 RB.check_static_equilibrium_output_multipliers(bridge_deploy.st;gravity=true)
-q_tag = RB.get_q(newbridge_tag.st)
+q_tag = RB.get_coordinates(newbridge_tag.st)
 
 RB.solve!(
     RB.SimProblem(
@@ -1943,7 +1943,7 @@ newembed1 = embed3d(;
     r,b,m,α,θ,n
 )
 
-q = RB.get_q(newembed1.st)
+q = RB.get_coordinates(newembed1.st)
 Φ = RB.make_constraints_function(newembed1.st)
 Φ(q) |> norm
 

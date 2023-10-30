@@ -360,14 +360,14 @@ function find_angular_velocity(x,ẋ)
 end
 
 
-∂Aᵀλ∂q(λ::AbstractVector) = ∂Aᵀλ∂q(first(λ))
+constraint_forces_jacobian(λ::AbstractVector) = constraint_forces_jacobian(first(λ))
 
-function ∂Aᵀλ∂q(λ)
+function constraint_forces_jacobian(λ)
     o = zero(λ)    
     Diagonal(SA[o,o,o,λ,λ,λ,λ])
 end
 
-struct CoordinateFunctions{QCT,MT,M⁻¹T,∂Mẋ∂xT,∂M⁻¹y∂xT,∂T∂xᵀT,∂T∂xᵀ∂xT,∂Aᵀλ∂qT,ΦT,ΦqT,cT}
+struct CoordinateFunctions{QCT,MT,M⁻¹T,∂Mẋ∂xT,∂M⁻¹y∂xT,∂T∂xᵀT,∂T∂xᵀ∂xT,constraint_forces_jacobianT,ΦT,ΦqT,cT}
     nmcs::QCT
     build_M::MT
     build_M⁻¹::M⁻¹T
@@ -375,7 +375,7 @@ struct CoordinateFunctions{QCT,MT,M⁻¹T,∂Mẋ∂xT,∂M⁻¹y∂xT,∂T∂x�
     build_∂M⁻¹y∂x::∂M⁻¹y∂xT
     build_∂T∂xᵀ::∂T∂xᵀT
     build_∂T∂xᵀ∂x::∂T∂xᵀ∂xT
-    ∂Aᵀλ∂q::∂Aᵀλ∂qT
+    constraint_forces_jacobian::constraint_forces_jacobianT
     Φ::ΦT
     Φq::ΦqT
     c::cT
@@ -400,7 +400,7 @@ function CoordinateFunctions(qcs)
         build_∂M⁻¹y∂x,
         build_∂T∂xᵀ,
         build_∂T∂xᵀ∂x,
-        ∂Aᵀλ∂q,
+        constraint_forces_jacobian,
         Φ,
         Φq,
         c,

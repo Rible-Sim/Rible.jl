@@ -13,7 +13,7 @@ using FiniteDifferences
 
 function ip_ns_stepk_maker(nq,nλ,nμ,nu,qₛ₋₁,q̇ₛ₋₁,pₛ₋₁,tₛ₋₁,dyfuncs,invM,h)
     M,Φ,A,Ψ,B,F!,jacobians,contact_funcs = dyfuncs
-    Jac_F!,Ψq,∂Aᵀλ∂q,∂Bᵀμ∂q = jacobians
+    Jac_F!,Ψq,constraint_forces_jacobian,∂Bᵀμ∂q = jacobians
     𝐠,get_indices,get_FCs,get_D = contact_funcs
 
     stepk! = stepk_maker(nq,nλ,nμ,qₛ₋₁,q̇ₛ₋₁,pₛ₋₁,tₛ₋₁,dyfuncs,invM,h)
@@ -58,7 +58,7 @@ function ip_ns_stepk_maker(nq,nλ,nμ,nu,qₛ₋₁,q̇ₛ₋₁,pₛ₋₁,tₛ
             pₛ = Momentum_k(qₛ₋₁,pₛ₋₁,qₛ,λₛ,μₛ,M,A,B,h)
             vₛ = invM*pₛ
 
-            ∂vₛ∂qₛ = 2/h*I + 1/(2h).*invM*(∂Aᵀλ∂q(qₛ,λₛ) + ∂Bᵀμ∂q(qₛ,μₛ))
+            ∂vₛ∂qₛ = 2/h*I + 1/(2h).*invM*(constraint_forces_jacobian(qₛ,λₛ) + ∂Bᵀμ∂q(qₛ,μₛ))
             ∂vₛ∂λₛ = invM*transpose(Aₛ-Aₛ₋₁)/(2h)
             ∂vₛ∂μₛ = invM*transpose(Bₛ-Bₛ₋₁)/(2h)
 
@@ -214,7 +214,7 @@ function ipsolve(nq,nλ,nμ,q0,q̇0,dyfuncs,tspan;dt=0.01,ftol=1e-14,xtol=ftol,v
                 progress=true,exception=true)
     # @unpack bot,tspan,dyfuncs,control!,restart = prob
     M,Φ,A,Ψ,B,F!,jacobians,contact_funcs = dyfuncs
-    Jac_F!,Ψq,∂Aᵀλ∂q,∂Bᵀμ∂q = jacobians
+    Jac_F!,Ψq,constraint_forces_jacobian,∂Bᵀμ∂q = jacobians
     𝐠,get_indices,get_FCs,get_D = contact_funcs
     totaltime = tspan[end] - tspan[begin]
     totalstep = ceil(Int,totaltime/dt)

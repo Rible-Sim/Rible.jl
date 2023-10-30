@@ -47,7 +47,7 @@ man_inv, as = inversekinematics(θs; k, c)
 
 man_inv = man_ndof(6;θ=-0.2,k,c)
 Y = build_Y(man_inv)
-q,_ = RB.get_q(man_inv.st)
+q,_ = RB.get_coordinates(man_inv.st)
 λ,u,a= RB.inverse(man_inv,deepcopy(man_inv),Y)
 RB.actuate!(man_inv,a)
 RB.check_static_equilibrium(man_inv.st,q,λ)
@@ -197,7 +197,7 @@ function pyplot_mode(tgstruct,θ,Z,xlim,ylim)
     end
     fig = plt.figure(figsize=(Full_width,2.5))
     grid = (1,3)
-    q0,_ = RB.get_q(tgstruct)
+    q0,_ = RB.get_coordinates(tgstruct)
 
     for i = 1:3
         ax = plt.subplot2grid(grid,(0,i-1),1,1,fig=fig)

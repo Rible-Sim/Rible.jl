@@ -48,7 +48,7 @@ RB.update_points!(man_inv.st)
 
 
 (;mem2num,num2sys) = man_inv.st.connectivity.numbered
-RB.get_c(man_inv)[indr1p2]
+RB.get_local_coordinates(man_inv)[indr1p2]
 
 # !!!! Check inverse statics first !!!!
 function get_testall_seq(bot;g=0.0,amax=0.01,amin=-0.01,n=20)
@@ -93,7 +93,7 @@ plot_traj!(man_inv_plot)
 # !!!! Check inverse statics first !!!!
 function get_actuate_seq(bot;g=0.0,amax=0.01,amin=-0.01,n=20)
     # plot_traj!(man_inv)
-    # q,_ = RB.get_q(bot.st)
+    # q,_ = RB.get_coordinates(bot.st)
     # λ,u,a = RB.inverse(bot,deepcopy(bot),Y)
     # @show Y
     start_sol,parameters0 = RB.get_start_system(bot)
@@ -163,7 +163,7 @@ end
 
 
 man_inv = man_ndof(1,[1.0,0.0];θ=deg2rad(-2.2571854917431766),k,c,restlen,isvirtual=true)
-q, = RB.get_q(man_inv.st)
+q, = RB.get_coordinates(man_inv.st)
 
 df = DataFrame(XLSX.readtable("三次实验平均1-9.xlsx", "Sheet4";infer_eltypes=true)...)
 theta1_raw = sort(df.theta1_raw)

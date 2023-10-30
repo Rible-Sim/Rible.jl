@@ -7,7 +7,7 @@ end
 
 function stepk_maker(nq,nλ,nμ,qₛ₋₁,q̇ₛ₋₁,pₛ₋₁,tₛ₋₁,dynfuncs,invM,h)
     M,Φ,A,Ψ,B,F!,jacobians,contact_funcs = dynfuncs
-    Jac_F!,Ψq,∂Aᵀλ∂q,∂Bᵀμ∂q = jacobians
+    Jac_F!,Ψq,constraint_forces_jacobian,∂Bᵀμ∂q = jacobians
     # E,𝐠,𝐠𝐪,∂𝐠𝐪ᵀΛ∂q,∂𝐠𝐪q̇∂q = contact_funcs
     n1 =  nq
     n2 = nq+nλ
@@ -33,7 +33,7 @@ function stepk_maker(nq,nλ,nμ,qₛ₋₁,q̇ₛ₋₁,pₛ₋₁,tₛ₋₁,dy
         Bₛ₋₁ = B(qₛ₋₁)
         Aₛ = A(qₛ)
         Bₛ = B(qₛ)
-        ∂q̇ₛ∂qₛ = 2/h*I + 1/(2h).*invM*(∂Aᵀλ∂q(qₛ,λₛ) + ∂Bᵀμ∂q(qₛ,μₛ))
+        ∂q̇ₛ∂qₛ = 2/h*I + 1/(2h).*invM*(constraint_forces_jacobian(qₛ,λₛ) + ∂Bᵀμ∂q(qₛ,μₛ))
         ∂q̇ₛ∂λₛ = invM*transpose(Aₛ-Aₛ₋₁)/(2h)
         ∂q̇ₛ∂μₛ = invM*transpose(Bₛ-Bₛ₋₁)/(2h)
 
@@ -61,7 +61,7 @@ end
 
 function ns_stepk_maker(nq,nλ,nμ,nu,qᵏ⁻¹,q̇ᵏ⁻¹,pᵏ⁻¹,tᵏ⁻¹,Aset,dynfuncs,invM,h)
     M,Φ,A,Ψ,B,F!,jacobians,contact_funcs = dynfuncs
-    Jac_F!,Ψq,∂Aᵀλ∂q,∂Bᵀμ∂q = jacobians
+    Jac_F!,Ψq,constraint_forces_jacobian,∂Bᵀμ∂q = jacobians
     E,𝐠,𝐠𝐪,∂𝐠𝐪ᵀΛ∂q,∂𝐠𝐪q̇∂q = contact_funcs
     r = 1.0
     n1 =  nq
@@ -89,7 +89,7 @@ function ns_stepk_maker(nq,nλ,nμ,nu,qᵏ⁻¹,q̇ᵏ⁻¹,pᵏ⁻¹,tᵏ⁻¹,
         Bᵏ⁻¹ = B(qᵏ⁻¹)
         Aᵏ = A(qᵏ)
         Bᵏ = B(qᵏ)
-        ∂q̇ᵏ∂qᵏ = 1/(2h).*invM*(∂Aᵀλ∂q(qᵏ,λᵏ) .+ ∂Bᵀμ∂q(qᵏ,μᵏ)) + 2/h*I
+        ∂q̇ᵏ∂qᵏ = 1/(2h).*invM*(constraint_forces_jacobian(qᵏ,λᵏ) .+ ∂Bᵀμ∂q(qᵏ,μᵏ)) + 2/h*I
         ∂q̇ᵏ∂λᵏ = invM*transpose(Aᵏ-Aᵏ⁻¹)/(2h)
         ∂q̇ᵏ∂μᵏ = invM*transpose(Bᵏ-Bᵏ⁻¹)/(2h)
 
@@ -159,7 +159,7 @@ end
 
 function sns_stepk_maker(nq,nλ,nμ,nu,qᵏ⁻¹,q̇ᵏ⁻¹,pᵏ⁻¹,tᵏ⁻¹,Aset,dynfuncs,invM,h)
     M,Φ,A,Ψ,B,F!,jacobians,contact_funcs = dynfuncs
-    Jac_F!,Ψq,∂Aᵀλ∂q,∂Bᵀμ∂q = jacobians
+    Jac_F!,Ψq,constraint_forces_jacobian,∂Bᵀμ∂q = jacobians
     E,𝐠,𝐠𝐪,∂𝐠𝐪ᵀΛ∂q,∂𝐠𝐪q̇∂q = contact_funcs
     r = 1.0
     n1 = nq
@@ -185,7 +185,7 @@ function sns_stepk_maker(nq,nλ,nμ,nu,qᵏ⁻¹,q̇ᵏ⁻¹,pᵏ⁻¹,tᵏ⁻¹
         Bᵏ⁻¹ = B(qᵏ⁻¹)
         Aᵏ = A(qᵏ)
         Bᵏ = B(qᵏ)
-        ∂q̇ᵏ∂qᵏ = 1/h.*invM*(∂Aᵀλ∂q(qᵏ,λᵏ) .+ ∂Bᵀμ∂q(qᵏ,μᵏ)) + 2/h*I
+        ∂q̇ᵏ∂qᵏ = 1/h.*invM*(constraint_forces_jacobian(qᵏ,λᵏ) .+ ∂Bᵀμ∂q(qᵏ,μᵏ)) + 2/h*I
         ∂q̇ᵏ∂λᵏ = invM*transpose(Aᵏ-Aᵏ⁻¹)/h
         ∂q̇ᵏ∂μᵏ = invM*transpose(Bᵏ-Bᵏ⁻¹)/h
 
@@ -261,7 +261,7 @@ end
 
 function ip_ns_stepk_maker(nq,nλ,nμ,nu,qᵏ⁻¹,q̇ᵏ⁻¹,pᵏ⁻¹,tᵏ⁻¹,Aset,dynfuncs,invM,h)
     M,Φ,A,Ψ,B,F!,jacobians,contact_funcs = dynfuncs
-    Jac_F!,Ψq,∂Aᵀλ∂q,∂Bᵀμ∂q = jacobians
+    Jac_F!,Ψq,constraint_forces_jacobian,∂Bᵀμ∂q = jacobians
     E,𝐠,𝐠𝐪,∂𝐠𝐪ᵀΛ∂q,∂𝐠𝐪q̇∂q = contact_funcs
     r = 1.0
     n1 = nq
@@ -292,7 +292,7 @@ function ip_ns_stepk_maker(nq,nλ,nμ,nu,qᵏ⁻¹,q̇ᵏ⁻¹,pᵏ⁻¹,tᵏ⁻
         Bᵏ⁻¹ = B(qᵏ⁻¹)
         Aᵏ = A(qᵏ)
         Bᵏ = B(qᵏ)
-        ∂q̇ᵏ∂qᵏ = 1/(2h).*invM*(∂Aᵀλ∂q(qᵏ,λᵏ) .+ ∂Bᵀμ∂q(qᵏ,μᵏ)) + 2/h*I
+        ∂q̇ᵏ∂qᵏ = 1/(2h).*invM*(constraint_forces_jacobian(qᵏ,λᵏ) .+ ∂Bᵀμ∂q(qᵏ,μᵏ)) + 2/h*I
         ∂q̇ᵏ∂λᵏ = invM*transpose(Aᵏ-Aᵏ⁻¹)/(2h)
         ∂q̇ᵏ∂μᵏ = invM*transpose(Bᵏ-Bᵏ⁻¹)/(2h)
 
@@ -369,7 +369,7 @@ function nhsolve(prob,nq,nλ,nμ,nu,q0,q̇0;tspan,dt=0.01,ftol=1e-14,verbose=fal
                 progress=true,exception=true)
     @unpack bot,dynfuncs = prob
     M,Φ,A,Ψ,B,F!,jacobians,contact_funcs = dynfuncs
-    Jac_F!,Ψq,∂Aᵀλ∂q,∂Bᵀμ∂q = jacobians
+    Jac_F!,Ψq,constraint_forces_jacobian,∂Bᵀμ∂q = jacobians
     E,𝐠,𝐠𝐪,∂𝐠𝐪ᵀΛ∂q,∂𝐠𝐪q̇∂q = contact_funcs
     totaltime = tspan[end] - tspan[begin]
     totalstep = ceil(Int,totaltime/dt)
@@ -517,7 +517,7 @@ function snhsolve(prob,nq,nλ,nμ,nu,q0,q̇0;tspan,dt=0.01,ftol=1e-14,verbose=fa
                 progress=true,exception=true)
     @unpack bot,dynfuncs = prob
     M,Φ,A,Ψ,B,F!,jacobians,contact_funcs = dynfuncs
-    Jac_F!,Ψq,∂Aᵀλ∂q,∂Bᵀμ∂q = jacobians
+    Jac_F!,Ψq,constraint_forces_jacobian,∂Bᵀμ∂q = jacobians
     E,𝐠,𝐠𝐪,∂𝐠𝐪ᵀΛ∂q,∂𝐠𝐪q̇∂q = contact_funcs
     totaltime = tspan[end] - tspan[begin]
     totalstep = ceil(Int,totaltime/dt)
@@ -631,7 +631,7 @@ function ipsolve(prob,nq,nλ,nμ,q0,q̇0;dt=0.01,ftol=1e-14,verbose=false,iterat
                 progress=true,exception=true)
     @unpack bot,tspan,dynfuncs,control!,restart = prob
     M,Φ,A,Ψ,B,F!,jacobians,contact_funcs = dynfuncs
-    Jac_F!,Ψq,∂Aᵀλ∂q,∂Bᵀμ∂q = jacobians
+    Jac_F!,Ψq,constraint_forces_jacobian,∂Bᵀμ∂q = jacobians
     E,𝐠,𝐠𝐪,∂𝐠𝐪ᵀΛ∂q,∂𝐠𝐪q̇∂q = contact_funcs
     totaltime = tspan[end] - tspan[begin]
     totalstep = ceil(Int,totaltime/dt)

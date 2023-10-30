@@ -73,7 +73,7 @@ function StructureState(bodies,tensiles,cnt::Connectivity{<:Any,<:Any,<:NamedTup
     q̈ = zero(q)
     F = zero(q)
     λ = Vector{T}(undef,nconstraints)
-    c = get_c(bodies,numbered)
+    c = get_local_coordinates(bodies,numbered)
     system = NonminimalCoordinatesState(t,q,q̇,q̈,F,λ,sysfree,syspres,c)
     parts = [
         begin
@@ -277,7 +277,9 @@ function make_constraints_function(st::AbstractStructure,q0::AbstractVector)
             memfree = mem2sysfree[bodyid]
             memincst = mem2sysincst[bodyid]
             if !isempty(memincst)
-                ret[memincst] .= body.state.cache.funcs.Φ(q[memfull],d[memincst])
+                ret[memincst] .= make_constraints_function(
+                    body.state.cache.funcs
+                )(q[memfull],d[memincst])
             end
         end
         is = Ref(ninconstraints)
@@ -290,10 +292,10 @@ function make_constraints_function(st::AbstractStructure,q0::AbstractVector)
     end
 
     function inner_constraints_function(q̌)
-        _inner_constraints_function(q̌,get_d(st),get_c(st))
+        _inner_constraints_function(q̌,get_d(st),get_local_coordinates(st))
     end
     function inner_constraints_function(q̌,d)
-        _inner_constraints_function(q̌,d,get_c(st))
+        _inner_constraints_function(q̌,d,get_local_coordinates(st))
     end
     function inner_constraints_function(q̌,d,c)
         _inner_constraints_function(q̌,d,c)
@@ -315,7 +317,9 @@ function make_constraints_function(st::AbstractStructure)
             memfree = mem2sysfree[bodyid]
             memincst = mem2sysincst[bodyid]
             if !isempty(memincst)
-                ret[memincst] .= body.state.cache.funcs.Φ(q[memfull])
+                ret[memincst] .= make_constraints_function(
+                    body.state.cache.funcs
+                )(q[memfull])
             end
         end
         foreach(jointed.joints) do joint
@@ -334,7 +338,7 @@ function make_constraints_jacobian(st::AbstractStructure,q0::AbstractVector)
     (;numbered,indexed,jointed) = st.connectivity
     (;nfull,nfree,syspres,sysfree,mem2sysfull,mem2sysfree,ninconstraints,mem2sysincst) = indexed
 
-    function _inner_A(q̌,c)
+    function _inner_constraints_jacobian(q̌,c)
         q = Vector{eltype(q̌)}(undef,nfull)
         q[syspres] .= q0[syspres]
         q[sysfree] .= q̌
@@ -345,7 +349,9 @@ function make_constraints_jacobian(st::AbstractStructure,q0::AbstractVector)
             memfree = mem2sysfree[bodyid]
             memincst = mem2sysincst[bodyid]
             if !isempty(memincst)
-                ret[memincst,memfree] .= body.state.cache.funcs.Φq(q[memfull])
+                ret[memincst,memfree] .= make_constraints_jacobian(
+                    body.state.cache.funcs
+                )(q[memfull])
             end
         end
         is = Ref(ninconstraints)
@@ -356,20 +362,20 @@ function make_constraints_jacobian(st::AbstractStructure,q0::AbstractVector)
         end
         ret
     end
-    function inner_A(q̌)
-        _inner_A(q̌,get_c(st))
+    function inner_constraints_jacobian(q̌)
+        _inner_constraints_jacobian(q̌,get_local_coordinates(st))
     end
-    function inner_A(q̌,c)
-        _inner_A(q̌,c)
+    function inner_constraints_jacobian(q̌,c)
+        _inner_constraints_jacobian(q̌,c)
     end
-    inner_A
+    inner_constraints_jacobian
 end
 
 function make_constraints_jacobian(st::AbstractStructure)
     (;bodies,nconstraints) = st
     (;numbered,indexed,jointed) = st.connectivity
     (;nfree,mem2sysfull,mem2sysfree,ninconstraints,mem2sysincst) = indexed
-    @inline @inbounds function inner_A(q)
+    @inline @inbounds function inner_constraints_jacobian(q)
         ret = zeros(eltype(q),nconstraints,nfree)
         is = Ref(ninconstraints)
         foreach(bodies) do body
@@ -378,7 +384,9 @@ function make_constraints_jacobian(st::AbstractStructure)
             memfree = mem2sysfree[bodyid]
             memincst = mem2sysincst[bodyid]
             if !isempty(memincst)
-                ret[memincst,memfree] .= body.state.cache.funcs.Φq(q[memfull])
+                ret[memincst,memfree] .= make_constraints_jacobian(
+                    body.state.cache.funcs
+                )(q[memfull])
             end
         end
         foreach(jointed.joints) do joint
@@ -398,8 +406,8 @@ function build_F̌(st,bodyid,pid,f)
         if body.prop.id == bodyid
             C = body.state.cache.Cps[pid]
             memfree = mem2sysfree[bodyid]
-            unconstrained_indices = body.state.cache.free_idx
-            F̌[memfree] = (transpose(C)*f)[unconstrained_indices,:]
+            free_coordinates_indices = body.state.cache.free_idx
+            F̌[memfree] = (transpose(C)*f)[free_coordinates_indices,:]
         end
     end
     reshape(F̌,:,1)
@@ -412,7 +420,7 @@ $(TYPEDSIGNATURES)
 """
 function check_jacobian_singularity(st)
     (;bodies,state) = st
-    q = get_q(st)
+    q = get_coordinates(st)
     A = make_constraints_jacobian(st)
     Aq = A(q)
     sys_rank = rank(Aq)
@@ -421,7 +429,7 @@ function check_jacobian_singularity(st)
     end
     foreach(bodies) do body
         bodyid = body.prop.id
-        unconstrained_indices = body.state.cache.free_idx
+        free_coordinates_indices = body.state.cache.free_idx
         q_rb = state.parts[bodyid].q
         Aq_rb = body.state.cache.funcs.Φq(q_rb)
         rb_rank = rank(Aq_rb)

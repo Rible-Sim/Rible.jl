@@ -76,7 +76,7 @@ tw = 469 |> pt2px
 # fontsize = 10 |> pt2px
 # cw = lw = tw = 455.24411 |> pt2px
 
-## 1st example, validation and verification
+## first example, validation and verification
 ## comparison with Adams
 obot = one_bar_one_tri()
 
@@ -2288,8 +2288,8 @@ _,λ=  RB.check_static_equilibrium_output_multipliers(bot.st)
 k = RB.get_cables_stiffness(bot.st)
 l = RB.get_cables_len(bot.st)
 f = RB.get_cables_tension(bot)
-q = RB.get_q(bot.st)
-q̌ = RB.get_q̌(bot.st)
+q = RB.get_coordinates(bot.st)
+q̌ = RB.get_free_coordinates(bot.st)
 Ǎ = RB.make_constraints_jacobian(bot.st)(q)
 # Ň_ = RB.nullspace(Ǎ)
 # Ň = RB.modified_gram_schmidt(Ň_)
@@ -2364,12 +2364,12 @@ ns = size(S,2)
 nk = size(D,2)
 
 λ = -inv(Ǎ*transpose(Ǎ))*Ǎ*Bᵀ*f
-Ǩa = RB.∂Aᵀλ∂q̌(bot.st,λ)
+Ǩa = RB.constraint_forces_on_free_jacobian(bot.st,λ)
 𝒦a = transpose(Ň)*Ǩa*Ň |> Symmetric 
 vals_𝒦a,vecs_𝒦a = eigen(𝒦a)
 
-Ǩm = RB.build_Ǩm!(bot.st,q,k)
-Ǩg = RB.build_Ǩg!(bot.st,q,f)
+Ǩm = RB.build_material_stiffness_matrix_on_free!(bot.st,q,k)
+Ǩg = RB.build_geometric_stiffness_matrix_on_free!(bot.st,q,f)
 vec𝒦ps = [
     begin
         si = S[:,i]
@@ -2377,9 +2377,9 @@ vec𝒦ps = [
         # @show s
         λi = inv(Ǎ*transpose(Ǎ))*Ǎ*Bᵀ*si
         # @show f,λ
-        Ǩai = - RB.∂Aᵀλ∂q̌(bot.st,λi)
+        Ǩai = - RB.constraint_forces_on_free_jacobian(bot.st,λi)
 
-        Ǩgi = RB.build_Ǩg!(bot.st,q,si)
+        Ǩgi = RB.build_geometric_stiffness_matrix_on_free!(bot.st,q,si)
 
         𝒦pi = transpose(Ň)*(Ǩgi.+Ǩai)*Ň |> Symmetric 
         # vec𝒦pi = SymmetricPacked(𝒦pi).tri
@@ -2439,9 +2439,9 @@ vecr𝒦ps = [
         # @show s
         λi = inv(Ǎ*transpose(Ǎ))*Ǎ*Bᵀ*si
         # @show f,λ
-        Ǩai = - RB.∂Aᵀλ∂q̌(bot.st,λi)
+        Ǩai = - RB.constraint_forces_on_free_jacobian(bot.st,λi)
 
-        Ǩgi = RB.build_Ǩg!(bot.st,q,si)
+        Ǩgi = RB.build_geometric_stiffness_matrix_on_free!(bot.st,q,si)
 
         r𝒦pi = transpose(Ňv)*(Ǩgi.+Ǩai)*Ňv |> Symmetric 
         # vecr𝒦pi = SymmetricPacked(r𝒦pi).tri

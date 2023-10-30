@@ -165,7 +165,7 @@ function dynamic_relax(tgbot,dynfuncs;dt=0.001,tend=10.0,verbose=false)
     tgbot,dynfuncs
 end
 _,dynfuncs = dynamic_relax(spine2,dynfuncs)
-qend,_ = RB.get_q(spine2.st)
+qend,_ = RB.get_coordinates(spine2.st)
 
 RB.set_new_initial!(spine2,qzero)
 function plot_super(pp,bot,pyramid;linked=false)

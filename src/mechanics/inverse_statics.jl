@@ -266,8 +266,8 @@ function check_inverse_sanity(B)
 end
 
 function build_inverse_statics_core(tginput,tgref::Structure,Fˣ=nothing;gravity=false)
-    q = get_q(tgref)
-    q̌ = get_q̌(tgref)
+    q = get_coordinates(tgref)
+    q̌ = get_free_coordinates(tgref)
     st = deepcopy(tginput)
     clear_forces!(st)
     update_rigids!(st,q)
@@ -440,7 +440,7 @@ function get_inverse_func(tg_input,reftg,Y;gravity=false,recheck=true,scale=true
         λ = x[1:acttg.nconstraint].*c
         a = x[acttg.nconstraint+1:end]
         # check_actuation(acttg,Y,a)
-        # refq = get_q(reftg)
+        # refq = get_coordinates(reftg)
         # actuate!(acttg,a)
         # check_static_equilibrium(acttg,refq,λ;gravity)
         u0 = get_cables_restlen(tg_input)
@@ -473,7 +473,7 @@ function check_static_equilibrium(tg_input,q,λ,F=nothing;gravity=false)
 end
 
 function check_static_equilibrium_output_multipliers(tg_input;F=nothing,gravity=false)
-    q = get_q(tg_input)
+    q = get_coordinates(tg_input)
     check_static_equilibrium_output_multipliers(tg_input,q,F;gravity)
 end
 
@@ -497,9 +497,9 @@ function check_static_equilibrium_output_multipliers!(st,q,F=nothing;
     if !isnothing(F)
         generalized_forces .+= F[:]
     end
-    q = get_q(st)
-    c = get_c(st)
-    q̌ = get_q̌(st)
+    q = get_coordinates(st)
+    c = get_local_coordinates(st)
+    q̌ = get_free_coordinates(st)
     A = make_constraints_jacobian(st,q)(q̌,c)
     # # @show A
     # s = get_s(st)
@@ -585,7 +585,7 @@ function inverse_for_restlength(tginput,tgref::Structure,Fˣ=nothing;
     end
     if recheck
         tgcheck = deepcopy(tginput)
-        q = get_q(tgref)
+        q = get_coordinates(tgref)
         set_restlen!(tgcheck,x0)
         _,λ = check_static_equilibrium_output_multipliers!(tgcheck,q;gravity)
     end
@@ -597,7 +597,7 @@ function inverse_for_multipliers(botinput::Robot,botref::Robot=botinput,F=nothin
 end
 
 function inverse_for_multipliers(tginput::Structure,tgref::Structure=tginput,F=nothing;gravity=false,scale=true,recheck=true)
-    q = get_q(tgref)
+    q = get_coordinates(tgref)
     _,λ = check_static_equilibrium_output_multipliers(tginput,q;gravity)
     λ
 end
@@ -616,7 +616,7 @@ function inverse_for_actuation(botinput,botref,Fˣ=nothing;Y=build_Y(botinput),
     a = y0[1:na]
     if recheck
         botcheck = deepcopy(botinput)
-        q = get_q(tgref)
+        q = get_coordinates(tgref)
         actuate!(botcheck,a)
         _,λ = check_static_equilibrium_output_multipliers(botcheck.st,q;gravity)
     end

@@ -1,10 +1,10 @@
 
-get_c(bot::Robot) = get_c(bot.st)
+get_local_coordinates(bot::Robot) = get_local_coordinates(bot.st)
 get_s(bot::Robot) = get_s(bot.st)
 
-get_q(st::Structure) = copy(st.state.system.q)
+get_coordinates(st::Structure) = copy(st.state.system.q)
 get_q̇(st::Structure) = copy(st.state.system.q̇)
-get_q̌(st::Structure) = copy(st.state.system.q̌)
+get_free_coordinates(st::Structure) = copy(st.state.system.q̌)
 get_q̌̇(st::Structure) = copy(st.state.system.q̌̇)
 
 function get_λ(st::Structure)
@@ -17,12 +17,12 @@ $(TYPEDSIGNATURES)
 """
 function get_initial(st::Structure)
     _,λ = check_static_equilibrium_output_multipliers(st::Structure)
-    q̌ = get_q̌(st::Structure)
-    q = get_q(st::Structure)
+    q̌ = get_free_coordinates(st::Structure)
+    q = get_coordinates(st::Structure)
     ℓ = get_cables_len(st::Structure)
     s = 1 ./ℓ
     d = get_d(st::Structure)
-    c = get_c(st::Structure)
+    c = get_local_coordinates(st::Structure)
     k = get_cables_stiffness(st::Structure)
     μ = get_cables_restlen(st::Structure)
     @eponymtuple(q̌,q,s,λ,d,c,k,μ,)
@@ -52,16 +52,16 @@ function get_s(st::Structure)
     1 ./get_cables_len(st::Structure)
 end
 
-function get_c(st::Structure,bodyid,pid)
+function get_local_coordinates(st::Structure,bodyid,pid)
     (;mem2num,num2sys) = st.connectivity.numbered
     (;c) = st.state.system
     cidx = mem2num[bodyid][pid]
     c[num2sys[cidx]]
 end
 
-get_c(st::Structure) = copy(st.state.system.c)
+get_local_coordinates(st::Structure) = copy(st.state.system.c)
 
-function get_c(bodies,numbered::NumberedPoints)
+function get_local_coordinates(bodies,numbered::NumberedPoints)
     ndim = get_num_of_dims(bodies)
     T = get_numbertype(bodies)
     (;mem2num,num2sys,nc) = numbered
@@ -70,17 +70,17 @@ function get_c(bodies,numbered::NumberedPoints)
         bodyid = body.prop.id
         for i in eachindex(body.prop.loci)
             ip = mem2num[bodyid][i]
-            ret[num2sys[ip]] .= get_c(body,body.prop.loci[i].position)
+            ret[num2sys[ip]] .= get_local_coordinates(body,body.prop.loci[i].position)
         end
     end
     ret
 end
 
-function get_c(body::RigidBody,r̄p)
-    body.state.cache.funcs.c(r̄p)
+function get_local_coordinates(body::RigidBody,r̄p)
+    to_local_coordinates(body.state.cache.funcs.nmcs,r̄p)
 end
 
-function get_c(body::FlexibleBody,r̄p)
+function get_local_coordinates(body::FlexibleBody,r̄p)
     body.state.cache.funcs.x(r̄p)
 end
 

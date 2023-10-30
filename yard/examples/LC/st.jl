@@ -25,7 +25,7 @@ includet("../vis.jl")
 twodofbot = man_nd1(2e3;ratio=γ0); twodofbot_plot = deepcopy(twodofbot)
 
 # for setting c
-# c = RB.get_c(twodofbot)
+# c = RB.get_local_coordinates(twodofbot)
 # RB.set_C!(twodofbot.st,c)
 
 function N(q)
@@ -54,9 +54,9 @@ function locate_bifurcation_point(bot_input,γ0)
     (;nfull,nfree) = connectivity.indexed
     ncables = length(cables)
     nλ = nconstraints
-    q̌0 = RB.get_q̌(st)
-    q0 = RB.get_q(st)
-    c0 = RB.get_c(st)
+    q̌0 = RB.get_free_coordinates(st)
+    q0 = RB.get_coordinates(st)
+    c0 = RB.get_local_coordinates(st)
     ℓ0 = RB.get_cables_len(st)
     s0 = 1 ./ℓ0
     k0 = RB.get_cables_stiffness(st)

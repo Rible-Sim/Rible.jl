@@ -72,7 +72,7 @@ function index_inconstraints(rbs)
     nincst_by_mem = zeros(Int,nmem)
     ndof_by_mem = zeros(Int,nmem)
     foreach(rbs) do body
-        nincst_by_mem[body.prop.id] = body.state.cache.nΦ
+        nincst_by_mem[body.prop.id] = body.state.cache.num_of_constraints
         ndof_by_mem[body.prop.id] = get_num_of_dof(body)
     end
     ninconstraints = sum(nincst_by_mem)
@@ -206,7 +206,7 @@ function Base.isless(rb1::AbstractBody,rb2::AbstractBody)
     isless(rb1.prop.id,rb2.prop.id)
 end
 
-function Base.isless(e2e1::End2End,e2e2::End2End)
+function Base.isless(e2e1::Hen2Egg,e2e2::Hen2Egg)
     isless(e2e1.id,e2e2.id)
 end
 
@@ -235,7 +235,7 @@ function connect(rbs,cm_input=Int[;;])
         rbid1,rbid2 = ifelse(row[rbids[1]]>0,rbids,reverse(rbids))
         pid1,pid2 = Int64.(abs.(row[[rbid1,rbid2]]))
         is += 1
-        push!(ret_raw,End2End(is,ID(rbs_sorted[rbid1],pid1),ID(rbs_sorted[rbid2],pid2)))
+        push!(ret_raw,Hen2Egg(is,ID(rbs_sorted[rbid1],pid1),ID(rbs_sorted[rbid2],pid2)))
     end
     ret = TypeSortedCollection(ret_raw)
 end
@@ -245,7 +245,7 @@ function cluster(rbs, cm2_input)
     ret_raw = []
     cm = cm2_input
     for row in eachrow(cm)
-        iret = Vector{End2End}()
+        iret = Vector{Hen2Egg}()
         is = 0
         rbids = findall(!iszero,row)
         if isempty(rbids)
@@ -256,7 +256,7 @@ function cluster(rbs, cm2_input)
             is += 1
             rbid1 = rbids[i]; rbid2 = rbids[i+1]
             pid1 = Int64(row[rbids[i]]); pid2 = Int64(row[rbids[i+1]])
-            push!(iret,End2End(is,ID(rbs_sorted[rbid1],pid1),ID(rbs_sorted[rbid2],pid2)))
+            push!(iret,Hen2Egg(is,ID(rbs_sorted[rbid1],pid1),ID(rbs_sorted[rbid2],pid2)))
         end
         push!(ret_raw, iret)
     end
