@@ -94,7 +94,7 @@ struct NonminimalCoordinatesCache{FuncsType,MassMatrixType,JacobianType,HessianT
 end
 
 function get_CoordinatesCache(prop::RigidBodyProperty{N,T},
-                                 nmcs::NCF.LNC,
+                                 nmcs::NCF.NC,
                                  pres_idx=Int[],
                                  cstr_idx=get_cstr_idx(nmcs)) where {N,T}
     (;mass,inertia,mass_locus,loci) = prop
@@ -392,7 +392,7 @@ end
 Return 约束方程编号。
 $(TYPEDSIGNATURES)
 """
-function get_cstr_idx(nmcs::NCF.LNC)
+function get_cstr_idx(nmcs::NCF.NC)
     num_of_cstr = NCF.get_num_of_cstr(nmcs)
     collect(1:num_of_cstr)
 end

@@ -472,7 +472,7 @@ plot_traj!(
     showarrows=false,
 )
 
-topn = make_top(origin_position,R,origin_velocity,Ω,RB.NCF.LNC;μ,e,loadmesh=true)
+topn = make_top(origin_position,R,origin_velocity,Ω,RB.NCF.NC;μ,e,loadmesh=true)
 RB.solve!(
     RB.SimProblem(topn,top_contact_dynfuncs),
     RB.ZhongCCP();
@@ -622,7 +622,7 @@ topn_longtimes = [
         R = RotX(θ)
         origin_velocity = [0.0,0.0,0.0]
         Ω = [0.0,0.0,200.0]
-        bot = make_top(origin_position,R,origin_velocity,Ω,RB.NCF.LNC;μ,e,loadmesh=true)
+        bot = make_top(origin_position,R,origin_velocity,Ω,RB.NCF.NC;μ,e,loadmesh=true)
         RB.solve!(
             RB.SimProblem(bot,(x)->top_contact_dynfuncs(x;checkpersist=check)),
             RB.ZhongCCP();
@@ -724,7 +724,7 @@ dts = [1e-3,1e-2]
 checks = [true,false]
 tops_e0 = [
     begin   
-        topbot = make_top(origin_position,R,origin_velocity,Ω,RB.NCF.LNC; μ = 0.01, e = 0.0,loadmesh=true)
+        topbot = make_top(origin_position,R,origin_velocity,Ω,RB.NCF.NC; μ = 0.01, e = 0.0,loadmesh=true)
         RB.solve!(
             RB.SimProblem(topbot,(x)->top_contact_dynfuncs(x;checkpersist=check)),
             RB.ZhongCCP();

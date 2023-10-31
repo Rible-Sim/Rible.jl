@@ -189,7 +189,7 @@ get_rigidbars(bot::Robot) = get_rigidbars(bot.st)
 
 function get_rigidbars(st::AbstractStructure)
     filter(get_bodies(st::Structure)) do body
-        body.state.cache.funcs.nmcs isa Union{NCF.LNC2D4C,NCF.LNC3D6C}
+        body.state.cache.funcs.nmcs isa Union{NCF.NC2D4C,NCF.NC3D6C}
     end
 end
 

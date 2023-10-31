@@ -1,3 +1,10 @@
+"""
+Return free indices of natural coodinates.
+$(TYPEDSIGNATURES)
+"""
+function get_free_idx(nmcs::NC,pres_idx)
+    deleteat!(collect(1:get_num_of_coords(nmcs)),pres_idx)
+end
 
 # """
 # Return 2D or 3D local natural coords deformations for rigid bars。
@@ -5,12 +12,12 @@
 # """
 @inline @inbounds get_deform(ū::AbstractVector) = sqrt(ū⋅ū)
 
-@inline @inbounds function get_deform(nmcs::Union{LNC2D1P,LNC3D1P})
+@inline @inbounds function get_deform(nmcs::Union{NC2D2C,NC3D3C})
     (;r̄i) = nmcs
     get_deform(r̄i)
 end
 
-@inline @inbounds function get_deform(nmcs::Union{LNC2D1P1V,LNC3D1P1V,LNC2D2P,LNC3D2P})
+@inline @inbounds function get_deform(nmcs::Union{NC2D4C,NC3D6C})
     (;ū) = nmcs
     get_deform(ū)
 end
@@ -23,7 +30,7 @@ end
     sqrt(ū⋅ū),sqrt(v̄⋅v̄),ū⋅v̄
 end
 
-@inline @inbounds function get_deform(nmcs::LNC2D6C)
+@inline @inbounds function get_deform(nmcs::NC2D6C)
     (;ū,v̄) = nmcs
     get_deform(ū,v̄)
 end
@@ -42,7 +49,7 @@ end
     u_sqrt,v_sqrt,w_sqrt,vw,uw,uv
 end
 
-@inline @inbounds function get_deform(nmcs::LNC3D12C)
+@inline @inbounds function get_deform(nmcs::NC3D12C)
     (;ū,v̄,w̄) = nmcs
     get_deform(ū,v̄,w̄)
 end
@@ -53,8 +60,8 @@ end
 Return 2D or 3D intrinsic cstr(s) ，用于Dispatch。
 $(TYPEDSIGNATURES)
 """
-function make_cstr_function(nmcs::LNC,cstr_idx)
-    deforms = get_deform(nmcs::LNC)
+function make_cstr_function(nmcs::NC,cstr_idx)
+    deforms = get_deform(nmcs::NC)
     make_cstr_function(nmcs,cstr_idx,deforms)
 end
 
@@ -72,7 +79,7 @@ end
 Return 2D or 3D intrinsic cstr(s) for point mass。
 $(TYPEDSIGNATURES)
 """
-function make_cstr_function(nmcs::Union{LNC2D2C,LNC3D3C},cstr_idx,deforms)
+function make_cstr_function(nmcs::Union{NC2D2C,NC3D3C},cstr_idx,deforms)
     @inline @inbounds function _inner_cstr_function(q,d)
         nothing
     end
@@ -83,9 +90,9 @@ end
 Return 2D or 3D intrinsic cstr(s) for rigid bars。
 $(TYPEDSIGNATURES)
 """
-function make_cstr_function(nmcs::Union{LNC2D4C,LNC3D6C},cstr_idx,deforms)
+function make_cstr_function(nmcs::Union{NC2D4C,NC3D6C},cstr_idx,deforms)
     ndim = get_num_of_dims(nmcs)
-    cv = nmcs.conversion
+    cv = nmcs.conversion_to_std
     @inline @inbounds function _inner_cstr_function(q,d)
         qstd = cv*q
         u = @view qstd[ndim+1:2ndim]
@@ -99,8 +106,8 @@ end
 Return 2D intrinsic cstr(s) , for rigid bodies。
 $(TYPEDSIGNATURES)
 """
-function make_cstr_function(nmcs::LNC2D6C,cstr_idx,deforms)
-    cv = nmcs.conversion
+function make_cstr_function(nmcs::NC2D6C,cstr_idx,deforms)
+    cv = nmcs.conversion_to_std
     @inline @inbounds function _inner_cstr_function(q,d)
         qstd = cv*q
         u = @view qstd[3:4]
@@ -120,8 +127,8 @@ end
 Return 3D intrinsic cstr(s) , for rigid bodies。
 $(TYPEDSIGNATURES)
 """
-function make_cstr_function(nmcs::LNC3D12C,cstr_idx,deforms)
-    cv = nmcs.conversion
+function make_cstr_function(nmcs::NC3D12C,cstr_idx,deforms)
+    cv = nmcs.conversion_to_std
     @inline @inbounds function _inner_cstr_function(q,d)
         qstd = cv*q
         u = @view qstd[4:6]
@@ -147,7 +154,7 @@ end
 Return 2D or 3D Jacobian matrix for rigid bars。
 $(TYPEDSIGNATURES)
 """
-function make_cstr_jacobian(nmcs::Union{LNC2D2C,LNC3D3C},free_coords_idx,cstr_idx)
+function make_cstr_jacobian(nmcs::Union{NC2D2C,NC3D3C},free_coords_idx,cstr_idx)
     @inline @inbounds function inner_cstr_jacobian(q)
         nothing
     end
@@ -157,9 +164,9 @@ end
 Return 2D or 3D Jacobian matrix for rigid bars。
 $(TYPEDSIGNATURES)
 """
-function make_cstr_jacobian(nmcs::Union{LNC2D4C,LNC3D6C},free_coords_idx,cstr_idx)
+function make_cstr_jacobian(nmcs::Union{NC2D4C,NC3D6C},free_coords_idx,cstr_idx)
     ndim = get_num_of_dims(nmcs)
-    cv = nmcs.conversion
+    cv = nmcs.conversion_to_std
     @inline @inbounds function inner_cstr_jacobian(q)
         qstd = cv*q
         u = @view qstd[ndim+1:2ndim]
@@ -173,7 +180,7 @@ end
 Return 2D Jacobian matrix , for rigid bodies。
 $(TYPEDSIGNATURES)
 """
-function make_cstr_jacobian(nmcs::LNC2D6C,free_coords_idx,cstr_idx)
+function make_cstr_jacobian(nmcs::NC2D6C,free_coords_idx,cstr_idx)
     @inline @inbounds function inner_cstr_jacobian(q)
         u,v = get_uv(nmcs,q)
         ret = zeros(eltype(q),3,6)
@@ -188,10 +195,10 @@ end
 Return 3D Jacobian matrix , for rigid bodies。
 $(TYPEDSIGNATURES)
 """
-function make_cstr_jacobian(nmcs::LNC3D12C,free_coords_idx,cstr_idx)
+function make_cstr_jacobian(nmcs::NC3D12C,free_coords_idx,cstr_idx)
     @inline @inbounds function inner_cstr_jacobian(q)
         u,v,w = get_uvw(nmcs,q)
-        cv = nmcs.conversion
+        cv = nmcs.conversion_to_std
         ret = zeros(eltype(q), 6, 12)
         ret[1,4:6]   = 2u
         ret[2,7:9]   = 2v
@@ -214,8 +221,8 @@ end
 Return nullspace matrix
 $(TYPEDSIGNATURES)
 """
-function make_nullspace(nmcs::LNC2D4C)
-    cv = nmcs.conversion
+function make_nullspace(nmcs::NC2D4C)
+    cv = nmcs.conversion_to_std
     @inline @inbounds function inner_nullspace(q)
         u,v = get_uv(nmcs,q)
         o2 = zero(u)
@@ -227,8 +234,8 @@ function make_nullspace(nmcs::LNC2D4C)
     end
 end
 
-function make_nullspace(nmcs::LNC2D6C)
-    cv = nmcs.conversion
+function make_nullspace(nmcs::NC2D6C)
+    cv = nmcs.conversion_to_std
     @inline @inbounds function inner_nullspace(q)
         u,v = get_uv(nmcs,q)
         o2 = zero(u)
@@ -241,8 +248,8 @@ function make_nullspace(nmcs::LNC2D6C)
     end
 end
 
-function make_nullspace(nmcs::LNC3D6C)
-    cv = nmcs.conversion
+function make_nullspace(nmcs::NC3D6C)
+    cv = nmcs.conversion_to_std
     @inline @inbounds function inner_nullspace(q)
         u,v,w = get_uvw(nmcs,q)
         o3 = zero(u)
@@ -255,8 +262,8 @@ function make_nullspace(nmcs::LNC3D6C)
     end
 end
 
-function make_nullspace(nmcs::LNC3D12C)
-    cv = nmcs.conversion
+function make_nullspace(nmcs::NC3D12C)
+    cv = nmcs.conversion_to_std
     @inline @inbounds function inner_nullspace(q)
         u,v,w = get_uvw(nmcs,q)
         o3 = zero(u)
@@ -278,17 +285,17 @@ function make_nullspace(nmcs::LNC3D12C)
 end
 
 
-get_idx(nmcs::Union{LNC2D4C,LNC3D6C}) = [
+get_idx(nmcs::Union{NC2D4C,NC3D6C}) = [
     [CartesianIndex(2,2),CartesianIndex(2,2)],
 ]
 
-get_idx(nmcs::LNC2D6C) = [
+get_idx(nmcs::NC2D6C) = [
     [CartesianIndex(2,2),CartesianIndex(2,2)],
     [CartesianIndex(3,3),CartesianIndex(3,3)],
     [CartesianIndex(2,3),CartesianIndex(3,2)]
 ]
 
-get_idx(nmcs::LNC3D12C) = [
+get_idx(nmcs::NC3D12C) = [
     [CartesianIndex(2,2),CartesianIndex(2,2)],
     [CartesianIndex(3,3),CartesianIndex(3,3)],
     [CartesianIndex(4,4),CartesianIndex(4,4)],
@@ -298,8 +305,8 @@ get_idx(nmcs::LNC3D12C) = [
 ]
 
 #todo cache cstr_hessians
-function make_cstr_hessians(nmcs::LNC)
-    cv = nmcs.conversion
+function make_cstr_hessians(nmcs::NC)
+    cv = nmcs.conversion_to_std
     nld = get_num_of_local_dims(nmcs)
     ndim = get_num_of_dims(nmcs)
     I_Bool = IMatrix(ndim)
@@ -317,7 +324,7 @@ function make_cstr_hessians(nmcs::LNC)
 end
 
 #todo use SymmetricPacked to the end
-function make_cstr_forces_jacobian(nmcs::Union{LNC2D2C,LNC3D3C},free_coords_idx,cstr_idx)
+function make_cstr_forces_jacobian(nmcs::Union{NC2D2C,NC3D3C},free_coords_idx,cstr_idx)
     function cstr_forces_jacobian(λ)
         nothing
     end
@@ -367,7 +374,7 @@ function make_cstr_forces_jacobian(
         cf::CoordinateFunctions,
         cstr_hessians
     )
-    (;nmcs::LNC,free_coords_idx,cstr_idx) = cf
+    (;nmcs::NC,free_coords_idx,cstr_idx) = cf
     function cstr_forces_jacobian(λ)
         ret = [
             begin
@@ -381,14 +388,14 @@ function make_cstr_forces_jacobian(
     end
 end
 
-function make_∂Aq̇∂q(nmcs::Union{LNC2D2C,LNC3D3C},free_coords_idx,cstr_idx)
+function make_∂Aq̇∂q(nmcs::Union{NC2D2C,NC3D3C},free_coords_idx,cstr_idx)
     function ∂Aq̇∂q(q̇)
         nothing
     end
 end
 
 # this is wrong
-function make_∂Aq̇∂q(nmcs::LNC,free_coords_idx,cstr_idx)
+function make_∂Aq̇∂q(nmcs::NC,free_coords_idx,cstr_idx)
     cstr_hessians = make_cstr_hessians(nmcs)
     function ∂Aq̇∂q(q̇)
         q̇uc = @view q̇[free_coords_idx]

@@ -392,12 +392,12 @@ function plot_tower2d!(ax,
     linesegs_tris =  Vector{Tuple{Point{ndim,T},Point{ndim,T}}}()
     ploys_tris = Vector{Vector{Point{ndim,T}}}()
     for rb in rbs
-        if body.state.cache.funcs.nmcs isa RB.NCF.LNC2D2P
+        if body.state.cache.funcs.nmcs isa RB.NCF.NC2D2P
             push!(
                 linesegs_bars,
                 (Point(body.state.loci_states[1]),Point(body.state.loci_states[2])),
             )
-        elseif body.state.cache.funcs.nmcs isa RB.NCF.LNCMP
+        elseif body.state.cache.funcs.nmcs isa RB.NCF.NCMP
         else
             append!(
                 linesegs_tris,
@@ -451,7 +451,7 @@ function plot_one_bar_one_tri!(ax,
         T = RB.get_numbertype($tgob)
         ret = Vector{Pair{Point{ndim,T},Point{ndim,T}}}()
         foreach($tgob.bodies) do body
-            if body.state.cache.funcs.nmcs isa RB.NCF.LNC2D2P
+            if body.state.cache.funcs.nmcs isa RB.NCF.NC2D2P
                 push!(ret,
                     Point(body.state.loci_states[1])=>
                     Point(body.state.loci_states[2])
@@ -466,7 +466,7 @@ function plot_one_bar_one_tri!(ax,
         T = RB.get_numbertype($tgob)
         ret = Vector{Vector{Point{ndim,T}}}()
         foreach($tgob.bodies) do body
-            if body.state.cache.funcs.nmcs isa RB.NCF.LNC2D2P
+            if body.state.cache.funcs.nmcs isa RB.NCF.NC2D2P
                 nothing
             else
                 push!(ret,

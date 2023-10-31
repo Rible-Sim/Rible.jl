@@ -1,7 +1,7 @@
 
 # Mass matrices
-Ī2J̄(::Union{LNC2D2C,LNC3D3C,LNC2D6C,LNC3D6C},Ī)  = Ī
-Ī2J̄(::LNC3D12C,Ī) = 1/2*tr(Ī)*I-Ī
+Ī2J̄(::Union{NC2D2C,NC3D3C,NC2D6C,NC3D6C},Ī)  = Ī
+Ī2J̄(::NC3D12C,Ī) = 1/2*tr(Ī)*I-Ī
 
 function Īg2az(nmcs,m,Īg,mass_center)
     (;r̄i,invX̄) = nmcs
@@ -27,6 +27,6 @@ function make_M(cf::CoordinateFunctions,m::T,Īg,mass_center) where {T} # ami (
     M_raw[1,2:1+nld] = M_raw[2:1+nld,1]
     M_raw[2:1+nld,2:1+nld] .= z
     M_std = kron(M_raw,IMatrix(ndim))
-    cv = nmcs.conversion
+    cv = nmcs.conversion_to_std
     M = SMatrix{ncoords,ncoords}(transpose(cv)*M_std*cv)
 end

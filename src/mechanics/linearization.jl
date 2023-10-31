@@ -1004,14 +1004,14 @@ function make_nullspace(st::Structure,q0::AbstractVector)
             (;nmcs) = body.state.cache.funcs
 			memfree = bodyid2sys_free_coords[bodyid]
             if !isempty(bodyid2sys_intrinsic_cstr_idx[bodyid])
-                if nmcs isa NCF.LNC3D12C
+                if nmcs isa NCF.NC3D12C
                         u,v,w = NCF.get_uvw(nmcs,q̌[memfree])
                         N = @view ret[bodyid2sys_free_coords[bodyid],bodyid2sys_intrinsic_cstr_idx[bodyid]]
                         N[1:3,1:3]   .= Matrix(1I,3,3)
                         N[4:6,4:6]   .= -skew(u)
                         N[7:9,4:6]   .= -skew(v)
                         N[10:12,4:6] .= -skew(w)
-                elseif nmcs isa NCF.LNC2D6C                    
+                elseif nmcs isa NCF.NC2D6C                    
                         u,v = NCF.get_uv(nmcs,q̌[memfree])
                         N = @view ret[bodyid2sys_free_coords[bodyid],bodyid2sys_intrinsic_cstr_idx[bodyid]]
                         N[1:2,1:2] .= Matrix(1I,2,2)

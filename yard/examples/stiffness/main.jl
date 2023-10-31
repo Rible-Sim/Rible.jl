@@ -1754,6 +1754,8 @@ end
 tbbot = Tbars(;θ=π/4)
 bot = tbbot
 @myshow bot.st.num_of_dof
+bodies = RB.get_bodies(bot)
+body1 = bodies[1]
 dt = 1e-3
 tspan = (0.0,5.0)
 prob = RB.SimProblem(bot,dynfuncs)

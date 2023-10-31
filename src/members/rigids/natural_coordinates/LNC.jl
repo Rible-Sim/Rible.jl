@@ -1,49 +1,3 @@
-
-"""
-local natural coords abstract type.
-"""
-abstract type LNC{T} end
-
-"""
-2D local natural coords abstract type.
-"""
-abstract type LNC2D{T} <: LNC{T} end
-
-"""
-3D local natural coords abstract type.
-"""
-abstract type LNC3D{T} <: LNC{T} end
-
-"""
-2 coords 2D local natural coords abstract type for point mass。
-"""
-abstract type LNC2D2C{T} <: LNC2D{T} end
-
-"""
-4 coords 2D local natural coords abstract type for rigid bars。
-"""
-abstract type LNC2D4C{T} <: LNC2D{T} end
-
-"""
-6 coords 2D local natural coords abstract type , for rigid bodies。
-"""
-abstract type LNC2D6C{T} <: LNC2D{T} end
-
-"""
-3 coords 3D local natural coords abstract type for point mass。
-"""
-abstract type LNC3D3C{T} <: LNC3D{T} end
-
-"""
-6 coords 3D local natural coords abstract type for rigid bars。
-"""
-abstract type LNC3D6C{T} <: LNC3D{T} end
-
-"""
-12 coords 3D local natural coords abstract type , for rigid bodies。
-"""
-abstract type LNC3D12C{T} <: LNC3D{T} end
-
 """
 Data local natural coords。
 """
@@ -61,44 +15,46 @@ const I2_Bool = IMatrix(2)
 const I3_Bool = IMatrix(3)
 
 """
+2D local natural coords of a point mass.
+$(TYPEDEF)
+"""
+struct NC{N,M,T,L}
+    np::Int64
+    nv::Int64
+    data::LNCData{N,M,T,L}
+    conversion_to_std::SparseMatrixCSC{Int64,Int64}
+    conversion_to_X::SparseMatrixCSC{Int64,Int64}
+end
+
+
+"""
 Return the dimension of space.
 $(TYPEDSIGNATURES)
 """
-get_num_of_dims(nmcs::LNC) = get_num_of_dims(nmcs.data)
 get_num_of_dims(::LNCData{N,M,T,L}) where {N,M,T,L} = N
+get_num_of_dims(nmcs::NC) = get_num_of_dims(nmcs.data)
 
 """
 Return local dimension of natural coodinates.
 $(TYPEDSIGNATURES)
 """
-get_num_of_local_dims(nmcs::LNC) = get_num_of_local_dims(nmcs.data)
 get_num_of_local_dims(::LNCData{N,M,T,L}) where {N,M,T,L} = M
+get_num_of_local_dims(nmcs::NC) = get_num_of_local_dims(nmcs.data)
 
 """
-Return the number of coords。
+Return the number of coordinates.
 $(TYPEDSIGNATURES)
 """
-get_num_of_coords(nmcs::LNC) = get_num_of_coords(nmcs.data)
 get_num_of_coords(::LNCData{N,M,T,L}) where {N,M,T,L} = N+L
+get_num_of_coords(nmcs::NC) = get_num_of_coords(nmcs.data)
 
 """
-Return 约束方程个数。
+Return the number of degrees of freedom
 $(TYPEDSIGNATURES)
 """
-get_num_of_cstr(::LNC2D2C) = 0
-get_num_of_cstr(::LNC3D3C) = 0
-get_num_of_cstr(::LNC2D4C) = 1
-get_num_of_cstr(::LNC2D6C) = 3
-get_num_of_cstr(::LNC3D6C) = 1
-get_num_of_cstr(::LNC3D12C) = 6
+get_num_of_dof(nmcs::NC) =  get_num_of_coords(nmcs) - get_num_of_cstr(nmcs)
 
-"""
-Return 自由度数。
-$(TYPEDSIGNATURES)
-"""
-get_num_of_dof(nmcs::LNC) =  get_num_of_coords(nmcs) - get_num_of_cstr(nmcs)
-
-function Base.getproperty(nmcs::LNC,p::Symbol)
+function Base.getproperty(nmcs::NC,p::Symbol)
     if (p == :r̄i) 
         return nmcs.data.r̄i
     elseif (p == :ū) 
@@ -122,130 +78,33 @@ function Base.getproperty(nmcs::LNC,p::Symbol)
     end
 end
 
+#  UnionAll types
+const NC2D{M,T,L} = NC{2,M,T,L}
+const NC3D{M,T,L} = NC{3,M,T,L}
+
+const NC2D2C{T} = NC{2,0,T,0}
+const NC2D4C{T} = NC{2,1,T,2}
+const NC2D6C{T} = NC{2,2,T,4}
+const NC3D3C{T} = NC{3,0,T,0}
+const NC3D6C{T} = NC{3,1,T,3}
+const NC3D12C{T} = NC{3,3,T,9}
 
 """
-3D local natural coords of a  point mass.
-$(TYPEDEF)
+Return the number of constraints.
+$(TYPEDSIGNATURES)
 """
-struct LNC3D1P{T} <: LNC3D3C{T}
-    data::LNCData{3,0,T,0}
-    conversion::SparseMatrixCSC{Int64,Int64}
-end
-
-"""
-2D local natural coords of a  point mass.
-$(TYPEDEF)
-"""
-struct LNC2D1P{T} <: LNC2D2C{T}
-    data::LNCData{2,0,T,0}
-    conversion::SparseMatrixCSC{Int64,Int64}
-end
-
-"""
-4 coords 2D local natural coords, using 2 basic points.
-$(TYPEDEF)
-"""
-struct LNC2D2P{T} <: LNC2D4C{T}
-    data::LNCData{2,1,T,2}
-    conversion::SparseMatrixCSC{Int64,Int64}
-end
-
-"""
-4 coords 2D local natural coords, using 1 basic point and 1 base vector.
-$(TYPEDEF)
-"""
-struct LNC2D1P1V{T} <: LNC2D4C{T}
-    data::LNCData{2,1,T,2}
-    conversion::SparseMatrixCSC{Int64,Int64}
-end
-
-"""
-6 coords 3D local natural coords, using 2 basic points.
-$(TYPEDEF)
-"""
-struct LNC3D2P{T} <: LNC3D6C{T}
-    data::LNCData{3,1,T,3}
-    conversion::SparseMatrixCSC{Int64,Int64}
-end
-
-"""
-6 coords 3D local natural coords, using 1 basic point and 1 base vector.
-$(TYPEDEF)
-"""
-struct LNC3D1P1V{T} <: LNC3D6C{T}
-    data::LNCData{3,1,T,3}
-    conversion::SparseMatrixCSC{Int64,Int64}
-end
-
-
-"""
-6 coords 2D local natural coords, using 1 basic point and 2 base vectors.
-$(TYPEDEF)
-"""
-struct LNC1P2V{T} <: LNC2D6C{T}
-    data::LNCData{2,2,T,4}
-    conversion::SparseMatrixCSC{Int64,Int64}
-end
-
-"""
-6 coords 2D local natural coords, using 2 basic points and 1 base vector.
-$(TYPEDEF)
-"""
-struct LNC2P1V{T} <: LNC2D6C{T}
-    data::LNCData{2,2,T,4}
-    conversion::SparseMatrixCSC{Int64,Int64}
-end
-
-"""
-6 coords 2D local natural coords, using 3 basic points.
-$(TYPEDEF)
-"""
-struct LNC3P{T} <: LNC2D6C{T}
-    data::LNCData{2,2,T,4}
-    conversion::SparseMatrixCSC{Int64,Int64}
-end
-
-"""
-12 coords 3D local natural coords, using 1 basic point and 3 base vectors.
-$(TYPEDEF)
-"""
-struct LNC1P3V{T} <: LNC3D12C{T}
-    data::LNCData{3,3,T,9}
-    conversion::SparseMatrixCSC{Int64,Int64}
-end
-
-"""
-12 coords 3D local natural coords, using 2 basic points and 2 base vectors.
-$(TYPEDEF)
-"""
-struct LNC2P2V{T} <: LNC3D12C{T}
-    data::LNCData{3,3,T,9}
-    conversion::SparseMatrixCSC{Int64,Int64}
-end
-
-"""
-12 coords 3D local natural coords, using 3 basic points and 1 base vector.
-$(TYPEDEF)
-"""
-struct LNC3P1V{T} <: LNC3D12C{T}
-    data::LNCData{3,3,T,9}
-    conversion::SparseMatrixCSC{Int64,Int64}
-end
-
-"""
-12 coords 3D local natural coords, using 4 basic points.
-$(TYPEDEF)
-"""
-struct LNC4P{T} <: LNC3D12C{T}
-    data::LNCData{3,3,T,9}
-    conversion::SparseMatrixCSC{Int64,Int64}
-end
+get_num_of_cstr(::NC2D2C) = 0
+get_num_of_cstr(::NC3D3C) = 0
+get_num_of_cstr(::NC2D4C) = 1
+get_num_of_cstr(::NC2D6C) = 3
+get_num_of_cstr(::NC3D6C) = 1
+get_num_of_cstr(::NC3D12C) = 6
 
 """
 ！！！！！！！！！
 $(TYPEDSIGNATURES)
 """
-function get_conversion(ndim,np,nv)
+function get_conversion_to_std(ndim,np,nv)
     nb = np+nv
     B = Matrix(1I,nb,nb)
     for i = 2:np
@@ -257,20 +116,34 @@ function get_conversion(ndim,np,nv)
     )
 end
 
-"""
-Return 3D point mass natural coodinates.
-$(TYPEDSIGNATURES)
-"""
-function NC3D1P(ri::AbstractVector{T}) where T
-    r̄i = @SVector zeros(T,3)
-    nmcs = LNC3D1P(
-        LNCData(
-            SVector{3}(r̄i),
-            SMatrix{3,0,T}()
-        ),
-        get_conversion(3,1,0)
+function get_std_to_X(ndim,nld)
+    V = zeros(Int,nld,1+nld)
+    for i = 1:nld
+        V[i,1+i] = 1
+    end
+    kron(
+        sparse(V),
+        IMatrix(ndim)
     )
-    nmcs,ri
+end
+
+function get_conversion_to_X(ndim,nld,np,nv)
+    conversion_to_std = get_conversion_to_std(ndim,np,nv)
+    std_to_X = get_std_to_X(ndim,nld)
+    std_to_X*conversion_to_std
+end
+
+function NC(np,nv,ndim,nld,r̄i::AbstractVector{T},X̄) where T
+    NC(
+        np,
+        nv,
+        LNCData(
+            SVector{ndim}(r̄i),
+            SMatrix{ndim,nld,T}(X̄)
+        ),
+        get_conversion_to_std(ndim,np,nv),
+        get_conversion_to_X(ndim,nld,np,nv)
+    )
 end
 
 """
@@ -279,14 +152,20 @@ $(TYPEDSIGNATURES)
 """
 function NC2D1P(ri::AbstractVector{T}) where T
     r̄i = @SVector zeros(T,2)
-    nmcs = LNC2D1P(
+    np = 1
+    nv = 0
+    ndim = 2
+    nld = 0
+    NC(
+        np,
+        nv,
         LNCData(
-            SVector{2}(r̄i),
-            SMatrix{2,0,T}()
+            SVector{ndim}(r̄i),
+            SMatrix{ndim,nld,T}()
         ),
-        get_conversion(2,1,0)
+        get_conversion_to_std(ndim,np,nv),
+        get_conversion_to_X(ndim,nld,np,nv)
     )
-    nmcs,ri
 end
 
 """
@@ -300,15 +179,11 @@ function NC2D1P1V(ri::AbstractVector{T},u::AbstractVector{T},
     r̄i = invR*(ri-origin_position) #
     ū = invR*u
     X̄ = ū
-    nmcs = LNC2D1P1V(
-        LNCData(
-            SVector{2}(r̄i),
-            SMatrix{2,1}(X̄)
-        ),
-        get_conversion(2,1,1)
-    )
-    q = vcat(ri,u)
-    nmcs
+    np = 1
+    nv = 1
+    ndim = 2
+    nld = 1
+    NC(np,nv,ndim,nld,r̄i,X̄)
 end
 
 function NC2D2P(ri::AbstractVector{T},rj::AbstractVector{T},
@@ -319,59 +194,12 @@ function NC2D2P(ri::AbstractVector{T},rj::AbstractVector{T},
     r̄j = invR*(rj-origin_position) #
     ū = r̄j-r̄i
     X̄ = ū
-    nmcs = LNC2D2P(
-        LNCData(
-            SVector{2}(r̄i),
-            SMatrix{2,1}(X̄)
-        ),
-        get_conversion(3,2,2)
-    )
-    q = vcat(ri,rj)
-    nmcs
+    np = 2
+    nv = 0
+    ndim = 2
+    nld = 1
+    NC(np,nv,ndim,nld,r̄i,X̄)
 end
-
-
-"""
-Return 3D rigid bar natural coodinates.
-$(TYPEDSIGNATURES)
-"""
-function NC3D1P1V(ri::AbstractVector{T},u::AbstractVector{T},
-               origin_position=SVector{3}(zeros(T,3)),R=SMatrix{3,3}(one(T)*I)
-               ) where T
-    invR = transpose(R) # because this is a rotation matrix
-    r̄i = invR*(ri-origin_position) 
-    ū = invR*u
-    X̄ = ū
-    nmcs = LNC3D1P1V(
-        LNCData(
-            SVector{3}(r̄i),
-            SMatrix{3,1}(X̄)
-        ),
-        get_conversion(3,1,1)
-    )
-    q = vcat(ri,u)
-    nmcs
-end
-
-function NC3D2P(ri::AbstractVector{T},rj::AbstractVector{T},
-    origin_position=SVector{3}(zeros(T,3)),R=SMatrix{3,3}(one(T)*I)
-    ) where T
-    invR = transpose(R) # because this is a rotation matrix
-    r̄i = invR*(ri-origin_position) #
-    r̄j = invR*(rj-origin_position)
-    ū = r̄j-r̄i
-    X̄ = ū
-    nmcs = LNC3D2P(
-        LNCData(
-            SVector{3}(r̄i),
-            SMatrix{3,1}(X̄)
-        ),
-        get_conversion(3,2,0)
-    )
-    q = vcat(ri,rj)
-    nmcs
-end
-
 
 """
 Return 2D rigid bodies natural coodinates, using 1 basic point and 2 base vectors.
@@ -389,15 +217,11 @@ function NC1P2V(ri::AbstractVector{T},
     u = R*ū
     v = R*v̄
     X̄ = hcat(ū,v̄)
-    nmcs = LNC1P2V(
-        LNCData(
-            SVector{2}(r̄i),
-            SMatrix{2,2}(X̄)
-        ),
-        get_conversion(2,1,2)
-    )
-    q = vcat(ri,u,v)
-    nmcs
+    np = 1
+    nv = 2
+    ndim = 2
+    nld = 2
+    NC(np,nv,ndim,nld,r̄i,X̄)
 end
 
 """
@@ -413,15 +237,11 @@ function NC2P1V(ri::AbstractVector{T},rj::AbstractVector{T},
     v̄ = rotation_matrix(π/2)*ū
     v = R*v̄
     X̄ = hcat(ū,v̄)
-    nmcs = LNC2P1V(
-        LNCData(
-            SVector{2}(r̄i),
-            SMatrix{2,2}(X̄)
-        ),
-        get_conversion(2,2,1)
-    )
-    q = vcat(ri,rj,v)
-    nmcs
+    np = 2
+    nv = 1
+    ndim = 2
+    nld = 2
+    NC(np,nv,ndim,nld,r̄i,X̄)
 end
 
 """
@@ -437,15 +257,66 @@ function NC3P(ri::AbstractVector{T},rj::AbstractVector{T},rk::AbstractVector{T},
     ū = r̄j - r̄i
     v̄ = r̄k - r̄i
     X̄ = hcat(ū,v̄)
-    nmcs = LNC3P(
+    np = 3
+    nv = 0
+    ndim = 2
+    nld = 2
+    NC(np,nv,ndim,nld,r̄i,X̄)
+end
+
+"""
+Return 3D point mass natural coodinates.
+$(TYPEDSIGNATURES)
+"""
+function NC3D1P(ri::AbstractVector{T}) where T
+    r̄i = @SVector zeros(T,3)
+    np = 1
+    nv = 0
+    ndim = 3
+    nld = 0
+    NC(
+        np,
+        nv,
         LNCData(
-            SVector{2}(r̄i),
-            SMatrix{2,2}(X̄)
+            SVector{ndim}(r̄i),
+            SMatrix{ndim,nld,T}()
         ),
-        get_conversion(2,3,0)
+        get_conversion_to_std(ndim,np,nv),
+        get_conversion_to_X(ndim,nld,np,nv)
     )
-    q = vcat(ri,rj,rk)
-    nmcs
+end
+
+"""
+Return 3D rigid bar natural coodinates.
+$(TYPEDSIGNATURES)
+"""
+function NC3D1P1V(ri::AbstractVector{T},u::AbstractVector{T},
+               origin_position=SVector{3}(zeros(T,3)),R=SMatrix{3,3}(one(T)*I)
+               ) where T
+    invR = transpose(R) # because this is a rotation matrix
+    r̄i = invR*(ri-origin_position) 
+    ū = invR*u
+    X̄ = ū
+    np = 1
+    nv = 1
+    ndim = 3
+    nld = 1
+    NC(np,nv,ndim,nld,r̄i,X̄)
+end
+
+function NC3D2P(ri::AbstractVector{T},rj::AbstractVector{T},
+    origin_position=SVector{3}(zeros(T,3)),R=SMatrix{3,3}(one(T)*I)
+    ) where T
+    invR = transpose(R) # because this is a rotation matrix
+    r̄i = invR*(ri-origin_position) #
+    r̄j = invR*(rj-origin_position)
+    ū = r̄j-r̄i
+    X̄ = ū
+    np = 1
+    nv = 0
+    ndim = 3
+    nld = 0
+    NC(np,nv,ndim,nld,r̄i,X̄)
 end
 
 ## 3D Rigid body
@@ -467,15 +338,11 @@ function NC1P3V(ri::AbstractVector{T},
     v = R*v̄
     w = R*w̄
     X̄ = hcat(ū,v̄,w̄)
-    nmcs = LNC1P3V(
-        LNCData(
-            SVector{3}(r̄i),
-            SMatrix{3,3}(X̄)
-        ),
-        get_conversion(3,1,3)
-    )
-    q = vcat(ri,u,v,w)
-    nmcs
+    np = 1
+    nv = 3
+    ndim = 3
+    nld = 3
+    NC(np,nv,ndim,nld,r̄i,X̄)
 end
 
 function NC1P3V(ri::AbstractVector{T},u::AbstractVector{T},v::AbstractVector{T},w::AbstractVector{T},
@@ -489,15 +356,11 @@ function NC1P3V(ri::AbstractVector{T},u::AbstractVector{T},v::AbstractVector{T},
     v̄ = invR*v
     w̄ = invR*w
     X̄ = hcat(ū,v̄,w̄)
-    nmcs = LNC1P3V(
-        LNCData(
-            SVector{3}(r̄i),
-            SMatrix{3,3}(X̄)
-        ),
-        get_conversion(3,1,3)
-    )
-    q = vcat(ri,u,v,w)
-    nmcs
+    np = 1
+    nv = 3
+    ndim = 3
+    nld = 3
+    NC(np,nv,ndim,nld,r̄i,X̄)
 end
 
 """
@@ -516,15 +379,11 @@ function NC2P2V(ri::AbstractVector{T},rj::AbstractVector{T},
     v = R*v̄
     w = R*w̄
     X̄ = hcat(ū,v̄,w̄)
-    nmcs = LNC2P2V(
-        LNCData(
-            SVector{3}(r̄i),
-            SMatrix{3,3}(X̄)
-        ),
-        get_conversion(3,2,2)
-    )
-    q = vcat(ri,rj,v,w)
-    nmcs
+    np = 2
+    nv = 2
+    ndim = 3
+    nld = 3
+    NC(np,nv,ndim,nld,r̄i,X̄)
 end
 
 function NC2P2V(ri::AbstractVector{T},rj::AbstractVector{T},
@@ -539,17 +398,12 @@ function NC2P2V(ri::AbstractVector{T},rj::AbstractVector{T},
     v̄ = invR*v
     w̄ = invR*w
     X̄ = hcat(ū,v̄,w̄)
-    nmcs = LNC2P2V(
-        LNCData(
-            SVector{3}(r̄i),
-            SMatrix{3,3}(X̄)
-        ),
-        get_conversion(3,2,2)
-    )
-    q = vcat(ri,rj,v,w)
-    nmcs
+    np = 2
+    nv = 2
+    ndim = 3
+    nld = 3
+    NC(np,nv,ndim,nld,r̄i,X̄)
 end
-
 
 """
 Return 3D rigid bodies natural coodinates, using 3 basic points and 1 base vector.
@@ -570,15 +424,11 @@ function NC3P1V(ri::AbstractVector{T},rj::AbstractVector{T},
     v̄ = r̄k-r̄i
     w̄ = invR*w
     X̄ = hcat(ū,v̄,w̄)
-    nmcs = LNC3P1V(
-        LNCData(
-            SVector{3}(r̄i),
-            SMatrix{3,3}(X̄)
-        ),
-        get_conversion(3,3,1)
-    )
-    q = vcat(ri,rj,rk,w)
-    nmcs
+    np = 3
+    nv = 1
+    ndim = 3
+    nld = 3
+    NC(np,nv,ndim,nld,r̄i,X̄)
 end
 
 """
@@ -598,40 +448,9 @@ function NC4P(ri::AbstractVector{T},rj::AbstractVector{T},
     v̄ = r̄k - r̄i
     w̄ = r̄l - r̄i
     X̄ = hcat(ū,v̄,w̄)
-    nmcs = LNC4P(
-        LNCData(
-            SVector{3}(r̄i),
-            SMatrix{3,3}(X̄)
-        ),
-        get_conversion(3,4,0)
-    )
-    q = vcat(ri,rj,rk,rl)
-    nmcs
-end
-
-
-function get_uvw(nmcs::LNC3D,q)
-    qstd = nmcs.conversion*q
-    if     nmcs isa LNC3D12C
-        u = @view qstd[4:6]
-        v = @view qstd[7:9]
-        w = @view qstd[10:12]
-    elseif nmcs isa LNC3D6C
-        u = @view qstd[4:6]
-        u /= norm(u)
-        v,w = HouseholderOrthogonalization(u)
-    end
-    SVector{3}(u),SVector{3}(v),SVector{3}(w)
-end
-
-function get_uv(nmcs::LNC2D,q)
-    qstd = nmcs.conversion*q
-    if     nmcs isa LNC2D6C
-        u = @view qstd[3:4]
-        v = @view qstd[5:6]
-    elseif nmcs isa LNC2D4C
-        u = @view qstd[3:4]
-        v = rotation_matrix(π/2)*u
-    end
-    SVector{2}(u),SVector{2}(v)
+    np = 4
+    nv = 0
+    ndim = 3
+    nld = 3
+    NC(np,nv,ndim,nld,r̄i,X̄)
 end

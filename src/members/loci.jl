@@ -46,8 +46,11 @@ function orthonormal_frame(n::SVector{N}) where {N}
     axes
 end
 
-function (Base.:*)(R::StaticArray,axes::Axes{N}) where N
+function (Base.:*)(R::StaticArray{Tuple{N,N}},axes::Axes{N}) where N
     Axes(SMatrix{N,N}(R*axes.X))
+end
+function (Base.:*)(n::StaticArray{Tuple{1,N}},axes::Axes{N}) where N
+    orthonormal_frame(SVector{N}(n)).X*axes
 end
 
 struct CartesianFrame{N,M,T}
