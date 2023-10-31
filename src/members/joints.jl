@@ -222,6 +222,11 @@ struct PrototypeJoint{valueType,hen2eggType,axesType,maskType} <: ExternalConstr
     mask_2nd::maskType
     mask_3rd::maskType
     mask_4th::maskType
+    # J::
+    # U::
+    # cstr_function::
+    # cstr_jacobian::
+    # cstr_hessians::
     values::valueType
 end
 
@@ -232,7 +237,13 @@ $(TYPEDSIGNATURES)
 function PrototypeJoint(id,hen2egg,joint_type::Symbol) 
     (;hen,egg) = hen2egg
     joint_info = get_joint_info(joint_type)
-    (;ntrl, nrot, num_of_dof, num_of_cstr, mask_1st, mask_2nd, mask_3rd_hen, mask_3rd_egg, mask_4th) = joint_info
+    (;  ntrl, nrot, 
+        num_of_dof, num_of_cstr, 
+        mask_1st, mask_2nd, 
+        mask_3rd_hen, 
+        mask_3rd_egg, 
+        mask_4th
+    ) = joint_info
     mask_3rd = vcat(mask_3rd_hen,mask_3rd_egg.+3)
     T = get_numbertype(hen.rbsig)
     nmcs_hen = hen.rbsig.state.cache.funcs.nmcs
@@ -250,12 +261,12 @@ function PrototypeJoint(id,hen2egg,joint_type::Symbol)
     C_egg = egg.rbsig.state.cache.Cps[egg.pid]
     J = [-C_hen C_egg;]
     q = vcat(q_hen,q_egg)
-    r_hen2egg = J*q
+    d_hen2egg = J*q
     # U = J'*J
     # first    
-    Φ_1st = r_hen2egg
+    Φ_1st = d_hen2egg
     # fourth    
-    Φ_4th = [r_hen2egg'*r_hen2egg]
+    Φ_4th = [d_hen2egg'*d_hen2egg]
     # third
     Φ_3rd = zeros(T,6)
     # second
@@ -266,9 +277,9 @@ function PrototypeJoint(id,hen2egg,joint_type::Symbol)
     axes_rot_hen = pinv(X_hen)*X_egg*axes_rot_egg
     if (nmcs_hen isa NCF.NC3D12C) && (nmcs_egg isa NCF.NC3D12C)
         # translate on hen
-        trl_hen = (X_hen*axes_trl_hen).X
+        trl_hen = (X_hen*axes_trl_hen.X)
         # translate on egg
-        trl_egg = (X_egg*axes_trl_egg).X
+        trl_egg = (X_egg*axes_trl_egg.X)
         # rotate of egg
         rot_hen_n = X_hen*axes_rot_hen.normal
         rot_hen_t = X_hen*axes_rot_hen.tangent
@@ -278,8 +289,8 @@ function PrototypeJoint(id,hen2egg,joint_type::Symbol)
         rot_egg_b = X_egg*axes_rot_egg.bitangent
         # third
         Φ_3rd .= [
-            trl_hen'*r_hen2egg;
-            trl_egg'*r_hen2egg;
+            trl_hen'*d_hen2egg;
+            trl_egg'*d_hen2egg;
         ]
         # second
         Φ_2nd .= [

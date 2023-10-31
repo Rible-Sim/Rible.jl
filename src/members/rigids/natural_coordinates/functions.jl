@@ -1,10 +1,10 @@
 function get_uv(nmcs::NC2D,q)
     X = nmcs.conversion_to_X*q
     if     nmcs isa NC2D6C
-        u = @view X[1:2]
-        v = @view X[3:4]
+        u = @view X[3:4]
+        v = @view X[5:6]
     elseif nmcs isa NC2D4C
-        u = @view X[1:2]
+        u = @view X[3:4]
         v = rotation_matrix(π/2)*u
     end
     SVector{2}(u),SVector{2}(v)
@@ -13,11 +13,11 @@ end
 function get_uvw(nmcs::NC3D,q)
     X = nmcs.conversion_to_X*q
     if     nmcs isa NC3D12C
-        u = @view X[1:3]
-        v = @view X[4:6]
-        w = @view X[7:9]
+        u = @view X[4:6]
+        v = @view X[7:9]
+        w = @view X[10:12]
     elseif nmcs isa NC3D6C
-        u = @view X[1:3]
+        u = @view X[4:6]
         u /= norm(u)
         v,w = HouseholderOrthogonalization(u)
     end
@@ -28,7 +28,7 @@ function get_X(nmcs::NC,q::AbstractVector)
     X = nmcs.conversion_to_X*q
     ndim = get_num_of_dims(nmcs)
     nld = get_num_of_local_dims(nmcs)
-    SMatrix{ndim,nld}(X)
+    SMatrix{ndim,nld}(X[ndim+1:end])
 end
 
 get_X(q::AbstractVector,nmcs::NC) = get_X(nmcs,q)

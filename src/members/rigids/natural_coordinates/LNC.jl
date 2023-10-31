@@ -116,21 +116,17 @@ function get_conversion_to_std(ndim,np,nv)
     )
 end
 
-function get_std_to_X(ndim,nld)
-    V = zeros(Int,nld,1+nld)
-    for i = 1:nld
-        V[i,1+i] = 1
+function get_conversion_to_X(ndim,nld,np,nv)
+    nb = np+nv
+    B = Matrix(1I,nb,nb)
+    B[1] = 0
+    for i = 2:np
+        B[i,1] = -1
     end
     kron(
-        sparse(V),
+        sparse(B),
         IMatrix(ndim)
     )
-end
-
-function get_conversion_to_X(ndim,nld,np,nv)
-    conversion_to_std = get_conversion_to_std(ndim,np,nv)
-    std_to_X = get_std_to_X(ndim,nld)
-    std_to_X*conversion_to_std
 end
 
 function NC(np,nv,ndim,nld,r̄i::AbstractVector{T},X̄) where T

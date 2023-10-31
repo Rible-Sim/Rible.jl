@@ -1757,7 +1757,7 @@ bot = tbbot
 bodies = RB.get_bodies(bot)
 body1 = bodies[1]
 dt = 1e-3
-tspan = (0.0,5.0)
+tspan = (0.0,0.001)
 prob = RB.SimProblem(bot,dynfuncs)
 RB.solve!(prob,RB.Zhong06();tspan,dt,ftol=1e-10,maxiters=50,verbose=true,exception=true)
 

@@ -15,7 +15,7 @@ function make_cstr_function(cst::PrototypeJoint,st::Structure)
     nmcs_egg = egg.rbsig.state.cache.funcs.nmcs
     id_hen = hen.rbsig.prop.id
     id_egg = egg.rbsig.prop.id
-    function _inner_cstr_function(q,d,c)
+    function _inner_cstr_function(q,c)
         T = eltype(q)
         ret = zeros(T,num_of_cstr)
         q_hen = @view q[bodyid2sys_full_coords[id_hen]]
@@ -30,20 +30,21 @@ function make_cstr_function(cst::PrototypeJoint,st::Structure)
         # @show C_egg,q_egg
         J = [-C_hen C_egg;]
         q = vcat(q_hen,q_egg)
-        r_hen2egg = J*q
+        d_hen2egg = J*q
+        # U = J'*J
         # first    
-        Φ_1st = r_hen2egg
+        Φ_1st = d_hen2egg
         # fourth    
-        Φ_4th = [r_hen2egg'*r_hen2egg]
+        Φ_4th = [d_hen2egg'*d_hen2egg]
         # third
         Φ_3rd = zeros(T,6)
         # second
         Φ_2nd = zeros(T,3)
         if (nmcs_hen isa NCF.NC3D12C) && (nmcs_egg isa NCF.NC3D12C)
             # translate on hen
-            trl_hen = (X_hen*axes_trl_hen).X
+            trl_hen = (X_hen*axes_trl_hen.X)
             # translate on egg
-            trl_egg = (X_egg*axes_trl_egg).X
+            trl_egg = (X_egg*axes_trl_egg.X)
             # rotate of egg
             rot_hen_t = X_hen*axes_rot_hen.tangent
             rot_hen_b = X_hen*axes_rot_hen.bitangent
@@ -51,8 +52,8 @@ function make_cstr_function(cst::PrototypeJoint,st::Structure)
             rot_egg_b = X_egg*axes_rot_egg.bitangent
             # third
             Φ_3rd .= [
-                trl_hen'*r_hen2egg;
-                trl_egg'*r_hen2egg;
+                trl_hen'*d_hen2egg;
+                trl_egg'*d_hen2egg;
             ]
             # second
             Φ_2nd .= [
@@ -70,20 +71,20 @@ function make_cstr_function(cst::PrototypeJoint,st::Structure)
         ) .- values
         ret
     end
-    function inner_cstr_function(q,d,c)
-        _inner_cstr_function(q,d,c)
-    end
     function inner_cstr_function(q)
-        d = get_d(st)
         c = get_local_coords(st)
-        _inner_cstr_function(q,d,c)
+        _inner_cstr_function(q,c)
     end
     inner_cstr_function
 end
 
 function make_cstr_jacobian(cst::PrototypeJoint,st::Structure)
     (;indexed,numbered) = st.connectivity
-    (;bodyid2sys_free_coords,bodyid2sys_full_coords,num_of_free_coords) = indexed
+    (;bodyid2sys_free_coords,
+      bodyid2sys_full_coords,
+      num_of_free_coords,
+      num_of_full_coords,
+    ) = indexed
     (;sys_loci2coords_idx,bodyid2sys_loci_idx) = numbered
     (;
         num_of_cstr,hen2egg,
@@ -93,111 +94,93 @@ function make_cstr_jacobian(cst::PrototypeJoint,st::Structure)
         mask_3rd, mask_3rd, mask_4th
     ) = cst
     (;hen,egg) = hen2egg
-    uci_hen =  hen.rbsig.state.cache.free_idx
-    uci_egg =  egg.rbsig.state.cache.free_idx
+    free_idx_hen =  hen.rbsig.state.cache.free_idx
+    free_idx_egg =  egg.rbsig.state.cache.free_idx
     id_hen = hen.rbsig.prop.id
     id_egg = egg.rbsig.prop.id
     free_hen = bodyid2sys_free_coords[id_hen]
     free_egg = bodyid2sys_free_coords[id_egg]
     nmcs_hen = hen.rbsig.state.cache.funcs.nmcs
     nmcs_egg = egg.rbsig.state.cache.funcs.nmcs
-    Y_hen = nmcs_hen.conversion_to_std
-    Y_egg = nmcs_egg.conversion_to_std
+    num_of_coords_hen = get_num_of_coords(nmcs_hen)
+    num_of_coords_egg = get_num_of_coords(nmcs_egg)
+    num_of_jointed_coords = num_of_coords_hen + num_of_coords_egg
+    # Y_hen = nmcs_hen.conversion_to_std
+    # Y_egg = nmcs_egg.conversion_to_std
+    X_hen = nmcs_hen.conversion_to_X
+    X_egg = nmcs_egg.conversion_to_X
+    select_uvw_hen = BlockDiagonal([X_hen,zero(X_egg)])
+    select_uvw_egg = BlockDiagonal([zero(X_hen),X_egg])
+    I3_Bool = I(3)
     function _inner_cstr_jacobian(q,c)
         T = eltype(q)
         ret = zeros(T,num_of_cstr,num_of_free_coords)
         q_hen = @view q[bodyid2sys_full_coords[id_hen]]
         q_egg = @view q[bodyid2sys_full_coords[id_egg]]
-        X_hen = NCF.get_X(nmcs_hen,q_hen)
-        X_egg = NCF.get_X(nmcs_egg,q_egg)
+        q = vcat(q_hen,q_egg)
+        # X_hen = NCF.get_X(nmcs_hen,q_hen)
+        # X_egg = NCF.get_X(nmcs_egg,q_egg)
         # translate 
         c_hen = c[sys_loci2coords_idx[bodyid2sys_loci_idx[id_hen][hen.pid]]]
         c_egg = c[sys_loci2coords_idx[bodyid2sys_loci_idx[id_egg][egg.pid]]]
         C_hen = to_transformation(hen.rbsig.state.cache.funcs.nmcs,c_hen)
         C_egg = to_transformation(egg.rbsig.state.cache.funcs.nmcs,c_egg)
         J = [-C_hen C_egg;]
-        q = vcat(q_hen,q_egg)
-        r_hen2egg = J*q
+        U = J'*J
         o3 = zeros(T,3)
         # jac 
-        A_1st = zeros(T,3,num_of_free_coords)
-        A_4th = zeros(T,1,num_of_free_coords)
-        A_3rd = zeros(T,6,num_of_free_coords)
-        A_2nd = zeros(T,3,num_of_free_coords)
+        A_1st = zeros(T,3,num_of_jointed_coords)
+        A_4th = zeros(T,1,num_of_jointed_coords)
+        A_3rd = zeros(T,6,num_of_jointed_coords)
+        A_2nd = zeros(T,3,num_of_jointed_coords)
         # first
-        A_1st[:,free_hen] .= -C_hen[:,uci_hen]
-        A_1st[:,free_egg] .=  C_egg[:,uci_egg]
+        A_1st .= J
         # jac 4th
-        A_4th[1,free_hen] =  2r_hen2egg'*(-C_hen[:,uci_hen])
-        A_4th[1,free_egg] =  2r_hen2egg'*( C_egg[:,uci_egg])
-
+        A_4th .=  2q'*U
         if (nmcs_hen isa NCF.NC3D12C) && (nmcs_egg isa NCF.NC3D12C) 
-            # translate on hen
-            trl_hen = (X_hen*axes_trl_hen).X
-            # translate on egg
-            trl_egg = (X_egg*axes_trl_egg).X
-            # rotate of egg
-            rot_hen_t = X_hen*axes_rot_hen.tangent
-            rot_hen_b = X_hen*axes_rot_hen.bitangent
-            rot_egg_n = X_egg*axes_rot_egg.normal
-            rot_egg_b = X_egg*axes_rot_egg.bitangent
             # jac third on hen
-            A_3rd[1:3,free_hen] .= kron(
-                    hcat(
-                        o3, transpose(trl_hen)
-                    ),
-                    transpose(r_hen2egg)
-                )[:,uci_hen]
-            A_3rd[1:3,free_hen] .-= transpose(trl_hen)*C_hen[:,uci_hen]
-            A_3rd[1:3,free_egg] .+= transpose(trl_hen)*C_egg[:,uci_egg]
+            # translate on hen
+            for i = 1:3
+                axis_hen = axes_trl_hen.X[:,i]
+                axis_zero = zero(axis_hen)
+                H = select_uvw_hen'*kron(vcat(0,axis_hen,0,axis_zero),I3_Bool)*J
+                A_3rd[i,:] = q'*(H .+ H')
+            end
             # jac third on egg
-            A_3rd[4:6,free_egg] .= kron(
-                    hcat(
-                        o3, transpose(trl_egg)
-                    ),
-                    transpose(r_hen2egg)
-                )[:,uci_egg]
-            A_3rd[4:6,free_hen] .-= transpose(trl_egg)*C_hen[:,uci_hen]
-            A_3rd[4:6,free_egg] .+= transpose(trl_egg)*C_egg[:,uci_egg]
+            # translate on egg
+            for i = 1:3
+                axis_egg = axes_trl_egg.X[:,i]
+                axis_zero = zero(axis_egg)
+                H = select_uvw_egg'*kron(vcat(0,axis_zero,0,axis_egg),I3_Bool)*J
+                A_3rd[3+i,:] = q'*(H .+ H')
+            end
             # jac 2nd
-            A_2nd[1,free_hen] = (
-                    transpose(
-                        kron(vcat(0,axes_rot_hen.tangent),rot_egg_b)
-                    )*Y_hen
-                )[:,uci_hen]
-            A_2nd[1,free_egg] = (
-                    transpose(
-                        kron(vcat(0,axes_rot_egg.bitangent),rot_hen_t)
-                    )*Y_egg
-                )[:,uci_egg]
-            A_2nd[2,free_hen] = (
-                    transpose(
-                        kron(vcat(0,axes_rot_hen.tangent),rot_egg_n)
-                    )*Y_hen
-                )[:,uci_hen]
-            A_2nd[2,free_egg] = (
-                    transpose(
-                        kron(vcat(0,axes_rot_egg.normal),rot_hen_t)
-                    )*Y_egg
-                )[:,uci_egg]
-            A_2nd[3,free_hen] = (
-                    transpose(
-                        kron(vcat(0,axes_rot_hen.bitangent),rot_egg_n)
-                    )*Y_hen
-                )[:,uci_hen]
-            A_2nd[3,free_egg] = (
-                    transpose(
-                        kron(vcat(0,axes_rot_egg.normal),rot_hen_b)
-                    )*Y_egg
-                )[:,uci_egg]
+            # rotate of egg
+            axes_idx = [
+                (2,3),
+                (2,1),
+                (3,1)
+            ]
+            for (i,(id_axis_hen,id_axis_egg)) in enumerate(axes_idx)
+                axis_hen = axes_rot_hen.X[:,id_axis_hen]
+                axis_egg = axes_rot_egg.X[:,id_axis_egg]
+                axis_zero = zero(axis_egg)
+                H = select_uvw_hen'*
+                    kron(vcat(0,axis_hen,0,axis_zero),I3_Bool)*
+                    kron(vcat(0,axis_zero,0,axis_egg),I3_Bool)'*
+                    select_uvw_egg
+                A_2nd[i,:] = q'*(H .+ H')
+            end
         end
         # cstr values
-        ret = vcat(
+        A = vcat(
             A_1st[mask_1st,:],
             A_4th[mask_4th,:],
             A_3rd[mask_3rd,:], 
             A_2nd[mask_2nd,:],
         )
+        ret[:,free_hen] .= A[:, free_idx_hen]
+        ret[:,free_egg] .= A[:,(free_idx_egg.+num_of_coords_hen)]
         ret
     end
     function inner_cstr_jacobian(q,c)
