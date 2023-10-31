@@ -6,7 +6,26 @@ using StaticArrays
 using ForwardDiff
 using DocStringExtensions
 
-export get_num_of_constraints, get_num_of_coordinates, get_num_of_dof, get_num_of_local_dims
+
+import ..Rible: get_num_of_cstr, get_num_of_coords
+import ..Rible: get_num_of_dof, get_num_of_local_dims
+# import ..Rible: to_local_coords, to_transformation
+
+import ..Rible: make_cstr_function
+import ..Rible: make_cstr_jacobian
+import ..Rible: make_cstr_hessians
+import ..Rible: make_cstr_forces_jacobian
+import ..Rible: cartesian_frame2coords
+
+export get_num_of_cstr, get_num_of_coords
+export get_num_of_dof, get_num_of_local_dims
+# export to_local_coords, to_transformation
+
+export make_cstr_function
+export make_cstr_jacobian
+export make_cstr_hessians
+export make_cstr_forces_jacobian
+export cartesian_frame2coords
 
 vec(q::Quaternion) = SA[q.s, q.v1, q.v2, q.v3]
 
@@ -133,20 +152,20 @@ function QC(m::T,J::AbstractMatrix{T};γ=maximum(diag(J))) where {T}
     QC(m,m⁻¹,γ,Jγ,γ⁻¹,J⁻¹γ)
 end
 
-get_num_of_constraints(::QC) = 1
-get_num_of_coordinates(::QC) = 7
+get_num_of_cstr(::QC) = 1
+get_num_of_coords(::QC) = 7
 get_num_of_dof(::QC) = 6
 get_num_of_local_dims(::QC) = 3
 
-function make_constraints_function()
-    function inner_constraints_function(x::AbstractVector)
+function make_cstr_function()
+    function inner_cstr_function(x::AbstractVector)
         q = @view x[4:7]
         (transpose(q)*q - 1)/2
     end
 end
 
-function make_constraints_jacobian()
-    function inner_constraints_jacobian(x::AbstractVector)
+function make_cstr_jacobian()
+    function inner_cstr_jacobian(x::AbstractVector)
         q = @view x[4:7]
         o = zero(eltype(q))
         SA[
@@ -332,7 +351,7 @@ function make_∂T∂xᵀ∂x(qcs::QC)
     end
 end
 
-function rigid_state2coordinates(origin_position,R,origin_velocity,ω)
+function cartesian_frame2coords(::QC,origin_position,R,origin_velocity,ω)
     Rmat = RotMatrix(R)
     q = QuatRotation(Rmat).q |> vec
     Ω = inv(Rmat)*ω
@@ -360,14 +379,14 @@ function find_angular_velocity(x,ẋ)
 end
 
 
-constraint_forces_jacobian(λ::AbstractVector) = constraint_forces_jacobian(first(λ))
+cstr_forces_jacobian(λ::AbstractVector) = cstr_forces_jacobian(first(λ))
 
-function constraint_forces_jacobian(λ)
+function cstr_forces_jacobian(λ)
     o = zero(λ)    
     Diagonal(SA[o,o,o,λ,λ,λ,λ])
 end
 
-struct CoordinateFunctions{QCT,MT,M⁻¹T,∂Mẋ∂xT,∂M⁻¹y∂xT,∂T∂xᵀT,∂T∂xᵀ∂xT,constraint_forces_jacobianT,ΦT,ΦqT,cT}
+struct CoordinateFunctions{QCT,MT,M⁻¹T,∂Mẋ∂xT,∂M⁻¹y∂xT,∂T∂xᵀT,∂T∂xᵀ∂xT,cstr_forces_jacobianT,ΦT,ΦqT,cT}
     nmcs::QCT
     build_M::MT
     build_M⁻¹::M⁻¹T
@@ -375,7 +394,7 @@ struct CoordinateFunctions{QCT,MT,M⁻¹T,∂Mẋ∂xT,∂M⁻¹y∂xT,∂T∂x�
     build_∂M⁻¹y∂x::∂M⁻¹y∂xT
     build_∂T∂xᵀ::∂T∂xᵀT
     build_∂T∂xᵀ∂x::∂T∂xᵀ∂xT
-    constraint_forces_jacobian::constraint_forces_jacobianT
+    cstr_forces_jacobian::cstr_forces_jacobianT
     Φ::ΦT
     Φq::ΦqT
     c::cT
@@ -389,8 +408,8 @@ function CoordinateFunctions(qcs)
     build_∂M⁻¹y∂x = make_∂M⁻¹y∂x(qcs)
     build_∂T∂xᵀ = make_∂T∂xᵀ(qcs)
     build_∂T∂xᵀ∂x = make_∂T∂xᵀ∂x(qcs)    
-    Φ = make_constraints_function()
-    Φq = make_constraints_jacobian()
+    Φ = make_cstr_function()
+    Φq = make_cstr_jacobian()
     c(x) = x
     CoordinateFunctions(
         qcs,
@@ -400,7 +419,7 @@ function CoordinateFunctions(qcs)
         build_∂M⁻¹y∂x,
         build_∂T∂xᵀ,
         build_∂T∂xᵀ∂x,
-        constraint_forces_jacobian,
+        cstr_forces_jacobian,
         Φ,
         Φq,
         c,

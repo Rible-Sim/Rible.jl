@@ -834,11 +834,11 @@ function simple2mesh(sp,color=:slategrey)
     topo  = Meshes.topology(sp)
     elems = Meshes.elements(topo)
 
-    # coordinates of vertices
-    coords = Meshes.coordinates.(verts)
+    # coords of vertices
+    coords = Meshes.coords.(verts)
     # fan triangulation (assume convexity)
     tris4elem = map(elems) do elem
-      I = Meshes.indices(elem)
+      I = Meshes.idx(elem)
       [[I[1], I[i], I[i+1]] for i in 2:length(I)-1]
     end
 

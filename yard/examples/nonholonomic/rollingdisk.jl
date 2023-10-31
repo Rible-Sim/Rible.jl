@@ -54,8 +54,8 @@ function dynfuncs(bot)
     nμ = 2
     nu = 2
     M = Matrix(RB.build_M(st))
-    Φ = RB.make_constraints_function(st)
-    A = RB.make_constraints_jacobian(st)
+    Φ = RB.make_cstr_function(st)
+    A = RB.make_cstr_jacobian(st)
     R = 1.0
     function Cc(q)
         x,y,u1,u2,v1,v2 = q
@@ -112,8 +112,8 @@ function dynfuncs(bot)
         # ret
     end
 
-    function constraint_forces_jacobian(q,λ)
-        RB.constraint_forces_on_free_jacobian(st,λ)
+    function cstr_forces_jacobian(q,λ)
+        RB.cstr_forces_on_free_jacobian(st,λ)
     end
 
     function Ψq(q,q̇)
@@ -134,7 +134,7 @@ function dynfuncs(bot)
         ret
     end
 
-    jacobians = Jac_F!,Ψq,constraint_forces_jacobian,∂Bᵀμ∂q
+    jacobians = Jac_F!,Ψq,cstr_forces_jacobian,∂Bᵀμ∂q
     contact_funcs = E,g,gq,∂gqᵀΛ∂q,∂gqq̇∂q
     M,Φ,A,Ψ,Ψq̇,F!,jacobians,contact_funcs
 end
@@ -146,8 +146,8 @@ M,Φ,A,Ψ,Ψq̇,F!,jacobians,contact_funcs = dynfuncs(disk)
 
 h = 1e-3
 tspan = (0.0,10.0)
-q0 = RB.get_coordinates(disk.st)
-q̇0 = RB.get_q̇(disk.st)
+q0 = RB.get_coords(disk.st)
+q̇0 = RB.get_velocs(disk.st)
 prob = RB.SimProblem(disk,dynfuncs)
 ts,qs,q̇s,ps,λs,friction_coefficients = RB.nhsolve(prob,6,3,2,2,q0,q̇0;tspan,dt=h,ftol=1e-10,exception=false)
 ts,qs,q̇s,ps,λs,friction_coefficients = RB.snhsolve(prob,6,3,2,2,q0,q̇0;tspan,dt=h,ftol=1e-12,exception=true)

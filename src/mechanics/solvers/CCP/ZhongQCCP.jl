@@ -14,8 +14,8 @@ function generate_cache(::ZhongQCCP,intor;dt,kargs...)
     M⁻¹! = make_M⁻¹!(st)
     Jac_M! = make_Jac_M!(st)
     Jac_M⁻¹! = make_Jac_M⁻¹!(st)
-    Φ = make_constraints_function(st)
-    A = make_constraints_jacobian(st)
+    Φ = make_cstr_function(st)
+    A = make_cstr_jacobian(st)
 
     nq = size(M,2)
     T = get_numbertype(st)
@@ -26,13 +26,13 @@ function generate_cache(::ZhongQCCP,intor;dt,kargs...)
     B(q) = Matrix{T}(undef,0,nq)
 
     # ∂𝐌𝐚∂𝐪(q,a) = zeros(T,nq,nq)
-    constraint_forces_jacobian(q,λ) = constraint_forces_on_free_jacobian(st,λ)
+    cstr_forces_jacobian(q,λ) = cstr_forces_on_free_jacobian(st,λ)
     # ∂𝚽𝐪𝐯∂𝒒(q,v) = RB.∂Aq̇∂q(st,v)
     ∂Bᵀμ∂q(q,μ) = zeros(T,nq,nq)
     cache = @eponymtuple(
         M,M⁻¹,∂Mq̇∂q,∂M⁻¹p∂q,
         M!,Jac_M!,M⁻¹!,Jac_M⁻¹!,
-        Φ,A,Ψ,B,∂Ψ∂q,constraint_forces_jacobian,∂Bᵀμ∂q,∂F∂q,∂F∂q̇)
+        Φ,A,Ψ,B,∂Ψ∂q,cstr_forces_jacobian,∂Bᵀμ∂q,∂F∂q,∂F∂q̇)
     ZhongQCCPCache(cache)
 end
 
@@ -46,9 +46,9 @@ end
 function make_zhongccp_ns_stepk(
         nq,nλ,na,qₖ₋₁,vₖ₋₁,pₖ₋₁,tₖ₋₁,pₖ,vₖ,
         F!,Jac_F!,get_directions_and_positions!,
-        cache,h,scaling,persistent_indices,mem2act_idx
+        cache,h,scaling,persistent_idx,mem2act_idx
     )
-    (;M!,Jac_M!,M⁻¹!,Jac_M⁻¹!,Φ,A,constraint_forces_jacobian) = cache
+    (;M!,Jac_M!,M⁻¹!,Jac_M⁻¹!,Φ,A,cstr_forces_jacobian) = cache
     T = eltype(qₖ₋₁)
     Fₘ = zeros(T,nq)
     ∂Fₘ∂qₘ = cache.∂F∂q
@@ -67,7 +67,7 @@ function make_zhongccp_ns_stepk(
             x,Λₘ,Dₖ₋₁,ŕₖ₋₁,
             Dₖ,Dper, Dimp, ∂Dₖvₖ∂qₖ, ∂DᵀₖHΛₘ∂qₖ, ŕₖ,H,
             restitution_coefficients,timestep,iteration)
-        # @show timestep, iteration, na, persistent_indices
+        # @show timestep, iteration, na, persistent_idx
         qₖ = @view x[   1:n1]
         λₘ = @view x[n1+1:n2]
         qₘ = (qₖ.+qₖ₋₁)./2
@@ -100,7 +100,7 @@ function make_zhongccp_ns_stepk(
             M⁻¹!(M⁻¹ₘ,qₘ)
             Jac_M!(∂Mₘq̇ₘ∂qₘ,qₘ,q̇ₘ)
             Jac_M⁻¹!(∂M⁻¹ₖpₖ∂qₖ,qₖ,pₖ)
-            ∂Aᵀₖλₘ∂qₖ = constraint_forces_jacobian(qₖ,λₘ)
+            ∂Aᵀₖλₘ∂qₖ = cstr_forces_jacobian(qₖ,λₘ)
             get_directions_and_positions!(Dₖ,Dper, Dimp, ∂Dₖvₖ∂qₖ, ∂DᵀₖHΛₘ∂qₖ,ŕₖ,qₖ, vₖ, H*Λₘ,mem2act_idx)
             ∂pₖ∂qₖ = 2/h.*Mₘ + 
                     ∂Mₘq̇ₘ∂qₘ .+
@@ -121,7 +121,7 @@ function make_zhongccp_ns_stepk(
                 is = 3(i-1)
                 vⁱₖ₋₁ = @view v́ₖ₋₁[is+1:is+3]
                 # vₜⁱₖ₋₁ = norm(vⁱₖ₋₁[2:3])
-                if i in persistent_indices
+                if i in persistent_idx
                     vⁱ⁺   = @view v́ₘ[is+1:is+3]
                     vₙⁱₖ₋₁ = zero(vⁱₖ₋₁[1])
                 else
@@ -136,7 +136,7 @@ function make_zhongccp_ns_stepk(
                 𝐛[is+1:is+3] .= [v́ₜⁱ,0,0]
                 
                 Dⁱₖ = @view Dₖ[is+1:is+3,:]                
-                if i in persistent_indices
+                if i in persistent_idx
                     𝐜ᵀ[is+1:is+3,   1:n1] .= ∂v́ₘ∂qₖ[is+1:is+3,:]                     
                     𝐜ᵀ[is+1     ,   1:n1] .+= 1/(norm(v́ₘ[is+2:is+3])+1e-14)*(v́ₘ[is+2]*∂v́ₘ∂qₖ[is+2,:] .+ v́ₘ[is+3]*∂v́ₘ∂qₖ[is+3,:])
                     𝐜ᵀ[is+1:is+3,n1+1:n2] .= 0
@@ -214,7 +214,7 @@ function solve!(intor::Integrator,solvercache::ZhongQCCPCache;
         qₖ₋½ .= qₖ₋₁ .+ dt./2 .*q̇ₖ₋₁
         qₖ .= qₖ₋₁ .+ dt .*q̇ₖ₋₁
         q̇ₖ .= q̇ₖ₋₁
-        na,mem2act_idx,persistent_indices,contacts_bits,
+        na,mem2act_idx,persistent_idx,contacts_bits,
         H,restitution_coefficients,Dₖ₋₁, Dper, Dimp, ∂Dq̇∂q, ∂DᵀΛ∂q, ŕₖ₋₁, 
         L = prepare_contacts!(qₖ₋½)
         isconverged = false
@@ -236,7 +236,7 @@ function solve!(intor::Integrator,solvercache::ZhongQCCPCache;
             nq,nλ,na,qₖ₋₁,q̇ₖ₋₁,pₖ₋₁,tₖ₋₁,pₖ,q̇ₖ,
             F!,Jac_F!,
             get_directions_and_positions!,
-            cache,dt,scaling,persistent_indices,mem2act_idx
+            cache,dt,scaling,persistent_idx,mem2act_idx
         )
         restart_count = 0
         Λ_guess = 0.1
@@ -293,7 +293,7 @@ function solve!(intor::Integrator,solvercache::ZhongQCCPCache;
                     Δx .= Jac\minusResΛ
                     Λʳₖ .= Λₘ
                     x .+= Δx
-                    # @show timestep, iteration, normRes, norm(Δx), norm(ΔΛₖ),persistent_indices
+                    # @show timestep, iteration, normRes, norm(Δx), norm(ΔΛₖ),persistent_idx
                 end
             end
             if isconverged

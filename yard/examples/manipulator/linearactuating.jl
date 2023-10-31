@@ -34,11 +34,11 @@ function actuation_interpolation(target_t,initial_a, target_a,
     end
 end
 
-function simulate_linearactuating(ndof=6;k,c,target_t=10.0,tend=20.0,Alg=Linear())
-    manipulator = man_ndof(ndof,k=k,c=c)
+function simulate_linearactuating(num_of_dof=6;k,c,target_t=10.0,tend=20.0,Alg=Linear())
+    manipulator = man_ndof(num_of_dof,k=k,c=c)
     Y = build_Y(manipulator)
 
-    refman = man_ndof(ndof,θ=-π/5,k=k) # reference
+    refman = man_ndof(num_of_dof,θ=-π/5,k=k) # reference
     _,_,initial_a = RB.inverse(manipulator,deepcopy(manipulator),Y)
     _,_,target_a = RB.inverse(manipulator,deepcopy(refman),Y)
 

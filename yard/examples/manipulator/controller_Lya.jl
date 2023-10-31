@@ -79,7 +79,7 @@ function make_control_lyapunov(bot)
         st = manipulator.st
         M = RB.build_massmatrix(st)
         invM = inv(M)
-        q,q̇ = RB.get_coordinates(st)
+        q,q̇ = RB.get_coords(st)
         A = RB.build_A(st)
         Ak = A(q)
         Ȧk = A(q̇)
@@ -137,9 +137,9 @@ function make_control_lyapunov(bot)
                end
             end
 
-            sx = zeros(st.ndof)
-            ∇s1 = zeros(st.ndof,st.ncoords*2)
-            for i in 1:1:st.ndof
+            sx = zeros(st.num_of_dof)
+            ∇s1 = zeros(st.num_of_dof,st.ncoords*2)
+            for i in 1:1:st.num_of_dof
                     S(s::Vector) = construct_s(Tsi[i*2-1:i*2,:]*s,Tsi[i*2+1:i*2+2,:]*s,Tsi[i*2+3:i*2+4,:]*s)
                     s = q
                     sx[i] = S(s)
@@ -263,10 +263,10 @@ function make_control_lyapunov(bot)
                 # end
                 # end
 
-                # sx = zeros(st.ndof)
-                # ∇s1 = zeros(st.ndof,st.ncoords)
+                # sx = zeros(st.num_of_dof)
+                # ∇s1 = zeros(st.num_of_dof,st.ncoords)
 
-                # for i in 1:1:st.ndof
+                # for i in 1:1:st.num_of_dof
                 #         S(s::Vector) = construct_s(Tsi[i*2-1:i*2,:]*s,Tsi[i*2+1:i*2+2,:]*s,Tsi[i*2+3:i*2+4,:]*s)
                 #         s = q
                 #         sx[i] = S(s)
@@ -296,12 +296,12 @@ function make_control_lyapunov(bot)
                 set_silent(Opt_Δu)
                 @variable(Opt_Δu, Δu[1:num_dof])
                 @objective(Opt_Δu, Min, sum(Δu))
-                #@constraint(Opt_γ, con0, γ.>=0)
-                @constraint(Opt_Δu, con0,Δu.<=0.04)
-                @constraint(Opt_Δu, con1,Δu.>=-0.04)
-                @constraint(Opt_Δu, con2, L_T*Δu.<=K_u)
-                @constraint(Opt_Δu, con3, ΓΓ*Δu.==μμ)
-                #@constraint(Opt_γ, con2, γ.<=D)
+                #@constraints(Opt_γ, con0, γ.>=0)
+                @constraints(Opt_Δu, con0,Δu.<=0.04)
+                @constraints(Opt_Δu, con1,Δu.>=-0.04)
+                @constraints(Opt_Δu, con2, L_T*Δu.<=K_u)
+                @constraints(Opt_Δu, con3, ΓΓ*Δu.==μμ)
+                #@constraints(Opt_γ, con2, γ.<=D)
                 optimize!(Opt_Δu)
                 # @show termination_status(Opt_γ)
                 #primal_status(Opt_γ)
@@ -422,10 +422,10 @@ function lya_sevor_run(dt,t_tol,manipulator)
             set_silent(Opt_Δu)
             @variable(Opt_Δu, Δu[1:num_dof])
             @objective(Opt_Δu, Min, sum(Δu))
-            @constraint(Opt_Δu, con0,Δu.<=0.04)
-            @constraint(Opt_Δu, con1,Δu.>=-0.04)
-            @constraint(Opt_Δu, con2, L_T*Δu.<=K_u)
-            @constraint(Opt_Δu, con3, Γ*Δu.==μ)
+            @constraints(Opt_Δu, con0,Δu.<=0.04)
+            @constraints(Opt_Δu, con1,Δu.>=-0.04)
+            @constraints(Opt_Δu, con2, L_T*Δu.<=K_u)
+            @constraints(Opt_Δu, con3, Γ*Δu.==μ)
             optimize!(Opt_Δu)
             objective_value(Opt_Δu)
             result_Δu = JuMP.value.(Δu)
@@ -513,7 +513,7 @@ using RowEchelon
 A = RB.build_A(manipulator.st)
 Q̃ = RB.build_Q̃(manipulator.st)
 L̂ = RB.build_L̂(manipulator.st)
-q,_ = RB.get_coordinates(manipulator.st)
+q,_ = RB.get_coords(manipulator.st)
 A(q)
 rref(hcat(transpose(A(q)),-Q̃*L̂))
 

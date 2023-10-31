@@ -22,7 +22,7 @@ manipulator = man_nd1(k,c)
 
 plotstructure(manipulator)
 
-function simulate_freevibra(ndof;k,c,unit="mks",dt=0.01)
+function simulate_freevibra(num_of_dof;k,c,unit="mks",dt=0.01)
     manipulator = man_nd1(k,c)
     q0,q̇0,λ0 = RB.get_initial(manipulator.st)
 
@@ -64,7 +64,7 @@ plotstructure(manipulator)
 
 
 manipulator = man_nd1(k,c;ratio=0.85)
-q0,_ = RB.get_coordinates(manipulator.st)
+q0,_ = RB.get_coords(manipulator.st)
 A = RB.build_A(manipulator.st)
 Q̃ = RB.build_Q̃(manipulator.st)
 Γ = RB.build_Γ(manipulator.st)

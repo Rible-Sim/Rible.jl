@@ -13,8 +13,8 @@ function generate_cache(solver::Zhong06,intor;dt,kargs...)
     # F!,_ = dynfuncs
     mm = build_MassMatrices(bot)
     # (;M) = mm
-    A = make_constraints_jacobian(bot)
-    Φ = make_constraints_function(bot)
+    A = make_cstr_jacobian(bot)
+    Φ = make_cstr_function(bot)
     Zhong06Cache(solver,mm,A,Φ)
 end
 

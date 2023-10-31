@@ -58,7 +58,7 @@ function compute_evs(bot,friction_coefficients,Ň)
 			RB.set_restlen!(st,μ)
 			RB.update!(st)
 			ini = RB.get_initial(st)			
-			# A = RB.make_constraints_jacobian(st,ini.q)
+			# A = RB.make_cstr_jacobian(st,ini.q)
 			# Ň(ini.q̌)
 			# A(ini.q̌)*Ň(ini.q̌)
 			rb2 = RB.get_bodies(st)[2]
@@ -70,7 +70,7 @@ function compute_evs(bot,friction_coefficients,Ň)
 			# Ň0 = Ň(ini.q̌)
 			Ǩm_Ǩg = RB.make_Ǩm_Ǩg(st,ini.q)
 			Ǩm0, Ǩg0 = Ǩm_Ǩg(ini.q̌,ini.s,ini.μ,ini.k,ini.c)
-			Ǩa0 = - RB.constraint_forces_on_free_jacobian(st,ini.λ)
+			Ǩa0 = - RB.cstr_forces_on_free_jacobian(st,ini.λ)
 			𝒦m0 = transpose(Ň0)*Ǩm0*Ň0
 			𝒦g0 = transpose(Ň0)*Ǩg0*Ň0
 			𝒦a0 = transpose(Ň0)*Ǩa0*Ň0
@@ -198,7 +198,7 @@ nb
 μ = friction_coefficients[end]
 @show σs |> extrema
 
-Ň = (q̌,c)-> RB.make_nullspace(spine2d2.st,RB.get_coordinates(spine2d2.st))(q̌)
+Ň = (q̌,c)-> RB.make_nullspace(spine2d2.st,RB.get_coords(spine2d2.st))(q̌)
 
 evs = compute_evs(spine2d2,friction_coefficients,Ň)
 
@@ -276,7 +276,7 @@ f[1]/f[4]
 
 @show σs |> extrema
 
-Ň = (q̌,c) -> RB.make_nullspace(spine3d2.st,RB.get_coordinates(spine3d2.st))(q̌)
+Ň = (q̌,c) -> RB.make_nullspace(spine3d2.st,RB.get_coords(spine3d2.st))(q̌)
 
 evs = compute_evs(spine3d2,friction_coefficients,Ň)
 @show evs.δVa |> extrema
@@ -325,20 +325,20 @@ end
 
 # Manipulator
 function make_nullspace_on_free(st,q)
-	(;ndof,connectivity) = st
+	(;num_of_dof,connectivity) = st
 	(;indexed,numbered) = connectivity
-	(;nfree,mem2sysfree) = indexed
-	(;mem2num,num2sys) = numbered
+	(;num_of_free_coords,bodyid2sys_free_coords) = indexed
+	(;bodyid2sys_loci_idx,sys_loci2coords_idx) = numbered
 	N = RB.make_nullspace(st,q)
 	function inner_Ň(q̌,c)
-		# ret = zeros(eltype(q̌),nfree,ndof)
+		# ret = zeros(eltype(q̌),num_of_free_coords,num_of_dof)
 		bodyid = 2
 		pid = 1
-		q_rb = @view q̌[mem2sysfree[bodyid]]
+		q_rb = @view q̌[bodyid2sys_free_coords[bodyid]]
 		u_rb = SVector{2}(q_rb[3:4])
 		v_rb = SVector{2}(q_rb[5:6])
-		ic = mem2num[bodyid][pid]
-		c1,c2 = c[num2sys[ic]]
+		ic = bodyid2sys_loci_idx[bodyid][pid]
+		c1,c2 = c[sys_loci2coords_idx[ic]]
 		ret = N(q̌)*[
 			c1.*skew(u_rb) .+ c2.*skew(v_rb);
 			1
@@ -348,18 +348,18 @@ function make_nullspace_on_free(st,q)
 end
 
 man1 = dualtri(1;θ=deg2rad(0))
-man1.st.ndof
+man1.st.num_of_dof
 # plot_traj!(man1;)  
-q0 = RB.get_coordinates(man1.st)
+q0 = RB.get_coords(man1.st)
 
 N = RB.make_nullspace(man1.st,q0)
-N(RB.get_free_coordinates(man1.st))
+N(RB.get_free_coords(man1.st))
 
 
 Ň = make_nullspace_on_free(man1.st,q0)
-Ň(RB.get_free_coordinates(man1.st),RB.get_local_coordinates(man1.st))
-A = RB.make_constraints_jacobian(man1.st,q0)
-A(RB.get_free_coordinates(man1.st))*Ň(RB.get_free_coordinates(man1.st),RB.get_local_coordinates(man1.st)) |> norm
+Ň(RB.get_free_coords(man1.st),RB.get_local_coords(man1.st))
+A = RB.make_cstr_jacobian(man1.st,q0)
+A(RB.get_free_coords(man1.st))*Ň(RB.get_free_coords(man1.st),RB.get_local_coords(man1.st)) |> norm
 
 B,F̃ = RB.build_inverse_statics_for_restlength(man1.st,man1.st)
 
@@ -413,13 +413,13 @@ function forward_bi(bot;
 			ini = RB.get_initial(bot.st)
 			startsol = (ini.q̌,ini.s,ini.λ)
 			start_parameters = (d=ini.d,c=ini.c,k=ini.k,u=ini.μ,g=[0.0])
-			(;mem2num,num2sys) = bot.st.connectivity.numbered
+			(;bodyid2sys_loci_idx,sys_loci2coords_idx) = bot.st.connectivity.numbered
 			target_parameters = deepcopy(start_parameters)
 			if change == :c
-				target_parameters.c[num2sys[mem2num[1][1]]] .+= [0.00,0.02]
-				target_parameters.c[num2sys[mem2num[1][3]]] .+= [0.02,0.0]
-				target_parameters.c[num2sys[mem2num[2][3]]] .+= [0.02,0.0]
-				target_parameters.c[num2sys[mem2num[2][2]]] .+= [0.02,0.02]
+				target_parameters.c[sys_loci2coords_idx[bodyid2sys_loci_idx[1][1]]] .+= [0.00,0.02]
+				target_parameters.c[sys_loci2coords_idx[bodyid2sys_loci_idx[1][3]]] .+= [0.02,0.0]
+				target_parameters.c[sys_loci2coords_idx[bodyid2sys_loci_idx[2][3]]] .+= [0.02,0.0]
+				target_parameters.c[sys_loci2coords_idx[bodyid2sys_loci_idx[2][2]]] .+= [0.02,0.02]
 			else
 				target_parameters.u .-= 0.01
 			end
@@ -437,9 +437,9 @@ function forward_bi(bot;
 					stptrc = RB.recover(stpt,botfor.st)
 					(;q,q̌,s,λ,d,c,k,u,g) = stptrc
 					Q̌ = RB.make_Q̌(botfor.st,q)(q̌,s,u,k,c)
-					A = RB.make_constraints_jacobian(botfor.st,q)(q̌,c)
+					A = RB.make_cstr_jacobian(botfor.st,q)(q̌,c)
 					# @show Q̌+transpose(A)*λ |> norm
-					# @show stptrc.c[num2sys[cidx]]
+					# @show stptrc.c[sys_loci2coords_idx[cidx]]
 					gěneralized_forces = Q̌
 					# @show gěneralized_forces
 					RB.set_restlen!(botfor.st,u)
@@ -593,10 +593,10 @@ GM.activate!(); plot_traj!(tggriper_plot; sup! = sup_ggriper!)
 
 # _,λ = RB.check_static_equilibrium_output_multipliers(tggriper.st)
 
-Ň = make_halftggriper_nullspace(tggriper,RB.get_free_coordinates(tggriper.st))
-A = RB.make_constraints_jacobian(tggriper)
+Ň = make_halftggriper_nullspace(tggriper,RB.get_free_coords(tggriper.st))
+A = RB.make_cstr_jacobian(tggriper)
 
-A(RB.get_coordinates(tggriper.st))*Ň(RB.get_free_coordinates(tggriper.st),RB.get_local_coordinates(tggriper.st)) |> norm
+A(RB.get_coords(tggriper.st))*Ň(RB.get_free_coords(tggriper.st),RB.get_local_coords(tggriper.st)) |> norm
 
 plot_traj!(tggriper)
 
@@ -612,8 +612,8 @@ function pinpoint_critical(bot_input;
 	ň = length(pv_equ.q̌)
 	ns = length(pv_equ.s)
 	nλ = length(pv_equ.λ)
-	ndof = ň - nλ
-	@polyvar ξ[1:ndof]
+	num_of_dof = ň - nλ
+	@polyvar ξ[1:num_of_dof]
 	@polyvar ζ
 	pv = merge(pv_equ,@eponymtuple(ξ,ζ))
     pnξ = 1.0ξ .+ 0.0
@@ -629,7 +629,7 @@ function pinpoint_critical(bot_input;
 	Ň0 = Ň(gue.q̌,gue.c)
 	𝒦0 = transpose(Ň0)*Ǩ0*Ň0
 	eg𝒦0 = eigen(𝒦0)
-	# 𝐞 = [1:ndof .== i for i in 1:ndof]
+	# 𝐞 = [1:num_of_dof .== i for i in 1:num_of_dof]
 	# i = 1; j = 2
 	# 𝒦0ij = (I-𝐞[i]*transpose(𝐞[i]))*𝒦0+𝐞[i]*transpose(𝐞[j])
 	# ξ0 = 𝒦0ij\𝐞[i]
@@ -644,7 +644,7 @@ function pinpoint_critical(bot_input;
             q̌x = @view x[             1:ň]
             sx = @view x[           ň+1:ň+ns]
             λx = @view x[        ň+ns+1:ň+ns+nλ]
-            ξx = @view x[     ň+ns+nλ+1:ň+ns+nλ+ndof]
+            ξx = @view x[     ň+ns+nλ+1:ň+ns+nλ+num_of_dof]
             ζx =       x[end]
 			Px = map(polyP) do z
                 z(
@@ -663,7 +663,7 @@ function pinpoint_critical(bot_input;
 			f .= Px
         end
     end
-    f_holder = zeros(ň+ns+nλ+ndof+1)
+    f_holder = zeros(ň+ns+nλ+num_of_dof+1)
     x_initial = vcat(gue.q̌,gue.s,gue.λ,ξ0,ζ0)
     pp! = make_bf()
     pp = nlsolve(pp!,x_initial,ftol=1e-10,iterations=100,method=:newton)
@@ -671,14 +671,14 @@ function pinpoint_critical(bot_input;
     pp!(f_holder,pp.zero)
 	# @show f_holder |> norm
     # @show f_holder[                 1:ň+ns+nλ] |> norm
-    # @show f_holder[ň+ns+nλ+1:ň+ns+nλ+ndof] |> norm
+    # @show f_holder[ň+ns+nλ+1:ň+ns+nλ+num_of_dof] |> norm
     # @show f_holder[end]
-    # @show  pp.zero[ň+ns+nλ+1:ň+ns+nλ+ndof]
+    # @show  pp.zero[ň+ns+nλ+1:ň+ns+nλ+num_of_dof]
     # @show  pp.zero[end]
     q̌ = pp.zero[        1:ň]
     s = pp.zero[      ň+1:ň+ns]
     λ = pp.zero[   ň+ns+1:ň+ns+nλ]
-    ξ = pp.zero[ň+ns+nλ+1:ň+ns+nλ+ndof]
+    ξ = pp.zero[ň+ns+nλ+1:ň+ns+nλ+num_of_dof]
     ζ = pp.zero[end]
 	ini = @eponymtuple(
 		q̌,s,λ,ξ,ζ,isconverged=converged(pp),
@@ -696,7 +696,7 @@ function pinpoint_gripper(Ň)
 	bots = [	
 		begin
 			bot = new_gripper(;guess...)
-			# c = RB.get_local_coordinates(bot.st)
+			# c = RB.get_local_coords(bot.st)
 			# # c[7] -= 0.1
 			# RB.update_points!(bot.st,c)
 			polyP, poly𝒦, ini, pv  = RB.pinpoint(bot;Ň)
@@ -735,8 +735,8 @@ plot_traj!(tggripers;
 	sup! = sup_ggriper!
 )
 
-tggriper.st.connectivity.numbered.mem2num[2][2]
-tggriper.st.connectivity.numbered.num2sys[4]
+tggriper.st.connectivity.numbered.bodyid2sys_loci_idx[2][2]
+tggriper.st.connectivity.numbered.sys_loci2coords_idx[4]
 
 GM.activate!(); with_theme(theme_pub;
 		fontsize = 6 |> pt2px,
@@ -791,7 +791,7 @@ function forward_bi_gripper(bot;
 			ini = RB.get_initial(bot.st)
 			startsol = (ini.q̌,ini.s,ini.λ)
 			start_parameters = (d=ini.d,c=ini.c,k=ini.k,u=ini.μ,g=[0.0])
-			(;mem2num,num2sys) = bot.st.connectivity.numbered
+			(;bodyid2sys_loci_idx,sys_loci2coords_idx) = bot.st.connectivity.numbered
 			target_parameters = deepcopy(start_parameters)
 			target_parameters.c[7] += Δc7
 			target_parameters.u[6] += Δu6
@@ -809,9 +809,9 @@ function forward_bi_gripper(bot;
 					stptrc = RB.recover(stpt,botfor.st)
 					(;q,q̌,s,λ,d,c,k,u,g) = stptrc
 					Q̌ = RB.make_Q̌(botfor.st,q)(q̌,s,u,k,c)
-					A = RB.make_constraints_jacobian(botfor.st,q)(q̌,c)
+					A = RB.make_cstr_jacobian(botfor.st,q)(q̌,c)
 					# @show Q̌+transpose(A)*λ |> norm
-					# @show stptrc.c[num2sys[cidx]]
+					# @show stptrc.c[sys_loci2coords_idx[cidx]]
 					gěneralized_forces = Q̌
 					# @show gěneralized_forces
 					RB.set_restlen!(botfor.st,u)

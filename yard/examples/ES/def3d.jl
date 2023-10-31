@@ -75,7 +75,7 @@ function make_3d_bar(
     nmcs = RB.NCF.NC3D1P1V(ri,û,ri,R)
     @myshow id,û
     # @show ri,rj,q0
-    # cf = RB.NCF.CoordinateFunctions(nmcs,q0,ci,free_coordinates_indices)
+    # cf = RB.NCF.CoordinateFunctions(nmcs,q0,ci,free_coords_idx)
     # @show typeof(nmcs)
     state = RB.RigidBodyState(prop,nmcs,ri,R,ṙo,ω,ci)
     if loadmesh
@@ -102,14 +102,14 @@ function make_3d_tri(
         movable = true,
         constrained = false,
         ci = Int[],
-        constraints_indices = collect(1:6),
+        cstr_idx = collect(1:6),
         radius = 0.005,
         height = 1e-2,
         color = :darkorchid4,
         loadmesh = false,
         m = 3,
     )
-    # free_coordinates_indices = collect(1:6)
+    # free_coords_idx = collect(1:6)
     mass = 0.2999233976
     Īg = SMatrix{3,3}(
         Matrix(Diagonal([
@@ -168,7 +168,7 @@ function make_3d_tri(
             ]
         )
     )
-    # cf = RB.NCF.CoordinateFunctions(nmcs,q0,ci,free_coordinates_indices)
+    # cf = RB.NCF.CoordinateFunctions(nmcs,q0,ci,free_coords_idx)
     # @show typeof(nmcs)
     # radius = norm(loci[2]-loci[1])/32
     # @show radius
@@ -191,7 +191,7 @@ function make_3d_tri(
             ]
         )
     end
-    state = RB.RigidBodyState(prop,nmcs,ro,R,ṙo,ω,ci,constraints_indices)
+    state = RB.RigidBodyState(prop,nmcs,ro,R,ṙo,ω,ci,cstr_idx)
     body = RB.RigidBody(prop,state,trimesh)
 end
 
@@ -209,11 +209,11 @@ function make_3d_plate(
         height=1e-2,
         radius=1e-3,
         ci = Int[],
-        constraints_indices = collect(1:6),
+        cstr_idx = collect(1:6),
         loadmesh = true,
         meshvisible = true,
     )
-    # free_coordinates_indices = collect(1:6)	
+    # free_coords_idx = collect(1:6)	
     constrained = ci != Int[]
     mat = filter(
         row -> row.name == "Teak", 
@@ -288,7 +288,7 @@ function make_3d_plate(
     # v = R*(nodes_positions[3] - nodes_positions[1])
     # w = R*(nodes_positions[4] - nodes_positions[1])
     nmcs = RB.NCF.NC1P3V(ri,ro,R)
-    state = RB.RigidBodyState(prop,nmcs,ro,R,ṙo,ω,ci,constraints_indices)
+    state = RB.RigidBodyState(prop,nmcs,ro,R,ṙo,ω,ci,cstr_idx)
     body = RB.RigidBody(prop,state,platemesh)
 end
 
@@ -517,10 +517,10 @@ function twotre3d(;
         begin
             if j == 1				
                 ci = collect(1:12)
-                constraints_indices = Int[]
+                cstr_idx = Int[]
             else
                 ci = Int[]
-                constraints_indices = collect(1:6)
+                cstr_idx = collect(1:6)
             end
             id = j
             if isspine
@@ -544,7 +544,7 @@ function twotre3d(;
                 # movable = true,
                 # constrained = false,
                 # ci = Int[],
-                # constraints_indices = collect(1:6),
+                # cstr_idx = collect(1:6),
                 color = :slategrey,
                 loadmesh,
             )
@@ -712,7 +712,7 @@ function prisms(;
             m=3,
             height=1e-2,
             ci = collect(1:12),
-            constraints_indices = Int[],
+            cstr_idx = Int[],
             loadmesh = false,
             meshvisible = true,
         )
@@ -1222,10 +1222,10 @@ function embed3d(;
         begin
             if j == 1				
                 ci = collect(1:12)
-                constraints_indices = Int[]
+                cstr_idx = Int[]
             else
                 ci = Int[]
-                constraints_indices = collect(1:6)
+                cstr_idx = collect(1:6)
             end
             id = (2n)*m+j
             ro = SVector(0.0,0.0,(j-1)*2h)
@@ -1248,7 +1248,7 @@ function embed3d(;
                 m,
                 height=1e-2,
                 ci,
-                constraints_indices,
+                cstr_idx,
                 loadmesh = false,
                 meshvisible = !isprism,
             )
@@ -1635,7 +1635,7 @@ function class1(;
     rb1 = make_3d_tri(1,loci,ro_by_rbid[1],R_by_rbid[1],rirjrkrl_by_rbid[1][1];			
         constrained = true,
         ci = collect(1:12),
-        constraints_indices = Int[]
+        cstr_idx = Int[]
     )
 
     rb2 = make_3d_tri(2,loci,ro_by_rbid[2],R_by_rbid[2],rirjrkrl_by_rbid[2][1:ijkl]...)
@@ -1716,10 +1716,10 @@ function spine3d(n;
     function rigidbody(i,prop,loci,r,R,ṙ,ω)
         if i == 1
             ci = collect(1:12)
-            constraints_indices = Int[]
+            cstr_idx = Int[]
         else
             ci = Int[]
-            constraints_indices = collect(1:6)
+            cstr_idx = collect(1:6)
         end
 
         # ri,rj,rk,rl = [r+R*r̄p for r̄p in loci]
@@ -1727,7 +1727,7 @@ function spine3d(n;
         # nmcs = RB.NCF.NC3P1V(ri,rk,rl,r,R,ṙ,ω)
         # nmcs = RB.NCF.NC2P2V(rk,rl,r,R,ṙ,ω)
         nmcs = RB.NCF.NC1P3V(r,r,R,ṙ,ω)
-        state = RB.RigidBodyState(prop,nmcs,r,R,ṙ,ω,ci,constraints_indices)
+        state = RB.RigidBodyState(prop,nmcs,r,R,ṙ,ω,ci,cstr_idx)
         radius = norm(loci[1]-loci[5])/25
         vertmesh = merge([
             endpoints2mesh(loci[i],loci[5];radius)
@@ -1832,10 +1832,10 @@ function newspine3d(n;
     function rigidbody(i, prop, loci, r, R, ṙ, ω)
         if i == 1
             ci = collect(1:12)
-            constraints_indices = Int[]
+            cstr_idx = Int[]
         else
             ci = Int[]
-            constraints_indices = collect(1:6)
+            cstr_idx = collect(1:6)
         end
 
         # ri,rj,rk,rl = [r+R*r̄p for r̄p in loci]
@@ -1843,7 +1843,7 @@ function newspine3d(n;
         # nmcs = RB.NCF.NC3P1V(ri,rk,rl,r,R,ṙ,ω)
         # nmcs = RB.NCF.NC2P2V(rk,rl,r,R,ṙ,ω)
         nmcs = RB.NCF.NC1P3V(r, r, R, ṙ, ω)
-        state = RB.RigidBodyState(prop, nmcs, r, R, ṙ, ω, ci, constraints_indices)
+        state = RB.RigidBodyState(prop, nmcs, r, R, ṙ, ω, ci, cstr_idx)
         radius = norm(loci[1] - loci[5]) / 25
         vertmesh = merge([
             endpoints2mesh(loci[i], loci[j]; radius)
@@ -1912,7 +1912,7 @@ function new_deck(id,loci,ro,R,ri,box;
         movable = true,
         constrained = false,
         ci = Int[],
-        constraints_indices = collect(1:6),
+        cstr_idx = collect(1:6),
     )
     mat = filter(
         row -> row.name == "Teak", 
@@ -1961,10 +1961,10 @@ function new_deck(id,loci,ro,R,ri,box;
     ṙo = zero(ro)
     ω = zero(ro)
     nmcs = RB.NCF.NC1P3V(ri,ro,R)
-    # cf = RB.NCF.CoordinateFunctions(nmcs,q0,ci,free_coordinates_indices)
+    # cf = RB.NCF.CoordinateFunctions(nmcs,q0,ci,free_coords_idx)
     # @show typeof(nmcs)
     boxmesh = Meshes.boundary(box) |> simple2mesh
-    state = RB.RigidBodyState(prop,nmcs,ro,R,ṙo,ω,ci,constraints_indices)
+    state = RB.RigidBodyState(prop,nmcs,ro,R,ṙo,ω,ci,cstr_idx)
     RB.RigidBody(prop,state,boxmesh)
 end
 
@@ -2244,7 +2244,7 @@ function lander(;k=nothing)
         movable = true,
         constrained = true,
         ci = collect(1:12),
-        constraints_indices = Int[],
+        cstr_idx = Int[],
     )
     
     # # #
@@ -2367,7 +2367,7 @@ function tower(;k=nothing)
         movable = true,
         constrained = true,
         ci = collect(1:12),
-        constraints_indices = Int[],
+        cstr_idx = Int[],
         radius = 0.04,
     )
 
@@ -2515,7 +2515,7 @@ function simple(;
             radius = r,
             # constrained = !free,	
             ci = ifelse(free,Int[],collect(1:12)),
-            constraints_indices = ifelse(free,collect(1:6),Int[]),
+            cstr_idx = ifelse(free,collect(1:6),Int[]),
         )
     ]
 

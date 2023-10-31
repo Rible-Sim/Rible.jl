@@ -20,15 +20,15 @@ set_pyplot()
 k = 1.e2; c = 0.0
 function inversekinematics(θs;k,c)
     n = length(θs)
-    ndof = 6
-    manipulator = man_ndof(ndof;k,c)
+    num_of_dof = 6
+    manipulator = man_ndof(num_of_dof;k,c)
     as = Vector{Vector{Float64}}()
 
     Y = build_Y(manipulator)
 
 
     for θ in θs
-        refman = man_ndof(ndof;θ,k,c) # reference
+        refman = man_ndof(num_of_dof;θ,k,c) # reference
         refqi,_,_ = RB.get_initial(refman.st)
         refλi,_,a= RB.inverse(manipulator,refman,Y)
         man_act = deepcopy(manipulator)
@@ -47,7 +47,7 @@ man_inv, as = inversekinematics(θs; k, c)
 
 man_inv = man_ndof(6;θ=-0.2,k,c)
 Y = build_Y(man_inv)
-q,_ = RB.get_coordinates(man_inv.st)
+q,_ = RB.get_coords(man_inv.st)
 λ,u,a= RB.inverse(man_inv,deepcopy(man_inv),Y)
 RB.actuate!(man_inv,a)
 RB.check_static_equilibrium(man_inv.st,q,λ)
@@ -71,12 +71,12 @@ ax.grid(true)
 fig.savefig("man_inverse.png",dpi=300,bbox_inches="tight")
 fig.savefig("man_inverse.eps",dpi=300,bbox_inches="tight")
 
-function pyplot2(θs;k,c,ndof = 6)
+function pyplot2(θs;k,c,num_of_dof = 6)
     fig,axs_raw = plt.subplots(2,3,figsize=(Full_width,4.5))
     axs = permutedims(axs_raw,[2,1])
 
     for (i,θ) in enumerate(θs[1:2:end])
-        refman = man_ndof(ndof;θ,k,c)
+        refman = man_ndof(num_of_dof;θ,k,c)
         bars_segs,cables_segs = bars_and_cables_segs(refman.st)
         ax = axs[i]
         ax.add_collection(bars_segs)
@@ -101,17 +101,17 @@ function pyplot2(θs;k,c,ndof = 6)
     fig.tight_layout()
     fig
 end
-fig = pyplot2(θs;k,c,ndof = 6)
+fig = pyplot2(θs;k,c,num_of_dof = 6)
 fig.savefig("inv2x3.png",dpi=300,bbox_inches="tight")
 
 
-ndof = 6
+num_of_dof = 6
 k = 1.e2
-manipulator = man_ndof(ndof; k, c)
+manipulator = man_ndof(num_of_dof; k, c)
 ncoords = manipulator.st.ncoords
 function eigenanalysis(θs; k, c)
-    ndof = 6
-    manipulator = man_ndof(ndof; k, c)
+    num_of_dof = 6
+    manipulator = man_ndof(num_of_dof; k, c)
 
     Y = build_Y(manipulator)
 
@@ -120,7 +120,7 @@ function eigenanalysis(θs; k, c)
     as = VectorOfArray(Vector{Vector{Float64}}())
 
     for θ in θs
-        refman = man_ndof(ndof;θ,k,c) # reference
+        refman = man_ndof(num_of_dof;θ,k,c) # reference
         refqi,_,_ = RB.get_initial(refman.st)
         refλi,_,ai= RB.inverse(manipulator,refman,Y)
         actmani = deepcopy(manipulator)
@@ -197,7 +197,7 @@ function pyplot_mode(tgstruct,θ,Z,xlim,ylim)
     end
     fig = plt.figure(figsize=(Full_width,2.5))
     grid = (1,3)
-    q0,_ = RB.get_coordinates(tgstruct)
+    q0,_ = RB.get_coords(tgstruct)
 
     for i = 1:3
         ax = plt.subplot2grid(grid,(0,i-1),1,1,fig=fig)
@@ -215,10 +215,10 @@ function pyplot_mode(tgstruct,θ,Z,xlim,ylim)
     fig
 end
 
-manipulator = man_ndof(ndof;θ = θs[1], k, c)
+manipulator = man_ndof(num_of_dof;θ = θs[1], k, c)
 fig = pyplot_mode(manipulator,θs[1],Zs[1],(-0.20,1.50),(-1.00,0.25))
 fig.savefig("man_pose1_mode_k=$k.png",dpi=300,bbox_inches="tight")
 
-manipulator = man_ndof(ndof;θ = θs[6], k, c)
+manipulator = man_ndof(num_of_dof;θ = θs[6], k, c)
 fig = pyplot_mode(manipulator,θs[6],Zs[6],(-0.20,1.50),(-1.00,0.25))
 fig.savefig("man_pose6_mode_k=$k.png",dpi=300,bbox_inches="tight")

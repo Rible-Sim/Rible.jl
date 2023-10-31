@@ -107,9 +107,9 @@ function tg_spark(tgsys)
     ntotalbody = length(rigidbodies)
     mvrigidbodies = rigidbodies.movables
     nbodies = length(mvrigidbodies)
-    ninconstraint = nbodies*6
-    nexconstraint = 0
-    nconstraint = ninconstraint + nexconstraint
+    nincstr = nbodies*6
+    num_of_extrinsic_cstr = 0
+    num_of_cstr = nincstr + num_of_extrinsic_cstr
     nq = nbodies*12
     mass_matrix = zeros(nq,nq)
     for (bodyid,rb) in enumerate(mvrigidbodies)

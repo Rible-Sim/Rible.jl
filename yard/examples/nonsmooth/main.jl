@@ -80,8 +80,8 @@ function new_pointmass(;
     loci = Ref(origin_position) .+ Ref(R).*loci
     nmcs = RB.NCF.NC3D1P(loci[1],)
     ci = Int[]
-    constraints_indices = Int[]
-    state = RB.RigidBodyState(prop,nmcs,origin_position,R,origin_velocity,ω,ci,constraints_indices)
+    cstr_idx = Int[]
+    state = RB.RigidBodyState(prop,nmcs,origin_position,R,origin_velocity,ω,ci,cstr_idx)
     rb1 = RB.RigidBody(prop,state)
 
     rbs = TypeSortedCollection((rb1,))
@@ -1069,7 +1069,7 @@ function make_hammer(id,r̄ijkl,origin_position,R,ri,rj=nothing,rk=nothing,rl=no
         movable = true,
         constrained = false,
         pres_idx = Int[],
-        constraints_indices = collect(1:6),
+        cstr_idx = collect(1:6),
     )
     # free_idx = collect(1:6)
     m = 4.58794901
@@ -1127,7 +1127,7 @@ function make_hammer(id,r̄ijkl,origin_position,R,ri,rj=nothing,rk=nothing,rl=no
         scale = 1/400,
         trans = [-0.20,0,0],
     )
-    state = RB.RigidBodyState(prop,nmcs,origin_position,R,origin_velocity,ω,pres_idx,constraints_indices)
+    state = RB.RigidBodyState(prop,nmcs,origin_position,R,origin_velocity,ω,pres_idx,cstr_idx)
     body = RB.RigidBody(prop,state,meteormesh)
 end
 
@@ -2337,7 +2337,7 @@ ros = [[0,0,z] for z = 10.0:-0.1:0.0]
 qs = [
     begin
         cube = make_cube(origin_position,RotXY(π/4,π/4))
-        q = RB.get_coordinates(cube.st)
+        q = RB.get_coords(cube.st)
     end
     for origin_position in ros
 ]

@@ -38,14 +38,14 @@ function fit_data()
         XLSX.readtable(
         "SMA_data.xlsx", "Sheet1",infer_eltypes=true)...)
     sorted_deforms = sort(unique(sma_df.形变量))
-    exclude_deform_indices = findall((x)->x∈[14,15,16,17,25,26,35,39],sma_df.形变量)
-    exclude_temp_indices = findall((x)->x>100,sma_df.实时温度)
-    exclude_indices = union(exclude_deform_indices,exclude_temp_indices)
-    forces = sma_df[Not(exclude_indices),:回复力]
-    temperatures = sma_df[Not(exclude_indices),:实时温度]
-    deformations = sma_df[Not(exclude_indices),:形变量]
-    include_defrom_indices = findall((x)->!(x∈[14,15,16,17,25,26,35,39]),sorted_deforms)
-    @show sorted_deforms[include_defrom_indices]
+    exclude_deform_idx = findall((x)->x∈[14,15,16,17,25,26,35,39],sma_df.形变量)
+    exclude_temp_idx = findall((x)->x>100,sma_df.实时温度)
+    exclude_idx = union(exclude_deform_idx,exclude_temp_idx)
+    forces = sma_df[Not(exclude_idx),:回复力]
+    temperatures = sma_df[Not(exclude_idx),:实时温度]
+    deformations = sma_df[Not(exclude_idx),:形变量]
+    include_defrom_idx = findall((x)->!(x∈[14,15,16,17,25,26,35,39]),sorted_deforms)
+    @show sorted_deforms[include_defrom_idx]
     # fig = Figure()
     # ax = fig[1,1] = LScene(fig, scenekw = (camera = cam3d!, raw = false))
     # scatter!(ax,temperatures,deformations,forces,axis=false, markersize = 300)
@@ -59,9 +59,9 @@ function fit_data()
     sets_deform = sort(unique(deformations))
     axis_forces = AxisArray(zeros(np, length(sets_deform)); temp = ts, deform = sets_deform)
     for (i,d) in enumerate(sets_deform)
-        d_indices = findall((x)->x==d,deformations)
-        d_temps = temperatures[d_indices]
-        d_forces = forces[d_indices]
+        d_idx = findall((x)->x==d,deformations)
+        d_temps = temperatures[d_idx]
+        d_forces = forces[d_idx]
         loess_model = loess(d_temps,d_forces,span=0.3,degree=3)
         fs = predict(loess_model, ts)
         axis_forces[:,i] = fs
@@ -86,8 +86,8 @@ function fit_data()
     # scale!(ax.scene, -1,-1,1)
     # fig
 
-    k_linear_indices = findall((x)->x>30.5&&x<61,ts)
-    k_fit = fitlinear(ts[k_linear_indices],ks[k_linear_indices])
+    k_linear_idx = findall((x)->x>30.5&&x<61,ts)
+    k_fit = fitlinear(ts[k_linear_idx],ks[k_linear_idx])
     fig_k,ax_k = plt.subplots(1,1,figsize=(Full_width,5))
     ax_k.plot(ts,ks,ls="",marker="o",label="Data")
     ax_k.plot(k_fit.x,k_fit.y,label="Linear fit")

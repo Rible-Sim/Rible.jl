@@ -1,6 +1,6 @@
 #done use the basic types of Constraints
 #todo parameterization of joints
-#note can full rotation constraints be linear?
+#note can full rotation cstr be linear?
 """
 ID
 $(TYPEDEF)
@@ -46,8 +46,8 @@ end
 $(TYPEDEF)
 """
 struct EmptyConstraint{T} <: ExternalConstraints{T}
-    nconstraints::Int64
-    indices::Vector{Int64}
+    num_of_cstr::Int64
+    idx::Vector{Int64}
     values::T
 end
 
@@ -61,14 +61,14 @@ function EmptyConstraint(values=Vector{Float64}())
     EmptyConstraint(0,Vector{Int64}(),values)
 end
 
-function make_constraints_function(::EmptyConstraint)
-    inner_constraints_function(q) = Vector{eltype(q)}()
-    inner_constraints_function(q,d) = Vector{eltype(q)}()
-    inner_constraints_function
+function make_cstr_function(::EmptyConstraint)
+    inner_cstr_function(q) = Vector{eltype(q)}()
+    inner_cstr_function(q,d) = Vector{eltype(q)}()
+    inner_cstr_function
 end
 
-function make_constraints_jacobian(::EmptyConstraint)
-    inner_constraints_jacobian(q) = Array{eltype(q)}(undef,0,length(q))
+function make_cstr_jacobian(::EmptyConstraint)
+    inner_cstr_jacobian(q) = Array{eltype(q)}(undef,0,length(q))
 end
 
 """
@@ -76,8 +76,8 @@ end
 $(TYPEDEF)
 """
 struct FixedBodyConstraint{T} <: ExternalConstraints{T}
-    nconstraints::Int64
-    indices::Vector{Int64}
+    num_of_cstr::Int64
+    idx::Vector{Int64}
     values::T
 end
 
@@ -85,30 +85,30 @@ end
 固定约束构造子。
 $(TYPEDSIGNATURES)
 """
-function FixedBodyConstraint(rbs,mem2sysfull,bodyid)
+function FixedBodyConstraint(rbs,bodyid2sys_full_coords,bodyid)
     body = rbs[bodyid]
     nmcs = body.state.cache.funcs.nmcs
     q_rb = body.state.coords.q
-    pres_idx = find_full_pres_indices(nmcs,q_rb)
-    indices = body2q[bodyid][pres_idx]
+    pres_idx = find_full_pres_idx(nmcs,q_rb)
+    idx = bodyid2q[bodyid][pres_idx]
     values = q_rb[pres_idx]
-    FixedBodyConstraint(length(indices),indices,values)
+    FixedBodyConstraint(length(idx),idx,values)
 end
 
-function make_constraints_function(cst::FixedBodyConstraint)
-    (;indices, values) = cst
-    @inline @inbounds inner_constraints_function(q)   = q[indices]-values
-    @inline @inbounds inner_constraints_function(q,d) = q[indices]-d
-    inner_constraints_function
+function make_cstr_function(cst::FixedBodyConstraint)
+    (;idx, values) = cst
+    @inline @inbounds inner_cstr_function(q)   = q[idx]-values
+    @inline @inbounds inner_cstr_function(q,d) = q[idx]-d
+    inner_cstr_function
 end
 
-function make_constraints_jacobian(cst::FixedBodyConstraint)
-    num_of_constraints = cst.nconstraints
-    indices = cst.indices
-    @inline @inbounds function inner_constraints_jacobian(q)
+function make_cstr_jacobian(cst::FixedBodyConstraint)
+    num_of_cstr = cst.num_of_cstr
+    idx = cst.idx
+    @inline @inbounds function inner_cstr_jacobian(q)
         nq = length(q)
-        ret = zeros(eltype(q),num_of_constraints,nq)
-        for (iΦ,i) in enumerate(indices)
+        ret = zeros(eltype(q),num_of_cstr,nq)
+        for (iΦ,i) in enumerate(idx)
             ret[iΦ,i] = 1
         end
         ret
@@ -121,8 +121,8 @@ $(TYPEDEF)
 """
 struct FixedIndicesConstraint{T} <: ExternalConstraints{T}
     id::Int64
-    nconstraints::Int64
-    indices::Vector{Int64}
+    num_of_cstr::Int64
+    idx::Vector{Int64}
     values::T
 end
 
@@ -130,29 +130,29 @@ end
 刚体坐标固定约束构造子。
 $(TYPEDSIGNATURES)
 """
-function FixedIndicesConstraint(id,indices,values)
-    FixedIndicesConstraint(id,length(indices),indices,values)
+function FixedIndicesConstraint(id,idx,values)
+    FixedIndicesConstraint(id,length(idx),idx,values)
 end
 
-function make_constraints_function(cst::FixedIndicesConstraint,st)
-    @unpack indices, values = cst
-    @inline @inbounds inner_constraints_function(q)   = q[indices]-values
-    @inline @inbounds inner_constraints_function(q,d) = q[indices]-d
-    inner_constraints_function
+function make_cstr_function(cst::FixedIndicesConstraint,st)
+    @unpack idx, values = cst
+    @inline @inbounds inner_cstr_function(q)   = q[idx]-values
+    @inline @inbounds inner_cstr_function(q,d) = q[idx]-d
+    inner_cstr_function
 end
 
-function make_constraints_jacobian(cst::FixedIndicesConstraint,st)
+function make_cstr_jacobian(cst::FixedIndicesConstraint,st)
     (;indexed,numbered) = st.connectivity
-    num_of_constraints = cst.nconstraints
-    indices = cst.indices
-    (;sysfree,nfree) = indexed
-    @inline @inbounds function inner_constraints_jacobian(q)
+    num_of_cstr = cst.num_of_cstr
+    idx = cst.idx
+    (;sys_free_coords_idx,num_of_free_coords) = indexed
+    @inline @inbounds function inner_cstr_jacobian(q)
         nq = length(q)
-        ret = zeros(eltype(q),num_of_constraints,nq)
-        for (iΦ,i) in enumerate(indices)
+        ret = zeros(eltype(q),num_of_cstr,nq)
+        for (iΦ,i) in enumerate(idx)
             ret[iΦ,i] = 1
         end
-        ret[:,sysfree]
+        ret[:,sys_free_coords_idx]
     end
 end
 
@@ -164,7 +164,7 @@ $(TYPEDEF)
 """
 struct LinearJoint{valueType} <: ExternalConstraints{valueType}
     id::Int
-    nconstraints::Int
+    num_of_cstr::Int
     values::Vector{valueType}
     A::Matrix{valueType}
 end
@@ -174,35 +174,35 @@ end
 $(TYPEDSIGNATURES)
 """
 function LinearJoint(A,values)
-    num_of_constraints = size(A,1)
-    LinearJoint(id,num_of_constraints,values,A)
+    num_of_cstr = size(A,1)
+    LinearJoint(id,num_of_cstr,values,A)
 end
 
-function make_constraints_function(cst::LinearJoint,indexed,numbered)
-    (;mem2sysfull) = indexed
-    (;nconstraints,values,A) = cst
-    function _inner_constraints_function(q,d)
-        ret = zeros(eltype(q),nconstraints)
+function make_cstr_function(cst::LinearJoint,indexed,numbered)
+    (;bodyid2sys_full_coords) = indexed
+    (;num_of_cstr,values,A) = cst
+    function _inner_cstr_function(q,d)
+        ret = zeros(eltype(q),num_of_cstr)
         ret .= A*q .- d
         ret
     end
-    inner_constraints_function(q)   = _inner_constraints_function(q,values)
-    inner_constraints_function(q,d) = _inner_constraints_function(q,d)
-    inner_constraints_function
+    inner_cstr_function(q)   = _inner_cstr_function(q,values)
+    inner_cstr_function(q,d) = _inner_cstr_function(q,d)
+    inner_cstr_function
 end
 
-function make_constraints_jacobian(cst::LinearJoint,indexed,numbered)
-    (;sysfree,nfree) = indexed
-    (;nconstraints,values,A) = cst
-    function _inner_constraints_jacobian(q,c)
-        q̌ = @view q[sysfree]
-        ret = zeros(eltype(q̌),nconstraints,nfree)
+function make_cstr_jacobian(cst::LinearJoint,indexed,numbered)
+    (;sys_free_coords_idx,num_of_free_coords) = indexed
+    (;num_of_cstr,values,A) = cst
+    function _inner_cstr_jacobian(q,c)
+        q̌ = @view q[sys_free_coords_idx]
+        ret = zeros(eltype(q̌),num_of_cstr,num_of_free_coords)
         ret .= A
         ret
     end
-    inner_constraints_jacobian(q)   = _inner_constraints_jacobian(q,0)
-    inner_constraints_jacobian(q,c) = _inner_constraints_jacobian(q,c)
-    inner_constraints_jacobian
+    inner_cstr_jacobian(q)   = _inner_cstr_jacobian(q,0)
+    inner_cstr_jacobian(q,c) = _inner_cstr_jacobian(q,c)
+    inner_cstr_jacobian
 end
 
 """
@@ -212,8 +212,8 @@ $(TYPEDEF)
 struct PrototypeJoint{valueType,hen2eggType,axesType,maskType} <: ExternalConstraints{valueType}
     id::Int
     hen2egg::hen2eggType
-    nconstraints::Int
-    ndof::Int
+    num_of_cstr::Int
+    num_of_dof::Int
     axes_trl_hen::axesType
     axes_trl_egg::axesType
     axes_rot_hen::axesType
@@ -233,14 +233,14 @@ $(TYPEDSIGNATURES)
 function PrototypeJoint(id,hen2egg,joint_type::Symbol) 
     (;hen,egg) = hen2egg
     joint_info = get_joint_info(joint_type)
-    (;ntrl, nrot, ndof, ncsts, mask_1st, mask_2nd, mask_3rd_hen, mask_3rd_egg, mask_4th) = joint_info
+    (;ntrl, nrot, num_of_dof, ncsts, mask_1st, mask_2nd, mask_3rd_hen, mask_3rd_egg, mask_4th) = joint_info
     T = get_numbertype(hen.rbsig)
     nmcs_hen = hen.rbsig.state.cache.funcs.nmcs
     nmcs_egg = egg.rbsig.state.cache.funcs.nmcs
     state_hen = hen.rbsig.state
     state_egg = egg.rbsig.state
-    q_hen = NCF.rigidstate2naturalcoords(nmcs_hen,state_hen.origin_position,state_hen.R)
-    q_egg = NCF.rigidstate2naturalcoords(nmcs_egg,state_egg.origin_position,state_egg.R)
+    q_hen = cartesian_frame2coords(nmcs_hen,state_hen.origin_position,state_hen.R)
+    q_egg = cartesian_frame2coords(nmcs_egg,state_egg.origin_position,state_egg.R)
     R_hen = NCF.find_rotation(nmcs_hen,q_hen)
     R_egg = NCF.find_rotation(nmcs_egg,q_egg)
     # translate     
@@ -288,7 +288,7 @@ function PrototypeJoint(id,hen2egg,joint_type::Symbol)
     ]
     # fourth    
     Φ_4th = [r_hen2egg'*r_hen2egg]
-    # constraint values
+    # cstr values
     values = vcat(
         Φ_4th[mask_4th],
         Φ_3rd_hen[mask_3rd_hen], # translate prior to 
@@ -300,35 +300,42 @@ function PrototypeJoint(id,hen2egg,joint_type::Symbol)
     # @show values
     PrototypeJoint(
         id,hen2egg,
-        ncsts,ndof,
-        axes_trl_hen,axes_trl_egg,axes_rot_hen,axes_rot_egg,
-        mask_1st, mask_2nd, mask_3rd_hen, mask_3rd_egg, mask_4th,
+        ncsts,num_of_dof,
+        axes_trl_hen,
+        axes_trl_egg,
+        axes_rot_hen,
+        axes_rot_egg,
+        in.([1,2,3],Ref(mask_1st)), 
+        in.([1,2,3],Ref(mask_2nd)), 
+        in.([1,2,3],Ref(mask_3rd_hen)),
+        in.([1,2,3],Ref(mask_3rd_egg)), 
+        in.([1,],Ref(mask_4th)),
         values
     )
 end
 
 function get_joint_info(joint_type::Symbol)
-    (joint_type == :FloatingSpherical)  && (return (ntrl = 3, nrot = 3, ndof = 6, ncsts = 0, mask_1st = Int[],   mask_2nd = Int[]  , mask_3rd_hen = Int[], mask_3rd_egg = Int[], mask_4th = Int[] ))
-    (joint_type == :OrbitalSpherical)   && (return (ntrl = 2, nrot = 3, ndof = 5, ncsts = 1, mask_1st = Int[],   mask_2nd = Int[]  , mask_3rd_hen = Int[], mask_3rd_egg = Int[], mask_4th = [1]   ))
-    (joint_type == :PlanarSpherical)    && (return (ntrl = 2, nrot = 3, ndof = 5, ncsts = 1, mask_1st = Int[],   mask_2nd = Int[]  , mask_3rd_hen = [1],   mask_3rd_egg = Int[], mask_4th = Int[] ))
-    (joint_type == :PrismaticSpherical) && (return (ntrl = 1, nrot = 3, ndof = 4, ncsts = 2, mask_1st = Int[],   mask_2nd = Int[]  , mask_3rd_hen = [2,3], mask_3rd_egg = Int[], mask_4th = Int[] ))
-    (joint_type == :Spherical)          && (return (ntrl = 0, nrot = 3, ndof = 3, ncsts = 3, mask_1st = [1,2,3], mask_2nd = Int[]  , mask_3rd_hen = Int[], mask_3rd_egg = Int[], mask_4th = Int[] ))
-    (joint_type == :FloatingUniversal)  && (return (ntrl = 3, nrot = 2, ndof = 5, ncsts = 1, mask_1st = Int[],   mask_2nd = [1]    , mask_3rd_hen = Int[], mask_3rd_egg = Int[], mask_4th = Int[] )) #t1'*t2
-    (joint_type == :OrbitalUniversal)   && (return (ntrl = 2, nrot = 2, ndof = 4, ncsts = 2, mask_1st = Int[],   mask_2nd = [1]    , mask_3rd_hen = Int[], mask_3rd_egg = Int[], mask_4th = [1]   )) #t1'*t2
-    (joint_type == :PlanarUniversal)    && (return (ntrl = 2, nrot = 2, ndof = 4, ncsts = 2, mask_1st = Int[],   mask_2nd = [1]    , mask_3rd_hen = [1],   mask_3rd_egg = Int[], mask_4th = Int[] )) #t1'*t2
-    (joint_type == :PrismaticUniversal) && (return (ntrl = 1, nrot = 2, ndof = 3, ncsts = 3, mask_1st = Int[],   mask_2nd = [1]    , mask_3rd_hen = [2,3], mask_3rd_egg = Int[], mask_4th = Int[] )) #t1'*t2
-    (joint_type == :UniversalPrismatic) && (return (ntrl = 1, nrot = 2, ndof = 3, ncsts = 3, mask_1st = Int[],   mask_2nd = [1]    , mask_3rd_hen = Int[], mask_3rd_egg = [2,3], mask_4th = Int[] )) #t1'*t2
-    (joint_type == :Universal)          && (return (ntrl = 0, nrot = 2, ndof = 2, ncsts = 4, mask_1st = [1,2,3], mask_2nd = [1]    , mask_3rd_hen = Int[], mask_3rd_egg = Int[], mask_4th = Int[] )) #t1'*t2
-    (joint_type == :FloatingRevolute)   && (return (ntrl = 3, nrot = 1, ndof = 4, ncsts = 2, mask_1st = Int[],   mask_2nd = [2,3]  , mask_3rd_hen = Int[], mask_3rd_egg = Int[], mask_4th = Int[] )) #t1'*n, t2'*n
-    (joint_type == :OrbitalRevolute)    && (return (ntrl = 2, nrot = 1, ndof = 3, ncsts = 3, mask_1st = Int[],   mask_2nd = [2,3]  , mask_3rd_hen = Int[], mask_3rd_egg = Int[], mask_4th = [1]   )) #t1'*n, t2'*n
-    (joint_type == :PlanarRevolute)     && (return (ntrl = 2, nrot = 1, ndof = 3, ncsts = 3, mask_1st = Int[],   mask_2nd = [2,3]  , mask_3rd_hen = [1],   mask_3rd_egg = Int[], mask_4th = Int[] )) #t1'*n, t2'*n
-    (joint_type == :Cylindrical)        && (return (ntrl = 1, nrot = 1, ndof = 2, ncsts = 4, mask_1st = Int[],   mask_2nd = [2,3]  , mask_3rd_hen = [2,3], mask_3rd_egg = Int[], mask_4th = Int[] )) #t1'*n, t2'*n
-    (joint_type == :Revolute)           && (return (ntrl = 0, nrot = 1, ndof = 1, ncsts = 5, mask_1st = [1,2,3], mask_2nd = [2,3]  , mask_3rd_hen = Int[], mask_3rd_egg = Int[], mask_4th = Int[] )) #t1'*n, t2'*n
-    (joint_type == :Floating)           && (return (ntrl = 3, nrot = 0, ndof = 3, ncsts = 3, mask_1st = Int[],   mask_2nd = [1,2,3], mask_3rd_hen = Int[], mask_3rd_egg = Int[], mask_4th = Int[] )) #t1'*t2, t1'*n, t2'*n
-    (joint_type == :Orbital)            && (return (ntrl = 2, nrot = 0, ndof = 2, ncsts = 4, mask_1st = Int[],   mask_2nd = [1,2,3], mask_3rd_hen = Int[], mask_3rd_egg = Int[], mask_4th = [1]   )) #t1'*t2, t1'*n, t2'*n
-    (joint_type == :Planar)             && (return (ntrl = 2, nrot = 0, ndof = 2, ncsts = 4, mask_1st = Int[],   mask_2nd = [1,2,3], mask_3rd_hen = [1],   mask_3rd_egg = Int[], mask_4th = Int[] )) #t1'*t2, t1'*n, t2'*n
-    (joint_type == :Prismatic)          && (return (ntrl = 1, nrot = 0, ndof = 1, ncsts = 5, mask_1st = Int[],   mask_2nd = [1,2,3], mask_3rd_hen = [2,3], mask_3rd_egg = Int[], mask_4th = Int[] )) #t1'*t2, t1'*n, t2'*n
-    (joint_type == :Fixed)              && (return (ntrl = 0, nrot = 0, ndof = 0, ncsts = 6, mask_1st = [1,2,3], mask_2nd = [1,2,3], mask_3rd_hen = Int[], mask_3rd_egg = Int[], mask_4th = Int[] )) #t1'*t2, t1'*n, t2'*n
+    (joint_type == :FloatingSpherical)  && (return (ntrl = 3, nrot = 3, num_of_dof = 6, ncsts = 0, mask_1st = Int[],   mask_2nd = Int[]  , mask_3rd_hen = Int[], mask_3rd_egg = Int[], mask_4th = Int[] ))
+    (joint_type == :OrbitalSpherical)   && (return (ntrl = 2, nrot = 3, num_of_dof = 5, ncsts = 1, mask_1st = Int[],   mask_2nd = Int[]  , mask_3rd_hen = Int[], mask_3rd_egg = Int[], mask_4th = [1]   ))
+    (joint_type == :PlanarSpherical)    && (return (ntrl = 2, nrot = 3, num_of_dof = 5, ncsts = 1, mask_1st = Int[],   mask_2nd = Int[]  , mask_3rd_hen = [1],   mask_3rd_egg = Int[], mask_4th = Int[] ))
+    (joint_type == :PrismaticSpherical) && (return (ntrl = 1, nrot = 3, num_of_dof = 4, ncsts = 2, mask_1st = Int[],   mask_2nd = Int[]  , mask_3rd_hen = [2,3], mask_3rd_egg = Int[], mask_4th = Int[] ))
+    (joint_type == :Spherical)          && (return (ntrl = 0, nrot = 3, num_of_dof = 3, ncsts = 3, mask_1st = [1,2,3], mask_2nd = Int[]  , mask_3rd_hen = Int[], mask_3rd_egg = Int[], mask_4th = Int[] ))
+    (joint_type == :FloatingUniversal)  && (return (ntrl = 3, nrot = 2, num_of_dof = 5, ncsts = 1, mask_1st = Int[],   mask_2nd = [1]    , mask_3rd_hen = Int[], mask_3rd_egg = Int[], mask_4th = Int[] )) #t1'*t2
+    (joint_type == :OrbitalUniversal)   && (return (ntrl = 2, nrot = 2, num_of_dof = 4, ncsts = 2, mask_1st = Int[],   mask_2nd = [1]    , mask_3rd_hen = Int[], mask_3rd_egg = Int[], mask_4th = [1]   )) #t1'*t2
+    (joint_type == :PlanarUniversal)    && (return (ntrl = 2, nrot = 2, num_of_dof = 4, ncsts = 2, mask_1st = Int[],   mask_2nd = [1]    , mask_3rd_hen = [1],   mask_3rd_egg = Int[], mask_4th = Int[] )) #t1'*t2
+    (joint_type == :PrismaticUniversal) && (return (ntrl = 1, nrot = 2, num_of_dof = 3, ncsts = 3, mask_1st = Int[],   mask_2nd = [1]    , mask_3rd_hen = [2,3], mask_3rd_egg = Int[], mask_4th = Int[] )) #t1'*t2
+    (joint_type == :UniversalPrismatic) && (return (ntrl = 1, nrot = 2, num_of_dof = 3, ncsts = 3, mask_1st = Int[],   mask_2nd = [1]    , mask_3rd_hen = Int[], mask_3rd_egg = [2,3], mask_4th = Int[] )) #t1'*t2
+    (joint_type == :Universal)          && (return (ntrl = 0, nrot = 2, num_of_dof = 2, ncsts = 4, mask_1st = [1,2,3], mask_2nd = [1]    , mask_3rd_hen = Int[], mask_3rd_egg = Int[], mask_4th = Int[] )) #t1'*t2
+    (joint_type == :FloatingRevolute)   && (return (ntrl = 3, nrot = 1, num_of_dof = 4, ncsts = 2, mask_1st = Int[],   mask_2nd = [2,3]  , mask_3rd_hen = Int[], mask_3rd_egg = Int[], mask_4th = Int[] )) #t1'*n, t2'*n
+    (joint_type == :OrbitalRevolute)    && (return (ntrl = 2, nrot = 1, num_of_dof = 3, ncsts = 3, mask_1st = Int[],   mask_2nd = [2,3]  , mask_3rd_hen = Int[], mask_3rd_egg = Int[], mask_4th = [1]   )) #t1'*n, t2'*n
+    (joint_type == :PlanarRevolute)     && (return (ntrl = 2, nrot = 1, num_of_dof = 3, ncsts = 3, mask_1st = Int[],   mask_2nd = [2,3]  , mask_3rd_hen = [1],   mask_3rd_egg = Int[], mask_4th = Int[] )) #t1'*n, t2'*n
+    (joint_type == :Cylindrical)        && (return (ntrl = 1, nrot = 1, num_of_dof = 2, ncsts = 4, mask_1st = Int[],   mask_2nd = [2,3]  , mask_3rd_hen = [2,3], mask_3rd_egg = Int[], mask_4th = Int[] )) #t1'*n, t2'*n
+    (joint_type == :Revolute)           && (return (ntrl = 0, nrot = 1, num_of_dof = 1, ncsts = 5, mask_1st = [1,2,3], mask_2nd = [2,3]  , mask_3rd_hen = Int[], mask_3rd_egg = Int[], mask_4th = Int[] )) #t1'*n, t2'*n
+    (joint_type == :Floating)           && (return (ntrl = 3, nrot = 0, num_of_dof = 3, ncsts = 3, mask_1st = Int[],   mask_2nd = [1,2,3], mask_3rd_hen = Int[], mask_3rd_egg = Int[], mask_4th = Int[] )) #t1'*t2, t1'*n, t2'*n
+    (joint_type == :Orbital)            && (return (ntrl = 2, nrot = 0, num_of_dof = 2, ncsts = 4, mask_1st = Int[],   mask_2nd = [1,2,3], mask_3rd_hen = Int[], mask_3rd_egg = Int[], mask_4th = [1]   )) #t1'*t2, t1'*n, t2'*n
+    (joint_type == :Planar)             && (return (ntrl = 2, nrot = 0, num_of_dof = 2, ncsts = 4, mask_1st = Int[],   mask_2nd = [1,2,3], mask_3rd_hen = [1],   mask_3rd_egg = Int[], mask_4th = Int[] )) #t1'*t2, t1'*n, t2'*n
+    (joint_type == :Prismatic)          && (return (ntrl = 1, nrot = 0, num_of_dof = 1, ncsts = 5, mask_1st = Int[],   mask_2nd = [1,2,3], mask_3rd_hen = [2,3], mask_3rd_egg = Int[], mask_4th = Int[] )) #t1'*t2, t1'*n, t2'*n
+    (joint_type == :Fixed)              && (return (ntrl = 0, nrot = 0, num_of_dof = 0, ncsts = 6, mask_1st = [1,2,3], mask_2nd = [1,2,3], mask_3rd_hen = Int[], mask_3rd_egg = Int[], mask_4th = Int[] )) #t1'*t2, t1'*n, t2'*n
 end
 
 FloatingSphericalJoint(id,hen2egg)  = PrototypeJoint(id,hen2egg,:FloatingSpherical)

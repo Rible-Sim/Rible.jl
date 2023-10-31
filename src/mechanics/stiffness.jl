@@ -2,7 +2,7 @@ function static_kinematic_determine(
         ℬᵀ;
         atol = 0.0
     )
-    ndof,ncables = size(ℬᵀ)
+    num_of_dof,ncables = size(ℬᵀ)
     U,S,V = svd(ℬᵀ; full = true, alg = LinearAlgebra.QRIteration())
     @show size(U),size(V),size(S)    
     rtol = min(size(ℬᵀ)...)*eps(real(float(one(eltype(ℬᵀ)))))
@@ -11,14 +11,14 @@ function static_kinematic_determine(
     rank_ℬᵀ = count(x -> x > tol, S)
     S_nonzero = S[begin:rank_ℬᵀ]
     dsi = ncables - rank_ℬᵀ
-    dki = ndof - rank_ℬᵀ
-    @show ndof,ncables,rank_ℬᵀ,dsi,dki
+    dki = num_of_dof - rank_ℬᵀ
+    @show num_of_dof,ncables,rank_ℬᵀ,dsi,dki
     A = vcat(
         ℬᵀ,
         Matrix(-1I,ncables,ncables)
     )
 
-    hr = hrep(A, zeros(ndof+ncables),  BitSet(1:ndof))
+    hr = hrep(A, zeros(num_of_dof+ncables),  BitSet(1:num_of_dof))
     ph = polyhedron(hr, lib)
     vr = vrep(ph)
     @assert npoints(vr) == 1
@@ -62,7 +62,7 @@ function optimize_maximum_stiffness(mat𝒦ps,vec𝒦m,vecI,A,b,nx)
 
     model = COSMO.Model()
 
-    constraint1 = COSMO.Constraint(
+    cstr1 = COSMO.Constraint(
         hcat(
             mat𝒦ps,zero(vecI),-vecI
         ), 
@@ -71,19 +71,19 @@ function optimize_maximum_stiffness(mat𝒦ps,vec𝒦m,vecI,A,b,nx)
         COSMO.PsdCone
     )
 
-    constraint2 = COSMO.Constraint(
+    cstr2 = COSMO.Constraint(
         A, 
         b, 
         COSMO.ZeroSet
     )
 
-    constraint3 = COSMO.Constraint(
+    cstr3 = COSMO.Constraint(
         Matrix(1.0I,nx,nx)[:,end-1] |> Diagonal, 
         zeros(nx), 
         COSMO.Nonnegatives
     )
 
-    constraints = [constraint1,constraint2,constraint3]
+    cstr = [cstr1,cstr2,cstr3]
 
     custom_settings = COSMO.Settings(
         verbose = true, 
@@ -96,7 +96,7 @@ function optimize_maximum_stiffness(mat𝒦ps,vec𝒦m,vecI,A,b,nx)
         model, 
         zeros(nx,nx), 
         -Matrix(1.0I,nx,nx)[:,end], 
-        constraints,
+        cstr,
         settings = custom_settings
     )
 
@@ -107,7 +107,7 @@ function optimize_zero_stiffness(mat𝒦ps,vec𝒦m,vecI,A,b,nx,x_0)
 
     model = COSMO.Model()
 
-    constraint1 = COSMO.Constraint(
+    cstr1 = COSMO.Constraint(
         hcat(
             mat𝒦ps,zero(vecI)
         ), 
@@ -116,13 +116,13 @@ function optimize_zero_stiffness(mat𝒦ps,vec𝒦m,vecI,A,b,nx,x_0)
         COSMO.PsdCone
     )
 
-    constraint2 = COSMO.Constraint(
+    cstr2 = COSMO.Constraint(
         A, 
         b, 
         COSMO.ZeroSet
     )
 
-    constraints = [constraint1,constraint2]
+    cstr = [cstr1,cstr2]
 
     custom_settings = COSMO.Settings(
         verbose = true, 
@@ -141,7 +141,7 @@ function optimize_zero_stiffness(mat𝒦ps,vec𝒦m,vecI,A,b,nx,x_0)
         model, 
         zeros(nx,nx), 
         -Matrix(1.0I,nx,nx)[:,end], 
-        constraints,
+        cstr,
         settings = custom_settings
     )
     COSMO.warm_start_primal!(model, x_0)
@@ -195,9 +195,9 @@ function optimize_zero_stiffness_Clarabel(mat𝒦ps,vec𝒦m,vecI,Aeq,beq,nx,x_0
 end
 
 # function super_stability(bot)
-#     q = RB.get_coordinates(bot.st)
-#     # q̌ = RB.get_free_coordinates(bot.st)
-#     Ǎ = RB.make_constraints_jacobian(bot.st)(q)
+#     q = RB.get_coords(bot.st)
+#     # q̌ = RB.get_free_coords(bot.st)
+#     Ǎ = RB.make_cstr_jacobian(bot.st)(q)
 #     Ň_ = RB.nullspace(Ǎ)
 #     Ň = modified_gram_schmidt(Ň_)
 #     Q̃ = RB.build_Q̃(bot.st)
@@ -219,7 +219,7 @@ end
 #         # μ = l .- (f./k)
 #         λ = inv(Ǎ*transpose(Ǎ))*Ǎ*Bᵀ*f
 #         # @show f,λ
-#         Ǩa = - RB.constraint_forces_on_free_jacobian(bot.st,λ)
+#         Ǩa = - RB.cstr_forces_on_free_jacobian(bot.st,λ)
 #         𝒦a = transpose(Ň)*Ǩa*Ň |> sparse
 #         D_𝒦a = ldl(𝒦a).D.diag |> sort
 

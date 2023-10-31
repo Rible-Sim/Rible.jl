@@ -70,7 +70,7 @@ function spine(n,dis,rm,heating_law;k=1000.0,c=0.0)
 		# nmcs = RB.NCF.NC2P2V(ri,rk,ro,R)
 		nmcs = RB.NCF.NC1P3V(ri,ro,R)
 		if i == 1
-			pres_idx = RB.find_full_pres_indices(nmcs,q)
+			pres_idx = RB.find_full_pres_idx(nmcs,q)
 		else
 			pres_idx = Int[]
 		end
@@ -89,18 +89,18 @@ function spine(n,dis,rm,heating_law;k=1000.0,c=0.0)
     ks = repeat(vcat(fill(kH,3),fill(kR,3)),n-1)
     # c = 0.0
     cs = repeat(fill(c,6),n-1)
-	SMA_strings_indices = collect([j for i = 1:n-1 for j in (6*(i-1)+1):(6*(i-1)+3)])
-	strings_indices = collect([j for i = 1:n-1 for j in (6*(i-1)+4):(6*(i-1)+6)])
-    SMA_strings = [RB.SMAString3D(i,stringlens[i],RB.LinearLaw(ks[i],0.0),cs[i]) for i in SMA_strings_indices]
-    strings = [RB.SString3D(i,stringlens[i],ks[i],cs[i]) for i in strings_indices]
+	SMA_strings_idx = collect([j for i = 1:n-1 for j in (6*(i-1)+1):(6*(i-1)+3)])
+	strings_idx = collect([j for i = 1:n-1 for j in (6*(i-1)+4):(6*(i-1)+6)])
+    SMA_strings = [RB.SMAString3D(i,stringlens[i],RB.LinearLaw(ks[i],0.0),cs[i]) for i in SMA_strings_idx]
+    strings = [RB.SString3D(i,stringlens[i],ks[i],cs[i]) for i in strings_idx]
 	tensiles = (strings = strings, SMA_strings = SMA_strings)
-	acs = [RB.ManualActuation(RB.SimpleActuator(i,stringlens[i])) for i = strings_indices]
+	acs = [RB.ManualActuation(RB.SimpleActuator(i,stringlens[i])) for i = strings_idx]
 	heaters = [RB.ManualSerialHeating(RB.SimpleActuators(i.+[6j for j=0:n-2],fill(40.0,n-1)),fill(heating_law,n-1)) for i in 1:3]
 	hub = (actuators=acs, heaters=heaters)
-    bodynq = RB.get_nbodycoords(rbs[1])
-    body2q_raw = [(bodynq*(i-1)+1:bodynq*i) for i = 1:n]
-	# body2q = RB.filter_body2q(body2q_raw,rbs)
-	body2q = body2q_raw
+    bodynq = RB.get_num_of_coords(rbs[1])
+    bodyid2q_raw = [(bodynq*(i-1)+1:bodynq*i) for i = 1:n]
+	# bodyid2q = RB.filter_bodyid2q(bodyid2q_raw,rbs)
+	bodyid2q = bodyid2q_raw
 
     string2ap = Vector{Tuple{RB.ID,RB.ID}}()
     for i = 1:n-1
@@ -111,7 +111,7 @@ function spine(n,dis,rm,heating_law;k=1000.0,c=0.0)
             push!(string2ap,(RB.ID(i,j),RB.ID(i+1,j+9)))
         end
     end
-    cnt = RB.Connectivity(body2q,string2ap)
+    cnt = RB.Connectivity(bodyid2q,string2ap)
     st = RB.Structure(rbs,tensiles,cnt)
 	RB.jac_singularity_check(st)
 	tr = RB.Robot(st,hub)
@@ -199,13 +199,13 @@ function spine_true(n,dis,rm;
 		# nmcs = RB.NCF.NC2P2V(ri,rk,ro,R)
 		nmcs = RB.NCF.NC1P3V(ri,ro,R)
 		if i == 1
-			ci = RB.find_full_pres_indices(nmcs,q)
-			constraints_indices = collect(1:6)
+			ci = RB.find_full_pres_idx(nmcs,q)
+			cstr_idx = collect(1:6)
 		else
 			ci = Int[]
-			constraints_indices = collect(1:6)
+			cstr_idx = collect(1:6)
 		end
-        state = RB.RigidBodyState(prop,nmcs,ro,R,ṙo,ω,ci,constraints_indices)
+        state = RB.RigidBodyState(prop,nmcs,ro,R,ṙo,ω,ci,cstr_idx)
         body = RB.RigidBody(prop,state)
     end
     rbs = [rigidbody(i,props[i],aps,rs[i],Rs[i],ṙs[i],ωs[i]) for i = 1:n]
@@ -223,8 +223,8 @@ function spine_true(n,dis,rm;
     ks = repeat(vcat(fill(kH,3),fill(kR,3)),n-1)
     c = 100.0
     cs = repeat(fill(c,6),n-1)
-	cables_indices = collect([j for i = 1:n-1 for j in (6*(i-1)+1):(6*(i-1)+6)])
-    cables = [RB.Cable3D(i,cablelens[i],ks[i],cs[i]) for i in cables_indices]
+	cables_idx = collect([j for i = 1:n-1 for j in (6*(i-1)+1):(6*(i-1)+6)])
+    cables = [RB.Cable3D(i,cablelens[i],ks[i],cs[i]) for i in cables_idx]
 	tensiles = (cables = cables,)
 
 	matrix_cnt = zeros(Int,6(n-1),n)
@@ -249,7 +249,7 @@ function spine_true(n,dis,rm;
 
 	acs = [
 		RB.ManualActuator(i,i,cablelens[i])
-		for i = cables_indices
+		for i = cables_idx
 	]
 	hub = (actuators=acs,)
 

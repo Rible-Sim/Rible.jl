@@ -7,6 +7,14 @@ using DocStringExtensions
 import FastGaussQuadrature as FGQ
 using QuadGK
 
+
+import ..Rible: get_num_of_cstr, get_num_of_coords
+import ..Rible: get_num_of_dof, get_num_of_local_dims
+
+export get_num_of_cstr, get_num_of_coords
+export get_num_of_dof, get_num_of_local_dims
+
+
 """
 Absolute Nodal Coordinates abstract type。
 """
@@ -59,23 +67,23 @@ get_num_of_local_dims(::ANC3D12C) = 1
 Return 坐标个数。
 $(TYPEDSIGNATURES)
 """
-get_num_of_coordinates(::ANC2D4C) = 4
-get_num_of_coordinates(::ANC2D6C) = 6
-get_num_of_coordinates(::ANC3D6C) = 6
-get_num_of_coordinates(::ANC3D12C) = 12
+get_num_of_coords(::ANC2D4C) = 4
+get_num_of_coords(::ANC2D6C) = 6
+get_num_of_coords(::ANC3D6C) = 6
+get_num_of_coords(::ANC3D12C) = 12
 """
 Return 约束方程个数。
 $(TYPEDSIGNATURES)
 """
-get_num_of_constraints(::ANC2D4C) = 0
-get_num_of_constraints(::ANC2D6C) = 0
-get_num_of_constraints(::ANC3D6C) = 0
-get_num_of_constraints(::ANC3D12C) = 0
+get_num_of_cstr(::ANC2D4C) = 0
+get_num_of_cstr(::ANC2D6C) = 0
+get_num_of_cstr(::ANC3D6C) = 0
+get_num_of_cstr(::ANC3D12C) = 0
 """
 Return 自由度数。
 $(TYPEDSIGNATURES)
 """
-get_num_of_dof(ancs::ANC) =  get_num_of_coordinates(ancs) - get_num_of_constraints(ancs)
+get_num_of_dof(ancs::ANC) =  get_num_of_coords(ancs) - get_num_of_cstr(ancs)
 
 
 """
@@ -368,7 +376,7 @@ struct CoordinateFunctions{ancsType,xT<:Function,ST<:Function}
     S::ST
 end
 
-function CoordinateFunctions(ancs,free_idx_mask,constraints_indices)
+function CoordinateFunctions(ancs,free_idx_mask,cstr_idx)
     _x = make_x(ancs)
     _S = make_S(ancs)
     CoordinateFunctions(ancs,_x,_S)
@@ -379,19 +387,19 @@ end
 Return 未约束的Absolute Nodal Coordinates编号。
 $(TYPEDSIGNATURES)
 """
-function get_unconstrained_indices(ancs::ANC,pres_idx)
-    deleteat!(collect(1:get_num_of_coordinates(ancs)),pres_idx)
+function get_unconstrained_idx(ancs::ANC,pres_idx)
+    deleteat!(collect(1:get_num_of_coords(ancs)),pres_idx)
 end
 
 """
 封装有函数的Absolute Nodal Coordinates类构造子。
 $(TYPEDSIGNATURES)
 """
-function CoordinateFunctions(ancs,free_coordinates_indices)
+function CoordinateFunctions(ancs,free_coords_idx)
     ξ = find_ξ(ancs)
     S = make_S(ancs)
-    nq = get_num_of_coordinates(ancs)
-    nuc = length(free_coordinates_indices)
+    nq = get_num_of_coords(ancs)
+    nuc = length(free_coords_idx)
     CoordinateFunctions(ancs,ξ,S)
 end
 

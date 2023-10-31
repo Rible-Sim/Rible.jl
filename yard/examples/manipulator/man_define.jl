@@ -1,7 +1,7 @@
 
-function man_ndof(ndof,onedir=[1.0,0.0];θ=0.0,k=0.0,c=0.0,unit="mks",restlen=0.16,isvirtual=true)
-    nbodies = ndof + 1
-    nbp = 2nbodies - ndof
+function man_ndof(num_of_dof,onedir=[1.0,0.0];θ=0.0,k=0.0,c=0.0,unit="mks",restlen=0.16,isvirtual=true)
+    nbodies = num_of_dof + 1
+    nbp = 2nbodies - num_of_dof
     n_lower = count(isodd,1:nbodies)
     n_upper = count(iseven,1:nbodies)
     lower_index = 1:2:nbodies
@@ -127,7 +127,7 @@ function man_ndof(ndof,onedir=[1.0,0.0];θ=0.0,k=0.0,c=0.0,unit="mks",restlen=0.
 
 		constrained = false
 		ci = Int[]
-		constraints_indices =  collect(1:3)
+		cstr_idx =  collect(1:3)
 		prop = RB.RigidBodyProperty(
 					i,movable,m,
 					Ī,
@@ -140,13 +140,13 @@ function man_ndof(ndof,onedir=[1.0,0.0];θ=0.0,k=0.0,c=0.0,unit="mks",restlen=0.
         if i in [1,2]
 			constrained = true
 			if i == 1
-            	ci = RB.find_full_pres_indices(nmcs, q)
+            	ci = RB.find_full_pres_idx(nmcs, q)
 				display(ci)
 			else
 				ci = [1]
 			end
 		end
-		state = RB.RigidBodyState(prop, nmcs, ri, α, ṙo, ω, ci, constraints_indices)
+		state = RB.RigidBodyState(prop, nmcs, ri, α, ṙo, ω, ci, cstr_idx)
 
         body = RB.RigidBody(prop,state)
     end

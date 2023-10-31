@@ -102,7 +102,7 @@ function man(n,θ=0.0)
     rb2p = [
         [i,i+1] for i = 1:length(rbs)
     ]
-    body2q = [
+    bodyid2q = [
         SVector(2pid[1]-1,2pid[1],2pid[2]-1,2pid[2]) for pid in rb2p
     ]
 
@@ -118,7 +118,7 @@ function man(n,θ=0.0)
         push!(string2p,(R2.ID(i,1),R2.ID(i+1,3)))
         push!(string2p,(R2.ID(i,3),R2.ID(i+1,2)))
     end
-    cnt = R2.Connectivity(body2q,string2p)
+    cnt = R2.Connectivity(bodyid2q,string2p)
     R2.Structure(rbs,ss,acs,cnt)
 end
 n = 2
@@ -142,14 +142,14 @@ function man_spark(n,tgstruct)
     rbs = tgstruct.rigidbodies
     vss = tgstruct.cables
     cnt = tgstruct.connectivity
-    @unpack body2q = cnt
+    @unpack bodyid2q = cnt
     @unpack nbodies,nfixbodies,ncables = tgstruct
-    ninconstraint = nbodies
-    nexconstraint = 3nfixbody
-    nconstraint = ninconstraint + nexconstraint
+    nincstr = nbodies
+    num_of_extrinsic_cstr = 3nfixbody
+    num_of_cstr = nincstr + num_of_extrinsic_cstr
 
 
-    mass_matrix = R2.build_massmatrix(rbs,body2q)
+    mass_matrix = R2.build_massmatrix(rbs,bodyid2q)
 
     function M!(mm,q)
         mm .= mass_matrix
@@ -213,15 +213,15 @@ function man_wend(n,tgstruct)
     rbs = tgstruct.rigidbodies
     vss = tgstruct.cables
     cnt = tgstruct.connectivity
-    @unpack body2q = cnt
+    @unpack bodyid2q = cnt
     @unpack nbodies,nfixbodies,ncables = tgstruct
-    ninconstraint = nbodies
-    nexconstraint = 3nfixbody
-    nconstraint = ninconstraint + nexconstraint
+    nincstr = nbodies
+    num_of_extrinsic_cstr = 3nfixbody
+    num_of_cstr = nincstr + num_of_extrinsic_cstr
     nq = tgstruct.ncoords
-    q0,q̇0 = R2.get_coordinates(tgstruct)
+    q0,q̇0 = R2.get_coords(tgstruct)
 
-    M = R2.build_massmatrix(rbs,body2q)
+    M = R2.build_massmatrix(rbs,bodyid2q)
 
     ref_angles = update_angles(refman)
     pids = [R2.PIDController.PID(0.01,0.1,1.0,
@@ -271,14 +271,14 @@ function initial(n,tgstruct)
     rbs = tgstruct.rigidbodies
     cnt = tgstruct.connectivity
     @unpack nbodies,nfixbodies = tgstruct
-    nq = cnt.body2q[end][end]
-    q0,q̇0 = get_coordinates(tgstruct)
+    nq = cnt.bodyid2q[end][end]
+    q0,q̇0 = get_coords(tgstruct)
     #q̇0[end] = 0.01
     #q̇0[end-1:end] .= [0.0,0.001]
-    ninconstraint = nbodies
-    nexconstraint = 3nfixbody
-    nconstraint = ninconstraint + nexconstraint
-    λ0 = zeros(nconstraint)
+    nincstr = nbodies
+    num_of_extrinsic_cstr = 3nfixbody
+    num_of_cstr = nincstr + num_of_extrinsic_cstr
+    λ0 = zeros(num_of_cstr)
     q0,q̇0,λ0
 end
 q0,q̇0,λ0 = initial(n,manipulator)

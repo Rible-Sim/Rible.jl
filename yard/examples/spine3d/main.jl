@@ -64,13 +64,13 @@ N(fullq0)
 
 function locate_bifurcation_point(bot,γ0)
     (;st) = bot
-    (;ncoords,ncables,ndof,nconstraint) = bot.st
-    (;mvindices,fixindices) = bot.st.connectivity
+    (;ncoords,ncables,num_of_dof,num_of_cstr) = bot.st
+    (;mvidx,fixidx) = bot.st.connectivity
     nq = ncoords
     ns = ncables
-    nd = ndof
-    nλ = nconstraint
-    c_val = RB.get_local_coordinates(st)
+    nd = num_of_dof
+    nλ = num_of_cstr
+    c_val = RB.get_local_coords(st)
     s_val = RB.get_s(st)
     ℓ_val = RB.get_cables_len(st)
     k_val = RB.get_cables_stiffness(st)
@@ -86,14 +86,14 @@ function locate_bifurcation_point(bot,γ0)
     eprs = 1s
     eprk = 1k
     eprμ = 1μ
-    eprq = subs(1q, q[fixindices]=>q_val[fixindices])
+    eprq = subs(1q, q[fixidx]=>q_val[fixidx])
     Φ = RB.build_Φ(st)
     A = RB.build_A(st)
-    𝚽_val = Φ(q_val[mvindices])
-    𝐀_val = A(q_val[mvindices])
+    𝚽_val = Φ(q_val[mvidx])
+    𝐀_val = A(q_val[mvidx])
     Q = RB.build_Q(st)
     𝐐 = Q(eprq,eprs,eprμ,eprk,eprc)
-    𝐐_val = Q(q_val,s_val,μ_val,k_val,c_val)[mvindices]
+    𝐐_val = Q(q_val,s_val,μ_val,k_val,c_val)[mvidx]
     # display(𝐀_val*transpose(𝐀_val))
     @assert 𝐀_val*transpose(𝐀_val) ≈ I
     λ_val=𝐀_val*𝐐_val
@@ -102,20 +102,20 @@ function locate_bifurcation_point(bot,γ0)
     eprλ = 1λ
     KE = RB.build_KE(st)
     KG = RB.build_KG(st)
-    Aᵀλ = System(transpose(A(eprq[mvindices]))*eprλ, variables = q[mvindices], parameters = λ)
+    Aᵀλ = System(transpose(A(eprq[mvidx]))*eprλ, variables = q[mvidx], parameters = λ)
     # jacobian(Aᵀλ)
     S = RB.build_S(st)
     𝐒 = S(eprq,eprs,eprc)
     S_val = S(q_val,s_val,c_val)
 
-    𝐊 = KE(eprq,eprs,eprk,eprc)[mvindices,mvindices] +
-         KG(eprq,eprs,eprμ,eprk,eprc)[mvindices,mvindices] +
+    𝐊 = KE(eprq,eprs,eprk,eprc)[mvidx,mvidx] +
+         KG(eprq,eprs,eprμ,eprk,eprc)[mvidx,mvidx] +
          jacobian(Aᵀλ)
-    𝐍 = N(eprq)[mvindices,7:12]
-    𝐍_val = N(q_val)[mvindices,7:12]
+    𝐍 = N(eprq)[mvidx,7:12]
+    𝐍_val = N(q_val)[mvidx,7:12]
     # display(𝐀_val*𝐍_val)
     𝑲 = transpose(𝐍)*𝐊*𝐍
-    𝑲_val = subs.(𝑲,q[mvindices]=>q_val[mvindices],s=>s_val,λ=>λ_val,c=>c_val,k=>k_val,μ=>μ_val) .|> to_number
+    𝑲_val = subs.(𝑲,q[mvidx]=>q_val[mvidx],s=>s_val,λ=>λ_val,c=>c_val,k=>k_val,μ=>μ_val) .|> to_number
 
     return eigen(𝑲_val).values
 
@@ -125,17 +125,17 @@ function locate_bifurcation_point(bot,γ0)
     ξ = 𝑲ij_val\𝐞[i]
 
     function Sx(qx,sx)
-        q_full = subs.(eprq,q[mvindices]=>qx) .|> to_number
+        q_full = subs.(eprq,q[mvidx]=>qx) .|> to_number
         S(q_full,sx,c_val)
     end
 
     function Qx(qx,sx,γ)
-        q_full = subs.(eprq,q[mvindices]=>qx) .|> to_number
-        Q(q_full,sx,γ.*ℓ_val,k_val,c_val)[mvindices]
+        q_full = subs.(eprq,q[mvidx]=>qx) .|> to_number
+        Q(q_full,sx,γ.*ℓ_val,k_val,c_val)[mvidx]
     end
 
     function 𝑲x(qx,sx,λx,γ)
-        subs.(𝑲,q[mvindices]=>qx,s=>sx,λ=>λx,c=>c_val,k=>k_val,μ=>(γ.*ℓ_val)) .|> to_number
+        subs.(𝑲,q[mvidx]=>qx,s=>sx,λ=>λx,c=>c_val,k=>k_val,μ=>(γ.*ℓ_val)) .|> to_number
     end
 
     function bp!(f,x)
@@ -152,7 +152,7 @@ function locate_bifurcation_point(bot,γ0)
         f[end]                    = transpose(𝐞[j])*ξx-1
     end
     f_holder = zeros(2nq+ns+1)
-    x_initial = vcat(q_val[mvindices],s_val,λ_val,ξ,γ0)
+    x_initial = vcat(q_val[mvidx],s_val,λ_val,ξ,γ0)
     # eigen(to_number.(𝐾_val))
     bp!(f_holder,x_initial)
     # @show f_holder[nq+ns+nλ+1:nq+ns+nλ+nd],x_initial[nq+ns+nλ+1:nq+ns+nλ+nd]

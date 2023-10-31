@@ -191,11 +191,11 @@ function dynfuncs(bot)
 end
 #
 # 𝐌,𝚽,𝚽𝐪,𝐅,Jacobians,contact_funcs = contact_dynfuncs(rod)
-# 𝐠,get_indices,get_FCs,get_D = contact_funcs
-# q0,v0 = RB.get_coordinates(rod.st)
+# 𝐠,get_idx,get_FCs,get_D = contact_funcs
+# q0,v0 = RB.get_coords(rod.st)
 #
 # 𝐠(q0)
-# get_indices(q0)
+# get_idx(q0)
 
 tspan = (0.0,0.4)
 h = 1e-3

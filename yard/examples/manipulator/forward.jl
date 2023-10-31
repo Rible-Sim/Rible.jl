@@ -61,7 +61,7 @@ end
 function get_actuate_seqs(bot,g0=[0.0])
     (;st) = bot
     (;nrigids) = st
-    (;mem2num,num2sys) = st.connectivity.numbered
+    (;bodyid2sys_loci_idx,sys_loci2coords_idx) = st.connectivity.numbered
     tg_end = deepcopy(st)
     nsegs = nrigids-1
     startsols,parameters0 = RB.get_start_system(bot,RB.AllMode())
@@ -82,7 +82,7 @@ function get_actuate_seqs(bot,g0=[0.0])
     indx_c = reduce(
         vcat,
         [
-            reduce(vcat,num2sys[mem2num[i][4:7]])
+            reduce(vcat,sys_loci2coords_idx[bodyid2sys_loci_idx[i][4:7]])
             for i = 1:nrigids
         ]
     )
@@ -107,8 +107,8 @@ function get_actuate_seqs(bot,g0=[0.0])
     P,variable_groups,parameters = RB.forward_system(st,RB.AllMode();)
     Psys, ide_pindx = RB.find_diff_system(P,variable_groups,parameters,dummy_parameter_points)
 
-    indr1p7 = num2sys[mem2num[1][7]]
-    indr2p5 = num2sys[mem2num[2][5]]
+    indr1p7 = sys_loci2coords_idx[bodyid2sys_loci_idx[1][7]]
+    indr2p5 = sys_loci2coords_idx[bodyid2sys_loci_idx[2][5]]
     @show indr1p7
     @show c0[indr1p7]
 
@@ -293,7 +293,7 @@ plotstructure(man_inv)
 function get_actuate_seqs(bot,g=0.0)
     # plotstructure(man_inv)
     Y = RB.build_Y(bot)
-    # q,_ = RB.get_coordinates(bot.st)
+    # q,_ = RB.get_coords(bot.st)
     # λ,u,a = RB.inverse(bot,deepcopy(bot),Y)
     start_sol,parameters0 = RB.get_start_system(bot,Y)
     # start_sol
@@ -447,7 +447,7 @@ function get_actuate_video(bot_input;g0=[0.0])
     bot = deepcopy(bot_input)
     (;st) = bot
     (;nrigids) = st
-    (;mem2num,num2sys) = st.connectivity.numbered
+    (;bodyid2sys_loci_idx,sys_loci2coords_idx) = st.connectivity.numbered
     tg_end = deepcopy(st)
     nsegs = nrigids-1
     startsols,parameters0 = RB.get_start_system(bot,RB.DeformMode())

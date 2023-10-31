@@ -13,7 +13,7 @@ jobs:
     strategy:
       matrix:
         julia-version: ['1.9.3']
-        julia-arch: [x64, aarch64]
+        julia-arch: [x64]
         os: [ubuntu-latest, windows-latest, macOS-latest]
     steps:
     - uses: actions/checkout@v2

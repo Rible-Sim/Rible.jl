@@ -25,7 +25,7 @@ includet("../vis.jl")
 twodofbot = man_nd1(2e3;ratio=γ0); twodofbot_plot = deepcopy(twodofbot)
 
 # for setting c
-# c = RB.get_local_coordinates(twodofbot)
+# c = RB.get_local_coords(twodofbot)
 # RB.set_C!(twodofbot.st,c)
 
 function N(q)
@@ -49,21 +49,21 @@ end
 function locate_bifurcation_point(bot_input,γ0)
     bot = deepcopy(bot_input)
     (;st) = bot
-    (;ndof,nconstraints,connectivity) = bot.st
+    (;num_of_dof,num_of_cstr,connectivity) = bot.st
     (;cables) = st.tensiles
-    (;nfull,nfree) = connectivity.indexed
+    (;num_of_full_coords,num_of_free_coords) = connectivity.indexed
     ncables = length(cables)
-    nλ = nconstraints
-    q̌0 = RB.get_free_coordinates(st)
-    q0 = RB.get_coordinates(st)
-    c0 = RB.get_local_coordinates(st)
+    nλ = num_of_cstr
+    q̌0 = RB.get_free_coords(st)
+    q0 = RB.get_coords(st)
+    c0 = RB.get_local_coords(st)
     ℓ0 = RB.get_cables_len(st)
     s0 = 1 ./ℓ0
     k0 = RB.get_cables_stiffness(st)
     μ0 = RB.get_cables_restlen(st)
     _,λ0 = RB.check_static_equilibrium_output_multipliers(st)
-    Φ = RB.make_constraints_function(st,q0)
-    A = RB.make_constraints_jacobian(st,q0)
+    Φ = RB.make_cstr_function(st,q0)
+    A = RB.make_cstr_jacobian(st,q0)
     Q̌ = RB.make_Q̌(st,q0)
     S = RB.make_S(st,q0)
     Ǩm_Ǩg = RB.make_Ǩm_Ǩg(st,q0)
@@ -92,11 +92,11 @@ function locate_bifurcation_point(bot_input,γ0)
     polyǨ = polyǨc .- (polyǨm .+ polyǨg)
     # initial
     nq̌ = length(q̌0)
-    ndof = 2
+    num_of_dof = 2
     Ǩ0 = RB.build_Ǩ(bot.st,λ0)
     Ň0 = nullspace(A(q̌0))
     𝒦 = transpose(Ň0)*Ǩ0*Ň0
-    𝐞 = [1:ndof .== i for i in 1:ndof]
+    𝐞 = [1:num_of_dof .== i for i in 1:num_of_dof]
     i = 2; j = 1
     𝒦ij = (I-𝐞[i]*transpose(𝐞[i]))*𝒦+𝐞[i]*transpose(𝐞[j])
     ξ0 = 𝒦ij\𝐞[i]
@@ -104,11 +104,11 @@ function locate_bifurcation_point(bot_input,γ0)
     # ncables = 0
     function make_bf()
         function inner_bp!(f,x)
-            q̌x = @view x[                      1:nfree]
-            sx = @view x[                nfree+1:nfree+ncables]
-            λx = @view x[        nfree+ncables+1:nfree+ncables+nλ]
-            ξx = @view x[     nfree+ncables+nλ+1:nfree+ncables+nλ+ndof]
-            γ =        x[nfree+ncables+nλ+ndof+1:end]
+            q̌x = @view x[                      1:num_of_free_coords]
+            sx = @view x[                num_of_free_coords+1:num_of_free_coords+ncables]
+            λx = @view x[        num_of_free_coords+ncables+1:num_of_free_coords+ncables+nλ]
+            ξx = @view x[     num_of_free_coords+ncables+nλ+1:num_of_free_coords+ncables+nλ+num_of_dof]
+            γ =        x[num_of_free_coords+ncables+nλ+num_of_dof+1:end]
             # RB.set_restlen!(st,γ.*ℓ0)
             # RB.update!(st)
             # Qx = Q̌(q̌x,sx,γ.*ℓ0,k0,c0)
@@ -145,14 +145,14 @@ function locate_bifurcation_point(bot_input,γ0)
                         pvc=>c0
                     )
                 end
-            f[                 1:nfree]                 = transpose(Ax)*λx - Qx
-            f[           nfree+1:nfree+ncables]         = Sx
-            f[   nfree+ncables+1:nfree+ncables+nλ]      = Φx
-            f[nfree+ncables+nλ+1:nfree+nλ+ncables+ndof] = transpose(Nx)*Ǩx*Nx*ξx
+            f[                 1:num_of_free_coords]                 = transpose(Ax)*λx - Qx
+            f[           num_of_free_coords+1:num_of_free_coords+ncables]         = Sx
+            f[   num_of_free_coords+ncables+1:num_of_free_coords+ncables+nλ]      = Φx
+            f[num_of_free_coords+ncables+nλ+1:num_of_free_coords+nλ+ncables+num_of_dof] = transpose(Nx)*Ǩx*Nx*ξx
             f[end]                                      = transpose(ξx)*ξx-1
         end
     end
-    f_holder = zeros(nfree+nλ+ncables+ndof+1)
+    f_holder = zeros(num_of_free_coords+nλ+ncables+num_of_dof+1)
     x_initial = vcat(q̌0,s0,λ0,ξ0,γ0)
     bp! = make_bf()
     # bp!(f_holder,x_initial)
@@ -161,14 +161,14 @@ function locate_bifurcation_point(bot_input,γ0)
     # @show
     bp!(f_holder,bp.zero)
 
-    @show f_holder[1:nfree+ncables+nλ] |> norm
-    @show f_holder[nfree+ncables+nλ+1:nfree+ncables+nλ+ndof] |> norm
-    @show  bp.zero[nfree+ncables+nλ+1:nfree+ncables+nλ+ndof]
+    @show f_holder[1:num_of_free_coords+ncables+nλ] |> norm
+    @show f_holder[num_of_free_coords+ncables+nλ+1:num_of_free_coords+ncables+nλ+num_of_dof] |> norm
+    @show  bp.zero[num_of_free_coords+ncables+nλ+1:num_of_free_coords+ncables+nλ+num_of_dof]
     @show  bp.zero[end]
-    q_bp = bp.zero[                 1:nfree]
-    s_bp = bp.zero[           nfree+1:nfree+ncables]
-    λ_bp = bp.zero[   nfree+ncables+1:nfree+ncables+nλ]
-    ξ_bp = bp.zero[nfree+ncables+nλ+1:nfree+ncables+nλ+ndof]
+    q_bp = bp.zero[                 1:num_of_free_coords]
+    s_bp = bp.zero[           num_of_free_coords+1:num_of_free_coords+ncables]
+    λ_bp = bp.zero[   num_of_free_coords+ncables+1:num_of_free_coords+ncables+nλ]
+    ξ_bp = bp.zero[num_of_free_coords+ncables+nλ+1:num_of_free_coords+ncables+nλ+num_of_dof]
     γ_bp = bp.zero[end]
     (q̌=q_bp,s=s_bp,λ=λ_bp,ξ=ξ_bp,γ=γ_bp,isconverged=converged(bp))
 end
@@ -214,7 +214,7 @@ end
 @show A(q0)'*λ-(Q̃*Γ)
 
 
-ind = st.connectivity.body2q
+ind = st.connectivity.bodyid2q
 spe = diagm([2.0 for i = 1:4])
 spe[1,3] = -2.0
 spe[2,4]= -2.0

@@ -9,8 +9,8 @@ function generate_cache(::ZhongCCP,intor;dt,kargs...)
     (;bot,dynfuncs) = prob
     (;st) = bot
     M = Matrix(build_M(st))
-    Φ = make_constraints_function(bot)
-    A = make_constraints_jacobian(bot)
+    Φ = make_cstr_function(bot)
+    A = make_cstr_jacobian(bot)
 
     nq = size(M,2)
     T = get_numbertype(bot)
@@ -19,10 +19,10 @@ function generate_cache(::ZhongCCP,intor;dt,kargs...)
     B(q) = Matrix{T}(undef,0,nq)
 
     # ∂𝐌𝐚∂𝐪(q,a) = zeros(T,nq,nq)
-    constraint_forces_jacobian(q,λ) = constraint_forces_on_free_jacobian(st,λ)
+    cstr_forces_jacobian(q,λ) = cstr_forces_on_free_jacobian(st,λ)
     # ∂𝚽𝐪𝐯∂𝒒(q,v) = RB.∂Aq̇∂q(st,v)
     ∂Bᵀμ∂q(q,μ) = zeros(T,nq,nq)
-    cache = @eponymtuple(M,Φ,A,Ψ,B,∂Ψ∂q,constraint_forces_jacobian,∂Bᵀμ∂q)
+    cache = @eponymtuple(M,Φ,A,Ψ,B,∂Ψ∂q,cstr_forces_jacobian,∂Bᵀμ∂q)
     ZhongCCPCache(cache)
 end
 
@@ -32,7 +32,7 @@ end
 
 function make_zhongccp_ns_stepk(nq,nλ,na,qₖ₋₁,vₖ₋₁,pₖ₋₁,tₖ₋₁,pₖ,vₖ,dynfuncs,cache,invM,h,scaling)
     F!,Jac_F!,_ = dynfuncs
-    (;M,Φ,A,constraint_forces_jacobian) = cache
+    (;M,Φ,A,cstr_forces_jacobian) = cache
 
     n1 = nq
     n2 = nq+nλ
@@ -75,7 +75,7 @@ function make_zhongccp_ns_stepk(nq,nλ,na,qₖ₋₁,vₖ₋₁,pₖ₋₁,tₖ�
             pₖ .= Momentum_k(qₖ₋₁,pₖ₋₁,qₖ,λₘ,M,A,scaling,h)
             vₖ .= invM*pₖ        
             ∂vₘ∂qₖ = 1/h*I
-            ∂vₖ∂qₖ = 2/h*I + 1/(h).*invM*(constraint_forces_jacobian(qₖ,λₘ))
+            ∂vₖ∂qₖ = 2/h*I + 1/(h).*invM*(cstr_forces_jacobian(qₖ,λₘ))
             ∂vₖ∂λₘ = scaling.*invM*transpose(Aₖ-Aₖ₋₁)/(h)
             
             v́⁺ = Dₘ*vₘ .+ Dₖ*vₖ
@@ -127,7 +127,7 @@ function solve!(intor::Integrator,solvercache::ZhongCCPCache;
         get_distribution_law!
     ) = dynfuncs
     (;cache) = solvercache
-    (;M,Φ,A,Ψ,B,∂Ψ∂q,constraint_forces_jacobian,∂Bᵀμ∂q) = cache
+    (;M,Φ,A,Ψ,B,∂Ψ∂q,cstr_forces_jacobian,∂Bᵀμ∂q) = cache
     invM = inv(M)
     q0 = traj.q[begin]
     λ0 = traj.λ[begin]
@@ -171,7 +171,7 @@ function solve!(intor::Integrator,solvercache::ZhongCCPCache;
         qˣ = qₖ₋₁ .+ dt./2 .*q̇ₖ₋₁
         qₖ .= qₖ₋₁ .+ dt .*q̇ₖ₋₁
         q̇ₖ .= q̇ₖ₋₁
-        na,mem2act_idx,persistent_indices,contacts_bits,H,restitution_coefficients,D, Dₘ,Dₖ,∂Dq̇∂q, ∂DᵀΛ∂q,ŕ, L = prepare_contacts!(qˣ)
+        na,mem2act_idx,persistent_idx,contacts_bits,H,restitution_coefficients,D, Dₘ,Dₖ,∂Dq̇∂q, ∂DᵀΛ∂q,ŕ, L = prepare_contacts!(qˣ)
         isconverged = false
         normRes = typemax(T)
         iteration_break = 0

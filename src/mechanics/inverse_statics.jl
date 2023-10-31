@@ -1,10 +1,10 @@
 function build_T(st,i)
     (;indexed) = st.connectivity
-    (;nfull,mem2sysfull) = indexed
-    T = spzeros(Int,length(mem2sysfull[i]),nfull)
-    # Ť = zeros(Int,length(mem2sysfull[i]),nfree)
-    # T̃ = zeros(Int,length(mem2sysfull[i]),npres)
-    for (i,j) in enumerate(mem2sysfull[i])
+    (;num_of_full_coords,bodyid2sys_full_coords) = indexed
+    T = spzeros(Int,length(bodyid2sys_full_coords[i]),num_of_full_coords)
+    # Ť = zeros(Int,length(bodyid2sys_full_coords[i]),num_of_free_coords)
+    # T̃ = zeros(Int,length(bodyid2sys_full_coords[i]),num_of_pres_coords)
+    for (i,j) in enumerate(bodyid2sys_full_coords[i])
         T[i,j] = 1
     end
     T
@@ -21,10 +21,10 @@ function build_Q̃(st)
     (;connected) = tensioned
     (;cables) = st.tensiles
     ncables = length(cables)
-    (;nfree,mem2sysfree) = indexed
+    (;num_of_free_coords,bodyid2sys_free_coords) = indexed
     T = get_numbertype(st)
     ndim = get_num_of_dims(st)
-    Q̃ = zeros(T,nfree,ndim*ncables)
+    Q̃ = zeros(T,num_of_free_coords,ndim*ncables)
 
     foreach(connected) do cc
         j = cc.id
@@ -35,8 +35,8 @@ function build_Q̃(st)
         C2 = rb2.state.cache.Cps[egg.pid]
         uci1 = rb1.state.cache.free_idx
         uci2 = rb2.state.cache.free_idx
-        m2sf1 = mem2sysfree[rb1.prop.id]
-        m2sf2 = mem2sysfree[rb2.prop.id]
+        m2sf1 = bodyid2sys_free_coords[rb1.prop.id]
+        m2sf2 = bodyid2sys_free_coords[rb2.prop.id]
         Q̃[m2sf2,(j-1)*ndim+1:j*ndim] .-= transpose(C2)[uci2,:]
         Q̃[m2sf1,(j-1)*ndim+1:j*ndim] .+= transpose(C1)[uci1,:]
     end
@@ -131,11 +131,11 @@ end
 
 function make_U(st)
     (;ndim) = st
-    (;nfull) = st.connectivity.indexed
+    (;num_of_full_coords) = st.connectivity.indexed
     (;cables) = st.tensiles
     ncables = length(cables)
     function inner_U(s,u)
-        ret = zeros(eltype(s),ncables*ndim,nfull)
+        ret = zeros(eltype(s),ncables*ndim,num_of_full_coords)
         for i = 1:ncables
             k = cables[i].k
             Ji = Array(build_Ji(st,i))
@@ -144,7 +144,7 @@ function make_U(st)
         ret
     end
     function inner_U(s,u,k)
-        ret = zeros(eltype(s),ncables*ndim,nfull)
+        ret = zeros(eltype(s),ncables*ndim,num_of_full_coords)
         for i = 1:ncables
             Ji = Array(build_Ji(st,i))
             ret[(i-1)*ndim+1:i*ndim,:] = k[i]*Ji*(1-s[i]*u[i])
@@ -157,16 +157,16 @@ end
 function make_Q̌(st,q0)
     (;ndim) = st
     (;numbered,indexed,tensioned) = st.connectivity
-    (;nfull,nfree,syspres,sysfree,mem2sysfull) = indexed
+    (;num_of_full_coords,num_of_free_coords,sys_pres_coords_idx,sys_free_coords_idx,bodyid2sys_full_coords) = indexed
     (;connected) = tensioned
     (;cables) = st.tensiles
-    (;mem2num,num2sys) = numbered
+    (;bodyid2sys_loci_idx,sys_loci2coords_idx) = numbered
     function inner_Q̌(q̌,s,u)
-		q = Vector{eltype(q̌)}(undef,nfull)
-		q[syspres] .= q0[syspres]
-		q[sysfree] .= q̌
-        ret = zeros(eltype(q̌),nfree)
-        Jj = zeros(eltype(q̌),ndim,nfull)
+		q = Vector{eltype(q̌)}(undef,num_of_full_coords)
+		q[sys_pres_coords_idx] .= q0[sys_pres_coords_idx]
+		q[sys_free_coords_idx] .= q̌
+        ret = zeros(eltype(q̌),num_of_free_coords)
+        Jj = zeros(eltype(q̌),ndim,num_of_full_coords)
         foreach(connected) do scnt
             j = scnt.id
             (;k) = cables[j]
@@ -178,22 +178,22 @@ function make_Q̌(st,q0)
             ap2id = scnt.egg.pid
             C1 = rb1.state.cache.Cps[ap1id]
             C2 = rb2.state.cache.Cps[ap2id]
-            mfull1 = mem2sysfull[rb1.prop.id]
-            mfull2 = mem2sysfull[rb2.prop.id]
+            mfull1 = bodyid2sys_full_coords[rb1.prop.id]
+            mfull2 = bodyid2sys_full_coords[rb2.prop.id]
             Jj .= 0
             Jj[:,mfull2] .+= C2
             Jj[:,mfull1] .-= C1
-            Ūj = @view (transpose(Jj)*Jj)[sysfree,:]
+            Ūj = @view (transpose(Jj)*Jj)[sys_free_coords_idx,:]
             ret .+= k*(u[j]*s[j]-1)*Ūj*q
         end
         ret
     end
     function inner_Q̌(q̌,s,μ,k,c)
-		q = Vector{eltype(q̌)}(undef,nfull)
-		q[syspres] .= q0[syspres]
-		q[sysfree] .= q̌
-        ret = zeros(eltype(q̌),nfree)
-        Jj = zeros(eltype(q̌),ndim,nfull)
+		q = Vector{eltype(q̌)}(undef,num_of_full_coords)
+		q[sys_pres_coords_idx] .= q0[sys_pres_coords_idx]
+		q[sys_free_coords_idx] .= q̌
+        ret = zeros(eltype(q̌),num_of_free_coords)
+        Jj = zeros(eltype(q̌),ndim,num_of_full_coords)
         foreach(connected) do scnt
             j = scnt.id
             rb1 = scnt.hen.rbsig
@@ -202,18 +202,18 @@ function make_Q̌(st,q0)
             rb2id = rb2.prop.id
             ap1id = scnt.hen.pid
             ap2id = scnt.egg.pid
-            c1 = c[num2sys[mem2num[rb1id][ap1id]]]
-            c2 = c[num2sys[mem2num[rb2id][ap2id]]]
+            c1 = c[sys_loci2coords_idx[bodyid2sys_loci_idx[rb1id][ap1id]]]
+            c2 = c[sys_loci2coords_idx[bodyid2sys_loci_idx[rb2id][ap2id]]]
             C1 = rb1.state.cache.funcs.C(c1)
             C2 = rb2.state.cache.funcs.C(c2)
             # C1 = rb1.state.cache.Cps[ap1id]
             # C2 = rb2.state.cache.Cps[ap2id]
-            mfull1 = mem2sysfull[rb1.prop.id]
-            mfull2 = mem2sysfull[rb2.prop.id]
+            mfull1 = bodyid2sys_full_coords[rb1.prop.id]
+            mfull2 = bodyid2sys_full_coords[rb2.prop.id]
             Jj .= 0
             Jj[:,mfull2] .+= C2
             Jj[:,mfull1] .-= C1
-            Ūj = @view (transpose(Jj)*Jj)[sysfree,:]
+            Ūj = @view (transpose(Jj)*Jj)[sys_free_coords_idx,:]
             ret .+= k[j]*(μ[j]*s[j]-1)*Ūj*q
         end
         ret
@@ -266,8 +266,8 @@ function check_inverse_sanity(B)
 end
 
 function build_inverse_statics_core(tginput,tgref::Structure,Fˣ=nothing;gravity=false)
-    q = get_coordinates(tgref)
-    q̌ = get_free_coordinates(tgref)
+    q = get_coords(tgref)
+    q̌ = get_free_coords(tgref)
     st = deepcopy(tginput)
     clear_forces!(st)
     update_rigids!(st,q)
@@ -287,7 +287,7 @@ function build_inverse_statics_core(tginput,tgref::Structure,Fˣ=nothing;gravity
 end
 
 function build_inverse_statics_core(st,q::AbstractVector,F)
-    A = make_constraints_jacobian(st)
+    A = make_cstr_jacobian(st)
     Nᵀ = transpose(nullspace(A(q)))
     Q̃ = build_Q̃(st)
     st,Nᵀ,Q̃,F
@@ -437,10 +437,10 @@ function get_inverse_func(tg_input,reftg,Y;gravity=false,recheck=true,scale=true
     @info "Number of coefficients = $ncoeffs"
     function inner_inverse_func(ξ)
         x = xp + nb*ξ
-        λ = x[1:acttg.nconstraint].*c
-        a = x[acttg.nconstraint+1:end]
+        λ = x[1:acttg.num_of_cstr].*c
+        a = x[acttg.num_of_cstr+1:end]
         # check_actuation(acttg,Y,a)
-        # refq = get_coordinates(reftg)
+        # refq = get_coords(reftg)
         # actuate!(acttg,a)
         # check_static_equilibrium(acttg,refq,λ;gravity)
         u0 = get_cables_restlen(tg_input)
@@ -462,18 +462,18 @@ function check_static_equilibrium(tg_input,q,λ,F=nothing;gravity=false)
     if !isnothing(F)
         generalized_forces .+= F[:]
     end
-    constraint_forces = transpose(make_constraints_jacobian(st)(q))*λ
-    static_equilibrium = constraint_forces ≈ generalized_forces
-    @debug "Res. forces = $(generalized_forces-constraint_forces)"
+    cstr_forces = transpose(make_cstr_jacobian(st)(q))*λ
+    static_equilibrium = cstr_forces ≈ generalized_forces
+    @debug "Res. forces = $(generalized_forces-cstr_forces)"
     if !static_equilibrium
-        @error "System not in static equilibrium. Err = $(norm(generalized_forces-constraint_forces))"
+        @error "System not in static equilibrium. Err = $(norm(generalized_forces-cstr_forces))"
         @info "This error could be harmless, if the error is sufficiently small, or nonpositive tension occurs."
     end
     static_equilibrium
 end
 
 function check_static_equilibrium_output_multipliers(tg_input;F=nothing,gravity=false)
-    q = get_coordinates(tg_input)
+    q = get_coords(tg_input)
     check_static_equilibrium_output_multipliers(tg_input,q,F;gravity)
 end
 
@@ -497,10 +497,10 @@ function check_static_equilibrium_output_multipliers!(st,q,F=nothing;
     if !isnothing(F)
         generalized_forces .+= F[:]
     end
-    q = get_coordinates(st)
-    c = get_local_coordinates(st)
-    q̌ = get_free_coordinates(st)
-    A = make_constraints_jacobian(st,q)(q̌,c)
+    q = get_coords(st)
+    c = get_local_coords(st)
+    q̌ = get_free_coords(st)
+    A = make_cstr_jacobian(st,q)(q̌,c)
     # # @show A
     # s = get_s(st)
     # u = get_cables_restlen(st)
@@ -518,11 +518,11 @@ function check_static_equilibrium_output_multipliers!(st,q,F=nothing;
     # # @show s 
     # @show generalized_forces - ǧeneralized_forces
     λ = inv(A*transpose(A))*A*(-generalized_forces)
-    constraint_forces = transpose(A)*λ
-    static_equilibrium = constraint_forces ≈ -generalized_forces
-    @debug "Res. forces = $(generalized_forces+constraint_forces)"
+    cstr_forces = transpose(A)*λ
+    static_equilibrium = cstr_forces ≈ -generalized_forces
+    @debug "Res. forces = $(generalized_forces+cstr_forces)"
     if !static_equilibrium
-        @error "System not in static equilibrium. Err = $(norm(generalized_forces+constraint_forces))"
+        @error "System not in static equilibrium. Err = $(norm(generalized_forces+cstr_forces))"
         @info "This error could be harmless, if the error is sufficiently small, or nonpositive tension occurs."
     end
     static_equilibrium, λ
@@ -585,7 +585,7 @@ function inverse_for_restlength(tginput,tgref::Structure,Fˣ=nothing;
     end
     if recheck
         tgcheck = deepcopy(tginput)
-        q = get_coordinates(tgref)
+        q = get_coords(tgref)
         set_restlen!(tgcheck,x0)
         _,λ = check_static_equilibrium_output_multipliers!(tgcheck,q;gravity)
     end
@@ -597,7 +597,7 @@ function inverse_for_multipliers(botinput::Robot,botref::Robot=botinput,F=nothin
 end
 
 function inverse_for_multipliers(tginput::Structure,tgref::Structure=tginput,F=nothing;gravity=false,scale=true,recheck=true)
-    q = get_coordinates(tgref)
+    q = get_coords(tgref)
     _,λ = check_static_equilibrium_output_multipliers(tginput,q;gravity)
     λ
 end
@@ -616,7 +616,7 @@ function inverse_for_actuation(botinput,botref,Fˣ=nothing;Y=build_Y(botinput),
     a = y0[1:na]
     if recheck
         botcheck = deepcopy(botinput)
-        q = get_coordinates(tgref)
+        q = get_coords(tgref)
         actuate!(botcheck,a)
         _,λ = check_static_equilibrium_output_multipliers(botcheck.st,q;gravity)
     end
@@ -651,14 +651,14 @@ function optimize_for_stiffness_and_restlen(
         -Y*f0;
            f0 .- fmin;
     ]
-    constraint1 = COSMO.Constraint(A,b_,COSMO.Nonnegatives)
+    cstr1 = COSMO.Constraint(A,b_,COSMO.Nonnegatives)
     # P = Diagonal(vcat(ones(ncables),zeros(size(Z,2)),zeros(size(Z,2))))
     P = Diagonal(vcat(ones(ncables),zeros(size(Z,2))))
     q = zeros(size(P,2))
 
     model = COSMO.Model()
     custom_settings = COSMO.Settings(eps_abs = 1e-6)
-    COSMO.assemble!(model, P, q, constraint1, settings = custom_settings)
+    COSMO.assemble!(model, P, q, cstr1, settings = custom_settings)
     results = COSMO.optimize!(model)
     results.x
     results.obj_val

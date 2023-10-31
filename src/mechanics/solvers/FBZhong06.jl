@@ -13,8 +13,8 @@ function generate_cache(::FBZhong06,intor;dt,kargs...)
     # F!,_ = dynfuncs
     mm = build_MassMatrices(bot)
     # (;M) = mm
-    A = make_constraints_jacobian(bot)
-    Φ = make_constraints_function(bot)
+    A = make_cstr_jacobian(bot)
+    Φ = make_cstr_function(bot)
     Ψ = make_Ψ(bot.st)
     FBZhong06Cache(mm,A,Φ,Ψ)
 end

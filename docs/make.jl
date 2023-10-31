@@ -11,7 +11,7 @@ makedocs(
         "index.md",
         "setup.md",
         "Modeling" => [
-            "naturalcoordinates.md",
+            "naturalcoords.md",
             "rigidbody.md",
             "cable.md",
         ],

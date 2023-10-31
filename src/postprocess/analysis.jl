@@ -181,9 +181,9 @@ function compute_contraint_error(bot)
     (;qs, q̇s) = traj
     Φ = build_Φ(st)
     A = build_A(st)
-    position_constraint_errors = [norm(Φ(q)) for q in qs]
-    velocity_constraint_errors = [norm(A(q)*q̇)/norm(q̇) for (q,q̇) in zip(qs,q̇s)]
-    position_constraint_errors, velocity_constraint_errors
+    position_cstr_errors = [norm(Φ(q)) for q in qs]
+    velocity_cstr_errors = [norm(A(q)*q̇)/norm(q̇) for (q,q̇) in zip(qs,q̇s)]
+    position_cstr_errors, velocity_cstr_errors
 end
 
 function get_tangent(x)

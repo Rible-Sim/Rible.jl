@@ -21,15 +21,15 @@ function rigidbody(i,m,Ia,ri,rj,aps)
 		constrained = true
 		if i == 1
 			ci = collect(1:6)
-			constraints_indices = Int[]
+			cstr_idx = Int[]
 		else
 			ci = [2]
-			constraints_indices = collect(1:3)
+			cstr_idx = collect(1:3)
 		end
 	else
 		constrained = false
 		ci = Int[]
-		constraints_indices = collect(1:3)
+		cstr_idx = collect(1:3)
 	end
 	prop = RB.RigidBodyProperty(
 				i,movable,m,
@@ -40,7 +40,7 @@ function rigidbody(i,m,Ia,ri,rj,aps)
 				)
 	nmcs = RB.NCF.NC2P1V(SVector{2}(ri), SVector{2}(rj), ro, α)
 
-	state = RB.RigidBodyState(prop, nmcs, ri, α, ṙo, ω, ci, constraints_indices)
+	state = RB.RigidBodyState(prop, nmcs, ri, α, ṙo, ω, ci, cstr_idx)
 
 	body = RB.RigidBody(prop,state)
 end
@@ -129,11 +129,11 @@ end
 
 function build_tgg_nullspace(bot,q̌)
 	(;st) = bot
-	(;ndof) = st
+	(;num_of_dof) = st
 	(;indexed) = st.connectivity
-	(;nfree,mem2sysfree) = indexed
-	q̌2 = @view q̌[mem2sysfree[2]]
-	q̌3 = @view q̌[mem2sysfree[3]]
+	(;num_of_free_coords,bodyid2sys_free_coords) = indexed
+	q̌2 = @view q̌[bodyid2sys_free_coords[2]]
+	q̌3 = @view q̌[bodyid2sys_free_coords[3]]
 	x2 = q̌2[1]
 	r2i = [x2,0.0]
 	r2j = q̌2[2:3]
@@ -142,7 +142,7 @@ function build_tgg_nullspace(bot,q̌)
 	r3j = q̌3[2:3]
 	u3 = r3j - r2i
 	v3 = q̌3[4:5]
-	ret = zeros(eltype(q̌),nfree,ndof)
+	ret = zeros(eltype(q̌),num_of_free_coords,num_of_dof)
 	ret .= [
 		 1            0  0;
 		[1,0] -skew(u2)  [0,0];
@@ -154,13 +154,13 @@ end
 
 function make_halftggriper_nullspace(bot,q̌)
 	(;st) = bot
-	(;ndof) = st
+	(;num_of_dof) = st
 	(;indexed) = st.connectivity
-	(;nfree,mem2sysfree) = indexed
+	(;num_of_free_coords,bodyid2sys_free_coords) = indexed
 	function inner_Ň(q̌,c)
-		ret = zeros(eltype(q̌),nfree,ndof)
-		q̌2 = @view q̌[mem2sysfree[2]]
-		q̌3 = @view q̌[mem2sysfree[3]]
+		ret = zeros(eltype(q̌),num_of_free_coords,num_of_dof)
+		q̌2 = @view q̌[bodyid2sys_free_coords[2]]
+		q̌3 = @view q̌[bodyid2sys_free_coords[3]]
 		x2 = q̌2[1]
 		r2i = [x2,0.0]
 		r2j = q̌2[2:3]
@@ -239,12 +239,12 @@ function make_spine(n,θ=0.0)
             movable = false
             constrained = true
             ci = collect(1:6)
-			constraints_indices = Int[]
+			cstr_idx = Int[]
         else
             movable = true
             constrained = false
             ci = Int[]
-			constraints_indices = collect(1:3)
+			cstr_idx = collect(1:3)
 	        # ap1 = b*[cos( α),sin( α)]
 	        # ap2 = b*[cos( α),sin( α)]
 	        # ap3 = b*[cos(-α),sin(-α)]
@@ -269,7 +269,7 @@ function make_spine(n,θ=0.0)
         ω = 0.0
         ṙo = @SVector zeros(2)
         nmcs,_ = RB.NCF.NC1P2V(ri,ro,θ)
-        state = RB.RigidBodyState(prop,nmcs,ro,θ,ṙo,ω, ci, constraints_indices)
+        state = RB.RigidBodyState(prop,nmcs,ro,θ,ṙo,ω, ci, cstr_idx)
         RB.RigidBody(prop,state)
     end
 
@@ -333,9 +333,9 @@ function sup_spine2d!(ax,tgob,sgi)
     linesegments!(ax, bars, linewidth = 10)
 end
 
-function dualtri(ndof,onedir=[1.0,0.0];θ=0.0,k=400.0,c=0.0,restlen=0.16)
-    nbodies = ndof + 1
-    nbp = 2nbodies - ndof
+function dualtri(num_of_dof,onedir=[1.0,0.0];θ=0.0,k=400.0,c=0.0,restlen=0.16)
+    nbodies = num_of_dof + 1
+    nbp = 2nbodies - num_of_dof
     n_lower = count(isodd,1:nbodies)
     n_upper = count(iseven,1:nbodies)
     lower_index = 1:2:nbodies
@@ -385,11 +385,11 @@ function dualtri(ndof,onedir=[1.0,0.0];θ=0.0,k=400.0,c=0.0,restlen=0.16)
         if i == 1
 			constrained = true
 			ci = collect(1:6)
-			constraints_indices = Int[]
+			cstr_idx = Int[]
 		else
 			constrained = false
 			ci = Int[]
-			constraints_indices = collect(1:3)
+			cstr_idx = collect(1:3)
 		end
 		
 		ω = 0.0
@@ -406,7 +406,7 @@ function dualtri(ndof,onedir=[1.0,0.0];θ=0.0,k=400.0,c=0.0,restlen=0.16)
 
 		nmcs = RB.NCF.NC1P2V(SVector{2}(ri), ro, α)
 
-		state = RB.RigidBodyState(prop, nmcs, ri, α, ṙo, ω, ci, constraints_indices)
+		state = RB.RigidBodyState(prop, nmcs, ri, α, ṙo, ω, ci, cstr_idx)
 
         body = RB.RigidBody(prop,state)
     end

@@ -46,9 +46,9 @@ function fit_spring(sheetname,rl,dmin,dmax,do_plot=true)
     # plt.xlim(0,deformations[end])
     # plt.ylim(0,forces[end])
 
-    s_indices = findall((x)->dmin<x<dmax,deformations)
-    ds = deformations[s_indices]
-    fs = forces[s_indices]
+    s_idx = findall((x)->dmin<x<dmax,deformations)
+    ds = deformations[s_idx]
+    fs = forces[s_idx]
     s_fit = fitlinear(ds,fs)
     r = s_fit.b
     k = s_fit.a
@@ -165,7 +165,7 @@ function dynamic_relax(tgbot,dynfuncs;dt=0.001,tend=10.0,verbose=false)
     tgbot,dynfuncs
 end
 _,dynfuncs = dynamic_relax(spine2,dynfuncs)
-qend,_ = RB.get_coordinates(spine2.st)
+qend,_ = RB.get_coords(spine2.st)
 
 RB.set_new_initial!(spine2,qzero)
 function plot_super(pp,bot,pyramid;linked=false)

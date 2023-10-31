@@ -149,28 +149,28 @@ function rigidbody(i, rdsi, r̄si; rigidIndex=rigidIndex, barIndex=barIndex)
         constrained = true
         ci = collect(1:6)
         # ci = collect(1:4)
-        constraints_indices = Int[]
+        cstr_idx = Int[]
     else
         movable = true
         if i in 2:3
             constrained = true
             ci = collect(1:2)
             if i == 2
-                constraints_indices = collect(1:3)
-                # constraints_indices = [1]
+                cstr_idx = collect(1:3)
+                # cstr_idx = [1]
             else
-                # constraints_indices = Int[]
-                constraints_indices = [1]
+                # cstr_idx = Int[]
+                cstr_idx = [1]
             end
         else
             constrained = false
             ci = Int[]
             if i in rigidIndex
-                constraints_indices = collect(1:3)
-                # constraints_indices = [1]
+                cstr_idx = collect(1:3)
+                # cstr_idx = [1]
             else
-                constraints_indices = [1]
-                # constraints_indices = collect(1:3)
+                cstr_idx = [1]
+                # cstr_idx = collect(1:3)
             end
         end
     end
@@ -203,7 +203,7 @@ function rigidbody(i, rdsi, r̄si; rigidIndex=rigidIndex, barIndex=barIndex)
         nmcs = RB.NCF.NC2D2P(SVector{2}(ri), SVector{2}(rj), ro, α)
         # nmcs = RB.NCF.NC2P1V(SVector{2}(ri), SVector{2}(rj), ro, α)
     end
-    state = RB.RigidBodyState(prop, nmcs, ri, α, ṙo, ω, ci, constraints_indices)
+    state = RB.RigidBodyState(prop, nmcs, ri, α, ṙo, ω, ci, cstr_idx)
     body = RB.RigidBody(prop, state)
 end
 
@@ -304,7 +304,7 @@ cnt = RB.Connectivity(numberedpoints, indexedcoords, connections)
 st = RB.ClusterTensegrityStructure(rigdibodies, tensiles, cnt)
 # st = RB.Structure(rigdibodies, tensiles, cnt)
 bot = RB.Robot(st, hub)
-# bot.traj.q̇[begin][bot.st.connectivity.indexed.mem2sysfull[end][1:4]] .= [50,0.0,50,0.0]
+# bot.traj.q̇[begin][bot.st.connectivity.indexed.bodyid2sys_full_coords[end][1:4]] .= [50,0.0,50,0.0]
 # function dynfuncs(bot)
 #     (;st) = bot
 #     function F!(F,q,q̇,s,t)
@@ -346,9 +346,9 @@ _,λ0 = RB.check_static_equilibrium_output_multipliers(bot.st,gravity=false)
 @show ω = [sqrt(ωi) for ωi in ω²[1:end]]
 
 # bot_plot = deepcopy(bot)
-# q = RB.get_coordinates(bot_plot.st)
-# (;sysfree) = bot_plot.st.connectivity.indexed
-# bot_plot.traj[1].q[sysfree] .+= 10 * δq̌[1]
+# q = RB.get_coords(bot_plot.st)
+# (;sys_free_coords_idx) = bot_plot.st.connectivity.indexed
+# bot_plot.traj[1].q[sys_free_coords_idx] .+= 10 * δq̌[1]
 # plot_traj!(bot_plot)
 temp = Matrix(RB.build_M̌(bot.st))
 @show size(temp),rank(temp)

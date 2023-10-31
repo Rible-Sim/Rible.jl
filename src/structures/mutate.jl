@@ -47,11 +47,11 @@ end
 
 function stretch_rigids!(st)
     (;bodies,state) = st
-    (;mem2sys) = st.connectivity.numbered
+    (;bodyid2sys_loci_coords_idx) = st.connectivity.numbered
     (;c) = state.system
     foreach(bodies) do body
         bodyid = body.prop.id
-        stretch_body!(body,c[mem2sys[bodyid]])
+        stretch_body!(body,c[bodyid2sys_loci_coords_idx[bodyid]])
     end
 end
 

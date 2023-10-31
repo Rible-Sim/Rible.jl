@@ -20,9 +20,9 @@ include("man_define.jl")
 include("man_plotting.jl")
 
 # ------------------Create Struture --------------------------
-ndof = 6
-refman = man_ndof(ndof,θ=-π/12) # reference
-manipulator = man_ndof(ndof,k=4.e3,c=1.e3,θ=0.0)
+num_of_dof = 6
+refman = man_ndof(num_of_dof,θ=-π/12) # reference
+manipulator = man_ndof(num_of_dof,k=4.e3,c=1.e3,θ=0.0)
 # ------------------Create Struture\\-------------------------
 Y = build_Y(manipulator)
 q0,q̇0,λ0 = RB.get_initial(manipulator) #backup

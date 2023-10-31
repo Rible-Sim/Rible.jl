@@ -27,13 +27,13 @@ includet("../plot_helpers.jl")
 set_pyplot()
 includet("planning_dev.jl")
 
-ndof = 6
+num_of_dof = 6
 k = 1.e3
 c = 0.0
-man = man_ndof(ndof;θ=0.0,k,c)
+man = man_ndof(num_of_dof;θ=0.0,k,c)
 function initialize_RRT(tr)
     @unpack st = tr
-    q0,q̇0 = RB.get_coordinates(st)
+    q0,q̇0 = RB.get_coords(st)
     chart0 = RB.Chart(st,q0,q̇0)
     x0 = chart0.xc
 

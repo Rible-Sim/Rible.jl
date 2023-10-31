@@ -39,20 +39,20 @@ function make_new_tail(n)
             movable = false
             constrained = true
             ci = collect(1:6)
-            constraints_indices = Int[]
+            cstr_idx = Int[]
         else
             movable = true
             if i == 2
                 constrained = true
                 ci = collect(1:2)
-                constraints_indices = [1]
+                cstr_idx = [1]
             else
                 constrained = false
                 ci = Int[]
                 if isodd(pos)
-                    constraints_indices = collect(1:3)
+                    cstr_idx = collect(1:3)
                 else
-                    constraints_indices = [1]
+                    cstr_idx = [1]
                 end
             end
         end
@@ -102,7 +102,7 @@ function make_new_tail(n)
         else
             nmcs = RB.NCF.NC2D2P(ri, rj, ro, α)
         end
-        state = RB.RigidBodyState(prop, nmcs, ri, α, ṙo, ω, ci, constraints_indices)
+        state = RB.RigidBodyState(prop, nmcs, ri, α, ṙo, ω, ci, cstr_idx)
         body = RB.RigidBody(prop, state)
     end
     rbs = [
@@ -180,7 +180,7 @@ plot_rigid(rbs[2])
 
 
 # 设置初始条件
-tail.traj.q̇[begin][tail.st.connectivity.indexed.mem2sysfull[end][1:4]] .= [0.1,0.0,0.1,0.0]
+tail.traj.q̇[begin][tail.st.connectivity.indexed.bodyid2sys_full_coords[end][1:4]] .= [0.1,0.0,0.1,0.0]
 
 # 定义广义力函数
 function dynfuncs(bot)

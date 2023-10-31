@@ -108,8 +108,8 @@ function links(n,a1=0.0,a2=0.0,α=0.0)
     cs = repeat(fill(c,7),n-1)
     ss = [RB.SString3D(stringlens[i],ks[i],cs[i]) for i = 1:nstrings]
     acs = [RB.Actuator(SVector{1}(ss[7(i-1)+j])) for j = 2:7 for i = 1:n-1]
-    bodynq = RB.get_nbodycoords(rbs[1])
-    body2q = [(bodynq*(i-1)+1:bodynq*i) for i = 1:n]
+    bodynq = RB.get_num_of_coords(rbs[1])
+    bodyid2q = [(bodynq*(i-1)+1:bodynq*i) for i = 1:n]
 
 
     string2ap = Vector{Tuple{RB.ID,RB.ID}}()
@@ -121,7 +121,7 @@ function links(n,a1=0.0,a2=0.0,α=0.0)
             push!(string2ap,(RB.ID(i,j),RB.ID(i+1,1)))
         end
     end
-    cnt = RB.Connectivity(body2q,string2ap)
+    cnt = RB.Connectivity(bodyid2q,string2ap)
     st = RB.Structure(rbs,ss,acs,cnt)
     RB.update_strings_apply_forces!(st)
     st

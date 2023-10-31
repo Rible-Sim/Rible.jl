@@ -25,7 +25,7 @@ function quad(c=100.0;
         movable = true
         constrained = false
         ci = Int[]
-        constraints_indices = collect(1:6)
+        cstr_idx = collect(1:6)
         ri = p[0]
         ro = ri
         R = SMatrix{3,3}(Matrix(1.0I,3,3))
@@ -52,7 +52,7 @@ function quad(c=100.0;
             constrained = constrained,
         )
         nmcs = RB.NCF.NC1P3V(ri, ro, R)
-        state = RB.RigidBodyState(prop, nmcs, ri, R, ṙo, ω, ci, constraints_indices)
+        state = RB.RigidBodyState(prop, nmcs, ri, R, ṙo, ω, ci, cstr_idx)
         trunk_mesh = load("身体.STL")
         body = RB.RigidBody(prop, state, trunk_mesh)
     end
@@ -61,7 +61,7 @@ function quad(c=100.0;
         movable = true
         constrained = false
         ci = Int[]
-        constraints_indices = [1]
+        cstr_idx = [1]
 
         ri = p[12+2(i-1)+1]
         rj = p[12+2(i-1)+2]
@@ -94,7 +94,7 @@ function quad(c=100.0;
             constrained = constrained,
         )
         nmcs = RB.NCF.NC3D2P(ri, rj, ro, R)
-        state = RB.RigidBodyState(prop, nmcs, ro, R, ṙo, ω, ci, constraints_indices)
+        state = RB.RigidBodyState(prop, nmcs, ro, R, ṙo, ω, ci, cstr_idx)
         leg_mesh = load("400杆.STL")
         body = RB.RigidBody(prop, state, leg_mesh)
     end
@@ -170,7 +170,7 @@ function rigidbar(i,
         movable = true,
         constrained = false,
         ci = Int[],
-        constraints_indices = [1],
+        cstr_idx = [1],
         isbody = false,
         loadmesh = true,
     )
@@ -226,7 +226,7 @@ function rigidbar(i,
         ω = RB.NCF.find_angular_velocity(nmcs,vcat(ri,u),vcat(ṙi,u̇))
         # @show ω, ṙi, u̇
     end
-    state = RB.RigidBodyState(prop, nmcs, ro, R, ṙo, ω, ci, constraints_indices)
+    state = RB.RigidBodyState(prop, nmcs, ro, R, ṙo, ω, ci, cstr_idx)
     # leg_mesh = load("400杆.STL")
     if loadmesh
         barmesh = load(joinpath(assetdir,"BZ.STL")) |> make_patch(;
@@ -269,7 +269,7 @@ function uni(c=100.0;
         movable = true
         constrained = true
         ci = collect(1:12)
-        constraints_indices = Int[]
+        cstr_idx = Int[]
         ri = p[1]
         ro = ri
         R = SMatrix{3,3}(Matrix(1.0I,3,3))
@@ -299,7 +299,7 @@ function uni(c=100.0;
             constrained = constrained,
         )
         nmcs = RB.NCF.NC1P3V(ri, ro, R)
-        state = RB.RigidBodyState(prop, nmcs, ri, R, ṙo, ω, ci, constraints_indices)
+        state = RB.RigidBodyState(prop, nmcs, ri, R, ṙo, ω, ci, cstr_idx)
         trimesh = load("BASE.STL") |> make_patch(;
             scale=1/1000,
             trans = [0,0,0.005],
@@ -324,8 +324,8 @@ function uni(c=100.0;
         movable = true,
         constrained = false,
         ci = Int[],
-        constraints_indices = collect(1:6),
-        # constraints_indices = [1],
+        cstr_idx = collect(1:6),
+        # cstr_idx = [1],
         isbody,
     )
     rb2 = rigidbase(2, p)
@@ -446,7 +446,7 @@ function superball(c=0.0;
             e,
             constrained = ifelse(i==1 && constrained,true,false),
             ci = ifelse(i==1 && constrained,collect(1:6),Int[]),
-            constraints_indices = ifelse(i==1 && constrained,Int[],[1]),
+            cstr_idx = ifelse(i==1 && constrained,Int[],[1]),
             loadmesh,
             isbody =false,
             )

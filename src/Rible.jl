@@ -45,16 +45,20 @@ include("members/loci.jl")
 
 include("members/abstract_body.jl")
 
+include("members/rigids/natural_coordinates/NCF.jl")
+using .NCF
+
+import .NCF: make_cstr_function
+import .NCF: make_cstr_jacobian
+import .NCF: make_cstr_hessians
+import .NCF: make_cstr_forces_jacobian
+import .NCF: get_num_of_cstr, get_num_of_coords, get_num_of_dof
+import .NCF: get_num_of_dims, get_num_of_local_dims
+import .NCF: cartesian_frame2coords
+
 include("members/rigids/QBF.jl")
 using .QBF
 
-include("members/rigids/NCF.jl")
-using .NCF
-
-import .NCF: make_constraints_function
-import .NCF: make_constraints_jacobian
-import .NCF: make_constraints_hessians
-import .NCF: make_constraint_forces_jacobian
 
 include("members/rigids/rigid_body.jl")
 
@@ -79,7 +83,7 @@ include("control/control.jl")
 
 include("./get.jl")
 
-include("mechanics/constraints.jl")
+include("mechanics/Constraints.jl")
 
 include("mechanics/inverse_statics.jl")
 

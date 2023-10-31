@@ -83,11 +83,11 @@ th = 622 |> pt2px
 #--- superball
 # for use with Class-1 and the 1st rigid fixed
 function build_nullspace_on_free(st)
-    (;sysfree,mem2sysndof) = st.connectivity.indexed
-    q = RB.get_coordinates(bot.st)
+    (;sys_free_coords_idx,bodyid2sys_dof_idx) = st.connectivity.indexed
+    q = RB.get_coords(bot.st)
     Nin = RB.make_intrinsic_nullspace(st,q)[
-        sysfree,
-        reduce(vcat,mem2sysndof[2:end])
+        sys_free_coords_idx,
+        reduce(vcat,bodyid2sys_dof_idx[2:end])
     ]
 end
 ballbot = superball(;
@@ -120,9 +120,9 @@ function verify_lambda(st)
     λs
 end
 verify_lambda(bot.st)
-q = RB.get_coordinates(bot.st)
-q̌ = RB.get_free_coordinates(bot.st)
-Ǎ = RB.make_constraints_jacobian(bot.st)(q)
+q = RB.get_coords(bot.st)
+q̌ = RB.get_free_coords(bot.st)
+Ǎ = RB.make_cstr_jacobian(bot.st)(q)
 # Ň_ = RB.nullspace(Ǎ)
 # Ň = modified_gram_schmidt(Ň_)
 Ň = build_nullspace_on_free(bot.st)
@@ -150,7 +150,7 @@ l = RB.get_cables_len(bot.st)
 # equivalent μ
 λ = -inv(Ǎ*transpose(Ǎ))*Ǎ*Bᵀ*f
 @myshow verify_lambda(bot.st),λ
-Ǩa = RB.constraint_forces_on_free_jacobian(bot.st,λ)
+Ǩa = RB.cstr_forces_on_free_jacobian(bot.st,λ)
 𝒦a = transpose(Ň)*Ǩa*Ň |> Symmetric 
 vals_𝒦a,vecs_𝒦a = eigen(𝒦a)
 @myshow sort(vals_𝒦a)
@@ -168,7 +168,7 @@ vec𝒦ps = [
         # @show s
         λi = inv(Ǎ*transpose(Ǎ))*Ǎ*Bᵀ*si
         # @show f,λ
-        Ǩai = - RB.constraint_forces_on_free_jacobian(bot.st,λi)
+        Ǩai = - RB.cstr_forces_on_free_jacobian(bot.st,λi)
 
         Ǩgi = RB.build_geometric_stiffness_matrix_on_free!(bot.st,q,si)
 
@@ -286,7 +286,7 @@ vecr𝒦ps = [
         # @show s
         λi = inv(Ǎ*transpose(Ǎ))*Ǎ*Bᵀ*si
         # @show f,λ
-        Ǩai = - RB.constraint_forces_on_free_jacobian(bot.st,λi)
+        Ǩai = - RB.cstr_forces_on_free_jacobian(bot.st,λi)
 
         Ǩgi = RB.build_geometric_stiffness_matrix_on_free!(bot.st,q,si)
 
@@ -463,17 +463,17 @@ rb1 = RB.get_bodies(bot)[1]
 viz(rb1) 
 plot_traj!(bot;showground=false)
 RB.check_static_equilibrium_output_multipliers(bot.st)
-@myshow bot.st.ndof
+@myshow bot.st.num_of_dof
 RB.update!(bot.st)
 f = RB.get_cables_tension(bot)
 
 # for use with Class-1 and the 1st rigid fixed
 function build_nullspace_on_free(st)
-    (;sysfree,mem2sysfull,mem2sysndof) = st.connectivity.indexed
-    q = RB.get_coordinates(bot.st)
+    (;sys_free_coords_idx,bodyid2sys_full_coords,bodyid2sys_dof_idx) = st.connectivity.indexed
+    q = RB.get_coords(bot.st)
     Nin = RB.make_intrinsic_nullspace(st,q)[
-        sysfree,
-        reduce(vcat,mem2sysndof[begin:end-1])
+        sys_free_coords_idx,
+        reduce(vcat,bodyid2sys_dof_idx[begin:end-1])
     ]
     Nex = zeros(eltype(q),30,12)
     for i = 1:6
@@ -485,7 +485,7 @@ function build_nullspace_on_free(st)
     for i = 1:3
         is = (3+cm[i+2]-1)*5
         js = (i-1)*2
-        q_I = q[mem2sysfull[i]]
+        q_I = q[bodyid2sys_full_coords[i]]
         ri = @view q_I[1:3]
         u = @view q_I[4:6]
         v,w = RB.HouseholderOrthogonalization(u)
@@ -496,17 +496,17 @@ function build_nullspace_on_free(st)
     Nin,Nex,Nin*Nex
 end
 
-q = RB.get_coordinates(bot.st)
-q̌ = RB.get_free_coordinates(bot.st)
-Ǎ = RB.make_constraints_jacobian(bot.st)(q)
+q = RB.get_coords(bot.st)
+q̌ = RB.get_free_coords(bot.st)
+Ǎ = RB.make_cstr_jacobian(bot.st)(q)
 # Ň_ = RB.nullspace(Ǎ)
 # Ň = RB.modified_gram_schmidt(Ň_)
 Nin,Nex,Ň = build_nullspace_on_free(bot.st)
 Q̃ = RB.build_Q̃(bot.st)
 L̂ = RB.build_L̂(bot.st)
 rank(Ň)
-# note 6 intrinsic constraints for 6 bars
-# note 18 extrinsic constraints for 6 pin joints
+# note 6 intrinsic cstr for 6 bars
+# note 18 extrinsic cstr for 6 pin joints
 Ǎ*Ň |> norm
 # Left hand side
 Q̃L̂ = Q̃*L̂
@@ -703,7 +703,7 @@ f = S*ᾱ
 
 λ = -inv(Ǎ*transpose(Ǎ))*Ǎ*Bᵀ*f
 # @show f,λ
-Ǩa = RB.constraint_forces_on_free_jacobian(bot.st,λ)
+Ǩa = RB.cstr_forces_on_free_jacobian(bot.st,λ)
 𝒦ain = transpose(Nin)*Ǩa*Nin
 𝒦a = transpose(Ň)*Ǩa*Ň |> Symmetric 
 vals_𝒦a,vecs_𝒦a = eigen(𝒦a)
@@ -730,7 +730,7 @@ vec𝒦ps = [
         # @show s
         λi = inv(Ǎ*transpose(Ǎ))*Ǎ*Bᵀ*si
         # @show f,λ
-        Ǩai = - RB.constraint_forces_on_free_jacobian(bot.st,λi)
+        Ǩai = - RB.cstr_forces_on_free_jacobian(bot.st,λi)
 
         Ǩgi = RB.build_geometric_stiffness_matrix_on_free!(bot.st,q,si)
 
@@ -958,17 +958,17 @@ end
 two = two_tri()
 bot = two
 plot_traj!(bot;showground=false)
-bot.st.ndof
+bot.st.num_of_dof
 
 RB.check_static_equilibrium_output_multipliers(bot.st)
 
 function make_nullspace_on_free(st)    
-    (;sysfree,mem2sysndof) = st.connectivity.indexed
-    q = RB.get_coordinates(bot.st)
+    (;sys_free_coords_idx,bodyid2sys_dof_idx) = st.connectivity.indexed
+    q = RB.get_coords(bot.st)
     Nin = RB.make_intrinsic_nullspace(st,q)
     Nin[
-        sysfree,
-        reduce(vcat,mem2sysndof[2:end])
+        sys_free_coords_idx,
+        reduce(vcat,bodyid2sys_dof_idx[2:end])
     ][:,end]
     # I2 = RB.NCF.I2_Bool
     # O2 = zero(I2)
@@ -988,9 +988,9 @@ function make_nullspace_on_free(st)
     # ret
 end
 
-q = RB.get_coordinates(bot.st)
-q̌ = RB.get_free_coordinates(bot.st)
-Ǎ = RB.make_constraints_jacobian(bot.st)(q)
+q = RB.get_coords(bot.st)
+q̌ = RB.get_free_coords(bot.st)
+Ǎ = RB.make_cstr_jacobian(bot.st)(q)
 Ň_ = RB.nullspace(Ǎ)
 Ň = RB.modified_gram_schmidt(Ň_)
 # Ň = Ň_
@@ -1152,7 +1152,7 @@ struct𝒦 = [
         # @show s
         λ = inv(Ǎ*transpose(Ǎ))*Ǎ*Bᵀ*s
         # @show f,λ
-        Ǩa = - RB.constraint_forces_on_free_jacobian(bot.st,λ)
+        Ǩa = - RB.cstr_forces_on_free_jacobian(bot.st,λ)
 
         Ǩg = RB.build_geometric_stiffness_matrix_on_free!(bot.st,q,s)
 
@@ -1235,9 +1235,9 @@ landerbot = lander()
 bot = landerbot 
 plot_traj!(bot;showground=false)
 
-q = RB.get_coordinates(bot.st)
-q̌ = RB.get_free_coordinates(bot.st)
-Ǎ = RB.make_constraints_jacobian(bot.st)(q)
+q = RB.get_coords(bot.st)
+q̌ = RB.get_free_coords(bot.st)
+Ǎ = RB.make_cstr_jacobian(bot.st)(q)
 Ň_ = RB.nullspace(Ǎ)
 Ň = RB.modified_gram_schmidt(Ň_)
 # Ň = build_nullspace_on_free(bot.st)
@@ -1268,7 +1268,7 @@ f = sum(S,dims=2)
 
 λ = -inv(Ǎ*transpose(Ǎ))*Ǎ*Bᵀ*f
 # @show f,λ
-Ǩa = RB.constraint_forces_on_free_jacobian(bot.st,λ)
+Ǩa = RB.cstr_forces_on_free_jacobian(bot.st,λ)
 𝒦a = transpose(Ň)*Ǩa*Ň |> Symmetric 
 vals_𝒦a,vecs_𝒦a = eigen(𝒦a)
 @myshow sort(vals_𝒦a)
@@ -1286,7 +1286,7 @@ vec𝒦ps = [
         # @show s
         λi = inv(Ǎ*transpose(Ǎ))*Ǎ*Bᵀ*si
         # @show f,λ
-        Ǩai = - RB.constraint_forces_on_free_jacobian(bot.st,λi)
+        Ǩai = - RB.cstr_forces_on_free_jacobian(bot.st,λi)
 
         Ǩgi = RB.build_geometric_stiffness_matrix_on_free!(bot.st,q,si)
 
@@ -1411,16 +1411,16 @@ end
 towerbot = tower()
 bot = towerbot
 
-@myshow bot.st.ndof
+@myshow bot.st.num_of_dof
 
 plot_traj!(bot;showground=false)
 
 function build_nullspace_on_free(st)
-    (;sysfree,mem2sysfull,mem2sysndof) = st.connectivity.indexed
-    q = RB.get_coordinates(bot.st)
+    (;sys_free_coords_idx,bodyid2sys_full_coords,bodyid2sys_dof_idx) = st.connectivity.indexed
+    q = RB.get_coords(bot.st)
     Nin = RB.make_intrinsic_nullspace(st,q)[
-        sysfree,
-        reduce(vcat,mem2sysndof[begin+1:end])
+        sys_free_coords_idx,
+        reduce(vcat,bodyid2sys_dof_idx[begin+1:end])
     ]    
     Nex = zeros(eltype(q),11,5)
     is = 0; js = 0
@@ -1428,7 +1428,7 @@ function build_nullspace_on_free(st)
     is = 5; js = 2
     Nex[is+4:is+6,js+1:js+3] .= Matrix(1I,3,3)
 
-    q_I = q[mem2sysfull[2]]
+    q_I = q[bodyid2sys_full_coords[2]]
     ri = @view q_I[1:3]
     u = @view q_I[4:6]
     v,w = RB.NCF.HouseholderOrthogonalization(u)
@@ -1439,9 +1439,9 @@ function build_nullspace_on_free(st)
     Nin*Nex
 end
 
-q = RB.get_coordinates(bot.st)
-q̌ = RB.get_free_coordinates(bot.st)
-Ǎ = RB.make_constraints_jacobian(bot.st)(q)
+q = RB.get_coords(bot.st)
+q̌ = RB.get_free_coords(bot.st)
+Ǎ = RB.make_cstr_jacobian(bot.st)(q)
 # Ň_ = RB.nullspace(Ǎ)
 # Ň = RB.modified_gram_schmidt(Ň_)
 Ň = build_nullspace_on_free(bot.st)
@@ -1599,7 +1599,7 @@ f = S*ᾱ
 
 λ = -inv(Ǎ*transpose(Ǎ))*Ǎ*Bᵀ*f
 # @show f,λ
-Ǩa = RB.constraint_forces_on_free_jacobian(bot.st,λ)
+Ǩa = RB.cstr_forces_on_free_jacobian(bot.st,λ)
 𝒦a = transpose(Ň)*Ǩa*Ň |> Symmetric 
 vals_𝒦a,vecs_𝒦a = eigen(𝒦a)
 @myshow sort(vals_𝒦a)
@@ -1619,7 +1619,7 @@ vec𝒦ps = [
         # @show s
         λi = inv(Ǎ*transpose(Ǎ))*Ǎ*Bᵀ*si
         # @show f,λ
-        Ǩai = - RB.constraint_forces_on_free_jacobian(bot.st,λi)
+        Ǩai = - RB.cstr_forces_on_free_jacobian(bot.st,λi)
 
         Ǩgi = RB.build_geometric_stiffness_matrix_on_free!(bot.st,q,si)
 
@@ -1753,7 +1753,7 @@ end
 #-- T bars
 tbbot = Tbars(;θ=π/4)
 bot = tbbot
-@myshow bot.st.ndof
+@myshow bot.st.num_of_dof
 dt = 1e-3
 tspan = (0.0,5.0)
 prob = RB.SimProblem(bot,dynfuncs)
@@ -1834,16 +1834,16 @@ bot = tbbot
 RB.check_static_equilibrium_output_multipliers(bot.st)
 
 function make_nullspace_on_free(st)    
-    (;sysfree,mem2sysfull,mem2sysndof) = st.connectivity.indexed
-    q = RB.get_coordinates(bot.st)
+    (;sys_free_coords_idx,bodyid2sys_full_coords,bodyid2sys_dof_idx) = st.connectivity.indexed
+    q = RB.get_coords(bot.st)
     Nin = RB.make_intrinsic_nullspace(st,q)[
-        sysfree,
-        reduce(vcat,mem2sysndof[2:end])
+        sys_free_coords_idx,
+        reduce(vcat,bodyid2sys_dof_idx[2:end])
     ]
     I3 = I(3)
     O3 = zero(I3)
     o3 = O3[:,1]
-    qbar = q[mem2sysfull[4]]
+    qbar = q[bodyid2sys_full_coords[4]]
     ri = @view qbar[1:3]
     u = @view qbar[4:6]
     v,w = RB.NCF.HouseholderOrthogonalization(u)
@@ -1868,9 +1868,9 @@ function make_nullspace_on_free(st)
     Nin*Nex
 end
 
-q = RB.get_coordinates(bot.st)
-q̌ = RB.get_free_coordinates(bot.st)
-Ǎ = RB.make_constraints_jacobian(bot.st)(q)
+q = RB.get_coords(bot.st)
+q̌ = RB.get_free_coords(bot.st)
+Ǎ = RB.make_cstr_jacobian(bot.st)(q)
 Ň_ = RB.nullspace(Ǎ)
 Ň = RB.modified_gram_schmidt(Ň_)
 
@@ -1910,7 +1910,7 @@ struct𝒦 = [
         # @show s
         λ = inv(Ǎ*transpose(Ǎ))*Ǎ*Bᵀ*s
         # @show f,λ
-        Ǩa = - RB.constraint_forces_on_free_jacobian(bot.st,λ)
+        Ǩa = - RB.cstr_forces_on_free_jacobian(bot.st,λ)
 
         Ǩg = RB.build_geometric_stiffness_matrix_on_free!(bot.st,q,s)
 
@@ -2108,13 +2108,13 @@ RB.solve!(prob,RB.Zhong06();tspan,dt,ftol=1e-7,maxiters=50,verbose=true,exceptio
 
 plot_traj!(bot;showground=false)
 
-@myshow bot.st.ndof
+@myshow bot.st.num_of_dof
 
 RB.check_static_equilibrium_output_multipliers(bot.st)
 
-q = RB.get_coordinates(bot.st)
-q̌ = RB.get_free_coordinates(bot.st)
-Ǎ = RB.make_constraints_jacobian(bot.st)(q)
+q = RB.get_coords(bot.st)
+q̌ = RB.get_free_coords(bot.st)
+Ǎ = RB.make_cstr_jacobian(bot.st)(q)
 Ň_ = RB.nullspace(Ǎ)
 Ň = RB.modified_gram_schmidt(Ň_)
 
@@ -2270,7 +2270,7 @@ end
 
 λ = -inv(Ǎ*transpose(Ǎ))*Ǎ*Bᵀ*f
 # @show f,λ
-Ǩa = RB.constraint_forces_on_free_jacobian(bot.st,λ)
+Ǩa = RB.cstr_forces_on_free_jacobian(bot.st,λ)
 𝒦a = transpose(Ň)*Ǩa*Ň |> Symmetric 
 vals_𝒦a,vecs_𝒦a = eigen(𝒦a)
 @myshow sort(vals_𝒦a)
@@ -2293,7 +2293,7 @@ struct𝒦p = [
         # @show s
         λ = inv(Ǎ*transpose(Ǎ))*Ǎ*Bᵀ*s
         # @show f,λ
-        Ǩa = - RB.constraint_forces_on_free_jacobian(bot.st,λ)
+        Ǩa = - RB.cstr_forces_on_free_jacobian(bot.st,λ)
         𝒦a = transpose(Ň)*Ǩa*Ň
 
         Ǩg = RB.build_geometric_stiffness_matrix_on_free!(bot.st,q,s)
@@ -2425,11 +2425,11 @@ end
 using Symbolics
 @variables λ[1:6]
 rb2 = RB.get_bodies(bot.st)[2]
-rb2.state.cache.funcs.constraint_forces_jacobian(λ)#[:,free_idx]
+rb2.state.cache.funcs.cstr_forces_jacobian(λ)#[:,free_idx]
 
 Ǎ*Ǎ'
 
-Ǩa = RB.constraint_forces_on_free_jacobian(bot.st,Symbolics.scalarize(λ))
+Ǩa = RB.cstr_forces_on_free_jacobian(bot.st,Symbolics.scalarize(λ))
 𝒦a = transpose(Ň)*Ǩa*Ň 
 vals_𝒦a,vecs_𝒦a = eigen(𝒦a)
 sort(vals_𝒦a)

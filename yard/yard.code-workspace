@@ -8,6 +8,9 @@
 		}
 	],
 	"settings": {
-		"julia.environmentPath": "/Users/jacob/Library/CloudStorage/OneDrive-SharedLibraries-onedrive/projects/Rible.jl/yard"
+		"julia.environmentPath": "/Users/jacob/Library/CloudStorage/OneDrive-SharedLibraries-onedrive/projects/Rible.jl/yard",
+		"github-actions.workflows.pinned.workflows": [
+			"Rible.jl/.github/workflows/test.yml"
+		]
 	}
 }

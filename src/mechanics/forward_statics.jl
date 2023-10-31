@@ -41,12 +41,12 @@ function check_slackness(𝐥,𝐮)
 end
 
 function forward_system(st,mode=PrimalMode();F̌=reshape(build_Ǧ(st),:,1))
-    (;nconstraints) = st
-    (;nfree) = st.connectivity.indexed
+    (;num_of_cstr) = st
+    (;num_of_free_coords) = st.connectivity.indexed
     (;nc) = st.connectivity.numbered
     ns = st.tensiles.cables |> length
-    nλ = nconstraints
-    @polyvar q̌[1:nfree]
+    nλ = num_of_cstr
+    @polyvar q̌[1:num_of_free_coords]
     @polyvar s[1:ns]
     @polyvar λ[1:nλ]
     @polyvar d[1:nλ]
@@ -62,9 +62,9 @@ function forward_system(st,mode=PrimalMode();F̌=reshape(build_Ǧ(st),:,1))
     polyk = 1.0k .+ 0.0
     polyu = 1.0u .+ 0.0
     polyg = 1.0g .+ 0.0
-    q0 = get_coordinates(st)
-    Φ = make_constraints_function(st,q0)
-    A = make_constraints_jacobian(st,q0)
+    q0 = get_coords(st)
+    Φ = make_cstr_function(st,q0)
+    A = make_cstr_jacobian(st,q0)
     Q̌ = make_Q̌(st,q0)
     S = make_S(st,q0)
 
@@ -258,9 +258,9 @@ function forward_multi_sequence(st::Structure,startsols,
 end
 
 function recover(state::NamedTuple,st::AbstractStructure)
-    q = get_coordinates(st)
-    (;sysfree) = st.connectivity.indexed
-    q[sysfree] = state.q̌
+    q = get_coords(st)
+    (;sys_free_coords_idx) = st.connectivity.indexed
+    q[sys_free_coords_idx] = state.q̌
     merge((q=q,),state)
 end
 
@@ -274,7 +274,7 @@ end
 
 function get_start_sol(bot)
     (;st) = bot
-    q̌ = get_free_coordinates(st)
+    q̌ = get_free_coords(st)
     isequ, λ = check_static_equilibrium_output_multipliers(bot.st)
     if isequ
         @info "Alreadly in static equilibrium, skipping inverse."
@@ -302,7 +302,7 @@ function get_start_system(bot,mode=PrimalMode();F=reshape(build_Ǧ(bot.st),:,1)
         start_parameters = @eponymtuple(d,u,g)
     elseif typeof(mode)<:AllMode
         d = get_d(st)
-        c = get_local_coordinates(st)
+        c = get_local_coords(st)
         k = get_cables_stiffness(st)
         start_parameters = @eponymtuple(d,c,k,u,g)
     else

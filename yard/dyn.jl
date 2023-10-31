@@ -75,8 +75,8 @@ function contact_dynfuncs(bot;
         checkpersist = true,
     )
     (;st) = bot
-    (;mem2num) = st.connectivity.numbered
-    npoints = length.(mem2num) |> sum
+    (;bodyid2sys_loci_idx) = st.connectivity.numbered
+    npoints = length.(bodyid2sys_loci_idx) |> sum
     contacts_bits = BitVector(undef,npoints)
     persistent_bits = BitVector(undef,npoints)
     T = RB.get_numbertype(st)
@@ -89,8 +89,8 @@ function contact_dynfuncs(bot;
         (;prop,state) = body
         bid = prop.id
         (;loci) = prop
-        μs_sys[mem2num[bid]] .= [locus.friction_coefficient for locus in loci]
-        es_sys[mem2num[bid]] .= [locus.restitution_coefficient for locus in loci]
+        μs_sys[bodyid2sys_loci_idx[bid]] .= [locus.friction_coefficient for locus in loci]
+        es_sys[bodyid2sys_loci_idx[bid]] .= [locus.restitution_coefficient for locus in loci]
     end
 
     function F!(F,q,q̇,t)
@@ -119,8 +119,8 @@ function contact_dynfuncs(bot;
             (;prop,state) = body
             bid = prop.id
             (;loci_states) = state
-            contacts_bits[mem2num[bid]] .= false
-            persistent_bits[mem2num[bid]] .= false
+            contacts_bits[bodyid2sys_loci_idx[bid]] .= false
+            persistent_bits[bodyid2sys_loci_idx[bid]] .= false
             if body isa RB.AbstractRigidBody
                 for pid in eachindex(loci_states)
                     locus_state = loci_states[pid]
@@ -131,10 +131,10 @@ function contact_dynfuncs(bot;
                     end
                     RB.activate!(contact_state,gap)
                     if contact_state.active
-                        contacts_bits[mem2num[bid][pid]] = true
+                        contacts_bits[bodyid2sys_loci_idx[bid][pid]] = true
                         contact_state.frame = RB.spatial_frame(flatplane.n)
                         if contact_state.persistent
-                            persistent_bits[mem2num[bid][pid]] = true
+                            persistent_bits[bodyid2sys_loci_idx[bid][pid]] = true
                         end
                         na += 1
                     end
@@ -148,18 +148,18 @@ function contact_dynfuncs(bot;
         end
         H = Diagonal(inv_friction_coefficients)
         restitution_coefficients = es_sys[contacts_bits]
-        # member's points indices to system's active points' indices
-        mem2act_idx = deepcopy(mem2num)
+        # member's points idx to system's active points' idx
+        mem2act_idx = deepcopy(bodyid2sys_loci_idx)
         act_start = 0
-        persistent_indices = Int[]
+        persistent_idx = Int[]
         for bid = 1:st.nbodies
             mem2act_idx[bid] .= 0
-            contacts_bits_body = findall(contacts_bits[mem2num[bid]])
+            contacts_bits_body = findall(contacts_bits[bodyid2sys_loci_idx[bid]])
             nactive_body = length(contacts_bits_body)
             mem_idx = act_start+1:act_start+nactive_body
             mem2act_idx[bid][contacts_bits_body] .= mem_idx
-            mem_per_idx = findall(persistent_bits[mem2num[bid]][contacts_bits_body])
-            append!(persistent_indices,mem_idx[mem_per_idx])
+            mem_per_idx = findall(persistent_bits[bodyid2sys_loci_idx[bid]][contacts_bits_body])
+            append!(persistent_idx,mem_idx[mem_per_idx])
             act_start += nactive_body
         end
         Ls = [
@@ -176,7 +176,7 @@ function contact_dynfuncs(bot;
         ∂Dq̇∂q = zeros(T,3na,nq)
         ∂DᵀΛ∂q = zeros(T,nq,nq)
         ŕ = Vector{T}(undef,3na)
-        na, mem2act_idx, persistent_indices, contacts_bits, H, restitution_coefficients, D, Dper, Dimp, ∂Dq̇∂q, ∂DᵀΛ∂q, ŕ, L
+        na, mem2act_idx, persistent_idx, contacts_bits, H, restitution_coefficients, D, Dper, Dimp, ∂Dq̇∂q, ∂DᵀΛ∂q, ŕ, L
     end
 
     function get_directions_and_positions!(D, Dper,Dimp, ∂Dq̇∂q, ∂DᵀΛ∂q, ŕ, q, q̇, Λ, mem2act_idx,)

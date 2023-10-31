@@ -21,7 +21,7 @@ function eigen_freq(θs = [0.0], epes = [0.05]; mode_index = nothing)
     freqs = VectorOfArray(Vector{Vector{Float64}}())
     for (i,(θ,epe)) in enumerate(zip(θs,epes))
         reflinkn = links(nstage,h,RotY(θ);k=3e1)
-        q,_ = RB.get_coordinates(reflinkn)
+        q,_ = RB.get_coords(reflinkn)
         λ,_,a = inverse_with_energy_3(linkn,reflinkn,Y,fill(epe,3))
         # @show a[1:3:end]
         RB.actuate!(linkn,a)
@@ -30,7 +30,7 @@ function eigen_freq(θs = [0.0], epes = [0.05]; mode_index = nothing)
         @show tension[1:3:end]
         push!(freqs,ω)
     end
-    nfirstmodes = linkn.ndof
+    nfirstmodes = linkn.num_of_dof
 
     # mode
     # fig,ax = plt.subplots(1,1,figsize=(5,4))
@@ -97,14 +97,14 @@ function plot_mode(epe=0.05)
     Y = build_Y(linkn)
 
     reflinkn = deepcopy(linkn)
-    q,_ = RB.get_coordinates(reflinkn)
+    q,_ = RB.get_coords(reflinkn)
     λ,_,a = inverse_with_energy_3(linkn,reflinkn,Y,fill(epe,3))
     RB.actuate!(linkn,a)
     ω,Z = RB.undamped_eigen!(linkn,q,λ)
 
     fig = plt.figure(figsize=(12,9))
     modeindex = 1:6
-    q0,_ = RB.get_coordinates(linkn)
+    q0,_ = RB.get_coords(linkn)
     mode_tgstruct = deepcopy(linkn)
     alphabet = join('a':'z')
     for (i,figlabel) = zip(modeindex,alphabet)

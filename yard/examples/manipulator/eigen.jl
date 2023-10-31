@@ -21,8 +21,8 @@ cd("examples/manipulator")
 include("man_define.jl")
 include("man_plotting.jl")
 function eigenanalysis(n,α=π/6,k=1.e4)
-    ndof = 6
-    manipulator = man_ndof(ndof,k=k,c=0.0)
+    num_of_dof = 6
+    manipulator = man_ndof(num_of_dof,k=k,c=0.0)
     as = Vector{Vector{Float64}}()
 
     Y = build_Y(manipulator)
@@ -42,7 +42,7 @@ function eigenanalysis(n,α=π/6,k=1.e4)
 
     for i = 1:n
         iθ = -i*α/n
-        refman = man_ndof(ndof,θ=iθ,k=k,c=0.0) # reference
+        refman = man_ndof(num_of_dof,θ=iθ,k=k,c=0.0) # reference
         refqi,_,_ = RB.get_initial(refman)
         refλi,Δu,a= RB.inverse(manipulator,refman,Y)
         push!(as,a)
@@ -68,8 +68,8 @@ spl = Spline1D(z,y)
 plt.plot(0:0.1:at,f.(0:0.1:at))
 
 
-function simulate_interpolation(spl,ndof=6;k=4.e3,c=0.0)
-    manipulator = man_ndof(ndof,k=k,c=c)
+function simulate_interpolation(spl,num_of_dof=6;k=4.e3,c=0.0)
+    manipulator = man_ndof(num_of_dof,k=k,c=c)
 
     q0,q̇0,λ0 = RB.get_initial(manipulator)
 

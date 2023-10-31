@@ -82,7 +82,7 @@ function inverse_analysis(θs)
         reflinkn = links(nstage,h,R)
         refqi,_,_ = RB.get_initial(reflinkn)
         # actlinkn,lhs,rhs = RB.statics_equation_for_actuation(linkn,reflinkn,Y,gravity=false,scale=false)
-        # λpt = zeros(actlinkn.nconstraint)
+        # λpt = zeros(actlinkn.num_of_cstr)
         # lengths = [s.state.length for s in actlinkn.strings]
         # u0 = [s.original_restlen for s in actlinkn.strings]
         # apt = lengths - u0
@@ -132,7 +132,7 @@ end
 
 function inverse2energy(tgstruct,refstruct,Y)
     actstruct,lhs,rhs = RB.statics_equation_for_actuation(tgstruct,refstruct,Y,gravity=false,scale=false)
-    λpt = zeros(actstruct.nconstraint)
+    λpt = zeros(actstruct.num_of_cstr)
     lengths = [s.state.length for s in actstruct.strings]
     u0 = [s.original_restlen for s in actstruct.strings]
     apt = lengths - u0
@@ -145,7 +145,7 @@ function inverse2energy(tgstruct,refstruct,Y)
     # 0 < u0 < lengths
     # -lengths < -u0 < 0
     # 0 < apt < lengths
-    ξ_limit = -u0./nb[actstruct.nconstraint+1:end]
+    ξ_limit = -u0./nb[actstruct.num_of_cstr+1:end]
     ξ_min_index = argmin(abs.(ξ_limit))
     ξ_max = ξ_limit[ξ_min_index]
     @show ξ_max
@@ -156,7 +156,7 @@ function inverse2energy(tgstruct,refstruct,Y)
     for (i,ξ) in enumerate(LinRange(0,ξ_max,nξ))
         # @show i,ξ
         xi = x(ξ)
-        ai = xi[actstruct.nconstraint+1:end]
+        ai = xi[actstruct.num_of_cstr+1:end]
         RB.actuate!(actstruct,ai)
         epei = RB.elastic_potential_energy(actstruct)
         epei_a = EPE_from_actuation(actstruct,Y,ai)
@@ -206,7 +206,7 @@ function inverse_with_energy(tgstruct,refstruct,Y,epe)
     Vfunc = build_EPE_from_actuation(refstruct,Y)
     function f!(ret,ξ)
         x = xp + nb*ξ
-        a = x[tgstruct.nconstraint+1:end]
+        a = x[tgstruct.num_of_cstr+1:end]
         ret[1] = Vfunc(a) - epe
     end
     nl_result = nlsolve(f!,[0.0], autodiff = :forward)
@@ -214,8 +214,8 @@ function inverse_with_energy(tgstruct,refstruct,Y,epe)
         @error "Not converged!"
     end
     x_result = (xp + nb*nl_result.zero)
-    λ_result = x_result[1:actstruct.nconstraint]
-    a_result = x_result[actstruct.nconstraint+1:end]
+    λ_result = x_result[1:actstruct.num_of_cstr]
+    a_result = x_result[actstruct.num_of_cstr+1:end]
     RB.actuation_check(actstruct,Y,a_result)
     u0 = [s.original_restlen for s in actstruct.strings]
     rl_result = u0 + Y*a_result
@@ -263,7 +263,7 @@ function inverse_with_energy_3(tr,reftr,Y,epes)
     Vfuncs = [build_EPE_from_actuation(acttr,Y,6(i-1)+1:6i) for i = 1:3]
     function f!(ret,ξ)
         x = xp + nb*ξ
-        a = x[acttg.nconstraint+1:end]
+        a = x[acttg.num_of_cstr+1:end]
         for i = 1:3
             ret[i] = Vfuncs[i](a) - epes[i]
         end
@@ -273,10 +273,10 @@ function inverse_with_energy_3(tr,reftr,Y,epes)
         @error "Not converged!"
     end
     x_result = (xp + nb*nl_result.zero)
-    λ_result = x_result[1:acttg.nconstraint].*c
-    a_result = x_result[acttg.nconstraint+1:end]
+    λ_result = x_result[1:acttg.num_of_cstr].*c
+    a_result = x_result[acttg.num_of_cstr+1:end]
     RB.actuation_check(acttr,Y,a_result)
-    refq,_ = RB.get_coordinates(reftr.st)
+    refq,_ = RB.get_coords(reftr.st)
     RB.actuate!(acttr,a_result)
     @assert RB.check_static_equilibrium(acttg,refq,λ_result)
     u0 = RB.get_original_restlen(acttr)

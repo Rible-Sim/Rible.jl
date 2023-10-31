@@ -130,8 +130,8 @@ hub = (actuators=acs,)
 rb2p = [
     ifelse(isodd(i),[i,i+1],[i-1,i+1]) for i = 1:length(rbs)
 ]
-body2q_raw = [[2pid[1]-1,2pid[1],2pid[2]-1,2pid[2]] for pid in rb2p]
-body2q = RB.filter_body2q(body2q_raw,rbs)
+bodyid2q_raw = [[2pid[1]-1,2pid[1],2pid[2]-1,2pid[2]] for pid in rb2p]
+bodyid2q = RB.filter_bodyid2q(bodyid2q_raw,rbs)
 string2ap = Vector{Tuple{RB.ID,RB.ID}}()
 for i = 1:n
     push!(string2ap,(RB.ID(2i+1,1),RB.ID(2i-1,1)))
@@ -139,7 +139,7 @@ for i = 1:n
     push!(string2ap,(RB.ID(2i+1,2),RB.ID(2i  ,1)))
     push!(string2ap,(RB.ID(2i+1,2),RB.ID(2i-1,2)))
 end
-cnt = RB.Connectivity(body2q,string2ap)
+cnt = RB.Connectivity(bodyid2q,string2ap)
 st = RB.Structure(rbs,tensiles,cnt)
 RB.update_cables_apply_forces!(st)
 RB.jac_singularity_check(st)
@@ -147,4 +147,4 @@ tr = RB.Robot(st,hub)
 
 Figur=plotstructure(tr)
 save("figure.png", Figur)
-q,_ = RB.get_coordinates(st)
+q,_ = RB.get_coords(st)

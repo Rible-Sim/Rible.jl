@@ -9,13 +9,13 @@ end
 
 function read_rb_mesh()
     pyramid = load("zlzt_1_1.obj")
-    pyramid_coordinates = coordinates(pyramid)
-    pyramid_pure_coordinates = metafree(pyramid_coordinates)
+    pyramid_coords = coords(pyramid)
+    pyramid_pure_coords = metafree(pyramid_coords)
     pyramid_normals = normals(pyramid)
-    pyramid_pure_coordinates_new = map((x)->RotX(π)*x*0.001,pyramid_pure_coordinates)
+    pyramid_pure_coords_new = map((x)->RotX(π)*x*0.001,pyramid_pure_coords)
     pyramid_normals_new = Ref(RotX(π)).*pyramid_normals
     pyramid_faces = faces(pyramid)
-    new_pyramid = GeometryBasics.Mesh(meta(pyramid_pure_coordinates_new;normals=pyramid_normals_new),pyramid_faces)
+    new_pyramid = GeometryBasics.Mesh(meta(pyramid_pure_coords_new;normals=pyramid_normals_new),pyramid_faces)
 end
 
 function bars_and_strings(st)

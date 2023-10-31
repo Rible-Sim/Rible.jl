@@ -1,11 +1,11 @@
 
-function man_ndof(ndof,onedir=[0.0,-1.0];θ=0.0,k=0.0,c=0.0,unit="mks",restlen=0.16,isvirtual=true)
-    nbodies = ndof + 1
+function man_ndof(num_of_dof,onedir=[0.0,-1.0];θ=0.0,k=0.0,c=0.0,unit="mks",restlen=0.16,isvirtual=true)
+    nbodies = num_of_dof + 1
     nbp = nbodies + 1
     n_lower = count(isodd,1:nbodies)
     n_upper = count(iseven,1:nbodies)
-    ends_indices = [1,nbodies]
-    inner_indices = 2:nbodies-1
+    ends_idx = [1,nbodies]
+    inner_idx = 2:nbodies-1
     a = zeros(nbodies)
     m = zeros(nbodies)
     Ia = zeros(nbodies)
@@ -18,7 +18,7 @@ function man_ndof(ndof,onedir=[0.0,-1.0];θ=0.0,k=0.0,c=0.0,unit="mks",restlen=0
         unit_M = 1
         unit_I = 1
     end
-    for j in ends_indices
+    for j in ends_idx
         a[j] = 12252e-5unit_L
         if isvirtual
             m[j] = 94.873e-3unit_M
@@ -27,7 +27,7 @@ function man_ndof(ndof,onedir=[0.0,-1.0];θ=0.0,k=0.0,c=0.0,unit="mks",restlen=0
         end
         Ia[j] = 3068.8e-7unit_I  #??2e-7??
     end
-    for k in inner_indices
+    for k in inner_idx
         a[k] = 12252e-5unit_L
         if isvirtual
             m[k] = 2*94.873e-3unit_M
@@ -128,12 +128,12 @@ function man_ndof(ndof,onedir=[0.0,-1.0];θ=0.0,k=0.0,c=0.0,unit="mks",restlen=0
         nmcs = RB.NCF.NC1P2V(ri,ro,α)
         if i == 1
             ci = collect(1:6)
-            constraints_indices = Int[]
+            cstr_idx = Int[]
         else
             ci = Int[]
-            constraints_indices = collect(1:3)
+            cstr_idx = collect(1:3)
         end
-        state = RB.RigidBodyState(prop,nmcs,ro,α,ṙo,ω,ci,constraints_indices)
+        state = RB.RigidBodyState(prop,nmcs,ro,α,ṙo,ω,ci,cstr_idx)
 
         body = RB.RigidBody(prop,state)
     end
@@ -218,12 +218,12 @@ function man_ndof(ndof,onedir=[0.0,-1.0];θ=0.0,k=0.0,c=0.0,unit="mks",restlen=0
 end
 
 
-function man_ndof_2022(ndof,onedir=[1.0,0.0];θ=0.0,k=1250.0,c=0.0,unit="mks")
+function man_ndof_2022(num_of_dof,onedir=[1.0,0.0];θ=0.0,k=1250.0,c=0.0,unit="mks")
 
     edi = 2 # 1 为HUI版，2 为ZHAO版
 
-    nbodies = ndof + 1
-    nbp = 2nbodies - ndof
+    nbodies = num_of_dof + 1
+    nbp = 2nbodies - num_of_dof
     n_lower = count(isodd,1:nbodies)
     n_upper = count(iseven,1:nbodies)
     lower_index = 1:2:nbodies
@@ -308,15 +308,15 @@ function man_ndof_2022(ndof,onedir=[1.0,0.0];θ=0.0,k=1250.0,c=0.0,unit="mks")
             constrained = true
             # edi == 1 ? ci = [1,3,4] : ci = [1,2,4]
             ci = collect(1:6)
-            constraints_indices = Int[]
+            cstr_idx = Int[]
         elseif i == 2
             constrained = true
             ci = collect(1:2)
-            constraints_indices = collect(1:3)
+            cstr_idx = collect(1:3)
         else
             constrained = false
             ci = Int[]
-            constraints_indices = collect(1:3)
+            cstr_idx = collect(1:3)
         end
 
         sti_l = 0.01832 #弹簧偏移顶点的量
@@ -439,7 +439,7 @@ function man_ndof_2022(ndof,onedir=[1.0,0.0];θ=0.0,k=1250.0,c=0.0,unit="mks")
 
         nmcs = RB.NCF.NC2P1V(ri,rj,ro,α)
 
-        state = RB.RigidBodyState(prop,nmcs,ro,α,ṙo,ω,ci,constraints_indices)
+        state = RB.RigidBodyState(prop,nmcs,ro,α,ṙo,ω,ci,cstr_idx)
 
         body = RB.RigidBody(prop,state)
 

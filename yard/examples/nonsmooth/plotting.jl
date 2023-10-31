@@ -33,7 +33,7 @@ function update_scene!(ax,st,cube_bars,q)
 end
 
 function sliderplot(fig,st,bot,ax,cube_bars,contact_dynamics)
-    # 𝒈,get_indices,,get_contacts = contact_dynamics(st)
+    # 𝒈,get_idx,,get_contacts = contact_dynamics(st)
     (;traj) = bot
     sg = SliderGrid(fig[2,1],
             (label="step", range=1:length(traj.t))

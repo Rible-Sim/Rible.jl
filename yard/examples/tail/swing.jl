@@ -27,8 +27,8 @@ tailscene
 q0,q̇0,λ0 = RB.get_initial(tail)
 # q̇0[end-3:end] .= 5*[0.1,0.0,0.1,0.0]
 
-# RB.get_nbodyconstraint(tail)
-# RB.get_nbodydof(tail) # RB.get_nbodycoords(tail)
+# RB.get_nbodycstr(tail)
+# RB.get_nbodydof(tail) # RB.get_num_of_coords(tail)
 
 
 function dynfuncs(tgstruct,q0)

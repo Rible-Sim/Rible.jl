@@ -134,24 +134,24 @@ function BuildTail()
             movable = false
             constrained = true
             ci = collect(1:6)
-            constraints_indices = Int[]
+            cstr_idx = Int[]
         else
             movable = true
             if i in 2:3
                 constrained = true
                 ci = collect(1:2)
                 if i == 2
-                    constraints_indices = collect(1:3)
+                    cstr_idx = collect(1:3)
                 else
-                    constraints_indices = [1]
+                    cstr_idx = [1]
                 end
             else
                 constrained = false
                 ci = Int[]
                 if i in rigidIndex
-                    constraints_indices = collect(1:3)
+                    cstr_idx = collect(1:3)
                 else
-                    constraints_indices = [1]
+                    cstr_idx = [1]
                 end
             end
         end
@@ -182,7 +182,7 @@ function BuildTail()
         else
             nmcs = RB.NCF.NC2D2P(SVector{2}(ri), SVector{2}(rj), ro, α)
         end
-        state = RB.RigidBodyState(prop, nmcs, ri, α, ṙo, ω, ci, constraints_indices)
+        state = RB.RigidBodyState(prop, nmcs, ri, α, ṙo, ω, ci, cstr_idx)
         body = RB.RigidBody(prop, state)
     end
 
@@ -403,24 +403,24 @@ function BuildTail(type; β=1.0, μ=0.02)
             movable = false
             constrained = true
             ci = collect(1:6)
-            constraints_indices = Int[]
+            cstr_idx = Int[]
         else
             movable = true
             if i in 2:3
                 constrained = true
                 ci = collect(1:2)
                 if i == 2
-                    constraints_indices = collect(1:3)
+                    cstr_idx = collect(1:3)
                 else
-                    constraints_indices = [1]
+                    cstr_idx = [1]
                 end
             else
                 constrained = false
                 ci = Int[]
                 if i in rigidIndex
-                    constraints_indices = collect(1:3)
+                    cstr_idx = collect(1:3)
                 else
-                    constraints_indices = [1]
+                    cstr_idx = [1]
                 end
             end
         end
@@ -451,7 +451,7 @@ function BuildTail(type; β=1.0, μ=0.02)
         else
             nmcs = RB.NCF.NC2D2P(SVector{2}(ri), SVector{2}(rj), ro, α)
         end
-        state = RB.RigidBodyState(prop, nmcs, ri, α, ṙo, ω, ci, constraints_indices)
+        state = RB.RigidBodyState(prop, nmcs, ri, α, ṙo, ω, ci, cstr_idx)
         body = RB.RigidBody(prop, state, rdsi.mesh)
     end
 

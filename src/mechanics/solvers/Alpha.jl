@@ -28,9 +28,9 @@ function generate_cache(solver::Alpha,intor;dt,kargs...)
     # F!,_ = dynfuncs
     mm = build_MassMatrices(bot)
     # (;M) = mm
-    A = make_constraints_jacobian(bot)
-    Φ = make_constraints_function(bot)
-    ∂Ǎᵀλ∂q̌ = (q,λ)->constraint_forces_on_free_jacobian(bot.st,λ)
+    A = make_cstr_jacobian(bot)
+    Φ = make_cstr_function(bot)
+    ∂Ǎᵀλ∂q̌ = (q,λ)->cstr_forces_on_free_jacobian(bot.st,λ)
     funcs = @eponymtuple(A,Φ,∂Ǎᵀλ∂q̌)
     h = dt
     β′ = (1-αm)/((h^2)*β*(1-αf))

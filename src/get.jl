@@ -1,11 +1,11 @@
 
-get_local_coordinates(bot::Robot) = get_local_coordinates(bot.st)
+get_local_coords(bot::Robot) = get_local_coords(bot.st)
 get_s(bot::Robot) = get_s(bot.st)
 
-get_coordinates(st::Structure) = copy(st.state.system.q)
-get_q̇(st::Structure) = copy(st.state.system.q̇)
-get_free_coordinates(st::Structure) = copy(st.state.system.q̌)
-get_q̌̇(st::Structure) = copy(st.state.system.q̌̇)
+get_coords(st::Structure) = copy(st.state.system.q)
+get_velocs(st::Structure) = copy(st.state.system.q̇)
+get_free_coords(st::Structure) = copy(st.state.system.q̌)
+get_free_velocs(st::Structure) = copy(st.state.system.q̌̇)
 
 function get_λ(st::Structure)
     st.state.system.λ
@@ -17,31 +17,31 @@ $(TYPEDSIGNATURES)
 """
 function get_initial(st::Structure)
     _,λ = check_static_equilibrium_output_multipliers(st::Structure)
-    q̌ = get_free_coordinates(st::Structure)
-    q = get_coordinates(st::Structure)
+    q̌ = get_free_coords(st::Structure)
+    q = get_coords(st::Structure)
     ℓ = get_cables_len(st::Structure)
     s = 1 ./ℓ
     d = get_d(st::Structure)
-    c = get_local_coordinates(st::Structure)
+    c = get_local_coords(st::Structure)
     k = get_cables_stiffness(st::Structure)
     μ = get_cables_restlen(st::Structure)
     @eponymtuple(q̌,q,s,λ,d,c,k,μ,)
 end
 
 function get_polyvar(st::Structure)
-    (;nconstraints,connectivity,tensiles) = st
+    (;num_of_cstr,connectivity,tensiles) = st
     (;cables) = tensiles
     (;indexed,numbered,) = connectivity
     (;nc) = numbered
-    (;ninconstraints) = indexed
-    (;nfree) = indexed
+    (;num_of_intrinsic_cstr) = indexed
+    (;num_of_free_coords) = indexed
     ncables = length(cables)
     # state variables
-    @polyvar q̌[1:nfree]
+    @polyvar q̌[1:num_of_free_coords]
     @polyvar s[1:ncables]
-    @polyvar λ[1:nconstraints]
+    @polyvar λ[1:num_of_cstr]
     # parameters
-    @polyvar d[1:nconstraints]
+    @polyvar d[1:num_of_cstr]
     @polyvar c[1:nc]
     @polyvar k[1:ncables]
     @polyvar μ[1:ncables]
@@ -52,67 +52,67 @@ function get_s(st::Structure)
     1 ./get_cables_len(st::Structure)
 end
 
-function get_local_coordinates(st::Structure,bodyid,pid)
-    (;mem2num,num2sys) = st.connectivity.numbered
+function get_local_coords(st::Structure,bodyid,pid)
+    (;bodyid2sys_loci_idx,sys_loci2coords_idx) = st.connectivity.numbered
     (;c) = st.state.system
-    cidx = mem2num[bodyid][pid]
-    c[num2sys[cidx]]
+    cidx = bodyid2sys_loci_idx[bodyid][pid]
+    c[sys_loci2coords_idx[cidx]]
 end
 
-get_local_coordinates(st::Structure) = copy(st.state.system.c)
+get_local_coords(st::Structure) = copy(st.state.system.c)
 
-function get_local_coordinates(bodies,numbered::NumberedPoints)
+function get_local_coords(bodies,numbered::Numbered)
     ndim = get_num_of_dims(bodies)
     T = get_numbertype(bodies)
-    (;mem2num,num2sys,nc) = numbered
+    (;bodyid2sys_loci_idx,sys_loci2coords_idx,nc) = numbered
     ret = zeros(T,nc)
     foreach(bodies) do body
         bodyid = body.prop.id
         for i in eachindex(body.prop.loci)
-            ip = mem2num[bodyid][i]
-            ret[num2sys[ip]] .= get_local_coordinates(body,body.prop.loci[i].position)
+            ip = bodyid2sys_loci_idx[bodyid][i]
+            ret[sys_loci2coords_idx[ip]] .= get_local_coords(body,body.prop.loci[i].position)
         end
     end
     ret
 end
 
-function get_local_coordinates(body::RigidBody,r̄p)
-    to_local_coordinates(body.state.cache.funcs.nmcs,r̄p)
+function get_local_coords(body::RigidBody,r̄p)
+    to_local_coords(body.state.cache.funcs.nmcs,r̄p)
 end
 
-function get_local_coordinates(body::FlexibleBody,r̄p)
+function get_local_coords(body::FlexibleBody,r̄p)
     body.state.cache.funcs.x(r̄p)
 end
 
 function set_C!(st::Structure,c)
     T = get_numbertype(st::Structure)
     (;numbered,indexed) = st.connectivity
-    (;mem2num,num2sys,nc) = numbered
+    (;bodyid2sys_loci_idx,sys_loci2coords_idx,nc) = numbered
     foreach(st.bodies) do body
         bodyid = body.prop.id
         for i in eachindex(body.prop.loci)
-            ip = mem2num[bodyid][i]
-            body.state.cache.Cps[i] = body.state.cache.funcs.C(c[num2sys[ip]])
+            ip = bodyid2sys_loci_idx[bodyid][i]
+            body.state.cache.Cps[i] = body.state.cache.funcs.C(c[sys_loci2coords_idx[ip]])
         end
     end
 end
 
 function get_d(st::Structure)
-    (;nconstraints,bodies) = st
+    (;num_of_cstr,bodies) = st
     (;indexed,jointed) = st.connectivity
-    (;mem2sysincst,ninconstraints) = indexed
+    (;bodyid2sys_intrinsic_cstr_idx,num_of_intrinsic_cstr) = indexed
     T = get_numbertype(st::Structure)
-    d = Vector{T}(undef,nconstraints)
-    is = Ref(ninconstraints)
+    d = Vector{T}(undef,num_of_cstr)
+    is = Ref(num_of_intrinsic_cstr)
     foreach(bodies) do body
         bodyid = body.prop.id
-        memincst = mem2sysincst[bodyid]
+        memincst = bodyid2sys_intrinsic_cstr_idx[bodyid]
         if !isempty(memincst)
             d[memincst] .= NCF.get_deform(body.state.cache.funcs.nmcs)
         end
     end
     foreach(jointed.joints) do joint
-        nc = joint.nconstraints
+        nc = joint.num_of_cstr
         d[is[]+1:is[]+nc] .= joint.values
         is[] += nc
     end
@@ -143,39 +143,22 @@ get_numbertype(::AbstractBodyProperty{N,T}) where {N,T} = T
 Return System 约束数量。
 $(TYPEDSIGNATURES)
 """
-get_num_of_constraints(st::Structure) = st.nconstraints
+get_num_of_cstr(st::Structure) = st.num_of_cstr
 
-function get_num_of_constraints(rbs::TypeSortedCollection)
-    ninconstraints = mapreduce(get_ninconstraints,+,rbs,init=0)
+function get_num_of_cstr(rbs::TypeSortedCollection)
+    num_of_intrinsic_cstr = mapreduce(get_num_of_intrinsic_cstr,+,rbs,init=0)
 end
-get_ninconstraints(body::AbstractRigidBody) = get_num_of_constraints(body.state.cache.funcs.nmcs)
-get_nbodycoords(body::AbstractRigidBody) = get_nbodycoords(body.state.cache.funcs.nmcs)
+get_num_of_intrinsic_cstr(body::AbstractRigidBody) = get_num_of_cstr(body.state.cache.funcs.nmcs)
+get_num_of_coords(body::AbstractRigidBody) = get_num_of_coords(body.state.cache.funcs.nmcs)
 get_num_of_dof(body::AbstractRigidBody) = get_num_of_dof(body.state.cache.funcs.nmcs)
 get_num_of_local_dims(body::AbstractRigidBody) = get_num_of_local_dims(body.state.cache)
 get_num_of_local_dims(cache::NonminimalCoordinatesCache) = get_num_of_local_dims(cache.funcs.nmcs)
 
-get_ninconstraints(fb::AbstractFlexibleBody) = get_num_of_constraints(fb.state.cache.funcs.ancs)
-get_nbodycoords(fb::AbstractFlexibleBody) = get_nbodycoords(fb.state.cache.funcs.ancs)
+get_num_of_intrinsic_cstr(body::AbstractFlexibleBody) = get_num_of_cstr(body.state.cache.funcs.ancs)
+get_num_of_coords(body::AbstractFlexibleBody) = get_num_of_coords(body.state.cache.funcs.ancs)
 get_num_of_dof(body::AbstractFlexibleBody) = get_num_of_dof(body.state.cache.funcs.ancs)
-get_num_of_local_dims(fb::AbstractFlexibleBody) = get_num_of_local_dims(fb.state.cache)
+get_num_of_local_dims(body::AbstractFlexibleBody) = get_num_of_local_dims(body.state.cache)
 get_num_of_local_dims(cache::FlexibleBodyCoordinatesCache) = get_num_of_local_dims(cache.funcs.ancs)
-
-get_num_of_constraints(nmcs::NCF.LNC) = NCF.get_num_of_constraints(nmcs)
-get_nbodycoords(nmcs::NCF.LNC) = NCF.get_num_of_coordinates(nmcs)
-get_num_of_dof(nmcs::NCF.LNC) = NCF.get_num_of_dof(nmcs)
-get_num_of_local_dims(nmcs::NCF.LNC) = NCF.get_num_of_local_dims(nmcs)
-
-get_num_of_constraints(nmcs::QBF.QC) = QBF.get_num_of_constraints(nmcs)
-get_nbodycoords(nmcs::QBF.QC) = QBF.get_num_of_coordinates(nmcs)
-get_num_of_dof(nmcs::QBF.QC) = QBF.get_num_of_dof(nmcs)
-get_num_of_local_dims(nmcs::QBF.QC) = QBF.get_num_of_local_dims(nmcs)
-
-
-get_num_of_constraints(ancs::ANCF.ANC) = ANCF.get_num_of_constraints(ancs)
-get_nbodycoords(ancs::ANCF.ANC) = ANCF.get_num_of_coordinates(ancs)
-get_num_of_dof(ancs::ANCF.ANC) = ANCF.get_num_of_dof(ancs)
-get_num_of_local_dims(ancs::ANCF.ANC) = ANCF.get_num_of_local_dims(ancs)
-
 
 """
 Return System 重力。

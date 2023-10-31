@@ -142,18 +142,18 @@ function nbridge(n,m=2;θ=missing,r=missing,c=0.0,h=1.0,o2=[0,4.0,0],right=false
 
 	nhcables = 5n*m
 	ncables = (l+1)*nhcables
-	active_cable_indices = [
+	active_cable_idx = [
 		k*nhcables + CA((j-1)*5*n+1:j*5n)[(j-1)*5+(i-1)*5+v]
 		for k = 0:l for j = 1:m for i = 1:n for v = 2:3
 	]
-	stale_cable_indices = [
+	stale_cable_idx = [
 		k*nhcables + CA((j-1)*5*n+1:j*5n)[-(j-1)*5+(i-1)*5+v]
 		for k = 0:l for j = 1:m for i = 1:n for v = [1,19]
 	]
 
 	restlens = fill(0.0,ncables)
 	ks = fill(2000.0,ncables)
-	ks[stale_cable_indices] .= 3000.0
+	ks[stale_cable_idx] .= 3000.0
     cs = fill(c,ncables)
     cables = [RB.Cable3D(i,restlens[i],ks[i],cs[i];slack=true) for i = 1:ncables]
     tensiles = (cables = cables,)
@@ -190,15 +190,15 @@ function nbridge(n,m=2;θ=missing,r=missing,c=0.0,h=1.0,o2=[0,4.0,0],right=false
 	actuators_active =
 		RB.ManualActuator(
 			1,
-			         active_cable_indices,
-			restlens[active_cable_indices],
+			         active_cable_idx,
+			restlens[active_cable_idx],
 			RB.Serial()
 		)
 	actuators_stale =
 		RB.ManualActuator(
 			2,
-			stale_cable_indices,
-			restlens[stale_cable_indices],
+			stale_cable_idx,
+			restlens[stale_cable_idx],
 			RB.Serial()
 		)
 	actuators_rings = [
@@ -341,19 +341,19 @@ function nrailbridge(n,m=2;θ=missing,r=missing,c=0.0,h=1.0,o2=[0,4.0,0],right=f
 	# 总绳索数
 	ncables = (l+1)*nhcables
 	# 主动绳索编号
-	active_cable_indices = [
+	active_cable_idx = [
 		k*nhcables + CA((j-1)*5*n+1:j*5n)[(j-1)*5+(i-1)*5+v]
 		for k = 0:l for j = 1:m for i = 1:n for v = 2:3
 	]
 	# 被动绳索编号
-	stale_cable_indices = [
+	stale_cable_idx = [
 		k*nhcables + CA((j-1)*5*n+1:j*5n)[-(j-1)*5+(i-1)*5+v]
 		for k = 0:l for j = 1:m for i = 1:n for v = [1,19]
 	]
 
 	restlens = fill(0.0,ncables)
 	ks = fill(2000.0,ncables)
-	ks[stale_cable_indices] .= 3000.0
+	ks[stale_cable_idx] .= 3000.0
     cs = fill(c,ncables)
     cables = [RB.Cable3D(i,restlens[i],ks[i],cs[i];slack=true) for i = 1:ncables]
     tensiles = (cables = cables,)
@@ -387,13 +387,13 @@ function nrailbridge(n,m=2;θ=missing,r=missing,c=0.0,h=1.0,o2=[0,4.0,0],right=f
 	tensioned = @eponymtuple(connected,)
 
 	# 导轨约束
-	A_cst = zeros(2n,indexed.nfull)
+	A_cst = zeros(2n,indexed.num_of_full_coords)
 	for i = 1:n
 	    j = 3(i-1)+1
-	    inds = indexed.mem2sysfull[j]
+	    inds = indexed.bodyid2sys_full_coords[j]
 	    indx, indy, indz = inds[1:3]
 		body = rbs[j]
-		q, _ = RB.NCF.rigidstate2naturalcoords(
+		q, _ = RB.cartesian_frame2coords(
 						body.state.cache.funcs.nmcs,
 						body.state.ro,
 						body.state.R,
@@ -415,15 +415,15 @@ function nrailbridge(n,m=2;θ=missing,r=missing,c=0.0,h=1.0,o2=[0,4.0,0],right=f
 	actuators_active =
 		RB.ManualActuator(
 			1,
-			         active_cable_indices,
-			restlens[active_cable_indices],
+			         active_cable_idx,
+			restlens[active_cable_idx],
 			RB.Serial()
 		)
 	actuators_stale =
 		RB.ManualActuator(
 			2,
-			stale_cable_indices,
-			restlens[stale_cable_indices],
+			stale_cable_idx,
+			restlens[stale_cable_idx],
 			RB.Serial()
 		)
 	actuators_rings = [

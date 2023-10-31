@@ -25,20 +25,20 @@ function rigidbody(i, rij, apss, rg)
         movable = false
         constrained = true
         ci = collect(1:6)
-        constraints_indices = Int[]
+        cstr_idx = Int[]
     else
         movable = true
         if i == 2
             constrained = true
             ci = collect(1:2)
-            constraints_indices = [1]
+            cstr_idx = [1]
         else
             constrained = false
             ci = Int[]
             if i == 4
-                constraints_indices = [1]
+                cstr_idx = [1]
             else
-                constraints_indices = collect(1:3)
+                cstr_idx = collect(1:3)
             end
         end
     end
@@ -69,7 +69,7 @@ function rigidbody(i, rij, apss, rg)
     else
         nmcs = RB.NCF.NC2D2P(SVector{2}(ri), SVector{2}(rj), ro, α)
     end
-    state = RB.RigidBodyState(prop, nmcs, ri, α, ṙo, ω, ci, constraints_indices)
+    state = RB.RigidBodyState(prop, nmcs, ri, α, ṙo, ω, ci, cstr_idx)
     body = RB.RigidBody(prop, state)
 end
 rij = [[[0.0, 0.0], [1.0, 0.0]],
@@ -121,7 +121,7 @@ st = RB.Structure(rigdibodies, tensiles, cnt)
 bot = RB.Robot(st, hub)
 plot_traj!(bot)
 
-# bot.traj.q̇[begin][tail.st.connectivity.indexed.mem2sysfull[end][1:4]] .= [0.1,0.0,0.1,0.0]
+# bot.traj.q̇[begin][tail.st.connectivity.indexed.bodyid2sys_full_coords[end][1:4]] .= [0.1,0.0,0.1,0.0]
 # function dynfuncs(bot)
 #     (;st) = bot
 #     function F!(F,q,q̇,t)
@@ -145,9 +145,9 @@ plot_traj!(bot)
 
 _,λ0 = RB.check_static_equilibrium_output_multipliers(bot.st,gravity=false)
 bot_plot = deepcopy(bot)
-q = RB.get_coordinates(bot_plot.st)
-(;sysfree) = bot_plot.st.connectivity.indexed
-bot_plot.traj[1].q[sysfree] .+= δq̌[1]
+q = RB.get_coords(bot_plot.st)
+(;sys_free_coords_idx) = bot_plot.st.connectivity.indexed
+bot_plot.traj[1].q[sys_free_coords_idx] .+= δq̌[1]
 plot_traj!(bot_plot)
 
 display(Matrix(RB.build_M(bot.st)))

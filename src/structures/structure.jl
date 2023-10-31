@@ -53,11 +53,11 @@ $(TYPEDSIGNATURES)
 """
 function StructureState(bodies,tensiles,cnt::Connectivity{<:Any,<:Any,<:NamedTuple{(:connected, )},<:Any})
     (;numbered,indexed,jointed) = cnt
-    (;mem2sys) = numbered
-    (;nfull,ninconstraints,sysfree,syspres) = indexed
-    (;mem2sysincst,mem2sysfull) = indexed
-    (;nexconstraints) = jointed
-    nconstraints = ninconstraints + nexconstraints
+    (;bodyid2sys_loci_coords_idx) = numbered
+    (;num_of_full_coords,num_of_intrinsic_cstr,sys_free_coords_idx,sys_pres_coords_idx) = indexed
+    (;bodyid2sys_intrinsic_cstr_idx,bodyid2sys_full_coords) = indexed
+    (;num_of_extrinsic_cstr) = jointed
+    num_of_cstr = num_of_intrinsic_cstr + num_of_extrinsic_cstr
     nb = length(bodies)
     pres_idx_by_mem = Vector{Vector{Int}}(undef,nb)
     free_idx_by_mem = Vector{Vector{Int}}(undef,nb)
@@ -68,21 +68,21 @@ function StructureState(bodies,tensiles,cnt::Connectivity{<:Any,<:Any,<:NamedTup
     end
     T = get_numbertype(bodies)
     t = zero(T)
-    q = Vector{T}(undef,nfull)
+    q = Vector{T}(undef,num_of_full_coords)
     q̇ = zero(q)
     q̈ = zero(q)
     F = zero(q)
-    λ = Vector{T}(undef,nconstraints)
-    c = get_local_coordinates(bodies,numbered)
-    system = NonminimalCoordinatesState(t,q,q̇,q̈,F,λ,sysfree,syspres,c)
+    λ = Vector{T}(undef,num_of_cstr)
+    c = get_local_coords(bodies,numbered)
+    system = NonminimalCoordinatesState(t,q,q̇,q̈,F,λ,sys_free_coords_idx,sys_pres_coords_idx,c)
     parts = [
         begin
-            qmem = @view q[mem2sysfull[bodyid]]
-            q̇mem = @view q̇[mem2sysfull[bodyid]]
-            q̈mem = @view q̈[mem2sysfull[bodyid]]
-            Fmem = @view F[mem2sysfull[bodyid]]
-            λmem = @view λ[mem2sysincst[bodyid]]
-            cmem = @view c[mem2sys[bodyid]]
+            qmem = @view q[bodyid2sys_full_coords[bodyid]]
+            q̇mem = @view q̇[bodyid2sys_full_coords[bodyid]]
+            q̈mem = @view q̈[bodyid2sys_full_coords[bodyid]]
+            Fmem = @view F[bodyid2sys_full_coords[bodyid]]
+            λmem = @view λ[bodyid2sys_intrinsic_cstr_idx[bodyid]]
+            cmem = @view c[bodyid2sys_loci_coords_idx[bodyid]]
             NonminimalCoordinatesState(
                 t,qmem,q̇mem,q̈mem,Fmem,λmem,
                 free_idx_by_mem[bodyid],
@@ -93,7 +93,7 @@ function StructureState(bodies,tensiles,cnt::Connectivity{<:Any,<:Any,<:NamedTup
         for bodyid = 1:nb
     ]
     foreach(bodies) do body
-        q, q̇ = body2coordinates(body)
+        q, q̇ = body2coords(body)
         parts[body.prop.id].q .= q
         parts[body.prop.id].q̇ .= q̇
     end
@@ -107,8 +107,8 @@ $(TYPEDEF)
 """
 struct Structure{BodyType,TenType,CntType,StateType} <: AbstractStructure
     ndim::Int
-    ndof::Int
-    nconstraints::Int
+    num_of_dof::Int
+    num_of_cstr::Int
     nbodies::Int
     ntensiles::Int
     bodies::BodyType
@@ -125,16 +125,16 @@ function Structure(bodies,tensiles,cnt::Connectivity)
     ndim = get_num_of_dims(bodies)
     nbodies = length(bodies)
     ntensiles = sum(map(length,tensiles))
-    (;nfree,ninconstraints) = cnt.indexed
-    (;nexconstraints) = cnt.jointed
-    nconstraints = ninconstraints + nexconstraints
-    ndof = nfree - nconstraints
-    if ndof <= 0
-        @warn "Non positive degree of freedom: $ndof."
+    (;num_of_free_coords,num_of_intrinsic_cstr) = cnt.indexed
+    (;num_of_extrinsic_cstr) = cnt.jointed
+    num_of_cstr = num_of_intrinsic_cstr + num_of_extrinsic_cstr
+    num_of_dof = num_of_free_coords - num_of_cstr
+    if num_of_dof <= 0
+        @warn "Non positive degree of freedom: $num_of_dof."
     end
     state = StructureState(bodies,tensiles,cnt)
     st = Structure(
-        ndim,ndof,nconstraints,
+        ndim,num_of_dof,num_of_cstr,
         nbodies,ntensiles,
         bodies,tensiles,
         cnt,
@@ -168,11 +168,11 @@ function update!(st::Structure,q::AbstractVector,q̇::AbstractVector=zero(q))
 end
 
 function build_M(st::AbstractStructure)
-    (;nfull,mem2sysfull) = st.connectivity.indexed
+    (;num_of_full_coords,bodyid2sys_full_coords) = st.connectivity.indexed
     T = get_numbertype(st)
-    M = spzeros(T,nfull,nfull)
+    M = spzeros(T,num_of_full_coords,num_of_full_coords)
     foreach(st.bodies) do body
-        memfull = mem2sysfull[body.prop.id]
+        memfull = bodyid2sys_full_coords[body.prop.id]
         M[memfull,memfull] .+= body.state.cache.M
     end
     # @assert issymmetric(M)
@@ -180,11 +180,11 @@ function build_M(st::AbstractStructure)
 end
 
 function build_M⁻¹(st::AbstractStructure)
-    (;nfull,mem2sysfull) = st.connectivity.indexed
+    (;num_of_full_coords,bodyid2sys_full_coords) = st.connectivity.indexed
     T = get_numbertype(st)
-    M⁻¹ = spzeros(T,nfull,nfull)
+    M⁻¹ = spzeros(T,num_of_full_coords,num_of_full_coords)
     foreach(st.bodies) do body
-        memfull = mem2sysfull[body.prop.id]
+        memfull = bodyid2sys_full_coords[body.prop.id]
         M⁻¹[memfull,memfull] .+= body.state.cache.M⁻¹
     end
     # @assert issymmetric(M⁻¹)
@@ -192,17 +192,17 @@ function build_M⁻¹(st::AbstractStructure)
 end
 
 function build_M̌(st::AbstractStructure)
-    (;sysfree) = st.connectivity.indexed
+    (;sys_free_coords_idx) = st.connectivity.indexed
     M = build_M(st)
-    M̌ = Symmetric(M[sysfree,sysfree])
+    M̌ = Symmetric(M[sys_free_coords_idx,sys_free_coords_idx])
 end
 
 function build_∂Mq̇∂q(st::AbstractStructure)
-    (;nfull,mem2sysfull) = st.connectivity.indexed
+    (;num_of_full_coords,bodyid2sys_full_coords) = st.connectivity.indexed
     T = get_numbertype(st)
-    ∂Mq̇∂q = spzeros(T,nfull,nfull)
+    ∂Mq̇∂q = spzeros(T,num_of_full_coords,num_of_full_coords)
     foreach(st.bodies) do body
-        memfull = mem2sysfull[body.prop.id]
+        memfull = bodyid2sys_full_coords[body.prop.id]
         ∂Mq̇∂q[memfull,memfull] .+= body.state.cache.∂Mq̇∂q
     end
     ∂Mq̇∂q
@@ -210,11 +210,11 @@ function build_∂Mq̇∂q(st::AbstractStructure)
 end
 
 function build_∂M⁻¹p∂q(st::AbstractStructure)
-    (;nfull,mem2sysfull) = st.connectivity.indexed
+    (;num_of_full_coords,bodyid2sys_full_coords) = st.connectivity.indexed
     T = get_numbertype(st)
-    ∂M⁻¹p∂q = spzeros(T,nfull,nfull)
+    ∂M⁻¹p∂q = spzeros(T,num_of_full_coords,num_of_full_coords)
     foreach(st.bodies) do body
-        memfull = mem2sysfull[body.prop.id]
+        memfull = bodyid2sys_full_coords[body.prop.id]
         ∂M⁻¹p∂q[memfull,memfull] .+= body.state.cache.∂M⁻¹p∂q
     end
     ∂M⁻¹p∂q
@@ -250,148 +250,148 @@ function make_Jac_M⁻¹!(st)
 end
 
 function build_∂T∂qᵀ(st::AbstractStructure)
-    (;nfull,mem2sysfull) = st.connectivity.indexed
+    (;num_of_full_coords,bodyid2sys_full_coords) = st.connectivity.indexed
     T = get_numbertype(st)
-    ∂T∂qᵀ = zeros(T,nfull)
+    ∂T∂qᵀ = zeros(T,num_of_full_coords)
     foreach(st.bodies) do body
-        memfull = mem2sysfull[body.prop.id]
+        memfull = bodyid2sys_full_coords[body.prop.id]
         ∂T∂qᵀ[memfull] .+= body.state.cache.∂T∂qᵀ
     end
     ∂T∂qᵀ
 end
 
 
-function make_constraints_function(st::AbstractStructure,q0::AbstractVector)
-    (;bodies,nconstraints) = st
+function make_cstr_function(st::AbstractStructure,q0::AbstractVector)
+    (;bodies,num_of_cstr) = st
     (;numbered,indexed,jointed) = st.connectivity
-    (;nfree,nfull,syspres,sysfree,mem2sysfull,mem2syspres,mem2sysfree,ninconstraints,mem2sysincst) = indexed
+    (;num_of_free_coords,num_of_full_coords,sys_pres_coords_idx,sys_free_coords_idx,bodyid2sys_full_coords,bodyid2sys_pres_coords,bodyid2sys_free_coords,num_of_intrinsic_cstr,bodyid2sys_intrinsic_cstr_idx) = indexed
 
-    function _inner_constraints_function(q̌,d,c)
-        q = Vector{eltype(q̌)}(undef,nfull)
-        q[syspres] .= q0[syspres]
-        q[sysfree] .= q̌
-        ret = Vector{eltype(q̌)}(undef,nconstraints)
+    function _inner_cstr_function(q̌,d,c)
+        q = Vector{eltype(q̌)}(undef,num_of_full_coords)
+        q[sys_pres_coords_idx] .= q0[sys_pres_coords_idx]
+        q[sys_free_coords_idx] .= q̌
+        ret = Vector{eltype(q̌)}(undef,num_of_cstr)
         foreach(bodies) do body
             bodyid = body.prop.id
-            memfull = mem2sysfull[bodyid]
-            memfree = mem2sysfree[bodyid]
-            memincst = mem2sysincst[bodyid]
+            memfull = bodyid2sys_full_coords[bodyid]
+            memfree = bodyid2sys_free_coords[bodyid]
+            memincst = bodyid2sys_intrinsic_cstr_idx[bodyid]
             if !isempty(memincst)
-                ret[memincst] .= make_constraints_function(
+                ret[memincst] .= make_cstr_function(
                     body.state.cache.funcs
                 )(q[memfull],d[memincst])
             end
         end
-        is = Ref(ninconstraints)
+        is = Ref(num_of_intrinsic_cstr)
         foreach(jointed.joints) do joint
-            nc = joint.nconstraints
-            ret[is[]+1:is[]+nc] .= make_constraints_function(joint,st)(q,d[is[]+1:is[]+nc],c)
+            nc = joint.num_of_cstr
+            ret[is[]+1:is[]+nc] .= make_cstr_function(joint,st)(q,d[is[]+1:is[]+nc],c)
             is[] += nc
         end
         ret
     end
 
-    function inner_constraints_function(q̌)
-        _inner_constraints_function(q̌,get_d(st),get_local_coordinates(st))
+    function inner_cstr_function(q̌)
+        _inner_cstr_function(q̌,get_d(st),get_local_coords(st))
     end
-    function inner_constraints_function(q̌,d)
-        _inner_constraints_function(q̌,d,get_local_coordinates(st))
+    function inner_cstr_function(q̌,d)
+        _inner_cstr_function(q̌,d,get_local_coords(st))
     end
-    function inner_constraints_function(q̌,d,c)
-        _inner_constraints_function(q̌,d,c)
+    function inner_cstr_function(q̌,d,c)
+        _inner_cstr_function(q̌,d,c)
     end
 
-    inner_constraints_function
+    inner_cstr_function
 end
 
-function make_constraints_function(st::AbstractStructure)
-    (;bodies,nconstraints) = st
+function make_cstr_function(st::AbstractStructure)
+    (;bodies,num_of_cstr) = st
     (;indexed,jointed,numbered) = st.connectivity
-    (;nfree,mem2sysfull,mem2sysfree,ninconstraints,mem2sysincst) = indexed
-    @inline @inbounds function inner_constraints_function(q)
-        ret = Vector{eltype(q)}(undef,nconstraints)
-        is = Ref(ninconstraints)
+    (;num_of_free_coords,bodyid2sys_full_coords,bodyid2sys_free_coords,num_of_intrinsic_cstr,bodyid2sys_intrinsic_cstr_idx) = indexed
+    @inline @inbounds function inner_cstr_function(q)
+        ret = Vector{eltype(q)}(undef,num_of_cstr)
+        is = Ref(num_of_intrinsic_cstr)
         foreach(bodies) do body
             bodyid = body.prop.id
-            memfull = mem2sysfull[bodyid]
-            memfree = mem2sysfree[bodyid]
-            memincst = mem2sysincst[bodyid]
+            memfull = bodyid2sys_full_coords[bodyid]
+            memfree = bodyid2sys_free_coords[bodyid]
+            memincst = bodyid2sys_intrinsic_cstr_idx[bodyid]
             if !isempty(memincst)
-                ret[memincst] .= make_constraints_function(
+                ret[memincst] .= make_cstr_function(
                     body.state.cache.funcs
                 )(q[memfull])
             end
         end
         foreach(jointed.joints) do joint
-            nc = joint.nconstraints
-            ret[is[]+1:is[]+nc] .= make_constraints_function(joint,st)(q)
+            nc = joint.num_of_cstr
+            ret[is[]+1:is[]+nc] .= make_cstr_function(joint,st)(q)
             is[] += nc
         end
         ret
     end
-    inner_constraints_function
+    inner_cstr_function
 end
 
 
-function make_constraints_jacobian(st::AbstractStructure,q0::AbstractVector)
-    (;bodies,nconstraints) = st
+function make_cstr_jacobian(st::AbstractStructure,q0::AbstractVector)
+    (;bodies,num_of_cstr) = st
     (;numbered,indexed,jointed) = st.connectivity
-    (;nfull,nfree,syspres,sysfree,mem2sysfull,mem2sysfree,ninconstraints,mem2sysincst) = indexed
+    (;num_of_full_coords,num_of_free_coords,sys_pres_coords_idx,sys_free_coords_idx,bodyid2sys_full_coords,bodyid2sys_free_coords,num_of_intrinsic_cstr,bodyid2sys_intrinsic_cstr_idx) = indexed
 
-    function _inner_constraints_jacobian(q̌,c)
-        q = Vector{eltype(q̌)}(undef,nfull)
-        q[syspres] .= q0[syspres]
-        q[sysfree] .= q̌
-        ret = zeros(eltype(q̌),nconstraints,nfree)
+    function _inner_cstr_jacobian(q̌,c)
+        q = Vector{eltype(q̌)}(undef,num_of_full_coords)
+        q[sys_pres_coords_idx] .= q0[sys_pres_coords_idx]
+        q[sys_free_coords_idx] .= q̌
+        ret = zeros(eltype(q̌),num_of_cstr,num_of_free_coords)
         foreach(bodies) do body
             bodyid = body.prop.id
-            memfull = mem2sysfull[bodyid]
-            memfree = mem2sysfree[bodyid]
-            memincst = mem2sysincst[bodyid]
+            memfull = bodyid2sys_full_coords[bodyid]
+            memfree = bodyid2sys_free_coords[bodyid]
+            memincst = bodyid2sys_intrinsic_cstr_idx[bodyid]
             if !isempty(memincst)
-                ret[memincst,memfree] .= make_constraints_jacobian(
+                ret[memincst,memfree] .= make_cstr_jacobian(
                     body.state.cache.funcs
                 )(q[memfull])
             end
         end
-        is = Ref(ninconstraints)
+        is = Ref(num_of_intrinsic_cstr)
         foreach(jointed.joints) do joint
-            nc = joint.nconstraints
-            ret[is[]+1:is[]+nc,:] .= make_constraints_jacobian(joint,st)(q,c)
+            nc = joint.num_of_cstr
+            ret[is[]+1:is[]+nc,:] .= make_cstr_jacobian(joint,st)(q,c)
             is[] += nc
         end
         ret
     end
-    function inner_constraints_jacobian(q̌)
-        _inner_constraints_jacobian(q̌,get_local_coordinates(st))
+    function inner_cstr_jacobian(q̌)
+        _inner_cstr_jacobian(q̌,get_local_coords(st))
     end
-    function inner_constraints_jacobian(q̌,c)
-        _inner_constraints_jacobian(q̌,c)
+    function inner_cstr_jacobian(q̌,c)
+        _inner_cstr_jacobian(q̌,c)
     end
-    inner_constraints_jacobian
+    inner_cstr_jacobian
 end
 
-function make_constraints_jacobian(st::AbstractStructure)
-    (;bodies,nconstraints) = st
+function make_cstr_jacobian(st::AbstractStructure)
+    (;bodies,num_of_cstr) = st
     (;numbered,indexed,jointed) = st.connectivity
-    (;nfree,mem2sysfull,mem2sysfree,ninconstraints,mem2sysincst) = indexed
-    @inline @inbounds function inner_constraints_jacobian(q)
-        ret = zeros(eltype(q),nconstraints,nfree)
-        is = Ref(ninconstraints)
+    (;num_of_free_coords,bodyid2sys_full_coords,bodyid2sys_free_coords,num_of_intrinsic_cstr,bodyid2sys_intrinsic_cstr_idx) = indexed
+    @inline @inbounds function inner_cstr_jacobian(q)
+        ret = zeros(eltype(q),num_of_cstr,num_of_free_coords)
+        is = Ref(num_of_intrinsic_cstr)
         foreach(bodies) do body
             bodyid = body.prop.id
-            memfull = mem2sysfull[bodyid]
-            memfree = mem2sysfree[bodyid]
-            memincst = mem2sysincst[bodyid]
+            memfull = bodyid2sys_full_coords[bodyid]
+            memfree = bodyid2sys_free_coords[bodyid]
+            memincst = bodyid2sys_intrinsic_cstr_idx[bodyid]
             if !isempty(memincst)
-                ret[memincst,memfree] .= make_constraints_jacobian(
+                ret[memincst,memfree] .= make_cstr_jacobian(
                     body.state.cache.funcs
                 )(q[memfull])
             end
         end
         foreach(jointed.joints) do joint
-            nc = joint.nconstraints
-            ret[is[]+1:is[]+nc,:] .= make_constraints_jacobian(joint,st)(q)
+            nc = joint.num_of_cstr
+            ret[is[]+1:is[]+nc,:] .= make_cstr_jacobian(joint,st)(q)
             is[] += nc
         end
         ret
@@ -400,14 +400,14 @@ end
 
 function build_F̌(st,bodyid,pid,f)
     T = get_numbertype(st)
-    (;nfree,mem2sysfree) = st.connectivity.indexed
-    F̌ = zeros(T,nfree)
+    (;num_of_free_coords,bodyid2sys_free_coords) = st.connectivity.indexed
+    F̌ = zeros(T,num_of_free_coords)
     foreach(st.bodies) do body
         if body.prop.id == bodyid
             C = body.state.cache.Cps[pid]
-            memfree = mem2sysfree[bodyid]
-            free_coordinates_indices = body.state.cache.free_idx
-            F̌[memfree] = (transpose(C)*f)[free_coordinates_indices,:]
+            memfree = bodyid2sys_free_coords[bodyid]
+            free_coords_idx = body.state.cache.free_idx
+            F̌[memfree] = (transpose(C)*f)[free_coords_idx,:]
         end
     end
     reshape(F̌,:,1)
@@ -420,8 +420,8 @@ $(TYPEDSIGNATURES)
 """
 function check_jacobian_singularity(st)
     (;bodies,state) = st
-    q = get_coordinates(st)
-    A = make_constraints_jacobian(st)
+    q = get_coords(st)
+    A = make_cstr_jacobian(st)
     Aq = A(q)
     sys_rank = rank(Aq)
     if sys_rank < minimum(size(Aq))
@@ -429,7 +429,7 @@ function check_jacobian_singularity(st)
     end
     foreach(bodies) do body
         bodyid = body.prop.id
-        free_coordinates_indices = body.state.cache.free_idx
+        free_coords_idx = body.state.cache.free_idx
         q_rb = state.parts[bodyid].q
         Aq_rb = body.state.cache.funcs.Φq(q_rb)
         rb_rank = rank(Aq_rb)

@@ -13,8 +13,8 @@ using FiniteDifferences
 
 function ip_ns_stepk_maker(nq,nλ,nμ,nu,qₛ₋₁,q̇ₛ₋₁,pₛ₋₁,tₛ₋₁,dyfuncs,invM,h)
     M,Φ,A,Ψ,B,F!,jacobians,contact_funcs = dyfuncs
-    Jac_F!,Ψq,constraint_forces_jacobian,∂Bᵀμ∂q = jacobians
-    𝐠,get_indices,get_FCs,get_D = contact_funcs
+    Jac_F!,Ψq,cstr_forces_jacobian,∂Bᵀμ∂q = jacobians
+    𝐠,get_idx,get_FCs,get_D = contact_funcs
 
     stepk! = stepk_maker(nq,nλ,nμ,qₛ₋₁,q̇ₛ₋₁,pₛ₋₁,tₛ₋₁,dyfuncs,invM,h)
 
@@ -58,7 +58,7 @@ function ip_ns_stepk_maker(nq,nλ,nμ,nu,qₛ₋₁,q̇ₛ₋₁,pₛ₋₁,tₛ
             pₛ = Momentum_k(qₛ₋₁,pₛ₋₁,qₛ,λₛ,μₛ,M,A,B,h)
             vₛ = invM*pₛ
 
-            ∂vₛ∂qₛ = 2/h*I + 1/(2h).*invM*(constraint_forces_jacobian(qₛ,λₛ) + ∂Bᵀμ∂q(qₛ,μₛ))
+            ∂vₛ∂qₛ = 2/h*I + 1/(2h).*invM*(cstr_forces_jacobian(qₛ,λₛ) + ∂Bᵀμ∂q(qₛ,μₛ))
             ∂vₛ∂λₛ = invM*transpose(Aₛ-Aₛ₋₁)/(2h)
             ∂vₛ∂μₛ = invM*transpose(Bₛ-Bₛ₋₁)/(2h)
 
@@ -214,8 +214,8 @@ function ipsolve(nq,nλ,nμ,q0,q̇0,dyfuncs,tspan;dt=0.01,ftol=1e-14,xtol=ftol,v
                 progress=true,exception=true)
     # @unpack bot,tspan,dyfuncs,control!,restart = prob
     M,Φ,A,Ψ,B,F!,jacobians,contact_funcs = dyfuncs
-    Jac_F!,Ψq,constraint_forces_jacobian,∂Bᵀμ∂q = jacobians
-    𝐠,get_indices,get_FCs,get_D = contact_funcs
+    Jac_F!,Ψq,cstr_forces_jacobian,∂Bᵀμ∂q = jacobians
+    𝐠,get_idx,get_FCs,get_D = contact_funcs
     totaltime = tspan[end] - tspan[begin]
     totalstep = ceil(Int,totaltime/dt)
     cs = OffsetArray([-1 for i in 1:totalstep+1],0:totalstep)
@@ -260,8 +260,8 @@ function ipsolve(nq,nλ,nμ,q0,q̇0,dyfuncs,tspan;dt=0.01,ftol=1e-14,xtol=ftol,v
         qˣ = qₛ₋₁ .+ dt./2 .*q̇ₛ₋₁
         qₛ .= qₛ₋₁ .+ dt.*q̇ₛ₋₁
         # q̇ₛ .= q̇ₛ₋₁
-        nu,active_indices,g = get_indices(qˣ)
-        gₙ = g[active_indices]
+        nu,active_idx,g = get_idx(qˣ)
+        gₙ = g[active_idx]
         cs[timestep] = nu
         # ns_stepk! = ns_stepk_maker(nq,nλ,nμ,qₛ₋₁,q̇ₛ₋₁,pₛ₋₁,tₛ₋₁,Aset,dyfuncs,invM,dt)
         # stepk! = stepk_maker(nq,nλ,nμ,nu,qₛ₋₁,q̇ₛ₋₁,pₛ₋₁,tₛ₋₁,dyfuncs,invM,dt)
@@ -306,10 +306,10 @@ function ipsolve(nq,nλ,nμ,q0,q̇0,dyfuncs,tspan;dt=0.01,ftol=1e-14,xtol=ftol,v
             ip_ns_stepk! = ip_ns_stepk_maker(nq,nλ,nμ,nu,qₛ₋₁,q̇ₛ₋₁,pₛ₋₁,tₛ₋₁,dyfuncs,invM,dt)
             μ = 1.0
             for iteration = 1:imax
-                Dₛ,ηs,restitution_coefficients,H = get_D(active_indices,qₛ)
+                Dₛ,ηs,restitution_coefficients,H = get_D(active_idx,qₛ)
                 # ηs .= 1
-                _,_,g = get_indices(qₛ)
-                gₙ = g[active_indices]
+                _,_,g = get_idx(qₛ)
+                gₙ = g[active_idx]
                 # @show iteration,Dₛ,ηs,restitution_coefficients,gₙ
                 μ,Δxc = ip_ns_stepk!(nonsmooth_R,nonsmooth_J,
                             nonsmooth_x,Dₛ,ηs,restitution_coefficients,H,μ)

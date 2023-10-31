@@ -505,29 +505,29 @@ CM.activate!(); plot_frequency_varying_restlengths("frequency_varying_restlength
 function pres2d!(sysstate,st;aux=true)
     (;t,q̃,q̃̇,q̃̈) = sysstate
     (;bodies,connectivity) = st
-    (;mem2syspres) = connectivity.indexed
+    (;bodyid2sys_pres_coords) = connectivity.indexed
     amp = 0.01
     p = 6π
     foreach(bodies) do body
         bodyid = body.prop.id
         if bodyid == 1
-            q̃[mem2syspres[bodyid]] .= [     amp*sin(p*t),0]
-            q̃̇[mem2syspres[bodyid]] .= [   p*amp*cos(p*t),0]
-            q̃̈[mem2syspres[bodyid]] .= [-p^2*amp*sin(p*t),0]
+            q̃[bodyid2sys_pres_coords[bodyid]] .= [     amp*sin(p*t),0]
+            q̃̇[bodyid2sys_pres_coords[bodyid]] .= [   p*amp*cos(p*t),0]
+            q̃̈[bodyid2sys_pres_coords[bodyid]] .= [-p^2*amp*sin(p*t),0]
         end
         if bodyid == 2
-            q̃[mem2syspres[bodyid]] .= [ 0.1+amp*sin(p*t),0]
-            q̃̇[mem2syspres[bodyid]] .= [   p*amp*cos(p*t),0]
-            q̃̈[mem2syspres[bodyid]] .= [-p^2*amp*sin(p*t),0]
+            q̃[bodyid2sys_pres_coords[bodyid]] .= [ 0.1+amp*sin(p*t),0]
+            q̃̇[bodyid2sys_pres_coords[bodyid]] .= [   p*amp*cos(p*t),0]
+            q̃̈[bodyid2sys_pres_coords[bodyid]] .= [-p^2*amp*sin(p*t),0]
         end
         if aux
             if bodyid == 8
-                q̃[mem2syspres[bodyid][3:4]] .= [-0.1+amp*sin(p*t),0]
-                q̃̇[mem2syspres[bodyid][3:4]] .= [   p*amp*cos(p*t),0]
-                q̃̈[mem2syspres[bodyid][3:4]] .= [-p^2*amp*sin(p*t),0]
-                q̃[mem2syspres[bodyid][5:6]] .= [ 0.2+amp*sin(p*t),0]
-                q̃̇[mem2syspres[bodyid][5:6]] .= [   p*amp*cos(p*t),0]
-                q̃̈[mem2syspres[bodyid][5:6]] .= [-p^2*amp*sin(p*t),0]
+                q̃[bodyid2sys_pres_coords[bodyid][3:4]] .= [-0.1+amp*sin(p*t),0]
+                q̃̇[bodyid2sys_pres_coords[bodyid][3:4]] .= [   p*amp*cos(p*t),0]
+                q̃̈[bodyid2sys_pres_coords[bodyid][3:4]] .= [-p^2*amp*sin(p*t),0]
+                q̃[bodyid2sys_pres_coords[bodyid][5:6]] .= [ 0.2+amp*sin(p*t),0]
+                q̃̇[bodyid2sys_pres_coords[bodyid][5:6]] .= [   p*amp*cos(p*t),0]
+                q̃̈[bodyid2sys_pres_coords[bodyid][5:6]] .= [-p^2*amp*sin(p*t),0]
             end
         end
     end
@@ -864,7 +864,7 @@ me.E |> lines
 function pres3d!(sysstate,st;ν=0.5)
     (;t,q̃,q̃̇,q̃̈) = sysstate
     (;bodies,connectivity) = st
-    (;mem2syspres) = connectivity.indexed
+    (;bodyid2sys_pres_coords) = connectivity.indexed
     amp = 0.01
     p = ν*2π
     foreach(bodies) do body
@@ -877,27 +877,27 @@ function pres3d!(sysstate,st;ν=0.5)
                     0.0,
                     0.0
                 ]
-                q̃[mem2syspres[bodyid]] .= r0 .+ [amp*sin(p*t),0,0]
-                q̃̇[mem2syspres[bodyid]] .=     [amp*p*cos(p*t),0,0]
-                q̃̈[mem2syspres[bodyid]] .=  [-amp*p^2*sin(p*t),0,0]
+                q̃[bodyid2sys_pres_coords[bodyid]] .= r0 .+ [amp*sin(p*t),0,0]
+                q̃̇[bodyid2sys_pres_coords[bodyid]] .=     [amp*p*cos(p*t),0,0]
+                q̃̈[bodyid2sys_pres_coords[bodyid]] .=  [-amp*p^2*sin(p*t),0,0]
             elseif bodyid == 2
                 r0 .= [
                     -0.05,
                      0.08660254037844387,
                     0.0
                 ]
-                q̃[mem2syspres[bodyid]] .= r0 .+ [amp*sin(p*t),0,0]
-                q̃̇[mem2syspres[bodyid]] .=     [amp*p*cos(p*t),0,0]
-                q̃̈[mem2syspres[bodyid]] .=  [-amp*p^2*sin(p*t),0,0]
+                q̃[bodyid2sys_pres_coords[bodyid]] .= r0 .+ [amp*sin(p*t),0,0]
+                q̃̇[bodyid2sys_pres_coords[bodyid]] .=     [amp*p*cos(p*t),0,0]
+                q̃̈[bodyid2sys_pres_coords[bodyid]] .=  [-amp*p^2*sin(p*t),0,0]
             elseif bodyid == 3
                 r0 .= [
                     -0.05,
                     -0.08660254037844387,
                     0.0
                 ]
-                q̃[mem2syspres[bodyid]] .= r0 .+ [amp*sin(p*t),0,0]
-                q̃̇[mem2syspres[bodyid]] .=     [amp*p*cos(p*t),0,0]
-                q̃̈[mem2syspres[bodyid]] .=  [-amp*p^2*sin(p*t),0,0]
+                q̃[bodyid2sys_pres_coords[bodyid]] .= r0 .+ [amp*sin(p*t),0,0]
+                q̃̇[bodyid2sys_pres_coords[bodyid]] .=     [amp*p*cos(p*t),0,0]
+                q̃̈[bodyid2sys_pres_coords[bodyid]] .=  [-amp*p^2*sin(p*t),0,0]
             end
         end
     end
@@ -1800,9 +1800,9 @@ k,μ = RB.optimize_for_stiffness_and_restlen(newbridge_tag;fmin=100.0)
 function pres3d!(sysstate,st;Td=10.0,q_ini,q_tag)
     (;t,q̃,q̃̇,q̃̈) = sysstate
     (;connectivity) = st
-    (;syspres) = connectivity.indexed
-    q̃_ini = @view q_ini[syspres]
-    q̃_tag = @view q_tag[syspres]
+    (;sys_pres_coords_idx) = connectivity.indexed
+    q̃_ini = @view q_ini[sys_pres_coords_idx]
+    q̃_tag = @view q_tag[sys_pres_coords_idx]
     Δq̃ = q̃_tag .- q̃_ini
     τ = t/Td
     q̃ .= q̃_ini .+ τ.*Δq̃
@@ -1853,7 +1853,7 @@ bridge_deploy = RB.Robot(
 )
     
 RB.check_static_equilibrium_output_multipliers(bridge_deploy.st;gravity=true)
-q_tag = RB.get_coordinates(newbridge_tag.st)
+q_tag = RB.get_coords(newbridge_tag.st)
 
 RB.solve!(
     RB.SimProblem(
@@ -1943,8 +1943,8 @@ newembed1 = embed3d(;
     r,b,m,α,θ,n
 )
 
-q = RB.get_coordinates(newembed1.st)
-Φ = RB.make_constraints_function(newembed1.st)
+q = RB.get_coords(newembed1.st)
+Φ = RB.make_cstr_function(newembed1.st)
 Φ(q) |> norm
 
 μ1 = RB.inverse_for_restlength(

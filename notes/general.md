@@ -1,10 +1,10 @@
 # Body & Coordinates
-Immutable properties, and coordinates type informations.
+Immutable properties, and coords type informations.
 passed around with no allocations.
 
-Mutable states, and coordinates cache.
+Mutable states, and coords cache.
 
-Typical calling methods: use the properties and coordinates type to mutate state and cache.
+Typical calling methods: use the properties and coords type to mutate state and cache.
 
 Question: what about joints? can it be fully immutable?
 Or immutable/mutable pairs?
@@ -33,22 +33,23 @@ more than necessary, but not redundant
 - [ ] rename fields
   - [ ] less symbols, more words
   - [ ] use snake case
+- [ ] connectivity, mask, use `BitVectors` isstead of `Vector{Int}` for free/pres, indice, 
 - [ ] more preallocations
     - [ ] free-flights
       - [ ] rigid bodies
-        - [ ] natural coordinates
+        - [ ] natural coords
           - [ ] get rid of functions fields
-          - [ ] where to put `pres_idx`, `free_idx`, `constraints_indices`?
-          - [ ] how to cache hessians? to get both `∂Aq̇∂q` and `constraint_forces_jacobian`
+          - [ ] where to put `pres_idx`, `free_idx`, `cstr_idx`?
+          - [ ] how to cache hessians? to get both `∂Aq̇∂q` and `cstr_forces_jacobian`
           - [ ] similarly `∂M⁻¹p∂q` and `∂Mq̇∂q`
         - [ ] quaternion-based
       - [ ] flexible bodies
-        - [ ] absolute nodal coordinates
+        - [ ] absolute nodal coords
     - [ ] ZhongCCP
     - [ ] ZhongQCCP
 - [ ] reduce functions fields
 - [ ] preallocations for autodiff
-- [ ] joint constraints, quadratic forms
+- [ ] joint cstr, quadratic forms
   - [ ] put joint into `NCF`, `QBF`
 - [x] put contacts into loci
 - [ ] local distribution law

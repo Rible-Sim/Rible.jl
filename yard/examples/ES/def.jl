@@ -33,7 +33,7 @@ end
 function build_2d_tri(id,ri,rj=nothing,rk=nothing;
         α = 0.0, 
         ci = Int[], 
-        constraints_indices = collect(1:3),        
+        cstr_idx = collect(1:3),        
         h = 0.05,
         b = 0.1,
         b1 = 0.05,
@@ -45,7 +45,7 @@ function build_2d_tri(id,ri,rj=nothing,rk=nothing;
     else
         constrained = true
     end
-    # free_coordinates_indices = collect(1:6)
+    # free_coords_idx = collect(1:6)
     b2 = b - b1
     a1 = 1.0b; b1 = √(2b^2-a1^2)
     a2 = 1.2b; b2 = √(2b^2-a2^2)
@@ -100,7 +100,7 @@ function build_2d_tri(id,ri,rj=nothing,rk=nothing;
             load("零件1.STL") |> make_patch(;scale=1/1000,color=:slategray4)
         end
     end
-    state = RB.RigidBodyState(prop,nmcs,ro,α,ṙo,ω,ci,constraints_indices)
+    state = RB.RigidBodyState(prop,nmcs,ro,α,ṙo,ω,ci,cstr_idx)
     body = RB.RigidBody(prop,state,trimesh)
 end
 
@@ -128,13 +128,13 @@ function build_2d_ground(id)
     ṙo = zero(ro)
     loci_states = Ref(ro) .+ Ref(R).*loci
     nmcs = RB.NCF.NCMP(loci_states,ro,R)
-    # cf = RB.NCF.CoordinateFunctions(nmcs,q0,ci,free_coordinates_indices)
+    # cf = RB.NCF.CoordinateFunctions(nmcs,q0,ci,free_coords_idx)
     # @show typeof(nmcs)
     nq = length(q0)
     ci = collect(1:nq)
-    free_coordinates_indices = Int[]
-    constraints_indices = Int[]
-    state = RB.RigidBodyState(prop,nmcs,ro,α,ṙo,ω,ci,constraints_indices)
+    free_coords_idx = Int[]
+    cstr_idx = Int[]
+    state = RB.RigidBodyState(prop,nmcs,ro,α,ṙo,ω,ci,cstr_idx)
     body = RB.RigidBody(prop,state)
 end
 
@@ -146,7 +146,7 @@ function two_tri(;k=100.0,c=0.0,ratio=0.8)
     rb1 = build_2d_tri(1,ro;
         α=α_tri1,
         ci=collect(1:6),
-        constraints_indices=Int[]
+        cstr_idx=Int[]
     )
     rb2 = build_2d_tri(2,ro;
         α=α_tri2,
@@ -651,7 +651,7 @@ end
 function trapezoid(id,ri,ro=ri,
         α = 0.0, 
         ci = Int[],
-        constraints_indices = collect(1:3)
+        cstr_idx = collect(1:3)
 
     )
     movable = true
@@ -660,7 +660,7 @@ function trapezoid(id,ri,ro=ri,
     else
         constrained = true
     end
-    # free_coordinates_indices = collect(1:6)
+    # free_coords_idx = collect(1:6)
     b2 = b - b1
     r̄p1 = SVector{2}([ -r, 0.0])
     r̄p2 = SVector{2}([  r, 0.0])
@@ -695,7 +695,7 @@ function trapezoid(id,ri,ro=ri,
     # ṙo = [0.0,0.0001]
     ṙo = zero(ro)
     nmcs = RB.NCF.NC1P2V(ri,ro,α)
-    state = RB.RigidBodyState(prop,nmcs,ro,α,ṙo,ω,ci,constraints_indices)
+    state = RB.RigidBodyState(prop,nmcs,ro,α,ṙo,ω,ci,cstr_idx)
     body = RB.RigidBody(prop,state)
 
 end

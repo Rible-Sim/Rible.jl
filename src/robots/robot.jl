@@ -17,7 +17,7 @@ $(TYPEDSIGNATURES)
 """
 function Robot(st,hub=nothing)
     (;numbered) = st.connectivity
-    (;mem2num) = numbered
+    (;bodyid2sys_loci_idx) = numbered
     update!(st)
     traj = StructArray([deepcopy(st.state.system)])
     
@@ -30,7 +30,7 @@ function Robot(st,hub=nothing)
                 bodyid = prop.id
                 [
                     Contact(id,lo.friction_coefficient,lo.restitution_coefficient)
-                    for (id,lo) in  zip(mem2num[bodyid],loci)
+                    for (id,lo) in  zip(bodyid2sys_loci_idx[bodyid],loci)
                 ]
             end
         )
@@ -39,8 +39,8 @@ function Robot(st,hub=nothing)
 end
 
 
-make_constraints_jacobian(bot::Robot) = make_constraints_jacobian(bot.st)
-make_constraints_function(bot::Robot) = make_constraints_function(bot.st)
+make_cstr_jacobian(bot::Robot) = make_cstr_jacobian(bot.st)
+make_cstr_function(bot::Robot) = make_cstr_function(bot.st)
 
 """
 Return System 质量矩阵。
@@ -48,11 +48,11 @@ $(TYPEDSIGNATURES)
 """
 function build_MassMatrices(bot::Robot)
     (;st) = bot
-    (;nfree,npres,sysfree,syspres) = st.connectivity.indexed
+    (;num_of_free_coords,num_of_pres_coords,sys_free_coords_idx,sys_pres_coords_idx) = st.connectivity.indexed
     M = build_M(st)
-    Ḿ = M[sysfree,:]
-    M̌ = Symmetric(M[sysfree,sysfree])
-    M̄ =           M[sysfree,syspres]
+    Ḿ = M[sys_free_coords_idx,:]
+    M̌ = Symmetric(M[sys_free_coords_idx,sys_free_coords_idx])
+    M̄ =           M[sys_free_coords_idx,sys_pres_coords_idx]
     invM̌_raw = inv(Matrix(M̌))
     invM̌ = Symmetric(sparse(invM̌_raw))
     @eponymtuple(Ḿ,M̌,M̄,invM̌)

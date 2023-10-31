@@ -136,8 +136,8 @@ hub = (actuators=acs,)
 rb2p = [
     ifelse(isodd(i),[i,i+1],[i-1,i+1]) for i = 1:length(rbs)
 ]
-body2q_raw = [[2pid[1]-1,2pid[1],2pid[2]-1,2pid[2]] for pid in rb2p]
-body2q = RB.filter_body2q(body2q_raw,rbs)
+bodyid2q_raw = [[2pid[1]-1,2pid[1],2pid[2]-1,2pid[2]] for pid in rb2p]
+bodyid2q = RB.filter_bodyid2q(bodyid2q_raw,rbs)
 string2ap = Vector{Tuple{RB.ID,RB.ID}}()
 for i = 1:n
     push!(string2ap,(RB.ID(2i+1,1),RB.ID(2i-1,1)))
@@ -145,11 +145,11 @@ for i = 1:n
     push!(string2ap,(RB.ID(2i+1,2),RB.ID(2i  ,1)))
     push!(string2ap,(RB.ID(2i+1,2),RB.ID(2i-1,2)))
 end
-cnt = RB.Connectivity(body2q,string2ap)
+cnt = RB.Connectivity(bodyid2q,string2ap)
 st = RB.Structure(rbs,tensiles,cnt)
 RB.update_cables_apply_forces!(st)
 function jac_singularity_check(st)
-    q,_ = RB.get_coordinates(st)
+    q,_ = RB.get_coords(st)
     q[22] = -10
     A = RB.build_A(st)
     Aq = A(q)
@@ -180,13 +180,13 @@ tr = RB.Robot(st,hub)
 
 Figur=plotstructure(tr)
 save("figure.png", Figur)
-q,_=RB.get_coordinates(st)
-#q,_ = RB.get_coordinates(st)
+q,_=RB.get_coords(st)
+#q,_ = RB.get_coords(st)
 #q = zeros(T,ncoords)
 #ncoords = st.ncoords
 #A = RB.build_A(st)
 #rbs = st.rigidbodies
-#@unpack body2q = st.connectivity
+#@unpack bodyid2q = st.connectivity
 #ncoords = st.ncoords
 #T = RB.get_numbertype(st)
 #q = zeros(T,ncoords)
@@ -197,20 +197,20 @@ sys_rank = rank(Aq)#求矩阵的秩
 minimum(size(Aq))
 ###############################################分割线##################################
 rbs = st.rigidbodies
-@unpack body2q = st.connectivity
+@unpack bodyid2q = st.connectivity
 ncoords = st.ncoords
 T = RB.get_numbertype(st)
 q = zeros(T,ncoords)
 
 
 @code_lowered for bodyid in st.mvbodyindex
-    pindex = body2q[bodyid]
+    pindex = bodyid2q[bodyid]
     q[pindex] .= rbs[bodyid].state.coords.q
 end
 
 st.mvbodyindex
 for bodyid in st.mvbodyindex
-    pindex = body2q[bodyid]
+    pindex = bodyid2q[bodyid]
     println(pindex)
     q[pindex] .= rbs[bodyid].state.coords.q
     println(q)
@@ -218,7 +218,7 @@ for bodyid in st.mvbodyindex
 end
 
 for bodyid in st.mvbodyindex
-    pindex = body2q[bodyid]
+    pindex = bodyid2q[bodyid]
     q[pindex] .= rbs[bodyid].state.coords.q
     q[22] = -10
 end

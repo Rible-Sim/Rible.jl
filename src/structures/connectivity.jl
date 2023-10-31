@@ -7,14 +7,14 @@ function check_rbid_sanity(rbs)
     ids,nb
 end
 
-struct NumberedPoints
-    "Member's points' indices to System's points' indices"
-    mem2num::Vector{Vector{Int}}
-    "System's points' indices to System's points' coordinates' indices"
-    num2sys::Vector{Vector{Int}}
-    "Member's points' indices to System's points' coordinates' indices"
-    mem2sys::Vector{Vector{Int}}
-    "Number of the System's points' coodinates"
+struct Numbered
+    "body's loci' idx to System's loci' idx"
+    bodyid2sys_loci_idx::Vector{Vector{Int}}
+    "System's loci' idx to System's loci' coords' idx"
+    sys_loci2coords_idx::Vector{Vector{Int}}
+    "body's loci' idx to System's loci' coords' idx"
+    bodyid2sys_loci_coords_idx::Vector{Vector{Int}}
+    "Number of the System's loci' coords"
     nc::Int
 end
 
@@ -27,150 +27,155 @@ function number(rbs)
         nnodes_by_mem[i] = body.prop.loci |> length
         nld_by_mem[i] = get_num_of_local_dims(body)
     end
-    mem2num = Vector{Int}[]
+    bodyid2sys_loci_idx = Vector{Int}[]
     num2ID = Vector{ID{Int,Int}}()
-    num2sys = Vector{Int}[]
+    sys_loci2coords_idx = Vector{Int}[]
     is = 1
     js = 0
     for bodyid in 1:nb
-        push!(mem2num,Int[])
+        push!(bodyid2sys_loci_idx,Int[])
         nld = nld_by_mem[bodyid]
         for pid in 1:nnodes_by_mem[bodyid]
             push!(num2ID,ID(bodyid,pid))
-            push!(mem2num[bodyid],is)
+            push!(bodyid2sys_loci_idx[bodyid],is)
             is += 1
-            push!(num2sys,collect(1:nld).+js)
+            push!(sys_loci2coords_idx,collect(1:nld).+js)
             js += nld
         end
     end
-    mem2sys = [
-        reduce(vcat,num2sys[mem2num[bodyid]])
+    bodyid2sys_loci_coords_idx = [
+        reduce(vcat,sys_loci2coords_idx[bodyid2sys_loci_idx[bodyid]])
         for bodyid = 1:nb
     ]
-    # @show mem2sys
-    NumberedPoints(mem2num,num2sys,mem2sys,js)
+    # @show bodyid2sys_loci_coords_idx
+    Numbered(
+        bodyid2sys_loci_idx,
+        sys_loci2coords_idx,
+        bodyid2sys_loci_coords_idx,
+        js
+    )
 end
 
-struct IndexedMemberCoords{mem2sysType,sysType}
-    nfull::Int
-    nfree::Int
-    npres::Int
-    nmem::Int
-    mem2sysfull::mem2sysType
-    mem2sysfree::mem2sysType
-    mem2syspres::mem2sysType
-    sysfree::sysType
-    syspres::sysType
-    ninconstraints::Int
-    mem2sysincst::mem2sysType
-    sysndof::Int
-    mem2sysndof::mem2sysType
+struct Indexed{mem2sysType,sysType}
+    num_of_full_coords::Int
+    num_of_free_coords::Int
+    num_of_pres_coords::Int
+    num_of_bodies::Int
+    bodyid2sys_full_coords::mem2sysType
+    bodyid2sys_free_coords::mem2sysType
+    bodyid2sys_pres_coords::mem2sysType
+    sys_free_coords_idx::sysType
+    sys_pres_coords_idx::sysType
+    num_of_intrinsic_cstr::Int
+    bodyid2sys_intrinsic_cstr_idx::mem2sysType
+    sys_num_of_dof::Int
+    bodyid2sys_dof_idx::mem2sysType
 end
 
-function index_inconstraints(rbs)
-    ids,nmem = check_rbid_sanity(rbs)
-    nincst_by_mem = zeros(Int,nmem)
-    ndof_by_mem = zeros(Int,nmem)
+function index_incstr(rbs)
+    ids,num_of_bodies = check_rbid_sanity(rbs)
+    nincst_by_mem = zeros(Int,num_of_bodies)
+    ndof_by_mem = zeros(Int,num_of_bodies)
     foreach(rbs) do body
-        nincst_by_mem[body.prop.id] = body.state.cache.num_of_constraints
+        nincst_by_mem[body.prop.id] = body.state.cache.num_of_cstr
         ndof_by_mem[body.prop.id] = get_num_of_dof(body)
     end
-    ninconstraints = sum(nincst_by_mem)
-    sysndof = sum(ndof_by_mem)
-    mem2sysincst = Vector{Int}[]
-    mem2sysndof = Vector{Int}[]
+    num_of_intrinsic_cstr = sum(nincst_by_mem)
+    sys_num_of_dof = sum(ndof_by_mem)
+    bodyid2sys_intrinsic_cstr_idx = Vector{Int}[]
+    bodyid2sys_dof_idx = Vector{Int}[]
     ilast = 0
     jlast = 0
-    for bodyid = 1:nmem
+    for bodyid = 1:num_of_bodies
         nincst = nincst_by_mem[bodyid]
-        push!(mem2sysincst,collect(ilast+1:ilast+nincst))
+        push!(bodyid2sys_intrinsic_cstr_idx,collect(ilast+1:ilast+nincst))
         ilast += nincst
-        ndof = ndof_by_mem[bodyid]
-        push!(mem2sysndof,collect(jlast+1:jlast+ndof))
-        jlast += ndof 
+        num_of_dof = ndof_by_mem[bodyid]
+        push!(bodyid2sys_dof_idx,collect(jlast+1:jlast+num_of_dof))
+        jlast += num_of_dof 
     end
-    ninconstraints,mem2sysincst,sysndof,mem2sysndof
+    num_of_intrinsic_cstr,bodyid2sys_intrinsic_cstr_idx,sys_num_of_dof,bodyid2sys_dof_idx
 end
 
 function index(rbs,sharing_input=Int[;;])
-    ids,nmem = check_rbid_sanity(rbs)
-    if size(sharing_input,2) > nmem
+    ids,num_of_bodies = check_rbid_sanity(rbs)
+    if size(sharing_input,2) > num_of_bodies
         @warn "Cropping the sharing matrix."
-        sharing = sharing_input[:,1:nmem]
+        sharing = sharing_input[:,1:num_of_bodies]
     else
         sharing = sharing_input[:,:]
     end
     sysfull = Int[]
-    syspres = Int[]
-    sysfree = Int[]
-    mem2sysfull = Vector{Int}[]
-    mem2syspres = Vector{Int}[]
-    mem2sysfree = Vector{Int}[]
-    ntotal_by_mem = zeros(Int,nmem)
-    pres_idx_by_mem = Vector{Vector{Int}}(undef,nmem)
-    free_idx_by_mem = Vector{Vector{Int}}(undef,nmem)
+    sys_pres_coords_idx = Int[]
+    sys_free_coords_idx = Int[]
+    bodyid2sys_full_coords = Vector{Int}[]
+    bodyid2sys_pres_coords = Vector{Int}[]
+    bodyid2sys_free_coords = Vector{Int}[]
+    ntotal_by_mem = zeros(Int,num_of_bodies)
+    pres_idx_by_mem = Vector{Vector{Int}}(undef,num_of_bodies)
+    free_idx_by_mem = Vector{Vector{Int}}(undef,num_of_bodies)
     foreach(rbs) do body
         bodyid = body.prop.id
-        ntotal_by_mem[bodyid] = get_nbodycoords(body)
+        ntotal_by_mem[bodyid] = get_num_of_coords(body)
         pres_idx_by_mem[bodyid] = body.state.cache.pres_idx
         free_idx_by_mem[bodyid] = body.state.cache.free_idx
     end
-    for bodyid = 1:nmem
+    for bodyid = 1:num_of_bodies
         ntotal = ntotal_by_mem[bodyid]
         pres = pres_idx_by_mem[bodyid]
         free = free_idx_by_mem[bodyid]
-        npres = length(pres)
-        nfree = ntotal - npres
-        push!(mem2sysfull,fill(-1,ntotal))
-        push!(mem2syspres,Int[])
-        push!(mem2sysfree,Int[])
+        num_of_pres_coords = length(pres)
+        num_of_free_coords = ntotal - num_of_pres_coords
+        push!(bodyid2sys_full_coords,fill(-1,ntotal))
+        push!(bodyid2sys_pres_coords,Int[])
+        push!(bodyid2sys_free_coords,Int[])
         unshareds = collect(1:ntotal)
-        shared_indices = Int[]
+        shared_idx = Int[]
         for row in eachrow(sharing)
             rbids = findall(!iszero,row)
             if bodyid in rbids[begin+1:end]
                 myindex = row[bodyid]
                 formerid = first(rbids)
                 formerindex = row[formerid]
-                mem2sysfull[bodyid][myindex] = mem2sysfull[formerid][formerindex]
-                push!(shared_indices,myindex)
+                bodyid2sys_full_coords[bodyid][myindex] = bodyid2sys_full_coords[formerid][formerindex]
+                push!(shared_idx,myindex)
             end
         end
-        deleteat!(unshareds,shared_indices)
+        deleteat!(unshareds,shared_idx)
         nusi = length(unshareds)
-        mem2sysfull[bodyid][unshareds] = collect(length(sysfull)+1:length(sysfull)+nusi)
-        append!(sysfull,mem2sysfull[bodyid][unshareds])
+        bodyid2sys_full_coords[bodyid][unshareds] = collect(length(sysfull)+1:length(sysfull)+nusi)
+        append!(sysfull,bodyid2sys_full_coords[bodyid][unshareds])
         for i in unshareds
             if i in pres
                 # pres
-                push!(syspres,mem2sysfull[bodyid][i])
+                push!(sys_pres_coords_idx,bodyid2sys_full_coords[bodyid][i])
             else
                 # free
-                push!(sysfree,mem2sysfull[bodyid][i])
+                push!(sys_free_coords_idx,bodyid2sys_full_coords[bodyid][i])
             end
         end
         for i in free
-            freei = findfirst((x)->x==mem2sysfull[bodyid][i],sysfree)
-            push!(mem2sysfree[bodyid],freei)
+            freei = findfirst((x)->x==bodyid2sys_full_coords[bodyid][i],sys_free_coords_idx)
+            push!(bodyid2sys_free_coords[bodyid],freei)
         end
         for i in pres
-            presi = findfirst((x)->x==mem2sysfull[bodyid][i],syspres)
-            push!(mem2syspres[bodyid],presi)
+            presi = findfirst((x)->x==bodyid2sys_full_coords[bodyid][i],sys_pres_coords_idx)
+            push!(bodyid2sys_pres_coords[bodyid],presi)
         end
     end
-    ninconstraints,mem2sysincst,sysndof,mem2sysndof = index_inconstraints(rbs)
-    IndexedMemberCoords(
-        length(sysfull),length(sysfree),length(syspres),nmem,
-        mem2sysfull,mem2sysfree,mem2syspres,
-        sysfree,syspres,
-        ninconstraints,mem2sysincst,
-        sysndof,mem2sysndof
+    num_of_intrinsic_cstr,bodyid2sys_intrinsic_cstr_idx,sys_num_of_dof,bodyid2sys_dof_idx = index_incstr(rbs)
+    Indexed(
+        length(sysfull),length(sys_free_coords_idx),length(sys_pres_coords_idx),num_of_bodies,
+        bodyid2sys_full_coords,bodyid2sys_free_coords,bodyid2sys_pres_coords,
+        sys_free_coords_idx,sys_pres_coords_idx,
+        num_of_intrinsic_cstr,bodyid2sys_intrinsic_cstr_idx,
+        sys_num_of_dof,bodyid2sys_dof_idx
     )
 end
 
 struct JointedMembers{JType,joint2sysexcstType}
     njoints::Int
-    nexconstraints::Int
+    num_of_extrinsic_cstr::Int
     joints::JType
     joint2sysexcst::joint2sysexcstType
 end
@@ -178,20 +183,20 @@ end
 function unjoin()
     njoints = 0
     joints = Int[]
-    nexconstraints = 0
+    num_of_extrinsic_cstr = 0
     joint2sysexcst = Vector{Int}[]
-    JointedMembers(njoints,nexconstraints,joints,joint2sysexcst)
+    JointedMembers(njoints,num_of_extrinsic_cstr,joints,joint2sysexcst)
 end
 
 function join(joints,indexed)
-    # nexconstraints = mapreduce((joint)->joint.nconstraints,+,joints,init=0)
+    # num_of_extrinsic_cstr = mapreduce((joint)->joint.num_of_cstr,+,joints,init=0)
     njoints = length(joints)
     joint2sysexcst = Vector{Int}[]
     nexcst_by_joint = zeros(Int,njoints)
     foreach(joints) do joint
-        nexcst_by_joint[joint.id] = joint.nconstraints
+        nexcst_by_joint[joint.id] = joint.num_of_cstr
     end
-    nexconstraints = sum(nexcst_by_joint)
+    num_of_extrinsic_cstr = sum(nexcst_by_joint)
     joint2sysexcst = Vector{Int}[]
     ilast = 0
     for jointid = 1:njoints
@@ -199,7 +204,7 @@ function join(joints,indexed)
         push!(joint2sysexcst,collect(ilast+1:ilast+nexcst))
         ilast += nexcst
     end
-    JointedMembers(njoints,nexconstraints,joints,joint2sysexcst)
+    JointedMembers(njoints,num_of_extrinsic_cstr,joints,joint2sysexcst)
 end
 
 function Base.isless(rb1::AbstractBody,rb2::AbstractBody)

@@ -1,6 +1,6 @@
-function dualtri(ndof,;onedir=[1.0,0.0],θ=0.0,k=400.0,c=0.0,restlen=0.16)
-    nbodies = ndof + 1
-    nbp = 2nbodies - ndof
+function dualtri(num_of_dof,;onedir=[1.0,0.0],θ=0.0,k=400.0,c=0.0,restlen=0.16)
+    nbodies = num_of_dof + 1
+    nbp = 2nbodies - num_of_dof
     n_lower = count(isodd,1:nbodies)
     n_upper = count(iseven,1:nbodies)
     lower_index = 1:2:nbodies
@@ -55,11 +55,11 @@ function dualtri(ndof,;onedir=[1.0,0.0],θ=0.0,k=400.0,c=0.0,restlen=0.16)
         if i == 1
             constrained = true
             ci = collect(1:6)
-            constraints_indices = Int[]
+            cstr_idx = Int[]
         else
             constrained = false
             ci = Int[]
-            constraints_indices = collect(1:3)
+            cstr_idx = collect(1:3)
         end
         
         ω = 0.0
@@ -77,7 +77,7 @@ function dualtri(ndof,;onedir=[1.0,0.0],θ=0.0,k=400.0,c=0.0,restlen=0.16)
 
         nmcs = RB.NCF.NC1P2V(SVector{2}(ri), ro, α)
 
-        state = RB.RigidBodyState(prop, nmcs, ri, α, ṙo, ω, ci, constraints_indices)
+        state = RB.RigidBodyState(prop, nmcs, ri, α, ṙo, ω, ci, cstr_idx)
 
         body = RB.RigidBody(prop,state)
     end
@@ -178,7 +178,7 @@ function Tbars(;θ = 0)
         m = 1.0
         Ī = SMatrix{3,3}(Matrix(1.0I,3,3))
         ci = collect(1:12)
-        constraints_indices = Int[]    
+        cstr_idx = Int[]    
         R = RotZ(0.0)    
         ω = SVo3
         ri = SVo3
@@ -196,7 +196,7 @@ function Tbars(;θ = 0)
 
         nmcs = RB.NCF.NC1P3V(ri, ro, R)
 
-        state = RB.RigidBodyState(prop, nmcs, ri, R, ṙo, ω, ci, constraints_indices)
+        state = RB.RigidBodyState(prop, nmcs, ri, R, ṙo, ω, ci, cstr_idx)
         basemesh = load(RB.assetpath("装配体1.STL")) |> make_patch(;
             # trans=[-1.0,0,0],
             rot = RotZ(π),
@@ -228,10 +228,10 @@ function Tbars(;θ = 0)
         )
 
         nmcs = RB.NCF.NC1P3V(ri, ro, R)
-        @show q[1:3]
-        @show q[4:6]
-        @show q[7:9]
-        @show q[10:12]
+        # @show q[1:3]
+        # @show q[4:6]
+        # @show q[7:9]
+        # @show q[10:12]
         ro = ri
         ṙo = zero(ro)
         ω = zero(ro)
@@ -334,7 +334,7 @@ function planar_parallel()
         m = 1.0
         Ī = SMatrix{3,3}(Matrix(1.0I,3,3))
         ci = collect(1:12)
-        constraints_indices = Int[]    
+        cstr_idx = Int[]    
         R = RotZ(0.0)    
         ω = SVo3
         ri = SVo3
@@ -352,7 +352,7 @@ function planar_parallel()
 
         nmcs = RB.NCF.NC1P3V(ri, ro, R)
 
-        state = RB.RigidBodyState(prop, nmcs, ri, R, ṙo, ω, ci, constraints_indices)
+        state = RB.RigidBodyState(prop, nmcs, ri, R, ṙo, ω, ci, cstr_idx)
 
         RB.RigidBody(prop,state)
     end

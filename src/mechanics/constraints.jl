@@ -1,10 +1,10 @@
 
-function make_constraints_function(cst::PrototypeJoint,st::Structure)
+function make_cstr_function(cst::PrototypeJoint,st::Structure)
     (;indexed,numbered) = st.connectivity
-    (;mem2sysfull) = indexed
-    (;num2sys,mem2num) = numbered
+    (;bodyid2sys_full_coords) = indexed
+    (;sys_loci2coords_idx,bodyid2sys_loci_idx) = numbered
     (;
-        nconstraints,hen2egg,values,
+        num_of_cstr,hen2egg,values,
         axes_trl_hen,axes_trl_egg,axes_rot_hen,axes_rot_egg,
         mask_1st, mask_2nd, mask_3rd_hen, mask_3rd_egg, mask_4th
     ) = cst
@@ -13,15 +13,15 @@ function make_constraints_function(cst::PrototypeJoint,st::Structure)
     nmcs_egg = egg.rbsig.state.cache.funcs.nmcs
     id_hen = hen.rbsig.prop.id
     id_egg = egg.rbsig.prop.id
-    function _inner_constraints_function(q,d,c)
-        ret = zeros(eltype(q),nconstraints)
-        q_hen = @view q[mem2sysfull[id_hen]]
-        q_egg = @view q[mem2sysfull[id_egg]]
+    function _inner_cstr_function(q,d,c)
+        ret = zeros(eltype(q),num_of_cstr)
+        q_hen = @view q[bodyid2sys_full_coords[id_hen]]
+        q_egg = @view q[bodyid2sys_full_coords[id_egg]]
         R_hen = NCF.find_rotation(nmcs_hen,q_hen)
         R_egg = NCF.find_rotation(nmcs_egg,q_egg)
         # translate
-        c_hen = c[num2sys[mem2num[id_hen]][hen.pid]]
-        c_egg = c[num2sys[mem2num[id_egg]][egg.pid]]
+        c_hen = c[sys_loci2coords_idx[bodyid2sys_loci_idx[id_hen]][hen.pid]]
+        c_egg = c[sys_loci2coords_idx[bodyid2sys_loci_idx[id_egg]][egg.pid]]
         C_hen = to_transformation(hen.rbsig.state.cache.funcs.nmcs,c_hen)
         C_egg = to_transformation(egg.rbsig.state.cache.funcs.nmcs,c_egg)
         # @show C_egg,q_egg
@@ -60,7 +60,7 @@ function make_constraints_function(cst::PrototypeJoint,st::Structure)
         ]
         # fourth    
         Φ_4th = [r_hen2egg'*r_hen2egg]
-        # constraint values
+        # cstr values
         ret = vcat(
             Φ_4th[mask_4th],
             Φ_3rd_hen[mask_3rd_hen], # translate prior to 
@@ -70,23 +70,23 @@ function make_constraints_function(cst::PrototypeJoint,st::Structure)
         ) .- values
         ret
     end
-    function inner_constraints_function(q,d,c)
-        _inner_constraints_function(q,d,c)
+    function inner_cstr_function(q,d,c)
+        _inner_cstr_function(q,d,c)
     end
-    function inner_constraints_function(q)
+    function inner_cstr_function(q)
         d = get_d(st)
-        c = get_local_coordinates(st)
-        _inner_constraints_function(q,d,c)
+        c = get_local_coords(st)
+        _inner_cstr_function(q,d,c)
     end
-    inner_constraints_function
+    inner_cstr_function
 end
 
-function make_constraints_jacobian(cst::PrototypeJoint,st::Structure)
+function make_cstr_jacobian(cst::PrototypeJoint,st::Structure)
     (;indexed,numbered) = st.connectivity
-    (;mem2sysfree,mem2sysfull,nfree) = indexed
-    (;num2sys,mem2num) = numbered
+    (;bodyid2sys_free_coords,bodyid2sys_full_coords,num_of_free_coords) = indexed
+    (;sys_loci2coords_idx,bodyid2sys_loci_idx) = numbered
     (;
-        nconstraints,hen2egg,
+        num_of_cstr,hen2egg,
         axes_trl_hen,axes_trl_egg,axes_rot_hen,axes_rot_egg, 
         mask_1st, mask_2nd, mask_3rd_hen, mask_3rd_egg, mask_4th
     ) = cst
@@ -95,21 +95,21 @@ function make_constraints_jacobian(cst::PrototypeJoint,st::Structure)
     uci_egg =  egg.rbsig.state.cache.free_idx
     id_hen = hen.rbsig.prop.id
     id_egg = egg.rbsig.prop.id
-    free_hen = mem2sysfree[id_hen]
-    free_egg = mem2sysfree[id_egg]
+    free_hen = bodyid2sys_free_coords[id_hen]
+    free_egg = bodyid2sys_free_coords[id_egg]
     nmcs_hen = hen.rbsig.state.cache.funcs.nmcs
     nmcs_egg = egg.rbsig.state.cache.funcs.nmcs
     Y_hen = nmcs_hen.conversion
     Y_egg = nmcs_egg.conversion
-    function _inner_constraints_jacobian(q,c)
-        ret = zeros(eltype(q),nconstraints,nfree)
-        q_hen = @view q[mem2sysfull[id_hen]]
-        q_egg = @view q[mem2sysfull[id_egg]]
+    function _inner_cstr_jacobian(q,c)
+        ret = zeros(eltype(q),num_of_cstr,num_of_free_coords)
+        q_hen = @view q[bodyid2sys_full_coords[id_hen]]
+        q_egg = @view q[bodyid2sys_full_coords[id_egg]]
         R_hen = NCF.find_rotation(nmcs_hen,q_hen)
         R_egg = NCF.find_rotation(nmcs_egg,q_egg)
         # translate 
-        c_hen = c[num2sys[mem2num[id_hen][hen.pid]]]
-        c_egg = c[num2sys[mem2num[id_egg][egg.pid]]]
+        c_hen = c[sys_loci2coords_idx[bodyid2sys_loci_idx[id_hen][hen.pid]]]
+        c_egg = c[sys_loci2coords_idx[bodyid2sys_loci_idx[id_egg][egg.pid]]]
         C_hen = to_transformation(hen.rbsig.state.cache.funcs.nmcs,c_hen)
         C_egg = to_transformation(egg.rbsig.state.cache.funcs.nmcs,c_egg)
         r_hen2egg = C_egg*q_egg .- C_hen*q_hen
@@ -131,11 +131,11 @@ function make_constraints_jacobian(cst::PrototypeJoint,st::Structure)
         # jac
         o3 = zeros(eltype(q),3)
         # jac first
-        A_first = zeros(eltype(q),3,nfree)
+        A_first = zeros(eltype(q),3,num_of_free_coords)
         A_first[:,free_hen] .= -C_hen[:,uci_hen]
         A_first[:,free_egg] .=  C_egg[:,uci_egg]
         # jac third on hen
-        A_3rd_hen = zeros(eltype(q),3,nfree)
+        A_3rd_hen = zeros(eltype(q),3,num_of_free_coords)
         A_3rd_hen[:,free_hen] .= kron(
                 hcat(
                     o3, transpose(trl_hen)
@@ -145,7 +145,7 @@ function make_constraints_jacobian(cst::PrototypeJoint,st::Structure)
         A_3rd_hen[:,free_hen] .-= transpose(trl_hen)*C_hen[:,uci_hen]
         A_3rd_hen[:,free_egg] .+= transpose(trl_hen)*C_egg[:,uci_egg]
         # jac third on egg
-        A_3rd_egg = zeros(eltype(q),3,nfree)
+        A_3rd_egg = zeros(eltype(q),3,num_of_free_coords)
         A_3rd_egg[:,free_egg] .= kron(
                 hcat(
                     o3, transpose(trl_egg)
@@ -155,7 +155,7 @@ function make_constraints_jacobian(cst::PrototypeJoint,st::Structure)
         A_3rd_egg[:,free_hen] .-= transpose(trl_egg)*C_hen[:,uci_hen]
         A_3rd_egg[:,free_egg] .+= transpose(trl_egg)*C_egg[:,uci_egg]
         # jac 2nd
-        A_2nd = zeros(eltype(q),3,nfree)
+        A_2nd = zeros(eltype(q),3,num_of_free_coords)
         if (nmcs_hen isa NCF.LNC3D12C) && (nmcs_egg isa NCF.LNC3D12C) 
             A_2nd[1,free_hen] = (
                     transpose(
@@ -189,10 +189,10 @@ function make_constraints_jacobian(cst::PrototypeJoint,st::Structure)
                 )[:,uci_egg]
         end
         # jac 4th
-        A_4th = zeros(eltype(q),1,nfree)
+        A_4th = zeros(eltype(q),1,num_of_free_coords)
         A_4th[1,free_hen] = -2r_hen2egg'*C_hen[:,uci_hen]
         A_4th[1,free_egg] =  2r_hen2egg'*C_egg[:,uci_egg]
-        # constraint values
+        # cstr values
         ret = vcat(
             A_4th[mask_4th,:],
             A_3rd_hen[mask_3rd_hen,:], # translate prior to 
@@ -202,19 +202,19 @@ function make_constraints_jacobian(cst::PrototypeJoint,st::Structure)
         )
         ret
     end
-    function inner_constraints_jacobian(q,c)
-        _inner_constraints_jacobian(q,c)
+    function inner_cstr_jacobian(q,c)
+        _inner_cstr_jacobian(q,c)
     end
-    function inner_constraints_jacobian(q)
-        c = get_local_coordinates(st)
-        _inner_constraints_jacobian(q,c)
+    function inner_cstr_jacobian(q)
+        c = get_local_coords(st)
+        _inner_cstr_jacobian(q,c)
     end
-    inner_constraints_jacobian
+    inner_cstr_jacobian
 end
 
-function make_constraints_hessians(cst::PrototypeJoint,st::Structure)
+function make_cstr_hessians(cst::PrototypeJoint,st::Structure)
     (;numbered) = st.connectivity
-    (;mem2num,num2sys) = numbered
+    (;bodyid2sys_loci_idx,sys_loci2coords_idx) = numbered
     (;
         hen2egg,
         axes_trl_hen,axes_trl_egg,axes_rot_hen,axes_rot_egg,
@@ -225,22 +225,22 @@ function make_constraints_hessians(cst::PrototypeJoint,st::Structure)
     id_egg = egg.rbsig.prop.id
     nmcs_hen = hen.rbsig.state.cache.funcs.nmcs
     nmcs_egg = egg.rbsig.state.cache.funcs.nmcs
-    nld_hen = NCF.get_num_of_local_dims(nmcs_hen)
-    nld_egg = NCF.get_num_of_local_dims(nmcs_egg)
+    nld_hen = get_num_of_local_dims(nmcs_hen)
+    nld_egg = get_num_of_local_dims(nmcs_egg)
     Y_hen = nmcs_hen.conversion
     Y_egg = nmcs_egg.conversion
     cv = BlockDiagonal([Y_hen,Y_egg])
-    ndim = NCF.get_num_of_dims(nmcs_hen)
+    ndim = get_num_of_dims(nmcs_hen)
     T = get_numbertype(cst)
     I_Int = I(ndim)
     # translate
-    c = get_local_coordinates(st)
-    c_hen = c[num2sys[mem2num[id_hen][hen.pid]]]
-    c_egg = c[num2sys[mem2num[id_egg][egg.pid]]]
+    c = get_local_coords(st)
+    c_hen = c[sys_loci2coords_idx[bodyid2sys_loci_idx[id_hen][hen.pid]]]
+    c_egg = c[sys_loci2coords_idx[bodyid2sys_loci_idx[id_egg][egg.pid]]]
     C_hen = to_transformation(hen.rbsig.state.cache.funcs.nmcs,c_hen)
     C_egg = to_transformation(egg.rbsig.state.cache.funcs.nmcs,c_egg)
     # first
-    constraints_hessians_first =[
+    cstr_hessians_first =[
         begin
             ret = kron(
                 zeros(
@@ -253,7 +253,7 @@ function make_constraints_hessians(cst::PrototypeJoint,st::Structure)
         end
         for i = 1:3
     ]
-    constraints_hessians_3rd_hen = [
+    cstr_hessians_3rd_hen = [
         begin
             d̄ = axes_trl_hen.X[:,i]
             ret_raw = zeros(
@@ -275,7 +275,7 @@ function make_constraints_hessians(cst::PrototypeJoint,st::Structure)
         end
         for i = 1:3
     ]
-    constraints_hessians_3rd_egg = [
+    cstr_hessians_3rd_egg = [
         begin
             ret_raw = zeros(
                 T,
@@ -297,7 +297,7 @@ function make_constraints_hessians(cst::PrototypeJoint,st::Structure)
         end
         for i = 1:3
     ]
-    constraints_hessians_2nd = [
+    cstr_hessians_2nd = [
         begin
             ret_raw = zeros(
                 T,
@@ -338,7 +338,7 @@ function make_constraints_hessians(cst::PrototypeJoint,st::Structure)
             ret
         end,
     ]    
-    constraints_hessians_4th = [
+    cstr_hessians_4th = [
         begin
             ret = kron(
                 zeros(
@@ -355,83 +355,83 @@ function make_constraints_hessians(cst::PrototypeJoint,st::Structure)
             ret
         end
     ]
-    constraints_hessians = vcat(
-        constraints_hessians_4th[mask_4th],
-        constraints_hessians_3rd_hen[mask_3rd_hen],
-        constraints_hessians_3rd_egg[mask_3rd_egg],
-        constraints_hessians_first[mask_1st],
-        constraints_hessians_2nd[mask_2nd],
+    cstr_hessians = vcat(
+        cstr_hessians_4th[mask_4th],
+        cstr_hessians_3rd_hen[mask_3rd_hen],
+        cstr_hessians_3rd_egg[mask_3rd_egg],
+        cstr_hessians_first[mask_1st],
+        cstr_hessians_2nd[mask_2nd],
     )
-    constraints_hessians
+    cstr_hessians
 end
 
 function get_jointed_free_idx(cst)
-    (;nconstraints,hen2egg,) = cst
+    (;num_of_cstr,hen2egg,) = cst
     (;hen,egg) = hen2egg
     uci_hen = hen.rbsig.state.cache.free_idx
     uci_egg = egg.rbsig.state.cache.free_idx
-    ncoords1 = NCF.get_num_of_coordinates(hen.rbsig.state.cache.funcs.nmcs)
-    # ncoords2 = NCF.get_num_of_coordinates(egg.rbsig.state.cache.nmcs)
-    free_coordinates_indices = vcat(
+    ncoords1 = NCF.get_num_of_coords(hen.rbsig.state.cache.funcs.nmcs)
+    # ncoords2 = NCF.get_num_of_coords(egg.rbsig.state.cache.nmcs)
+    free_coords_idx = vcat(
         uci_hen,
         uci_egg .+ ncoords1
     )
 end
 
 function get_jointed_free(cst,indexed)
-    (;nconstraints,hen2egg,) = cst
-    (;mem2sysfree,mem2sysfull,nfree) = indexed
+    (;num_of_cstr,hen2egg,) = cst
+    (;bodyid2sys_free_coords,bodyid2sys_full_coords,num_of_free_coords) = indexed
     (;hen,egg) = hen2egg
     id_hen = hen.rbsig.prop.id
     id_egg = egg.rbsig.prop.id
-    mem2sysfree1 = mem2sysfree[id_hen]
-    mem2sysfree2 = mem2sysfree[id_egg]
+    mem2sysfree1 = bodyid2sys_free_coords[id_hen]
+    mem2sysfree2 = bodyid2sys_free_coords[id_egg]
     cst2sysfree = vcat(
         mem2sysfree1,
         mem2sysfree2
     )
 end
 
-function make_constraint_forces_jacobian(cst,st)
-    (;nconstraints) = cst
-    free_coordinates_indices = get_jointed_free_idx(cst)
-    constraints_hessians = make_constraints_hessians(cst,st)
-    function constraint_forces_jacobian(λ)
+function make_cstr_forces_jacobian(cst,st)
+    (;num_of_cstr) = cst
+    free_coords_idx = get_jointed_free_idx(cst)
+    cstr_hessians = make_cstr_hessians(cst,st)
+    function cstr_forces_jacobian(λ)
         ret = [
             begin
-                a = constraints_hessians[i][free_coordinates_indices,free_coordinates_indices] .* λ[i]
+                a = cstr_hessians[i][free_coords_idx,free_coords_idx] .* λ[i]
                 # display(a)
                 a 
             end
-            for i = 1:nconstraints
+            for i = 1:num_of_cstr
         ]
         sum(ret)
     end
 end
 
 function get_jointed_free_idx(cst::LinearJoint)
-    free_coordinates_indices = collect(1:size(cst.A,2))
+    free_coords_idx = collect(1:size(cst.A,2))
 end
 
 function get_jointed_free(cst::LinearJoint,indexed)
-    cst2sysfree = collect(1:indexed.nfree)
+    cst2sysfree = collect(1:indexed.num_of_free_coords)
 end
 
-function make_constraint_forces_jacobian(cst::LinearJoint,st)
-    free_coordinates_indices = get_jointed_free_idx(cst)
-    function constraint_forces_jacobian(λ)
-        zeros(eltype(λ),length(free_coordinates_indices),length(free_coordinates_indices))
+function make_cstr_forces_jacobian(cst::LinearJoint,st)
+    free_coords_idx = get_jointed_free_idx(cst)
+    function cstr_forces_jacobian(λ)
+        zeros(eltype(λ),length(free_coords_idx),length(free_coords_idx))
     end
 end
 
 
 function get_jointed_free(cst::FixedIndicesConstraint,indexed)
-    cst2sysfree = collect(1:indexed.nfree)
+    cst2sysfree = collect(1:indexed.num_of_free_coords)
 end
 
-function make_constraint_forces_jacobian(cst::FixedIndicesConstraint,st)
-    (;nfree) = st.connectivity.indexed
-    function constraint_forces_jacobian(λ)
-        zeros(eltype(λ),nfree,nfree)
+function make_cstr_forces_jacobian(cst::FixedIndicesConstraint,st)
+    (;num_of_free_coords) = st.connectivity.indexed
+    function cstr_forces_jacobian(λ)
+        zeros(eltype(λ),num_of_free_coords,num_of_free_coords)
     end
 end

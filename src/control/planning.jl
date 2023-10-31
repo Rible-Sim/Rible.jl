@@ -9,7 +9,7 @@ struct Chart{T,ϕcT,make_ψcT}
     cosα::T
     ρ::T
     σ::T
-    neighbor_indices::Vector{Int}
+    neighbor_idx::Vector{Int}
     neighbor_vectors::Vector{Vector{T}}
 end
 
@@ -36,7 +36,7 @@ end
 
 function Chart(st, qc::AbstractVector{T}, q̇c::AbstractVector{T};
                 ε=zero(T), α=zero(T), ρ=one(T), σ=2one(T)) where T
-    nc = get_nconstraint(st)
+    nc = get_ncstr(st)
     F, Jac_F = build_Jac_F(st)
     xc = vcat(qc, q̇c)
     Q, R = qr(transpose(Jac_F(xc)))
@@ -56,12 +56,12 @@ function Chart(st, qc::AbstractVector{T}, q̇c::AbstractVector{T};
         end
         inner_ψc!, inner_Jac_ψc!
     end
-    neighbor_indices = Int[]
+    neighbor_idx = Int[]
     neighbor_vectors = Vector{Vector{T}}()
     @assert σ > ρ
     Chart(nq, nX,
         xc, Uc,
         ϕc, make_ψc,
         ε, cos(α), ρ, σ,
-        neighbor_indices,neighbor_vectors)
+        neighbor_idx,neighbor_vectors)
 end

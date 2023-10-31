@@ -43,7 +43,7 @@ end
 M,Φ,A,F!,Jacs = dynfuncs(tail,q0)
 
 @var q[1:tail.ncoords]
-@var λ[1:tail.nconstraint]
+@var λ[1:tail.num_of_cstr]
 @var u[1:tail.ncables]
 @var a[1:tail.ncables]
 polyq = (1.0q)

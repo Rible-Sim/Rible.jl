@@ -82,10 +82,10 @@ function man_nd(n;θ=0.0,k=0.0,c=0.0)
     rb2p = [
         [i,i+1] for i = 1:length(rbs)
     ]
-    body2q_raw = [
+    bodyid2q_raw = [
         [2pid[1]-1,2pid[1],2pid[2]-1,2pid[2]] for pid in rb2p
     ]
-    body2q = RB.filter_body2q(body2q_raw,rbs)
+    bodyid2q = RB.filter_bodyid2q(bodyid2q_raw,rbs)
     string2ap_raw = [
         [zeros(Int,2),zeros(Int,2)] for i = 1:length(ss)
     ]
@@ -97,7 +97,7 @@ function man_nd(n;θ=0.0,k=0.0,c=0.0)
         push!(string2ap,(RB.ID(j,4),RB.ID(j+2,1)))
         push!(string2ap,(RB.ID(j,2),RB.ID(j+2,4)))
     end
-    cnt = RB.Connectivity(body2q,string2ap)
+    cnt = RB.Connectivity(bodyid2q,string2ap)
     st = RB.Structure(rbs,ss,acs,cnt)
     RB.update_cables_apply_forces!(st)
     st

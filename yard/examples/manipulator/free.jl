@@ -35,8 +35,8 @@ ax.set_aspect("equal")
 ax.grid(true)
 fig.tight_layout()
 fig.savefig("undamped_initial_position.png",dpi=300,bbox_inches="tight")
-function simulate_free(ndof;k,c,unit="mks",dt=0.01,tend=10.0,verbose=false)
-    manipulator = man_ndof(ndof;k,c,unit)
+function simulate_free(num_of_dof;k,c,unit="mks",dt=0.01,tend=10.0,verbose=false)
+    manipulator = man_ndof(num_of_dof;k,c,unit)
 
     function free(tr)
         st = tr.st
@@ -146,7 +146,7 @@ fig = pyplot_energy(man_free_long,l0s)
 
 fig.savefig("undamped_energy_error.png",dpi=300,bbox_inches="tight")
 
-function plot_constraint_drift(tr)
+function plot_cstr_drift(tr)
     @unpack traj = tr
     @unpack ts = traj
     tmin = ts[begin]
@@ -175,5 +175,5 @@ function plot_constraint_drift(tr)
     fig
 end
 
-fig = plot_constraint_drift(man_free)
-fig.savefig("constraint_drift.png",dpi=300,bbox_inches="tight")
+fig = plot_cstr_drift(man_free)
+fig.savefig("cstr_drift.png",dpi=300,bbox_inches="tight")

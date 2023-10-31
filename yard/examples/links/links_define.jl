@@ -67,7 +67,7 @@ function links(n,di,rm;k=3e1,c=0.0)
 		# nmcs = RB.NCF.NC2P2V(ri,rj,rk-ri,rl-ri,ro,R)
 		nmcs = RB.NCF.NC1P3V(ri,ro,R)
 		if i == 1
-			pres_idx = RB.find_full_pres_indices(nmcs,q)
+			pres_idx = RB.find_full_pres_idx(nmcs,q)
 		else
 			pres_idx = Int[]
 		end
@@ -90,10 +90,10 @@ function links(n,di,rm;k=3e1,c=0.0)
 	tensiles = (strings=ss,)
 	acs = [RB.ManualActuator(RB.SimpleRegistor(6(i-1)+j,stringlens[6(i-1)+j])) for i = 1:n-1  for j = 1:6]
 	hub = (actuators=acs,)
-	bodynq = RB.get_nbodycoords(rbs[1])
-    body2q_raw = [(bodynq*(i-1)+1:bodynq*i) for i = 1:n]
-	# body2q = RB.filter_body2q(body2q_raw,rbs)
-	body2q = body2q_raw
+	bodynq = RB.get_num_of_coords(rbs[1])
+    bodyid2q_raw = [(bodynq*(i-1)+1:bodynq*i) for i = 1:n]
+	# bodyid2q = RB.filter_bodyid2q(bodyid2q_raw,rbs)
+	bodyid2q = bodyid2q_raw
 
     string2ap = Vector{Tuple{RB.ID,RB.ID}}()
     for i = 1:n-1
@@ -104,7 +104,7 @@ function links(n,di,rm;k=3e1,c=0.0)
             push!(string2ap,(RB.ID(i,j),RB.ID(i+1,1)))
         end
     end
-    cnt = RB.Connectivity(body2q,string2ap)
+    cnt = RB.Connectivity(bodyid2q,string2ap)
     st = RB.Structure(rbs,tensiles,cnt)
     RB.update_strings_apply_forces!(st)
 	RB.jac_singularity_check(st)

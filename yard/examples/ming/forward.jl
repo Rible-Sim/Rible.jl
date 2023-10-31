@@ -37,7 +37,7 @@ const figdir=raw"C:\Users\luo22\OneDrive\Papers\Ph.D.Thesis\ff"
 spine2 = spine_true(2,0.105,RotY(0.0))
 # @code_warntype spine_true(2,0.105,RotY(0.0))
 # Φ = RB.build_Φ(spine2.st)
-# q, _ = RB.get_coordinates(spine2.st)
+# q, _ = RB.get_coords(spine2.st)
 # Φ(q)
 # @code_warntype Φ(q)
 # A = RB.build_A(spine2.st)
@@ -423,7 +423,7 @@ errs[end]
 @descend_code_warntype tsff(spine2.st)
 [body.state.ro for rb in spine2.st.rigidbodies]
 
-identical_indices = [1,2,3,4] .== [1,2,3,5]
+identical_idx = [1,2,3,4] .== [1,2,3,5]
 a = collect(5:8)
-a[identical_indices]
-.!(identical_indices)
+a[identical_idx]
+.!(identical_idx)

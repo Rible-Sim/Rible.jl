@@ -1189,7 +1189,7 @@ end
 function pres3d!(sysstate,st;ν=0.5)
     (;t,q̃,q̃̇,q̃̈) = sysstate
     (;bodies,connectivity) = st
-    (;mem2syspres) = connectivity.indexed
+    (;bodyid2sys_pres_coords) = connectivity.indexed
     amp = 0.01
     p = ν*2π
     foreach(bodies) do body
@@ -1202,27 +1202,27 @@ function pres3d!(sysstate,st;ν=0.5)
                     0.0,
                     0.0
                 ]
-                q̃[mem2syspres[bodyid]] .= r0 .+ [amp*sin(p*t),0,0]
-                q̃̇[mem2syspres[bodyid]] .=     [amp*p*cos(p*t),0,0]
-                q̃̈[mem2syspres[bodyid]] .=  [-amp*p^2*sin(p*t),0,0]
+                q̃[bodyid2sys_pres_coords[bodyid]] .= r0 .+ [amp*sin(p*t),0,0]
+                q̃̇[bodyid2sys_pres_coords[bodyid]] .=     [amp*p*cos(p*t),0,0]
+                q̃̈[bodyid2sys_pres_coords[bodyid]] .=  [-amp*p^2*sin(p*t),0,0]
             elseif bodyid == 2
                 r0 .= [
                     -0.05,
                      0.08660254037844387,
                     0.0
                 ]
-                q̃[mem2syspres[bodyid]] .= r0 .+ [amp*sin(p*t),0,0]
-                q̃̇[mem2syspres[bodyid]] .=     [amp*p*cos(p*t),0,0]
-                q̃̈[mem2syspres[bodyid]] .=  [-amp*p^2*sin(p*t),0,0]
+                q̃[bodyid2sys_pres_coords[bodyid]] .= r0 .+ [amp*sin(p*t),0,0]
+                q̃̇[bodyid2sys_pres_coords[bodyid]] .=     [amp*p*cos(p*t),0,0]
+                q̃̈[bodyid2sys_pres_coords[bodyid]] .=  [-amp*p^2*sin(p*t),0,0]
             elseif bodyid == 3
                 r0 .= [
                     -0.05,
                     -0.08660254037844387,
                     0.0
                 ]
-                q̃[mem2syspres[bodyid]] .= r0 .+ [amp*sin(p*t),0,0]
-                q̃̇[mem2syspres[bodyid]] .=     [amp*p*cos(p*t),0,0]
-                q̃̈[mem2syspres[bodyid]] .=  [-amp*p^2*sin(p*t),0,0]
+                q̃[bodyid2sys_pres_coords[bodyid]] .= r0 .+ [amp*sin(p*t),0,0]
+                q̃̇[bodyid2sys_pres_coords[bodyid]] .=     [amp*p*cos(p*t),0,0]
+                q̃̈[bodyid2sys_pres_coords[bodyid]] .=  [-amp*p^2*sin(p*t),0,0]
             end
         end
     end
@@ -2288,9 +2288,9 @@ _,λ=  RB.check_static_equilibrium_output_multipliers(bot.st)
 k = RB.get_cables_stiffness(bot.st)
 l = RB.get_cables_len(bot.st)
 f = RB.get_cables_tension(bot)
-q = RB.get_coordinates(bot.st)
-q̌ = RB.get_free_coordinates(bot.st)
-Ǎ = RB.make_constraints_jacobian(bot.st)(q)
+q = RB.get_coords(bot.st)
+q̌ = RB.get_free_coords(bot.st)
+Ǎ = RB.make_cstr_jacobian(bot.st)(q)
 # Ň_ = RB.nullspace(Ǎ)
 # Ň = RB.modified_gram_schmidt(Ň_)
 Ň = RB.make_intrinsic_nullspace(bot.st,q)
@@ -2364,7 +2364,7 @@ ns = size(S,2)
 nk = size(D,2)
 
 λ = -inv(Ǎ*transpose(Ǎ))*Ǎ*Bᵀ*f
-Ǩa = RB.constraint_forces_on_free_jacobian(bot.st,λ)
+Ǩa = RB.cstr_forces_on_free_jacobian(bot.st,λ)
 𝒦a = transpose(Ň)*Ǩa*Ň |> Symmetric 
 vals_𝒦a,vecs_𝒦a = eigen(𝒦a)
 
@@ -2377,7 +2377,7 @@ vec𝒦ps = [
         # @show s
         λi = inv(Ǎ*transpose(Ǎ))*Ǎ*Bᵀ*si
         # @show f,λ
-        Ǩai = - RB.constraint_forces_on_free_jacobian(bot.st,λi)
+        Ǩai = - RB.cstr_forces_on_free_jacobian(bot.st,λi)
 
         Ǩgi = RB.build_geometric_stiffness_matrix_on_free!(bot.st,q,si)
 
@@ -2439,7 +2439,7 @@ vecr𝒦ps = [
         # @show s
         λi = inv(Ǎ*transpose(Ǎ))*Ǎ*Bᵀ*si
         # @show f,λ
-        Ǩai = - RB.constraint_forces_on_free_jacobian(bot.st,λi)
+        Ǩai = - RB.cstr_forces_on_free_jacobian(bot.st,λi)
 
         Ǩgi = RB.build_geometric_stiffness_matrix_on_free!(bot.st,q,si)
 
