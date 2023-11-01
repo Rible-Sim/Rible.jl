@@ -80,7 +80,7 @@ function make_3d_bar(
     state = RB.RigidBodyState(prop,nmcs,ri,R,ṙo,ω,ci)
     if loadmesh
         barmesh = load(RB.assetpath("装配体3.STL")) |> make_patch(;
-            trans=[0,0,0.025],
+            # trans=[0,0,0.025],
             scale=1/500,
             color=:palegreen3,
         )

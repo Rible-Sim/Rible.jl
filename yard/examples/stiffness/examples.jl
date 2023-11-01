@@ -162,7 +162,7 @@ function Tbars(;θ = 0)
         r̄p2 = SVector{3}([ -a,-b,c])
         r̄p3 = SVector{3}([0.0, b,c])
         r̄p4 = SVector{3}([0.0,-b,c])
-        r̄p5 = SVo3
+        r̄p5 = SVector{3}([0.0,0.0,c])
         r̄p6 = SVector{3}([-2a,0.0,c])
         r̄p7 = SVector{3}([  a,0.0,c])
         nodes_positions = [r̄p1,r̄p2,r̄p3,r̄p4,r̄p5,r̄p6,r̄p7]
@@ -210,8 +210,12 @@ function Tbars(;θ = 0)
         constrained = false
         mass_center_position = SVo3
         r̄p1 = SVector(0.0,0.0,c)
-        nodes_positions = [r̄p1,]
-        axes = [SVector{3}([1.0,0.0,0.0]),]
+        r̄p2 = SVector(0.0,0.0,c/2)
+        nodes_positions = [r̄p1,r̄p2]
+        axes = [
+            SVector{3}([1.0,0.0,0.0]),
+            SVector{3}([1.0,0.0,0.0]),
+        ]
         Ī = SMatrix{3,3}(Matrix(1.0I,3,3))
         ω = SVo3
         ro = ri
@@ -251,14 +255,14 @@ function Tbars(;θ = 0)
         RB.RigidBody(prop,state,slidermesh)
     end
     base = make_base(1)
-    p1 = SVector(-b*cos(θ),0.0,0.0)
+    p1 = SVector(-b*cos(θ),0.0,0)
     p2 = SVector(0,b*sin(θ),0)
     slider1 = make_slider(2;ri = p1)
     slider2 = make_slider(3;ri = p2,)
     bar = make_3d_bar(
         4,
-        p1,
-        p2;
+        p1 + SVector(0,0,c/2),
+        p2 + SVector(0,0,c/2);
 		loadmesh = true,
     )
     rbs = [base,slider1,slider2,bar]
@@ -299,14 +303,10 @@ function Tbars(;θ = 0)
     j1 = RB.PrismaticJoint(1,RB.Hen2Egg(1,RB.ID(base,5,1),RB.ID(slider1,1,1)))
     j2 = RB.PrismaticJoint(2,RB.Hen2Egg(2,RB.ID(base,5,2),RB.ID(slider2,1,1)))
 
-    j3 = RB.PinJoint(3,RB.Hen2Egg(3,RB.ID(bar,1,1),RB.ID(slider1,1,1)))
-    j4 = RB.PinJoint(4,RB.Hen2Egg(4,RB.ID(bar,2,1),RB.ID(slider2,1,1)))
+    j3 = RB.PinJoint(3,RB.Hen2Egg(3,RB.ID(bar,1,1),RB.ID(slider1,2,1)))
+    j4 = RB.PinJoint(4,RB.Hen2Egg(4,RB.ID(bar,2,1),RB.ID(slider2,2,1)))
 
-
-    js = [
-        j1,j2,
-        j3,j4
-    ]
+    js = [j1,j2,j3,j4]
 
     jointed = RB.join(js,indexed)
     cnt = RB.Connectivity(numbered,indexed,tensioned,jointed)

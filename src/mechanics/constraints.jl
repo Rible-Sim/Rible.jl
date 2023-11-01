@@ -91,7 +91,10 @@ function make_cstr_jacobian(cst::PrototypeJoint,st::Structure)
         axes_trl_hen,axes_trl_egg,
         axes_rot_hen,axes_rot_egg, 
         mask_1st, mask_2nd, 
-        mask_3rd, mask_3rd, mask_4th
+        mask_3rd, mask_4th, 
+        hess_1st, hess_2nd, 
+        hess_3rd, hess_4th,
+        transformations,
     ) = cst
     (;hen,egg) = hen2egg
     free_idx_hen =  hen.rbsig.state.cache.free_idx
@@ -105,79 +108,25 @@ function make_cstr_jacobian(cst::PrototypeJoint,st::Structure)
     num_of_coords_hen = get_num_of_coords(nmcs_hen)
     num_of_coords_egg = get_num_of_coords(nmcs_egg)
     num_of_jointed_coords = num_of_coords_hen + num_of_coords_egg
-    # Y_hen = nmcs_hen.conversion_to_std
-    # Y_egg = nmcs_egg.conversion_to_std
-    X_hen = nmcs_hen.conversion_to_X
-    X_egg = nmcs_egg.conversion_to_X
-    select_uvw_hen = BlockDiagonal([X_hen,zero(X_egg)])
-    select_uvw_egg = BlockDiagonal([zero(X_hen),X_egg])
-    I3_Bool = I(3)
     function _inner_cstr_jacobian(q,c)
         T = eltype(q)
         ret = zeros(T,num_of_cstr,num_of_free_coords)
         q_hen = @view q[bodyid2sys_full_coords[id_hen]]
         q_egg = @view q[bodyid2sys_full_coords[id_egg]]
         q = vcat(q_hen,q_egg)
-        # X_hen = NCF.get_X(nmcs_hen,q_hen)
-        # X_egg = NCF.get_X(nmcs_egg,q_egg)
         # translate 
-        c_hen = c[sys_loci2coords_idx[bodyid2sys_loci_idx[id_hen][hen.pid]]]
-        c_egg = c[sys_loci2coords_idx[bodyid2sys_loci_idx[id_egg][egg.pid]]]
-        C_hen = to_transformation(hen.rbsig.state.cache.funcs.nmcs,c_hen)
-        C_egg = to_transformation(egg.rbsig.state.cache.funcs.nmcs,c_egg)
-        J = [-C_hen C_egg;]
-        U = J'*J
-        o3 = zeros(T,3)
-        # jac 
-        A_1st = zeros(T,3,num_of_jointed_coords)
-        A_4th = zeros(T,1,num_of_jointed_coords)
-        A_3rd = zeros(T,6,num_of_jointed_coords)
-        A_2nd = zeros(T,3,num_of_jointed_coords)
-        # first
-        A_1st .= J
-        # jac 4th
-        A_4th .=  2q'*U
-        if (nmcs_hen isa NCF.NC3D12C) && (nmcs_egg isa NCF.NC3D12C) 
-            # jac third on hen
-            # translate on hen
-            for i = 1:3
-                axis_hen = axes_trl_hen.X[:,i]
-                axis_zero = zero(axis_hen)
-                H = select_uvw_hen'*kron(vcat(0,axis_hen,0,axis_zero),I3_Bool)*J
-                A_3rd[i,:] = q'*(H .+ H')
-            end
-            # jac third on egg
-            # translate on egg
-            for i = 1:3
-                axis_egg = axes_trl_egg.X[:,i]
-                axis_zero = zero(axis_egg)
-                H = select_uvw_egg'*kron(vcat(0,axis_zero,0,axis_egg),I3_Bool)*J
-                A_3rd[3+i,:] = q'*(H .+ H')
-            end
-            # jac 2nd
-            # rotate of egg
-            axes_idx = [
-                (2,3),
-                (2,1),
-                (3,1)
-            ]
-            for (i,(id_axis_hen,id_axis_egg)) in enumerate(axes_idx)
-                axis_hen = axes_rot_hen.X[:,id_axis_hen]
-                axis_egg = axes_rot_egg.X[:,id_axis_egg]
-                axis_zero = zero(axis_egg)
-                H = select_uvw_hen'*
-                    kron(vcat(0,axis_hen,0,axis_zero),I3_Bool)*
-                    kron(vcat(0,axis_zero,0,axis_egg),I3_Bool)'*
-                    select_uvw_egg
-                A_2nd[i,:] = q'*(H .+ H')
-            end
-        end
-        # cstr values
+        J = transformations
+        RefqT = Ref(q')
+        A_zeros = spzeros(T,0,num_of_jointed_coords)
+        A_1st = J
+        A_4th = reduce(vcat,RefqT.*hess_4th;init = A_zeros)
+        A_3rd = reduce(vcat,RefqT.*hess_3rd;init = A_zeros)
+        A_2nd = reduce(vcat,RefqT.*hess_2nd;init = A_zeros)
         A = vcat(
-            A_1st[mask_1st,:],
-            A_4th[mask_4th,:],
-            A_3rd[mask_3rd,:], 
-            A_2nd[mask_2nd,:],
+            A_1st,
+            A_4th,
+            A_3rd, 
+            A_2nd,
         )
         ret[:,free_hen] .= A[:, free_idx_hen]
         ret[:,free_egg] .= A[:,(free_idx_egg.+num_of_coords_hen)]

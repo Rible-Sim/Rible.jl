@@ -205,124 +205,6 @@ function make_cstr_jacobian(cst::LinearJoint,indexed,numbered)
     inner_cstr_jacobian
 end
 
-"""
-刚体铰接约束类。
-$(TYPEDEF)
-"""
-struct PrototypeJoint{valueType,hen2eggType,axesType,maskType} <: ExternalConstraints{valueType}
-    id::Int
-    hen2egg::hen2eggType
-    num_of_cstr::Int
-    num_of_dof::Int
-    axes_trl_hen::axesType
-    axes_trl_egg::axesType
-    axes_rot_hen::axesType
-    axes_rot_egg::axesType
-    mask_1st::maskType
-    mask_2nd::maskType
-    mask_3rd::maskType
-    mask_4th::maskType
-    # J::
-    # U::
-    # cstr_function::
-    # cstr_jacobian::
-    # cstr_hessians::
-    values::valueType
-end
-
-"""
-铰接约束构造子。
-$(TYPEDSIGNATURES)
-"""
-function PrototypeJoint(id,hen2egg,joint_type::Symbol) 
-    (;hen,egg) = hen2egg
-    joint_info = get_joint_info(joint_type)
-    (;  ntrl, nrot, 
-        num_of_dof, num_of_cstr, 
-        mask_1st, mask_2nd, 
-        mask_3rd_hen, 
-        mask_3rd_egg, 
-        mask_4th
-    ) = joint_info
-    mask_3rd = vcat(mask_3rd_hen,mask_3rd_egg.+3)
-    T = get_numbertype(hen.rbsig)
-    nmcs_hen = hen.rbsig.state.cache.funcs.nmcs
-    nmcs_egg = egg.rbsig.state.cache.funcs.nmcs
-    state_hen = hen.rbsig.state
-    state_egg = egg.rbsig.state
-    q_hen = cartesian_frame2coords(nmcs_hen,state_hen.origin_position,state_hen.R)
-    q_egg = cartesian_frame2coords(nmcs_egg,state_egg.origin_position,state_egg.R)
-    X_hen = NCF.get_X(nmcs_hen,q_hen)
-    X_egg = NCF.get_X(nmcs_egg,q_egg)
-    invX̄_hen = nmcs_hen.invX̄
-    invX̄_egg = nmcs_egg.invX̄
-    # translate     
-    C_hen = hen.rbsig.state.cache.Cps[hen.pid]
-    C_egg = egg.rbsig.state.cache.Cps[egg.pid]
-    J = [-C_hen C_egg;]
-    q = vcat(q_hen,q_egg)
-    d_hen2egg = J*q
-    # U = J'*J
-    # first    
-    Φ_1st = d_hen2egg
-    # fourth    
-    Φ_4th = [d_hen2egg'*d_hen2egg]
-    # third
-    Φ_3rd = zeros(T,6)
-    # second
-    Φ_2nd = zeros(T,3)
-    axes_trl_hen = invX̄_hen*hen.rbsig.prop.loci[hen.rotid].axes
-    axes_trl_egg = invX̄_egg*egg.rbsig.prop.loci[egg.trlid].axes
-    axes_rot_egg = invX̄_egg*egg.rbsig.prop.loci[egg.rotid].axes
-    axes_rot_hen = pinv(X_hen)*X_egg*axes_rot_egg
-    if (nmcs_hen isa NCF.NC3D12C) && (nmcs_egg isa NCF.NC3D12C)
-        # translate on hen
-        trl_hen = (X_hen*axes_trl_hen.X)
-        # translate on egg
-        trl_egg = (X_egg*axes_trl_egg.X)
-        # rotate of egg
-        rot_hen_n = X_hen*axes_rot_hen.normal
-        rot_hen_t = X_hen*axes_rot_hen.tangent
-        rot_hen_b = X_hen*axes_rot_hen.bitangent
-        rot_egg_n = X_egg*axes_rot_egg.normal
-        rot_egg_t = X_egg*axes_rot_egg.tangent
-        rot_egg_b = X_egg*axes_rot_egg.bitangent
-        # third
-        Φ_3rd .= [
-            trl_hen'*d_hen2egg;
-            trl_egg'*d_hen2egg;
-        ]
-        # second
-        Φ_2nd .= [
-            rot_hen_t'*rot_egg_b,
-            rot_hen_t'*rot_egg_n,
-            rot_hen_b'*rot_egg_n
-        ]
-    end
-    # cstr values
-    values = vcat(
-        Φ_1st[mask_1st],
-        Φ_4th[mask_4th],
-        Φ_3rd[mask_3rd], 
-        Φ_2nd[mask_2nd], 
-    )
-    # @show joint_info
-    # @show values
-    PrototypeJoint(
-        id,hen2egg,
-        num_of_cstr,num_of_dof,
-        axes_trl_hen,
-        axes_trl_egg,
-        axes_rot_hen,
-        axes_rot_egg,
-        in.([1,2,3],Ref(mask_1st)), 
-        in.([1,2,3],Ref(mask_2nd)), 
-        in.([1,2,3,4,5,6],Ref(mask_3rd)), 
-        in.([1,],Ref(mask_4th)),
-        values
-    )
-end
-
 function get_joint_info(joint_type::Symbol)
     (joint_type == :FloatingSpherical)  && (return (ntrl = 3, nrot = 3, num_of_dof = 6, num_of_cstr = 0, mask_1st = Int[],   mask_2nd = Int[]  , mask_3rd_hen = Int[], mask_3rd_egg = Int[], mask_4th = Int[] ))
     (joint_type == :OrbitalSpherical)   && (return (ntrl = 2, nrot = 3, num_of_dof = 5, num_of_cstr = 1, mask_1st = Int[],   mask_2nd = Int[]  , mask_3rd_hen = Int[], mask_3rd_egg = Int[], mask_4th = [1]   ))
@@ -370,3 +252,179 @@ PrismaticJoint(id,hen2egg)          = PrototypeJoint(id,hen2egg,:Prismatic)
 FixedJoint(id,hen2egg)              = PrototypeJoint(id,hen2egg,:Fixed)
 
 const PinJoint = SphericalJoint
+
+
+"""
+刚体铰接约束类。
+$(TYPEDEF)
+"""
+struct PrototypeJoint{hen2eggType,axesType,maskType,tranType,hessType,valueType} <: ExternalConstraints{valueType}
+    id::Int
+    hen2egg::hen2eggType
+    num_of_cstr::Int
+    num_of_dof::Int
+    axes_trl_hen::axesType
+    axes_trl_egg::axesType
+    axes_rot_hen::axesType
+    axes_rot_egg::axesType
+    mask_1st::maskType
+    mask_2nd::maskType
+    mask_3rd::maskType
+    mask_4th::maskType
+    transformations::tranType
+    hess_1st::Vector{hessType}
+    hess_2nd::Vector{hessType}
+    hess_3rd::Vector{hessType}
+    hess_4th::Vector{hessType}
+    values::valueType
+end
+
+"""
+铰接约束构造子。
+$(TYPEDSIGNATURES)
+"""
+function PrototypeJoint(id,hen2egg,joint_type::Symbol) 
+    (;hen,egg) = hen2egg
+    joint_info = get_joint_info(joint_type)
+    (;  ntrl, nrot, 
+        num_of_dof, num_of_cstr, 
+        mask_1st, mask_2nd, 
+        mask_3rd_hen, 
+        mask_3rd_egg, 
+        mask_4th
+    ) = joint_info
+    mask_3rd = vcat(mask_3rd_hen,mask_3rd_egg.+3)
+    bits_1st = in.([1,2,3],Ref(mask_1st))
+    bits_2nd = in.([1,2,3],Ref(mask_2nd))
+    bits_3rd = in.([1,2,3,4,5,6],Ref(mask_3rd))
+    bits_4th = in.([1,],Ref(mask_4th))
+    T = get_numbertype(hen.rbsig)
+    nmcs_hen = hen.rbsig.state.cache.funcs.nmcs
+    nmcs_egg = egg.rbsig.state.cache.funcs.nmcs
+    num_of_coords_hen = get_num_of_coords(nmcs_hen)
+    num_of_coords_egg = get_num_of_coords(nmcs_egg)
+    num_of_jointed_coords = num_of_coords_hen + num_of_coords_egg
+    state_hen = hen.rbsig.state
+    state_egg = egg.rbsig.state
+    q_hen = cartesian_frame2coords(nmcs_hen,state_hen.origin_position,state_hen.R)
+    q_egg = cartesian_frame2coords(nmcs_egg,state_egg.origin_position,state_egg.R)
+    X_hen = NCF.get_X(nmcs_hen,q_hen)
+    X_egg = NCF.get_X(nmcs_egg,q_egg)
+    invX̄_hen = nmcs_hen.invX̄
+    invX̄_egg = nmcs_egg.invX̄
+    # translate     
+    C_hen = hen.rbsig.state.cache.Cps[hen.pid]
+    C_egg = egg.rbsig.state.cache.Cps[egg.pid]
+    J = [-C_hen C_egg;] |> sparse 
+    q = vcat(q_hen,q_egg)
+    d_hen2egg = J*q
+    # U = J'*J
+    # first    
+    Φ_1st = d_hen2egg
+    # fourth    
+    Φ_4th = [d_hen2egg'*d_hen2egg]
+    # third
+    Φ_3rd = zeros(T,6)
+    # second
+    Φ_2nd = zeros(T,3)
+    axes_trl_hen = invX̄_hen*hen.rbsig.prop.loci[hen.rotid].axes
+    axes_trl_egg = invX̄_egg*egg.rbsig.prop.loci[egg.trlid].axes
+    axes_rot_egg = invX̄_egg*egg.rbsig.prop.loci[egg.rotid].axes
+    axes_rot_hen = pinv(X_hen)*X_egg*axes_rot_egg
+    
+    select_uvw_hen = BlockDiagonal([nmcs_hen.conversion_to_X,zero(nmcs_egg.conversion_to_X)])
+    select_uvw_egg = BlockDiagonal([zero(nmcs_hen.conversion_to_X),nmcs_egg.conversion_to_X])
+    I3_Bool = I(3)
+    # translate
+    heros = spzeros(T,num_of_jointed_coords,num_of_jointed_coords) |> Symmetric
+    # hes 1st
+    hess_1st = fill(heros,3)
+    # hes 4th
+    hess_4th = [2(J'*J) |> sparse |> Symmetric]
+    # hes 3rd
+    hess_3rd = fill(heros,6)
+    hess_2nd = fill(heros,3)
+    if (nmcs_hen isa NCF.NC3D12C) && (nmcs_egg isa NCF.NC3D12C)
+        for i = 1:3
+            axis_hen = axes_trl_hen.X[:,i]
+            axis_zero = zero(axis_hen)
+            H = select_uvw_hen'*kron(vcat(0,axis_hen,0,axis_zero),I3_Bool)*J
+            hess_3rd[i] = (H .+ H') |> sparse |> Symmetric
+        end
+        # hes 3rd on egg
+        # translate on egg
+        for i = 1:3
+            axis_egg = axes_trl_egg.X[:,i]
+            axis_zero = zero(axis_egg)
+            H = select_uvw_egg'*kron(vcat(0,axis_zero,0,axis_egg),I3_Bool)*J
+            hess_3rd[3+i] = (H .+ H') |> sparse |> Symmetric
+        end
+        # hes 2nd
+        # rotate of egg
+        axes_idx = [
+            (2,3),
+            (2,1),
+            (3,1)
+        ]
+        for (i,(id_axis_hen,id_axis_egg)) in enumerate(axes_idx)
+            axis_hen = axes_rot_hen.X[:,id_axis_hen]
+            axis_egg = axes_rot_egg.X[:,id_axis_egg]
+            axis_zero = zero(axis_egg)
+            H = select_uvw_hen'*
+                kron(vcat(0,axis_hen,0,axis_zero),I3_Bool)*
+                kron(vcat(0,axis_zero,0,axis_egg),I3_Bool)'*
+                select_uvw_egg
+            hess_2nd[i] = (H .+ H') |> sparse |> Symmetric
+        end
+        # hes 3rd on hen
+        # translate on hen
+        trl_hen = (X_hen*axes_trl_hen.X)
+        # translate on egg
+        trl_egg = (X_egg*axes_trl_egg.X)
+        # rotate of egg
+        rot_hen_n = X_hen*axes_rot_hen.normal
+        rot_hen_t = X_hen*axes_rot_hen.tangent
+        rot_hen_b = X_hen*axes_rot_hen.bitangent
+        rot_egg_n = X_egg*axes_rot_egg.normal
+        rot_egg_t = X_egg*axes_rot_egg.tangent
+        rot_egg_b = X_egg*axes_rot_egg.bitangent
+        # third
+        Φ_3rd .= [
+            trl_hen'*d_hen2egg;
+            trl_egg'*d_hen2egg;
+        ]
+        # second
+        Φ_2nd .= [
+            rot_hen_t'*rot_egg_b,
+            rot_hen_t'*rot_egg_n,
+            rot_hen_b'*rot_egg_n
+        ]
+    end
+    # cstr values
+    values = vcat(
+        Φ_1st[bits_1st],
+        Φ_4th[bits_4th],
+        Φ_3rd[bits_3rd], 
+        Φ_2nd[bits_2nd], 
+    )
+    # @show joint_info
+    # @show values
+    PrototypeJoint(
+        id,hen2egg,
+        num_of_cstr,num_of_dof,
+        axes_trl_hen,
+        axes_trl_egg,
+        axes_rot_hen,
+        axes_rot_egg,
+        bits_1st,
+        bits_2nd,
+        bits_3rd,
+        bits_4th,
+        J[bits_1st,:],
+        hess_1st[bits_1st],
+        hess_2nd[bits_2nd],
+        hess_3rd[bits_3rd],
+        hess_4th[bits_4th],
+        values
+    )
+end
