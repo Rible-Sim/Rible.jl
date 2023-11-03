@@ -1,50 +1,12 @@
 abstract type AbstractStructure end
 
-
 """
-Rigid Body Natural Coordinates State Type.
-$(TYPEDEF)
-"""
-mutable struct NonminimalCoordinatesState{T,qT,qviewT}
-    t::T
-    q::qT
-    q̇::qT
-    q̈::qT
-    F::qT
-    λ::qT
-    q̌::qviewT
-    q̌̇::qviewT
-    q̌̈::qviewT
-    q̃::qviewT
-    q̃̇::qviewT
-    q̃̈::qviewT
-    F̌::qviewT
-    c::qT
-end
-
-"""
-Natural Coordinates State Constructor.
-$(TYPEDSIGNATURES)
-"""
-function NonminimalCoordinatesState(t,q,q̇,q̈,F,λ,freei,presi,c)
-    q̌ = @view q[freei]
-    q̌̇ = @view q̇[freei]
-    q̌̈ = @view q̈[freei]
-    q̃ = @view q[presi]
-    q̃̇ = @view q̇[presi]
-    q̃̈ = @view q̈[presi]
-    F̌ = @view F[freei]
-    NonminimalCoordinatesState(t,q,q̇,q̈,F,λ,q̌,q̌̇,q̌̈,q̃,q̃̇,q̃̈,F̌,c)
-end
-
-
-"""
-State Type.
+StructureState Type.
 $(TYPEDEF)
 """
 struct StructureState{sysT, msT}
     system::sysT
-    parts::msT
+    members::msT
 end
 
 """
@@ -54,7 +16,7 @@ $(TYPEDSIGNATURES)
 function StructureState(bodies,tensiles,cnt::Connectivity{<:Any,<:Any,<:NamedTuple{(:connected, )},<:Any})
     (;numbered,indexed,jointed) = cnt
     (;bodyid2sys_loci_coords_idx) = numbered
-    (;num_of_full_coords,num_of_intrinsic_cstr,sys_free_coords_idx,sys_pres_coords_idx) = indexed
+    (;num_of_full_coords,num_of_intrinsic_cstr,sys_free_idx,sys_pres_idx) = indexed
     (;bodyid2sys_intrinsic_cstr_idx,bodyid2sys_full_coords) = indexed
     (;num_of_extrinsic_cstr) = jointed
     num_of_cstr = num_of_intrinsic_cstr + num_of_extrinsic_cstr
@@ -74,8 +36,10 @@ function StructureState(bodies,tensiles,cnt::Connectivity{<:Any,<:Any,<:NamedTup
     F = zero(q)
     λ = Vector{T}(undef,num_of_cstr)
     c = get_local_coords(bodies,numbered)
-    system = NonminimalCoordinatesState(t,q,q̇,q̈,F,λ,sys_free_coords_idx,sys_pres_coords_idx,c)
-    parts = [
+    p = zero(q)
+    p̌ = zero(q)
+    system = NonminimalCoordinatesState(t,q,q̇,q̈,F,p,p̌,λ,sys_free_idx,sys_pres_idx,c)
+    members = [
         begin
             qmem = @view q[bodyid2sys_full_coords[bodyid]]
             q̇mem = @view q̇[bodyid2sys_full_coords[bodyid]]
@@ -83,8 +47,11 @@ function StructureState(bodies,tensiles,cnt::Connectivity{<:Any,<:Any,<:NamedTup
             Fmem = @view F[bodyid2sys_full_coords[bodyid]]
             λmem = @view λ[bodyid2sys_intrinsic_cstr_idx[bodyid]]
             cmem = @view c[bodyid2sys_loci_coords_idx[bodyid]]
+            pmem = zero(p[bodyid2sys_full_coords[bodyid]])
+            p̌mem = zero(p[bodyid2sys_full_coords[bodyid]])
             NonminimalCoordinatesState(
-                t,qmem,q̇mem,q̈mem,Fmem,λmem,
+                t,
+                qmem,q̇mem,q̈mem,Fmem,pmem,p̌mem,λmem,
                 free_idx_by_mem[bodyid],
                 pres_idx_by_mem[bodyid],
                 cmem
@@ -93,24 +60,23 @@ function StructureState(bodies,tensiles,cnt::Connectivity{<:Any,<:Any,<:NamedTup
         for bodyid = 1:nb
     ]
     foreach(bodies) do body
-        q, q̇ = body2coords(body)
-        parts[body.prop.id].q .= q
-        parts[body.prop.id].q̇ .= q̇
+        q, q̇ = body_state2coords_state(body)
+        members[body.prop.id].q .= q
+        members[body.prop.id].q̇ .= q̇
     end
-    StructureState(system,parts)
+    StructureState(system,members)
 end
-
 
 """
 Structure Type.
 $(TYPEDEF)
 """
 struct Structure{BodyType,TenType,CntType,StateType} <: AbstractStructure
-    ndim::Int
+    num_of_dim::Int
     num_of_dof::Int
     num_of_cstr::Int
-    nbodies::Int
-    ntensiles::Int
+    num_of_bodies::Int
+    num_of_tensiles::Int
     bodies::BodyType
     tensiles::TenType
     connectivity::CntType
@@ -122,9 +88,9 @@ Structure Constructor.
 $(TYPEDSIGNATURES)
 """
 function Structure(bodies,tensiles,cnt::Connectivity)
-    ndim = get_num_of_dims(bodies)
-    nbodies = length(bodies)
-    ntensiles = sum(map(length,tensiles))
+    num_of_dim = get_num_of_dims(bodies)
+    num_of_bodies = length(bodies)
+    num_of_tensiles = sum(map(length,tensiles))
     (;num_of_free_coords,num_of_intrinsic_cstr) = cnt.indexed
     (;num_of_extrinsic_cstr) = cnt.jointed
     num_of_cstr = num_of_intrinsic_cstr + num_of_extrinsic_cstr
@@ -134,8 +100,8 @@ function Structure(bodies,tensiles,cnt::Connectivity)
     end
     state = StructureState(bodies,tensiles,cnt)
     st = Structure(
-        ndim,num_of_dof,num_of_cstr,
-        nbodies,ntensiles,
+        num_of_dim,num_of_dof,num_of_cstr,
+        num_of_bodies,num_of_tensiles,
         bodies,tensiles,
         cnt,
         state
@@ -260,16 +226,30 @@ function build_∂T∂qᵀ(st::AbstractStructure)
     ∂T∂qᵀ
 end
 
+"""
+Return System mass matrices
+$(TYPEDSIGNATURES)
+"""
+function build_mass_matrices(structure::Structure,)
+    (;sys_free_idx,sys_pres_idx) = structure.connectivity.indexed
+    M = assemble_M(structure,) |> sparse |> Symmetric
+    M⁻¹ = M |> Matrix |> inv |> sparse |> Symmetric
+    M̌   = M[sys_free_idx,sys_free_idx] |> sparse |> Symmetric
+    M̌⁻¹ = M̌ |> Matrix |> inv |> sparse |> Symmetric
+    Ḿ = M[sys_free_idx,:]            |> sparse
+    M̄ = M[sys_free_idx,sys_pres_idx] |> sparse
+    @eponymtuple(M,M⁻¹,M̌,M̌⁻¹,Ḿ,M̄)
+end
 
 function make_cstr_function(st::AbstractStructure,q0::AbstractVector)
     (;bodies,num_of_cstr) = st
     (;numbered,indexed,jointed) = st.connectivity
-    (;num_of_free_coords,num_of_full_coords,sys_pres_coords_idx,sys_free_coords_idx,bodyid2sys_full_coords,bodyid2sys_pres_coords,bodyid2sys_free_coords,num_of_intrinsic_cstr,bodyid2sys_intrinsic_cstr_idx) = indexed
+    (;num_of_free_coords,num_of_full_coords,sys_pres_idx,sys_free_idx,bodyid2sys_full_coords,bodyid2sys_pres_coords,bodyid2sys_free_coords,num_of_intrinsic_cstr,bodyid2sys_intrinsic_cstr_idx) = indexed
 
     function _inner_cstr_function(q̌,d,c)
         q = Vector{eltype(q̌)}(undef,num_of_full_coords)
-        q[sys_pres_coords_idx] .= q0[sys_pres_coords_idx]
-        q[sys_free_coords_idx] .= q̌
+        q[sys_pres_idx] .= q0[sys_pres_idx]
+        q[sys_free_idx] .= q̌
         ret = Vector{eltype(q̌)}(undef,num_of_cstr)
         foreach(bodies) do body
             bodyid = body.prop.id
@@ -332,16 +312,15 @@ function make_cstr_function(st::AbstractStructure)
     inner_cstr_function
 end
 
-
 function make_cstr_jacobian(st::AbstractStructure,q0::AbstractVector)
     (;bodies,num_of_cstr) = st
     (;numbered,indexed,jointed) = st.connectivity
-    (;num_of_full_coords,num_of_free_coords,sys_pres_coords_idx,sys_free_coords_idx,bodyid2sys_full_coords,bodyid2sys_free_coords,num_of_intrinsic_cstr,bodyid2sys_intrinsic_cstr_idx) = indexed
+    (;num_of_full_coords,num_of_free_coords,sys_pres_idx,sys_free_idx,bodyid2sys_full_coords,bodyid2sys_free_coords,num_of_intrinsic_cstr,bodyid2sys_intrinsic_cstr_idx) = indexed
 
     function _inner_cstr_jacobian(q̌,c)
         q = Vector{eltype(q̌)}(undef,num_of_full_coords)
-        q[sys_pres_coords_idx] .= q0[sys_pres_coords_idx]
-        q[sys_free_coords_idx] .= q̌
+        q[sys_pres_idx] .= q0[sys_pres_idx]
+        q[sys_free_idx] .= q̌
         ret = zeros(eltype(q̌),num_of_cstr,num_of_free_coords)
         foreach(bodies) do body
             bodyid = body.prop.id
@@ -406,8 +385,8 @@ function build_F̌(st,bodyid,pid,f)
         if body.prop.id == bodyid
             C = body.state.cache.Cps[pid]
             memfree = bodyid2sys_free_coords[bodyid]
-            free_coords_idx = body.state.cache.free_idx
-            F̌[memfree] = (transpose(C)*f)[free_coords_idx,:]
+            free_idx = body.state.cache.free_idx
+            F̌[memfree] = (transpose(C)*f)[free_idx,:]
         end
     end
     reshape(F̌,:,1)
@@ -429,8 +408,8 @@ function check_jacobian_singularity(st)
     end
     foreach(bodies) do body
         bodyid = body.prop.id
-        free_coords_idx = body.state.cache.free_idx
-        q_rb = state.parts[bodyid].q
+        free_idx = body.state.cache.free_idx
+        q_rb = state.members[bodyid].q
         Aq_rb = body.state.cache.funcs.Φq(q_rb)
         rb_rank = rank(Aq_rb)
         if rb_rank < minimum(size(Aq_rb))

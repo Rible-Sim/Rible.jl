@@ -44,28 +44,28 @@ material_properties = Table(
 )
 
 function dynfuncs(bot;actuate=false,gravity=false,(Fˣ!)=(F,t)->nothing)
-    (;st) = bot
+    (;structure) = bot
     function F!(F,q,q̇,t)
         if actuate
             RB.actuate!(bot,[t])
         end
-        RB.clear_forces!(st)
-        RB.update_rigids!(st,q,q̇)
-        RB.update_tensiles!(st)
+        RB.clear_forces!(structure)
+        RB.update_rigids!(structure,q,q̇)
+        RB.update_tensiles!(structure)
         if gravity
-            RB.apply_gravity!(st)
+            RB.apply_gravity!(structure)
         end
-        F .= RB.generate_forces!(st)
+        F .= RB.generate_forces!(structure)
         Fˣ!(F,t)
     end
     function Jac_F!(∂F∂q̌,∂F∂q̌̇,q,q̇,t)
         ∂F∂q̌ .= 0
         ∂F∂q̌̇ .= 0
-        RB.clear_forces!(st)
-        RB.update_rigids!(st,q,q̇)
-        RB.update_tensiles!(st)
-        RB.build_∂Q̌∂q̌!(∂F∂q̌,st)
-        RB.build_∂Q̌∂q̌̇!(∂F∂q̌̇,st)
+        RB.clear_forces!(structure)
+        RB.update_rigids!(structure,q,q̇)
+        RB.update_tensiles!(structure)
+        RB.build_∂Q̌∂q̌!(∂F∂q̌,structure)
+        RB.build_∂Q̌∂q̌̇!(∂F∂q̌̇,structure)
     end
     @eponymtuple(F!,Jac_F!)
 end
@@ -152,7 +152,7 @@ function contact_dynfuncs(bot;
         mem2act_idx = deepcopy(bodyid2sys_loci_idx)
         act_start = 0
         persistent_idx = Int[]
-        for bid = 1:st.nbodies
+        for bid = 1:st.num_of_bodies
             mem2act_idx[bid] .= 0
             contacts_bits_body = findall(contacts_bits[bodyid2sys_loci_idx[bid]])
             nactive_body = length(contacts_bits_body)

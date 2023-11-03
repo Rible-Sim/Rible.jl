@@ -64,8 +64,8 @@ struct Indexed{mem2sysType,sysType}
     bodyid2sys_full_coords::mem2sysType
     bodyid2sys_free_coords::mem2sysType
     bodyid2sys_pres_coords::mem2sysType
-    sys_free_coords_idx::sysType
-    sys_pres_coords_idx::sysType
+    sys_free_idx::sysType
+    sys_pres_idx::sysType
     num_of_intrinsic_cstr::Int
     bodyid2sys_intrinsic_cstr_idx::mem2sysType
     sys_num_of_dof::Int
@@ -106,8 +106,8 @@ function index(rbs,sharing_input=Int[;;])
         sharing = sharing_input[:,:]
     end
     sysfull = Int[]
-    sys_pres_coords_idx = Int[]
-    sys_free_coords_idx = Int[]
+    sys_pres_idx = Int[]
+    sys_free_idx = Int[]
     bodyid2sys_full_coords = Vector{Int}[]
     bodyid2sys_pres_coords = Vector{Int}[]
     bodyid2sys_free_coords = Vector{Int}[]
@@ -148,26 +148,26 @@ function index(rbs,sharing_input=Int[;;])
         for i in unshareds
             if i in pres
                 # pres
-                push!(sys_pres_coords_idx,bodyid2sys_full_coords[bodyid][i])
+                push!(sys_pres_idx,bodyid2sys_full_coords[bodyid][i])
             else
                 # free
-                push!(sys_free_coords_idx,bodyid2sys_full_coords[bodyid][i])
+                push!(sys_free_idx,bodyid2sys_full_coords[bodyid][i])
             end
         end
         for i in free
-            freei = findfirst((x)->x==bodyid2sys_full_coords[bodyid][i],sys_free_coords_idx)
-            push!(bodyid2sys_free_coords[bodyid],freei)
+            free_idx = findfirst((x)->x==bodyid2sys_full_coords[bodyid][i],sys_free_idx)
+            push!(bodyid2sys_free_coords[bodyid],free_idx)
         end
         for i in pres
-            presi = findfirst((x)->x==bodyid2sys_full_coords[bodyid][i],sys_pres_coords_idx)
-            push!(bodyid2sys_pres_coords[bodyid],presi)
+            pres_idx = findfirst((x)->x==bodyid2sys_full_coords[bodyid][i],sys_pres_idx)
+            push!(bodyid2sys_pres_coords[bodyid],pres_idx)
         end
     end
     num_of_intrinsic_cstr,bodyid2sys_intrinsic_cstr_idx,sys_num_of_dof,bodyid2sys_dof_idx = index_incstr(rbs)
     Indexed(
-        length(sysfull),length(sys_free_coords_idx),length(sys_pres_coords_idx),num_of_bodies,
+        length(sysfull),length(sys_free_idx),length(sys_pres_idx),num_of_bodies,
         bodyid2sys_full_coords,bodyid2sys_free_coords,bodyid2sys_pres_coords,
-        sys_free_coords_idx,sys_pres_coords_idx,
+        sys_free_idx,sys_pres_idx,
         num_of_intrinsic_cstr,bodyid2sys_intrinsic_cstr_idx,
         sys_num_of_dof,bodyid2sys_dof_idx
     )
@@ -207,16 +207,16 @@ function join(joints,indexed)
     JointedMembers(njoints,num_of_extrinsic_cstr,joints,joint2sysexcst)
 end
 
-function Base.isless(rb1::AbstractBody,rb2::AbstractBody)
-    isless(rb1.prop.id,rb2.prop.id)
+function Base.isless(a::AbstractBody,b::AbstractBody)
+    isless(a.prop.id,b.prop.id)
 end
 
-function Base.isless(e2e1::Hen2Egg,e2e2::Hen2Egg)
-    isless(e2e1.id,e2e2.id)
+function Base.isless(a::Hen2Egg,b::Hen2Egg)
+    isless(a.id,b.id)
 end
 
-function Base.sort(c::TypeSortedCollection)
-    sort!(reduce(vcat,c.data))
+function Base.sort(tsc::TypeSortedCollection)
+    sort!(reduce(vcat,tsc.data))
 end
 
 function connect(rbs,cm_input=Int[;;])

@@ -106,7 +106,7 @@ function get_jointed_free_idx(cst)
     uci_egg = egg.rbsig.state.cache.free_idx
     ncoords1 = NCF.get_num_of_coords(hen.rbsig.state.cache.funcs.nmcs)
     # ncoords2 = NCF.get_num_of_coords(egg.rbsig.state.cache.nmcs)
-    free_coords_idx = vcat(
+    free_idx = vcat(
         uci_hen,
         uci_egg .+ ncoords1
     )
@@ -132,7 +132,7 @@ function make_cstr_forces_jacobian(cst,st)
         hess_1st, hess_2nd, 
         hess_3rd, hess_4th,
     ) = cst
-    free_coords_idx = get_jointed_free_idx(cst)
+    free_idx = get_jointed_free_idx(cst)
     hessians = vcat(
         hess_1st,
         hess_4th,
@@ -142,7 +142,7 @@ function make_cstr_forces_jacobian(cst,st)
     function cstr_forces_jacobian(λ)
         ret = [
             begin
-                a = hessians[i][free_coords_idx,free_coords_idx] .* λ[i]
+                a = hessians[i][free_idx,free_idx] .* λ[i]
                 # display(a)
                 a 
             end
@@ -153,7 +153,7 @@ function make_cstr_forces_jacobian(cst,st)
 end
 
 function get_jointed_free_idx(cst::LinearJoint)
-    free_coords_idx = collect(1:size(cst.A,2))
+    free_idx = collect(1:size(cst.A,2))
 end
 
 function get_jointed_free(cst::LinearJoint,indexed)
@@ -161,9 +161,9 @@ function get_jointed_free(cst::LinearJoint,indexed)
 end
 
 function make_cstr_forces_jacobian(cst::LinearJoint,st)
-    free_coords_idx = get_jointed_free_idx(cst)
+    free_idx = get_jointed_free_idx(cst)
     function cstr_forces_jacobian(λ)
-        zeros(eltype(λ),length(free_coords_idx),length(free_coords_idx))
+        zeros(eltype(λ),length(free_idx),length(free_idx))
     end
 end
 

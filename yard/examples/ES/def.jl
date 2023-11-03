@@ -45,7 +45,7 @@ function build_2d_tri(id,ri,rj=nothing,rk=nothing;
     else
         constrained = true
     end
-    # free_coords_idx = collect(1:6)
+    # free_idx = collect(1:6)
     b2 = b - b1
     a1 = 1.0b; b1 = √(2b^2-a1^2)
     a2 = 1.2b; b2 = √(2b^2-a2^2)
@@ -128,11 +128,11 @@ function build_2d_ground(id)
     ṙo = zero(ro)
     loci_states = Ref(ro) .+ Ref(R).*loci
     nmcs = RB.NCF.NCMP(loci_states,ro,R)
-    # cf = RB.NCF.CoordinateFunctions(nmcs,q0,ci,free_coords_idx)
+    # cf = RB.NCF.CoordinateFunctions(nmcs,q0,ci,free_idx)
     # @show typeof(nmcs)
     nq = length(q0)
     ci = collect(1:nq)
-    free_coords_idx = Int[]
+    free_idx = Int[]
     cstr_idx = Int[]
     state = RB.RigidBodyState(prop,nmcs,ro,α,ṙo,ω,ci,cstr_idx)
     body = RB.RigidBody(prop,state)
@@ -380,7 +380,7 @@ function plot_tower2d!(ax,
         barcolor = refcolor
         markercolor = refcolor
     end
-    (;nbodies) = st
+    (;num_of_bodies) = st
     (;tensioned) = st.connectivity
     (;cables) = st.tensiles
     ncables = length(cables)
@@ -442,14 +442,14 @@ function plot_one_bar_one_tri!(ax,
         markercolor = refcolor
     end
     st = tgob[]
-    (;nbodies) = st
-    ndim = RB.get_num_of_dims(st)
+    (;num_of_bodies) = st
+    num_of_dim = RB.get_num_of_dims(st)
     T = RB.get_numbertype(st)
 
     linesegs_bars = @lift begin
-        ndim = RB.get_num_of_dims($tgob)
+        num_of_dim = RB.get_num_of_dims($tgob)
         T = RB.get_numbertype($tgob)
-        ret = Vector{Pair{Point{ndim,T},Point{ndim,T}}}()
+        ret = Vector{Pair{Point{num_of_dim,T},Point{num_of_dim,T}}}()
         foreach($tgob.bodies) do body
             if body.state.cache.funcs.nmcs isa RB.NCF.NC2D2P
                 push!(ret,
@@ -660,7 +660,7 @@ function trapezoid(id,ri,ro=ri,
     else
         constrained = true
     end
-    # free_coords_idx = collect(1:6)
+    # free_idx = collect(1:6)
     b2 = b - b1
     r̄p1 = SVector{2}([ -r, 0.0])
     r̄p2 = SVector{2}([  r, 0.0])

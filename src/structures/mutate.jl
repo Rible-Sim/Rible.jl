@@ -22,7 +22,7 @@ function update_tensiles!(st::AbstractStructure)
     update_tensiles!(st, st.connectivity.tensioned)
 end
 
-function update_tensiles!(st, @eponymargs(connected,))
+function update_tensiles!(st::Structure, @eponymargs(connected,))
     (;cables) = st.tensiles
     foreach(connected) do scnt
         scable = cables[scnt.id]
@@ -90,7 +90,7 @@ function update_rigids!(st)
     (;bodies,state) = st
     foreach(bodies) do body
         bodyid = body.prop.id
-        (;q, q̇) = state.parts[bodyid]
+        (;q, q̇) = state.members[bodyid]
         update_body!(body,q,q̇)
         update_transformations!(body,q)
         move_body!(body,q,q̇)
@@ -103,10 +103,10 @@ $(TYPEDSIGNATURES)
 """
 function generate_forces!(st::Structure)
     (;bodies,state) = st
-    (;system,parts) = state
+    (;system,members) = state
     system.F .= 0.0
     foreach(bodies) do body
-        (;F) = parts[body.prop.id]
+        (;F) = members[body.prop.id]
         generalize_force!(F,body.state)
     end
     system.F̌

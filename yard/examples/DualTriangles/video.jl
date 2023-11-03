@@ -35,14 +35,14 @@ plotstructure(man_inv)
 function get_actuate_seqs(bot,g=0.0)
     # plotstructure(man_inv)
     Y = RB.build_Y(bot)
-    # q,_ = RB.get_coords(bot.st)
+    # q,_ = RB.get_coords(bot.structure)
     # λ,u,a = RB.inverse(bot,deepcopy(bot),Y)
     start_sol,parameters0 = RB.get_start_system(bot,Y)
     # start_sol
     # parameters0.u
     # parameters0.g
     # RB.actuate!(bot,a)
-    # RB.check_static_equilibrium(bot.st,q,λ)
+    # RB.check_static_equilibrium(bot.structure,q,λ)
     # 0.182-5.2024/292.14
     u1 = copy(parameters0.u)
     a1 = 0.01
@@ -57,13 +57,13 @@ function get_actuate_seqs(bot,g=0.0)
     g1 = g
     g2 = g
 
-    # result = RB.forward_once(bot.st,(q,s,λ),(u,0.0),(u1,g1))
+    # result = RB.forward_once(bot.structure,(q,s,λ),(u,0.0),(u1,g1))
 
     parameters1 = (u=u1, g=[g1])
     parameters2 = (u=u2, g=[g2])
     parameters_seq = [parameters0,parameters1,parameters2]
 
-    man_sys,_ = RB.forward_system(bot.st)
+    man_sys,_ = RB.forward_system(bot.structure)
 
     # seq = RB.forward_sequence(man_sys,start_sol,start_parameters,target_parameters)
     seqs = RB.forward_multi_sequence(man_sys,start_sol,parameters_seq;n=20)
@@ -154,14 +154,14 @@ plotstructure(man_inv)
 function get_actuate_seqs(bot,g=0.0)
     # plotstructure(man_inv)
     Y = RB.build_Y(bot)
-    # q,_ = RB.get_coords(bot.st)
+    # q,_ = RB.get_coords(bot.structure)
     # λ,u,a = RB.inverse(bot,deepcopy(bot),Y)
     start_sol,parameters0 = RB.get_start_system(bot,Y)
     # start_sol
     # parameters0.u
     # parameters0.g
     # RB.actuate!(bot,a)
-    # RB.check_static_equilibrium(bot.st,q,λ)
+    # RB.check_static_equilibrium(bot.structure,q,λ)
     # 0.182-5.2024/292.14
     u1 = copy(parameters0.u)
     u2 = copy(parameters0.u)
@@ -180,7 +180,7 @@ function get_actuate_seqs(bot,g=0.0)
     g3 = 1.0g
     g4 = 1.0g
 
-    # result = RB.forward_once(bot.st,(q,s,λ),(u,0.0),(u1,g1))
+    # result = RB.forward_once(bot.structure,(q,s,λ),(u,0.0),(u1,g1))
 
     parameters1 = (u=u1, g=[g1])
     parameters2 = (u=u2, g=[g2])
@@ -188,7 +188,7 @@ function get_actuate_seqs(bot,g=0.0)
     parameters4 = (u=u4, g=[g4])
     parameters_seq = [parameters0,parameters1,parameters2,parameters3,parameters4]
 
-    man_sys,_ = RB.forward_system(bot.st)
+    man_sys,_ = RB.forward_system(bot.structure)
 
     # seq = RB.forward_sequence(man_sys,start_sol,start_parameters,target_parameters)
     seqs = RB.forward_multi_sequence(man_sys,start_sol,parameters_seq;n=10)

@@ -154,7 +154,7 @@ end
 Return 2D or 3D Jacobian matrix for rigid bars。
 $(TYPEDSIGNATURES)
 """
-function make_cstr_jacobian(nmcs::Union{NC2D2C,NC3D3C},free_coords_idx,cstr_idx)
+function make_cstr_jacobian(nmcs::Union{NC2D2C,NC3D3C},free_idx,cstr_idx)
     @inline @inbounds function inner_cstr_jacobian(q)
         nothing
     end
@@ -164,7 +164,7 @@ end
 Return 2D or 3D Jacobian matrix for rigid bars。
 $(TYPEDSIGNATURES)
 """
-function make_cstr_jacobian(nmcs::Union{NC2D4C,NC3D6C},free_coords_idx,cstr_idx)
+function make_cstr_jacobian(nmcs::Union{NC2D4C,NC3D6C},free_idx,cstr_idx)
     ndim = get_num_of_dims(nmcs)
     cv = nmcs.conversion_to_std
     @inline @inbounds function inner_cstr_jacobian(q)
@@ -172,7 +172,7 @@ function make_cstr_jacobian(nmcs::Union{NC2D4C,NC3D6C},free_coords_idx,cstr_idx)
         u = @view qstd[ndim+1:2ndim]
         ret = zeros(eltype(q),1,2ndim)
         ret[ndim+1:2ndim] = 2u
-        @view (ret*cv)[cstr_idx,free_coords_idx]
+        @view (ret*cv)[cstr_idx,free_idx]
     end
 end
 
@@ -195,7 +195,7 @@ end
 Return 3D Jacobian matrix , for rigid bodies。
 $(TYPEDSIGNATURES)
 """
-function make_cstr_jacobian(nmcs::NC3D12C,free_coords_idx,cstr_idx)
+function make_cstr_jacobian(nmcs::NC3D12C,free_idx,cstr_idx)
     @inline @inbounds function inner_cstr_jacobian(q)
         u,v,w = get_uvw(nmcs,q)
         cv = nmcs.conversion_to_std
@@ -213,7 +213,7 @@ function make_cstr_jacobian(nmcs::NC3D12C,free_coords_idx,cstr_idx)
         ret[6,4:6] =  v
         ret[6,7:9] =  u
 
-        @view (ret*cv)[cstr_idx,free_coords_idx]
+        @view (ret*cv)[cstr_idx,free_idx]
     end
 end
 
@@ -308,8 +308,8 @@ get_idx(nmcs::NC3D12C) = [
 function make_cstr_hessians(nmcs::NC)
     cv = nmcs.conversion_to_std
     nld = get_num_of_local_dims(nmcs)
-    ndim = get_num_of_dims(nmcs)
-    I_Bool = IMatrix(ndim)
+    num_of_dim = get_num_of_dims(nmcs)
+    I_Bool = IMatrix(num_of_dim)
     idx = get_idx(nmcs)
     cstr_hessians = [
         begin
@@ -324,7 +324,7 @@ function make_cstr_hessians(nmcs::NC)
 end
 
 #todo use SymmetricPacked to the end
-function make_cstr_forces_jacobian(nmcs::Union{NC2D2C,NC3D3C},free_coords_idx,cstr_idx)
+function make_cstr_forces_jacobian(nmcs::Union{NC2D2C,NC3D3C},free_idx,cstr_idx)
     function cstr_forces_jacobian(λ)
         nothing
     end

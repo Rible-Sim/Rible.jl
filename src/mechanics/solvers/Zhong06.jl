@@ -11,7 +11,7 @@ function generate_cache(solver::Zhong06,intor;dt,kargs...)
     (;prob) = intor
     (;bot,dynfuncs) = prob
     # F!,_ = dynfuncs
-    mm = build_MassMatrices(bot)
+    mm = build_mass_matrices(bot)
     # (;M) = mm
     A = make_cstr_jacobian(bot)
     Φ = make_cstr_function(bot)

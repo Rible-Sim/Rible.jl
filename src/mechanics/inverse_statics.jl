@@ -23,9 +23,8 @@ function build_Q̃(st)
     ncables = length(cables)
     (;num_of_free_coords,bodyid2sys_free_coords) = indexed
     T = get_numbertype(st)
-    ndim = get_num_of_dims(st)
-    Q̃ = zeros(T,num_of_free_coords,ndim*ncables)
-
+    num_of_dim = get_num_of_dims(st)
+    Q̃ = zeros(T,num_of_free_coords,num_of_dim*ncables)
     foreach(connected) do cc
         j = cc.id
         (;hen,egg) = cc
@@ -37,8 +36,8 @@ function build_Q̃(st)
         uci2 = rb2.state.cache.free_idx
         m2sf1 = bodyid2sys_free_coords[rb1.prop.id]
         m2sf2 = bodyid2sys_free_coords[rb2.prop.id]
-        Q̃[m2sf2,(j-1)*ndim+1:j*ndim] .-= transpose(C2)[uci2,:]
-        Q̃[m2sf1,(j-1)*ndim+1:j*ndim] .+= transpose(C1)[uci1,:]
+        Q̃[m2sf2,(j-1)*num_of_dim+1:j*num_of_dim] .-= transpose(C2)[uci2,:]
+        Q̃[m2sf1,(j-1)*num_of_dim+1:j*num_of_dim] .+= transpose(C1)[uci1,:]
     end
     Q̃
 end
@@ -65,28 +64,28 @@ end
 
 
 function build_L̂(st)
-    (;connectivity,ndim) = st
+    (;connectivity,num_of_dim) = st
     (;connected) = connectivity.tensioned
     (;cables) = st.tensiles
     ncables = length(cables)
     T = get_numbertype(st)
-    L̂ = spzeros(T, ncables*ndim, ncables)
+    L̂ = spzeros(T, ncables*num_of_dim, ncables)
     foreach(connected) do scnt
         j = scnt.id
         scable = cables[j]
-        js = (j-1)*ndim
-        L̂[js+1:js+ndim,j] = scable.state.direction
+        js = (j-1)*num_of_dim
+        L̂[js+1:js+num_of_dim,j] = scable.state.direction
     end
     L̂
 end
 
 function build_K̂(st)
-    (;connectivity,ndim) = st
+    (;connectivity,num_of_dim) = st
     (;connected) = connectivity.tensioned
     (;cables) = st.tensiles
     ncables = length(cables)
     T = get_numbertype(st)
-    K̂ = spzeros(T, ncables*ndim, ncables)
+    K̂ = spzeros(T, ncables*num_of_dim, ncables)
     foreach(connected) do scnt
         j = scnt.id
         scable = cables[j]
@@ -97,17 +96,17 @@ function build_K̂(st)
 end
 
 function build_L(st)
-    (;connectivity,ndim) = st
+    (;connectivity,num_of_dim) = st
     (;connected) = connectivity.tensioned
     (;cables) = st.tensiles
     ncables = length(cables)
     T = get_numbertype(st)
-    L = spzeros(T, ncables*ndim, ncables)
+    L = spzeros(T, ncables*num_of_dim, ncables)
     foreach(connected) do scnt
         j = scnt.id
         scable = cables[j]
-        js = (j-1)*ndim
-        L[js+1:js+ndim,j] = scable.state.direction*scable.state.length
+        js = (j-1)*num_of_dim
+        L[js+1:js+num_of_dim,j] = scable.state.direction*scable.state.length
     end
     L
 end
@@ -130,24 +129,24 @@ function build_Ǧ(tginput;factor=1.0)
 end
 
 function make_U(st)
-    (;ndim) = st
+    (;num_of_dim) = st
     (;num_of_full_coords) = st.connectivity.indexed
     (;cables) = st.tensiles
     ncables = length(cables)
     function inner_U(s,u)
-        ret = zeros(eltype(s),ncables*ndim,num_of_full_coords)
+        ret = zeros(eltype(s),ncables*num_of_dim,num_of_full_coords)
         for i = 1:ncables
             k = cables[i].k
             Ji = Array(build_Ji(st,i))
-            ret[(i-1)*ndim+1:i*ndim,:] = k*Ji*(1-s[i]*u[i])
+            ret[(i-1)*num_of_dim+1:i*num_of_dim,:] = k*Ji*(1-s[i]*u[i])
         end
         ret
     end
     function inner_U(s,u,k)
-        ret = zeros(eltype(s),ncables*ndim,num_of_full_coords)
+        ret = zeros(eltype(s),ncables*num_of_dim,num_of_full_coords)
         for i = 1:ncables
             Ji = Array(build_Ji(st,i))
-            ret[(i-1)*ndim+1:i*ndim,:] = k[i]*Ji*(1-s[i]*u[i])
+            ret[(i-1)*num_of_dim+1:i*num_of_dim,:] = k[i]*Ji*(1-s[i]*u[i])
         end
         ret
     end
@@ -155,18 +154,18 @@ function make_U(st)
 end
 
 function make_Q̌(st,q0)
-    (;ndim) = st
+    (;num_of_dim) = st
     (;numbered,indexed,tensioned) = st.connectivity
-    (;num_of_full_coords,num_of_free_coords,sys_pres_coords_idx,sys_free_coords_idx,bodyid2sys_full_coords) = indexed
+    (;num_of_full_coords,num_of_free_coords,sys_pres_idx,sys_free_idx,bodyid2sys_full_coords) = indexed
     (;connected) = tensioned
     (;cables) = st.tensiles
     (;bodyid2sys_loci_idx,sys_loci2coords_idx) = numbered
     function inner_Q̌(q̌,s,u)
 		q = Vector{eltype(q̌)}(undef,num_of_full_coords)
-		q[sys_pres_coords_idx] .= q0[sys_pres_coords_idx]
-		q[sys_free_coords_idx] .= q̌
+		q[sys_pres_idx] .= q0[sys_pres_idx]
+		q[sys_free_idx] .= q̌
         ret = zeros(eltype(q̌),num_of_free_coords)
-        Jj = zeros(eltype(q̌),ndim,num_of_full_coords)
+        Jj = zeros(eltype(q̌),num_of_dim,num_of_full_coords)
         foreach(connected) do scnt
             j = scnt.id
             (;k) = cables[j]
@@ -183,17 +182,17 @@ function make_Q̌(st,q0)
             Jj .= 0
             Jj[:,mfull2] .+= C2
             Jj[:,mfull1] .-= C1
-            Ūj = @view (transpose(Jj)*Jj)[sys_free_coords_idx,:]
+            Ūj = @view (transpose(Jj)*Jj)[sys_free_idx,:]
             ret .+= k*(u[j]*s[j]-1)*Ūj*q
         end
         ret
     end
     function inner_Q̌(q̌,s,μ,k,c)
 		q = Vector{eltype(q̌)}(undef,num_of_full_coords)
-		q[sys_pres_coords_idx] .= q0[sys_pres_coords_idx]
-		q[sys_free_coords_idx] .= q̌
+		q[sys_pres_idx] .= q0[sys_pres_idx]
+		q[sys_free_idx] .= q̌
         ret = zeros(eltype(q̌),num_of_free_coords)
-        Jj = zeros(eltype(q̌),ndim,num_of_full_coords)
+        Jj = zeros(eltype(q̌),num_of_dim,num_of_full_coords)
         foreach(connected) do scnt
             j = scnt.id
             rb1 = scnt.hen.rbsig
@@ -213,7 +212,7 @@ function make_Q̌(st,q0)
             Jj .= 0
             Jj[:,mfull2] .+= C2
             Jj[:,mfull1] .-= C1
-            Ūj = @view (transpose(Jj)*Jj)[sys_free_coords_idx,:]
+            Ūj = @view (transpose(Jj)*Jj)[sys_free_idx,:]
             ret .+= k[j]*(μ[j]*s[j]-1)*Ūj*q
         end
         ret
@@ -228,10 +227,10 @@ function make_Q̌(st,q0)
     #         rb2id = rb2.prop.id
     #         ap1id = scnt.hen.pid
     #         ap2id = scnt.egg.pid
-    #         is1 = (apnb[rb1id][ap1id]-1)*ndim
-    #         is2 = (apnb[rb2id][ap2id]-1)*ndim
-    #         c1 = c[is1+1:is1+ndim]
-    #         c2 = c[is2+1:is2+ndim]
+    #         is1 = (apnb[rb1id][ap1id]-1)*num_of_dim
+    #         is2 = (apnb[rb2id][ap2id]-1)*num_of_dim
+    #         c1 = c[is1+1:is1+num_of_dim]
+    #         c2 = c[is2+1:is2+num_of_dim]
     #         C1 = rb1.state.cache.funcs.C(c1)
     #         C2 = rb2.state.cache.funcs.C(c2)
     #         T1 = build_Ti(st,rb1id)
@@ -425,7 +424,7 @@ function check_actuation(bot,Y,a)
     Δu = Y*a
     u0 = get_original_restlen(bot)
     u = u0 + Δu
-    check_restlen(bot.st,u)
+    check_restlen(bot.structure,u)
     u
 end
 
@@ -635,9 +634,9 @@ function optimize_for_stiffness_and_restlen(
 
     f0,Z = get_solution_set(B,F̃)
     @show size(Z)
-    ncables = bot.st.tensiles.cables |> length
+    ncables = bot.structure.tensiles.cables |> length
     Y = build_Y(bot)
-    l0 = get_cables_len(bot.st)
+    l0 = get_cables_len(bot.structure)
 
     # decision variables [k,x_ini,x]
     O_YZ = zero(Y*Z)

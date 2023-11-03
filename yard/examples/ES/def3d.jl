@@ -75,7 +75,7 @@ function make_3d_bar(
     nmcs = RB.NCF.NC3D1P1V(ri,û,ri,R)
     @myshow id,û
     # @show ri,rj,q0
-    # cf = RB.NCF.CoordinateFunctions(nmcs,q0,ci,free_coords_idx)
+    # cf = RB.NCF.CoordinateFunctions(nmcs,q0,ci,free_idx)
     # @show typeof(nmcs)
     state = RB.RigidBodyState(prop,nmcs,ri,R,ṙo,ω,ci)
     if loadmesh
@@ -109,7 +109,7 @@ function make_3d_tri(
         loadmesh = false,
         m = 3,
     )
-    # free_coords_idx = collect(1:6)
+    # free_idx = collect(1:6)
     mass = 0.2999233976
     Īg = SMatrix{3,3}(
         Matrix(Diagonal([
@@ -168,7 +168,7 @@ function make_3d_tri(
             ]
         )
     )
-    # cf = RB.NCF.CoordinateFunctions(nmcs,q0,ci,free_coords_idx)
+    # cf = RB.NCF.CoordinateFunctions(nmcs,q0,ci,free_idx)
     # @show typeof(nmcs)
     # radius = norm(loci[2]-loci[1])/32
     # @show radius
@@ -213,7 +213,7 @@ function make_3d_plate(
         loadmesh = true,
         meshvisible = true,
     )
-    # free_coords_idx = collect(1:6)	
+    # free_idx = collect(1:6)	
     constrained = ci != Int[]
     mat = filter(
         row -> row.name == "Teak", 
@@ -1961,7 +1961,7 @@ function new_deck(id,loci,ro,R,ri,box;
     ṙo = zero(ro)
     ω = zero(ro)
     nmcs = RB.NCF.NC1P3V(ri,ro,R)
-    # cf = RB.NCF.CoordinateFunctions(nmcs,q0,ci,free_coords_idx)
+    # cf = RB.NCF.CoordinateFunctions(nmcs,q0,ci,free_idx)
     # @show typeof(nmcs)
     boxmesh = Meshes.boundary(box) |> simple2mesh
     state = RB.RigidBodyState(prop,nmcs,ro,R,ṙo,ω,ci,cstr_idx)

@@ -395,11 +395,11 @@ end
 封装有函数的Absolute Nodal Coordinates类构造子。
 $(TYPEDSIGNATURES)
 """
-function CoordinateFunctions(ancs,free_coords_idx)
+function CoordinateFunctions(ancs,free_idx)
     ξ = find_ξ(ancs)
     S = make_S(ancs)
     nq = get_num_of_coords(ancs)
-    nuc = length(free_coords_idx)
+    nuc = length(free_idx)
     CoordinateFunctions(ancs,ξ,S)
 end
 

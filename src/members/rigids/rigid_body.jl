@@ -1,7 +1,7 @@
 abstract type AbstractRigidBody{N,T} <: AbstractBody{N,T}end
 abstract type AbstractRigidBodyProperty{N,T} <: AbstractBodyProperty{N,T} end
 abstract type AbstractRigidBodyState{N,T} <: AbstractBodyState{N,T} end
-abstract type ExternalConstraints{T} end
+abstract type ExtrinsicConstraints{T} end
 
 """
 Rigid Body Property Type 
@@ -257,7 +257,7 @@ end
 RigidBody(prop,state) = RigidBody(prop,state,nothing)
 
 
-function body2coords(body::RigidBody)
+function body_state2coords_state(body::RigidBody)
     (;origin_position,R,origin_velocity,ω,cache) = body.state
     cartesian_frame2coords(cache.funcs.nmcs,origin_position,R,origin_velocity,ω)
 end

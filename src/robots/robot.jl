@@ -3,28 +3,27 @@
 Robot Type.
 $(TYPEDEF)
 """
-struct Robot{tgT,hubT,trajT,contacts_trajT}
-    st::tgT
-    hub::hubT
-    traj::trajT
-    contacts_traj::contacts_trajT
+struct Robot{stType,cacheType,hubType,trajType,contacts_trajType}
+    structure::stType
+    structure_cache::cacheType
+    control_hub::hubType
+    traj::trajType
+    contacts_traj::contacts_trajType
 end
-
 
 """
 Robot Type Constructor.
 $(TYPEDSIGNATURES)
 """
-function Robot(st,hub=nothing)
-    (;numbered) = st.connectivity
+function Robot(structure,hub=nothing)
+    (;numbered) = structure.connectivity
     (;bodyid2sys_loci_idx) = numbered
-    update!(st)
-    traj = StructArray([deepcopy(st.state.system)])
-    
+    update!(structure)
+    traj = StructArray([deepcopy(structure.state.system)])
     contacts_traj = [
         reduce(
             vcat,
-            map(get_bodies(st)) do body
+            map(get_bodies(structure)) do body
                 (;prop,) = body
                 (;loci) = prop
                 bodyid = prop.id
@@ -35,24 +34,24 @@ function Robot(st,hub=nothing)
             end
         )
     ]
-    Robot(st,hub,traj,contacts_traj)
+    Robot(structure,nothing,hub,traj,contacts_traj)
 end
 
 
-make_cstr_jacobian(bot::Robot) = make_cstr_jacobian(bot.st)
-make_cstr_function(bot::Robot) = make_cstr_function(bot.st)
+make_cstr_jacobian(bot::Robot) = make_cstr_jacobian(bot.structure)
+make_cstr_function(bot::Robot) = make_cstr_function(bot.structure)
 
 """
 Return System 质量矩阵。
 $(TYPEDSIGNATURES)
 """
-function build_MassMatrices(bot::Robot)
-    (;st) = bot
-    (;num_of_free_coords,num_of_pres_coords,sys_free_coords_idx,sys_pres_coords_idx) = st.connectivity.indexed
-    M = build_M(st)
-    Ḿ = M[sys_free_coords_idx,:]
-    M̌ = Symmetric(M[sys_free_coords_idx,sys_free_coords_idx])
-    M̄ =           M[sys_free_coords_idx,sys_pres_coords_idx]
+function build_mass_matrices(bot::Robot)
+    (;structure) = bot
+    (;num_of_free_coords,num_of_pres_coords,sys_free_idx,sys_pres_idx) = structure.connectivity.indexed
+    M = build_M(structure)
+    Ḿ = M[sys_free_idx,:]
+    M̌ = Symmetric(M[sys_free_idx,sys_free_idx])
+    M̄ =           M[sys_free_idx,sys_pres_idx]
     invM̌_raw = inv(Matrix(M̌))
     invM̌ = Symmetric(sparse(invM̌_raw))
     @eponymtuple(Ḿ,M̌,M̄,invM̌)
@@ -60,9 +59,9 @@ end
 
 
 function build_Y(bot)
-    (;st, hub) = bot
+    (;structure, hub) = bot
     (;actuators) = hub
-    (;cables) = st.tensiles
+    (;cables) = structure.tensiles
     ncables = length(cables)
     nact = length(actuators)
     ret = spzeros(Int,ncables,nact)
@@ -86,11 +85,11 @@ end
 $(TYPEDSIGNATURES)
 """
 function reset!(bot::Robot)
-    (;st, traj) = bot
+    (;structure, traj) = bot
     (;q, q̇) = traj
-    clear_forces!(st)
-    update_rigids!(st,q[begin],q̇[begin])
-    update_tensiles!(st)
+    clear_forces!(structure)
+    update_rigids!(structure,q[begin],q̇[begin])
+    update_tensiles!(structure)
     resize!(traj,1)
 end
 
@@ -99,7 +98,7 @@ end
 $(TYPEDSIGNATURES)
 """
 function set_new_initial!(bot::Robot,q,q̇=zero(q))
-    (;st, traj) = bot
+    (;structure, traj) = bot
     traj.q[begin] .= q
     traj.q̇[begin] .= q̇
     reset!(bot)
@@ -110,29 +109,29 @@ Update System 到指定时间步State.
 $(TYPEDSIGNATURES)
 """
 function goto_step!(bot::Robot,that_step;actuate=false)
-    (;st, traj) = bot
-    st.state.system.c .= traj.c[that_step]
-    st.state.system.q .= traj.q[that_step]
-    st.state.system.q̇ .= traj.q̇[that_step]
+    (;structure, traj) = bot
+    structure.state.system.c .= traj.c[that_step]
+    structure.state.system.q .= traj.q[that_step]
+    structure.state.system.q̇ .= traj.q̇[that_step]
     if actuate
         actuate!(bot,[traj.t[that_step]])
     end
-    update!(st)
+    update!(structure)
     bot
 end
 
 
 function mechanical_energy!(bot::Robot;actuate=false,gravity=true)
-    (;st,traj) = bot
+    (;structure,traj) = bot
     StructArray([
         begin
-            st.state.system.q .= trajstate.q
-            st.state.system.q̇ .= trajstate.q̇
+            structure.state.system.q .= trajstate.q
+            structure.state.system.q̇ .= trajstate.q̇
             if actuate
                 actuate!(bot,[trajstate.t])
             end
-            update!(st)
-            mechanical_energy(st;gravity)
+            update!(structure)
+            mechanical_energy(structure;gravity)
         end
         for trajstate in traj
     ])

@@ -1,6 +1,6 @@
 
-get_local_coords(bot::Robot) = get_local_coords(bot.st)
-get_s(bot::Robot) = get_s(bot.st)
+get_local_coords(bot::Robot) = get_local_coords(bot.structure)
+get_s(bot::Robot) = get_s(bot.structure)
 
 get_coords(st::Structure) = copy(st.state.system.q)
 get_velocs(st::Structure) = copy(st.state.system.q̇)
@@ -62,7 +62,7 @@ end
 get_local_coords(st::Structure) = copy(st.state.system.c)
 
 function get_local_coords(bodies,numbered::Numbered)
-    ndim = get_num_of_dims(bodies)
+    num_of_dim = get_num_of_dims(bodies)
     T = get_numbertype(bodies)
     (;bodyid2sys_loci_idx,sys_loci2coords_idx,nc) = numbered
     ret = zeros(T,nc)
@@ -123,7 +123,7 @@ end
 Return System 维度。
 $(TYPEDSIGNATURES)
 """
-get_num_of_dims(bot::Robot) = get_num_of_dims(bot.st)
+get_num_of_dims(bot::Robot) = get_num_of_dims(bot.structure)
 get_num_of_dims(st::AbstractStructure) = get_num_of_dims(st.bodies)
 get_num_of_dims(bodies::AbstractVector{<:AbstractBody}) = get_num_of_dims(eltype(bodies))
 get_num_of_dims(bodies::TypeSortedCollection) = get_num_of_dims(eltype(bodies.data[1]))
@@ -131,7 +131,7 @@ get_num_of_dims(body::AbstractBody) = get_num_of_dims(typeof(body))
 get_num_of_dims(::Type{<:AbstractBody{N,T}}) where {N,T} = N
 get_num_of_dims(::AbstractBodyProperty{N}) where {N} = N
 
-get_numbertype(bot::Robot) = get_numbertype(bot.st)
+get_numbertype(bot::Robot) = get_numbertype(bot.structure)
 get_numbertype(st::AbstractStructure) = get_numbertype(st.bodies)
 get_numbertype(bodies::AbstractVector{<:AbstractBody}) = get_numbertype(eltype(bodies))
 get_numbertype(bodies::TypeSortedCollection) = get_numbertype(eltype(bodies.data[1]))
@@ -164,7 +164,7 @@ get_num_of_local_dims(cache::FlexibleBodyCoordinatesCache) = get_num_of_local_di
 Return System 重力。
 $(TYPEDSIGNATURES)
 """
-get_gravity(bot::Robot) = get_gravity(bot.st)
+get_gravity(bot::Robot) = get_gravity(bot.structure)
 get_gravity(st::Structure) = get_gravity(st.bodies)
 get_gravity(rbs::AbstractVector{<:AbstractRigidBody}) = get_gravity(eltype(rbs))
 get_gravity(rbs::TypeSortedCollection) = get_gravity(eltype(rbs.data[1]))
@@ -174,18 +174,18 @@ get_gravity(::Type{<:AbstractBody{3,T}}) where {T} = SVector(zero(T),zero(T),-9.
 # get_gravity(::Type{<:AbstractBody{3,T}}) where {T} = SVector(zero(T),-9.81*one(T),zero(T))
 # get_gravity(::Type{<:AbstractBody{3,T}}) where {T} = SVector(-9.81*one(T),zero(T),zero(T))
 
-get_cables_len(bot::Robot) = get_cables_len(bot.st)
-get_cables_deform(bot::Robot) = get_cables_deform(bot.st)
-get_cables_restlen(bot::Robot) = get_cables_restlen(bot.st)
-get_cables_len_dot(bot::Robot) = get_cables_len_dot(bot.st)
-get_cables_tension(bot::Robot) = get_cables_tension(bot.st)
-get_cables_stiffness(bot::Robot) = get_cables_stiffness(bot.st)
-get_cables_force_density(bot::Robot) = get_cables_force_density(bot.st)
+get_cables_len(bot::Robot) = get_cables_len(bot.structure)
+get_cables_deform(bot::Robot) = get_cables_deform(bot.structure)
+get_cables_restlen(bot::Robot) = get_cables_restlen(bot.structure)
+get_cables_len_dot(bot::Robot) = get_cables_len_dot(bot.structure)
+get_cables_tension(bot::Robot) = get_cables_tension(bot.structure)
+get_cables_stiffness(bot::Robot) = get_cables_stiffness(bot.structure)
+get_cables_force_density(bot::Robot) = get_cables_force_density(bot.structure)
 
-get_bodies(bot::Robot) = get_bodies(bot.st)
+get_bodies(bot::Robot) = get_bodies(bot.structure)
 get_bodies(st::AbstractStructure) = sort(st.bodies)
 
-get_rigidbars(bot::Robot) = get_rigidbars(bot.st)
+get_rigidbars(bot::Robot) = get_rigidbars(bot.structure)
 
 function get_rigidbars(st::AbstractStructure)
     filter(get_bodies(st::Structure)) do body
@@ -193,7 +193,7 @@ function get_rigidbars(st::AbstractStructure)
     end
 end
 
-get_connected(bot::Robot) = get_connected(bot.st)
+get_connected(bot::Robot) = get_connected(bot.structure)
 get_connected(st::AbstractStructure) = sort(st.connectivity.tensioned.connected)
 
 function get_cables_len!(st::Structure,q)
@@ -273,7 +273,7 @@ function get_original_restlen(botinput::Robot)
     bot = deepcopy(botinput)
     T = get_numbertype(bot)
     actuate!(bot,zeros(T,length(bot.hub.actuators)))
-    u0 = get_cables_restlen(bot.st)
+    u0 = get_cables_restlen(bot.structure)
 end
 
 function force_densities_to_restlen(st::Structure,γs)

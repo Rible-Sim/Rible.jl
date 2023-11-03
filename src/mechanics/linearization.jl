@@ -201,13 +201,13 @@ function build_Ǩ(st)
 end
 
 function build_material_stiffness_matrix_on_free!(st::Structure,q,k)
-    (;ndim) = st
+    (;num_of_dim) = st
     (;indexed,tensioned) = st.connectivity
-    (;num_of_full_coords,num_of_free_coords,sys_free_coords_idx,bodyid2sys_full_coords) = indexed
+    (;num_of_full_coords,num_of_free_coords,sys_free_idx,bodyid2sys_full_coords) = indexed
     (;connected) = tensioned
     (;cables) = st.tensiles
     update!(st,q)
-    Jj = zeros(eltype(q),ndim,num_of_full_coords)
+    Jj = zeros(eltype(q),num_of_dim,num_of_full_coords)
     retǨm = zeros(eltype(q),num_of_free_coords,num_of_free_coords)
     foreach(connected) do scnt
         j = scnt.id
@@ -227,20 +227,20 @@ function build_material_stiffness_matrix_on_free!(st::Structure,q,k)
         Jj[:,mfull2] .+= C2
         Jj[:,mfull1] .-= C1
         Uj = transpose(Jj)*Jj
-        Ūjq = Uj[sys_free_coords_idx,:]*q
+        Ūjq = Uj[sys_free_idx,:]*q
         retǨm .+= k[j]*s^2*(Ūjq*transpose(Ūjq))
     end
     retǨm
 end
 
 function build_geometric_stiffness_matrix_on_free!(st::Structure,q,f)
-    (;ndim) = st
+    (;num_of_dim) = st
     (;indexed,tensioned) = st.connectivity
-    (;num_of_full_coords,num_of_free_coords,sys_free_coords_idx,bodyid2sys_full_coords) = indexed
+    (;num_of_full_coords,num_of_free_coords,sys_free_idx,bodyid2sys_full_coords) = indexed
     (;connected) = tensioned
     (;cables) = st.tensiles
     update!(st,q)
-    Jj = zeros(eltype(q),ndim,num_of_full_coords)
+    Jj = zeros(eltype(q),num_of_dim,num_of_full_coords)
     retǨg = zeros(eltype(q),num_of_free_coords,num_of_free_coords)
     foreach(connected) do scnt
         j = scnt.id
@@ -260,25 +260,25 @@ function build_geometric_stiffness_matrix_on_free!(st::Structure,q,f)
         Jj[:,mfull2] .+= C2
         Jj[:,mfull1] .-= C1
         Uj = transpose(Jj)*Jj
-        Ǔj = @view Uj[sys_free_coords_idx,sys_free_coords_idx]
-        Ūjq = Uj[sys_free_coords_idx,:]*q
+        Ǔj = @view Uj[sys_free_idx,sys_free_idx]
+        Ūjq = Uj[sys_free_idx,:]*q
         retǨg .+= f[j]/length*(Ǔj-s^2*Ūjq*transpose(Ūjq))
     end
     retǨg
 end
 
 function make_Ǩm_Ǩg(st,q0)
-    (;ndim) = st
+    (;num_of_dim) = st
     (;numbered,indexed,tensioned) = st.connectivity
-    (;num_of_full_coords,num_of_free_coords,sys_pres_coords_idx,sys_free_coords_idx,bodyid2sys_full_coords) = indexed
+    (;num_of_full_coords,num_of_free_coords,sys_pres_idx,sys_free_idx,bodyid2sys_full_coords) = indexed
     (;connected) = tensioned
     (;cables) = st.tensiles
     (;bodyid2sys_loci_idx,sys_loci2coords_idx) = numbered
     function inner_Ǩm_Ǩg(q̌,s,μ,k,c)
 		q = Vector{eltype(q̌)}(undef,num_of_full_coords)
-		q[sys_pres_coords_idx] .= q0[sys_pres_coords_idx]
-		q[sys_free_coords_idx] .= q̌
-        Jj = zeros(eltype(q̌),ndim,num_of_full_coords)
+		q[sys_pres_idx] .= q0[sys_pres_idx]
+		q[sys_free_idx] .= q̌
+        Jj = zeros(eltype(q̌),num_of_dim,num_of_full_coords)
         retǨm = zeros(eltype(q̌),num_of_free_coords,num_of_free_coords)
         retǨg = zeros(eltype(q̌),num_of_free_coords,num_of_free_coords)
         foreach(connected) do scnt
@@ -299,8 +299,8 @@ function make_Ǩm_Ǩg(st,q0)
             Jj[:,mfull2] .+= C2
             Jj[:,mfull1] .-= C1
             Uj = transpose(Jj)*Jj
-            Ǔj = @view Uj[sys_free_coords_idx,sys_free_coords_idx]
-            Ūjq = Uj[sys_free_coords_idx,:]*q
+            Ǔj = @view Uj[sys_free_idx,sys_free_idx]
+            Ūjq = Uj[sys_free_idx,:]*q
             retǨm .+= k[j]*s[j]^2*(Ūjq*transpose(Ūjq))
             retǨg .+= k[j]*(1-μ[j]*s[j])*(Ǔj-s[j]^2*Ūjq*transpose(Ūjq))
         end
@@ -308,9 +308,9 @@ function make_Ǩm_Ǩg(st,q0)
     end
     function inner_Ǩm_Ǩg(q̌)
 		q = Vector{eltype(q̌)}(undef,num_of_full_coords)
-		q[sys_pres_coords_idx] .= q0[sys_pres_coords_idx]
-		q[sys_free_coords_idx] .= q̌
-        Jj = zeros(eltype(q̌),ndim,num_of_full_coords)
+		q[sys_pres_idx] .= q0[sys_pres_idx]
+		q[sys_free_idx] .= q̌
+        Jj = zeros(eltype(q̌),num_of_dim,num_of_full_coords)
         retǨm = zeros(eltype(q̌),num_of_free_coords,num_of_free_coords)
         retǨg = zeros(eltype(q̌),num_of_free_coords,num_of_free_coords)
         foreach(connected) do scnt
@@ -331,8 +331,8 @@ function make_Ǩm_Ǩg(st,q0)
             Jj[:,mfull2] .+= C2
             Jj[:,mfull1] .-= C1
             Uj = transpose(Jj)*Jj
-            Ǔj = @view Uj[sys_free_coords_idx,sys_free_coords_idx]
-            Ūjq = Uj[sys_free_coords_idx,:]*q
+            Ǔj = @view Uj[sys_free_idx,sys_free_idx]
+            Ūjq = Uj[sys_free_idx,:]*q
             retǨm .+= k*s^2*(Ūjq*transpose(Ūjq))
             retǨg .+= tension/length*(Ǔj-s^2*Ūjq*transpose(Ūjq))
         end
@@ -341,19 +341,19 @@ function make_Ǩm_Ǩg(st,q0)
 end
 
 function make_S(st,q0)
-    (;ndim) = st
+    (;num_of_dim) = st
     (;numbered,indexed,tensioned) = st.connectivity
-    (;sys_pres_coords_idx,sys_free_coords_idx,num_of_full_coords,bodyid2sys_full_coords) = indexed
+    (;sys_pres_idx,sys_free_idx,num_of_full_coords,bodyid2sys_full_coords) = indexed
     (;bodyid2sys_loci_idx,sys_loci2coords_idx) = numbered
     (;connected) = tensioned
     (;cables) = st.tensiles
     ncables = length(cables)
     function inner_S(q̌,s)
 		q = Vector{eltype(q̌)}(undef,num_of_full_coords)
-		q[sys_pres_coords_idx] .= q0[sys_pres_coords_idx]
-		q[sys_free_coords_idx] .= q̌
+		q[sys_pres_idx] .= q0[sys_pres_idx]
+		q[sys_free_idx] .= q̌
         ret = zeros(eltype(q̌),ncables)
-        Jj = zeros(eltype(q̌),ndim,num_of_full_coords)
+        Jj = zeros(eltype(q̌),num_of_dim,num_of_full_coords)
         foreach(connected) do scnt
             j = scnt.id
             rb1 = scnt.hen.rbsig
@@ -380,10 +380,10 @@ function make_S(st,q0)
     end
     function inner_S(q̌,s,c)
         q = Vector{eltype(q̌)}(undef,num_of_full_coords)
-        q[sys_pres_coords_idx] .= q0[sys_pres_coords_idx]
-        q[sys_free_coords_idx] .= q̌
+        q[sys_pres_idx] .= q0[sys_pres_idx]
+        q[sys_free_idx] .= q̌
         ret = zeros(eltype(q̌),ncables)
-        Jj = zeros(eltype(q̌),ndim,num_of_full_coords)
+        Jj = zeros(eltype(q̌),num_of_dim,num_of_full_coords)
         foreach(connected) do scnt
             j = scnt.id
             rb1 = scnt.hen.rbsig
@@ -425,13 +425,13 @@ end
 function build_∂Q̌∂q̌(st,@eponymargs(connected,))
     (;cables) = st.tensiles
     (;indexed) = st.connectivity
-    (;num_of_full_coords,num_of_free_coords,sys_free_coords_idx,bodyid2sys_free_coords,bodyid2sys_full_coords) = indexed
+    (;num_of_full_coords,num_of_free_coords,sys_free_idx,bodyid2sys_free_coords,bodyid2sys_full_coords) = indexed
     T = get_numbertype(st)
-    ndim = get_num_of_dims(st)
+    num_of_dim = get_num_of_dims(st)
     ∂Q̌∂q̌ = zeros(T,num_of_free_coords,num_of_free_coords)
-    D = @MMatrix zeros(T,ndim,ndim)
-    Im = Symmetric(SMatrix{ndim,ndim}(one(T)*I))
-    J̌ = zeros(T,ndim,num_of_free_coords)
+    D = @MMatrix zeros(T,num_of_dim,num_of_dim)
+    Im = Symmetric(SMatrix{num_of_dim,num_of_dim}(one(T)*I))
+    J̌ = zeros(T,num_of_dim,num_of_free_coords)
     foreach(connected) do cc
         cable = cables[cc.id]
         (;hen,egg) = cc
@@ -470,13 +470,13 @@ end
 function build_∂Q̌∂q̌(st,@eponymargs(clustered))
     (;clustercables) = st.tensiles
     (;indexed) = st.connectivity
-    (;num_of_full_coords,num_of_free_coords,sys_free_coords_idx,bodyid2sys_free_coords,bodyid2sys_full_coords) = indexed
+    (;num_of_full_coords,num_of_free_coords,sys_free_idx,bodyid2sys_free_coords,bodyid2sys_full_coords) = indexed
     T = get_numbertype(st)
-    ndim = get_num_of_dims(st)
+    num_of_dim = get_num_of_dims(st)
     ∂Q̌∂q̌ = zeros(T,num_of_free_coords,num_of_free_coords)
-    D = @MMatrix zeros(T,ndim,ndim)
-    Im = Symmetric(SMatrix{ndim,ndim}(one(T)*I))
-    J̌ = zeros(T,ndim,num_of_free_coords)
+    D = @MMatrix zeros(T,num_of_dim,num_of_dim)
+    Im = Symmetric(SMatrix{num_of_dim,num_of_dim}(one(T)*I))
+    J̌ = zeros(T,num_of_dim,num_of_free_coords)
     i = 0
     foreach(clustered) do clustercable
         i += 1
@@ -517,13 +517,13 @@ function build_∂Q̌∂q̌!(∂Q̌∂q̌,st)
     (;tensioned,indexed) = connectivity
     (;cables) = st.tensiles
     (;connected) = tensioned
-    (;num_of_full_coords,num_of_free_coords,sys_free_coords_idx,bodyid2sys_free_coords,bodyid2sys_full_coords) = indexed
+    (;num_of_full_coords,num_of_free_coords,sys_free_idx,bodyid2sys_free_coords,bodyid2sys_full_coords) = indexed
     T = get_numbertype(st)
-    ndim = get_num_of_dims(st)
+    num_of_dim = get_num_of_dims(st)
     # ∂Q̌∂q̌ = zeros(T,num_of_free_coords,num_of_free_coords)
-    D = @MMatrix zeros(T,ndim,ndim)
-    Im = Symmetric(SMatrix{ndim,ndim}(one(T)*I))
-    J̌ = zeros(T,ndim,num_of_free_coords)
+    D = @MMatrix zeros(T,num_of_dim,num_of_dim)
+    Im = Symmetric(SMatrix{num_of_dim,num_of_dim}(one(T)*I))
+    J̌ = zeros(T,num_of_dim,num_of_free_coords)
     foreach(connected) do cc
         cable = cables[cc.id]
         (;hen,egg) = cc
@@ -587,13 +587,13 @@ end
 function build_∂Q̌∂q̌̇(st, @eponymargs(connected, ))
     (;cables) = st.tensiles
     (;indexed) = st.connectivity
-    (;num_of_full_coords,num_of_free_coords,sys_free_coords_idx,bodyid2sys_free_coords,bodyid2sys_full_coords) = indexed
+    (;num_of_full_coords,num_of_free_coords,sys_free_idx,bodyid2sys_free_coords,bodyid2sys_full_coords) = indexed
     T = get_numbertype(st)
-    ndim = get_num_of_dims(st)
+    num_of_dim = get_num_of_dims(st)
     ∂Q̌∂q̌̇ = zeros(T,num_of_free_coords,num_of_free_coords)
-    D = @MMatrix zeros(T,ndim,ndim)
-    Im = Symmetric(SMatrix{ndim,ndim}(one(T)*I))
-    J̌ = zeros(T,ndim,num_of_free_coords)
+    D = @MMatrix zeros(T,num_of_dim,num_of_dim)
+    Im = Symmetric(SMatrix{num_of_dim,num_of_dim}(one(T)*I))
+    J̌ = zeros(T,num_of_dim,num_of_free_coords)
     foreach(connected) do cc
         cable = cables[cc.id]
         (;hen,egg) = cc
@@ -630,13 +630,13 @@ end
 function build_∂Q̌∂q̌̇(st, @eponymargs(clustered, ))
     (;clustercables) = st.tensiles
     (;indexed) = st.connectivity
-    (;num_of_full_coords,num_of_free_coords,sys_free_coords_idx,bodyid2sys_free_coords,bodyid2sys_full_coords) = indexed
+    (;num_of_full_coords,num_of_free_coords,sys_free_idx,bodyid2sys_free_coords,bodyid2sys_full_coords) = indexed
     T = get_numbertype(st)
-    ndim = get_num_of_dims(st)
+    num_of_dim = get_num_of_dims(st)
     ∂Q̌∂q̌̇ = zeros(T,num_of_free_coords,num_of_free_coords)
-    D = @MMatrix zeros(T,ndim,ndim)
-    Im = Symmetric(SMatrix{ndim,ndim}(one(T)*I))
-    J̌ = zeros(T,ndim,num_of_free_coords)
+    D = @MMatrix zeros(T,num_of_dim,num_of_dim)
+    Im = Symmetric(SMatrix{num_of_dim,num_of_dim}(one(T)*I))
+    J̌ = zeros(T,num_of_dim,num_of_free_coords)
     i = 0
     foreach(clustered) do clustercable
         i += 1
@@ -674,13 +674,13 @@ function build_∂Q̌∂q̌̇!(∂Q̌∂q̌̇,st)
     (;tensioned,indexed) = st.connectivity
     (;connected) = tensioned
     (;cables) = st.tensiles
-    (;num_of_full_coords,num_of_free_coords,sys_free_coords_idx,bodyid2sys_free_coords,bodyid2sys_full_coords) = indexed
+    (;num_of_full_coords,num_of_free_coords,sys_free_idx,bodyid2sys_free_coords,bodyid2sys_full_coords) = indexed
     T = get_numbertype(st)
-    ndim = get_num_of_dims(st)
+    num_of_dim = get_num_of_dims(st)
     # ∂Q̌∂q̌̇ = zeros(T,num_of_free_coords,num_of_free_coords)
-    D = @MMatrix zeros(T,ndim,ndim)
-    Im = Symmetric(SMatrix{ndim,ndim}(one(T)*I))
-    J̌ = zeros(T,ndim,num_of_free_coords)
+    D = @MMatrix zeros(T,num_of_dim,num_of_dim)
+    Im = Symmetric(SMatrix{num_of_dim,num_of_dim}(one(T)*I))
+    J̌ = zeros(T,num_of_dim,num_of_free_coords)
     foreach(connected) do cc
         cable = cables[cc.id]
         (;hen,egg) = cc
@@ -717,15 +717,15 @@ function build_∂Q̌∂s̄(st)
     (;cables,clustercables) = st.tensiles
     nclustercables = length(clustercables)
     (;tensioned,indexed) = connectivity
-    (;num_of_full_coords,num_of_free_coords,sys_free_coords_idx,bodyid2sys_free_coords,bodyid2sys_full_coords) = indexed
+    (;num_of_full_coords,num_of_free_coords,sys_free_idx,bodyid2sys_free_coords,bodyid2sys_full_coords) = indexed
     ns = sum([length(clustercables[i].sps) for i in 1:nclustercables])
     T = get_numbertype(st)
-    ndim = get_num_of_dims(st)
+    num_of_dim = get_num_of_dims(st)
     ∂Q̌∂s̄ = zeros(T,2ns,num_of_free_coords)
-    D = zeros(T, ndim)
-    lkn = zeros(T, 2ns, ndim)
-    # Im = Symmetric(SMatrix{ndim,ndim}(one(T)*I))
-    J̌ = zeros(T,ndim,num_of_free_coords)
+    D = zeros(T, num_of_dim)
+    lkn = zeros(T, 2ns, num_of_dim)
+    # Im = Symmetric(SMatrix{num_of_dim,num_of_dim}(one(T)*I))
+    J̌ = zeros(T,num_of_dim,num_of_free_coords)
 
     N_list = Vector{SparseMatrixCSC{Float64,Int64}}()
     kc = Vector{Float64}()
@@ -972,7 +972,7 @@ function check_stability!(bot::Robot,Ň;
     static_equilibrium,λ = check_static_equilibrium_output_multipliers(st)
     @assert static_equilibrium
     q̌ = get_free_coords(st)
-    _, Ň0, er = check_stability(bot.st,λ,Ň;verbose=true)
+    _, Ň0, er = check_stability(bot.structure,λ,Ň;verbose=true)
     resize!(traj,1)
     for i in 1:length(er.values)
         push!(traj,deepcopy(traj[end]))
@@ -992,12 +992,12 @@ end
 
 function make_nullspace(st::Structure,q0::AbstractVector)
 	(;bodies,connectivity) = st
-    (;num_of_free_coords,num_of_full_coords,sys_pres_coords_idx,sys_free_coords_idx,bodyid2sys_free_coords,bodyid2sys_intrinsic_cstr_idx,num_of_intrinsic_cstr) = connectivity.indexed
+    (;num_of_free_coords,num_of_full_coords,sys_pres_idx,sys_free_idx,bodyid2sys_free_coords,bodyid2sys_intrinsic_cstr_idx,num_of_intrinsic_cstr) = connectivity.indexed
     function inner_nullspace(q̌)
         T = eltype(q̌)
 		q = Vector{T}(undef,num_of_full_coords)
-		q[sys_pres_coords_idx] .= q0[sys_pres_coords_idx]
-		q[sys_free_coords_idx] .= q̌
+		q[sys_pres_idx] .= q0[sys_pres_idx]
+		q[sys_free_idx] .= q̌
         ret = zeros(T,num_of_free_coords,num_of_free_coords-num_of_intrinsic_cstr)
         foreach(bodies) do body
             bodyid = body.prop.id
@@ -1029,7 +1029,7 @@ function get_poly(bot_input;
     )
     bot = deepcopy(bot_input)
     (;st) = bot
-    # (;num_of_dof,num_of_cstr,connectivity) = bot.st
+    # (;num_of_dof,num_of_cstr,connectivity) = bot.structure
     # (;cables) = st.tensiles
     # (;num_of_full_coords,num_of_free_coords) = connectivity.indexed
     # ncables = length(cables)
@@ -1069,7 +1069,7 @@ function get_poly(bot_input;
         # transpose(pnξ)*pnξ-1;
     ]
 
-    # Ǩ0 = RB.build_Ǩ(bot.st,gue.λ)
+    # Ǩ0 = RB.build_Ǩ(bot.structure,gue.λ)
     # Ǩx = map(polyǨ) do z
     # 		z(
     # 			pv.q̌=>gue.q̌,

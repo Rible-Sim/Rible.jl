@@ -259,8 +259,8 @@ end
 
 function recover(state::NamedTuple,st::AbstractStructure)
     q = get_coords(st)
-    (;sys_free_coords_idx) = st.connectivity.indexed
-    q[sys_free_coords_idx] = state.q̌
+    (;sys_free_idx) = st.connectivity.indexed
+    q[sys_free_idx] = state.q̌
     merge((q=q,),state)
 end
 
@@ -275,7 +275,7 @@ end
 function get_start_sol(bot)
     (;st) = bot
     q̌ = get_free_coords(st)
-    isequ, λ = check_static_equilibrium_output_multipliers(bot.st)
+    isequ, λ = check_static_equilibrium_output_multipliers(bot.structure)
     if isequ
         @info "Alreadly in static equilibrium, skipping inverse."
         # λ = inverse_for_multipliers(bot,bot);
@@ -288,7 +288,7 @@ function get_start_sol(bot)
     @eponymtuple(q̌,s,λ),u
 end
 
-function get_start_system(bot,mode=PrimalMode();F=reshape(build_Ǧ(bot.st),:,1))
+function get_start_system(bot,mode=PrimalMode();F=reshape(build_Ǧ(bot.structure),:,1))
     (;st) = bot
     start_sol,u = get_start_sol(bot)
     g = zeros(get_numbertype(bot),size(F,2))

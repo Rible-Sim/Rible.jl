@@ -381,14 +381,14 @@ function pinpoint_equilibriums(μ0,Δμ,
 	bots = [
 		begin
 			bot = dualtri(1;θ)
-			RB.set_restlen!(bot.st,μ0.+σ.*Δμ)
-			# RB.update!(bot.st)
+			RB.set_restlen!(bot.structure,μ0.+σ.*Δμ)
+			# RB.update!(bot.structure)
 			polyP, poly𝒦, ini, pv = RB.pinpoint(bot;Ň)
 			@assert ini.isconverged
-			inirc = RB.recover(ini,bot.st)
+			inirc = RB.recover(ini,bot.structure)
 			RB.set_new_initial!(bot,inirc.q)
-			RB.update!(bot.st)
-			_, _, er = RB.check_stability(bot.st)
+			RB.update!(bot.structure)
+			_, _, er = RB.check_stability(bot.structure)
 			@show er.values
 			# plot_traj!(dualtri_up;)
 			bot
@@ -410,10 +410,10 @@ function forward_bi(bot;
 	[
 		begin
 			RB.goto_step!(bot,i)
-			ini = RB.get_initial(bot.st)
+			ini = RB.get_initial(bot.structure)
 			startsol = (ini.q̌,ini.s,ini.λ)
 			start_parameters = (d=ini.d,c=ini.c,k=ini.k,u=ini.μ,g=[0.0])
-			(;bodyid2sys_loci_idx,sys_loci2coords_idx) = bot.st.connectivity.numbered
+			(;bodyid2sys_loci_idx,sys_loci2coords_idx) = bot.structure.connectivity.numbered
 			target_parameters = deepcopy(start_parameters)
 			if change == :c
 				target_parameters.c[sys_loci2coords_idx[bodyid2sys_loci_idx[1][1]]] .+= [0.00,0.02]
@@ -426,7 +426,7 @@ function forward_bi(bot;
 
 			@show i
 			seq = RB.forward_sequence(
-				bot.st,
+				bot.structure,
 				startsol,
 				start_parameters,
 				target_parameters,
@@ -624,7 +624,7 @@ function pinpoint_critical(bot_input;
 	push!(polyP,transpose(pnξ)*pnξ-1)
 	# initial
 
-	Ǩ0 = RB.build_Ǩ(bot.st,gue.λ)
+	Ǩ0 = RB.build_Ǩ(bot.structure,gue.λ)
 	# @show Ǩ0
 	Ň0 = Ň(gue.q̌,gue.c)
 	𝒦0 = transpose(Ň0)*Ǩ0*Ň0
@@ -696,15 +696,15 @@ function pinpoint_gripper(Ň)
 	bots = [	
 		begin
 			bot = new_gripper(;guess...)
-			# c = RB.get_local_coords(bot.st)
+			# c = RB.get_local_coords(bot.structure)
 			# # c[7] -= 0.1
-			# RB.update_points!(bot.st,c)
+			# RB.update_points!(bot.structure,c)
 			polyP, poly𝒦, ini, pv  = RB.pinpoint(bot;Ň)
 			@assert ini.isconverged
-			inirc = RB.recover(ini,bot.st)
+			inirc = RB.recover(ini,bot.structure)
 			RB.set_new_initial!(bot,inirc.q)
-			RB.update!(bot.st)
-			_, _, er = RB.check_stability(bot.st)
+			RB.update!(bot.structure)
+			_, _, er = RB.check_stability(bot.structure)
 			@show er.values
 			# plot_traj!(dualtri_up;)
 			bot
@@ -788,17 +788,17 @@ function forward_bi_gripper(bot;
 	[
 		begin
 			RB.goto_step!(bot,i)
-			ini = RB.get_initial(bot.st)
+			ini = RB.get_initial(bot.structure)
 			startsol = (ini.q̌,ini.s,ini.λ)
 			start_parameters = (d=ini.d,c=ini.c,k=ini.k,u=ini.μ,g=[0.0])
-			(;bodyid2sys_loci_idx,sys_loci2coords_idx) = bot.st.connectivity.numbered
+			(;bodyid2sys_loci_idx,sys_loci2coords_idx) = bot.structure.connectivity.numbered
 			target_parameters = deepcopy(start_parameters)
 			target_parameters.c[7] += Δc7
 			target_parameters.u[6] += Δu6
 
 			@show i
 			seq = RB.forward_sequence(
-				bot.st,
+				bot.structure,
 				startsol,
 				start_parameters,
 				target_parameters,
@@ -953,16 +953,16 @@ function path_follow_critical(polyP, ini, pv;
 			q̌,s,λ,ξ,ζ = RB.split_by_lengths(sol,length.(variable_groups))
 			pp = @eponymtuple(q̌,s,λ,ξ,ζ=ζ[1])
 			pprc = RB.recover(pp,bot0.st)
-			RB.set_restlen!(bot.st,tar.μ)
-			RB.update_points!(bot.st,tar.c)		
+			RB.set_restlen!(bot.structure,tar.μ)
+			RB.update_points!(bot.structure,tar.c)		
 			RB.set_new_initial!(bot,pprc.q)
 			if i == 0
-				bot0.traj[1] = deepcopy(bot.st.state.system)
+				bot0.traj[1] = deepcopy(bot.structure.state.system)
 			else
 				append!(bot0.traj,deepcopy(bot.traj))
 			end
 			@show pprc.ζ
-			merge(pprc,(V=RB.mechanical_energy(bot.st).V,))
+			merge(pprc,(V=RB.mechanical_energy(bot.structure).V,))
 		end
 		for i = 0:n
 	] |> StructArray

@@ -26,11 +26,11 @@ function generate_cache(solver::Alpha,intor;dt,kargs...)
     (;bot,dynfuncs) = prob
     (;αm,αf,γ,β) = solver
     # F!,_ = dynfuncs
-    mm = build_MassMatrices(bot)
+    mm = build_mass_matrices(bot)
     # (;M) = mm
     A = make_cstr_jacobian(bot)
     Φ = make_cstr_function(bot)
-    ∂Ǎᵀλ∂q̌ = (q,λ)->cstr_forces_on_free_jacobian(bot.st,λ)
+    ∂Ǎᵀλ∂q̌ = (q,λ)->cstr_forces_on_free_jacobian(bot.structure,λ)
     funcs = @eponymtuple(A,Φ,∂Ǎᵀλ∂q̌)
     h = dt
     β′ = (1-αm)/((h^2)*β*(1-αf))
@@ -52,7 +52,7 @@ function solve!(intor::Integrator,cache::AlphaCache;
     (;solver,mass_matrices,funcs,β′,γ′) = cache
     (;A,Φ,∂Ǎᵀλ∂q̌) = funcs
     (;αm,αf,γ,β) = solver
-    (;Ḿ,M̌,M̄,invM̌) = mass_matrices
+    (;Ḿ,M̌,M̄,M̌⁻¹) = mass_matrices
     q̌0 = traj.q̌[begin]
     λ0 = traj.λ[begin]
     q0 = traj.q[begin]
@@ -67,7 +67,7 @@ function solve!(intor::Integrator,cache::AlphaCache;
     ∂F∂q̌ = zeros(T,nq̌,nq̌)
     ∂F∂q̌̇ = zeros(T,nq̌,nq̌)
     F!(F̌0,q0,q̇0,t0)
-    q̌̈0 .= invM̌*F̌0
+    q̌̈0 .= M̌⁻¹*F̌0
     aᵏ⁻¹ = copy(q̈0)
     aᵏ = copy(aᵏ⁻¹)
     step = 0

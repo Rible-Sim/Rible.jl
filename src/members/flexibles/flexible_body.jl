@@ -167,7 +167,7 @@ function FlexibleBody(prop,state)
 end
 
 
-function body2coords(fb::FlexibleBody)
+function body_state2coords_state(fb::FlexibleBody)
     (;e,ė) = fb.state.cache
     e,ė
 end

@@ -45,13 +45,13 @@ end
 空约束类。
 $(TYPEDEF)
 """
-struct EmptyConstraint{T} <: ExternalConstraints{T}
+struct EmptyConstraint{T} <: ExtrinsicConstraints{T}
     num_of_cstr::Int64
     idx::Vector{Int64}
     values::T
 end
 
-get_numbertype(cst::ExternalConstraints{<:AbstractArray{T}}) where T = T
+get_numbertype(cst::ExtrinsicConstraints{<:AbstractArray{T}}) where T = T
 
 """
 空约束构造子。
@@ -75,7 +75,7 @@ end
 刚体固定约束类。
 $(TYPEDEF)
 """
-struct FixedBodyConstraint{T} <: ExternalConstraints{T}
+struct FixedBodyConstraint{T} <: ExtrinsicConstraints{T}
     num_of_cstr::Int64
     idx::Vector{Int64}
     values::T
@@ -119,7 +119,7 @@ end
 刚体坐标固定约束类，适用于单个坐标。
 $(TYPEDEF)
 """
-struct FixedIndicesConstraint{T} <: ExternalConstraints{T}
+struct FixedIndicesConstraint{T} <: ExtrinsicConstraints{T}
     id::Int64
     num_of_cstr::Int64
     idx::Vector{Int64}
@@ -145,14 +145,14 @@ function make_cstr_jacobian(cst::FixedIndicesConstraint,st)
     (;indexed,numbered) = st.connectivity
     num_of_cstr = cst.num_of_cstr
     idx = cst.idx
-    (;sys_free_coords_idx,num_of_free_coords) = indexed
+    (;sys_free_idx,num_of_free_coords) = indexed
     @inline @inbounds function inner_cstr_jacobian(q)
         nq = length(q)
         ret = zeros(eltype(q),num_of_cstr,nq)
         for (iΦ,i) in enumerate(idx)
             ret[iΦ,i] = 1
         end
-        ret[:,sys_free_coords_idx]
+        ret[:,sys_free_idx]
     end
 end
 
@@ -162,7 +162,7 @@ end
 刚体通用线性约束类。
 $(TYPEDEF)
 """
-struct LinearJoint{valueType} <: ExternalConstraints{valueType}
+struct LinearJoint{valueType} <: ExtrinsicConstraints{valueType}
     id::Int
     num_of_cstr::Int
     values::Vector{valueType}
@@ -192,10 +192,10 @@ function make_cstr_function(cst::LinearJoint,indexed,numbered)
 end
 
 function make_cstr_jacobian(cst::LinearJoint,indexed,numbered)
-    (;sys_free_coords_idx,num_of_free_coords) = indexed
+    (;sys_free_idx,num_of_free_coords) = indexed
     (;num_of_cstr,values,A) = cst
     function _inner_cstr_jacobian(q,c)
-        q̌ = @view q[sys_free_coords_idx]
+        q̌ = @view q[sys_free_idx]
         ret = zeros(eltype(q̌),num_of_cstr,num_of_free_coords)
         ret .= A
         ret
@@ -258,7 +258,7 @@ const PinJoint = SphericalJoint
 刚体铰接约束类。
 $(TYPEDEF)
 """
-struct PrototypeJoint{hen2eggType,axesType,maskType,halfType,hessType,valueType} <: ExternalConstraints{valueType}
+struct PrototypeJoint{hen2eggType,axesType,maskType,halfType,hessType,valueType} <: ExtrinsicConstraints{valueType}
     id::Int
     hen2egg::hen2eggType
     num_of_cstr::Int

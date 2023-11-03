@@ -39,7 +39,7 @@ function generate_cache(solver::AlphaCCP,intor;dt,kargs...)
     (;ρ∞) = solver
     coeffs = generalized_α(ρ∞,dt)
     # F!,_ = dynfuncs
-    # mm = RB.build_MassMatrices(bot)
+    # mm = RB.build_mass_matrices(bot)
     M = Matrix(build_M(st))
     # (;M) = mm
     A = make_cstr_jacobian(bot)

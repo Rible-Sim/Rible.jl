@@ -169,7 +169,7 @@ GM.activate!();with_theme(theme_pub;
         sup! = (ax,tgob,sgi) -> begin
             hidey(ax)
             for (istep,step) in enumerate(steps)
-                suptg = deepcopy(bot.st)
+                suptg = deepcopy(bot.structure)
                 suptg.state.system.q .= bot.traj.q[step]
                 RB.update!(suptg)
                 viz!(ax,Observable(suptg);
@@ -281,7 +281,7 @@ GM.activate!(); with_theme(theme_pub;
         sup! = (ax,tgob,sgi) -> begin
             hidey(ax)
             for (istep,step) in enumerate(steps)
-                suptg = deepcopy(bot.st)
+                suptg = deepcopy(bot.structure)
                 suptg.state.system.q .= bot.traj.q[step]
                 RB.update!(suptg)
                 viz!(ax,Observable(suptg);
@@ -540,7 +540,7 @@ GM.activate!();with_theme(theme_pub;
         sup! = (ax,tgob,sgi) -> begin
             hidey(ax)
             for (istep,step) in enumerate(steps)
-                suptg = deepcopy(bot.st)
+                suptg = deepcopy(bot.structure)
                 suptg.state.system.q .= bot.traj.q[step]
                 RB.update!(suptg)
                 (;r,b,g) = cg[istep]
@@ -790,7 +790,7 @@ GM.activate!();with_theme(theme_pub;
             ax.xlabeloffset = 0.0
             ax.zlabeloffset = 2fontsize
             for (istep,step) in enumerate(steps)
-                suptg = deepcopy(bot.st)
+                suptg = deepcopy(bot.structure)
                 suptg.state.system.q .= bot.traj.q[step]
                 RB.update!(suptg)
                 (;r,g,b) = cg[istep]
@@ -1369,7 +1369,7 @@ with_theme(theme_pub;
         sup! = (ax,_,_) -> begin
             for (i,step) in enumerate(steps)
                 RB.goto_step!(bot,step)
-                tgvis = deepcopy(bot.st)
+                tgvis = deepcopy(bot.structure)
                 (;r,g,b) = cg[i]
                 viz!(ax,tgvis;
                     meshcolor=Makie.RGBAf(r,g,b,alphas[i])
@@ -1516,7 +1516,7 @@ with_theme(theme_pub;
         sup! = (ax,_,_) -> begin
             for (i,step) in enumerate(steps)
                 RB.goto_step!(bot,step)
-                tgvis = deepcopy(bot.st)
+                tgvis = deepcopy(bot.structure)
                 (;r,g,b) = cg[i]
                 viz!(ax,tgvis;meshcolor=Makie.RGBA(r,g,b,alphas[i]))
             end
@@ -2139,7 +2139,7 @@ GM.activate!(); with_theme(theme_pub;
         sup! = (ax,_,_) -> begin
             for (i,step) in enumerate(steps)
                 RB.goto_step!(bot,step)
-                tgvis = deepcopy(bot.st)
+                tgvis = deepcopy(bot.structure)
                 (;r,g,b) = cg[i]
                 db = Makie.parse(Makie.RGBA,"deepskyblue")
                 viz!(ax,tgvis;

@@ -16,14 +16,14 @@ mutable struct ClusterNonminimalCoordinatesState{T,qT,qviewT}
     F̌::qviewT
 end
 
-function ClusterNonminimalCoordinatesState(t,q,q̇,q̈,F,λ,freei,presi,s)
-    q̌ = @view q[freei]
-    q̌̇ = @view q̇[freei]
-    q̌̈ = @view q̈[freei]
-    q̃ = @view q[presi]
-    q̃̇ = @view q̇[presi]
-    q̃̈ = @view q̈[presi]
-    F̌ = @view F[freei]
+function ClusterNonminimalCoordinatesState(t,q,q̇,q̈,F,λ,free_idx,pres_idx,s)
+    q̌ = @view q[free_idx]
+    q̌̇ = @view q̇[free_idx]
+    q̌̈ = @view q̈[free_idx]
+    q̃ = @view q[pres_idx]
+    q̃̇ = @view q̇[pres_idx]
+    q̃̈ = @view q̈[pres_idx]
+    F̌ = @view F[free_idx]
     ClusterNonminimalCoordinatesState(t,q,q̇,q̈,F,λ,s,q̌,q̌̇,q̌̈,q̃,q̃̇,q̃̈,F̌)
 end
 
@@ -32,7 +32,7 @@ end
 function StructureState(bodies,tensiles,cnt::Connectivity{<:Any,<:Any,<:NamedTuple{(:connected, :clustered)},<:Any})
     (;clustercables) = tensiles
     (;indexed,jointed) = cnt
-    (;num_of_full_coords,num_of_intrinsic_cstr,sys_free_coords_idx,sys_pres_coords_idx) = indexed
+    (;num_of_full_coords,num_of_intrinsic_cstr,sys_free_idx,sys_pres_idx) = indexed
     (;bodyid2sys_intrinsic_cstr_idx,bodyid2sys_full_coords,bodyid2sys_free_coords,bodyid2sys_pres_coords) = indexed
     (;num_of_extrinsic_cstr) = jointed
     nclustercables = length(clustercables)
@@ -54,8 +54,8 @@ function StructureState(bodies,tensiles,cnt::Connectivity{<:Any,<:Any,<:NamedTup
     F = zero(q)
     s = zeros(T, 2ns)
     λ = Vector{T}(undef,num_of_cstr)
-    system = ClusterNonminimalCoordinatesState(t,q,q̇,q̈,F,λ,sys_free_coords_idx,sys_pres_coords_idx,s)
-    parts = [
+    system = ClusterNonminimalCoordinatesState(t,q,q̇,q̈,F,λ,sys_free_idx,sys_pres_idx,s)
+    members = [
         begin
             qmem = @view q[bodyid2sys_full_coords[bodyid]]
             q̇mem = @view q̇[bodyid2sys_full_coords[bodyid]]
@@ -70,10 +70,10 @@ function StructureState(bodies,tensiles,cnt::Connectivity{<:Any,<:Any,<:NamedTup
     foreach(bodies) do body
         (;ro,R,ṙo,ω,cache) = body.state
         q,q̇ = cartesian_frame2coords(cache.funcs.nmcs,ro,R,ṙo,ω)
-        parts[body.prop.id].q .= q
-        parts[body.prop.id].q̇ .= q̇
+        members[body.prop.id].q .= q
+        members[body.prop.id].q̇ .= q̇
     end
-    StructureState(system,parts)
+    StructureState(system,members)
 end
 
 function update_tensiles!(st, @eponymargs(clustered,))
@@ -235,12 +235,12 @@ function get_TransMatrix(n)
 end
 
 function build_∂ζ∂q(st::AbstractStructure,q̌)
-    (;ndim, connectivity) = st
+    (;num_of_dim, connectivity) = st
     (;clustercables) = st.tensiles
     nclustercables = length(clustercables)
     (;tensioned, indexed) = connectivity
     # (;q̌) = st.state.system
-    (;num_of_full_coords, num_of_free_coords, sys_free_coords_idx, bodyid2sys_free_coords, bodyid2sys_full_coords) = indexed
+    (;num_of_full_coords, num_of_free_coords, sys_free_idx, bodyid2sys_free_coords, bodyid2sys_full_coords) = indexed
     ns = sum([length(clustercables[i].sps) for i in 1:nclustercables])
     nclustersegs = ns + nclustercables
     Type = get_numbertype(st)
@@ -249,7 +249,7 @@ function build_∂ζ∂q(st::AbstractStructure,q̌)
     foreach(tensioned.clustered) do clustercable
         i += 1
         foreach(clustercable) do cc
-            J̌ = zeros(Type,ndim,num_of_free_coords)
+            J̌ = zeros(Type,num_of_dim,num_of_free_coords)
             j += 1
             cable = clustercables[i].segs[cc.id]
             (;hen,egg) = cc
@@ -297,10 +297,10 @@ function build_∂ζ∂q(st::AbstractStructure,q̌)
 end
 
 function Record_build_∂ζ∂q(st::AbstractStructure,q̌, xlsxname, sheetname)
-    (;nclustercables, clustercables, ndim, connectivity) = st
+    (;nclustercables, clustercables, num_of_dim, connectivity) = st
     (;tensioned, indexed) = connectivity
     # (;q̌) = st.state.system
-    (;num_of_full_coords, num_of_free_coords, sys_free_coords_idx, bodyid2sys_free_coords, bodyid2sys_full_coords) = indexed
+    (;num_of_full_coords, num_of_free_coords, sys_free_idx, bodyid2sys_free_coords, bodyid2sys_full_coords) = indexed
     ns = sum([length(clustercables[i].sps) for i in 1:nclustercables])
     nclustersegs = ns + nclustercables
     Type = get_numbertype(st)
@@ -309,7 +309,7 @@ function Record_build_∂ζ∂q(st::AbstractStructure,q̌, xlsxname, sheetname)
     foreach(tensioned.clustercables) do clustercable
         i += 1
         foreach(clustercable) do cc
-            J̌ = zeros(Type,ndim,num_of_free_coords)
+            J̌ = zeros(Type,num_of_dim,num_of_free_coords)
             j += 1
             cable = st.clustercables[i].segs[cc.id]
             (;hen,egg) = cc

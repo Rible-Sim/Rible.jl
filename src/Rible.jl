@@ -43,8 +43,6 @@ include("utils.jl")
 
 include("members/loci.jl")
 
-include("members/abstract_body.jl")
-
 include("members/rigids/natural_coordinates/NCF.jl")
 using .NCF
 
@@ -59,6 +57,7 @@ import .NCF: cartesian_frame2coords
 include("members/rigids/QBF.jl")
 using .QBF
 
+include("members/abstract_body.jl")
 
 include("members/rigids/rigid_body.jl")
 

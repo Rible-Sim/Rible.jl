@@ -195,13 +195,13 @@ function optimize_zero_stiffness_Clarabel(mat𝒦ps,vec𝒦m,vecI,Aeq,beq,nx,x_0
 end
 
 # function super_stability(bot)
-#     q = RB.get_coords(bot.st)
-#     # q̌ = RB.get_free_coords(bot.st)
-#     Ǎ = RB.make_cstr_jacobian(bot.st)(q)
+#     q = RB.get_coords(bot.structure)
+#     # q̌ = RB.get_free_coords(bot.structure)
+#     Ǎ = RB.make_cstr_jacobian(bot.structure)(q)
 #     Ň_ = RB.nullspace(Ǎ)
 #     Ň = modified_gram_schmidt(Ň_)
-#     Q̃ = RB.build_Q̃(bot.st)
-#     L̂ = RB.build_L̂(bot.st)
+#     Q̃ = RB.build_Q̃(bot.structure)
+#     L̂ = RB.build_L̂(bot.structure)
 
 #     # Left hand side
 #     Q̃L̂ = Q̃*L̂
@@ -210,7 +210,7 @@ end
 #     ℬᵀ = transpose(Ň)*Bᵀ
 
 #     S,D = static_kinematic_determine(ℬᵀ)
-#     k = RB.get_cables_stiffness(bot.st)
+#     k = RB.get_cables_stiffness(bot.structure)
 
 #     ns = size(S,2)
 #     for i = 1:ns
@@ -219,11 +219,11 @@ end
 #         # μ = l .- (f./k)
 #         λ = inv(Ǎ*transpose(Ǎ))*Ǎ*Bᵀ*f
 #         # @show f,λ
-#         Ǩa = - RB.cstr_forces_on_free_jacobian(bot.st,λ)
+#         Ǩa = - RB.cstr_forces_on_free_jacobian(bot.structure,λ)
 #         𝒦a = transpose(Ň)*Ǩa*Ň |> sparse
 #         D_𝒦a = ldl(𝒦a).D.diag |> sort
 
-#         Ǩm, Ǩg = RB.build_Ǩm_Ǩg!(bot.st,q,f,k)
+#         Ǩm, Ǩg = RB.build_Ǩm_Ǩg!(bot.structure,q,f,k)
 
 #         𝒦m = transpose(Ň)*Ǩm*Ň |> sparse
 #         𝒦g = transpose(Ň)*Ǩg*Ň |> sparse

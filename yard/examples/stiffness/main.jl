@@ -28,6 +28,7 @@ import WGLMakie as WM
 GM.activate!()
 Makie.inline!(false)
 using FileIO, MeshIO
+using JLD2
 using LaTeXStrings
 using TexTables
 using DataStructures
@@ -83,10 +84,10 @@ th = 622 |> pt2px
 #--- superball
 # for use with Class-1 and the 1st rigid fixed
 function build_nullspace_on_free(st)
-    (;sys_free_coords_idx,bodyid2sys_dof_idx) = st.connectivity.indexed
-    q = RB.get_coords(bot.st)
+    (;sys_free_idx,bodyid2sys_dof_idx) = st.connectivity.indexed
+    q = RB.get_coords(bot.structure)
     Nin = RB.make_intrinsic_nullspace(st,q)[
-        sys_free_coords_idx,
+        sys_free_idx,
         reduce(vcat,bodyid2sys_dof_idx[2:end])
     ]
 end
@@ -101,14 +102,14 @@ ballbot = superball(;
 )
 bot = ballbot
 
-RB.check_static_equilibrium_output_multipliers(bot.st)
+RB.check_static_equilibrium_output_multipliers(bot.structure)
 
-RB.update!(bot.st)
+RB.update!(bot.structure)
 f = RB.get_cables_tension(bot)
 
 function verify_lambda(st)
     T = RB.get_numbertype(st)
-    λs = zeros(T,st.nbodies)
+    λs = zeros(T,st.num_of_bodies)
     foreach(st.bodies) do body
         (;prop,state) = body
         (;loci_states,origin_position) = state
@@ -119,15 +120,15 @@ function verify_lambda(st)
     end
     λs
 end
-verify_lambda(bot.st)
-q = RB.get_coords(bot.st)
-q̌ = RB.get_free_coords(bot.st)
-Ǎ = RB.make_cstr_jacobian(bot.st)(q)
+verify_lambda(bot.structure)
+q = RB.get_coords(bot.structure)
+q̌ = RB.get_free_coords(bot.structure)
+Ǎ = RB.make_cstr_jacobian(bot.structure)(q)
 # Ň_ = RB.nullspace(Ǎ)
 # Ň = modified_gram_schmidt(Ň_)
-Ň = build_nullspace_on_free(bot.st)
-Q̃ = RB.build_Q̃(bot.st)
-L̂ = RB.build_L̂(bot.st)
+Ň = build_nullspace_on_free(bot.structure)
+Q̃ = RB.build_Q̃(bot.structure)
+L̂ = RB.build_L̂(bot.structure)
 
 rank(Ň)
 Ǎ*Ň |> norm
@@ -143,14 +144,14 @@ D
 
 ns = size(S,2)
 nk = size(D,2)
-k = RB.get_cables_stiffness(bot.st)
-l = RB.get_cables_len(bot.st)
+k = RB.get_cables_stiffness(bot.structure)
+l = RB.get_cables_len(bot.structure)
 # μ = l .- (100.0./k)
 # f = S[:,1]# + S[:,2] + S[:,3] + S[:,4]
 # equivalent μ
 λ = -inv(Ǎ*transpose(Ǎ))*Ǎ*Bᵀ*f
-@myshow verify_lambda(bot.st),λ
-Ǩa = RB.cstr_forces_on_free_jacobian(bot.st,λ)
+@myshow verify_lambda(bot.structure),λ
+Ǩa = RB.cstr_forces_on_free_jacobian(bot.structure,λ)
 𝒦a = transpose(Ň)*Ǩa*Ň |> Symmetric 
 vals_𝒦a,vecs_𝒦a = eigen(𝒦a)
 @myshow sort(vals_𝒦a)
@@ -158,8 +159,8 @@ vals_𝒦a,vecs_𝒦a = eigen(𝒦a)
 # @show count((x)->x<0,D_𝒦a)
 # @show count((x)->x==0,D_𝒦a)
 
-Ǩm = RB.build_material_stiffness_matrix_on_free!(bot.st,q,k)
-Ǩg = RB.build_geometric_stiffness_matrix_on_free!(bot.st,q,f)
+Ǩm = RB.build_material_stiffness_matrix_on_free!(bot.structure,q,k)
+Ǩg = RB.build_geometric_stiffness_matrix_on_free!(bot.structure,q,f)
 
 vec𝒦ps = [
     begin
@@ -168,9 +169,9 @@ vec𝒦ps = [
         # @show s
         λi = inv(Ǎ*transpose(Ǎ))*Ǎ*Bᵀ*si
         # @show f,λ
-        Ǩai = - RB.cstr_forces_on_free_jacobian(bot.st,λi)
+        Ǩai = - RB.cstr_forces_on_free_jacobian(bot.structure,λi)
 
-        Ǩgi = RB.build_geometric_stiffness_matrix_on_free!(bot.st,q,si)
+        Ǩgi = RB.build_geometric_stiffness_matrix_on_free!(bot.structure,q,si)
 
         𝒦pi = transpose(Ň)*(Ǩgi.+Ǩai)*Ň |> Symmetric 
         # vec𝒦pi = SymmetricPacked(𝒦pi).tri
@@ -260,7 +261,7 @@ end
 
 Ňv = Ň*nullspace(v')
 
-Ǩm = RB.build_material_stiffness_matrix_on_free!(bot.st,q,k) 
+Ǩm = RB.build_material_stiffness_matrix_on_free!(bot.structure,q,k) 
 r𝒦m = transpose(Ňv)*(Ǩm)*Ňv |> Symmetric 
 # vecr𝒦m = SymmetricPacked(r𝒦m).tri
 rd = nullspace(r𝒦m)
@@ -286,9 +287,9 @@ vecr𝒦ps = [
         # @show s
         λi = inv(Ǎ*transpose(Ǎ))*Ǎ*Bᵀ*si
         # @show f,λ
-        Ǩai = - RB.cstr_forces_on_free_jacobian(bot.st,λi)
+        Ǩai = - RB.cstr_forces_on_free_jacobian(bot.structure,λi)
 
-        Ǩgi = RB.build_geometric_stiffness_matrix_on_free!(bot.st,q,si)
+        Ǩgi = RB.build_geometric_stiffness_matrix_on_free!(bot.structure,q,si)
 
         r𝒦pi = transpose(Ňv)*(Ǩgi.+Ǩai)*Ňv |> Symmetric 
         # vecr𝒦pi = SymmetricPacked(r𝒦pi).tri
@@ -462,17 +463,17 @@ bot = prism1
 rb1 = RB.get_bodies(bot)[1]
 viz(rb1) 
 plot_traj!(bot;showground=false)
-RB.check_static_equilibrium_output_multipliers(bot.st)
-@myshow bot.st.num_of_dof
-RB.update!(bot.st)
+RB.check_static_equilibrium_output_multipliers(bot.structure)
+@myshow bot.structure.num_of_dof
+RB.update!(bot.structure)
 f = RB.get_cables_tension(bot)
 
 # for use with Class-1 and the 1st rigid fixed
 function build_nullspace_on_free(st)
-    (;sys_free_coords_idx,bodyid2sys_full_coords,bodyid2sys_dof_idx) = st.connectivity.indexed
-    q = RB.get_coords(bot.st)
+    (;sys_free_idx,bodyid2sys_full_coords,bodyid2sys_dof_idx) = st.connectivity.indexed
+    q = RB.get_coords(bot.structure)
     Nin = RB.make_intrinsic_nullspace(st,q)[
-        sys_free_coords_idx,
+        sys_free_idx,
         reduce(vcat,bodyid2sys_dof_idx[begin:end-1])
     ]
     Nex = zeros(eltype(q),30,12)
@@ -496,14 +497,14 @@ function build_nullspace_on_free(st)
     Nin,Nex,Nin*Nex
 end
 
-q = RB.get_coords(bot.st)
-q̌ = RB.get_free_coords(bot.st)
-Ǎ = RB.make_cstr_jacobian(bot.st)(q)
+q = RB.get_coords(bot.structure)
+q̌ = RB.get_free_coords(bot.structure)
+Ǎ = RB.make_cstr_jacobian(bot.structure)(q)
 # Ň_ = RB.nullspace(Ǎ)
 # Ň = RB.modified_gram_schmidt(Ň_)
-Nin,Nex,Ň = build_nullspace_on_free(bot.st)
-Q̃ = RB.build_Q̃(bot.st)
-L̂ = RB.build_L̂(bot.st)
+Nin,Nex,Ň = build_nullspace_on_free(bot.structure)
+Q̃ = RB.build_Q̃(bot.structure)
+L̂ = RB.build_L̂(bot.structure)
 rank(Ň)
 # note 6 intrinsic cstr for 6 bars
 # note 18 extrinsic cstr for 6 pin joints
@@ -687,10 +688,10 @@ GM.activate!();with_theme(theme_pub;
     fig
 end
 
-k = RB.get_cables_stiffness(bot.st)
-l = RB.get_cables_len(bot.st)
+k = RB.get_cables_stiffness(bot.structure)
+l = RB.get_cables_len(bot.structure)
 
-Ǩm = RB.build_material_stiffness_matrix_on_free!(bot.st,q,k)
+Ǩm = RB.build_material_stiffness_matrix_on_free!(bot.structure,q,k)
 𝒦m = transpose(Ň)*Ǩm*Ň |> Symmetric
 vec𝒦m  = vec(𝒦m)
 vecI = vec(Matrix(1.0I,size(𝒦m)))
@@ -703,7 +704,7 @@ f = S*ᾱ
 
 λ = -inv(Ǎ*transpose(Ǎ))*Ǎ*Bᵀ*f
 # @show f,λ
-Ǩa = RB.cstr_forces_on_free_jacobian(bot.st,λ)
+Ǩa = RB.cstr_forces_on_free_jacobian(bot.structure,λ)
 𝒦ain = transpose(Nin)*Ǩa*Nin
 𝒦a = transpose(Ň)*Ǩa*Ň |> Symmetric 
 vals_𝒦a,vecs_𝒦a = eigen(𝒦a)
@@ -712,7 +713,7 @@ vals_𝒦a,vecs_𝒦a = eigen(𝒦a)
 # @show count((x)->x<0,D_𝒦a)
 # @show count((x)->x==0,D_𝒦a)
 
-Ǩg = RB.build_geometric_stiffness_matrix_on_free!(bot.st,q,f)
+Ǩg = RB.build_geometric_stiffness_matrix_on_free!(bot.structure,q,f)
 
 𝒦g = transpose(Ň)*Ǩg*Ň |> Symmetric
 
@@ -730,9 +731,9 @@ vec𝒦ps = [
         # @show s
         λi = inv(Ǎ*transpose(Ǎ))*Ǎ*Bᵀ*si
         # @show f,λ
-        Ǩai = - RB.cstr_forces_on_free_jacobian(bot.st,λi)
+        Ǩai = - RB.cstr_forces_on_free_jacobian(bot.structure,λi)
 
-        Ǩgi = RB.build_geometric_stiffness_matrix_on_free!(bot.st,q,si)
+        Ǩgi = RB.build_geometric_stiffness_matrix_on_free!(bot.structure,q,si)
 
         𝒦pi = transpose(Ň)*(Ǩgi.+Ǩai)*Ň |> Symmetric 
         # vec𝒦pi = SymmetricPacked(𝒦pi).tri
@@ -958,16 +959,16 @@ end
 two = two_tri()
 bot = two
 plot_traj!(bot;showground=false)
-bot.st.num_of_dof
+bot.structure.num_of_dof
 
-RB.check_static_equilibrium_output_multipliers(bot.st)
+RB.check_static_equilibrium_output_multipliers(bot.structure)
 
 function make_nullspace_on_free(st)    
-    (;sys_free_coords_idx,bodyid2sys_dof_idx) = st.connectivity.indexed
-    q = RB.get_coords(bot.st)
+    (;sys_free_idx,bodyid2sys_dof_idx) = st.connectivity.indexed
+    q = RB.get_coords(bot.structure)
     Nin = RB.make_intrinsic_nullspace(st,q)
     Nin[
-        sys_free_coords_idx,
+        sys_free_idx,
         reduce(vcat,bodyid2sys_dof_idx[2:end])
     ][:,end]
     # I2 = RB.NCF.I2_Bool
@@ -988,15 +989,15 @@ function make_nullspace_on_free(st)
     # ret
 end
 
-q = RB.get_coords(bot.st)
-q̌ = RB.get_free_coords(bot.st)
-Ǎ = RB.make_cstr_jacobian(bot.st)(q)
+q = RB.get_coords(bot.structure)
+q̌ = RB.get_free_coords(bot.structure)
+Ǎ = RB.make_cstr_jacobian(bot.structure)(q)
 Ň_ = RB.nullspace(Ǎ)
 Ň = RB.modified_gram_schmidt(Ň_)
 # Ň = Ň_
-# N = RB.make_intrinsic_nullspace(bot.st,q)
+# N = RB.make_intrinsic_nullspace(bot.structure,q)
 
-Ň = make_nullspace_on_free(bot.st)
+Ň = make_nullspace_on_free(bot.structure)
 
 rank(Ň)
 
@@ -1138,23 +1139,23 @@ GM.activate!();with_theme(theme_pub;
 end
 
 
-k = RB.get_cables_stiffness(bot.st)
+k = RB.get_cables_stiffness(bot.structure)
 
-l = RB.get_cables_len(bot.st)
+l = RB.get_cables_len(bot.structure)
 
 
 struct𝒦 = [
     begin
         s = S[:,i]        
-        Ǩm = RB.build_material_stiffness_matrix_on_free!(bot.st,q,100*s)
+        Ǩm = RB.build_material_stiffness_matrix_on_free!(bot.structure,q,100*s)
         𝒦m = transpose(Ň)*Ǩm*Ň 
         # s = S\f
         # @show s
         λ = inv(Ǎ*transpose(Ǎ))*Ǎ*Bᵀ*s
         # @show f,λ
-        Ǩa = - RB.cstr_forces_on_free_jacobian(bot.st,λ)
+        Ǩa = - RB.cstr_forces_on_free_jacobian(bot.structure,λ)
 
-        Ǩg = RB.build_geometric_stiffness_matrix_on_free!(bot.st,q,s)
+        Ǩg = RB.build_geometric_stiffness_matrix_on_free!(bot.structure,q,s)
 
         𝒦p = transpose(Ň)*(Ǩg.+Ǩa)*Ň
         @eponymtuple(𝒦m, 𝒦p,)
@@ -1235,14 +1236,14 @@ landerbot = lander()
 bot = landerbot 
 plot_traj!(bot;showground=false)
 
-q = RB.get_coords(bot.st)
-q̌ = RB.get_free_coords(bot.st)
-Ǎ = RB.make_cstr_jacobian(bot.st)(q)
+q = RB.get_coords(bot.structure)
+q̌ = RB.get_free_coords(bot.structure)
+Ǎ = RB.make_cstr_jacobian(bot.structure)(q)
 Ň_ = RB.nullspace(Ǎ)
 Ň = RB.modified_gram_schmidt(Ň_)
-# Ň = build_nullspace_on_free(bot.st)
-Q̃ = RB.build_Q̃(bot.st)
-L̂ = RB.build_L̂(bot.st)
+# Ň = build_nullspace_on_free(bot.structure)
+Q̃ = RB.build_Q̃(bot.structure)
+L̂ = RB.build_L̂(bot.structure)
 
 Ǎ*Ň |> norm
 
@@ -1258,8 +1259,8 @@ D
 
 ns = size(S,2)
 nk = size(D,2)
-k = RB.get_cables_stiffness(bot.st)
-l = RB.get_cables_len(bot.st)
+k = RB.get_cables_stiffness(bot.structure)
+l = RB.get_cables_len(bot.structure)
 
 f = sum(S,dims=2)
 
@@ -1268,7 +1269,7 @@ f = sum(S,dims=2)
 
 λ = -inv(Ǎ*transpose(Ǎ))*Ǎ*Bᵀ*f
 # @show f,λ
-Ǩa = RB.cstr_forces_on_free_jacobian(bot.st,λ)
+Ǩa = RB.cstr_forces_on_free_jacobian(bot.structure,λ)
 𝒦a = transpose(Ň)*Ǩa*Ň |> Symmetric 
 vals_𝒦a,vecs_𝒦a = eigen(𝒦a)
 @myshow sort(vals_𝒦a)
@@ -1276,8 +1277,8 @@ vals_𝒦a,vecs_𝒦a = eigen(𝒦a)
 # @show count((x)->x<0,D_𝒦a)
 # @show count((x)->x==0,D_𝒦a)
 
-Ǩm = RB.build_material_stiffness_matrix_on_free!(bot.st,q,k)
-Ǩg = RB.build_geometric_stiffness_matrix_on_free!(bot.st,q,f)
+Ǩm = RB.build_material_stiffness_matrix_on_free!(bot.structure,q,k)
+Ǩg = RB.build_geometric_stiffness_matrix_on_free!(bot.structure,q,f)
 
 vec𝒦ps = [
     begin
@@ -1286,9 +1287,9 @@ vec𝒦ps = [
         # @show s
         λi = inv(Ǎ*transpose(Ǎ))*Ǎ*Bᵀ*si
         # @show f,λ
-        Ǩai = - RB.cstr_forces_on_free_jacobian(bot.st,λi)
+        Ǩai = - RB.cstr_forces_on_free_jacobian(bot.structure,λi)
 
-        Ǩgi = RB.build_geometric_stiffness_matrix_on_free!(bot.st,q,si)
+        Ǩgi = RB.build_geometric_stiffness_matrix_on_free!(bot.structure,q,si)
 
         𝒦pi = transpose(Ň)*(Ǩgi.+Ǩai)*Ň |> Symmetric 
         # vec𝒦pi = SymmetricPacked(𝒦pi).tri
@@ -1416,10 +1417,10 @@ bot = towerbot
 plot_traj!(bot;showground=false)
 
 function build_nullspace_on_free(st)
-    (;sys_free_coords_idx,bodyid2sys_full_coords,bodyid2sys_dof_idx) = st.connectivity.indexed
-    q = RB.get_coords(bot.st)
+    (;sys_free_idx,bodyid2sys_full_coords,bodyid2sys_dof_idx) = st.connectivity.indexed
+    q = RB.get_coords(bot.structure)
     Nin = RB.make_intrinsic_nullspace(st,q)[
-        sys_free_coords_idx,
+        sys_free_idx,
         reduce(vcat,bodyid2sys_dof_idx[begin+1:end])
     ]    
     Nex = zeros(eltype(q),11,5)
@@ -1439,14 +1440,14 @@ function build_nullspace_on_free(st)
     Nin*Nex
 end
 
-q = RB.get_coords(bot.st)
-q̌ = RB.get_free_coords(bot.st)
-Ǎ = RB.make_cstr_jacobian(bot.st)(q)
+q = RB.get_coords(bot.structure)
+q̌ = RB.get_free_coords(bot.structure)
+Ǎ = RB.make_cstr_jacobian(bot.structure)(q)
 # Ň_ = RB.nullspace(Ǎ)
 # Ň = RB.modified_gram_schmidt(Ň_)
-Ň = build_nullspace_on_free(bot.st)
-Q̃ = RB.build_Q̃(bot.st)
-L̂ = RB.build_L̂(bot.st)
+Ň = build_nullspace_on_free(bot.structure)
+Q̃ = RB.build_Q̃(bot.structure)
+L̂ = RB.build_L̂(bot.structure)
 
 Ǎ*Ň |> norm
 
@@ -1462,8 +1463,8 @@ D
 
 ns = size(S,2)
 nk = size(D,2)
-k = RB.get_cables_stiffness(bot.st)
-l = RB.get_cables_len(bot.st)
+k = RB.get_cables_stiffness(bot.structure)
+l = RB.get_cables_len(bot.structure)
 
 isis = [8,14,24]
 GM.activate!();with_theme(theme_pub;
@@ -1599,7 +1600,7 @@ f = S*ᾱ
 
 λ = -inv(Ǎ*transpose(Ǎ))*Ǎ*Bᵀ*f
 # @show f,λ
-Ǩa = RB.cstr_forces_on_free_jacobian(bot.st,λ)
+Ǩa = RB.cstr_forces_on_free_jacobian(bot.structure,λ)
 𝒦a = transpose(Ň)*Ǩa*Ň |> Symmetric 
 vals_𝒦a,vecs_𝒦a = eigen(𝒦a)
 @myshow sort(vals_𝒦a)
@@ -1607,7 +1608,7 @@ vals_𝒦a,vecs_𝒦a = eigen(𝒦a)
 # @show count((x)->x<0,D_𝒦a)
 # @show count((x)->x==0,D_𝒦a)
 
-Ǩm = RB.build_material_stiffness_matrix_on_free!(bot.st,q,k)
+Ǩm = RB.build_material_stiffness_matrix_on_free!(bot.structure,q,k)
 𝒦m = transpose(Ň)*Ǩm*Ň |> Symmetric
 vec𝒦m = vec(𝒦m)
 vecI = vec(Matrix(1.0I,size(𝒦m)))
@@ -1619,9 +1620,9 @@ vec𝒦ps = [
         # @show s
         λi = inv(Ǎ*transpose(Ǎ))*Ǎ*Bᵀ*si
         # @show f,λ
-        Ǩai = - RB.cstr_forces_on_free_jacobian(bot.st,λi)
+        Ǩai = - RB.cstr_forces_on_free_jacobian(bot.structure,λi)
 
-        Ǩgi = RB.build_geometric_stiffness_matrix_on_free!(bot.st,q,si)
+        Ǩgi = RB.build_geometric_stiffness_matrix_on_free!(bot.structure,q,si)
 
         𝒦pi = transpose(Ň)*(Ǩgi.+Ǩai)*Ň |> Symmetric 
         vals_𝒦pi, _ = eigen(𝒦pi)
@@ -1753,7 +1754,7 @@ end
 #-- T bars
 tbbot = Tbars(;θ=π/4)
 bot = tbbot
-@myshow bot.st.num_of_dof
+@myshow bot.structure.num_of_dof
 bodies = RB.get_bodies(bot)
 body1 = bodies[1]
 dt = 1e-3
@@ -1833,13 +1834,13 @@ end
 tbbot = Tbars(;θ=0.0)
 bot = tbbot
 
-RB.check_static_equilibrium_output_multipliers(bot.st)
+RB.check_static_equilibrium_output_multipliers(bot.structure)
 
 function make_nullspace_on_free(st)    
-    (;sys_free_coords_idx,bodyid2sys_full_coords,bodyid2sys_dof_idx) = st.connectivity.indexed
-    q = RB.get_coords(bot.st)
+    (;sys_free_idx,bodyid2sys_full_coords,bodyid2sys_dof_idx) = st.connectivity.indexed
+    q = RB.get_coords(bot.structure)
     Nin = RB.make_intrinsic_nullspace(st,q)[
-        sys_free_coords_idx,
+        sys_free_idx,
         reduce(vcat,bodyid2sys_dof_idx[2:end])
     ]
     I3 = I(3)
@@ -1870,13 +1871,13 @@ function make_nullspace_on_free(st)
     Nin*Nex
 end
 
-q = RB.get_coords(bot.st)
-q̌ = RB.get_free_coords(bot.st)
-Ǎ = RB.make_cstr_jacobian(bot.st)(q)
+q = RB.get_coords(bot.structure)
+q̌ = RB.get_free_coords(bot.structure)
+Ǎ = RB.make_cstr_jacobian(bot.structure)(q)
 Ň_ = RB.nullspace(Ǎ)
 Ň = RB.modified_gram_schmidt(Ň_)
 
-Ň = make_nullspace_on_free(bot.st)
+Ň = make_nullspace_on_free(bot.structure)
 
 # done construct null space 
 #note only work in θ = 0
@@ -1884,8 +1885,8 @@ rank(Ň)
 
 Ǎ*Ň |> norm
 
-Q̃ = RB.build_Q̃(bot.st)
-L̂ = RB.build_L̂(bot.st)
+Q̃ = RB.build_Q̃(bot.structure)
+L̂ = RB.build_L̂(bot.structure)
 
 # Left hand side
 Q̃L̂ = Q̃*L̂
@@ -1899,22 +1900,22 @@ D
 nk = size(D,2)
 ns = size(S,2)
 
-k = RB.get_cables_stiffness(bot.st)
+k = RB.get_cables_stiffness(bot.structure)
 
-l = RB.get_cables_len(bot.st)
+l = RB.get_cables_len(bot.structure)
 
 struct𝒦 = [
     begin
         s = S[:,i]        
-        Ǩm = RB.build_material_stiffness_matrix_on_free!(bot.st,q,s)
+        Ǩm = RB.build_material_stiffness_matrix_on_free!(bot.structure,q,s)
         𝒦m = transpose(Ň)*Ǩm*Ň 
         # s = S\f
         # @show s
         λ = inv(Ǎ*transpose(Ǎ))*Ǎ*Bᵀ*s
         # @show f,λ
-        Ǩa = - RB.cstr_forces_on_free_jacobian(bot.st,λ)
+        Ǩa = - RB.cstr_forces_on_free_jacobian(bot.structure,λ)
 
-        Ǩg = RB.build_geometric_stiffness_matrix_on_free!(bot.st,q,s)
+        Ǩg = RB.build_geometric_stiffness_matrix_on_free!(bot.structure,q,s)
 
         𝒦g = transpose(Ň)*(Ǩg)*Ň
 
@@ -2110,24 +2111,24 @@ RB.solve!(prob,RB.Zhong06();tspan,dt,ftol=1e-7,maxiters=50,verbose=true,exceptio
 
 plot_traj!(bot;showground=false)
 
-@myshow bot.st.num_of_dof
+@myshow bot.structure.num_of_dof
 
-RB.check_static_equilibrium_output_multipliers(bot.st)
+RB.check_static_equilibrium_output_multipliers(bot.structure)
 
-q = RB.get_coords(bot.st)
-q̌ = RB.get_free_coords(bot.st)
-Ǎ = RB.make_cstr_jacobian(bot.st)(q)
+q = RB.get_coords(bot.structure)
+q̌ = RB.get_free_coords(bot.structure)
+Ǎ = RB.make_cstr_jacobian(bot.structure)(q)
 Ň_ = RB.nullspace(Ǎ)
 Ň = RB.modified_gram_schmidt(Ň_)
 
-# Ň = build_nullspace_on_free(bot.st)
+# Ň = build_nullspace_on_free(bot.structure)
 
 rank(Ň)
 
 Ǎ*Ň |> norm
 
-Q̃ = RB.build_Q̃(bot.st)
-L̂ = RB.build_L̂(bot.st)
+Q̃ = RB.build_Q̃(bot.structure)
+L̂ = RB.build_L̂(bot.structure)
 
 # Left hand side
 Q̃L̂ = Q̃*L̂
@@ -2141,8 +2142,8 @@ D
 ns = size(S,2)
 nk = size(D,2)
 
-k = RB.get_cables_stiffness(bot.st)
-# l = RB.get_cables_len(bot.st)
+k = RB.get_cables_stiffness(bot.structure)
+# l = RB.get_cables_len(bot.structure)
 
 ᾱ = ones(ns)
 f =  S*ᾱ
@@ -2272,13 +2273,13 @@ end
 
 λ = -inv(Ǎ*transpose(Ǎ))*Ǎ*Bᵀ*f
 # @show f,λ
-Ǩa = RB.cstr_forces_on_free_jacobian(bot.st,λ)
+Ǩa = RB.cstr_forces_on_free_jacobian(bot.structure,λ)
 𝒦a = transpose(Ň)*Ǩa*Ň |> Symmetric 
 vals_𝒦a,vecs_𝒦a = eigen(𝒦a)
 @myshow sort(vals_𝒦a)
 @myshow 𝒦a[1:3,1:3]
 
-Ǩm = RB.build_material_stiffness_matrix_on_free!(bot.st,q,k)
+Ǩm = RB.build_material_stiffness_matrix_on_free!(bot.structure,q,k)
 𝒦m = transpose(Ň)*Ǩm*Ň |> Symmetric
 vals_𝒦m,vecs_𝒦m = eigen(𝒦m)
 
@@ -2295,10 +2296,10 @@ struct𝒦p = [
         # @show s
         λ = inv(Ǎ*transpose(Ǎ))*Ǎ*Bᵀ*s
         # @show f,λ
-        Ǩa = - RB.cstr_forces_on_free_jacobian(bot.st,λ)
+        Ǩa = - RB.cstr_forces_on_free_jacobian(bot.structure,λ)
         𝒦a = transpose(Ň)*Ǩa*Ň
 
-        Ǩg = RB.build_geometric_stiffness_matrix_on_free!(bot.st,q,s)
+        Ǩg = RB.build_geometric_stiffness_matrix_on_free!(bot.structure,q,s)
         𝒦g = transpose(Ň)*Ǩg*Ň
 
         𝒦p = 𝒦a .+ 𝒦g
@@ -2426,12 +2427,12 @@ end
 # @show f,λ
 using Symbolics
 @variables λ[1:6]
-rb2 = RB.get_bodies(bot.st)[2]
+rb2 = RB.get_bodies(bot.structure)[2]
 rb2.state.cache.funcs.cstr_forces_jacobian(λ)#[:,free_idx]
 
 Ǎ*Ǎ'
 
-Ǩa = RB.cstr_forces_on_free_jacobian(bot.st,Symbolics.scalarize(λ))
+Ǩa = RB.cstr_forces_on_free_jacobian(bot.structure,Symbolics.scalarize(λ))
 𝒦a = transpose(Ň)*Ǩa*Ň 
 vals_𝒦a,vecs_𝒦a = eigen(𝒦a)
 sort(vals_𝒦a)
@@ -2442,7 +2443,7 @@ Symbolics.unwrap(λ)[memincst...]
 # @show count((x)->x<0,D_𝒦a)
 # @show count((x)->x==0,D_𝒦a)
 
-Ǩm, Ǩg = RB.build_Ǩm_Ǩg!(bot.st,q,f,k)
+Ǩm, Ǩg = RB.build_Ǩm_Ǩg!(bot.structure,q,f,k)
 
 𝒦m = transpose(Ň)*Ǩm*Ň |> Symmetric 
 𝒦g = transpose(Ň)*Ǩg*Ň |> Symmetric 

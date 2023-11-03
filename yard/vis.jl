@@ -191,11 +191,11 @@ function plot_traj!(bot::RB.Robot;
         sup! = (ax,tgob,sgi)->nothing,
         kargs...
     )
-    (;st,traj) = bot
-    ndim = RB.get_num_of_dims(st)
-    st.state.system.q .= traj.q[begin]
-    RB.update!(st)
-    tgobini = Observable(deepcopy(st))
+    (;structure,traj) = bot
+    ndim = RB.get_num_of_dims(structure)
+    structure.state.system.q .= traj.q[begin]
+    RB.update!(structure)
+    tgobini = Observable(deepcopy(structure))
     xmin, xmax = xlims
     ymin, ymax = ylims
     zmin, zmax = zlims
@@ -232,7 +232,7 @@ function plot_traj!(bot::RB.Robot;
         this_step = parsed_steps[sgi]
         this_time = Observable(traj.t[this_step])
         RB.goto_step!(bot,this_step;actuate)
-        tgob = Observable(deepcopy(st))
+        tgob = Observable(deepcopy(structure))
         axtitle = Makie.lift(this_time) do tt
             titleformatfunc(sgi,tt)
         end
@@ -359,14 +359,14 @@ function plot_traj!(bot::RB.Robot;
                     if actuate
                         RB.actuate!(bot,[traj.t[this_step]])
                     end
-                    st.state.system.q .= traj.q[this_step]
-                    st.state.system.c .= traj.c[this_step]
-                    RB.update!(st)
-                    # @show RB.mechanical_energy(st)
+                    structure.state.system.q .= traj.q[this_step]
+                    structure.state.system.c .= traj.c[this_step]
+                    RB.update!(structure)
+                    # @show RB.mechanical_energy(structure)
                     #
                     this_time[] = traj.t[this_step]
-                    RB.analyse_slack(st,true)
-                    tgob[] = st
+                    RB.analyse_slack(structure,true)
+                    tgob[] = structure
                 end
             else
                 grid3 = sg[2,:] = GridLayout()
@@ -378,14 +378,14 @@ function plot_traj!(bot::RB.Robot;
                     if actuate
                         RB.actuate!(bot,[traj.t[this_step]])
                     end
-                    st.state.system.q .= traj.q[this_step]
-                    st.state.system.c .= traj.c[this_step]
-                    RB.update!(st)
-                    # @show RB.mechanical_energy(st)
+                    structure.state.system.q .= traj.q[this_step]
+                    structure.state.system.c .= traj.c[this_step]
+                    RB.update!(structure)
+                    # @show RB.mechanical_energy(structure)
                     #
                     this_time[] = traj.t[this_step]
-                    RB.analyse_slack(st,true)
-                    tgob[] = st
+                    RB.analyse_slack(structure,true)
+                    tgob[] = structure
                     if auto
                         if AxisType <: LScene
                             center!(ax.scene)
@@ -422,7 +422,7 @@ function savefig(fig,figname=nothing)
     fig
 end
 
-@recipe(Viz, st) do scene
+@recipe(Viz, structure) do scene
     # theme_pub,
     Attributes(        
         isref=false,
@@ -450,7 +450,7 @@ end
 
 function Makie.plot!(viz::Viz{Tuple{S}};
     ) where S <:RB.AbstractBody
-    body_ob = viz[:st]
+    body_ob = viz[:structure]
     # body decorations
     mass_center_ob = @lift $body_ob.state.mass_locus_state.position |> Makie.Point
     nodes_ob = @lift begin
@@ -506,7 +506,7 @@ end
 
 function Makie.plot!(viz::Viz{Tuple{Vector{S}}};
     ) where S <: RB.Cable
-    cables_ob = viz[:st]
+    cables_ob = viz[:structure]
     point_mid_ob = @lift [
         begin 
             point_start = cab.state.start
@@ -593,8 +593,8 @@ function Makie.plot!(viz::Viz{Tuple{S}};
         show_mass_centers = viz.show_mass_centers[]
         show_nodes = viz.show_nodes[]
     end
-    tgob = viz[:st]
-    (;tensiles,nbodies) = tgob[]
+    tgob = viz[:structure]
+    (;tensiles,num_of_bodies) = tgob[]
     ncables = length(tensiles.cables)
     if ncables > 0 && viz.showcables[]
         cables_ob = @lift $tgob.tensiles.cables
@@ -606,11 +606,11 @@ function Makie.plot!(viz::Viz{Tuple{S}};
             show_cable_labels,
         )
     end
-    if nbodies > 0
+    if num_of_bodies > 0
         bodies_ob = @lift RB.get_bodies($tgob)
         bodies_array_ob = [
             @lift $(bodies_ob)[i]
-            for i = 1:nbodies
+            for i = 1:num_of_bodies
         ]
         for body_ob in bodies_array_ob
             viz!(viz,body_ob;
@@ -652,11 +652,11 @@ function get3Dstate(body)
     end
 end
 
-function get_linesegs_cables(st;slackonly=false,noslackonly=false)
-    (;connected) = st.connectivity.tensioned
-    (;cables) = st.tensiles
-    ndim = RB.get_num_of_dims(st)
-    T = RB.get_numbertype(st)
+function get_linesegs_cables(structure;slackonly=false,noslackonly=false)
+    (;connected) = structure.connectivity.tensioned
+    (;cables) = structure.tensiles
+    ndim = RB.get_num_of_dims(structure)
+    T = RB.get_numbertype(structure)
     linesegs_cables = Vector{Tuple{Point{ndim,T},Point{ndim,T}}}()
     foreach(connected) do scnt
         scable = cables[scnt.id]
@@ -835,10 +835,10 @@ function simple2mesh(sp,color=:slategrey)
     elems = Meshes.elements(topo)
 
     # coords of vertices
-    coords = Meshes.coords.(verts)
+    coords = Meshes.coordinates.(verts)
     # fan triangulation (assume convexity)
     tris4elem = map(elems) do elem
-      I = Meshes.idx(elem)
+      I = Meshes.indices(elem)
       [[I[1], I[i], I[i+1]] for i in 2:length(I)-1]
     end
 
@@ -1032,7 +1032,7 @@ function plot_self_stress_states(
         botinput,
         S;
         rtol = 1e-14
-        # Ň = build_nullspace_on_free(bot.st)
+        # Ň = build_nullspace_on_free(bot.structure)
     )
     bot = deepcopy(botinput)
     @myshow S
@@ -1108,7 +1108,7 @@ function plot_kinematic_indeterminacy(
         botinput,
         D,
         Ň,
-        # Ň = build_nullspace_on_free(bot.st)
+        # Ň = build_nullspace_on_free(bot.structure)
     )
     bot = deepcopy(botinput)
     nk = size(D,2)

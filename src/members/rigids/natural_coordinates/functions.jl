@@ -26,29 +26,29 @@ end
 
 function get_X(nmcs::NC,q::AbstractVector)
     X = nmcs.conversion_to_X*q
-    ndim = get_num_of_dims(nmcs)
+    num_of_dim = get_num_of_dims(nmcs)
     nld = get_num_of_local_dims(nmcs)
-    SMatrix{ndim,nld}(X[ndim+1:end])
+    SMatrix{num_of_dim,nld}(X[num_of_dim+1:end])
 end
 
 get_X(q::AbstractVector,nmcs::NC) = get_X(nmcs,q)
 
 function find_rotation(nmcs::NC,q::AbstractVector)
-    ndim = get_num_of_dims(nmcs)
+    num_of_dim = get_num_of_dims(nmcs)
     if nmcs isa NC2D4C
         (;r̄i,X̄) = nmcs
         ū,v̄ = get_uv(nmcs,vcat(r̄i,vec(X̄)))
         u,v = get_uv(nmcs,q)
-        R = SMatrix{ndim,ndim}([u;;v]*inv([ū;;v̄]))
+        R = SMatrix{num_of_dim,num_of_dim}([u;;v]*inv([ū;;v̄]))
     elseif nmcs isa NC3D6C
         (;r̄i,X̄) = nmcs
         ū,v̄,w̄ = get_uvw(nmcs,vcat(r̄i,vec(X̄)))
         u,v,w = get_uvw(nmcs,q)
-        R = SMatrix{ndim,ndim}([u;;v;;w]*inv([ū;;v̄;;w̄]))
+        R = SMatrix{num_of_dim,num_of_dim}([u;;v;;w]*inv([ū;;v̄;;w̄]))
     else
         X = get_X(nmcs,q)
         (;invX̄) = nmcs
-        R = SMatrix{ndim,ndim}(X*invX̄)
+        R = SMatrix{num_of_dim,num_of_dim}(X*invX̄)
     end
     return R
 end
@@ -59,8 +59,8 @@ find_rotation(q::AbstractVector, nmcs::NC) = find_rotation(nmcs,q)
 function find_angular_velocity(nmcs::NC,q::AbstractVector,q̇::AbstractVector)
     Ẋ = get_X(nmcs,q̇)
     X = get_X(nmcs,q)
-    ndim = get_num_of_dims(nmcs)
-    if ndim == 2
+    num_of_dim = get_num_of_dims(nmcs)
+    if num_of_dim == 2
         u = X[:,1]
         u̇ = Ẋ[:,1]
         ω = SVector{1}([-u[2],u[1]]\u̇)
@@ -83,12 +83,12 @@ function to_local_coords(nmcs::NC,r̄)
 end
 
 function to_transformation(nmcs::NC,c)
-    ndim = get_num_of_dims(nmcs)
+    num_of_dim = get_num_of_dims(nmcs)
     nlds = get_num_of_local_dims(nmcs)
     ncoords = get_num_of_coords(nmcs)
     conversion = nmcs.conversion_to_std
     C_raw = hcat(1,transpose(SVector{nlds}(c)))
-    SMatrix{ndim,ncoords}(kron(C_raw,IMatrix(ndim))*conversion)
+    SMatrix{num_of_dim,ncoords}(kron(C_raw,IMatrix(num_of_dim))*conversion)
 end
 
 """
