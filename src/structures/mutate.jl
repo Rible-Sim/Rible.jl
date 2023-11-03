@@ -51,7 +51,7 @@ function stretch_rigids!(st)
     (;c) = state.system
     foreach(bodies) do body
         bodyid = body.prop.id
-        stretch_body!(body,c[bodyid2sys_loci_coords_idx[bodyid]])
+        stretch_loci!(body,c[bodyid2sys_loci_coords_idx[bodyid]])
     end
 end
 
@@ -66,7 +66,7 @@ function move_rigids!(st)
     foreach(bodies) do body
         bodyid = body.prop.id
         (;q,q̇) = state.parts[bodyid]
-        move_body!(body,q,q̇)
+        update_loci_states!(body,q,q̇)
     end
 end
 
@@ -91,9 +91,9 @@ function update_rigids!(st)
     foreach(bodies) do body
         bodyid = body.prop.id
         (;q, q̇) = state.members[bodyid]
-        update_body!(body,q,q̇)
+        update_state!(body,q,q̇)
         update_transformations!(body,q)
-        move_body!(body,q,q̇)
+        update_loci_states!(body,q,q̇)
     end
 end
 

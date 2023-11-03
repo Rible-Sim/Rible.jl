@@ -3,9 +3,10 @@ abstract type AbstractBodyProperty{N,T} end
 abstract type AbstractBodyState{N,T} end
 abstract type AbstractBodyCache end
 
-update_body!(body::AbstractBody,q,q̇) = update_body!(body.state,body.coords,body.cache,body.prop,q,q̇)
-move_body!(body::AbstractBody,q,q̇)	= move_body!(body.state,body.coords,body.cache,body.prop,q,q̇)
-stretch_body!(body::AbstractBody,c) = stretch_body!(body.coords,body.cache,body.prop,c)
+update_cache!(body::AbstractBody,q,q̇) = update_cache!(body.cache,body.coords,body.prop,q,q̇)
+update_state!(body::AbstractBody,q,q̇) = update_state!(body.state,body.coords,body.cache,body.prop,q,q̇)
+update_loci_states!(body::AbstractBody,q,q̇) = update_loci_states!(body.state,body.coords,body.cache,body.prop,q,q̇)
+stretch_loci!(body::AbstractBody,c) = stretch_loci!(body.coords,body.cache,body.prop,c)
 update_transformations!(body::AbstractBody,q) = update_transformations!(body.coords,body.cache,body.state,body.prop,q)
 function body_state2coords_state(body::AbstractBody)
     body_state2coords_state(body.state,body.coords)
@@ -78,6 +79,8 @@ struct NonminimalCoordinatesCache{MType,JType,HType,GType}
     M⁻¹::MType
     ∂Mq̇∂q::JType
     ∂M⁻¹p∂q::JType
+    "Coriolis force"
     Ṁq̇::GType
+    "Centripetal force"
     ∂T∂qᵀ::GType
 end

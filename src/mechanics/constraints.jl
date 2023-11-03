@@ -102,13 +102,13 @@ end
 function get_jointed_free_idx(cst)
     (;num_of_cstr,hen2egg,) = cst
     (;hen,egg) = hen2egg
-    uci_hen = hen.rbsig.state.cache.free_idx
-    uci_egg = egg.rbsig.state.cache.free_idx
-    ncoords1 = NCF.get_num_of_coords(hen.rbsig.state.cache.funcs.nmcs)
-    # ncoords2 = NCF.get_num_of_coords(egg.rbsig.state.cache.nmcs)
+    free_idx_hen = hen.rbsig.coords.free_idx
+    free_idx_egg = egg.rbsig.coords.free_idx
+    ncoords_hen = NCF.get_num_of_coords(hen.rbsig.coords.nmcs)
+    # ncoords_egg = NCF.get_num_of_coords(egg.rbsig.coords.nmcs)
     free_idx = vcat(
-        uci_hen,
-        uci_egg .+ ncoords1
+        free_idx_hen,
+        free_idx_egg .+ ncoords_hen
     )
 end
 

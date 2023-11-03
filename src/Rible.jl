@@ -54,8 +54,8 @@ import .NCF: get_num_of_cstr, get_num_of_coords, get_num_of_dof
 import .NCF: get_num_of_dims, get_num_of_local_dims
 import .NCF: cartesian_frame2coords
 
-include("members/rigids/QBF.jl")
-using .QBF
+include("members/rigids/QCF.jl")
+using .QCF
 
 include("members/abstract_body.jl")
 

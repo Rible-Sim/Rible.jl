@@ -1,4 +1,4 @@
-module QBF
+module QCF
 using LinearAlgebra
 using Rotations
 using Quaternions

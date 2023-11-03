@@ -30,10 +30,10 @@ function build_Q̃(st)
         (;hen,egg) = cc
         rb1 = hen.rbsig
         rb2 = egg.rbsig
-        C1 = rb1.state.cache.Cps[hen.pid]
-        C2 = rb2.state.cache.Cps[egg.pid]
-        uci1 = rb1.state.cache.free_idx
-        uci2 = rb2.state.cache.free_idx
+        C1 = rb1.cache.Cps[hen.pid]
+        C2 = rb2.cache.Cps[egg.pid]
+        uci1 = rb1.coords.free_idx
+        uci2 = rb2.coords.free_idx
         m2sf1 = bodyid2sys_free_coords[rb1.prop.id]
         m2sf2 = bodyid2sys_free_coords[rb2.prop.id]
         Q̃[m2sf2,(j-1)*num_of_dim+1:j*num_of_dim] .-= transpose(C2)[uci2,:]

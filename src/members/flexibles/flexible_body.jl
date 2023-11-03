@@ -172,7 +172,7 @@ function body_state2coords_state(fb::FlexibleBody)
     e,ė
 end
 
-function update_body!(
+function update_state!(
         state::FlexibleBodyState,
         cache::FlexibleBodyCoordinatesCache{<:ANCF.CoordinateFunctions},
         prop::AbstractBodyProperty,q,q̇)
@@ -184,7 +184,7 @@ function update_body!(
     mul!(mass_locus_state.velocity, Sg, q̇)
 end
 
-function stretch_body!(
+function stretch_loci!(
     cache::FlexibleBodyCoordinatesCache,
 	prop::AbstractBodyProperty,c)
 end
@@ -195,7 +195,7 @@ function update_transformations!(
     prop::AbstractBodyProperty,q)
 end
 
-function move_body!(
+function update_loci_states!(
         state::FlexibleBodyState,
         cache::FlexibleBodyCoordinatesCache{<:ANCF.CoordinateFunctions},
         prop::AbstractBodyProperty,e,ė)

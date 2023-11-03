@@ -66,11 +66,13 @@ function cstr_forces_on_free_jacobian(st::AbstractStructure,λ)
         bodyid = body.prop.id
         memfree = bodyid2sys_free_coords[bodyid]
         memincst = bodyid2sys_intrinsic_cstr_idx[bodyid]
-        free_idx = body.state.cache.free_idx
+        free_idx = body.coords.free_idx
         if !isempty(memincst)
             ret[memfree,memfree] .+= make_cstr_forces_jacobian(
-                body.state.cache.funcs,
-                body.state.cache.cstr_hessians
+                body.coords.nmcs,
+                body.coords.free_idx,
+                body.coords.cstr_idx,
+                body.cache.coords_cache.cstr_hessians
             )(λ[memincst])#[:,free_idx]
         end
     end
@@ -215,8 +217,8 @@ function build_material_stiffness_matrix_on_free!(st::Structure,q,k)
         rb2 = scnt.egg.rbsig
         ap1id = scnt.hen.pid
         ap2id = scnt.egg.pid
-        C1 = rb1.state.cache.Cps[ap1id]
-        C2 = rb2.state.cache.Cps[ap2id]
+        C1 = rb1.cache.Cps[ap1id]
+        C2 = rb2.cache.Cps[ap2id]
         mfull1 = bodyid2sys_full_coords[rb1.prop.id]
         mfull2 = bodyid2sys_full_coords[rb2.prop.id]
         cable = cables[j]
@@ -248,8 +250,8 @@ function build_geometric_stiffness_matrix_on_free!(st::Structure,q,f)
         rb2 = scnt.egg.rbsig
         ap1id = scnt.hen.pid
         ap2id = scnt.egg.pid
-        C1 = rb1.state.cache.Cps[ap1id]
-        C2 = rb2.state.cache.Cps[ap2id]
+        C1 = rb1.cache.Cps[ap1id]
+        C2 = rb2.cache.Cps[ap2id]
         mfull1 = bodyid2sys_full_coords[rb1.prop.id]
         mfull2 = bodyid2sys_full_coords[rb2.prop.id]
         cable = cables[j]

@@ -344,7 +344,7 @@ function make_top(origin_position = [0.0,0.0,0.0],
         R = one(RotMatrix{3}),
         origin_velocity = [0.0,0.0,0.0],
         Ω = [0.0,0.0,5.0],
-        cT = RB.QBF.QC;
+        cT = RB.QCF.QC;
         μ = 0.5,
         e = 0.9,
         color = :slategray,
@@ -408,8 +408,8 @@ function make_top(origin_position = [0.0,0.0,0.0],
     )
     ri = origin_position+R*loci[5]
     @myshow ri
-    if cT == RB.QBF.QC
-        nmcs = RB.QBF.QC(m,Ī)
+    if cT == RB.QCF.QC
+        nmcs = RB.QCF.QC(m,Ī)
     else
         nmcs = RB.NCF.NC1P3V(ri,origin_position,R,origin_velocity,ω)
     end

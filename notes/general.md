@@ -50,7 +50,7 @@ more than necessary, but not redundant
 - [ ] reduce functions fields
 - [ ] preallocations for autodiff
 - [ ] joint cstr, quadratic forms
-  - [ ] put joint into `NCF`, `QBF`
+  - [ ] put joint into `NCF`, `QCF`
 - [x] put contacts into loci
 - [ ] local distribution law
 - [ ] try SNAKE/RATTLE scheme

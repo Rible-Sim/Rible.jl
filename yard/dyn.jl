@@ -199,13 +199,13 @@ function contact_dynfuncs(bot;
                     epi = 3(ci-1)+1:3ci
                     D[epi,:] = dm*CT
                     ŕ[epi]   = dm*position
-                    if state.cache.funcs.nmcs isa RB.QBF.QC
+                    if state.cache.funcs.nmcs isa RB.QCF.QC
                         Tbody = RB.build_T(st,bid)
                         locus = prop.loci[pid]
-                        ∂Cẋ∂x = RB.QBF.make_∂Cẋ∂x(locus.position)
+                        ∂Cẋ∂x = RB.QCF.make_∂Cẋ∂x(locus.position)
                         ∂Cq̇∂q = ∂Cẋ∂x(Tbody*q,Tbody*q̇)*Tbody
                         ∂Dq̇∂q[epi,:] = dm*∂Cq̇∂q
-                        ∂Cᵀf∂x = RB.QBF.make_∂Cᵀf∂x(locus.position)
+                        ∂Cᵀf∂x = RB.QCF.make_∂Cᵀf∂x(locus.position)
                         Λi = @view Λ[epi]
                         fi = dm'*Λi
                         ∂DᵀΛ∂q .+= transpose(Tbody)*∂Cᵀf∂x(Tbody*q,fi)*Tbody

@@ -181,7 +181,7 @@ end
 
 function get_CoordinatesCache(
         prop::RigidBodyProperty{N,T},
-        qcs::QBF.QC,
+        qcs::QCF.QC,
         pres_idx=Int[],
         cstr_idx=get_cstr_idx(qcs)
     ) where {N,T}
@@ -250,7 +250,32 @@ function body_state2coords_state(state::RigidBodyState,coords::NonminimalCoordin
     cartesian_frame2coords(coords.nmcs,origin_position,R,origin_velocity,ω)
 end
 
-function update_body!(state::RigidBodyState,
+function update_cache!(
+        cache::RigidBodyCache,
+        coords::NonminimalCoordinates{<:NCF.NC},
+        prop::RigidBodyProperty,
+        q,q̇
+    )
+end
+
+function update_cache!(
+        cache::RigidBodyCache,
+        coords::NonminimalCoordinates{<:QCF.QC},
+        prop::RigidBodyProperty,
+        q,q̇
+    )
+    (;M,M⁻¹,∂Mq̇∂q,∂M⁻¹p∂q,∂T∂qᵀ) = cache
+    # update inertia
+    # @show x[4:7],ẋ[4:7]
+    qcs = coords.nmcs
+    M .= funcs.build_M(x)
+    M⁻¹ .= funcs.build_M⁻¹(x)	
+    ∂Mq̇∂q .= funcs.build_∂Mẋ∂x(x,ẋ)
+    ∂M⁻¹p∂q .= funcs.build_∂M⁻¹y∂x(x,M*ẋ)
+    ∂T∂qᵀ .= funcs.build_∂T∂xᵀ(x,ẋ)
+end
+
+function update_state!(state::RigidBodyState,
             coords::NonminimalCoordinates{<:NCF.NC},cache,
             prop::RigidBodyProperty,q,q̇)
     (;
@@ -268,31 +293,25 @@ function update_body!(state::RigidBodyState,
     ω .= NCF.find_angular_velocity(nmcs,q,q̇)
 end
 
-function update_body!(state::RigidBodyState,
-            coords::NonminimalCoordinates{<:QBF.QC},cache,
+function update_state!(state::RigidBodyState,
+            coords::NonminimalCoordinates{<:QCF.QC},cache,
             prop::RigidBodyProperty,x,ẋ)
     (;
         origin_position,R,
         origin_velocity,ω,
         mass_locus_state,
     ) = state
-    (;M,M⁻¹,∂Mq̇∂q,∂M⁻¹p∂q,∂T∂qᵀ) = cache
-    # update inertia
-    # @show x[4:7],ẋ[4:7]
-    qcs = coords.nmcs
-    M .= funcs.build_M(x)
-    M⁻¹ .= funcs.build_M⁻¹(x)	
-    ∂Mq̇∂q .= funcs.build_∂Mẋ∂x(x,ẋ)
-    ∂M⁻¹p∂q .= funcs.build_∂M⁻¹y∂x(x,M*ẋ)
-    ∂T∂qᵀ .= funcs.build_∂T∂xᵀ(x,ẋ)
     origin_position .= mass_locus_state.position .= x[1:3]
     origin_velocity .= mass_locus_state.velocity .= ẋ[1:3]
-    R .= QBF.find_rotation(x)
-    ω .= R*QBF.find_local_angular_velocity(x,ẋ)
+    R .= QCF.find_rotation(x)
+    ω .= R*QCF.find_local_angular_velocity(x,ẋ)
 end
 
-function stretch_body!(coords::NonminimalCoordinates{<:NCF.NC},cache,
-                    prop::RigidBodyProperty,c)
+function stretch_loci!(
+        coords::NonminimalCoordinates{<:NCF.NC},
+        cache,
+        prop::RigidBodyProperty,c
+    )
     (;loci) = prop
     (;Cps,) = cache
     (;nmcs) = coords
@@ -302,35 +321,12 @@ function stretch_body!(coords::NonminimalCoordinates{<:NCF.NC},cache,
     end
 end
 
-function stretch_body!(coords::NonminimalCoordinates{<:QBF.QC},cache,
-                prop::RigidBodyProperty,c)
-end
-
-function move_body!(state::RigidBodyState,
-                    coords::NonminimalCoordinates{<:NCF.NC},cache,
-                    prop::RigidBodyProperty,q,q̇)
-    (;loci_states) = state
-    (;Cps) = cache
-    for (i,locus_state) in enumerate(loci_states)
-        mul!(locus_state.position, Cps[i], q)
-        mul!(locus_state.velocity, Cps[i], q̇)
-    end
-end
-
-function move_body!(state::RigidBodyState,
-                    coords::NonminimalCoordinates{<:QBF.QC},cache,
-                    prop::RigidBodyProperty,q,q̇)
-    update_body!(state,cache,prop,q,q̇)
-    (;loci) = prop
-    (;loci_states,
-    origin_position,R,
-    origin_velocity,ω,
-    ) = state
-    for (locus,locus_state) in zip(loci,loci_states)
-        relative_velocity = R * locus.position
-        locus_state.position .= origin_position .+ relative_velocity
-        locus_state.velocity .= origin_velocity .+ ω × relative_velocity
-    end
+function stretch_loci!(
+        coords::NonminimalCoordinates{<:QCF.QC},
+        cache,
+        prop::RigidBodyProperty,c
+    )
+    # to be implemented
 end
 
 function update_transformations!(
@@ -340,13 +336,13 @@ function update_transformations!(
 end
 
 function update_transformations!(
-        coords::NonminimalCoordinates{<:QBF.QC},cache,
+        coords::NonminimalCoordinates{<:QCF.QC},cache,
         state::RigidBodyState,
         prop::RigidBodyProperty,q)
     (;mass_locus,loci) = prop
     (;R,) = state
     (;Cg,Cps) = cache
-    L = QBF.Lmat(q[4:7])
+    L = QCF.Lmat(q[4:7])
     for (Cp,lo) in zip(Cps,loci)
         for i = 1:3 
         	Cp[i,i] = 1
@@ -357,6 +353,34 @@ function update_transformations!(
     	Cg[i,i] = 1
     end
     Cg[1:3,4:7] .= -2R*skew(mass_locus.position)*L
+end
+
+
+function update_loci_states!(state::RigidBodyState,
+        coords::NonminimalCoordinates{<:NCF.NC},cache,
+        prop::RigidBodyProperty,q,q̇)
+    (;loci_states) = state
+    (;Cps) = cache
+    for (i,locus_state) in enumerate(loci_states)
+        mul!(locus_state.position, Cps[i], q)
+        mul!(locus_state.velocity, Cps[i], q̇)
+    end
+end
+
+function update_loci_states!(state::RigidBodyState,
+        coords::NonminimalCoordinates{<:QCF.QC},cache,
+        prop::RigidBodyProperty,q,q̇)
+    update_state!(state,cache,prop,q,q̇)
+    (;loci) = prop
+    (;loci_states,
+        origin_position,R,
+        origin_velocity,ω,
+    ) = state
+    for (locus,locus_state) in zip(loci,loci_states)
+        relative_velocity = R * locus.position
+        locus_state.position .= origin_position .+ relative_velocity
+        locus_state.velocity .= origin_velocity .+ ω × relative_velocity
+    end
 end
 
 function generalize_force!(F,state::AbstractBodyState,cache::AbstractBodyCache)
@@ -387,7 +411,7 @@ function get_cstr_idx(nmcs::NCF.NC)
     collect(1:num_of_cstr)
 end
 
-get_cstr_idx(::QBF.QC) = collect(1:1)
+get_cstr_idx(::QCF.QC) = collect(1:1)
 ##
 
 # operations on rigid body
