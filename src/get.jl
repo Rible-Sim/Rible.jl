@@ -77,7 +77,7 @@ function get_local_coords(bodies,numbered::Numbered)
 end
 
 function get_local_coords(body::RigidBody,r̄p)
-    to_local_coords(body.state.cache.funcs.nmcs,r̄p)
+    to_local_coords(body.coords.nmcs,r̄p)
 end
 
 function get_local_coords(body::FlexibleBody,r̄p)
@@ -148,17 +148,17 @@ get_num_of_cstr(st::Structure) = st.num_of_cstr
 function get_num_of_cstr(rbs::TypeSortedCollection)
     num_of_intrinsic_cstr = mapreduce(get_num_of_intrinsic_cstr,+,rbs,init=0)
 end
-get_num_of_intrinsic_cstr(body::AbstractRigidBody) = get_num_of_cstr(body.state.cache.funcs.nmcs)
-get_num_of_coords(body::AbstractRigidBody) = get_num_of_coords(body.state.cache.funcs.nmcs)
-get_num_of_dof(body::AbstractRigidBody) = get_num_of_dof(body.state.cache.funcs.nmcs)
-get_num_of_local_dims(body::AbstractRigidBody) = get_num_of_local_dims(body.state.cache)
-get_num_of_local_dims(cache::NonminimalCoordinatesCache) = get_num_of_local_dims(cache.funcs.nmcs)
+get_num_of_intrinsic_cstr(body::AbstractRigidBody) = get_num_of_cstr(body.coords.nmcs)
+get_num_of_coords(body::AbstractRigidBody) = get_num_of_coords(body.coords.nmcs)
+get_num_of_dof(body::AbstractRigidBody) = get_num_of_dof(body.coords.nmcs)
+get_num_of_local_dims(body::AbstractRigidBody) = get_num_of_local_dims(body.coords.nmcs)
+get_num_of_local_dims(cache::NonminimalCoordinatesCache) = get_num_of_local_dims(cache.nmcs)
 
-get_num_of_intrinsic_cstr(body::AbstractFlexibleBody) = get_num_of_cstr(body.state.cache.funcs.ancs)
-get_num_of_coords(body::AbstractFlexibleBody) = get_num_of_coords(body.state.cache.funcs.ancs)
-get_num_of_dof(body::AbstractFlexibleBody) = get_num_of_dof(body.state.cache.funcs.ancs)
-get_num_of_local_dims(body::AbstractFlexibleBody) = get_num_of_local_dims(body.state.cache)
-get_num_of_local_dims(cache::FlexibleBodyCoordinatesCache) = get_num_of_local_dims(cache.funcs.ancs)
+get_num_of_intrinsic_cstr(body::AbstractFlexibleBody) = get_num_of_cstr(body.coords.ancs)
+get_num_of_coords(body::AbstractFlexibleBody) = get_num_of_coords(body.coords.ancs)
+get_num_of_dof(body::AbstractFlexibleBody) = get_num_of_dof(body.coords.ancs)
+get_num_of_local_dims(body::AbstractFlexibleBody) = get_num_of_local_dims(body.coords.ancs)
+get_num_of_local_dims(cache::FlexibleBodyCoordinatesCache) = get_num_of_local_dims(cache.ancs)
 
 """
 Return System 重力。

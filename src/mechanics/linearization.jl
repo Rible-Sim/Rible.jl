@@ -154,7 +154,7 @@ function make_intrinsic_nullspace(st,q)
     ret = zeros(eltype(q),num_of_full_coords,sys_num_of_dof)
     foreach(bodies) do body
         bodyid = body.prop.id
-        (;nmcs) = body.state.cache.funcs
+        (;nmcs) = body.coords
         mem2full = bodyid2sys_full_coords[bodyid]
         ret[mem2full,bodyid2sys_dof_idx[bodyid]] = NCF.make_nullspace(nmcs)(q[mem2full])
     end
@@ -529,10 +529,10 @@ function build_∂Q̌∂q̌!(∂Q̌∂q̌,st)
         (;hen,egg) = cc
         rb1 = hen.rbsig
         rb2 = egg.rbsig
-        C1 = rb1.state.cache.Cps[hen.pid]
-        C2 = rb2.state.cache.Cps[egg.pid]
-        free_idx1 = rb1.state.cache.free_idx
-        free_idx2 = rb2.state.cache.free_idx
+        C1 = rb1.cache.Cps[hen.pid]
+        C2 = rb2.cache.Cps[egg.pid]
+        free_idx1 = rb1.coords.free_idx
+        free_idx2 = rb2.coords.free_idx
         mfree1 = bodyid2sys_free_coords[rb1.prop.id]
         mfree2 = bodyid2sys_free_coords[rb2.prop.id]
         (;k,c,state,slack) = cable
@@ -686,10 +686,10 @@ function build_∂Q̌∂q̌̇!(∂Q̌∂q̌̇,st)
         (;hen,egg) = cc
         rb1 = hen.rbsig
         rb2 = egg.rbsig
-        C1 = rb1.state.cache.Cps[hen.pid]
-        C2 = rb2.state.cache.Cps[egg.pid]
-        free_idx1 = rb1.state.cache.free_idx
-        free_idx2 = rb2.state.cache.free_idx
+        C1 = rb1.cache.Cps[hen.pid]
+        C2 = rb2.cache.Cps[egg.pid]
+        free_idx1 = rb1.coords.free_idx
+        free_idx2 = rb2.coords.free_idx
         mfree1 = bodyid2sys_free_coords[rb1.prop.id]
         mfree2 = bodyid2sys_free_coords[rb2.prop.id]
         (;k,c,state,slack) = cable

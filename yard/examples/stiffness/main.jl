@@ -606,9 +606,9 @@ GM.activate!();with_theme(theme_pub;
                 )
             rcs_by_cables = @lift begin
                 (;tensioned) = $tgob.connectivity
-                ndim = RB.get_num_of_dims($tgob)
+                num_of_dim = RB.get_num_of_dims($tgob)
                 T = RB.get_numbertype($tgob)
-                ret = Vector{MVector{ndim,T}}()
+                ret = Vector{MVector{num_of_dim,T}}()
                 mapreduce(
                     (scnt)->
                     [(
@@ -1003,8 +1003,8 @@ rank(Ň)
 
 Ǎ*Ň |> norm
 
-Q̃ = RB.build_Q̃(bot.st)
-L̂ = RB.build_L̂(bot.st)
+Q̃ = RB.build_Q̃(bot.structure)
+L̂ = RB.build_L̂(bot.structure)
 
 # Left hand side
 Q̃L̂ = Q̃*L̂
@@ -1094,9 +1094,9 @@ GM.activate!();with_theme(theme_pub;
                 )
             rcs_by_cables = @lift begin
                 (;tensioned) = $tgob.connectivity
-                ndim = RB.get_num_of_dims($tgob)
+                num_of_dim = RB.get_num_of_dims($tgob)
                 T = RB.get_numbertype($tgob)
-                ret = Vector{MVector{ndim,T}}()
+                ret = Vector{MVector{num_of_dim,T}}()
                 mapreduce(
                     (scnt)->
                     [(
@@ -1412,7 +1412,7 @@ end
 towerbot = tower()
 bot = towerbot
 
-@myshow bot.st.num_of_dof
+@myshow bot.structure.num_of_dof
 
 plot_traj!(bot;showground=false)
 
@@ -1548,9 +1548,9 @@ GM.activate!();with_theme(theme_pub;
                 )
             rcs_by_cables = @lift begin
                 (;tensioned) = $tgob.connectivity
-                ndim = RB.get_num_of_dims($tgob)
+                num_of_dim = RB.get_num_of_dims($tgob)
                 T = RB.get_numbertype($tgob)
-                ret = Vector{MVector{ndim,T}}()
+                ret = Vector{MVector{num_of_dim,T}}()
                 mapreduce(
                     (scnt)->
                     [(
@@ -1985,9 +1985,9 @@ GM.activate!();with_theme(theme_pub;
                 )
             rcs_by_cables = @lift begin
                 (;tensioned) = $tgob.connectivity
-                ndim = RB.get_num_of_dims($tgob)
+                num_of_dim = RB.get_num_of_dims($tgob)
                 T = RB.get_numbertype($tgob)
-                ret = Vector{MVector{ndim,T}}()
+                ret = Vector{MVector{num_of_dim,T}}()
                 mapreduce(
                     (scnt)->
                     [(
@@ -2228,9 +2228,9 @@ GM.activate!();with_theme(theme_pub;
                 )
             rcs_by_cables = @lift begin
                 (;tensioned) = $tgob.connectivity
-                ndim = RB.get_num_of_dims($tgob)
+                num_of_dim = RB.get_num_of_dims($tgob)
                 T = RB.get_numbertype($tgob)
-                ret = Vector{MVector{ndim,T}}()
+                ret = Vector{MVector{num_of_dim,T}}()
                 mapreduce(
                     (scnt)->
                     [(

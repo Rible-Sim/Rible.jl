@@ -25,8 +25,8 @@ function StructureState(bodies,tensiles,cnt::Connectivity{<:Any,<:Any,<:NamedTup
     free_idx_by_mem = Vector{Vector{Int}}(undef,nb)
     foreach(bodies) do body
         bodyid = body.prop.id
-        pres_idx_by_mem[bodyid] = body.state.cache.pres_idx
-        free_idx_by_mem[bodyid] = body.state.cache.free_idx
+        pres_idx_by_mem[bodyid] = body.coords.pres_idx
+        free_idx_by_mem[bodyid] = body.coords.free_idx
     end
     T = get_numbertype(bodies)
     t = zero(T)
@@ -139,7 +139,7 @@ function build_M(st::AbstractStructure)
     M = spzeros(T,num_of_full_coords,num_of_full_coords)
     foreach(st.bodies) do body
         memfull = bodyid2sys_full_coords[body.prop.id]
-        M[memfull,memfull] .+= body.state.cache.M
+        M[memfull,memfull] .+= body.cache.M
     end
     # @assert issymmetric(M)
     M
@@ -298,7 +298,7 @@ function make_cstr_function(st::AbstractStructure)
             memincst = bodyid2sys_intrinsic_cstr_idx[bodyid]
             if !isempty(memincst)
                 ret[memincst] .= make_cstr_function(
-                    body.state.cache.funcs
+                    body.coords
                 )(q[memfull])
             end
         end
@@ -329,7 +329,7 @@ function make_cstr_jacobian(st::AbstractStructure,q0::AbstractVector)
             memincst = bodyid2sys_intrinsic_cstr_idx[bodyid]
             if !isempty(memincst)
                 ret[memincst,memfree] .= make_cstr_jacobian(
-                    body.state.cache.funcs
+                    body.coords
                 )(q[memfull])
             end
         end
@@ -364,7 +364,7 @@ function make_cstr_jacobian(st::AbstractStructure)
             memincst = bodyid2sys_intrinsic_cstr_idx[bodyid]
             if !isempty(memincst)
                 ret[memincst,memfree] .= make_cstr_jacobian(
-                    body.state.cache.funcs
+                    body.coords
                 )(q[memfull])
             end
         end

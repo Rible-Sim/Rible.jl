@@ -15,9 +15,8 @@ function Īg2az(nmcs,m,Īg,mass_center)
 end
 
 ## Mass matrices: standard
-function make_M(cf::CoordinateFunctions,m::T,Īg,mass_center) where {T} # ami (area moment of inertia tensor)
-    (;nmcs) = cf
-    ndim = get_num_of_dims(nmcs)
+function make_M(nmcs::NC,m::T,Īg,mass_center) where {T} # ami (area moment of inertia tensor)
+    num_of_dim = get_num_of_dims(nmcs)
     nld = get_num_of_local_dims(nmcs)
     ncoords = get_num_of_coords(nmcs)
     a,z = Īg2az(nmcs,m,Īg,mass_center)
@@ -26,7 +25,7 @@ function make_M(cf::CoordinateFunctions,m::T,Īg,mass_center) where {T} # ami (
     M_raw[2:1+nld,1] = m*a
     M_raw[1,2:1+nld] = M_raw[2:1+nld,1]
     M_raw[2:1+nld,2:1+nld] .= z
-    M_std = kron(M_raw,IMatrix(ndim))
+    M_std = kron(M_raw,IMatrix(num_of_dim))
     cv = nmcs.conversion_to_std
     M = SMatrix{ncoords,ncoords}(transpose(cv)*M_std*cv)
 end

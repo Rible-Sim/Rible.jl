@@ -180,7 +180,7 @@ end
 Return 2D Jacobian matrix , for rigid bodies。
 $(TYPEDSIGNATURES)
 """
-function make_cstr_jacobian(nmcs::NC2D6C,free_coords_idx,cstr_idx)
+function make_cstr_jacobian(nmcs::NC2D6C,free_idx,cstr_idx)
     @inline @inbounds function inner_cstr_jacobian(q)
         u,v = get_uv(nmcs,q)
         ret = zeros(eltype(q),3,6)
@@ -188,7 +188,7 @@ function make_cstr_jacobian(nmcs::NC2D6C,free_coords_idx,cstr_idx)
         ret[2,5:6] = 2v
         ret[3,3:4] =  v
         ret[3,5:6] =  u
-        @view (ret*cv)[cstr_idx,free_coords_idx]
+        @view (ret*cv)[cstr_idx,free_idx]
     end
 end
 """
@@ -330,55 +330,11 @@ function make_cstr_forces_jacobian(nmcs::Union{NC2D2C,NC3D3C},free_idx,cstr_idx)
     end
 end
 
-
-# CoordinateFunctions
-"""
-封装有函数的natural coodinates.
-$(TYPEDEF)
-"""
-struct CoordinateFunctions{nmcsType,IndicesType}
-    nmcs::nmcsType
-    free_coords_idx::IndicesType
-    cstr_idx::IndicesType
-end
-
-"""
-封装有函数的natural coodinates 构造子。
-$(TYPEDSIGNATURES)
-"""
-function CoordinateFunctions(nmcs,free_coords_idx,cstr_idx)
-    # # cstr_forces_jacobian = make_cstr_forces_jacobian_forwarddiff(Φq,nq,nuc)
-    # cstr_forces_jacobian = make_cstr_forces_jacobian(nmcs,free_coords_idx,cstr_idx)
-    # # ∂Aq̇∂q = make_∂Aq̇∂q_forwarddiff(Φq,nuc,num_of_cstr)
-    # ∂Aq̇∂q = make_∂Aq̇∂q(nmcs,free_coords_idx,cstr_idx)
-    CoordinateFunctions(
-        nmcs,
-        free_coords_idx,
-        cstr_idx
-    )
-end
-
-function make_cstr_function(cf::CoordinateFunctions)
-    make_cstr_function(cf.nmcs,cf.cstr_idx)
-end
-
-function make_cstr_jacobian(cf::CoordinateFunctions)
-    make_cstr_jacobian(
-        cf.nmcs,
-        cf.free_coords_idx,
-        cf.cstr_idx,
-    )
-end
-
-function make_cstr_forces_jacobian(
-        cf::CoordinateFunctions,
-        cstr_hessians
-    )
-    (;nmcs::NC,free_coords_idx,cstr_idx) = cf
+function make_cstr_forces_jacobian(nmcs::NC,free_idx,cstr_idx,cstr_hessians)
     function cstr_forces_jacobian(λ)
         ret = [
             begin
-                a = cstr_hessians[j][free_coords_idx,free_coords_idx] .* λ[i]
+                a = cstr_hessians[j][free_idx,free_idx] .* λ[i]
                 # display(a)
                 a 
             end
@@ -388,20 +344,20 @@ function make_cstr_forces_jacobian(
     end
 end
 
-function make_∂Aq̇∂q(nmcs::Union{NC2D2C,NC3D3C},free_coords_idx,cstr_idx)
+function make_∂Aq̇∂q(nmcs::Union{NC2D2C,NC3D3C},free_idx,cstr_idx)
     function ∂Aq̇∂q(q̇)
         nothing
     end
 end
 
 # this is wrong
-function make_∂Aq̇∂q(nmcs::NC,free_coords_idx,cstr_idx)
+function make_∂Aq̇∂q(nmcs::NC,free_idx,cstr_idx)
     cstr_hessians = make_cstr_hessians(nmcs)
     function ∂Aq̇∂q(q̇)
-        q̇uc = @view q̇[free_coords_idx]
+        q̇uc = @view q̇[free_idx]
         ret = [
             begin
-                a = transpose(q̇uc)*cstr_hessians[j][free_coords_idx,free_coords_idx]
+                a = transpose(q̇uc)*cstr_hessians[j][free_idx,free_idx]
                 # display(a)
                 a 
             end
@@ -425,7 +381,6 @@ function make_cstr_forces_jacobian_forwarddiff(Φq,nq,nuc)
         ForwardDiff.jacobian!(out,ATλ,ones(λT,nq))
     end
 end
-
 
 """
 Return ∂Aq̇∂q的前向自动微分结果。

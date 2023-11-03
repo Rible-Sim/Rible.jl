@@ -2,10 +2,10 @@ abstract type AbstractBody{N,T} end
 abstract type AbstractBodyProperty{N,T} end
 abstract type AbstractBodyState{N,T} end
 
-update_body!(body::AbstractBody,q,q̇) = update_body!(body.state,body.state.cache,body.prop,q,q̇)
-move_body!(body::AbstractBody,q,q̇)	= move_body!(body.state,body.state.cache,body.prop,q,q̇)
-stretch_body!(body::AbstractBody,c) = stretch_body!(body.state.cache,body.prop,c)
-update_transformations!(body::AbstractBody,q) = update_transformations!(body.state.cache,body.state,body.prop,q)
+update_body!(body::AbstractBody,q,q̇) = update_body!(body.state,body.coords,body.cache,body.prop,q,q̇)
+move_body!(body::AbstractBody,q,q̇)	= move_body!(body.state,body.coords,body.cache,body.prop,q,q̇)
+stretch_body!(body::AbstractBody,c) = stretch_body!(body.coords,body.cache,body.prop,c)
+update_transformations!(body::AbstractBody,q) = update_transformations!(body.coords,body.cache,body.state,body.prop,q)
 function body_state2coords_state(body::AbstractBody)
     body_state2coords_state(body.state,body.coords)
 end
@@ -60,6 +60,10 @@ function NonminimalCoordinates(nmcs::NCF.NC,
     )
     free_idx = NCF.get_free_idx(nmcs,pres_idx)
     NonminimalCoordinates(nmcs,pres_idx,free_idx,cstr_idx)
+end
+
+function make_cstr_function(coords::NonminimalCoordinates)
+    make_cstr_function(coords.nmcs,coords.cstr_idx)
 end
 
 function make_cstr_jacobian(coords::NonminimalCoordinates)

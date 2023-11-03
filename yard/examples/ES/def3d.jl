@@ -77,7 +77,8 @@ function make_3d_bar(
     # @show ri,rj,q0
     # cf = RB.NCF.CoordinateFunctions(nmcs,q0,ci,free_idx)
     # @show typeof(nmcs)
-    state = RB.RigidBodyState(prop,nmcs,ri,R,ṙo,ω,ci)
+    state = RB.RigidBodyState(prop,ri,R,ṙo,ω)
+    coords = RB.NonminimalCoordinates(nmcs,ci)
     if loadmesh
         barmesh = load(RB.assetpath("装配体3.STL")) |> make_patch(;
             # trans=[0,0,0.025],
@@ -87,7 +88,7 @@ function make_3d_bar(
     else
         barmesh = endpoints2mesh(r̄p1,r̄p2;radius,)
     end
-    body = RB.RigidBody(prop,state,barmesh)
+    body = RB.RigidBody(prop,state,coords,barmesh)
 end
 
 function make_3d_tri(

@@ -87,7 +87,7 @@ $(TYPEDSIGNATURES)
 """
 function FixedBodyConstraint(rbs,bodyid2sys_full_coords,bodyid)
     body = rbs[bodyid]
-    nmcs = body.state.cache.funcs.nmcs
+    nmcs = body.coords.nmcs
     q_rb = body.state.coords.q
     pres_idx = find_full_pres_idx(nmcs,q_rb)
     idx = bodyid2q[bodyid][pres_idx]
@@ -303,8 +303,8 @@ function PrototypeJoint(id,hen2egg,joint_type::Symbol)
     bits_3rd = in.([1,2,3,4,5,6],Ref(mask_3rd))
     bits_4th = in.([1,],Ref(mask_4th))
     T = get_numbertype(hen.rbsig)
-    nmcs_hen = hen.rbsig.state.cache.funcs.nmcs
-    nmcs_egg = egg.rbsig.state.cache.funcs.nmcs
+    nmcs_hen = hen.rbsig.coords.nmcs
+    nmcs_egg = egg.rbsig.coords.nmcs
     num_of_coords_hen = get_num_of_coords(nmcs_hen)
     num_of_coords_egg = get_num_of_coords(nmcs_egg)
     num_of_jointed_coords = num_of_coords_hen + num_of_coords_egg
@@ -316,9 +316,11 @@ function PrototypeJoint(id,hen2egg,joint_type::Symbol)
     X_egg = NCF.get_X(nmcs_egg,q_egg)
     invX̄_hen = nmcs_hen.invX̄
     invX̄_egg = nmcs_egg.invX̄
-    # translate     
-    C_hen = hen.rbsig.state.cache.Cps[hen.pid]
-    C_egg = egg.rbsig.state.cache.Cps[egg.pid]
+    # translate
+    c_hen = to_local_coords(nmcs_hen,hen.rbsig.prop.loci[hen.pid].position)
+    C_hen = to_transformation(nmcs_hen,c_hen)
+    c_egg = to_local_coords(nmcs_egg,egg.rbsig.prop.loci[egg.pid].position)
+    C_egg = to_transformation(nmcs_egg,c_egg)
     J = [-C_hen C_egg;] |> sparse 
     q = vcat(q_hen,q_egg)
     axes_trl_hen = invX̄_hen*hen.rbsig.prop.loci[hen.rotid].axes

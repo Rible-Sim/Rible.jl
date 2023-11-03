@@ -1,13 +1,13 @@
 function dualtri(num_of_dof,;onedir=[1.0,0.0],θ=0.0,k=400.0,c=0.0,restlen=0.16)
-    nbodies = num_of_dof + 1
+    num_of_bodies = num_of_dof + 1
     nbp = 2nbodies - num_of_dof
-    n_lower = count(isodd,1:nbodies)
-    n_upper = count(iseven,1:nbodies)
-    lower_index = 1:2:nbodies
-    upper_index = 2:2:nbodies
-    a = zeros(nbodies)
-    m = zeros(nbodies)
-    Ia = zeros(nbodies)
+    n_lower = count(isodd,1:num_of_bodies)
+    n_upper = count(iseven,1:num_of_bodies)
+    lower_index = 1:2:num_of_bodies
+    upper_index = 2:2:num_of_bodies
+    a = zeros(num_of_bodies)
+    m = zeros(num_of_bodies)
+    Ia = zeros(num_of_bodies)
     for (i,j) in enumerate(lower_index)
         a[j] = 12252e-5
         m[j] = 200.40071778e-3
@@ -91,7 +91,7 @@ function dualtri(num_of_dof,;onedir=[1.0,0.0],θ=0.0,k=400.0,c=0.0,restlen=0.16)
                 atan(d[2],d[1])
             )
         end
-        for i = 1:nbodies
+        for i = 1:num_of_bodies
     ]
 
     rigdibodies = TypeSortedCollection(rbs)
@@ -99,7 +99,7 @@ function dualtri(num_of_dof,;onedir=[1.0,0.0],θ=0.0,k=400.0,c=0.0,restlen=0.16)
 
     indexed = RB.index(rigdibodies)
 
-    ncables = 2(nbodies-1)
+    ncables = 2(num_of_bodies-1)
     upstringlen = restlen
     lostringlen = restlen
     original_restlens = zeros(ncables)
@@ -116,8 +116,8 @@ function dualtri(num_of_dof,;onedir=[1.0,0.0],θ=0.0,k=400.0,c=0.0,restlen=0.16)
     ss = [RB.Cable2D(i, original_restlens[i],ks[i],cs[i];slack=false) for i = 1:ncables]
     tensiles = (cables=ss,)
 
-    matrix_cnt = zeros(Int,2(nbodies-1),nbodies)
-    for i = 1:nbodies-1
+    matrix_cnt = zeros(Int,2(num_of_bodies-1),num_of_bodies)
+    for i = 1:num_of_bodies-1
         ul = [1,-3]
         dl = [3,-2]
         if iseven(i)
@@ -136,11 +136,11 @@ function dualtri(num_of_dof,;onedir=[1.0,0.0],θ=0.0,k=400.0,c=0.0,restlen=0.16)
         RB.ManualActuator(actid,ids,original_values,RB.Ganged())
     end
     acs = [ifelse(isodd(i),ganged_act(i,2(i-1)+1,2i,original_restlens),
-                           ganged_act(i,2i,2(i-1)+1,original_restlens)) for i = 1:nbodies-1]
+                           ganged_act(i,2i,2(i-1)+1,original_restlens)) for i = 1:num_of_bodies-1]
     hub = (actuators=acs,)
     pjs = [
         RB.PinJoint(i,RB.Hen2Egg(i,RB.ID(rbs[i],2,1),RB.ID(rbs[i+1],1)))
-        for i = 1:nbodies-1
+        for i = 1:num_of_bodies-1
     ]
     jointed = RB.join(pjs,indexed)
 
@@ -196,14 +196,16 @@ function Tbars(;θ = 0)
 
         nmcs = RB.NCF.NC1P3V(ri, ro, R)
 
-        state = RB.RigidBodyState(prop, nmcs, ri, R, ṙo, ω, ci, cstr_idx)
+        state = RB.RigidBodyState(prop, ri, R, ṙo, ω)
+        coords = RB.NonminimalCoordinates(nmcs, ci, cstr_idx)
         basemesh = load(RB.assetpath("装配体1.STL")) |> make_patch(;
             # trans=[-1.0,0,0],
             rot = RotZ(π),
             scale=1/500,
             color = :silver,
         )
-        RB.RigidBody(prop,state,basemesh)
+
+        RB.RigidBody(prop,state,coords,basemesh)
     end
     function make_slider(i;ri=SVo3,R=RotZ(0.0),)
         movable = true
@@ -239,7 +241,8 @@ function Tbars(;θ = 0)
         ro = ri
         ṙo = zero(ro)
         ω = zero(ro)
-        state = RB.RigidBodyState(prop, nmcs, ri, R, ṙo, ω)
+        state = RB.RigidBodyState(prop, ri, R, ṙo, ω)
+        coords = RB.NonminimalCoordinates(nmcs,)
         slidermesh = load(RB.assetpath("装配体2.2.STL")) |> make_patch(;
             # trans=[-1.0,0,0],
             rot = begin
@@ -252,7 +255,7 @@ function Tbars(;θ = 0)
             scale=1/500,
             color=:mediumpurple4
         )
-        RB.RigidBody(prop,state,slidermesh)
+        RB.RigidBody(prop,state,coords,slidermesh)
     end
     base = make_base(1)
     p1 = SVector(-b*cos(θ),0.0,0)

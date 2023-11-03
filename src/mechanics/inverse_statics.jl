@@ -89,8 +89,8 @@ function build_K̂(st)
     foreach(connected) do scnt
         j = scnt.id
         scable = cables[j]
-        js = (j-1)*ndim
-        K̂[js+1:js+ndim,j] = scable.state.direction*scable.k
+        js = (j-1)*num_of_dim
+        K̂[js+1:js+num_of_dim,j] = scable.state.direction*scable.k
     end
     K̂
 end

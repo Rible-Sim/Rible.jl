@@ -107,7 +107,7 @@ function generate_forces!(st::Structure)
     system.F .= 0.0
     foreach(bodies) do body
         (;F) = members[body.prop.id]
-        generalize_force!(F,body.state)
+        generalize_force!(F,body.state,body.cache)
     end
     system.F̌
 end

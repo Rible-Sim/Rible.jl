@@ -77,7 +77,7 @@ function index_incstr(rbs)
     nincst_by_mem = zeros(Int,num_of_bodies)
     ndof_by_mem = zeros(Int,num_of_bodies)
     foreach(rbs) do body
-        nincst_by_mem[body.prop.id] = body.state.cache.num_of_cstr
+        nincst_by_mem[body.prop.id] = length(body.coords.cstr_idx)
         ndof_by_mem[body.prop.id] = get_num_of_dof(body)
     end
     num_of_intrinsic_cstr = sum(nincst_by_mem)
@@ -117,8 +117,8 @@ function index(rbs,sharing_input=Int[;;])
     foreach(rbs) do body
         bodyid = body.prop.id
         ntotal_by_mem[bodyid] = get_num_of_coords(body)
-        pres_idx_by_mem[bodyid] = body.state.cache.pres_idx
-        free_idx_by_mem[bodyid] = body.state.cache.free_idx
+        pres_idx_by_mem[bodyid] = body.coords.pres_idx
+        free_idx_by_mem[bodyid] = body.coords.free_idx
     end
     for bodyid = 1:num_of_bodies
         ntotal = ntotal_by_mem[bodyid]

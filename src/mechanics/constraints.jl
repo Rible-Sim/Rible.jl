@@ -54,14 +54,14 @@ function make_cstr_jacobian(cst::PrototypeJoint,st::Structure)
         transformations,
     ) = cst
     (;hen,egg) = hen2egg
-    free_idx_hen =  hen.rbsig.state.cache.free_idx
-    free_idx_egg =  egg.rbsig.state.cache.free_idx
+    free_idx_hen =  hen.rbsig.coords.free_idx
+    free_idx_egg =  egg.rbsig.coords.free_idx
     id_hen = hen.rbsig.prop.id
     id_egg = egg.rbsig.prop.id
     free_hen = bodyid2sys_free_coords[id_hen]
     free_egg = bodyid2sys_free_coords[id_egg]
-    nmcs_hen = hen.rbsig.state.cache.funcs.nmcs
-    nmcs_egg = egg.rbsig.state.cache.funcs.nmcs
+    nmcs_hen = hen.rbsig.coords.nmcs
+    nmcs_egg = egg.rbsig.coords.nmcs
     num_of_coords_hen = get_num_of_coords(nmcs_hen)
     num_of_coords_egg = get_num_of_coords(nmcs_egg)
     num_of_jointed_coords = num_of_coords_hen + num_of_coords_egg
