@@ -8,7 +8,7 @@ function generate_cache(::ZhongCCP,intor;dt,kargs...)
     (;prob) = intor
     (;bot,dynfuncs) = prob
     (;st) = bot
-    M = Matrix(build_M(st))
+    M = Matrix(assemble_M(st))
     Φ = make_cstr_function(bot)
     A = make_cstr_jacobian(bot)
 

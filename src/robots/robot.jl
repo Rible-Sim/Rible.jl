@@ -18,6 +18,7 @@ $(TYPEDSIGNATURES)
 function Robot(structure,hub=nothing)
     (;numbered) = structure.connectivity
     (;bodyid2sys_loci_idx) = numbered
+    structure_cache = StructureCache(structure)
     update!(structure)
     traj = StructArray([deepcopy(structure.state.system)])
     contacts_traj = [
@@ -34,7 +35,7 @@ function Robot(structure,hub=nothing)
             end
         )
     ]
-    Robot(structure,nothing,hub,traj,contacts_traj)
+    Robot(structure,structure_cache,hub,traj,contacts_traj)
 end
 
 
@@ -48,7 +49,7 @@ $(TYPEDSIGNATURES)
 function build_mass_matrices(bot::Robot)
     (;structure) = bot
     (;num_of_free_coords,num_of_pres_coords,sys_free_idx,sys_pres_idx) = structure.connectivity.indexed
-    M = build_M(structure)
+    M = assemble_M(structure)
     Ḿ = M[sys_free_idx,:]
     M̌ = Symmetric(M[sys_free_idx,sys_free_idx])
     M̄ =           M[sys_free_idx,sys_pres_idx]

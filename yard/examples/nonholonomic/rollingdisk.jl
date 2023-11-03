@@ -53,7 +53,7 @@ function dynfuncs(bot)
     nq = 6
     nμ = 2
     nu = 2
-    M = Matrix(RB.build_M(st))
+    M = Matrix(RB.assemble_M(st))
     Φ = RB.make_cstr_function(st)
     A = RB.make_cstr_jacobian(st)
     R = 1.0

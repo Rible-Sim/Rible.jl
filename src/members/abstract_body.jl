@@ -1,6 +1,7 @@
 abstract type AbstractBody{N,T} end
 abstract type AbstractBodyProperty{N,T} end
 abstract type AbstractBodyState{N,T} end
+abstract type AbstractBodyCache end
 
 update_body!(body::AbstractBody,q,q̇) = update_body!(body.state,body.coords,body.cache,body.prop,q,q̇)
 move_body!(body::AbstractBody,q,q̇)	= move_body!(body.state,body.coords,body.cache,body.prop,q,q̇)
@@ -68,4 +69,15 @@ end
 
 function make_cstr_jacobian(coords::NonminimalCoordinates)
     make_cstr_jacobian(coords.nmcs,coords.free_idx,coords.cstr_idx)
+end
+
+
+struct NonminimalCoordinatesCache{MType,JType,HType,GType}
+    cstr_hessians::Vector{HType}
+    M::MType
+    M⁻¹::MType
+    ∂Mq̇∂q::JType
+    ∂M⁻¹p∂q::JType
+    Ṁq̇::GType
+    ∂T∂qᵀ::GType
 end

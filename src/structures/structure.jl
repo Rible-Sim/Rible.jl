@@ -133,13 +133,13 @@ function update!(st::Structure,q::AbstractVector,q̇::AbstractVector=zero(q))
     update!(st)
 end
 
-function build_M(st::AbstractStructure)
+function assemble_M(st::AbstractStructure)
     (;num_of_full_coords,bodyid2sys_full_coords) = st.connectivity.indexed
     T = get_numbertype(st)
     M = spzeros(T,num_of_full_coords,num_of_full_coords)
     foreach(st.bodies) do body
         memfull = bodyid2sys_full_coords[body.prop.id]
-        M[memfull,memfull] .+= body.cache.M
+        M[memfull,memfull] .+= body.cache.coords_cache.M
     end
     # @assert issymmetric(M)
     M
@@ -159,7 +159,7 @@ end
 
 function build_M̌(st::AbstractStructure)
     (;sys_free_coords_idx) = st.connectivity.indexed
-    M = build_M(st)
+    M = assemble_M(st)
     M̌ = Symmetric(M[sys_free_coords_idx,sys_free_coords_idx])
 end
 
@@ -190,7 +190,7 @@ end
 function make_M!(st)
     function inner_M!(M,q)
         update_rigids!(st,q)
-        M .= build_M(st)
+        M .= assemble_M(st)
     end
 end
 
@@ -392,6 +392,34 @@ function build_F̌(st,bodyid,pid,f)
     reshape(F̌,:,1)
 end
 
+struct StructureCache{sysType}
+    system::sysType
+    function StructureCache(st::Structure)
+        system_cache = NonminimalCoordinatesCache(st,)
+        new{typeof(system_cache)}(
+            system_cache,
+        )
+    end
+end
+
+function NonminimalCoordinatesCache(st::Structure)
+    (;M,M⁻¹,M̌,M̌⁻¹,Ḿ,M̄) = build_mass_matrices(st)
+    T = get_numbertype(st)
+    (;num_of_full_coords) = st.connectivity.indexed
+    ∂Mq̇∂q = spzeros(T,num_of_full_coords,num_of_full_coords)
+    ∂M⁻¹p∂q = spzeros(T,num_of_full_coords,num_of_full_coords)
+    ∂T∂qᵀ = spzeros(T,num_of_full_coords)
+    Ṁq̇ = spzeros(T,num_of_full_coords)
+    cstr_hessians = [nothing]
+    NonminimalCoordinatesCache(
+        cstr_hessians,
+        M,M⁻¹,
+        # M̌,M̌⁻¹,
+        # Ḿ,M̄,
+        ∂Mq̇∂q,∂M⁻¹p∂q,
+        Ṁq̇,∂T∂qᵀ
+    )
+end
 
 """
 检查雅可比矩阵奇异性
@@ -432,7 +460,7 @@ Return System Kinetic energy
 $(TYPEDSIGNATURES)
 """
 function kinetic_energy(st::Structure)
-    M = build_M(st)
+    M = assemble_M(st)
     (;q̇) = st.state.system
     T = 1/2*transpose(q̇)*M*q̇
 end

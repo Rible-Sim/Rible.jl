@@ -75,90 +75,6 @@ function RigidBodyProperty(
     )
 end
 
-struct NonminimalCoordinatesCache{MType,JType,HType,GType,CType}
-    cstr_hessians::Vector{HType}
-    M::MType
-    M⁻¹::MType
-    ∂Mq̇∂q::JType
-    ∂M⁻¹p∂q::JType
-    Ṁq̇::GType
-    ∂T∂qᵀ::GType
-    Co::CType
-    Cg::CType
-    Cps::Vector{CType}
-end
-
-function get_CoordinatesCache(prop::RigidBodyProperty{N,T},
-                                 nmcs::NCF.NC,
-                                 pres_idx=Int[],
-                                 cstr_idx=get_cstr_idx(nmcs)) where {N,T}
-    (;mass,inertia,mass_locus,loci) = prop
-    mass_center = mass_locus.position
-    num_of_loci = length(loci)
-    free_idx = NCF.get_free_idx(nmcs,pres_idx)
-    num_of_cstr = length(cstr_idx)
-    cstr_hessians = make_cstr_hessians(nmcs)
-    mass_matrix = NCF.make_M(nmcs,mass,inertia,mass_center)
-    M⁻¹ = inv(mass_matrix)
-    ∂Mq̇∂q = zero(mass_matrix)
-    ∂M⁻¹p∂q = zero(mass_matrix)
-    Ṁq̇ = @MVector zeros(T,size(mass_matrix,2))
-    ∂T∂qᵀ = @MVector zeros(T,size(mass_matrix,2))
-    c(x) = NCF.to_local_coords(nmcs,x)
-    C(c) = NCF.to_transformation(nmcs,c)
-    Co = C(c(zero(mass_center)))
-    Cg = C(c(mass_center))
-    Cps = [typeof(Cg)(C(c(loci[i].position))) for i in 1:num_of_loci]
-    if prop.movable
-        if prop.constrained && pres_idx == Int[]
-            @error "Rigid body constrained, but no index specified."
-        elseif !prop.constrained && !(pres_idx == Int[])
-            @error "Rigid body not constrained. No index should be specified."
-        end
-    end
-    NonminimalCoordinatesCache(
-        cstr_hessians,
-        mass_matrix,M⁻¹,
-        ∂Mq̇∂q,∂M⁻¹p∂q,Ṁq̇,
-        ∂T∂qᵀ,
-        Co,Cg,Cps
-    )
-end
-
-function get_CoordinatesCache(prop::RigidBodyProperty{N,T},
-                                qcs::QBF.QC,
-                                pres_idx=Int[],
-                                cstr_idx=get_cstr_idx(qcs)) where {N,T}
-    (;mass,inertia,mass_locus,loci) = prop
-    mass_center = mass_locus.position
-    num_of_loci = length(loci)
-    free_idx = deleteat!(collect(1:7),pres_idx)
-    num_of_cstr = length(cstr_idx)
-    cstr_hessians = make_cstr_hessians(qcs)
-    mass_matrix = MMatrix{7,7}(Matrix(one(T)*I,7,7))
-    M⁻¹ = MMatrix{7,7}(Matrix(one(T)*I,7,7))
-    ∂Mq̇∂q = @MMatrix zeros(T,7,7)
-    ∂M⁻¹p∂q = @MMatrix zeros(T,7,7)
-    Ṁq̇ = @MVector zeros(T,7)
-    ∂T∂qᵀ = @MVector zeros(T,7)
-    Co = MMatrix{3,7}(zeros(T,3,7))
-    for i = 1:3
-        Co[i,i] = 1
-    end
-    Cg = deepcopy(Co)
-    Cps = [deepcopy(Co) for i in 1:num_of_loci]
-    if prop.movable
-        if prop.constrained && pres_idx == Int[]
-            @error "Rigid body constrained, but no index specified."
-        elseif !prop.constrained && !(pres_idx == Int[])
-            @error "Rigid body not constrained. No index should be specified."
-        end
-    end
-    NonminimalCoordinatesCache(
-        cstr_hessians,mass_matrix,M⁻¹,∂Mq̇∂q,∂M⁻¹p∂q,Ṁq̇,∂T∂qᵀ,Co,Cg,Cps
-    )
-end
-
 """
 Rigid Body State mutableType.所有坐标在同一个惯性系中表达。
 $(TYPEDEF)
@@ -221,6 +137,79 @@ function RigidBodyState(prop::RigidBodyProperty{N,T},
         origin_velocity,ω,
         mass_locus_state,
         loci_states,
+    )
+end
+
+struct RigidBodyCache{CType,cacheType} <: AbstractBodyCache
+    Co::CType
+    Cg::CType
+    Cps::Vector{CType}
+    coords_cache::cacheType
+end
+
+
+function get_CoordinatesCache(prop::RigidBodyProperty{N,T},
+        nmcs::NCF.NC,
+        pres_idx=Int[],
+        cstr_idx=get_cstr_idx(nmcs)) where {N,T}
+    (;mass,inertia,mass_locus,loci) = prop
+    mass_center = mass_locus.position
+    num_of_loci = length(loci)
+    cstr_hessians = make_cstr_hessians(nmcs)
+    M = NCF.make_M(nmcs,mass,inertia,mass_center)
+    M⁻¹ = inv(M)
+    ∂Mq̇∂q = zero(M)
+    ∂M⁻¹p∂q = zero(M)
+    Ṁq̇ = @MVector zeros(T,size(M,2))
+    ∂T∂qᵀ = @MVector zeros(T,size(M,2))
+    c(x) = NCF.to_local_coords(nmcs,x)
+    C(c) = NCF.to_transformation(nmcs,c)
+    Co = C(c(zero(mass_center)))
+    Cg = C(c(mass_center))
+    Cps = [typeof(Cg)(C(c(loci[i].position))) for i in 1:num_of_loci]
+    coords_cache = NonminimalCoordinatesCache(
+        cstr_hessians,
+        M,M⁻¹,
+        ∂Mq̇∂q,∂M⁻¹p∂q,
+        Ṁq̇,∂T∂qᵀ
+    )
+    RigidBodyCache(
+        Co,Cg,Cps,
+        coords_cache
+    )
+end
+
+function get_CoordinatesCache(
+        prop::RigidBodyProperty{N,T},
+        qcs::QBF.QC,
+        pres_idx=Int[],
+        cstr_idx=get_cstr_idx(qcs)
+    ) where {N,T}
+    (;mass,inertia,mass_locus,loci) = prop
+    mass_center = mass_locus.position
+    num_of_loci = length(loci)
+    cstr_hessians = make_cstr_hessians(qcs)
+    M = MMatrix{7,7}(Matrix(one(T)*I,7,7))
+    M⁻¹ = MMatrix{7,7}(Matrix(one(T)*I,7,7))
+    ∂Mq̇∂q = @MMatrix zeros(T,7,7)
+    ∂M⁻¹p∂q = @MMatrix zeros(T,7,7)
+    Ṁq̇ = @MVector zeros(T,7)
+    ∂T∂qᵀ = @MVector zeros(T,7)
+    Co = MMatrix{3,7}(zeros(T,3,7))
+    for i = 1:3
+        Co[i,i] = 1
+    end
+    Cg = deepcopy(Co)
+    Cps = [deepcopy(Co) for i in 1:num_of_loci]
+    coords_cache = NonminimalCoordinatesCache(
+        cstr_hessians,
+        M,M⁻¹,
+        ∂Mq̇∂q,∂M⁻¹p∂q,
+        Ṁq̇,∂T∂qᵀ
+    )
+    RigidBodyCache(
+        Co,Cg,Cps,
+        coords_cache
     )
 end
 
@@ -370,14 +359,14 @@ function update_transformations!(
     Cg[1:3,4:7] .= -2R*skew(mass_locus.position)*L
 end
 
-function generalize_force!(F,state::AbstractRigidBodyState,cache::NonminimalCoordinatesCache)
+function generalize_force!(F,state::AbstractBodyState,cache::AbstractBodyCache)
     (;mass_locus_state,loci_states) = state
-    (;Cps,Cg,∂T∂qᵀ) = cache
+    (;Cps,Cg,coords_cache) = cache
     for (pid,locus_state) in enumerate(loci_states)
         mul!(F,transpose(Cps[pid]),locus_state.force,1,1)
     end
     mul!(F,transpose(Cg),mass_locus_state.force,1,1)
-    F .+= ∂T∂qᵀ
+    F .+= coords_cache.∂T∂qᵀ
     F
 end
 

@@ -6,7 +6,7 @@ end
 
 function generate_cache(solver::Zhong06Q,intor;dt,kargs...)
     (;st) = intor.prob.bot
-    M = build_M(st) |> Matrix
+    M = assemble_M(st) |> Matrix
     ∂Mq̇∂q = build_∂Mq̇∂q(st)
     M! = make_M!(st)
     Jac_M! = make_Jac_M!(st)
