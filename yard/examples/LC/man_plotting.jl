@@ -25,7 +25,7 @@ end
 
 function update_scene!(st,bars,cables,q)
     cnt = st.connectivity
-    RB.update_rigids!(st,q)
+    RB.update_bodies!(st,q)
     foreach(st.rigidbodies) do body
         bars[bodyid][] = rb_bars(body)
     end

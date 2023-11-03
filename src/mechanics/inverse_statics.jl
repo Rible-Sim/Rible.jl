@@ -114,7 +114,7 @@ end
 function build_Γ(st)
     function inner_Γ(q)
         clear_forces!(st)
-        update_rigids!(st,q)
+        update_bodies!(st,q)
         update_cables_apply_forces!(st)
         forces = [s.state.tension.*s.state.direction for s in st.cables]
         reduce(vcat,forces)
@@ -125,7 +125,7 @@ function build_Ǧ(tginput;factor=1.0)
     st = deepcopy(tginput)
     clear_forces!(st)
     apply_gravity!(st;factor)
-    Ǧ = generate_forces!(st)
+    Ǧ = assemble_force!(st)
 end
 
 function make_U(st)
@@ -269,7 +269,7 @@ function build_inverse_statics_core(tginput,tgref::Structure,Fˣ=nothing;gravity
     q̌ = get_free_coords(tgref)
     st = deepcopy(tginput)
     clear_forces!(st)
-    update_rigids!(st,q)
+    update_bodies!(st,q)
     update_tensiles!(st)
     if gravity
         Ǧ = build_Ǧ(st)
@@ -486,13 +486,13 @@ function check_static_equilibrium_output_multipliers!(st,q,F=nothing;
         # stpt = nothing
     )
     clear_forces!(st)
-    update_rigids!(st)
+    update_bodies!(st)
     update_tensiles!(st)
     # check_restlen(st,get_cables_restlen(st))
     if gravity
         apply_gravity!(st)
     end
-    generalized_forces = generate_forces!(st)
+    generalized_forces = assemble_force!(st)
     if !isnothing(F)
         generalized_forces .+= F[:]
     end

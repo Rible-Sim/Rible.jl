@@ -7,9 +7,9 @@ end
 function generate_cache(::ZhongQCCP,intor;dt,kargs...)
     (;st) = intor.prob.bot
     M = assemble_M(st) 
-    M⁻¹ = build_M⁻¹(st) 
-    ∂Mq̇∂q = build_∂Mq̇∂q(st)
-    ∂M⁻¹p∂q = build_∂M⁻¹p∂q(st)
+    M⁻¹ = assemble_M⁻¹(st) 
+    ∂Mq̇∂q = assemble_∂Mq̇∂q(st)
+    ∂M⁻¹p∂q = assemble_∂M⁻¹p∂q(st)
     M! = make_M!(st)
     M⁻¹! = make_M⁻¹!(st)
     Jac_M! = make_Jac_M!(st)

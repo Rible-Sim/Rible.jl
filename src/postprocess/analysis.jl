@@ -10,7 +10,7 @@ function get_trajectory!(bot::Robot,bodyid::Int,pid::Int,step_range=:)
     body = bodies[bodyid]
     for (i,state) in enumerate(traj)
         (;t,q,q̇) = state 
-        update_rigids!(st,q,q̇)
+        update_bodies!(st,q,q̇)
         if pid == 0
             position_traj[i] .= body.state.mass_locus_state.position
         else
@@ -32,7 +32,7 @@ function get_velocity!(bot::Robot,bodyid::Int,pid::Int,step_range=:)
     body = bodies[bodyid]
     for (i,state) in enumerate(traj)
         (;t,q,q̇) = state 
-        update_rigids!(st,q,q̇)
+        update_bodies!(st,q,q̇)
         if pid == 0
             velocity_traj[i] .= body.state.mass_locus_state.velocity
         else
@@ -51,7 +51,7 @@ function get_mid_velocity!(bot::Robot,bodyid::Int,pid::Int,step_range=:)
     bodies = get_bodies(st)
     body = bodies[bodyid]
     for (qₖ,qₖ₋₁) in zip(traj.q[begin+1:end], traj.q[begin:end-1])
-        update_rigids!(st,(qₖ.+qₖ₋₁)./2,(qₖ.-qₖ₋₁)./h)
+        update_bodies!(st,(qₖ.+qₖ₋₁)./2,(qₖ.-qₖ₋₁)./h)
         push!(ṙp,body.state.ṙps[pid])
     end
     ṙp[step_range] |> VectorOfArray
@@ -64,7 +64,7 @@ function get_orientation!(bot::Robot,bodyid::Int,step_range=:)
     bodies = get_bodies(st)
     body = bodies[bodyid]
     for (q,q̇) in zip(traj.q, traj.q̇)
-        update_rigids!(st,q,q̇)
+        update_bodies!(st,q,q̇)
         update_orientations!(st)
         push!(R,body.state.R)
     end
@@ -78,7 +78,7 @@ function get_angular_velocity!(bot::Robot,bodyid::Int,step_range=:)
     bodies = get_bodies(st)
     body = bodies[bodyid]
     for (q,q̇) in zip(traj.q, traj.q̇)
-        update_rigids!(st,q,q̇)
+        update_bodies!(st,q,q̇)
         push!(ω,body.state.ω)
     end
     ω[step_range] |> VectorOfArray

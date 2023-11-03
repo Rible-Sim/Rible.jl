@@ -4,6 +4,7 @@ abstract type AbstractBodyState{N,T} end
 abstract type AbstractBodyCache end
 
 update_cache!(body::AbstractBody,q,q̇) = update_cache!(body.cache,body.coords,body.prop,q,q̇)
+lazy_update_state!(body::AbstractBody,q,q̇) = lazy_update_state!(body.state,body.coords,body.cache,body.prop,q,q̇)
 update_state!(body::AbstractBody,q,q̇) = update_state!(body.state,body.coords,body.cache,body.prop,q,q̇)
 update_loci_states!(body::AbstractBody,q,q̇) = update_loci_states!(body.state,body.coords,body.cache,body.prop,q,q̇)
 stretch_loci!(body::AbstractBody,c) = stretch_loci!(body.coords,body.cache,body.prop,c)

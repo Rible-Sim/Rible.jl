@@ -1760,7 +1760,12 @@ body1 = bodies[1]
 dt = 1e-3
 tspan = (0.0,5.0)
 prob = RB.SimProblem(bot,dynfuncs)
-RB.solve!(prob,RB.Zhong06();tspan,dt,ftol=1e-10,maxiters=50,verbose=true,exception=true)
+solver = RB.Zhong06()
+intor = RB.Integrator(prob,solver;tspan,dt,)
+solvercache = RB.generate_cache(solver,intor;dt)
+
+@time RB.solve!(intor,solvercache;dt,ftol=1e-10,maxiters=50,verbose=false,exception=true,progress=false,)
+
 
 plot_traj!(bot;showarrows = false, showground=false)
 

@@ -24,12 +24,12 @@ function initialize_GDR(st,F::Nothing;gravity=true)
     function 𝛚(x)
         # Q = Q̃*Γ(x)
         clear_forces!(st)
-        update_rigids!(st,x)
+        update_bodies!(st,x)
         update_tensiles!(st)
         if gravity
             apply_gravity!(st)
         end
-        F = generate_forces!(st)
+        F = assemble_force!(st)
         # @show abs.(F-Q) |> maximum
         -F
     end

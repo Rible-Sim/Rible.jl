@@ -275,6 +275,21 @@ function update_cache!(
     ∂T∂qᵀ .= funcs.build_∂T∂xᵀ(x,ẋ)
 end
 
+function lazy_update_state!(state::RigidBodyState,
+        coords::NonminimalCoordinates{<:NCF.NC},cache,
+        prop::RigidBodyProperty,q,q̇)
+    (;
+    origin_position,R,
+    origin_velocity,ω,
+    mass_locus_state,
+    ) = state
+    (;Co,Cg) = cache
+    mul!(origin_position, Co, q)
+    mul!(origin_velocity, Co, q̇)
+    mul!(mass_locus_state.position, Cg, q)
+    mul!(mass_locus_state.velocity, Cg, q̇)
+end
+
 function update_state!(state::RigidBodyState,
             coords::NonminimalCoordinates{<:NCF.NC},cache,
             prop::RigidBodyProperty,q,q̇)
@@ -283,19 +298,15 @@ function update_state!(state::RigidBodyState,
         origin_velocity,ω,
         mass_locus_state,
     ) = state
-    (;Co,Cg) = cache
     (;nmcs) = coords
-    mul!(origin_position, Co, q)
-    mul!(origin_velocity, Co, q̇)
-    mul!(mass_locus_state.position, Cg, q)
-    mul!(mass_locus_state.velocity, Cg, q̇)
+    lazy_update_state!(state,coords,cache,prop,q,q̇)
     R .= NCF.find_rotation(nmcs,q)
     ω .= NCF.find_angular_velocity(nmcs,q,q̇)
 end
 
-function update_state!(state::RigidBodyState,
-            coords::NonminimalCoordinates{<:QCF.QC},cache,
-            prop::RigidBodyProperty,x,ẋ)
+function lazy_update_state!(state::RigidBodyState,
+        coords::NonminimalCoordinates{<:QCF.QC},cache,
+        prop::RigidBodyProperty,x,ẋ)
     (;
         origin_position,R,
         origin_velocity,ω,
@@ -303,6 +314,17 @@ function update_state!(state::RigidBodyState,
     ) = state
     origin_position .= mass_locus_state.position .= x[1:3]
     origin_velocity .= mass_locus_state.velocity .= ẋ[1:3]
+end
+
+function update_state!(state::RigidBodyState,
+        coords::NonminimalCoordinates{<:QCF.QC},cache,
+        prop::RigidBodyProperty,x,ẋ)
+    (;
+        origin_position,R,
+        origin_velocity,ω,
+        mass_locus_state,
+    ) = state
+    lazy_update_state!(state,coords,cache,prop,q,q̇)
     R .= QCF.find_rotation(x)
     ω .= R*QCF.find_local_angular_velocity(x,ẋ)
 end

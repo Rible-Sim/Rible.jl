@@ -126,10 +126,10 @@ plot_traj!(bot)
 #     (;st) = bot
 #     function F!(F,q,q̇,t)
 #         RB.clear_forces!(st)
-#         RB.update_rigids!(st,q,q̇)
+#         RB.update_bodies!(st,q,q̇)
 #         RB.update_tensiles!(st)
 #         # RB.apply_gravity!(st)
-#         RB.generate_forces!(st)
+#         RB.assemble_force!(st)
 #         RB.get_force!(F,st)
 #         ## F .= 0
 #     end

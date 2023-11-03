@@ -20,7 +20,7 @@ end
 
 function update_scene!(ax,st,cube_bars,q)
     # RB.reset_forces!(st)
-    RB.update_rigids!(st,q)
+    RB.update_bodies!(st,q)
     newcube, newbars = get_cube_bars(st)
     cube, bars = cube_bars
     cube[] = newcube

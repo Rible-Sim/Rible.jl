@@ -74,19 +74,42 @@ end
 Update Rigid Body State.
 $(TYPEDSIGNATURES)
 """
-function update_rigids!(st,q)
+function lazy_update_bodies!(st,q)
     st.state.system.q .= q
     st.state.system.q̇ .= 0.0
-    update_rigids!(st)
+    lazy_update_bodies!(st)
 end
 
-function update_rigids!(st,q,q̇)
+function lazy_update_bodies!(st,q,q̇)
     st.state.system.q .= q
     st.state.system.q̇ .= q̇
-    update_rigids!(st)
+    lazy_update_bodies!(st)
 end
 
-function update_rigids!(st)
+function lazy_update_bodies!(st)
+    (;bodies,state) = st
+    foreach(bodies) do body
+        bodyid = body.prop.id
+        (;q, q̇) = state.members[bodyid]
+        lazy_update_state!(body,q,q̇)
+        update_transformations!(body,q)
+        update_loci_states!(body,q,q̇)
+    end
+end
+
+function update_bodies!(st,q)
+    st.state.system.q .= q
+    st.state.system.q̇ .= 0.0
+    update_bodies!(st)
+end
+
+function update_bodies!(st,q,q̇)
+    st.state.system.q .= q
+    st.state.system.q̇ .= q̇
+    update_bodies!(st)
+end
+
+function update_bodies!(st)
     (;bodies,state) = st
     foreach(bodies) do body
         bodyid = body.prop.id
@@ -101,7 +124,7 @@ end
 计算System 力的大小。
 $(TYPEDSIGNATURES)
 """
-function generate_forces!(st::Structure)
+function assemble_force!(st::Structure)
     (;bodies,state) = st
     (;system,members) = state
     system.F .= 0.0

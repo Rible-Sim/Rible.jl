@@ -16,8 +16,18 @@ $(TYPEDSIGNATURES)
 function StructureState(bodies,tensiles,cnt::Connectivity{<:Any,<:Any,<:NamedTuple{(:connected, )},<:Any})
     (;numbered,indexed,jointed) = cnt
     (;bodyid2sys_loci_coords_idx) = numbered
-    (;num_of_full_coords,num_of_intrinsic_cstr,sys_free_idx,sys_pres_idx) = indexed
-    (;bodyid2sys_intrinsic_cstr_idx,bodyid2sys_full_coords) = indexed
+    (;
+        num_of_full_coords,
+        num_of_free_coords,
+        num_of_intrinsic_cstr,
+        sys_free_idx,
+        sys_pres_idx
+    ) = indexed
+    (;
+        bodyid2sys_intrinsic_cstr_idx,
+        bodyid2sys_full_coords,
+        bodyid2sys_free_coords,
+    ) = indexed
     (;num_of_extrinsic_cstr) = jointed
     num_of_cstr = num_of_intrinsic_cstr + num_of_extrinsic_cstr
     nb = length(bodies)
@@ -37,7 +47,7 @@ function StructureState(bodies,tensiles,cnt::Connectivity{<:Any,<:Any,<:NamedTup
     λ = Vector{T}(undef,num_of_cstr)
     c = get_local_coords(bodies,numbered)
     p = zero(q)
-    p̌ = zero(q)
+    p̌ = Vector{T}(undef,num_of_free_coords)
     system = NonminimalCoordinatesState(t,q,q̇,q̈,F,p,p̌,λ,sys_free_idx,sys_pres_idx,c)
     members = [
         begin
@@ -48,7 +58,7 @@ function StructureState(bodies,tensiles,cnt::Connectivity{<:Any,<:Any,<:NamedTup
             λmem = @view λ[bodyid2sys_intrinsic_cstr_idx[bodyid]]
             cmem = @view c[bodyid2sys_loci_coords_idx[bodyid]]
             pmem = zero(p[bodyid2sys_full_coords[bodyid]])
-            p̌mem = zero(p[bodyid2sys_full_coords[bodyid]])
+            p̌mem = zero(p[bodyid2sys_free_coords[bodyid]])
             NonminimalCoordinatesState(
                 t,
                 qmem,q̇mem,q̈mem,Fmem,pmem,p̌mem,λmem,
@@ -119,12 +129,22 @@ end
 function update!(st::AbstractStructure; gravity=false)
     clear_forces!(st)
     stretch_rigids!(st)
-    update_rigids!(st)
+    update_bodies!(st)
     update_tensiles!(st)
     if gravity
         apply_gravity!(st)
     end
-    generate_forces!(st)
+    assemble_force!(st)
+end
+
+function lazy_update!(st::AbstractStructure; gravity=false)
+    clear_forces!(st)
+    lazy_update_bodies!(st)
+    update_tensiles!(st)
+    if gravity
+        apply_gravity!(st)
+    end
+    assemble_force!(st)
 end
 
 function update!(st::Structure,q::AbstractVector,q̇::AbstractVector=zero(q))
@@ -145,7 +165,7 @@ function assemble_M(st::AbstractStructure)
     M
 end
 
-function build_M⁻¹(st::AbstractStructure)
+function assemble_M⁻¹(st::AbstractStructure)
     (;num_of_full_coords,bodyid2sys_full_coords) = st.connectivity.indexed
     T = get_numbertype(st)
     M⁻¹ = spzeros(T,num_of_full_coords,num_of_full_coords)
@@ -157,13 +177,13 @@ function build_M⁻¹(st::AbstractStructure)
     M⁻¹
 end
 
-function build_M̌(st::AbstractStructure)
+function assemble_M̌(st::AbstractStructure)
     (;sys_free_coords_idx) = st.connectivity.indexed
     M = assemble_M(st)
     M̌ = Symmetric(M[sys_free_coords_idx,sys_free_coords_idx])
 end
 
-function build_∂Mq̇∂q(st::AbstractStructure)
+function assemble_∂Mq̇∂q(st::AbstractStructure)
     (;num_of_full_coords,bodyid2sys_full_coords) = st.connectivity.indexed
     T = get_numbertype(st)
     ∂Mq̇∂q = spzeros(T,num_of_full_coords,num_of_full_coords)
@@ -175,7 +195,7 @@ function build_∂Mq̇∂q(st::AbstractStructure)
     # symsparsecsr(M;symmetrize=true)
 end
 
-function build_∂M⁻¹p∂q(st::AbstractStructure)
+function assemble_∂M⁻¹p∂q(st::AbstractStructure)
     (;num_of_full_coords,bodyid2sys_full_coords) = st.connectivity.indexed
     T = get_numbertype(st)
     ∂M⁻¹p∂q = spzeros(T,num_of_full_coords,num_of_full_coords)
@@ -187,35 +207,7 @@ function build_∂M⁻¹p∂q(st::AbstractStructure)
     # symsparsecsr(M;symmetrize=true)
 end
 
-function make_M!(st)
-    function inner_M!(M,q)
-        update_rigids!(st,q)
-        M .= assemble_M(st)
-    end
-end
-
-function make_M⁻¹!(st)
-    function inner_M⁻¹!(M⁻¹,q)
-        update_rigids!(st,q)
-        M⁻¹ .= build_M⁻¹(st)
-    end
-end
-
-function make_Jac_M!(st)
-    function Jac_M!(∂Mq̇∂q,q,q̇)
-        update_rigids!(st,q,q̇)
-        ∂Mq̇∂q .= build_∂Mq̇∂q(st)
-    end
-end
-
-function make_Jac_M⁻¹!(st)
-    function Jac_M⁻¹!(∂M⁻¹p∂q,q,q̇)
-        update_rigids!(st,q,q̇)
-        ∂M⁻¹p∂q .= build_∂M⁻¹p∂q(st)
-    end
-end
-
-function build_∂T∂qᵀ(st::AbstractStructure)
+function assemble_∂T∂qᵀ(st::AbstractStructure)
     (;num_of_full_coords,bodyid2sys_full_coords) = st.connectivity.indexed
     T = get_numbertype(st)
     ∂T∂qᵀ = zeros(T,num_of_full_coords)
@@ -224,6 +216,35 @@ function build_∂T∂qᵀ(st::AbstractStructure)
         ∂T∂qᵀ[memfull] .+= body.state.cache.∂T∂qᵀ
     end
     ∂T∂qᵀ
+end
+
+function make_M!(st)
+    function inner_M!(M,q)
+        update_bodies!(st,q)
+        M .= assemble_M(st)
+    end
+end
+
+
+function make_M⁻¹!(st)
+    function inner_M⁻¹!(M⁻¹,q)
+        update_bodies!(st,q)
+        M⁻¹ .= assemble_M⁻¹(st)
+    end
+end
+
+function make_Jac_M!(st)
+    function Jac_M!(∂Mq̇∂q,q,q̇)
+        update_bodies!(st,q,q̇)
+        ∂Mq̇∂q .= assemble_∂Mq̇∂q(st)
+    end
+end
+
+function make_Jac_M⁻¹!(st)
+    function Jac_M⁻¹!(∂M⁻¹p∂q,q,q̇)
+        update_bodies!(st,q,q̇)
+        ∂M⁻¹p∂q .= assemble_∂M⁻¹p∂q(st)
+    end
 end
 
 """

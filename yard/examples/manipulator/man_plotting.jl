@@ -85,7 +85,7 @@ end
 
 function update_scene!(st,bars,cables,q)
     cnt = st.connectivity
-    RB.update_rigids!(st,q)
+    RB.update_bodies!(st,q)
     rbs = RB.get_bodies(st)
     bars[] = reduce(
         vcat,[

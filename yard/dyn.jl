@@ -50,19 +50,19 @@ function dynfuncs(bot;actuate=false,gravity=false,(Fˣ!)=(F,t)->nothing)
             RB.actuate!(bot,[t])
         end
         RB.clear_forces!(structure)
-        RB.update_rigids!(structure,q,q̇)
+        RB.lazy_update_bodies!(structure,q,q̇)
         RB.update_tensiles!(structure)
         if gravity
             RB.apply_gravity!(structure)
         end
-        F .= RB.generate_forces!(structure)
+        F .= RB.assemble_force!(structure)
         Fˣ!(F,t)
     end
     function Jac_F!(∂F∂q̌,∂F∂q̌̇,q,q̇,t)
         ∂F∂q̌ .= 0
         ∂F∂q̌̇ .= 0
         RB.clear_forces!(structure)
-        RB.update_rigids!(structure,q,q̇)
+        RB.lazy_update_bodies!(structure,q,q̇)
         RB.update_tensiles!(structure)
         RB.build_∂Q̌∂q̌!(∂F∂q̌,structure)
         RB.build_∂Q̌∂q̌̇!(∂F∂q̌̇,structure)
@@ -95,16 +95,16 @@ function contact_dynfuncs(bot;
 
     function F!(F,q,q̇,t)
         RB.clear_forces!(st)
-        RB.update_rigids!(st,q,q̇)
+        RB.update_bodies!(st,q,q̇)
         RB.update_tensiles!(st)
         RB.apply_gravity!(st)
-        F .= RB.generate_forces!(st)
+        F .= RB.assemble_force!(st)
     end
     function Jac_F!(∂F∂q̌,∂F∂q̌̇,q,q̇,t)
         ∂F∂q̌ .= 0
         ∂F∂q̌̇ .= 0
         RB.clear_forces!(st)
-        RB.update_rigids!(st,q,q̇)
+        RB.update_bodies!(st,q,q̇)
         RB.update_tensiles!(st)
         RB.build_∂Q̌∂q̌!(∂F∂q̌,st)
         RB.build_∂Q̌∂q̌̇!(∂F∂q̌̇,st)
@@ -114,7 +114,7 @@ function contact_dynfuncs(bot;
         T = eltype(q)
         nq = length(q)
         na = 0
-        RB.update_rigids!(st,q)
+        RB.update_bodies!(st,q)
         foreach(st.bodies) do body
             (;prop,state) = body
             bid = prop.id
@@ -180,7 +180,7 @@ function contact_dynfuncs(bot;
     end
 
     function get_directions_and_positions!(D, Dper,Dimp, ∂Dq̇∂q, ∂DᵀΛ∂q, ŕ, q, q̇, Λ, mem2act_idx,)
-        RB.update_rigids!(st,q)
+        RB.update_bodies!(st,q)
         ∂Dq̇∂q .= 0
         ∂DᵀΛ∂q .= 0
         foreach(st.bodies) do body
@@ -222,7 +222,7 @@ function contact_dynfuncs(bot;
 
     function get_distribution_law!(L,mem2act_idx,q)
         T = eltype(q)
-        RB.update_rigids!(st,q)
+        RB.update_bodies!(st,q)
         foreach(st.bodies) do body
             (;prop,state) = body
             bid = prop.id

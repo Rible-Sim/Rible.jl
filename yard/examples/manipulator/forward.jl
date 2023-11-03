@@ -41,7 +41,7 @@ function dist!(st,state)
     target = GeometryBasics.Circle(Point2(0.061260,-0.21),0.1)
     T = RB.get_numbertype(st)
     RB.update_points!(st,state.c)
-    RB.update_rigids!(st,state.q)
+    RB.update_bodies!(st,state.q)
     d = Ref(zero(T))
     foreach(st.rigidbodies) do body
         bodyid = body.prop.id
@@ -230,7 +230,7 @@ function plot_angles(bot,seq,seq_g)
     append!(traj.t,     u[2:end])
     θ = [
         begin
-            RB.update_rigids!(st,q)
+            RB.update_bodies!(st,q)
             get_angles(bot)[1]
         end
         for q in seq.q
@@ -244,7 +244,7 @@ function plot_angles(bot,seq,seq_g)
 
     θ_g = [
         begin
-            RB.update_rigids!(st,q)
+            RB.update_bodies!(st,q)
             get_angles(bot)[1]
         end
         for q in seq_g.q

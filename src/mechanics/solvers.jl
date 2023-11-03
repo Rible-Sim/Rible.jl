@@ -62,9 +62,10 @@ function prepare_traj!(traj,contacts_traj;tspan,dt,restart=true)
     totalstep
 end
 
-function solve!(prob::SimProblem,solver::AbstractSolver,
-                controller = (prescribe! = nothing, actuate! = nothing);
-                tspan,dt,restart=true,karg...)
+function Integrator(prob::SimProblem,solver::AbstractSolver,
+        controller = (prescribe! = nothing, actuate! = nothing);
+        tspan,dt,restart=true,karg...
+    )
     (;bot,dynfuncs) = prob
     (;structure,traj,contacts_traj) = bot
     totalstep = prepare_traj!(traj,contacts_traj;tspan,dt,restart)
@@ -75,6 +76,12 @@ function solve!(prob::SimProblem,solver::AbstractSolver,
         end
     end
     intor = Integrator(prob,controller,tspan,restart,totalstep)
+end
+
+function solve!(prob::SimProblem,solver::AbstractSolver,
+                controller = (prescribe! = nothing, actuate! = nothing);
+                tspan,dt,restart=true,karg...)
+    intor = Integrator(prob,solver,controller;tspan,dt,restart)
     solve!(intor,solver;dt,karg...)
 end
 

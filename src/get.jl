@@ -197,7 +197,7 @@ get_connected(bot::Robot) = get_connected(bot.structure)
 get_connected(st::AbstractStructure) = sort(st.connectivity.tensioned.connected)
 
 function get_cables_len!(st::Structure,q)
-    update_rigids!(st::Structure,q,zero(q))
+    update_bodies!(st::Structure,q,zero(q))
     update_cables_apply_forces!(st::Structure)
     get_cables_len(st::Structure)
 end

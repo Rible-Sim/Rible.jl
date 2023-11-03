@@ -149,7 +149,7 @@ function cable_angle(bot_input,seq)
     (;st) = bot
     θs = Vector{Float64}()
     for q in seq.q
-        RB.update_rigids!(st,q)
+        RB.update_bodies!(st,q)
         RB.update_tensiles!(st)
         sdir = st.tensiles.cables[2].state.direction
         θ = atan(sdir[2],sdir[1])
@@ -193,7 +193,7 @@ function plot_angles(bot,seq,seq_g,figname=nothing)
 
     θ1 = [
         begin
-            RB.update_rigids!(st,q)
+            RB.update_bodies!(st,q)
             get_angles(bot)[1]
         end
         for q in seq.q
@@ -201,7 +201,7 @@ function plot_angles(bot,seq,seq_g,figname=nothing)
 
     θ2 = [
         begin
-            RB.update_rigids!(st,q)
+            RB.update_bodies!(st,q)
             get_angles(bot)[2]
         end
         for q in seq.q
@@ -215,7 +215,7 @@ function plot_angles(bot,seq,seq_g,figname=nothing)
 
     θ1_g = [
         begin
-            RB.update_rigids!(st,q)
+            RB.update_bodies!(st,q)
             get_angles(bot)[1]
         end
         for q in seq_g.q
@@ -223,7 +223,7 @@ function plot_angles(bot,seq,seq_g,figname=nothing)
 
     θ2_g = [
         begin
-            RB.update_rigids!(st,q)
+            RB.update_bodies!(st,q)
             get_angles(bot)[2]
         end
         for q in seq_g.q
@@ -354,7 +354,7 @@ function plot_sweeping!(ax,bot,seq1,seq2,colormap)
     (;st, traj) = bot
     imid = cld(length(colormap),2)
     for i in 1:length(seq1.q)
-        RB.update_rigids!(st,seq1.q[i])
+        RB.update_bodies!(st,seq1.q[i])
         lower_bars = get_lower_bars(st)
         for bar in lower_bars
             linesegments!(ax, bar, color = colormap.colors[imid-1+i], linewidth = 3)
@@ -369,7 +369,7 @@ function plot_sweeping!(ax,bot,seq1,seq2,colormap)
     linesegments!(ax, endpoint_linesegments, color = endpoint_colors, linewidth = 3)
 
     for i in 1:length(seq2.q)
-        RB.update_rigids!(st,seq2.q[i])
+        RB.update_bodies!(st,seq2.q[i])
         upper_bars = get_upper_bars(st)
         for bar in upper_bars
             linesegments!(ax, bar, color = colormap.colors[imid+1-i], linewidth = 3)
@@ -610,7 +610,7 @@ df = DataFrame(XLSX.readtable("9.4-2k-0.005-0deg-0g--2.xlsx", "Sheet1";infer_elt
 
 θ_g = [
     begin
-        RB.update_rigids!(mandyn.st,q)
+        RB.update_bodies!(mandyn.st,q)
         -get_angles(mandyn)
     end
     for q in mandyn.traj.q

@@ -34,22 +34,25 @@ more than necessary, but not redundant
   - [ ] less symbols, more words
   - [ ] use snake case
 - [ ] connectivity, mask, use `BitVectors` isstead of `Vector{Int}` for free/pres, indice, 
-- [ ] more preallocations
+- [ ] more preallocations/cache
     - [ ] free-flights
       - [ ] rigid bodies
         - [ ] natural coords
-          - [ ] get rid of functions fields
-          - [ ] where to put `pres_idx`, `free_idx`, `cstr_idx`?
+          - [x] get rid of functions fields
+          - [x] where to put `pres_idx`, `free_idx`, `cstr_idx`? To `NonminimalCoordinates` for now
           - [ ] how to cache hessians? to get both `∂Aq̇∂q` and `cstr_forces_jacobian`
-          - [ ] similarly `∂M⁻¹p∂q` and `∂Mq̇∂q`
         - [ ] quaternion-based
+          - [ ] similarly `∂M⁻¹p∂q` and `∂Mq̇∂q`
       - [ ] flexible bodies
         - [ ] absolute nodal coords
+    - [ ] Zhong06
+    - [ ] ZhongQ06
     - [ ] ZhongCCP
     - [ ] ZhongQCCP
-- [ ] reduce functions fields
+- [x] reduce functions fields
 - [ ] preallocations for autodiff
-- [ ] joint cstr, quadratic forms
+- [ ] joint cstr
+  - [x] quadratic forms
   - [ ] put joint into `NCF`, `QCF`
 - [x] put contacts into loci
 - [ ] local distribution law

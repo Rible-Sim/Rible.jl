@@ -122,7 +122,7 @@ function contact_dynamics(st)
 	contacts = [RB.Contact(i,μ,e) for i = 1:2]
 
     function prepare_contacts!(contacts, q)
-		RB.update_rigids!(st,q)
+		RB.update_bodies!(st,q)
 		body = rbs[1]
 		for pid = 1:2
 			gap = body.state.loci_states[pid][3]
@@ -172,16 +172,16 @@ function dynfuncs(bot)
     (;st) = bot
     function F!(F,q,q̇,t)
         RB.clear_forces!(st)
-        RB.update_rigids!(st,q,q̇)
+        RB.update_bodies!(st,q,q̇)
         RB.update_cables_apply_forces!(st)
         RB.apply_gravity!(st)
-        F .= RB.generate_forces!(st)
+        F .= RB.assemble_force!(st)
     end
     function Jac_F!(∂F∂q̌,∂F∂q̌̇,q,q̇,t)
 		∂F∂q̌ .= 0
         ∂F∂q̌̇ .= 0
         RB.clear_forces!(st)
-        RB.update_rigids!(st,q,q̇)
+        RB.update_bodies!(st,q,q̇)
         RB.update_cables_apply_forces!(st)
         RB.build_∂Q̌∂q̌!(∂F∂q̌,st)
         RB.build_∂Q̌∂q̌̇!(∂F∂q̌̇,st)
@@ -227,7 +227,7 @@ function find_θs(bot)
 	rbs = RB.get_bodies(st)
     [
         begin
-            RB.update_rigids!(st,q)
+            RB.update_bodies!(st,q)
 			RB.update_orientations!(st)
             R = RotXYZ(RotXYZ(rbs[1].state.R))
             R.theta2

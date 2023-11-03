@@ -89,7 +89,7 @@ function reset!(bot::Robot)
     (;structure, traj) = bot
     (;q, q̇) = traj
     clear_forces!(structure)
-    update_rigids!(structure,q[begin],q̇[begin])
+    update_bodies!(structure,q[begin],q̇[begin])
     update_tensiles!(structure)
     resize!(traj,1)
 end
