@@ -52,7 +52,7 @@ function generate_cache(solver::AlphaCCP,intor;dt,kargs...)
     B(q) = Matrix{T}(undef,0,nq)
 
     # ∂𝐌𝐚∂𝐪(q,a) = zeros(T,nq,nq)
-    cstr_forces_jacobian(q,λ) = cstr_forces_on_free_jacobian(st,λ)
+    cstr_forces_jacobian(q,λ) = cstr_forces_jacobian(st,λ)
     # ∂𝚽𝐪𝐯∂𝒒(q,v) = RB.∂Aq̇∂q(st,v)
     ∂Bᵀμ∂q(q,μ) = zeros(T,nq,nq)
     cache = @eponymtuple(M,Φ,A,Ψ,B,∂Ψ∂q,cstr_forces_jacobian,∂Bᵀμ∂q,coeffs)

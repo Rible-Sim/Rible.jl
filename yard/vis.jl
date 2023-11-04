@@ -444,7 +444,7 @@ end
         rigidlabelcolor=:darkblue,
         refcolor=:lightgrey,
         cablewidth=2,
-        meshcolor=:slategrey,
+        meshcolor=nothing,
     )
 end
 

@@ -319,7 +319,7 @@ function make_cstr_forces_jacobian(nmcs::NC,free_idx,cstr_idx,cstr_hessians)
     function cstr_forces_jacobian(λ)
         ret = [
             begin
-                a = cstr_hessians[j][free_idx,free_idx] .* λ[i]
+                a = -λ[i] .* cstr_hessians[j][free_idx,free_idx]
                 # display(a)
                 a 
             end

@@ -2364,12 +2364,12 @@ ns = size(S,2)
 nk = size(D,2)
 
 λ = -inv(Ǎ*transpose(Ǎ))*Ǎ*Bᵀ*f
-Ǩa = RB.cstr_forces_on_free_jacobian(bot.st,λ)
+Ǩa = RB.cstr_forces_jacobian(bot.st,λ)
 𝒦a = transpose(Ň)*Ǩa*Ň |> Symmetric 
 vals_𝒦a,vecs_𝒦a = eigen(𝒦a)
 
-Ǩm = RB.build_material_stiffness_matrix_on_free!(bot.st,q,k)
-Ǩg = RB.build_geometric_stiffness_matrix_on_free!(bot.st,q,f)
+Ǩm = RB.build_material_stiffness_matrix!(bot.st,q,k)
+Ǩg = RB.build_geometric_stiffness_matrix!(bot.st,q,f)
 vec𝒦ps = [
     begin
         si = S[:,i]
@@ -2377,9 +2377,9 @@ vec𝒦ps = [
         # @show s
         λi = inv(Ǎ*transpose(Ǎ))*Ǎ*Bᵀ*si
         # @show f,λ
-        Ǩai = - RB.cstr_forces_on_free_jacobian(bot.st,λi)
+        Ǩai = - RB.cstr_forces_jacobian(bot.st,λi)
 
-        Ǩgi = RB.build_geometric_stiffness_matrix_on_free!(bot.st,q,si)
+        Ǩgi = RB.build_geometric_stiffness_matrix!(bot.st,q,si)
 
         𝒦pi = transpose(Ň)*(Ǩgi.+Ǩai)*Ň |> Symmetric 
         # vec𝒦pi = SymmetricPacked(𝒦pi).tri
@@ -2439,9 +2439,9 @@ vecr𝒦ps = [
         # @show s
         λi = inv(Ǎ*transpose(Ǎ))*Ǎ*Bᵀ*si
         # @show f,λ
-        Ǩai = - RB.cstr_forces_on_free_jacobian(bot.st,λi)
+        Ǩai = - RB.cstr_forces_jacobian(bot.st,λi)
 
-        Ǩgi = RB.build_geometric_stiffness_matrix_on_free!(bot.st,q,si)
+        Ǩgi = RB.build_geometric_stiffness_matrix!(bot.st,q,si)
 
         r𝒦pi = transpose(Ňv)*(Ǩgi.+Ǩai)*Ňv |> Symmetric 
         # vecr𝒦pi = SymmetricPacked(r𝒦pi).tri

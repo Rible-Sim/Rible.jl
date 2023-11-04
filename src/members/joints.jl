@@ -308,8 +308,8 @@ function PrototypeJoint(id,hen2egg,joint_type::Symbol)
     q_egg = cartesian_frame2coords(nmcs_egg,state_egg.origin_position,state_egg.R)
     X_hen = NCF.get_X(nmcs_hen,q_hen)
     X_egg = NCF.get_X(nmcs_egg,q_egg)
-    invX̄_hen = nmcs_hen.invX̄
-    invX̄_egg = nmcs_egg.invX̄
+    invX̄_hen = nmcs_hen.data.invX̄
+    invX̄_egg = nmcs_egg.data.invX̄
     # translate
     c_hen = to_local_coords(nmcs_hen,hen.rbsig.prop.loci[hen.pid].position)
     C_hen = to_transformation(nmcs_hen,c_hen)
@@ -320,8 +320,6 @@ function PrototypeJoint(id,hen2egg,joint_type::Symbol)
     axes_trl_hen = invX̄_hen*hen.rbsig.prop.loci[hen.rotid].axes
     axes_trl_egg = invX̄_egg*egg.rbsig.prop.loci[egg.trlid].axes
     axes_rot_egg = invX̄_egg*egg.rbsig.prop.loci[egg.rotid].axes
-    axes_rot_hen = pinv(X_hen)*X_egg*axes_rot_egg
-    
     select_uvw_hen = BlockDiagonal([nmcs_hen.conversion_to_X,zero(nmcs_egg.conversion_to_X)])
     select_uvw_egg = BlockDiagonal([zero(nmcs_hen.conversion_to_X),nmcs_egg.conversion_to_X])
     I3_Bool = I(3)
@@ -335,6 +333,7 @@ function PrototypeJoint(id,hen2egg,joint_type::Symbol)
     half_3rd = fill(heros,6)
     half_2nd = fill(heros,3)
     if (nmcs_hen isa NCF.NC3D12C) && (nmcs_egg isa NCF.NC3D12C)
+        axes_rot_hen = inv(X_hen)*X_egg*axes_rot_egg
         for i = 1:3
             axis_hen = axes_trl_hen.X[:,i]
             axis_zero = zero(axis_hen)
@@ -363,6 +362,9 @@ function PrototypeJoint(id,hen2egg,joint_type::Symbol)
                 kron(vcat(0,axis_zero,0,axis_egg),I3_Bool)'*
                 select_uvw_egg |> sparse
         end
+    else
+        # not to be used
+        axes_rot_hen = axes_rot_egg
     end
     hess_1st = [(H .+ H') |> Symmetric for H in half_1st]
     hess_4th = [(H .+ H') |> Symmetric for H in half_4th]

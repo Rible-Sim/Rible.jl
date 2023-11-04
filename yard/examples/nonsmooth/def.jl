@@ -226,7 +226,10 @@ function rigidbar(i,
         ω = RB.NCF.find_angular_velocity(nmcs,vcat(ri,u),vcat(ṙi,u̇))
         # @show ω, ṙi, u̇
     end
-    state = RB.RigidBodyState(prop, nmcs, ro, R, ṙo, ω, ci, cstr_idx)
+    state = RB.RigidBodyState(prop, ro, R, ṙo, ω)
+    coords = RB.NonminimalCoordinates(
+        nmcs, ci, cstr_idx
+    )
     # leg_mesh = load("400杆.STL")
     if loadmesh
         barmesh = load(joinpath(assetdir,"BZ.STL")) |> make_patch(;
@@ -236,7 +239,7 @@ function rigidbar(i,
     else
         barmesh = endpoints2mesh(r̄p1,r̄p2;radius = norm(r̄p2-r̄p1)/40)
     end
-    body = RB.RigidBody(prop, state, barmesh)
+    body = RB.RigidBody(prop, state, coords, barmesh)
 end
 
 function uni(c=100.0;

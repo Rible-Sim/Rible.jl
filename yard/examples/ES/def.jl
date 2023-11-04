@@ -49,14 +49,14 @@ function build_2d_tri(id,ri,rj=nothing,rk=nothing;
     b2 = b - b1
     a1 = 1.0b; b1 = √(2b^2-a1^2)
     a2 = 1.2b; b2 = √(2b^2-a2^2)
-    mass_locus  = SVector{2}([ (b1+b)/3, h/3])
+    mass_center  = SVector{2}([ (b1+b)/3, h/3])
     r̄p1 = SVector{2}([      0.0, 0.0])
     r̄p2 = SVector{2}([       -a1, b2])
     r̄p3 = SVector{2}([        a1, b2])
     r̄p4 = SVector{2}([      -3a2, b2])
     r̄p5 = SVector{2}([       3a2, b2])
-    loci = [r̄p1,r̄p2,r̄p3,r̄p4,r̄p5]
-    @myshow loci
+    loci_positions = [r̄p1,r̄p2,r̄p3,r̄p4,r̄p5]
+    @myshow loci_positions
     axes = [ SVector{2}([      1.0, 0.0])]
     Īgx = (b*h^3)/36
     Īgy = h*b*(b^2 - b*b1 + b1^2)/36
@@ -72,11 +72,16 @@ function build_2d_tri(id,ri,rj=nothing,rk=nothing;
             Īgxy Īgx
         ]
     )
-    @show norm(mass_locus),m,Īg,tr(Īg)
-    @show mass_locus,atan(mass_locus[2],mass_locus[1])
-    prop = RB.RigidBodyProperty(id,movable,m,Īg,
-                mass_locus,loci,;constrained=constrained
-                )
+    @show norm(mass_center),m,Īg,tr(Īg)
+    @show mass_center,atan(mass_center[2],mass_center[1])
+    prop = RB.RigidBodyProperty(
+        id,
+        movable,
+        m,Īg,
+        mass_center,
+        loci_positions,
+        ;constrained=constrained
+    )
     ω = 0.0
     ro = ri
     # ṙo = [0.0,0.0001]
@@ -93,15 +98,16 @@ function build_2d_tri(id,ri,rj=nothing,rk=nothing;
     else
         nmcs = RB.NCF.NC3P(ri,rj,rk,ro,α)
     end
+    state = RB.RigidBodyState(prop,ro,α,ṙo,ω)
+    coords = RB.NonminimalCoordinates(nmcs,ci,cstr_idx)
     trimesh = begin
         if id == 1
-            load("零件1 - 副本.STL") |> make_patch(;scale=1/1000,color=:mediumpurple4)
+            load(RB.assetpath("零件1 - 副本.STL")) |> make_patch(;scale=1/1000,color=:mediumpurple4)
         else
-            load("零件1.STL") |> make_patch(;scale=1/1000,color=:slategray4)
+            load(RB.assetpath("零件1.STL")) |> make_patch(;scale=1/1000,color=:slategray4)
         end
     end
-    state = RB.RigidBodyState(prop,nmcs,ro,α,ṙo,ω,ci,cstr_idx)
-    body = RB.RigidBody(prop,state,trimesh)
+    body = RB.RigidBody(prop,state,coords,trimesh)
 end
 
 function build_2d_ground(id)

@@ -37,7 +37,10 @@ function RigidBodyProperty(
         mass::T,inertia_input,
         mass_center_position::AbstractVector,
         positions=SVector{size(inertia_input,1),T}[],
-        axes_normals=SVector{size(inertia_input,1),T}[],
+        axes_normals=[
+            ones(T,size(inertia_input,1)) |> SVector{size(inertia_input,1)}
+            for i = 1:length(positions)
+        ],
         friction_coefficients=zeros(T,length(positions)),
         restitution_coefficients=zeros(T,length(positions));
         constrained = false,
@@ -65,6 +68,7 @@ function RigidBodyProperty(
             restitution_coefficients
         )
     ]
+    @show loci
     return RigidBodyProperty(
         movable,constrained,
         id,type,

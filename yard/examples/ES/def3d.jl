@@ -289,8 +289,9 @@ function make_3d_plate(
     # v = R*(nodes_positions[3] - nodes_positions[1])
     # w = R*(nodes_positions[4] - nodes_positions[1])
     nmcs = RB.NCF.NC1P3V(ri,ro,R)
-    state = RB.RigidBodyState(prop,nmcs,ro,R,ṙo,ω,ci,cstr_idx)
-    body = RB.RigidBody(prop,state,platemesh)
+    state = RB.RigidBodyState(prop,ro,R,ṙo,ω)
+    coords = RB.NonminimalCoordinates(nmcs,ci,cstr_idx)
+    body = RB.RigidBody(prop,state,coords,platemesh)
 end
 
 function tower3d(;

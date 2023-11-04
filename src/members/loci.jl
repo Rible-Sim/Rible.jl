@@ -2,10 +2,10 @@ struct Axes{N,T}
     X::SMatrix{N,N,T}
 end
 
-function Base.getproperty(a::Axes{2}, p) 
-    if (p == :n) || (p == :normal)
+function Base.getproperty(a::Axes{2}, p::Symbol) 
+    if (p === :n) || (p === :normal)
         return a.X[:,1]
-    elseif (p == :t) || (p == :tangent)
+    elseif (p === :t) || (p === :tangent)
         return  a.X[:,2]
     else # fallback to getfield
         return getfield(a, p)
@@ -13,11 +13,11 @@ function Base.getproperty(a::Axes{2}, p)
 end
 
 function Base.getproperty(a::Axes{3}, p::Symbol) 
-    if (p == :n) || (p == :normal)
+    if (p === :n) || (p === :normal)
         return a.X[:,1]
-    elseif (p == :t) || (p == :tangent)
+    elseif (p === :t) || (p === :tangent)
         return  a.X[:,2]
-    elseif (p == :b) || (p == :bitangent)
+    elseif (p === :b) || (p === :bitangent)
         return  a.X[:,3]
     else # fallback to getfield
         return getfield(a, p)
@@ -27,7 +27,7 @@ end
 function planar_frame(n)
     n /= norm(n)
     Axes(
-        SMatrix{2,2,eltype{n}}(
+        SMatrix{2,2}(
             n[1], n[2], -n[2], n[1]
         )
     )

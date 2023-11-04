@@ -70,7 +70,7 @@ function compute_evs(bot,friction_coefficients,Ň)
 			# Ň0 = Ň(ini.q̌)
 			Ǩm_Ǩg = RB.make_Ǩm_Ǩg(st,ini.q)
 			Ǩm0, Ǩg0 = Ǩm_Ǩg(ini.q̌,ini.s,ini.μ,ini.k,ini.c)
-			Ǩa0 = - RB.cstr_forces_on_free_jacobian(st,ini.λ)
+			Ǩa0 = - RB.cstr_forces_jacobian(st,ini.λ)
 			𝒦m0 = transpose(Ň0)*Ǩm0*Ň0
 			𝒦g0 = transpose(Ň0)*Ǩg0*Ň0
 			𝒦a0 = transpose(Ň0)*Ǩa0*Ň0

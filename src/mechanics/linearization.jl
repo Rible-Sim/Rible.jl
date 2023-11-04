@@ -56,7 +56,7 @@ function find_full_pres_idx(nmcs,q)
     col_index[size(Aq,1)+1:end] |> sort
 end
 
-function cstr_forces_on_free_jacobian(st::AbstractStructure,λ)
+function cstr_forces_jacobian(st::AbstractStructure,λ)
     (;numbered,indexed,jointed) = st.connectivity
     (;num_of_free_coords,
     num_of_intrinsic_cstr,
@@ -205,7 +205,7 @@ function build_Ǩ(st)
     build_Ǩ(st,λ)
 end
 
-function build_material_stiffness_matrix_on_free!(st::Structure,q,k)
+function build_material_stiffness_matrix!(st::Structure,q,k)
     (;num_of_dim) = st
     (;indexed,tensioned) = st.connectivity
     (;num_of_full_coords,num_of_free_coords,sys_free_idx,bodyid2sys_full_coords) = indexed
@@ -238,7 +238,7 @@ function build_material_stiffness_matrix_on_free!(st::Structure,q,k)
     retǨm
 end
 
-function build_geometric_stiffness_matrix_on_free!(st::Structure,q,f)
+function build_geometric_stiffness_matrix!(st::Structure,q,f)
     (;num_of_dim) = st
     (;indexed,tensioned) = st.connectivity
     (;num_of_full_coords,num_of_free_coords,sys_free_idx,bodyid2sys_full_coords) = indexed
@@ -785,7 +785,7 @@ function build_Ǩ(st,λ)
     (;num_of_free_coords) = st.connectivity.indexed
     T = get_numbertype(st)
     # Ǩ = zeros(T,num_of_free_coords,num_of_free_coords)
-    Ǩ = -build_∂Q̌∂q̌(st) .- cstr_forces_on_free_jacobian(st,λ)
+    Ǩ = -build_∂Q̌∂q̌(st) .- cstr_forces_jacobian(st,λ)
     # Ǩ .= Ǩ
     Ǩ
 end

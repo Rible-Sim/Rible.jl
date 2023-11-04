@@ -112,23 +112,16 @@ function get_jointed_free(cst,indexed)
     )
 end
 
-function make_cstr_forces_jacobian(cst,st)
+function make_cstr_forces_jacobian(cst::PrototypeJoint,st)
     (;
         num_of_cstr,
-        hess_1st, hess_2nd, 
-        hess_3rd, hess_4th,
+        hessians
     ) = cst
     free_idx = get_jointed_free_idx(cst)
-    hessians = vcat(
-        hess_1st,
-        hess_4th,
-        hess_3rd,
-        hess_2nd
-    )
     function cstr_forces_jacobian(λ)
         ret = [
             begin
-                a = hessians[i][free_idx,free_idx] .* λ[i]
+                a = -λ[i] .* hessians[i][free_idx,free_idx]
                 # display(a)
                 a 
             end

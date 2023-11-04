@@ -36,18 +36,18 @@ get_X(q::AbstractVector,nmcs::NC) = get_X(nmcs,q)
 function find_rotation(nmcs::NC,q::AbstractVector)
     num_of_dim = get_num_of_dims(nmcs)
     if nmcs isa NC2D4C
-        (;r̄i,X̄) = nmcs
+        (;r̄i,X̄) = nmcs.data
         ū,v̄ = get_uv(nmcs,vcat(r̄i,vec(X̄)))
         u,v = get_uv(nmcs,q)
         R = SMatrix{num_of_dim,num_of_dim}([u;;v]*inv([ū;;v̄]))
     elseif nmcs isa NC3D6C
-        (;r̄i,X̄) = nmcs
+        (;r̄i,X̄) = nmcs.data
         ū,v̄,w̄ = get_uvw(nmcs,vcat(r̄i,vec(X̄)))
         u,v,w = get_uvw(nmcs,q)
         R = SMatrix{num_of_dim,num_of_dim}([u;;v;;w]*inv([ū;;v̄;;w̄]))
     else
         X = get_X(nmcs,q)
-        (;invX̄) = nmcs
+        (;invX̄) = nmcs.data
         R = SMatrix{num_of_dim,num_of_dim}(X*invX̄)
     end
     return R
@@ -78,7 +78,7 @@ Return transformation matrix。
 $(TYPEDSIGNATURES)
 """
 function to_local_coords(nmcs::NC,r̄)
-    (;r̄i,invX̄) = nmcs
+    (;r̄i,invX̄) = nmcs.data
     invX̄*(r̄-r̄i)
 end
 
@@ -104,7 +104,7 @@ function cartesian_frame2coords(nmcs::Union{NC2D2C,NC3D3C},origin_position,R,ori
 end
 
 function cartesian_frame2coords(nmcs,origin_position,R)
-    (;r̄i,X̄) = nmcs
+    (;r̄i,X̄) = nmcs.data
     ri = origin_position + R*r̄i
     X = R*X̄
     qstd = vcat(ri,vec(X))
@@ -114,7 +114,7 @@ function cartesian_frame2coords(nmcs,origin_position,R)
 end
 
 function cartesian_frame2coords(nmcs,origin_position,R,origin_velocity,ω)
-    (;r̄i,X̄) = nmcs
+    (;r̄i,X̄) = nmcs.data
     ri = origin_position + R*r̄i
     ṙi = origin_velocity + ω×(ri-origin_position)
     X = R*X̄

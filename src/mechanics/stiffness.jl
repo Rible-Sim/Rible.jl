@@ -219,7 +219,7 @@ end
 #         # μ = l .- (f./k)
 #         λ = inv(Ǎ*transpose(Ǎ))*Ǎ*Bᵀ*f
 #         # @show f,λ
-#         Ǩa = - RB.cstr_forces_on_free_jacobian(bot.structure,λ)
+#         Ǩa = - RB.cstr_forces_jacobian(bot.structure,λ)
 #         𝒦a = transpose(Ň)*Ǩa*Ň |> sparse
 #         D_𝒦a = ldl(𝒦a).D.diag |> sort
 

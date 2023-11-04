@@ -113,7 +113,7 @@ function dynfuncs(bot)
     end
 
     function cstr_forces_jacobian(q,λ)
-        RB.cstr_forces_on_free_jacobian(st,λ)
+        RB.cstr_forces_jacobian(st,λ)
     end
 
     function Ψq(q,q̇)
