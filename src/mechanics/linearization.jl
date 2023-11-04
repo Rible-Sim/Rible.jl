@@ -58,8 +58,11 @@ end
 
 function cstr_forces_on_free_jacobian(st::AbstractStructure,λ)
     (;numbered,indexed,jointed) = st.connectivity
-    (;num_of_free_coords,num_of_intrinsic_cstr,bodyid2sys_free_coords,bodyid2sys_intrinsic_cstr_idx) = indexed
-    (;njoints,num_of_extrinsic_cstr,joints,joint2sysexcst) = jointed
+    (;num_of_free_coords,
+    num_of_intrinsic_cstr,
+    bodyid2sys_free_coords,
+    bodyid2sys_intrinsic_cstr_idx) = indexed
+    (;njoints,num_of_extrinsic_cstr,joints,jointid2sys_extrinsic_cstr_idx) = jointed
     ret = zeros(eltype(λ),num_of_free_coords,num_of_free_coords)
     (;bodies,num_of_cstr) = st
     foreach(bodies) do body
@@ -79,7 +82,7 @@ function cstr_forces_on_free_jacobian(st::AbstractStructure,λ)
     #todo skip 2D for now
     if get_num_of_dims(st) == 3
         foreach(joints) do joint
-            jointexcst = joint2sysexcst[joint.id]
+            jointexcst = num_of_intrinsic_cstr .+ jointid2sys_extrinsic_cstr_idx[joint.id]
             jointfree = get_jointed_free(joint,indexed)
             ret[jointfree,jointfree] .+= make_cstr_forces_jacobian(joint,st)(λ[jointexcst])
         end

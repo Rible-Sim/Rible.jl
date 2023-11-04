@@ -4,9 +4,10 @@ function make_cstr_function(cst::PrototypeJoint,st::Structure)
     (;bodyid2sys_full_coords) = indexed
     (;sys_loci2coords_idx,bodyid2sys_loci_idx) = numbered
     (;
-        num_of_cstr,hen2egg,values,
-        half_1st, half_2nd, 
-        half_3rd, half_4th,
+        num_of_cstr,hen2egg,
+        mask_1st,
+        violations,
+        halves,
         transformations,
     ) = cst
     (;hen,egg) = hen2egg
@@ -18,19 +19,12 @@ function make_cstr_function(cst::PrototypeJoint,st::Structure)
         q_hen = @view q[bodyid2sys_full_coords[id_hen]]
         q_egg = @view q[bodyid2sys_full_coords[id_egg]]
         q = vcat(q_hen,q_egg)
-        # cstr values
-        Refq = Ref(q)
-        RefqT = Ref(q')
-        Φ_1st = transformations*q
-        Φ_4th = RefqT.*half_4th.*Refq
-        Φ_3rd = RefqT.*half_3rd.*Refq
-        Φ_2nd = RefqT.*half_2nd.*Refq
-        ret = vcat(
-            Φ_1st,
-            Φ_4th,
-            Φ_3rd, 
-            Φ_2nd, 
-        ) .- values
+        # cstr violations
+        for icstr = 1:num_of_cstr
+            ret[icstr] = q'*halves[icstr]*q
+        end
+        ret[mask_1st] .+= transformations*q
+        ret .-= violations
     end
     function inner_cstr_function(q)
         c = get_local_coords(st)
@@ -49,8 +43,8 @@ function make_cstr_jacobian(cst::PrototypeJoint,st::Structure)
     (;sys_loci2coords_idx,bodyid2sys_loci_idx) = numbered
     (;
         num_of_cstr,hen2egg,
-        hess_1st, hess_2nd, 
-        hess_3rd, hess_4th,
+        mask_1st,
+        hessians,
         transformations,
     ) = cst
     (;hen,egg) = hen2egg
@@ -71,22 +65,14 @@ function make_cstr_jacobian(cst::PrototypeJoint,st::Structure)
         q_hen = @view q[bodyid2sys_full_coords[id_hen]]
         q_egg = @view q[bodyid2sys_full_coords[id_egg]]
         q = vcat(q_hen,q_egg)
-        # translate 
-        J = transformations
-        RefqT = Ref(q')
-        A_zeros = spzeros(T,0,num_of_jointed_coords)
-        A_1st = J
-        A_4th = reduce(vcat,RefqT.*hess_4th;init = A_zeros)
-        A_3rd = reduce(vcat,RefqT.*hess_3rd;init = A_zeros)
-        A_2nd = reduce(vcat,RefqT.*hess_2nd;init = A_zeros)
-        A = vcat(
-            A_1st,
-            A_4th,
-            A_3rd, 
-            A_2nd,
-        )
-        ret[:,free_hen] .= A[:, free_idx_hen]
-        ret[:,free_egg] .= A[:,(free_idx_egg.+num_of_coords_hen)]
+        # translate
+        for icstr in 1:num_of_cstr
+            A = q'*hessians[icstr]
+            ret[icstr,free_hen] .= A[1,free_idx_hen]
+            ret[icstr,free_egg] .= A[1,(free_idx_egg.+num_of_coords_hen)]
+        end
+        ret[mask_1st,free_hen] .+= transformations[mask_1st,free_idx_hen]
+        ret[mask_1st,free_egg] .+= transformations[mask_1st,(free_idx_egg.+num_of_coords_hen)]
         ret
     end
     function inner_cstr_jacobian(q,c)

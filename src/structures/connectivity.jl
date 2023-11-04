@@ -177,34 +177,35 @@ struct JointedMembers{JType,joint2sysexcstType}
     njoints::Int
     num_of_extrinsic_cstr::Int
     joints::JType
-    joint2sysexcst::joint2sysexcstType
+    jointid2sys_extrinsic_cstr_idx::joint2sysexcstType
 end
 
 function unjoin()
     njoints = 0
     joints = Int[]
     num_of_extrinsic_cstr = 0
-    joint2sysexcst = Vector{Int}[]
-    JointedMembers(njoints,num_of_extrinsic_cstr,joints,joint2sysexcst)
+    jointid2sys_extrinsic_cstr_idx = Vector{Int}[]
+    JointedMembers(njoints,num_of_extrinsic_cstr,joints,jointid2sys_extrinsic_cstr_idx)
 end
 
 function join(joints,indexed)
     # num_of_extrinsic_cstr = mapreduce((joint)->joint.num_of_cstr,+,joints,init=0)
     njoints = length(joints)
-    joint2sysexcst = Vector{Int}[]
+    jointid2sys_extrinsic_cstr_idx = Vector{Int}[]
     nexcst_by_joint = zeros(Int,njoints)
     foreach(joints) do joint
         nexcst_by_joint[joint.id] = joint.num_of_cstr
     end
     num_of_extrinsic_cstr = sum(nexcst_by_joint)
-    joint2sysexcst = Vector{Int}[]
+    jointid2sys_extrinsic_cstr_idx = Vector{Int}[]
     ilast = 0
     for jointid = 1:njoints
         nexcst = nexcst_by_joint[jointid]
-        push!(joint2sysexcst,collect(ilast+1:ilast+nexcst))
+        push!(jointid2sys_extrinsic_cstr_idx,collect(ilast+1:ilast+nexcst))
         ilast += nexcst
     end
-    JointedMembers(njoints,num_of_extrinsic_cstr,joints,joint2sysexcst)
+    type_sorted_joints = TypeSortedCollection(joints)
+    JointedMembers(njoints,num_of_extrinsic_cstr,type_sorted_joints,jointid2sys_extrinsic_cstr_idx)
 end
 
 function Base.isless(a::AbstractBody,b::AbstractBody)

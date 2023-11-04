@@ -272,15 +272,9 @@ struct PrototypeJoint{hen2eggType,axesType,maskType,halfType,hessType,valueType}
     mask_3rd::maskType
     mask_4th::maskType
     transformations::halfType
-    half_1st::Vector{halfType}
-    half_2nd::Vector{halfType}
-    half_3rd::Vector{halfType}
-    half_4th::Vector{halfType}
-    hess_1st::Vector{hessType}
-    hess_2nd::Vector{hessType}
-    hess_3rd::Vector{hessType}
-    hess_4th::Vector{hessType}
-    values::valueType
+    halves::Vector{halfType}
+    hessians::Vector{hessType}
+    violations::valueType
 end
 
 """
@@ -298,10 +292,10 @@ function PrototypeJoint(id,hen2egg,joint_type::Symbol)
         mask_4th
     ) = joint_info
     mask_3rd = vcat(mask_3rd_hen,mask_3rd_egg.+3)
-    bits_1st = in.([1,2,3],Ref(mask_1st))
-    bits_2nd = in.([1,2,3],Ref(mask_2nd))
-    bits_3rd = in.([1,2,3,4,5,6],Ref(mask_3rd))
-    bits_4th = in.([1,],Ref(mask_4th))
+    # bits_1st = in.([1,2,3],Ref(mask_1st))
+    # bits_2nd = in.([1,2,3],Ref(mask_2nd))
+    # bits_3rd = in.([1,2,3,4,5,6],Ref(mask_3rd))
+    # bits_4th = in.([1,],Ref(mask_4th))
     T = get_numbertype(hen.rbsig)
     nmcs_hen = hen.rbsig.coords.nmcs
     nmcs_egg = egg.rbsig.coords.nmcs
@@ -374,41 +368,42 @@ function PrototypeJoint(id,hen2egg,joint_type::Symbol)
     hess_4th = [(H .+ H') |> Symmetric for H in half_4th]
     hess_3rd = [(H .+ H') |> Symmetric for H in half_3rd]
     hess_2nd = [(H .+ H') |> Symmetric for H in half_2nd]
+    # cstr cache
+    halves = vcat(
+        half_1st[mask_1st],
+        half_4th[mask_4th],
+        half_3rd[mask_3rd],
+        half_2nd[mask_2nd];
+    )
+    hessians = vcat(
+        hess_1st[mask_1st],
+        hess_4th[mask_4th],
+        hess_3rd[mask_3rd],
+        hess_2nd[mask_2nd];
+    )
     # cstr values
     Refq = Ref(q)
     RefqT = Ref(q')
-    Φ_1st = J*q
-    Φ_4th = RefqT.*half_4th.*Refq
-    Φ_3rd = RefqT.*half_3rd.*Refq
-    Φ_2nd = RefqT.*half_2nd.*Refq
-    values = vcat(
-        Φ_1st[bits_1st],
-        Φ_4th[bits_4th],
-        Φ_3rd[bits_3rd], 
-        Φ_2nd[bits_2nd], 
-    )
+    transformations = J[mask_1st,:]
+    values = RefqT.*halves.*Refq
+    values[mask_1st] .+= transformations*q
     # @show joint_info
     # @show values
     PrototypeJoint(
         id,hen2egg,
-        num_of_cstr,num_of_dof,
+        num_of_cstr,
+        num_of_dof,
         axes_trl_hen,
         axes_trl_egg,
         axes_rot_hen,
         axes_rot_egg,
-        bits_1st,
-        bits_2nd,
-        bits_3rd,
-        bits_4th,
-        J[bits_1st,:],
-        half_1st[bits_1st],
-        half_2nd[bits_2nd],
-        half_3rd[bits_3rd],
-        half_4th[bits_4th],
-        hess_1st[bits_1st],
-        hess_2nd[bits_2nd],
-        hess_3rd[bits_3rd],
-        hess_4th[bits_4th],
+        mask_1st,
+        mask_2nd,
+        mask_3rd,
+        mask_4th,
+        transformations,
+        halves,
+        hessians,
         values
     )
 end

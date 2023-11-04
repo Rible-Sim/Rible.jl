@@ -10,15 +10,15 @@ end
 # Return 2D or 3D local natural coords deformations for rigid bars。
 # $(TYPEDSIGNATURES)
 # """
-@inline @inbounds get_deform(ū::AbstractVector) = sqrt(ū⋅ū)
+@inline @inbounds get_deform(ū::AbstractVector) = SVector(sqrt(ū⋅ū))
 
 @inline @inbounds function get_deform(nmcs::Union{NC2D2C,NC3D3C})
-    (;r̄i) = nmcs
+    (;r̄i) = nmcs.data
     get_deform(r̄i)
 end
 
 @inline @inbounds function get_deform(nmcs::Union{NC2D4C,NC3D6C})
-    (;ū) = nmcs
+    (;ū) = nmcs.data
     get_deform(ū)
 end
 
@@ -26,32 +26,24 @@ end
 # Return 2D natural coodinates deformations , for rigid bodies。
 # $(TYPEDSIGNATURES)
 # """
-@inline @inbounds function get_deform(ū,v̄)
-    sqrt(ū⋅ū),sqrt(v̄⋅v̄),ū⋅v̄
-end
-
 @inline @inbounds function get_deform(nmcs::NC2D6C)
-    (;ū,v̄) = nmcs
-    get_deform(ū,v̄)
+    (;ū,v̄) = nmcs.data
+    SVector(sqrt(ū⋅ū),sqrt(v̄⋅v̄),ū⋅v̄)
 end
 
 # """
 # Return 3D natural coodinates deformations , for rigid bodies。
 # $(TYPEDSIGNATURES)
 # """
-@inline @inbounds function get_deform(ū,v̄,w̄)
+@inline @inbounds function get_deform(nmcs::NC3D12C)
+    (;ū,v̄,w̄) = nmcs.data
     u_sqrt = sqrt(ū⋅ū)
     v_sqrt = sqrt(v̄⋅v̄)
     w_sqrt = sqrt(w̄⋅w̄)
     vw = v̄⋅w̄
     uw = ū⋅w̄
     uv = ū⋅v̄
-    u_sqrt,v_sqrt,w_sqrt,vw,uw,uv
-end
-
-@inline @inbounds function get_deform(nmcs::NC3D12C)
-    (;ū,v̄,w̄) = nmcs
-    get_deform(ū,v̄,w̄)
+    SVector(u_sqrt,v_sqrt,w_sqrt,vw,uw,uv)
 end
 
 # Intrinsic Constraints
@@ -61,29 +53,26 @@ Return 2D or 3D intrinsic cstr(s) ，用于Dispatch。
 $(TYPEDSIGNATURES)
 """
 function make_cstr_function(nmcs::NC,cstr_idx)
-    deforms = get_deform(nmcs::NC)
+    deforms = get_deform(nmcs)
     make_cstr_function(nmcs,cstr_idx,deforms)
 end
 
-function make_inner_cstr_function(func,deforms)
-    @inline @inbounds function ret_func(q)
-        func(q,deforms)
-    end
-    @inline @inbounds function ret_func(q,d)
-        func(q,d)
-    end
-    ret_func
-end
+# function make_inner_cstr_function(func,deforms)
+#     @inline @inbounds function ret_func(q,d=deforms)
+#         func(q,d)
+#     end
+#     ret_func
+# end
 
 """
 Return 2D or 3D intrinsic cstr(s) for point mass。
 $(TYPEDSIGNATURES)
 """
 function make_cstr_function(nmcs::Union{NC2D2C,NC3D3C},cstr_idx,deforms)
-    @inline @inbounds function _inner_cstr_function(q,d)
+    @inline @inbounds function inner_cstr_function(q,d=deforms)
         nothing
     end
-    make_inner_cstr_function(_inner_cstr_function,deforms)
+    # make_inner_cstr_function(inner_cstr_function,deforms)
 end
 
 """
@@ -93,13 +82,12 @@ $(TYPEDSIGNATURES)
 function make_cstr_function(nmcs::Union{NC2D4C,NC3D6C},cstr_idx,deforms)
     ndim = get_num_of_dims(nmcs)
     cv = nmcs.conversion_to_std
-    @inline @inbounds function _inner_cstr_function(q,d)
+    @inline @inbounds function inner_cstr_function(q,d=deforms)
         qstd = cv*q
         u = @view qstd[ndim+1:2ndim]
-        all = [u⋅u - d^2]
+        all = [u⋅u - d[1]^2]
         all[cstr_idx]
     end
-    make_inner_cstr_function(_inner_cstr_function,deforms)
 end
 
 """
@@ -108,7 +96,7 @@ $(TYPEDSIGNATURES)
 """
 function make_cstr_function(nmcs::NC2D6C,cstr_idx,deforms)
     cv = nmcs.conversion_to_std
-    @inline @inbounds function _inner_cstr_function(q,d)
+    @inline @inbounds function inner_cstr_function(q,d=deforms)
         qstd = cv*q
         u = @view qstd[3:4]
         v = @view qstd[5:6]
@@ -119,7 +107,6 @@ function make_cstr_function(nmcs::NC2D6C,cstr_idx,deforms)
         ]
         all[cstr_idx]
     end
-    make_inner_cstr_function(_inner_cstr_function,deforms)
 end
 
 
@@ -129,7 +116,7 @@ $(TYPEDSIGNATURES)
 """
 function make_cstr_function(nmcs::NC3D12C,cstr_idx,deforms)
     cv = nmcs.conversion_to_std
-    @inline @inbounds function _inner_cstr_function(q,d)
+    @inline @inbounds function inner_cstr_function(q,d=deforms)
         qstd = cv*q
         u = @view qstd[4:6]
         v = @view qstd[7:9]
@@ -144,12 +131,9 @@ function make_cstr_function(nmcs::NC3D12C,cstr_idx,deforms)
         ]
         @view all[cstr_idx]
     end
-    make_inner_cstr_function(_inner_cstr_function,deforms)
 end
 
 ## Jacobians
-
-
 """
 Return 2D or 3D Jacobian matrix for rigid bars。
 $(TYPEDSIGNATURES)
@@ -181,6 +165,7 @@ Return 2D Jacobian matrix , for rigid bodies。
 $(TYPEDSIGNATURES)
 """
 function make_cstr_jacobian(nmcs::NC2D6C,free_idx,cstr_idx)
+    cv = nmcs.conversion_to_std
     @inline @inbounds function inner_cstr_jacobian(q)
         u,v = get_uv(nmcs,q)
         ret = zeros(eltype(q),3,6)
@@ -196,9 +181,9 @@ Return 3D Jacobian matrix , for rigid bodies。
 $(TYPEDSIGNATURES)
 """
 function make_cstr_jacobian(nmcs::NC3D12C,free_idx,cstr_idx)
+    cv = nmcs.conversion_to_std
     @inline @inbounds function inner_cstr_jacobian(q)
         u,v,w = get_uvw(nmcs,q)
-        cv = nmcs.conversion_to_std
         ret = zeros(eltype(q), 6, 12)
         ret[1,4:6]   = 2u
         ret[2,7:9]   = 2v

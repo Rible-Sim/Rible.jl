@@ -73,7 +73,6 @@ function make_cstr_jacobian(coords::NonminimalCoordinates)
     make_cstr_jacobian(coords.nmcs,coords.free_idx,coords.cstr_idx)
 end
 
-
 struct NonminimalCoordinatesCache{MType,JType,HType,GType}
     cstr_hessians::Vector{HType}
     M::MType

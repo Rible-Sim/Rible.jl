@@ -54,27 +54,22 @@ $(TYPEDSIGNATURES)
 """
 get_num_of_dof(nmcs::NC) =  get_num_of_coords(nmcs) - get_num_of_cstr(nmcs)
 
-function Base.getproperty(nmcs::NC,p::Symbol)
-    if (p == :r̄i) 
-        return nmcs.data.r̄i
-    elseif (p == :ū) 
-        return nmcs.data.X̄[:,1]
+
+function Base.getproperty(data::LNCData,p::Symbol)
+    if     (p == :ū) 
+        return data.X̄[:,1]
     elseif (p == :v̄)
-        return nmcs.data.X̄[:,2]
+        return data.X̄[:,2]
     elseif (p == :w̄)
-        return nmcs.data.X̄[:,3]
-    elseif (p == :X̄)
-        return nmcs.data.X̄
-    elseif (p == :invX̄)
-        return nmcs.data.invX̄
-    elseif (p == :r̄j)
-        return nmcs.data.r̄i + nmcs.data.ū
-    elseif  (p == :r̄k)
-        return nmcs.data.r̄i + nmcs.data.v̄
-    elseif  (p == :r̄l)
-        return nmcs.data.r̄i + nmcs.data.w̄
+        return data.X̄[:,3]
+    elseif (p === :r̄j)
+        return data.r̄i + data.ū
+    elseif  (p === :r̄k)
+        return data.r̄i + data.v̄
+    elseif  (p === :r̄l)
+        return data.r̄i + data.w̄
     else # fallback to getfield
-        return getfield(nmcs, p)
+        return getfield(data, p)
     end
 end
 

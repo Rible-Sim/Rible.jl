@@ -265,8 +265,20 @@ end
 function make_cstr_function(st::AbstractStructure,q0::AbstractVector)
     (;bodies,num_of_cstr) = st
     (;numbered,indexed,jointed) = st.connectivity
-    (;num_of_free_coords,num_of_full_coords,sys_pres_idx,sys_free_idx,bodyid2sys_full_coords,bodyid2sys_pres_coords,bodyid2sys_free_coords,num_of_intrinsic_cstr,bodyid2sys_intrinsic_cstr_idx) = indexed
-
+    (;
+        num_of_free_coords,
+        num_of_full_coords,
+        sys_pres_idx,
+        sys_free_idx,
+        bodyid2sys_full_coords,
+        bodyid2sys_pres_coords,
+        bodyid2sys_free_coords,
+        num_of_intrinsic_cstr,
+        bodyid2sys_intrinsic_cstr_idx
+    ) = indexed
+    (;
+        jointid2sys_extrinsic_cstr_idx
+    ) = jointed
     function _inner_cstr_function(q̌,d,c)
         q = Vector{eltype(q̌)}(undef,num_of_full_coords)
         q[sys_pres_idx] .= q0[sys_pres_idx]
@@ -283,11 +295,9 @@ function make_cstr_function(st::AbstractStructure,q0::AbstractVector)
                 )(q[memfull],d[memincst])
             end
         end
-        is = Ref(num_of_intrinsic_cstr)
         foreach(jointed.joints) do joint
-            nc = joint.num_of_cstr
-            ret[is[]+1:is[]+nc] .= make_cstr_function(joint,st)(q,d[is[]+1:is[]+nc],c)
-            is[] += nc
+            jointexcst = num_of_intrinsic_cstr.+jointid2sys_extrinsic_cstr_idx[joint.id]
+            ret[jointexcst] .= make_cstr_function(joint,st)(q,c)
         end
         ret
     end
@@ -308,7 +318,16 @@ end
 function make_cstr_function(st::AbstractStructure)
     (;bodies,num_of_cstr) = st
     (;indexed,jointed,numbered) = st.connectivity
-    (;num_of_free_coords,bodyid2sys_full_coords,bodyid2sys_free_coords,num_of_intrinsic_cstr,bodyid2sys_intrinsic_cstr_idx) = indexed
+    (;
+        num_of_free_coords,
+        bodyid2sys_full_coords,
+        bodyid2sys_free_coords,
+        num_of_intrinsic_cstr,
+        bodyid2sys_intrinsic_cstr_idx
+    ) = indexed
+    (;
+        jointid2sys_extrinsic_cstr_idx
+    ) = jointed
     @inline @inbounds function inner_cstr_function(q)
         ret = Vector{eltype(q)}(undef,num_of_cstr)
         is = Ref(num_of_intrinsic_cstr)
@@ -324,9 +343,8 @@ function make_cstr_function(st::AbstractStructure)
             end
         end
         foreach(jointed.joints) do joint
-            nc = joint.num_of_cstr
-            ret[is[]+1:is[]+nc] .= make_cstr_function(joint,st)(q)
-            is[] += nc
+            jointexcst = num_of_intrinsic_cstr.+jointid2sys_extrinsic_cstr_idx[joint.id]
+            ret[jointexcst] .= make_cstr_function(joint,st)(q)
         end
         ret
     end
@@ -336,8 +354,19 @@ end
 function make_cstr_jacobian(st::AbstractStructure,q0::AbstractVector)
     (;bodies,num_of_cstr) = st
     (;numbered,indexed,jointed) = st.connectivity
-    (;num_of_full_coords,num_of_free_coords,sys_pres_idx,sys_free_idx,bodyid2sys_full_coords,bodyid2sys_free_coords,num_of_intrinsic_cstr,bodyid2sys_intrinsic_cstr_idx) = indexed
-
+    (;
+        num_of_full_coords,
+        num_of_free_coords,
+        sys_pres_idx,
+        sys_free_idx,
+        bodyid2sys_full_coords,
+        bodyid2sys_free_coords,
+        num_of_intrinsic_cstr,
+        bodyid2sys_intrinsic_cstr_idx
+    ) = indexed
+    (;
+        jointid2sys_extrinsic_cstr_idx
+    ) = jointed
     function _inner_cstr_jacobian(q̌,c)
         q = Vector{eltype(q̌)}(undef,num_of_full_coords)
         q[sys_pres_idx] .= q0[sys_pres_idx]
@@ -354,11 +383,9 @@ function make_cstr_jacobian(st::AbstractStructure,q0::AbstractVector)
                 )(q[memfull])
             end
         end
-        is = Ref(num_of_intrinsic_cstr)
         foreach(jointed.joints) do joint
-            nc = joint.num_of_cstr
-            ret[is[]+1:is[]+nc,:] .= make_cstr_jacobian(joint,st)(q,c)
-            is[] += nc
+            jointexcst = num_of_intrinsic_cstr.+jointid2sys_extrinsic_cstr_idx[joint.id]
+            ret[jointexcst,:] .= make_cstr_jacobian(joint,st)(q,c)
         end
         ret
     end
@@ -374,10 +401,18 @@ end
 function make_cstr_jacobian(st::AbstractStructure)
     (;bodies,num_of_cstr) = st
     (;numbered,indexed,jointed) = st.connectivity
-    (;num_of_free_coords,bodyid2sys_full_coords,bodyid2sys_free_coords,num_of_intrinsic_cstr,bodyid2sys_intrinsic_cstr_idx) = indexed
+    (;
+        num_of_free_coords,
+        bodyid2sys_full_coords,
+        bodyid2sys_free_coords,
+        num_of_intrinsic_cstr,
+        bodyid2sys_intrinsic_cstr_idx
+    ) = indexed
+    (;
+        jointid2sys_extrinsic_cstr_idx
+    ) = jointed
     @inline @inbounds function inner_cstr_jacobian(q)
         ret = zeros(eltype(q),num_of_cstr,num_of_free_coords)
-        is = Ref(num_of_intrinsic_cstr)
         foreach(bodies) do body
             bodyid = body.prop.id
             memfull = bodyid2sys_full_coords[bodyid]
@@ -390,9 +425,8 @@ function make_cstr_jacobian(st::AbstractStructure)
             end
         end
         foreach(jointed.joints) do joint
-            nc = joint.num_of_cstr
-            ret[is[]+1:is[]+nc,:] .= make_cstr_jacobian(joint,st)(q)
-            is[] += nc
+            jointexcst = num_of_intrinsic_cstr.+jointid2sys_extrinsic_cstr_idx[joint.id]
+            ret[jointexcst,:] .= make_cstr_jacobian(joint,st)(q)
         end
         ret
     end
