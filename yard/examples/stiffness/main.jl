@@ -81,6 +81,38 @@ tw = 468 |> pt2px
 th = 622 |> pt2px
 #-- preamble end
 
+#-- one_tri_one_bar
+tb = one_tri_one_bar(;)
+GM.activate!();with_theme(
+        # resolution = (1tw,0.4tw),
+        theme_pub;
+        Axis3 = (
+            azimuth = 1.8345150083269814,
+            elevation = 0.34652720669872356
+        ),
+        Poly = (
+            transparency = true,
+        ),
+    ) do
+    plot_traj!(tb;
+        AxisType = Axis3,
+        showground=false,
+        showpoints = false,
+        showlabels = false,
+        doslide = false,
+        showinfo = true,
+        xlims = (-0.6,0.45),
+        ylims = (-0.5,0.5),
+        zlims = (-0.25,0.25),
+        showtitle = false,
+        sup! = (ax,tgob,sgi)->begin
+            hidedecorations!(ax)
+            hidespines!(ax)
+        end,
+        figname = "modeling_raw"
+    )
+end
+
 #--- superball
 # for use with Class-1 and the 1st rigid fixed
 function build_nullspace_on_free(st)
@@ -808,7 +840,7 @@ with_theme(theme_pub;
     
     ax2 = Axis(fig[1,2],
         xlabel = L"\sigma",
-        ylabel = L"\rho"
+        ylabel = L"\rho_{(\mathrm{1})}"
     )
     for i in 1:6
         lines!(ax2,σs,Vals[i,:],label=latexstring("\\rho_{($i)}"))
@@ -904,15 +936,15 @@ with_theme(theme_pub;
     ) do 
     fig = Figure()
     ax1 = Axis(fig[1,1],
-        xlabel = L"\bar{\alpha}_1",
+        xlabel = L"\bar{\alpha}_2",
         ylabel = L"\rho_{(\mathrm{1})}"
     )
     lines!(ax1,σs,Vals_α[1,:],)
     xlims!(ax1,0,1700)
     ylims!(ax1,-20,60)
     ax2 = Axis(fig[1,2],
-        xlabel = L"\bar{\alpha}_1",
-        ylabel = L"\rho"
+        xlabel = L"\bar{\alpha}_2",
+        ylabel = L"\rho_{(\mathrm{1})}"
     )
     for i in 1:6
         lines!(ax2,σs,Vals_α[i,:],label=latexstring("\\rho_{($i)}"))

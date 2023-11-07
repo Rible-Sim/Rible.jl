@@ -6,6 +6,7 @@ function make_3d_bar(
         radius_ratio = 1/30,
         mat_name = nothing, #"Teak",
         loadmesh = false,
+        loadmesh2 = false,
     )
     # @show id,ri,rj
     movable = true
@@ -85,6 +86,11 @@ function make_3d_bar(
             scale=1/500,
             color=:palegreen3,
         )
+    elseif loadmesh2
+        barmesh = load(RB.assetpath("球铰/零件2.STL")) |> make_patch(;
+            scale=1/200,
+            color=:palegreen3,
+        )
     else
         barmesh = endpoints2mesh(r̄p1,r̄p2;radius,)
     end
@@ -93,7 +99,7 @@ end
 
 function make_3d_tri(
         id,
-        nodes_positions,
+        loci_positions,
         ro,
         R,
         ri,
@@ -129,22 +135,22 @@ function make_3d_tri(
 
     axes = [
         SVector(1.0,0,0)
-        for i = eachindex(nodes_positions)
+        for i = eachindex(loci_positions)
     ]
     prop = RB.RigidBodyProperty(
         id,
         movable,
         mass,Īg,
         mass_center,
-        nodes_positions,
+        Ref(inv(R)).*loci_positions,
         axes;
         constrained=constrained
     )
     ṙo = zero(ro)
     ω = zero(ro)
-    u = R*(nodes_positions[2] - nodes_positions[1])
-    v = R*(nodes_positions[3] - nodes_positions[1])
-    w = R*(nodes_positions[4] - nodes_positions[1])
+    u = R*(loci_positions[2] - loci_positions[1])
+    v = R*(loci_positions[3] - loci_positions[1])
+    w = R*(loci_positions[4] - loci_positions[1])
     if rj isa Nothing
         nmcs = RB.NCF.NC1P3V(ri,ro,R)
     elseif rk isa Nothing
@@ -161,39 +167,52 @@ function make_3d_tri(
                 ("density", density),
                 ("mass", mass),
                 ("inertia", Īg),
-                ("mass center", mass_locus),
-                ("loci[1]", loci[1]),
-                ("loci[2]", loci[2]),
-                ("loci[3]", loci[3]),
-                ("loci[4]", loci[4])
+                ("mass center", mass_center),
+                ("loci_positions[1]", loci_positions[1]),
+                ("loci_positions[2]", loci_positions[2]),
+                ("loci_positions[3]", loci_positions[3]),
+                ("loci_positions[4]", loci_positions[4])
             ]
         )
     )
     # cf = RB.NCF.CoordinateFunctions(nmcs,q0,ci,free_idx)
     # @show typeof(nmcs)
-    # radius = norm(loci[2]-loci[1])/32
+    # radius = norm(loci_positions[2]-loci_positions[1])/32
     # @show radius
-    trimesh = GB.merge(
-        [
-            endpoints2mesh(loci[i],loci[j];
-            radius,color)
-            for (i,j) in [
-                [1,2],[1,3],[1,4],
-                [2,3],[3,4],[4,2]
-            ]
-        ]
-    ) |> make_patch(;color = :darkslategrey)
+
     if loadmesh
-        platemesh = endpoints2mesh(SVector(0.0,0.0,-height/2),SVector(0.0,0.0,height/2);radius=norm(loci[2]),n1=m,n2=2)
+        trimesh = load(
+            RB.assetpath("球铰/零件1.stl")
+        ) |> make_patch(;
+        scale = 1/200, 
+        color = :tomato1,
+        trans = [0,0,-0.39]
+        )
+    else
         trimesh = GB.merge(
             [
-                trimesh,
-                platemesh
+                endpoints2mesh(loci_positions[i],loci_positions[j];
+                radius,color)
+                for (i,j) in [
+                    [1,2],[1,3],[1,4],
+                    [2,3],[3,4],[4,2]
+                ]
             ]
-        )
+        ) |> make_patch(;color = :darkslategrey)
+        #     platemesh = endpoints2mesh(
+        #         SVector(0.0,0.0,-height/2),
+        #         SVector(0.0,0.0, height/2);
+        #         radius=norm(loci[2]),n1=m,n2=2)
+        #     trimesh = GB.merge(
+        #         [
+        #             trimesh,
+        #             platemesh
+        #         ]
+        #     )
     end
-    state = RB.RigidBodyState(prop,nmcs,ro,R,ṙo,ω,ci,cstr_idx)
-    body = RB.RigidBody(prop,state,trimesh)
+    state = RB.RigidBodyState(prop,ro,R,ṙo,ω)
+    coords = RB.NonminimalCoordinates(nmcs,ci,cstr_idx)
+    body = RB.RigidBody(prop,state,coords,trimesh)
 end
 
 function make_3d_plate(
@@ -2326,6 +2345,113 @@ function lander(;k=nothing)
 
     st = RB.Structure(rbs,tensiles,cnt)
     bot = RB.Robot(st,hub)
+end
+
+function one_tri_one_bar(;k=nothing)
+    a = 0.255 #tetrahedra base triangle length
+    h = 0.39
+    l = 2.0 #legs lengths
+    θ = 2π/4 #triangle angle
+    d = 0.72
+    α = π/3
+    R = RotY(-π/2)
+    P = Ref(R).*vcat(
+        [
+            [
+                2a/sqrt(2)*cos(i*θ+θ/2),
+                2a/sqrt(2)*sin(i*θ+θ/2),
+                -h + 0.01
+            ] 
+            for i = 0:3
+        ],
+        [
+            [
+                2a/sqrt(3)*cos((i+0.5)*θ),
+                2a/sqrt(3)*sin((i+0.5)*θ),
+                h
+            ] 
+            for i = -1:1
+        ],
+        [
+            RotXY(-π/18,π/24)*[0.0,0.0,d],
+            [0.0,0.0,0.0],
+        ]
+    ) .|> SVector{3}
+    
+    # scatter(P)
+    
+    base = make_3d_tri(
+        1,
+        P[[8,1,2,3,4]],
+        zero(P[8]),
+        R,
+        P[8];
+        movable = true,
+        constrained = true,
+        ci = collect(1:12),
+        cstr_idx = Int[],
+        radius = 0.04,
+        loadmesh=true
+    )
+
+    bar = make_3d_bar(
+        2,
+        P[end],
+        P[end-1],;		
+        radius_ratio = 1/40,
+        ci = Int[],
+        loadmesh2 = true,
+    )
+    
+
+    # # #
+    nb = 2
+    rbs = TypeSortedCollection([base,bar,])
+    numberedpoints = RB.number(rbs)
+    indexedcoords = RB.index(rbs,)
+    
+    # 
+    cnt_matrix_elas = ElasticArray{Int}(undef, nb, 0)
+    cnt_circular = CircularArray([2,3,4])
+    # left
+    for i = 1:4	
+        row = zeros(Int,nb)
+        row[1] = -(i+1)
+        row[2] = 2
+        append!(cnt_matrix_elas,row)
+    end
+
+    display(cnt_matrix_elas)
+    cnt_matrix = Matrix(cnt_matrix_elas')
+    ncables = size(cnt_matrix,1)
+    if k isa Nothing
+        cables = [RB.Cable3D(i,0.0,100.0,0.0;slack=false) for i = 1:ncables]
+    else
+        cables = [RB.Cable3D(i,0.0,k[i],0.0;slack=false) for i = 1:ncables]
+    end
+    tensiles = (cables = cables,)
+    connected = RB.connect(rbs,cnt_matrix)
+
+    cst1 = RB.PinJoint(
+        1,
+        RB.Hen2Egg(
+            1,
+            RB.ID(base,1),
+            RB.ID(bar,1),
+        )
+    )
+    
+    jointedmembers = RB.join((cst1,),indexedcoords)
+
+    cnt = RB.Connectivity(
+        numberedpoints,
+        indexedcoords,
+        @eponymtuple(connected,),
+        jointedmembers
+    )
+
+    st = RB.Structure(rbs,tensiles,cnt)
+    bot = RB.Robot(st,)
 end
 
 function tower(;k=nothing)
