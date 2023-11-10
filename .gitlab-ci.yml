@@ -14,7 +14,7 @@
   script:
     # Let's run the tests. Substitute `coverage = false` below, if you do not
     # want coverage results.
-    - julia -e 'using Pkg; Pkg.clone(pwd()); Pkg.build("Rible"); Pkg.test("Rible"; coverage = false)'
+    - julia -e 'using Pkg; Pkg.develop(path=pwd()); Pkg.build("Rible"); Pkg.test("Rible"; coverage = false)'
     # Comment out below if you do not want coverage results.
     # - julia -e 'using Pkg; Pkg.add("Coverage");
     #   import Rible; cd(joinpath(dirname(pathof(Rible)), ".."));
