@@ -7,8 +7,8 @@ end
 function generate_cache(::ZhongCCP,intor;dt,kargs...)
     (;prob) = intor
     (;bot,dynfuncs) = prob
-    (;st) = bot
-    M = Matrix(assemble_M(st))
+    (;structure) = bot
+    M = Matrix(assemble_M(structure))
     Φ = make_cstr_function(bot)
     A = make_cstr_jacobian(bot)
 
@@ -19,10 +19,10 @@ function generate_cache(::ZhongCCP,intor;dt,kargs...)
     B(q) = Matrix{T}(undef,0,nq)
 
     # ∂𝐌𝐚∂𝐪(q,a) = zeros(T,nq,nq)
-    cstr_forces_jacobian(q,λ) = cstr_forces_jacobian(st,λ)
-    # ∂𝚽𝐪𝐯∂𝒒(q,v) = RB.∂Aq̇∂q(st,v)
+    ∂Aᵀλ∂q(q::AbstractVector,λ) = cstr_forces_jacobian(structure,λ)
+    # ∂𝚽𝐪𝐯∂𝒒(q,v) = RB.∂Aq̇∂q(structure,v)
     ∂Bᵀμ∂q(q,μ) = zeros(T,nq,nq)
-    cache = @eponymtuple(M,Φ,A,Ψ,B,∂Ψ∂q,cstr_forces_jacobian,∂Bᵀμ∂q)
+    cache = @eponymtuple(M,Φ,A,Ψ,B,∂Ψ∂q,∂Aᵀλ∂q,∂Bᵀμ∂q)
     ZhongCCPCache(cache)
 end
 
@@ -32,7 +32,7 @@ end
 
 function make_zhongccp_ns_stepk(nq,nλ,na,qₖ₋₁,vₖ₋₁,pₖ₋₁,tₖ₋₁,pₖ,vₖ,dynfuncs,cache,invM,h,scaling)
     F!,Jac_F!,_ = dynfuncs
-    (;M,Φ,A,cstr_forces_jacobian) = cache
+    (;M,Φ,A,∂Aᵀλ∂q) = cache
 
     n1 = nq
     n2 = nq+nλ
@@ -75,7 +75,7 @@ function make_zhongccp_ns_stepk(nq,nλ,na,qₖ₋₁,vₖ₋₁,pₖ₋₁,tₖ�
             pₖ .= Momentum_k(qₖ₋₁,pₖ₋₁,qₖ,λₘ,M,A,scaling,h)
             vₖ .= invM*pₖ        
             ∂vₘ∂qₖ = 1/h*I
-            ∂vₖ∂qₖ = 2/h*I + 1/(h).*invM*(cstr_forces_jacobian(qₖ,λₘ))
+            ∂vₖ∂qₖ = 2/h*I + 1/(h).*invM*(∂Aᵀλ∂q(qₖ,λₘ))
             ∂vₖ∂λₘ = scaling.*invM*transpose(Aₖ-Aₖ₋₁)/(h)
             
             v́⁺ = Dₘ*vₘ .+ Dₖ*vₖ
@@ -127,7 +127,7 @@ function solve!(intor::Integrator,solvercache::ZhongCCPCache;
         get_distribution_law!
     ) = dynfuncs
     (;cache) = solvercache
-    (;M,Φ,A,Ψ,B,∂Ψ∂q,cstr_forces_jacobian,∂Bᵀμ∂q) = cache
+    (;M,A) = cache
     invM = inv(M)
     q0 = traj.q[begin]
     λ0 = traj.λ[begin]

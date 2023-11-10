@@ -5,6 +5,9 @@
 		},
 		{
 			"path": ".."
+		},
+		{
+			"path": "../../../../../../.julia/dev/ReinforcementLearning/src/ReinforcementLearningExperiments"
 		}
 	],
 	"settings": {

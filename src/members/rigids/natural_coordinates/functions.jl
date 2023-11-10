@@ -35,7 +35,9 @@ get_X(q::AbstractVector,nmcs::NC) = get_X(nmcs,q)
 
 function find_rotation(nmcs::NC,q::AbstractVector)
     num_of_dim = get_num_of_dims(nmcs)
-    if nmcs isa NC2D4C
+    if (nmcs isa NC2D2C) || (nmcs isa NC3D3C)
+        R = SMatrix{num_of_dim,num_of_dim}(I(num_of_dim))
+    elseif nmcs isa NC2D4C
         (;r̄i,X̄) = nmcs.data
         ū,v̄ = get_uv(nmcs,vcat(r̄i,vec(X̄)))
         u,v = get_uv(nmcs,q)
@@ -56,18 +58,28 @@ end
 find_rotation(q::AbstractVector, nmcs::NC) = find_rotation(nmcs,q)
 
 
-function find_angular_velocity(nmcs::NC,q::AbstractVector,q̇::AbstractVector)
+function find_angular_velocity(nmcs::NC{N,M,T},q::AbstractVector,q̇::AbstractVector) where {N,M,T}
     Ẋ = get_X(nmcs,q̇)
     X = get_X(nmcs,q)
     num_of_dim = get_num_of_dims(nmcs)
+    o = zero(T)
     if num_of_dim == 2
-        u = X[:,1]
-        u̇ = Ẋ[:,1]
-        ω = SVector{1}([-u[2],u[1]]\u̇)
+        if nmcs isa NC2D2C
+            ω = SVector{1}(o)
+        else
+            u = X[:,1]
+            u̇ = Ẋ[:,1]
+            ω = SVector{1}([-u[2],u[1]]\u̇)
+        end
     else
-        Ω = Ẋ*pinv(X)
-        ω = SVector{3}(Ω[3,2],Ω[1,3],Ω[2,1])
+        if nmcs isa NC3D3C
+            ω = SVector{3}(o,o,o)
+        else
+            Ω = Ẋ*pinv(X)
+            ω = SVector{3}(Ω[3,2],Ω[1,3],Ω[2,1])
+        end
     end
+    return ω
 end
 
 find_angular_velocity(q::AbstractVector,q̇::AbstractVector,nmcs::NC3D) = find_angular_velocity(nmcs,q,q̇)

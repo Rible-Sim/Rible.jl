@@ -1,46 +1,7 @@
 #-- preamble
-using LinearAlgebra
-using Statistics
-using SparseArrays
-using StaticArrays
-using Rotations
-# using Parameters
-import GeometryBasics as GB
-using OffsetArrays
-using Makie
-import GLMakie as GM
-import CairoMakie as CM
-GM.activate!()
-using LaTeXStrings
-using BlockDiagonals
-using RecursiveArrayTools
-using Interpolations
-using EponymTuples
-using CircularArrays
-using TypeSortedCollections
-using DataStructures
-using PrettyTables
-using Printf
-using CoordinateTransformations
-using Meshing
-using ForwardDiff
-using BenchmarkTools
-using IterTools
-using Unitful
-using Match
-using FileIO
-using Cthulhu
-using JET
-using TypedTables
-using Revise
-using AbbreviatedStackTraces
-ENV["JULIA_STACKTRACE_ABBREVIATED"] = true
-ENV["JULIA_STACKTRACE_MINIMAL"] = true
-import Rible as RB
-import Meshes
+include("deps.jl")
 cd(@__DIR__)
 include("def.jl"); includet("def.jl")
-# includet("plotting.jl")
 include("../../vis.jl"); includet("../../vis.jl")
 include("../../dyn.jl"); includet("../../dyn.jl")
 figdir::String = ""
@@ -81,8 +42,9 @@ function new_pointmass(;
     nmcs = RB.NCF.NC3D1P(loci[1],)
     ci = Int[]
     cstr_idx = Int[]
-    state = RB.RigidBodyState(prop,nmcs,origin_position,R,origin_velocity,ω,ci,cstr_idx)
-    rb1 = RB.RigidBody(prop,state)
+    state = RB.RigidBodyState(prop,origin_position,R,origin_velocity,ω)
+    coords = RB.NonminimalCoordinates(nmcs,ci,cstr_idx)
+    rb1 = RB.RigidBody(prop,state,coords)
 
     rbs = TypeSortedCollection((rb1,))
     numberedpoints = RB.number(rbs)
@@ -111,22 +73,22 @@ h = 1e-3
 # horizontal plane
 restitution_coefficients = [0.5]
 v0s = [1.0]
-pms_hp = [
-    begin
-        pm = new_pointmass(;
-                e,μ=0.1,origin_velocity = [v0,0,0]
-            )
-        RB.solve!(
-            RB.SimProblem(pm,pm_contact_dynfuncs),
-            RB.ZhongCCP();
-            tspan,dt=h,
-            ftol=1e-14,
-            maxiters=50,
-            exception=false
-        )
-    end
-    for v0 in v0s for e in restitution_coefficients
-]
+
+pm = new_pointmass(;
+    e = restitution_coefficients[1],
+    μ=0.1,
+    origin_velocity = [v0s[1],0,0]
+)
+
+prob = RB.SimProblem(pm,pm_contact_dynfuncs)
+RB.solve!(
+    prob,
+    RB.ZhongCCP();
+    tspan,dt=h,
+    ftol=1e-14,
+    maxiters=50,
+    exception=false
+)
 
 GM.activate!();with_theme(theme_pub;
             resolution = (0.8tw,0.2tw),
@@ -144,7 +106,7 @@ GM.activate!();with_theme(theme_pub;
                 cycle = [:color ],
             )
     ) do
-    bot = pms_hp[1]
+    bot = pm
     fig = Figure()
     gd = fig[1,1] = GridLayout()
     gd1 = fig[1,2] = GridLayout()

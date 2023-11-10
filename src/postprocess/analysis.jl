@@ -1,16 +1,16 @@
 function get_trajectory!(bot::Robot,bodyid::Int,pid::Int,step_range=:)
-    (; st, traj)= bot
+    (; structure, traj)= bot
 	T = get_numbertype(bot)
     N = get_num_of_dims(bot)
     position_traj = [
         zeros(T,N)
         for _ in eachindex(traj)
     ]
-    bodies = get_bodies(st)
+    bodies = get_bodies(structure)
     body = bodies[bodyid]
     for (i,state) in enumerate(traj)
         (;t,q,q̇) = state 
-        update_bodies!(st,q,q̇)
+        update_bodies!(structure,q,q̇)
         if pid == 0
             position_traj[i] .= body.state.mass_locus_state.position
         else
@@ -21,18 +21,18 @@ function get_trajectory!(bot::Robot,bodyid::Int,pid::Int,step_range=:)
 end
 
 function get_velocity!(bot::Robot,bodyid::Int,pid::Int,step_range=:)
-    (; st, traj)= bot
+    (; structure, traj)= bot
 	T = get_numbertype(bot)
     N = get_num_of_dims(bot)
     velocity_traj = [
         zeros(T,N)
         for _ in eachindex(traj)
     ]
-    bodies = get_bodies(st)
+    bodies = get_bodies(structure)
     body = bodies[bodyid]
     for (i,state) in enumerate(traj)
         (;t,q,q̇) = state 
-        update_bodies!(st,q,q̇)
+        update_bodies!(structure,q,q̇)
         if pid == 0
             velocity_traj[i] .= body.state.mass_locus_state.velocity
         else
@@ -43,42 +43,42 @@ function get_velocity!(bot::Robot,bodyid::Int,pid::Int,step_range=:)
 end
 
 function get_mid_velocity!(bot::Robot,bodyid::Int,pid::Int,step_range=:)
-    (; st, traj)= bot
+    (; structure, traj)= bot
 	(; t, q) = traj
 	T = get_numbertype(bot)
 	h = t[begin+1] - t[begin]
     ṙp = Vector{T}[]
-    bodies = get_bodies(st)
+    bodies = get_bodies(structure)
     body = bodies[bodyid]
     for (qₖ,qₖ₋₁) in zip(traj.q[begin+1:end], traj.q[begin:end-1])
-        update_bodies!(st,(qₖ.+qₖ₋₁)./2,(qₖ.-qₖ₋₁)./h)
+        update_bodies!(structure,(qₖ.+qₖ₋₁)./2,(qₖ.-qₖ₋₁)./h)
         push!(ṙp,body.state.ṙps[pid])
     end
     ṙp[step_range] |> VectorOfArray
 end
 
 function get_orientation!(bot::Robot,bodyid::Int,step_range=:)
-    (; st, traj)= bot
+    (; structure, traj)= bot
 	T = get_numbertype(bot)
     R = VectorOfArray(Vector{Matrix{T}}())
-    bodies = get_bodies(st)
+    bodies = get_bodies(structure)
     body = bodies[bodyid]
     for (q,q̇) in zip(traj.q, traj.q̇)
-        update_bodies!(st,q,q̇)
-        update_orientations!(st)
+        update_bodies!(structure,q,q̇)
+        update_orientations!(structure)
         push!(R,body.state.R)
     end
     R[step_range] |> VectorOfArray
 end
 
 function get_angular_velocity!(bot::Robot,bodyid::Int,step_range=:)
-    (; st, traj)= bot
+    (; structure, traj)= bot
 	T = get_numbertype(bot)
     ω = Vector{T}[]
-    bodies = get_bodies(st)
+    bodies = get_bodies(structure)
     body = bodies[bodyid]
     for (q,q̇) in zip(traj.q, traj.q̇)
-        update_bodies!(st,q,q̇)
+        update_bodies!(structure,q,q̇)
         push!(ω,body.state.ω)
     end
     ω[step_range] |> VectorOfArray
@@ -90,15 +90,15 @@ function get_time_mids(bot::Robot)
 end
 
 function get_tension!(bot::Robot,cid::Int,step_range=:)
-    (; st, traj)= bot
-    (; cables) = st.tensiles
-    T = get_numbertype(st)
+    (; structure, traj)= bot
+    (; cables) = structure.tensiles
+    T = get_numbertype(structure)
     f = Vector{T}()
     h = traj.t[2] - traj.t[1]
     q_mids = [(traj.q[k] .+ traj.q[k+1])./2 for k = 1:length(traj)-1]
     q̇_mids = [(traj.q[k] .- traj.q[k+1])./h for k = 1:length(traj)-1]
     for (q,q̇) in zip(q_mids, q̇_mids)
-        update!(st,q)
+        update!(structure,q)
         push!(f,cables[cid].state.tension)
     end
     f
@@ -110,8 +110,8 @@ end
 
 function analyse_energy(tr_input;actuation=false,gravity=false,elasticity=false,factor=1)
     tr = deepcopy(tr_input)
-    (;st, traj) = tr
-    kes = [kinetic_energy_coords(st,q,q̇) for (q,q̇) in zip(traj.q,traj.q̇)]
+    (;structure, traj) = tr
+    kes = [kinetic_energy_coords(structure,q,q̇) for (q,q̇) in zip(traj.q,traj.q̇)]
     epes = 0.0
     gpes = 0.0
 
@@ -121,13 +121,13 @@ function analyse_energy(tr_input;actuation=false,gravity=false,elasticity=false,
             as = get_actuation_traj(tr)
             epes = factor.*[elastic_potential_energy(tr,q,a) for (q,a) in zip(traj.qs,as)]
         else
-            epes = factor.*[elastic_potential_energy(st,q) for q in traj.qs]
+            epes = factor.*[elastic_potential_energy(structure,q) for q in traj.qs]
         end
 
         restitution_coefficients += epes
     end
     if gravity
-        gpes = factor.*[gravity_potential_energy(st,q) for q in traj.qs]
+        gpes = factor.*[gravity_potential_energy(structure,q) for q in traj.qs]
         restitution_coefficients += gpes
     end
     es1 = restitution_coefficients[1]
@@ -163,11 +163,11 @@ function analyse_slackness(tgstruct,q)
 end
 
 function test_slackness(tr)
-    (;st, traj) = tr
+    (;structure, traj) = tr
     @testset "Test Slackness" begin
         @testset "Solution $j" for (j,q) in enumerate(traj.qs)
-            distribute_q_to_rbs!(st,q)
-            @testset "String $i" for (i,s) in enumerate(st.cables)
+            distribute_q_to_rbs!(structure,q)
+            @testset "String $i" for (i,s) in enumerate(structure.cables)
                 len = s.state.length
                 restlen = s.state.restlen
                 @test len > restlen
@@ -177,10 +177,10 @@ function test_slackness(tr)
 end
 
 function compute_contraint_error(bot)
-    (;st, traj) = bot
+    (;structure, traj) = bot
     (;qs, q̇s) = traj
-    Φ = build_Φ(st)
-    A = build_A(st)
+    Φ = build_Φ(structure)
+    A = build_A(structure)
     position_cstr_errors = [norm(Φ(q)) for q in qs]
     velocity_cstr_errors = [norm(A(q)*q̇)/norm(q̇) for (q,q̇) in zip(qs,q̇s)]
     position_cstr_errors, velocity_cstr_errors

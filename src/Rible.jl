@@ -82,7 +82,7 @@ include("control/control.jl")
 
 include("./get.jl")
 
-include("mechanics/Constraints.jl")
+include("mechanics/constraints.jl")
 
 include("mechanics/inverse_statics.jl")
 

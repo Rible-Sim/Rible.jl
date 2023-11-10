@@ -269,6 +269,7 @@ function make_nullspace(nmcs::NC3D12C)
     end
 end
 
+get_idx(nmcs::Union{NC2D2C,NC3D3C}) = CartesianIndex{2}[]
 
 get_idx(nmcs::Union{NC2D4C,NC3D6C}) = [
     [CartesianIndex(2,2),CartesianIndex(2,2)],

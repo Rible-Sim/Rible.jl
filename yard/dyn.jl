@@ -74,18 +74,18 @@ function contact_dynfuncs(bot;
         flatplane = RB.Plane([0,0,1.0],[0,0,0.0]),
         checkpersist = true,
     )
-    (;st) = bot
-    (;bodyid2sys_loci_idx) = st.connectivity.numbered
+    (;structure) = bot
+    (;bodyid2sys_loci_idx) = structure.connectivity.numbered
     npoints = length.(bodyid2sys_loci_idx) |> sum
     contacts_bits = BitVector(undef,npoints)
     persistent_bits = BitVector(undef,npoints)
-    T = RB.get_numbertype(st)
+    T = RB.get_numbertype(structure)
     μs_sys = ones(T,npoints)
     es_sys = zeros(T,npoints)
     gaps_sys = fill(typemax(T),npoints)
 
     # initilize
-    foreach(st.bodies) do body
+    foreach(structure.bodies) do body
         (;prop,state) = body
         bid = prop.id
         (;loci) = prop
@@ -94,28 +94,28 @@ function contact_dynfuncs(bot;
     end
 
     function F!(F,q,q̇,t)
-        RB.clear_forces!(st)
-        RB.update_bodies!(st,q,q̇)
-        RB.update_tensiles!(st)
-        RB.apply_gravity!(st)
-        F .= RB.assemble_force!(st)
+        RB.clear_forces!(structure)
+        RB.update_bodies!(structure,q,q̇)
+        RB.update_tensiles!(structure)
+        RB.apply_gravity!(structure)
+        F .= RB.assemble_force!(structure)
     end
     function Jac_F!(∂F∂q̌,∂F∂q̌̇,q,q̇,t)
         ∂F∂q̌ .= 0
         ∂F∂q̌̇ .= 0
-        RB.clear_forces!(st)
-        RB.update_bodies!(st,q,q̇)
-        RB.update_tensiles!(st)
-        RB.build_∂Q̌∂q̌!(∂F∂q̌,st)
-        RB.build_∂Q̌∂q̌̇!(∂F∂q̌̇,st)
+        RB.clear_forces!(structure)
+        RB.update_bodies!(structure,q,q̇)
+        RB.update_tensiles!(structure)
+        RB.build_∂Q̌∂q̌!(∂F∂q̌,structure)
+        RB.build_∂Q̌∂q̌̇!(∂F∂q̌̇,structure)
     end
     
     function prepare_contacts!(q)
         T = eltype(q)
         nq = length(q)
         na = 0
-        RB.update_bodies!(st,q)
-        foreach(st.bodies) do body
+        RB.update_bodies!(structure,q)
+        foreach(structure.bodies) do body
             (;prop,state) = body
             bid = prop.id
             (;loci_states) = state
@@ -152,7 +152,7 @@ function contact_dynfuncs(bot;
         mem2act_idx = deepcopy(bodyid2sys_loci_idx)
         act_start = 0
         persistent_idx = Int[]
-        for bid = 1:st.num_of_bodies
+        for bid = 1:structure.num_of_bodies
             mem2act_idx[bid] .= 0
             contacts_bits_body = findall(contacts_bits[bodyid2sys_loci_idx[bid]])
             nactive_body = length(contacts_bits_body)
@@ -180,11 +180,11 @@ function contact_dynfuncs(bot;
     end
 
     function get_directions_and_positions!(D, Dper,Dimp, ∂Dq̇∂q, ∂DᵀΛ∂q, ŕ, q, q̇, Λ, mem2act_idx,)
-        RB.update_bodies!(st,q)
+        RB.update_bodies!(structure,q)
         ∂Dq̇∂q .= 0
         ∂DᵀΛ∂q .= 0
-        foreach(st.bodies) do body
-            (;prop,state) = body
+        foreach(structure.bodies) do body
+            (;prop,state,coords,cache) = body
             bid = prop.id
             (;loci_states) = state
             for (pid,locus_state) in enumerate(loci_states)
@@ -192,15 +192,15 @@ function contact_dynfuncs(bot;
                 if contact_state.active
                     (;position) = loci_states[pid]
                     (;normal,tangent,bitangent) = contact_state.frame
-                    C = state.cache.Cps[pid]
-                    CT = C*RB.build_T(st,bid)
+                    C = cache.Cps[pid]
+                    CT = C*RB.build_T(structure,bid)
                     dm = hcat(normal,tangent,bitangent) |> transpose
                     ci = mem2act_idx[bid][pid]
                     epi = 3(ci-1)+1:3ci
                     D[epi,:] = dm*CT
                     ŕ[epi]   = dm*position
-                    if state.cache.funcs.nmcs isa RB.QCF.QC
-                        Tbody = RB.build_T(st,bid)
+                    if coords.nmcs isa RB.QCF.QC
+                        Tbody = RB.build_T(structure,bid)
                         locus = prop.loci[pid]
                         ∂Cẋ∂x = RB.QCF.make_∂Cẋ∂x(locus.position)
                         ∂Cq̇∂q = ∂Cẋ∂x(Tbody*q,Tbody*q̇)*Tbody
@@ -222,8 +222,8 @@ function contact_dynfuncs(bot;
 
     function get_distribution_law!(L,mem2act_idx,q)
         T = eltype(q)
-        RB.update_bodies!(st,q)
-        foreach(st.bodies) do body
+        RB.update_bodies!(structure,q)
+        foreach(structure.bodies) do body
             (;prop,state) = body
             bid = prop.id
             (;loci) = prop

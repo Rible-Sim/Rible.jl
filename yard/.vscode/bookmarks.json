@@ -54,37 +54,32 @@
 			"path": "examples/nonsmooth/main.jl",
 			"bookmarks": [
 				{
-					"line": 0,
-					"column": 12,
-					"label": ""
-				},
-				{
-					"line": 53,
+					"line": 14,
 					"column": 6,
 					"label": ""
 				},
 				{
-					"line": 971,
+					"line": 933,
 					"column": 10,
 					"label": ""
 				},
 				{
-					"line": 1059,
+					"line": 1021,
 					"column": 12,
 					"label": ""
 				},
 				{
-					"line": 1423,
+					"line": 1385,
 					"column": 7,
 					"label": ""
 				},
 				{
-					"line": 1592,
+					"line": 1554,
 					"column": 4,
 					"label": ""
 				},
 				{
-					"line": 1843,
+					"line": 1805,
 					"column": 9,
 					"label": ""
 				}
