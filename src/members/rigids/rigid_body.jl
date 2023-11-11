@@ -304,8 +304,8 @@ function update_state!(state::RigidBodyState,
     ) = state
     (;nmcs) = coords
     lazy_update_state!(state,coords,cache,prop,q,q̇)
-    R .= NCF.find_rotation(nmcs,q)
-    ω .= NCF.find_angular_velocity(nmcs,q,q̇)
+    R .= find_rotation(nmcs,q)
+    ω .= find_angular_velocity(nmcs,q,q̇)
 end
 
 function lazy_update_state!(state::RigidBodyState,
@@ -322,15 +322,16 @@ end
 
 function update_state!(state::RigidBodyState,
         coords::NonminimalCoordinates{<:QCF.QC},cache,
-        prop::RigidBodyProperty,x,ẋ)
+        prop::RigidBodyProperty,q,q̇)
     (;
         origin_position,R,
         origin_velocity,ω,
         mass_locus_state,
     ) = state
+    (;nmcs) = coords
     lazy_update_state!(state,coords,cache,prop,q,q̇)
-    R .= QCF.find_rotation(x)
-    ω .= R*QCF.find_local_angular_velocity(x,ẋ)
+    R .= find_rotation(nmcs,q)
+    ω .= R*find_local_angular_velocity(nmcs,q,q̇)
 end
 
 function stretch_loci!(
@@ -396,7 +397,7 @@ end
 function update_loci_states!(state::RigidBodyState,
         coords::NonminimalCoordinates{<:QCF.QC},cache,
         prop::RigidBodyProperty,q,q̇)
-    update_state!(state,cache,prop,q,q̇)
+    # assuming origin_position,R, origin_velocity,ω has been updated
     (;loci) = prop
     (;loci_states,
         origin_position,R,

@@ -5,20 +5,20 @@ struct ZhongQCCPCache{CacheType}
 end
 
 function generate_cache(::ZhongQCCP,intor;dt,kargs...)
-    (;st) = intor.prob.bot
-    M = assemble_M(st) 
-    M⁻¹ = assemble_M⁻¹(st) 
-    ∂Mq̇∂q = assemble_∂Mq̇∂q(st)
-    ∂M⁻¹p∂q = assemble_∂M⁻¹p∂q(st)
-    M! = make_M!(st)
-    M⁻¹! = make_M⁻¹!(st)
-    Jac_M! = make_Jac_M!(st)
-    Jac_M⁻¹! = make_Jac_M⁻¹!(st)
-    Φ = make_cstr_function(st)
-    A = make_cstr_jacobian(st)
+    (;structure) = intor.prob.bot
+    M = assemble_M(structure) 
+    M⁻¹ = assemble_M⁻¹(structure) 
+    ∂Mq̇∂q = assemble_∂Mq̇∂q(structure)
+    ∂M⁻¹p∂q = assemble_∂M⁻¹p∂q(structure)
+    M! = make_M!(structure)
+    M⁻¹! = make_M⁻¹!(structure)
+    Jac_M! = make_Jac_M!(structure)
+    Jac_M⁻¹! = make_Jac_M⁻¹!(structure)
+    Φ = make_cstr_function(structure)
+    A = make_cstr_jacobian(structure)
 
     nq = size(M,2)
-    T = get_numbertype(st)
+    T = get_numbertype(structure)
     ∂F∂q = zeros(T,nq,nq)
     ∂F∂q̇ = zeros(T,nq,nq)
     Ψ(q,q̇) = Vector{T}()
@@ -26,13 +26,13 @@ function generate_cache(::ZhongQCCP,intor;dt,kargs...)
     B(q) = Matrix{T}(undef,0,nq)
 
     # ∂𝐌𝐚∂𝐪(q,a) = zeros(T,nq,nq)
-    cstr_forces_jacobian(q,λ) = cstr_forces_jacobian(st,λ)
+    ∂Aᵀλ∂q(q,λ) = cstr_forces_jacobian(structure,λ)
     # ∂𝚽𝐪𝐯∂𝒒(q,v) = RB.∂Aq̇∂q(st,v)
     ∂Bᵀμ∂q(q,μ) = zeros(T,nq,nq)
     cache = @eponymtuple(
         M,M⁻¹,∂Mq̇∂q,∂M⁻¹p∂q,
         M!,Jac_M!,M⁻¹!,Jac_M⁻¹!,
-        Φ,A,Ψ,B,∂Ψ∂q,cstr_forces_jacobian,∂Bᵀμ∂q,∂F∂q,∂F∂q̇)
+        Φ,A,Ψ,B,∂Ψ∂q,∂Aᵀλ∂q,∂Bᵀμ∂q,∂F∂q,∂F∂q̇)
     ZhongQCCPCache(cache)
 end
 
@@ -48,7 +48,7 @@ function make_zhongccp_ns_stepk(
         F!,Jac_F!,get_directions_and_positions!,
         cache,h,scaling,persistent_idx,mem2act_idx
     )
-    (;M!,Jac_M!,M⁻¹!,Jac_M⁻¹!,Φ,A,cstr_forces_jacobian) = cache
+    (;M!,Jac_M!,M⁻¹!,Jac_M⁻¹!,Φ,A,∂Aᵀλ∂q) = cache
     T = eltype(qₖ₋₁)
     Fₘ = zeros(T,nq)
     ∂Fₘ∂qₘ = cache.∂F∂q
@@ -100,7 +100,7 @@ function make_zhongccp_ns_stepk(
             M⁻¹!(M⁻¹ₘ,qₘ)
             Jac_M!(∂Mₘq̇ₘ∂qₘ,qₘ,q̇ₘ)
             Jac_M⁻¹!(∂M⁻¹ₖpₖ∂qₖ,qₖ,pₖ)
-            ∂Aᵀₖλₘ∂qₖ = cstr_forces_jacobian(qₖ,λₘ)
+            ∂Aᵀₖλₘ∂qₖ = ∂Aᵀλ∂q(qₖ,λₘ)
             get_directions_and_positions!(Dₖ,Dper, Dimp, ∂Dₖvₖ∂qₖ, ∂DᵀₖHΛₘ∂qₖ,ŕₖ,qₖ, vₖ, H*Λₘ,mem2act_idx)
             ∂pₖ∂qₖ = 2/h.*Mₘ + 
                     ∂Mₘq̇ₘ∂qₘ .+

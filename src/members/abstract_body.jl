@@ -57,11 +57,19 @@ struct NonminimalCoordinates{nmcsType}
     cstr_idx::Vector{Int}
 end
 
-function NonminimalCoordinates(nmcs::NCF.NC,
+"""
+Return free indices of natural coodinates.
+$(TYPEDSIGNATURES)
+"""
+function get_free_idx(nmcs,pres_idx)
+    deleteat!(collect(1:get_num_of_coords(nmcs)),pres_idx)
+end
+
+function NonminimalCoordinates(nmcs,
         pres_idx=Int[],
         cstr_idx=get_cstr_idx(nmcs)
     )
-    free_idx = NCF.get_free_idx(nmcs,pres_idx)
+    free_idx = get_free_idx(nmcs,pres_idx)
     NonminimalCoordinates(nmcs,pres_idx,free_idx,cstr_idx)
 end
 

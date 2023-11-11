@@ -41,4 +41,3 @@ using BenchmarkTools
 using AbbreviatedStackTraces
 ENV["JULIA_STACKTRACE_ABBREVIATED"] = true
 ENV["JULIA_STACKTRACE_MINIMAL"] = true
-import Rible as RB

@@ -74,8 +74,9 @@ import .NCF: make_cstr_forces_jacobian
 import .NCF: get_num_of_cstr, get_num_of_coords, get_num_of_dof
 import .NCF: get_num_of_dims, get_num_of_local_dims
 import .NCF: cartesian_frame2coords
+import .NCF: find_rotation, find_angular_velocity
 
-include("members/rigids/QCF.jl")
+include("members/rigids/quaternion_coordinates/QCF.jl")
 using .QCF
 
 include("members/abstract_body.jl")

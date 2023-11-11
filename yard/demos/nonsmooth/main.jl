@@ -8,7 +8,10 @@ end
 
 #--  Spinning top
 includet("deps.jl")
+import Rible as RB
+include("../../vis.jl")
 includet("../../vis.jl")
+include("../../../examples/robots/spinningtop.jl")
 includet("../../../examples/robots/spinningtop.jl")
 function top_contact_dynfuncs(bot;checkpersist=true,)
     RB.contact_dynfuncs(bot;
