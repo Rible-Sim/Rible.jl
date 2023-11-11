@@ -21,6 +21,7 @@ MakieCore.@recipe(Viz, structure) do scene
         refcolor=:lightgrey,
         cablewidth=2,
         meshcolor=nothing,
+        fontsize = 12,
     )
 end
 
@@ -47,7 +48,7 @@ function MakieCore.plot!(viz::Viz{Tuple{S}};
     if viz.show_mass_centers[]
         MakieCore.scatter!(viz,mass_center_ob;)
         if viz.show_mass_center_labels[]
-            text!(viz,
+            MakieCore.text!(viz,
                 "r$(id[])g" ,
                 position = mass_center_ob,
                 color = viz.rigidlabelcolor[],
@@ -59,12 +60,12 @@ function MakieCore.plot!(viz::Viz{Tuple{S}};
     if viz.show_nodes[]
         MakieCore.scatter!(viz,nodes_ob;color=viz.pointcolor[])
         if viz.show_node_labels[]
-            text!(viz,
+            MakieCore.text!(viz,
                 ["r$(id[])p$pid" for (pid,rp) in enumerate(nodes_ob[])],
                 position = nodes_ob,
                 color = :darkred,
                 align = (:left, :top),
-                offset = (0,2fontsize*(rand()-0.5))
+                offset = (0,2viz.fontsize[]*(rand()-0.5))
             )
         end
     end
@@ -79,9 +80,9 @@ function MakieCore.plot!(viz::Viz{Tuple{S}};
             strokewidth = 0
         end
         if viz.isref[]
-            mesh!(viz, meshes_ob; shading = true)
+            MakieCore.mesh!(viz, meshes_ob; shading = true)
         else
-            poly!(viz, meshes_ob; shading = true,
+            MakieCore.poly!(viz, meshes_ob; shading = true,
                 # strokewidth
             )
         end
@@ -133,13 +134,13 @@ function MakieCore.plot!(viz::Viz{Tuple{Vector{S}}};
     end
     # slackonly=false,
     # noslackonly=true
-    linesegments!(
+    MakieCore.linesegments!(
         viz, noslackseg_ob, 
         color = viz.cablecolor[], 
         linewidth = viz.cablewidth[], 
         linestyle = :solid
     )
-    linesegments!(
+    MakieCore.linesegments!(
         viz, slackseg_ob, 
         color = viz.cablecolor[], 
         linewidth = viz.cablewidth[], 
@@ -147,7 +148,7 @@ function MakieCore.plot!(viz::Viz{Tuple{Vector{S}}};
     )
     # show cable labels
     if viz.show_cable_labels[]
-        text!(viz,
+        MakieCore.text!(viz,
             ids_ob,
             position = point_mid_ob,
             color = viz.cablelabelcolor[],
@@ -193,7 +194,7 @@ function MakieCore.plot!(viz::Viz{Tuple{S}};
         cables_ob = lift(tgob) do tgob
             tgob.tensiles.cables
         end
-        viz!(viz,cables_ob;
+        MakieCore.viz!(viz,cables_ob;
             cablecolor,
             cablewidth = viz.cablewidth[],
             cablelabelcolor = viz.cablelabelcolor[],
@@ -248,12 +249,12 @@ function build_mesh(body::AbstractRigidBody;update=true,color=nothing)
     
     
     if !(color isa Nothing)
-        parsedcolor = parse(CT.RGBf,color)
+        parsedcolor = parse(CT.RGB{Float32},color)
         colors = fill(parsedcolor,length(updated_pos))
     elseif hasproperty(mesh,:color)
         colors = mesh.color
     else
-        parsedcolor = parse(CT.RGBf,:slategrey) 
+        parsedcolor = parse(CT.RGB{Float32},:slategrey) 
         colors = fill(parsedcolor,length(updated_pos))
     end
     GB.Mesh(GB.meta(updated_pos,normals=nls,color=colors),fac)

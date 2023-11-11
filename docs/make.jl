@@ -1,4 +1,4 @@
-using Documenter, DocStringExtensions, Literate, DocumenterMarkdown
+using Documenter, DocStringExtensions, Literate
 using Rible
 
 cd(@__DIR__)
@@ -86,7 +86,7 @@ makedocs(
         # :parse_error, 
         # :setup_block
     ),
-    workdir = "../yard", # the working directory where @example and @repl code blocks are executed. 
+    workdir = joinpath(@__DIR__, "../yard"), # the working directory where @example and @repl code blocks are executed. 
     format = Documenter.HTML(),
 )
 

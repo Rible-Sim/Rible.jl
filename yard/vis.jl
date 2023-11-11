@@ -6,14 +6,14 @@ to_resolution(dpi,len) = uconvert(Unitful.NoUnits,dpi*len)
 pt2px(x, ppi = 300*u"px"/1u"inch") = ustrip(u"px",x*u"pt"*ppi)
 px2pt(x, ppi = 300*u"px"/1u"inch") = ustrip(u"pt",x*u"px"/ppi)
 
-fontsize::Float64 = 8 |> RB.pt2px
+fontsize::Float64 = 8 |> pt2px
 markersize::Float64 = 0.5fontsize
-linewidth::Float64 = 0.5 |> RB.pt2px
-# cablewidth = 0.75 |> RB.pt2px
-# barwidth = 1.5 |> RB.pt2px
-cw::Float64 = 455 |> RB.pt2px
-tw::Float64 = 455 |> RB.pt2px
-th::Float64 = 688.5 |> RB.pt2px
+linewidth::Float64 = 0.5 |> pt2px
+# cablewidth = 0.75 |> pt2px
+# barwidth = 1.5 |> pt2px
+cw::Float64 = 455 |> pt2px
+tw::Float64 = 455 |> pt2px
+th::Float64 = 688.5 |> pt2px
 # 455.24411
 mks_cyc::Base.Iterators.Cycle{Vector{String}} = Iterators.cycle(["o","v","^","s","P","X","d","<",">","h"])
 lss_cyc::Base.Iterators.Cycle{Vector{String}} = Iterators.cycle(["-","--","-.",":"])
@@ -38,19 +38,19 @@ macro myshow(exs...)
     return blk
 end
 
-set_theme!(RB.theme_pub)
+set_theme!(RB.theme_pub;
+    fonts = (; 
+        regular = "CMU Serif", 
+        bold = "CMU Serif Bold",
+        italic = "CMU Serif Italic",
+        math = "NewComputerModern 10 Italic"
+    ),
+    fontsize,
+    markersize,
+    linewidth,
+    figure_padding = (fontsize,fontsize,fontsize,fontsize)
+)
 
-# fonts = (; 
-#     regular = "CMU Serif", 
-#     bold = "CMU Serif Bold",
-#     italic = "CMU Serif Italic",
-#     math = "NewComputerModern 10 Italic"
-# )
-# fontsize,
-# markersize,
-# linewidth,
-# figure_padding = (fontsize,fontsize,fontsize,fontsize),
-    
 function RB.get_groundmesh(f::Function,rect)
     GB.Mesh(f, rect, NaiveSurfaceNets()) |> make_patch(;color = :snow)
 end
@@ -174,7 +174,7 @@ function plot_traj!(bot::RB.Robot;
         end
         if showwire || showmesh || showcables || showlabels || showpoints
             if showinit
-                viz!(ax,tgobini;
+                RB.viz!(ax,tgobini;
                     showmesh,
                     showwire,
                     isref=true,
@@ -183,7 +183,7 @@ function plot_traj!(bot::RB.Robot;
                     kargs...
                 )
             end
-            viz!(ax,tgob;
+            RB.viz!(ax,tgob;
                 showmesh,
                 showwire,
                 showlabels,

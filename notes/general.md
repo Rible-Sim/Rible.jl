@@ -28,6 +28,21 @@ aim for parametric optimization
 excessive data: 
 more than necessary, but not redundant
 
+# Docs
+run `make.jl` in the `yard` environment, where developmental/experimental codes reside.
+
+run Literate to transform dev codes to `@example` code
+
+run `makedocs` to actually run `@example` codes and generates docs.
+
+Examples are reused for dev/docs/test/benchmark.
+To do this, use `include`, docs/test/benchmark; use `includet` dev;
+- [ ] where to put assets?
+  - [ ] in robots too?
+  - [ ] already independent of `.jl` files
+- [ ] where to put `vis.jl`?
+  - [ ] something like `deps.jl`
+
 # Todo
 
 - [ ] rename fields

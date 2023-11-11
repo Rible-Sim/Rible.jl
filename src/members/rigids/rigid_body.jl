@@ -496,8 +496,8 @@ end
 function get3Dstate(body)
     (;state) = body
     (;origin_position,R,origin_velocity,ω) = state
-    ndim = RB.get_num_of_dims(body)
-    T = RB.get_numbertype(body)
+    ndim = get_num_of_dims(body)
+    T = get_numbertype(body)
     o = zero(T)
     i = one(T)
     if ndim == 3

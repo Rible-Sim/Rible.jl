@@ -1,7 +1,6 @@
 module ANCF
 using LinearAlgebra
 using StaticArrays
-using Parameters
 using ForwardDiff
 using DocStringExtensions
 import FastGaussQuadrature as FGQ

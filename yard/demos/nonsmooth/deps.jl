@@ -9,6 +9,7 @@ using BlockDiagonals
 using TypeSortedCollections
 using RecursiveArrayTools
 using Interpolations
+using TypedTables
 # AD
 using ForwardDiff
 # data
@@ -31,13 +32,11 @@ using Match
 # print
 using PrettyTables
 using Printf
-using TypedTables
 # IO
 using FileIO
 # code 
 using Cthulhu
 using JET
-using Revise
 using BenchmarkTools
 using AbbreviatedStackTraces
 ENV["JULIA_STACKTRACE_ABBREVIATED"] = true
