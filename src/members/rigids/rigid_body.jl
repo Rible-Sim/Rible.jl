@@ -491,3 +491,28 @@ function clear_forces!(body::AbstractRigidBody)
         locus_state.torque .= 0
     end
 end
+
+
+function get3Dstate(body)
+    (;state) = body
+    (;origin_position,R,origin_velocity,ω) = state
+    ndim = RB.get_num_of_dims(body)
+    T = RB.get_numbertype(body)
+    o = zero(T)
+    i = one(T)
+    if ndim == 3
+        return origin_position, R, origin_velocity, ω
+    else
+        origin_position_3D = MVector{3}(origin_position[1],origin_position[2],o)
+        origin_velocity_3D = MVector{3}(origin_velocity[1],origin_velocity[2],o)
+        R3 = MMatrix{3,3}(
+            [
+                 R[1,1] -R[2,1] o;
+                -R[1,2]  R[2,2] o;
+                o      o        i;
+            ]
+        )
+        ω3 = MVector{3}(o,o,ω[1])
+        return origin_position_3D, R3, origin_velocity_3D, ω3
+    end
+end

@@ -134,7 +134,7 @@ function linearize(tginput,λ,u,q,q̇=zero(q))
     A = build_A(st)
     Q̃ = build_Q̃(st)
     ∂L∂q,∂L∂q̇ = build_tangent(st)
-    @unpack ncoords,num_of_cstr = st
+    (;ncoords,num_of_cstr) = st
     nz = ncoords + num_of_cstr
     M̂ = zeros(eltype(q),nz,nz)
     Ĉ  = zeros(eltype(q),nz,nz)
@@ -735,7 +735,7 @@ function build_∂Q̌∂s̄(st)
     N_list = Vector{SparseMatrixCSC{Float64,Int64}}()
     kc = Vector{Float64}()
     for (cid,clustercable) in enumerate(clustercables)
-        @unpack segs = clustercable
+        (;segs) = clustercable
         nsegs = length(segs)
         for (sid, seg) in enumerate(segs)
             push!(kc, seg.k)
@@ -862,7 +862,7 @@ function old_undamped_eigen(st)
     # @show size(K̄),rank(K̄),cond(K̄),rank(M̄)
     d,aug_Z = eigen(K̄,M̄)
     aug_ω2 = d .- α
-    @unpack ncoords, num_of_dof = st
+    (;ncoords, num_of_dof) = st
     # @show aug_ω2
     ω2,Z = find_finite(aug_ω2,aug_Z,num_of_dof)
     ω = sqrt.(ω2)

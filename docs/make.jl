@@ -1,7 +1,40 @@
-using Documenter
-using DocStringExtensions
-import Rible
+using Documenter, DocStringExtensions, Literate, DocumenterMarkdown
+using Rible
 
+cd(@__DIR__)
+function replace_includes(str)
+
+    included = [
+        "1Dfield_temporalprediction.jl",
+        "2Dfield_crossprediction.jl", 
+        "2Dfield_temporalprediction.jl"
+    ]
+
+    path = dirname(dirname(pathof(Rible)))*"/examples/"
+
+    for ex in included
+        content = read(path*ex, String)
+        str = replace(str, "include(\"$(ex)\")" => content)
+    end
+    return str
+end
+
+# Literate it:
+Literate.markdown(
+    "src/stexamples.jl", 
+    "src/";
+    name = "stexamples", 
+    preprocess = replace_includes,
+    documenter = true,
+)
+
+Literate.markdown(
+    "examples/tail/dynamics.jl", 
+    "src/";
+    name="tail"
+)
+
+#      
 makedocs(
     root = @__DIR__,
     source = "src", #where the markdown source files are read from

@@ -118,7 +118,7 @@ mutable struct LinearLaw{T}
 end
 
 function (ll::LinearLaw)(Δl)
-    @unpack F0, k = ll
+    (;F0, k) = ll
     F = F0 + k*Δl
 end
 

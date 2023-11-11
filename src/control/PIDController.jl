@@ -93,8 +93,8 @@ function update!(pid,input)
 end
 
 function update!(pid)
-    @unpack Kp,Ki,Kd,setpoint = pid
-    @unpack input,dt,output_limits = pid
+    (;Kp,Ki,Kd,setpoint) = pid
+    (;input,dt,output_limits) = pid
     # Compute all the working error variables
     err = setpoint - input
     # Compute PID every term
@@ -115,8 +115,8 @@ function update!(pid)
     return pid.output
 end
 # function update!(pid,::Val{:OnMeasurement})
-#     @unpack Kp,Ki,Kd,setpoint = pid
-#     @unpack input,dt,output_limits = pid
+#     (;Kp,Ki,Kd,setpoint) = pid
+#     (;input,dt,output_limits) = pid
 #     # How long since we last calculated
 #     @assert dt > 0.0
 #     # Compute all the working error variables

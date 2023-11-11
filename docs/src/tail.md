@@ -4,10 +4,6 @@ EditURL = "<unknown>/examples/tail/dynamics.jl"
 
 # 二维类脊椎张拉整体动力学仿真
 
-````@example tail
-# using Literate #hide
-# Literate.markdown("examples/tail/dynamics.jl", "src/";name="tail") #hide
-````
 
 加载所需程序包
 

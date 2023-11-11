@@ -4,9 +4,9 @@ generate_cache(::Wendlandt,intor) = WendlandtCache()
 
 function solve(intor::Integrator,cache::WendlandtCache;dt=0.01,ftol=1e-14,verbose=false,
                                  callback=DEFAULT_CALLBACK)
-    @unpack prob,sol = intor
-    @unpack ts,qs,q̇s,λs = sol
-    @unpack funcs,tspan,q0,q̇0,λ0,nx,nq,nλ = prob
+    (;prob,sol) = intor
+    (;ts,qs,q̇s,λs) = sol
+    (;funcs,tspan,q0,q̇0,λ0,nx,nq,nλ) = prob
     M,Φ,A,F!,Jacs = funcs
     F⁺ = zero(q0)
     F⁻ = zero(q0)

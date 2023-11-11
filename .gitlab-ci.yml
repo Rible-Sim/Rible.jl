@@ -4,6 +4,21 @@
 # This specific template is located at:
 # https://gitlab.com/gitlab-org/gitlab/-/blob/master/lib/gitlab/ci/templates/Julia.gitlab-ci.yml
 
+# Example documentation deployment
+pages:
+  image: julia:1.9
+  stage: deploy
+  script:
+    - apt-get update -qq && apt-get install -y git xorg-dev mesa-utils xvfb libgl1 freeglut3-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev libxext-dev # needed by Documenter
+    - DISPLAY=:0 xvfb-run -s '-screen 0 1024x768x24' julia --project=yard/ -e 'using Pkg; Pkg.develop(PackageSpec(path=pwd())); Pkg.instantiate()'
+    - DISPLAY=:0 xvfb-run -s '-screen 0 1024x768x24' julia --project=yard/ --color=yes docs/make.jl
+    - mv docs/build public  # move to the directory picked up by Gitlab pages
+  artifacts:
+    paths:
+      - public
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
 # Below is the template to run your tests in Julia
 .test_template: &test_definition
   # Uncomment below (and adjust as needed) to run the tests for specific references
@@ -33,21 +48,6 @@ test:1.9:
 # - Navigating to the `CI/CD Pipelines` settings of your project,
 # - Copying and pasting the default `Simplecov` regex example provided, i.e.,
 #   `\(\d+.\d+\%\) covered` in the `test coverage parsing` textfield.
-
-# Example documentation deployment
-pages:
-  image: julia:1.9
-  stage: deploy
-  script:
-    - apt-get update -qq && apt-get install -y git xorg-dev mesa-utils xvfb libgl1 freeglut3-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev libxext-dev # needed by Documenter
-    - DISPLAY=:0 xvfb-run -s '-screen 0 1024x768x24' julia --project=docs/ -e 'using Pkg; Pkg.develop(PackageSpec(path=pwd())); Pkg.instantiate()'
-    - DISPLAY=:0 xvfb-run -s '-screen 0 1024x768x24' julia --project=docs/ --color=yes docs/make.jl
-    - mv docs/build public  # move to the directory picked up by Gitlab pages
-  artifacts:
-    paths:
-      - public
-  rules:
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
 
 # WARNING: This template is using the `julia` images from [Docker Hub][3]. 
 # One can use custom Julia images and/or the official ones found in the same place. 

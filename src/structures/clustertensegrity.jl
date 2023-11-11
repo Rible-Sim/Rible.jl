@@ -175,7 +175,7 @@ function make_Ψ(st::AbstractStructure)
         s⁻ = @view s̄[begin+1:2:end]
         is = 0
         for (csid,cs) in enumerate(clustercables)
-            @unpack sps,segs = cs
+            (;sps,segs) = cs
             nsi = length(cs.sps)
             for (i,sp) in enumerate(sps)
                 ζ⁺ = segs[i+1].state.tension/sp.α - segs[i].state.tension
@@ -212,7 +212,7 @@ function build_ζ(st::AbstractStructure)
     ζ⁻ = @view ζ[begin+1:2:end]
     is = 0
     for cs in clustercables
-        @unpack sps,segs = cs
+        (;sps,segs) = cs
         nsi = length(cs.sps)
         for (i,sp) in enumerate(sps)
             ζ⁺[is+i] = segs[i+1].state.tension/sp.α - segs[i].state.tension
@@ -274,7 +274,7 @@ function build_∂ζ∂q(st::AbstractStructure,q̌)
     b_list = Vector{SparseMatrixCSC{Float64,Int64}}()
     T_list = Vector{SparseMatrixCSC{Float64,Int64}}()
     for (cid,clustercable) in enumerate(clustercables)
-        @unpack segs,sps = clustercable
+        (;segs,sps) = clustercable
         nsegs = length(segs)
         for (sid, seg) in enumerate(segs)
             push!(kc, seg.k)
@@ -340,7 +340,7 @@ function Record_build_∂ζ∂q(st::AbstractStructure,q̌, xlsxname, sheetname)
     b_list = Vector{SparseMatrixCSC{Float64,Int64}}()
     T_list = Vector{SparseMatrixCSC{Float64,Int64}}()
     for (cid,clustercable) in enumerate(clustercables)
-        @unpack segs,sps = clustercable
+        (;segs,sps) = clustercable
         nsegs = length(segs)
         for (sid, seg) in enumerate(segs)
             push!(kc, seg.k)

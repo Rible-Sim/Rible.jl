@@ -47,31 +47,31 @@ function dynfuncs(bot;actuate=false,gravity=false,(Fˣ!)=(F,t)->nothing)
     (;structure) = bot
     function F!(F,q,q̇,t)
         if actuate
-            RB.actuate!(bot,[t])
+            actuate!(bot,[t])
         end
-        RB.clear_forces!(structure)
-        RB.lazy_update_bodies!(structure,q,q̇)
-        RB.update_tensiles!(structure)
+        clear_forces!(structure)
+        lazy_update_bodies!(structure,q,q̇)
+        update_tensiles!(structure)
         if gravity
-            RB.apply_gravity!(structure)
+            apply_gravity!(structure)
         end
-        F .= RB.assemble_force!(structure)
+        F .= assemble_force!(structure)
         Fˣ!(F,t)
     end
     function Jac_F!(∂F∂q̌,∂F∂q̌̇,q,q̇,t)
         ∂F∂q̌ .= 0
         ∂F∂q̌̇ .= 0
-        RB.clear_forces!(structure)
-        RB.lazy_update_bodies!(structure,q,q̇)
-        RB.update_tensiles!(structure)
-        RB.build_∂Q̌∂q̌!(∂F∂q̌,structure)
-        RB.build_∂Q̌∂q̌̇!(∂F∂q̌̇,structure)
+        clear_forces!(structure)
+        lazy_update_bodies!(structure,q,q̇)
+        update_tensiles!(structure)
+        build_∂Q̌∂q̌!(∂F∂q̌,structure)
+        build_∂Q̌∂q̌̇!(∂F∂q̌̇,structure)
     end
     @eponymtuple(F!,Jac_F!)
 end
 
 function contact_dynfuncs(bot;
-        flatplane = RB.Plane([0,0,1.0],[0,0,0.0]),
+        flatplane = Plane([0,0,1.0],[0,0,0.0]),
         checkpersist = true,
     )
     (;structure) = bot
@@ -79,7 +79,7 @@ function contact_dynfuncs(bot;
     npoints = length.(bodyid2sys_loci_idx) |> sum
     contacts_bits = BitVector(undef,npoints)
     persistent_bits = BitVector(undef,npoints)
-    T = RB.get_numbertype(structure)
+    T = get_numbertype(structure)
     μs_sys = ones(T,npoints)
     es_sys = zeros(T,npoints)
     gaps_sys = fill(typemax(T),npoints)
@@ -94,45 +94,45 @@ function contact_dynfuncs(bot;
     end
 
     function F!(F,q,q̇,t)
-        RB.clear_forces!(structure)
-        RB.update_bodies!(structure,q,q̇)
-        RB.update_tensiles!(structure)
-        RB.apply_gravity!(structure)
-        F .= RB.assemble_force!(structure)
+        clear_forces!(structure)
+        update_bodies!(structure,q,q̇)
+        update_tensiles!(structure)
+        apply_gravity!(structure)
+        F .= assemble_force!(structure)
     end
     function Jac_F!(∂F∂q̌,∂F∂q̌̇,q,q̇,t)
         ∂F∂q̌ .= 0
         ∂F∂q̌̇ .= 0
-        RB.clear_forces!(structure)
-        RB.update_bodies!(structure,q,q̇)
-        RB.update_tensiles!(structure)
-        RB.build_∂Q̌∂q̌!(∂F∂q̌,structure)
-        RB.build_∂Q̌∂q̌̇!(∂F∂q̌̇,structure)
+        clear_forces!(structure)
+        update_bodies!(structure,q,q̇)
+        update_tensiles!(structure)
+        build_∂Q̌∂q̌!(∂F∂q̌,structure)
+        build_∂Q̌∂q̌̇!(∂F∂q̌̇,structure)
     end
     
     function prepare_contacts!(q)
         T = eltype(q)
         nq = length(q)
         na = 0
-        RB.update_bodies!(structure,q)
+        update_bodies!(structure,q)
         foreach(structure.bodies) do body
             (;prop,state) = body
             bid = prop.id
             (;loci_states) = state
             contacts_bits[bodyid2sys_loci_idx[bid]] .= false
             persistent_bits[bodyid2sys_loci_idx[bid]] .= false
-            if body isa RB.AbstractRigidBody
+            if body isa AbstractRigidBody
                 for pid in eachindex(loci_states)
                     locus_state = loci_states[pid]
                     (;position,contact_state) = locus_state
-                    gap = RB.signed_distance(position,flatplane)
+                    gap = signed_distance(position,flatplane)
                     if !checkpersist
                         contact_state.active = false
                     end
-                    RB.activate!(contact_state,gap)
+                    activate!(contact_state,gap)
                     if contact_state.active
                         contacts_bits[bodyid2sys_loci_idx[bid][pid]] = true
-                        contact_state.frame = RB.spatial_frame(flatplane.n)
+                        contact_state.frame = spatial_frame(flatplane.n)
                         if contact_state.persistent
                             persistent_bits[bodyid2sys_loci_idx[bid][pid]] = true
                         end
@@ -180,7 +180,7 @@ function contact_dynfuncs(bot;
     end
 
     function get_directions_and_positions!(D, Dper,Dimp, ∂Dq̇∂q, ∂DᵀΛ∂q, ŕ, q, q̇, Λ, mem2act_idx,)
-        RB.update_bodies!(structure,q)
+        update_bodies!(structure,q)
         ∂Dq̇∂q .= 0
         ∂DᵀΛ∂q .= 0
         foreach(structure.bodies) do body
@@ -193,19 +193,19 @@ function contact_dynfuncs(bot;
                     (;position) = loci_states[pid]
                     (;normal,tangent,bitangent) = contact_state.frame
                     C = cache.Cps[pid]
-                    CT = C*RB.build_T(structure,bid)
+                    CT = C*build_T(structure,bid)
                     dm = hcat(normal,tangent,bitangent) |> transpose
                     ci = mem2act_idx[bid][pid]
                     epi = 3(ci-1)+1:3ci
                     D[epi,:] = dm*CT
                     ŕ[epi]   = dm*position
-                    if coords.nmcs isa RB.QCF.QC
-                        Tbody = RB.build_T(structure,bid)
+                    if coords.nmcs isa QCF.QC
+                        Tbody = build_T(structure,bid)
                         locus = prop.loci[pid]
-                        ∂Cẋ∂x = RB.QCF.make_∂Cẋ∂x(locus.position)
+                        ∂Cẋ∂x = QCF.make_∂Cẋ∂x(locus.position)
                         ∂Cq̇∂q = ∂Cẋ∂x(Tbody*q,Tbody*q̇)*Tbody
                         ∂Dq̇∂q[epi,:] = dm*∂Cq̇∂q
-                        ∂Cᵀf∂x = RB.QCF.make_∂Cᵀf∂x(locus.position)
+                        ∂Cᵀf∂x = QCF.make_∂Cᵀf∂x(locus.position)
                         Λi = @view Λ[epi]
                         fi = dm'*Λi
                         ∂DᵀΛ∂q .+= transpose(Tbody)*∂Cᵀf∂x(Tbody*q,fi)*Tbody
@@ -222,7 +222,7 @@ function contact_dynfuncs(bot;
 
     function get_distribution_law!(L,mem2act_idx,q)
         T = eltype(q)
-        RB.update_bodies!(structure,q)
+        update_bodies!(structure,q)
         foreach(structure.bodies) do body
             (;prop,state) = body
             bid = prop.id
@@ -241,9 +241,9 @@ function contact_dynfuncs(bot;
                     inv_μs_body[3(i-1)+1] = 1/locus.friction_coefficient
                     dm = hcat(normal,tangent,bitangent) |> transpose
                     R[3(i-1)+1:3(i-1)+3,1:3] = dm
-                    R[3(i-1)+1:3(i-1)+3,4:6] = dm*(-RB.skew(position))
+                    R[3(i-1)+1:3(i-1)+3,4:6] = dm*(-skew(position))
                 end
-                blocks(L)[bid] .= (I-pinv(R)'*R')*Diagonal(inv_μs_body)
+                BlockDiagonals.blocks(L)[bid] .= (I-pinv(R)'*R')*Diagonal(inv_μs_body)
             end
         end
     end
@@ -274,9 +274,9 @@ function make_pres_actor(μ0,μ1,start,stop)
         [scaled_itps(j,t) for j in 1:nμ]
     end
 
-    RB.PrescribedActuator(
+    PrescribedActuator(
         1,
-        RB.ManualActuator(1,collect(1:nμ),zeros(nμ),RB.Uncoupled()),
+        ManualActuator(1,collect(1:nμ),zeros(nμ),Uncoupled()),
         itp
     )
 end

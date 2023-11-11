@@ -135,7 +135,7 @@ function FixedIndicesConstraint(id,idx,values)
 end
 
 function make_cstr_function(cst::FixedIndicesConstraint,st)
-    @unpack idx, values = cst
+    (;idx, values) = cst
     @inline @inbounds inner_cstr_function(q)   = q[idx]-values
     @inline @inbounds inner_cstr_function(q,d) = q[idx]-d
     inner_cstr_function
