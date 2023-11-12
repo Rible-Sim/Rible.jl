@@ -6,10 +6,12 @@ end
 
 function generate_cache(::ZhongQCCP,intor;dt,kargs...)
     (;structure) = intor.prob.bot
-    M = assemble_M(structure) 
-    M⁻¹ = assemble_M⁻¹(structure) 
-    ∂Mq̇∂q = assemble_∂Mq̇∂q(structure)
-    ∂M⁻¹p∂q = assemble_∂M⁻¹p∂q(structure)
+    Mₘ = assemble_M(structure) 
+    M⁻¹ₘ = assemble_M⁻¹(structure)
+    M⁻¹ₖ = deepcopy(M⁻¹ₘ)
+    ∂Mₘq̇ₘ∂qₘ = assemble_∂Mq̇∂q(structure)
+    ∂Mₘqₖ∂qₘ = zero(∂Mₘq̇ₘ∂qₘ)
+    ∂M⁻¹ₖpₖ∂qₖ = assemble_∂M⁻¹p∂q(structure)
     M! = make_M!(structure)
     M⁻¹! = make_M⁻¹!(structure)
     Jac_M! = make_Jac_M!(structure)
@@ -17,10 +19,11 @@ function generate_cache(::ZhongQCCP,intor;dt,kargs...)
     Φ = make_cstr_function(structure)
     A = make_cstr_jacobian(structure)
 
-    nq = size(M,2)
+    nq = size(Mₘ,2)
     T = get_numbertype(structure)
-    ∂F∂q = zeros(T,nq,nq)
-    ∂F∂q̇ = zeros(T,nq,nq)
+    Fₘ = zeros(T,nq)
+    ∂Fₘ∂qₘ = zeros(T,nq,nq)
+    ∂Fₘ∂q̇ₘ = zeros(T,nq,nq)
     Ψ(q,q̇) = Vector{T}()
     ∂Ψ∂q(q,q̇) = Matrix{T}(undef,0,nq)
     B(q) = Matrix{T}(undef,0,nq)
@@ -30,9 +33,15 @@ function generate_cache(::ZhongQCCP,intor;dt,kargs...)
     # ∂𝚽𝐪𝐯∂𝒒(q,v) = RB.∂Aq̇∂q(st,v)
     ∂Bᵀμ∂q(q,μ) = zeros(T,nq,nq)
     cache = @eponymtuple(
-        M,M⁻¹,∂Mq̇∂q,∂M⁻¹p∂q,
-        M!,Jac_M!,M⁻¹!,Jac_M⁻¹!,
-        Φ,A,Ψ,B,∂Ψ∂q,∂Aᵀλ∂q,∂Bᵀμ∂q,∂F∂q,∂F∂q̇)
+        Mₘ,M⁻¹ₘ,M⁻¹ₖ,
+        ∂Mₘq̇ₘ∂qₘ,∂Mₘqₖ∂qₘ,∂M⁻¹ₖpₖ∂qₖ,
+        Fₘ,∂Fₘ∂qₘ,∂Fₘ∂q̇ₘ,
+        M!,Jac_M!,
+        M⁻¹!,Jac_M⁻¹!,
+        Φ,A,Ψ,B,
+        ∂Ψ∂q,
+        ∂Aᵀλ∂q,∂Bᵀμ∂q,
+    )
     ZhongQCCPCache(cache)
 end
 
@@ -44,21 +53,25 @@ function Momentum_k(qₖ₋₁,pₖ₋₁,qₖ,λₘ,Mₘ,A,Λₘ,Dₖ₋₁,D�
 end
 
 function make_zhongccp_ns_stepk(
-        nq,nλ,na,qₖ₋₁,vₖ₋₁,pₖ₋₁,tₖ₋₁,pₖ,vₖ,
-        F!,Jac_F!,get_directions_and_positions!,
-        cache,h,scaling,persistent_idx,mem2act_idx
+        nq,nλ,na,
+        qₖ₋₁,vₖ₋₁,pₖ₋₁,tₖ₋₁,
+        pₖ,vₖ,
+        F!,Jac_F!,
+        get_directions_and_positions!,
+        cache,
+        h,scaling,
+        persistent_idx,mem2act_idx
     )
-    (;M!,Jac_M!,M⁻¹!,Jac_M⁻¹!,Φ,A,∂Aᵀλ∂q) = cache
-    T = eltype(qₖ₋₁)
-    Fₘ = zeros(T,nq)
-    ∂Fₘ∂qₘ = cache.∂F∂q
-    ∂Fₘ∂q̇ₘ = cache.∂F∂q̇
-    ∂Mₘqₖ∂qₘ = cache.∂Mq̇∂q
-    ∂Mₘq̇ₘ∂qₘ = zero(∂Mₘqₖ∂qₘ)
-    ∂M⁻¹ₖpₖ∂qₖ = cache.∂M⁻¹p∂q
-    Mₘ = cache.M
-    M⁻¹ₘ = cache.M⁻¹
-    M⁻¹ₖ = deepcopy(M⁻¹ₘ)
+    (;
+        Mₘ,M⁻¹ₘ,M⁻¹ₖ,
+        ∂Mₘq̇ₘ∂qₘ,∂Mₘqₖ∂qₘ,∂M⁻¹ₖpₖ∂qₖ,
+        Fₘ,∂Fₘ∂qₘ,∂Fₘ∂q̇ₘ,
+        M!,Jac_M!,
+        M⁻¹!,Jac_M⁻¹!,
+        Φ,A,
+        ∂Aᵀλ∂q,
+    ) = cache
+    # T = eltype(qₖ₋₁)
     n1 = nq
     n2 = nq+nλ
     nΛ = 3na
@@ -116,7 +129,7 @@ function make_zhongccp_ns_stepk(
             𝐜ᵀ .= 0
             v́ₖ₋₁ = Dₖ₋₁*vₖ₋₁
             v́ₘ = (ŕₖ .- ŕₖ₋₁)./h
-            v́⁺ = copy(v́ₖ)            
+            v́⁺ = copy(v́ₖ)
             for i = 1:na
                 is = 3(i-1)
                 vⁱₖ₋₁ = @view v́ₖ₋₁[is+1:is+3]
@@ -177,12 +190,12 @@ function solve!(intor::Integrator,solvercache::ZhongQCCPCache;
         get_distribution_law!
     ) = dynfuncs
     (;cache) = solvercache
-    (;M,M⁻¹,M!,M⁻¹!,A) = cache
+    (;Mₘ,M⁻¹ₘ,M!,M⁻¹!,A) = cache
     q0 = traj.q[begin]
     λ0 = traj.λ[begin]
     q̇0 = traj.q̇[begin]
-    M!(M,q0)
-    pₖ₋₁ = M*q̇0
+    M!(Mₘ,q0)
+    pₖ₋₁ = Mₘ*q̇0
     pₖ   = deepcopy(pₖ₋₁)
     qₖ₋½ = deepcopy(q0)
     T = eltype(q0)
@@ -194,7 +207,7 @@ function solve!(intor::Integrator,solvercache::ZhongQCCPCache;
     x = zero(Δx)
     Res = zero(Δx)
     Jac = zeros(T,nx,nx)
-    mr = norm(M,Inf)
+    mr = norm(Mₘ,Inf)
     scaling = mr
     @show mr
     iteration = 0
@@ -306,11 +319,11 @@ function solve!(intor::Integrator,solvercache::ZhongQCCPCache;
         qₖ .= x[      1:nq]
         λₘ .= x[   nq+1:nq+nλ]
         qₖ₋½ .= (qₖ.+qₖ₋₁)./2
-        M!(M,qₖ₋½)
+        M!(Mₘ,qₖ₋½)
         get_directions_and_positions!(Dₖ, Dper, Dimp, ∂Dq̇∂q, ∂DᵀΛ∂q, ŕₖ, qₖ, q̇ₖ, Λₘ, mem2act_idx)
-        pₖ .= Momentum_k(qₖ₋₁,pₖ₋₁,qₖ,λₘ,M,A,Λₘ,Dₖ₋₁,Dₖ,H,scaling,dt)
-        M⁻¹!(M⁻¹,qₖ)
-        q̇ₖ .= M⁻¹*pₖ
+        pₖ .= Momentum_k(qₖ₋₁,pₖ₋₁,qₖ,λₘ,Mₘ,A,Λₘ,Dₖ₋₁,Dₖ,H,scaling,dt)
+        M⁻¹!(M⁻¹ₘ,qₖ)
+        q̇ₖ .= M⁻¹ₘ*pₖ
         if na != 0
             update_contacts!(cₖ[contacts_bits],cₖ₋₁[contacts_bits],Dₖ*q̇ₖ,Λₘ./(scaling*dt))
         end
