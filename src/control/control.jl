@@ -109,16 +109,16 @@ function actuate!(bot::Robot,friction_coefficients)
 end
 
 # function heat!(tr::Robot,us;inc=false)
-#     @unpack st, hub = tr
-#     @unpack heaters = hub
+#     (;st, hub) = tr
+#     (;heaters) = hub
 #     for (heater,u) in zip(heaters,us)
 #         heat!(heater,st,u;inc)
 #     end
 # end
 #
 # function heat!(ctrller::ManualHeater,st,u;inc=false,abs=true)
-#     @unpack SMA_cables = st.tensiles
-#     @unpack id_string, original_value, heating_law = ctrller.act
+#     (;SMA_cables) = st.tensiles
+#     (;id_string, original_value, heating_law) = ctrller.act
 #     s = select_by_id(SMA_cables,id_string)
 #     if abs
 #         s.state.temp = u
@@ -138,8 +138,8 @@ end
 #
 # function heat!(ctrller::ManualSerialHeater,
 #                 SMA_cables::AbstractVector{<:SMACable},u;inc=false,abs=true)
-#     @unpack acts, heating_laws = ctrller
-#     @unpack id_cables, original_values = acts
+#     (;acts, heating_laws) = ctrller
+#     (;id_cables, original_values) = acts
 #     for (id, original_value, heating_law) in zip(id_cables,original_values,heating_laws)
 #         s = select_by_id(SMA_cables,id)
 #         if abs

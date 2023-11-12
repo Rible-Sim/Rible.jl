@@ -304,8 +304,8 @@ function update_state!(state::RigidBodyState,
     ) = state
     (;nmcs) = coords
     lazy_update_state!(state,coords,cache,prop,q,q̇)
-    R .= NCF.find_rotation(nmcs,q)
-    ω .= NCF.find_angular_velocity(nmcs,q,q̇)
+    R .= find_rotation(nmcs,q)
+    ω .= find_angular_velocity(nmcs,q,q̇)
 end
 
 function lazy_update_state!(state::RigidBodyState,
@@ -322,15 +322,16 @@ end
 
 function update_state!(state::RigidBodyState,
         coords::NonminimalCoordinates{<:QCF.QC},cache,
-        prop::RigidBodyProperty,x,ẋ)
+        prop::RigidBodyProperty,q,q̇)
     (;
         origin_position,R,
         origin_velocity,ω,
         mass_locus_state,
     ) = state
+    (;nmcs) = coords
     lazy_update_state!(state,coords,cache,prop,q,q̇)
-    R .= QCF.find_rotation(x)
-    ω .= R*QCF.find_local_angular_velocity(x,ẋ)
+    R .= find_rotation(nmcs,q)
+    ω .= R*find_local_angular_velocity(nmcs,q,q̇)
 end
 
 function stretch_loci!(
@@ -396,7 +397,7 @@ end
 function update_loci_states!(state::RigidBodyState,
         coords::NonminimalCoordinates{<:QCF.QC},cache,
         prop::RigidBodyProperty,q,q̇)
-    update_state!(state,cache,prop,q,q̇)
+    # assuming origin_position,R, origin_velocity,ω has been updated
     (;loci) = prop
     (;loci_states,
         origin_position,R,
@@ -489,5 +490,30 @@ function clear_forces!(body::AbstractRigidBody)
     foreach(loci_states) do locus_state
         locus_state.force .= 0
         locus_state.torque .= 0
+    end
+end
+
+
+function get3Dstate(body)
+    (;state) = body
+    (;origin_position,R,origin_velocity,ω) = state
+    ndim = get_num_of_dims(body)
+    T = get_numbertype(body)
+    o = zero(T)
+    i = one(T)
+    if ndim == 3
+        return origin_position, R, origin_velocity, ω
+    else
+        origin_position_3D = MVector{3}(origin_position[1],origin_position[2],o)
+        origin_velocity_3D = MVector{3}(origin_velocity[1],origin_velocity[2],o)
+        R3 = MMatrix{3,3}(
+            [
+                 R[1,1] -R[2,1] o;
+                -R[1,2]  R[2,2] o;
+                o      o        i;
+            ]
+        )
+        ω3 = MVector{3}(o,o,ω[1])
+        return origin_position_3D, R3, origin_velocity_3D, ω3
     end
 end

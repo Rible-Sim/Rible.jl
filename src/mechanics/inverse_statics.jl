@@ -44,7 +44,7 @@ end
 
 
 function iksolve(prob;ftol=1e-14)
-    @unpack funcs,q0,u0,λ0,nq,nu,nλ = prob
+    (;funcs,q0,u0,λ0,nq,nu,nλ) = prob
     A,F! = funcs
     F = zeros(nq)
     function IK_R!(R,x)
@@ -420,7 +420,7 @@ function check_restlen(st,u)
 end
 
 function check_actuation(bot,Y,a)
-    @unpack st = bot
+    (;st) = bot
     Δu = Y*a
     u0 = get_original_restlen(bot)
     u = u0 + Δu

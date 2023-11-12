@@ -1,397 +1,20 @@
-#-- preamble
-include("deps.jl")
-cd(@__DIR__)
-include("def.jl"); includet("def.jl")
-include("../../vis.jl"); includet("../../vis.jl")
-include("../../dyn.jl"); includet("../../dyn.jl")
 figdir::String = ""
 if Sys.iswindows()
     figdir::String = raw"C:\Users\luo22\OneDrive\Papers\FrictionalContact\CMAME"
 elseif Sys.isapple()
     figdir::String = raw"/Users/jacob/Library/CloudStorage/OneDrive-SharedLibraries-onedrive/Papers/FrictionalContact/CMAME"
 end
-#-- preamble end
-
-#-- point Mass
-
-function new_pointmass(;
-        origin_position = [0.0,0.0,1.0],
-        origin_velocity = zero(origin_position),
-        m = 1.0,
-        μ = 0.3,
-        e = 0.9
-    )
-    movable = false
-    constrained = true
-    Ia = SMatrix{3,3}(Matrix(m*I,3,3))
-    mass_locus  = SVector{3}([ 0.0, 0.0, 0.0])
-    r̄p1 = SVector{3}([ 0.0, 0.0, 0.0])
-    loci = [r̄p1]
-    axes = [SVector{3}([ 1.0, 0.0, 0.0])]
-    friction_coefficients = [μ]
-    restitution_coefficients = [e]
-    prop = RB.RigidBodyProperty(
-        1,movable,m,Ia,
-        mass_locus,loci,axes,
-        friction_coefficients,restitution_coefficients,
-        ;constrained=constrained
-    )
-    ω = zero(origin_position)
-    R = RotX(0.0)
-    loci = Ref(origin_position) .+ Ref(R).*loci
-    nmcs = RB.NCF.NC3D1P(loci[1],)
-    ci = Int[]
-    cstr_idx = Int[]
-    state = RB.RigidBodyState(prop,origin_position,R,origin_velocity,ω)
-    coords = RB.NonminimalCoordinates(nmcs,ci,cstr_idx)
-    rb1 = RB.RigidBody(prop,state,coords)
-
-    rbs = TypeSortedCollection((rb1,))
-    numberedpoints = RB.number(rbs)
-    matrix_sharing = zeros(Int,0,0)
-    indexedcoords = RB.index(rbs,matrix_sharing)
-    ss = Int[]
-    tensiles = (cables = ss,)
-    connected = RB.connect(rbs,zeros(Int,0,0))
-    tensioned = @eponymtuple(connected,)
-    cnt = RB.Connectivity(numberedpoints,indexedcoords,tensioned)
-    st = RB.Structure(rbs,tensiles,cnt,)
-    bot = RB.Robot(st)
-end
-
-function pm_contact_dynfuncs(bot;θ=0.0)
-    a = tan(θ)
-    n = [-a,0,1]
-    inclined_plane = RB.Plane(n,zeros(3))
-    contact_dynfuncs(bot;flatplane = inclined_plane)
-end
-
-tspan = (0.0,0.455)
-tspan = (0.0,1.5)
-h = 1e-3
-
-# horizontal plane
-restitution_coefficients = [0.5]
-v0s = [1.0]
-
-pm = new_pointmass(;
-    e = restitution_coefficients[1],
-    μ=0.1,
-    origin_velocity = [v0s[1],0,0]
-)
-
-prob = RB.SimProblem(pm,pm_contact_dynfuncs)
-RB.solve!(
-    prob,
-    RB.ZhongCCP();
-    tspan,dt=h,
-    ftol=1e-14,
-    maxiters=50,
-    exception=false
-)
-
-GM.activate!();with_theme(theme_pub;
-            resolution = (0.8tw,0.2tw),
-            figure_padding = (0,fontsize,0,0),
-            Axis3 = (
-                azimuth = 4.575530633326986,
-                elevation = 0.13269908169872408
-            ),
-            color = :red,
-            palette = (
-                color = [:red, :blue],
-            ),
-            Scatter = (
-                color = :red,
-                cycle = [:color ],
-            )
-    ) do
-    bot = pm
-    fig = Figure()
-    gd = fig[1,1] = GridLayout()
-    gd1 = fig[1,2] = GridLayout()
-    colsize!(fig.layout,2,Fixed(0.5tw))
-    steps = 1:60:1000
-    cg = cgrad(:winter, length(steps), categorical = true)
-    plot_traj!(bot;
-        doslide=false,
-        AxisType = Axis3,
-        fig = gd,
-        # gridsize=(1,4),
-        xlims=(-1e-3,1.0),
-        ylims=(-0.4,0.4),
-        zlims=(-1e-3,1.0),
-        showinfo =false,
-        showmesh=false,
-        showwire=false,
-        showlabels=false,
-        showcables=false,
-        showpoints=false,
-        showtitle=false,
-        sup! = (ax,tgob,sgi) -> begin
-            hidey(ax)
-            for (istep,step) in enumerate(steps)
-                suptg = deepcopy(bot.structure)
-                suptg.state.system.q .= bot.traj.q[step]
-                RB.update!(suptg)
-                viz!(ax,Observable(suptg);
-                    showlabels=false,
-                    showmesh=false,
-                    showcables=false,
-                    showwire=false,
-                    showpoints=true,
-                    pointcolor=cg[istep]
-                )
-            end
-        end
-        # figname="pointmass_e05_v00",
-        # figname="pointmass_e05_v10"
-    )
-    Label(gd[1,1,TopLeft()], 
-        rich("($(alphabet[1]))",font=:bold)
-    )
-    (;t) = bot.traj
-    ax1 = Axis(gd1[1,1], xlabel = tlabel, ylabel = L"\dot{z}~(\mathrm{m/s})")
-    vp1 = RB.get_velocity!(bot,1,1)
-    lines!(ax1,t,vp1[3,:])
-    xlims!(ax1,t[begin],t[end])
-    # ylims!(ax1,-6,6)
-    Label(gd1[1,1,TopLeft()], 
-        rich("($(alphabet[2]))",font=:bold)
-    )
-    hlines!(ax1,[0],color=:gray)
-    ax2 = Axis(gd1[1,2], xlabel = tlabel, ylabel = L"\dot{x}~(\mathrm{m/s})")
-    # me = RB.mechanical_energy!(bot)
-    # lines!(ax2,t,me.E)
-    lines!(ax2,t,vp1[1,:])
-    xlims!(ax2,t[begin],t[end])
-    # ylims!(ax2,-1,11)
-    # ax2.yticks = [0,0.3,0.7,1.0]
-    # ax2.xticks = collect(1:xtickmaxs[botid])
-    Label(gd1[1,2,TopLeft()], 
-        rich("($(alphabet[3]))",font=:bold)
-    )
-    savefig(fig,"pointmass_bouncing")
-    fig
-end
-
-θ = 15 |> deg2rad
-inclined_plane = RB.Plane([-tan(θ),0,1],zeros(3))
-origin_position = [0.0,0,-1e-7]
-origin_velocity = [2.0cos(θ),0,2.0sin(θ)]
-# origin_velocity = [0,-2.0,0]
-
-# analytical
-g = 9.81
-μ=0.3
-vo = norm(origin_velocity)
-a = -μ*g*cos(θ)-g*sin(θ)
-# μ*g*cos(θ)-g*sin(θ)
-tf = -vo/a
-# d(t) -> vo*t+1/2*a*t^2
-tspan = (0.0,0.6)
-pm = new_pointmass(;e=0.0, μ, origin_position, origin_velocity)
-
-prob = RB.SimProblem(pm,(x)->pm_contact_dynfuncs(x;θ))
-RB.solve!(prob,RB.ZhongCCP();tspan,dt=1e-3,ftol=1e-14,maxiters=50,exception=false)
-
-rp1 = RB.get_trajectory!(pm,1,1)
-ṙp1 = RB.get_velocity!(pm,1,1)
-dp1 = rp1.u .|> norm
-vl1 = [u ⋅ normalize(origin_velocity) for u in ṙp1]
-# overshoot!
-scatterlines(vl1)
-GM.activate!(); with_theme(theme_pub;
-        # fontsize = 6 |> pt2px,
-        resolution = (1tw,0.2tw),
-        figure_padding = (fontsize,fontsize,0,0),
-        Axis3 = (
-            azimuth = 4.575530633326984,
-            elevation = 0.16269908169872405,
-            # zlabelvisible = false,
-            # yticklabelsvisible = false,
-            zlabeloffset = 2.5fontsize,
-        )
-    ) do
-    steps = 1:50:600
-    cg = cgrad(:winter, length(steps), categorical = true)
-    bot = pm
-    (;t) = bot.traj
-    fig = Figure()
-    gd1 = fig[1,1] = GridLayout()
-    gd2 = fig[1,2] = GridLayout()
-    Label(gd1[1,1,TopLeft()], 
-        rich("($(alphabet[1]))",font=:bold)
-    )
-    colsize!(fig.layout,2,Fixed(0.55tw))
-    colgap!(fig.layout,fontsize/2)
-    plot_traj!(bot;
-        doslide=false,
-        AxisType=Axis3,
-        fig = gd1,
-        xlims=(-8e-3,0.5),
-        ylims=(-0.1,0.1),
-        zlims=(-8e-3,0.2),
-        showinfo =false,
-        showmesh=false,
-        showwire=false,
-        showlabels=false,
-        showcables=false,
-        showpoints=false,
-        showtitle=false,
-        ground=inclined_plane,
-        sup! = (ax,tgob,sgi) -> begin
-            hidey(ax)
-            for (istep,step) in enumerate(steps)
-                suptg = deepcopy(bot.structure)
-                suptg.state.system.q .= bot.traj.q[step]
-                RB.update!(suptg)
-                viz!(ax,Observable(suptg);
-                    showlabels=false,
-                    showmesh=false,
-                    showcables=false,
-                    showwire=false,
-                    showpoints=true,
-                    pointcolor=cg[istep]
-                )
-            end
-        end,
-        # figname="pointmass_sliding"
-    )
-    ax1 = Axis(gd2[1,1], xlabel = tlabel, ylabel = "disp. (m)")
-    Label(gd2[1,1,TopLeft()], 
-        rich("($(alphabet[2]))",font=:bold)
-    )
-    ax2 = Axis(gd2[1,2], xlabel = tlabel, ylabel = "disp. (m)")
-    Label(gd2[1,2,TopLeft()], 
-        rich("($(alphabet[3]))",font=:bold)
-    )
-    rp1 = RB.get_trajectory!(bot,1,1)
-    ṙp1 = RB.get_velocity!(bot,1,1)
-    dp1 = rp1.u .|> norm
-    vl1 = ṙp1.u .|> norm
-    @myshow findmax(dp1)
-    stopstep = time2step(tf,t)
-    lines!(ax1,t,dp1)
-    xlims!(ax1,0,0.6)
-    scatterlines!(ax2,t[1:stopstep],(t) -> vo*t+1/2*a*t^2,color=:red,label="Analytic")
-    scatterlines!(ax2,t[stopstep:end],(t) -> vo*tf+1/2*a*tf^2,color=:red)
-    scatter!(ax2,t,dp1,color=:blue,marker=:diamond,label="NMSI")
-    # lines!(ax2,t,vl1)
-    axislegend(ax2;position=:rt,orientation=:horizontal,)
-    xlims!(ax2,0.369,0.389)
-    ylims!(ax2,3.7161e-1,3.7164e-1)
-    vlines!(ax1,t[stopstep])
-    vlines!(ax2,t[stopstep])
-    text!(ax1,latexstring("t_s=0.372(s)"), 
-        position = (tf+0.02, 0.19),
-        fontsize = 6 |> pt2px,
-        align = (:left, :center)
-    )
-    text!(ax2,latexstring("t_s=0.372(s)"), 
-        position = (tf+0.02, 1.0),
-        fontsize = 6 |> pt2px,
-        align = (:left, :center)
-    )
-    @show extrema(dp1), extrema(vl1)
-    savefig(fig,"pointmass_sliding")
-    fig
-end
-
 #-- point mass end
 
 #--  Spinning top
-
-function make_top(origin_position = [0.0,0.0,0.0],
-        R = one(RotMatrix{3}),
-        origin_velocity = [0.0,0.0,0.0],
-        Ω = [0.0,0.0,5.0],
-        cT = RB.QCF.QC;
-        μ = 0.5,
-        e = 0.9,
-        color = :slategray,
-        constrained=false,
-        loadmesh=false,
-    )
-    ω = R*Ω
-    movable = true
-    if constrained
-        pres_idx = [1,2,3]
-    else
-        pres_idx = Int[]
-    end
-
-    m =  0.58387070
-    mass_locus = @SVector zeros(3)
-    # Ī = SMatrix{3,3}(Matrix(1.0I,3,3))
-    Ī = SMatrix{3,3}(
-        Diagonal(SA[
-            0.00022129,
-            0.00022129,
-            0.00030207
-            ])
-        )
-    
-    # h = 0.02292582
-    radius = 0.044/√2
-    h = 2*0.01897941
-    loci = [radius.*[1,1,0] for i = 1:4]
-    push!(loci,[0,0,-h])
-    axes = [SVector(1.0,0,0) for i = 1:5]
-    friction_coefficients = [μ for i = 1:5]
-    restitution_coefficients = [e for i = 1:5]
-    if loadmesh
-        topmesh = load(
-            RB.assetpath("Toupise2.STL")
-        ) |> make_patch(;
-            scale=1/1000,
-            color,
-        )
-    else
-        pts = Point3.(loci)
-        fcs = GB.TriangleFace.([
-            [5,1,2],
-            [5,4,3],
-            [5,3,1],
-            [5,2,4],
-            [1,4,2],
-            [4,1,3],
-            [3,2,1],
-            [2,3,4]
-        ])
-        nls = GB.normals(pts,fcs)
-        topmesh = GB.Mesh(GB.meta(pts,normals=nls),fcs)
-    end
-    prop = RB.RigidBodyProperty(
-        1,movable,m,Ī,
-        mass_locus,loci,axes,
-        friction_coefficients,restitution_coefficients;
-        constrained
-    )
-    ri = origin_position+R*loci[5]
-    @myshow ri
-    if cT == RB.QCF.QC
-        nmcs = RB.QCF.QC(m,Ī)
-    else
-        nmcs = RB.NCF.NC1P3V(ri,origin_position,R,origin_velocity,ω)
-    end
-    state = RB.RigidBodyState(prop,nmcs,origin_position,R,origin_velocity,ω,pres_idx)
-    rb1 = RB.RigidBody(prop,state,topmesh)
-    rbs = TypeSortedCollection((rb1,))
-    numberedpoints = RB.number(rbs)
-    matrix_sharing = zeros(Int,0,0)
-    indexedcoords = RB.index(rbs,matrix_sharing)
-    ss = Int[]
-    tensiles = (cables = ss,)
-    connected = RB.connect(rbs,zeros(Int,0,0))
-    tensioned = @eponymtuple(connected,)
-    cnt = RB.Connectivity(numberedpoints,indexedcoords,tensioned)
-    st = RB.Structure(rbs,tensiles,cnt,)
-    bot = RB.Robot(st)
-end
-
+includet("deps.jl")
+import Rible as RB
+include("../../vis.jl")
+includet("../../vis.jl")
+include("../../../examples/robots/spinningtop.jl")
+includet("../../../examples/robots/spinningtop.jl")
 function top_contact_dynfuncs(bot;checkpersist=true,)
-    contact_dynfuncs(bot;
+    RB.contact_dynfuncs(bot;
         flatplane = RB.Plane([0,0,1.0],[0,0,0.0]),
         checkpersist,
     )
@@ -401,9 +24,6 @@ origin_position = [0,0,0.5]
 R = RotX(0.0)
 origin_velocity = [1.0,0.0,0.0]
 Ω = [0.0,0.0,200.0]
-# R = rand(RotMatrix3)
-# origin_velocity = rand(3)
-# Ω = rand(3)
 
 # tspan = (0.0,1.0)
 μ = 0.95
@@ -453,7 +73,7 @@ plot_traj!(
     # figsize=(0.6tw,0.6tw)
 )
 
-GM.activate!();with_theme(theme_pub;
+GM.activate!();with_theme(RB.theme_pub;
         resolution = (1.0tw,0.3tw),
         figure_padding = (0,fontsize,0,0),
         Axis3 = (
@@ -500,13 +120,13 @@ GM.activate!();with_theme(theme_pub;
         ylims = (-0.1,0.2),
         zlims = (-1e-6,0.6),
         sup! = (ax,tgob,sgi) -> begin
-            hidey(ax)
+            RB.hidey(ax)
             for (istep,step) in enumerate(steps)
                 suptg = deepcopy(bot.structure)
                 suptg.state.system.q .= bot.traj.q[step]
                 RB.update!(suptg)
                 (;r,b,g) = cg[istep]
-                viz!(ax,Observable(suptg);
+                RB.viz!(ax,Observable(suptg);
                     showlabels=false,
                     showarrows=false,
                     showpoints=false,
@@ -534,7 +154,7 @@ GM.activate!();with_theme(theme_pub;
         ylabel = L"\acute{v}_{tb}~(\mathrm{m/s})",
     )
     lines!(ax3,t,[norm(vp5[2:3,i]) for i = 1:length(t)])
-    hidex(ax1)
+    RB.hidex(ax1)
     xlims!(ax1,0,1.8)
     xlims!(ax2,0,1.8)
     xlims!(ax3,0,1.8)
@@ -605,7 +225,6 @@ plot_traj!(
     showarrows=false,
     # figsize=(0.6tw,0.6tw)
 )
-
 
 plotsave_contact_persistent(topn_longtimes[1])
 true_me = RB.mechanical_energy!(topn_longtimes[1])
@@ -928,63 +547,7 @@ GM.activate!();with_theme(theme_pub;
     # savefig(fig,"spinningtop_order")
     fig
 end
-
 #-- spinning top
-
-#--  painleve's Bar
-function make_bar(;
-        μ = 0.1,
-        e = 0.0
-    )
-    movable = true
-    constrained = false
-    m = 0.402
-    l = 1.0
-    Ixx = 1/12*m*l^2
-    Ī = SMatrix{3,3}(Diagonal([Ixx,0.0,0.0]))
-    mass_locus = SVector{3}(0.0,0.0,0.0)
-    loci = SVector{3}.([
-        [ -l/2, 0.0, 0.0],
-        [  l/2, 0.0, 0.0]
-    ])
-    θ = π/4
-    zoffset = 1e-6
-    xoffset = 1e-6
-    ri = [     0.0-xoffset,0.0,sin(θ)*l-zoffset]
-    rj = [cos(θ)*l-xoffset,0.0,     0.0-zoffset]
-    origin_position = (ri + rj)./2
-    origin_velocity = zero(origin_position)
-    ω = zero(origin_position)
-    R = Matrix(RotY(θ))
-
-    # b = l/2*ω[2]*sin(θ)-9.81
-    # p⁺ = 1 + 3*cos(θ)^2-μ*cos(θ)*sin(θ)
-    # @show b,p⁺
-
-    prop = RB.RigidBodyProperty(1,movable,m,Ī,mass_locus,loci;constrained)
-
-    nmcs = RB.NCF.NC3D2P(ri,rj,origin_position,R,origin_velocity,ω)
-    state = RB.RigidBodyState(prop,nmcs,origin_position,R,origin_velocity,ω)
-
-    p1 = Meshes.Point(loci[1])
-    p2 = Meshes.Point(loci[2])
-    s = Meshes.Segment(p1,p2)
-    cyl_bar = Meshes.Cylinder(Meshes.length(s)/40,s)
-    cylsurf_bar = Meshes.boundary(cyl_bar)
-    cyl_bar_simple = Meshes.triangulate(cylsurf_bar)
-    cyl_bar_mesh = cyl_bar_simple |> simple2mesh
-    rb1 = RB.RigidBody(prop,state,cyl_bar_mesh)
-    rbs = TypeSortedCollection((rb1,))
-    numberedpoints = RB.number(rbs)
-    matrix_sharing = zeros(Int,0,0)
-    indexedcoords = RB.index(rbs,matrix_sharing)
-    ss = Int[]
-    tensiles = (cables = ss,)
-    connections = RB.connect(rbs,zeros(Int,0,0))
-    cnt = RB.Connectivity(numberedpoints,indexedcoords,connections)
-    st = RB.Structure(rbs,tensiles,cnt,)
-    bot = RB.Robot(st)
-end
 
 bar = make_bar(;)
 

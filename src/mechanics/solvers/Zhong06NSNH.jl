@@ -367,7 +367,7 @@ end
 
 function nhsolve(prob,nq,nλ,nμ,nu,q0,q̇0;tspan,dt=0.01,ftol=1e-14,verbose=false,iterations=50,
                 progress=true,exception=true)
-    @unpack bot,dynfuncs = prob
+    (;bot,dynfuncs) = prob
     M,Φ,A,Ψ,B,F!,jacobians,contact_funcs = dynfuncs
     Jac_F!,Ψq,cstr_forces_jacobian,∂Bᵀμ∂q = jacobians
     E,𝐠,𝐠𝐪,∂𝐠𝐪ᵀΛ∂q,∂𝐠𝐪q̇∂q = contact_funcs
@@ -515,7 +515,7 @@ end
 
 function snhsolve(prob,nq,nλ,nμ,nu,q0,q̇0;tspan,dt=0.01,ftol=1e-14,verbose=false,iterations=50,
                 progress=true,exception=true)
-    @unpack bot,dynfuncs = prob
+    (;bot,dynfuncs) = prob
     M,Φ,A,Ψ,B,F!,jacobians,contact_funcs = dynfuncs
     Jac_F!,Ψq,cstr_forces_jacobian,∂Bᵀμ∂q = jacobians
     E,𝐠,𝐠𝐪,∂𝐠𝐪ᵀΛ∂q,∂𝐠𝐪q̇∂q = contact_funcs
@@ -629,7 +629,7 @@ end
 
 function ipsolve(prob,nq,nλ,nμ,q0,q̇0;dt=0.01,ftol=1e-14,verbose=false,iterations=50,
                 progress=true,exception=true)
-    @unpack bot,tspan,dynfuncs,control!,restart = prob
+    (;bot,tspan,dynfuncs,control!,restart) = prob
     M,Φ,A,Ψ,B,F!,jacobians,contact_funcs = dynfuncs
     Jac_F!,Ψq,cstr_forces_jacobian,∂Bᵀμ∂q = jacobians
     E,𝐠,𝐠𝐪,∂𝐠𝐪ᵀΛ∂q,∂𝐠𝐪q̇∂q = contact_funcs

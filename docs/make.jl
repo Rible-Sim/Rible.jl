@@ -1,18 +1,59 @@
-using Documenter
-using DocStringExtensions
+using Documenter, DocStringExtensions, Literate
 using Rible
 
+cd(@__DIR__)
+function replace_includes(str)
+
+    included = [
+        "1Dfield_temporalprediction.jl",
+        "2Dfield_crossprediction.jl", 
+        "2Dfield_temporalprediction.jl"
+    ]
+
+    path = dirname(dirname(pathof(Rible)))*"/examples/"
+
+    for ex in included
+        content = read(path*ex, String)
+        str = replace(str, "include(\"$(ex)\")" => content)
+    end
+    return str
+end
+
+# Literate it:
+Literate.markdown(
+    "src/stexamples.jl", 
+    "src/";
+    name = "stexamples", 
+    preprocess = replace_includes,
+    documenter = true,
+)
+
+Literate.markdown(
+    "examples/tail/dynamics.jl", 
+    "src/";
+    name="tail"
+)
+
+#      
 makedocs(
-    sitename = "Rible",
-    format = Documenter.HTML(),
+    root = @__DIR__,
+    source = "src", #where the markdown source files are read from
+    build = "build", #into which generated files and folders are written
+    clean = true, #whether to do clean build
+    doctest = true,
     modules = [Rible],
-    workdir = @__DIR__,
-    warnonly=:doctest,
+    # repo = Documenter.Remotes.GitHub("jacobleft/Rible.jl"),# concrete Remotes.Remote object
+    repo = Documenter.Remotes.GitLab("robotgroup/Rible.jl"),# concrete Remotes.Remote object
+    # remotes = [
+    #     path => remote,
+    # ],
+    highlightsig = true,
+    sitename = "Rible.jl",
     pages = [
         "index.md",
         "setup.md",
         "Modeling" => [
-            "naturalcoords.md",
+            "naturalcoordinates.md",
             "rigidbody.md",
             # "cable.md",
         ],
@@ -27,10 +68,26 @@ makedocs(
         "Dynamics" => [
             "solvers.md"
         ],
-        "Examples" => [
-            "tail.md"
-        ]
-    ]
+        # "Examples" => [
+        #     # "tail.md"
+        # ]
+    ],
+    pagesonly = true,
+    draft = false,
+    checkdocs = :all,
+    linkcheck = true,
+    warnonly = Documenter.except(
+        # :autodocs_block, :cross_references, 
+        # :docs_block, :doctest, 
+        # :eval_block, :example_block, 
+        # :footnote, 
+        # :linkcheck_remotes, :linkcheck, 
+        # :meta_block, :missing_docs, 
+        # :parse_error, 
+        # :setup_block
+    ),
+    workdir = joinpath(@__DIR__, "../yard"), # the working directory where @example and @repl code blocks are executed. 
+    format = Documenter.HTML(),
 )
 
 # Documenter can also automatically deploy documentation to gh-pages.

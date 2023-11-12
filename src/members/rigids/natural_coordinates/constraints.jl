@@ -1,11 +1,3 @@
-"""
-Return free indices of natural coodinates.
-$(TYPEDSIGNATURES)
-"""
-function get_free_idx(nmcs::NC,pres_idx)
-    deleteat!(collect(1:get_num_of_coords(nmcs)),pres_idx)
-end
-
 # """
 # Return 2D or 3D local natural coords deformations for rigid bars。
 # $(TYPEDSIGNATURES)

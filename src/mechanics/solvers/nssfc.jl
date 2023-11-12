@@ -212,7 +212,7 @@ end
 
 function ipsolve(nq,nλ,nμ,q0,q̇0,dyfuncs,tspan;dt=0.01,ftol=1e-14,xtol=ftol,verbose=false,imax=50,
                 progress=true,exception=true)
-    # @unpack bot,tspan,dyfuncs,control!,restart = prob
+    # (;bot,tspan,dyfuncs,control!,restart) = prob
     M,Φ,A,Ψ,B,F!,jacobians,contact_funcs = dyfuncs
     Jac_F!,Ψq,cstr_forces_jacobian,∂Bᵀμ∂q = jacobians
     𝐠,get_idx,get_FCs,get_D = contact_funcs

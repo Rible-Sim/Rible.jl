@@ -5,6 +5,7 @@ to_resolution(dpi,len) = uconvert(Unitful.NoUnits,dpi*len)
 
 pt2px(x, ppi = 300*u"px"/1u"inch") = ustrip(u"px",x*u"pt"*ppi)
 px2pt(x, ppi = 300*u"px"/1u"inch") = ustrip(u"pt",x*u"px"/ppi)
+
 fontsize::Float64 = 8 |> pt2px
 markersize::Float64 = 0.5fontsize
 linewidth::Float64 = 0.5 |> pt2px
@@ -26,16 +27,6 @@ tenmarkers::Vector{Symbol} = [
 ]
 tlabel::LaTeXString = L"t~(\mathrm{s})"
 
-
-function match_figsize(figsize)
-    @match figsize begin
-        :UHD => (3840,2160)
-        :FHD => (1920,1080)
-        :HD  => (1280,720)
-        fs::Tuple => fs
-    end
-end
-
 macro myshow(exs...)
     blk = Expr(:block)
     for ex in exs
@@ -47,29 +38,7 @@ macro myshow(exs...)
     return blk
 end
 
-
-function hidex(ax)
-    ax.xticklabelsvisible = false
-    ax.xlabelvisible = false
-end
-
-function hidey(ax)
-    ax.yticklabelsvisible = false
-    ax.ylabelvisible = false
-end
-
-function hidez(ax)
-    ax.zticklabelsvisible = false
-    ax.zlabelvisible = false
-end
-
-function hidexyz(ax)
-    hidex(ax)
-    hidey(ax)
-    hidez(ax)
-end
-
-theme_pub = Theme(;
+set_theme!(RB.theme_pub;
     fonts = (; 
         regular = "CMU Serif", 
         bold = "CMU Serif Bold",
@@ -79,80 +48,17 @@ theme_pub = Theme(;
     fontsize,
     markersize,
     linewidth,
-    figure_padding = (fontsize,fontsize,fontsize,fontsize),
-    resolution=match_figsize(:FHD),
-    palette = (
-        vlinecolor = [:slategrey],
-        linestyle = [
-            :solid,
-            :dash, 
-            :dot,
-            :dashdot,
-            :dashdotdot,
-        ],
-        marker = [
-            :xcross,:cross,
-            :utriangle,:dtriangle,
-            :ltriangle,:rtriangle,
-            :diamond,:hexagon,
-            :star8,:star5
-        ],
-        markercolor = [:red, :blue],
-    ),
-    Axis = (
-        # titlefont = "CMU Serif Bold",
-        # titlesize = fontsize,
-        titlegap = 0,
-    ),
-    Axis3 = (
-        # titlefont = "CMU Serif Bold",
-        # titlesize = fontsize,
-        titlegap = 0,
-    ),
-    Label = (
-        # fontsize = fontsize,
-        # font = "CMU Serif Bold",
-        halign = :left,
-        padding = (0, 0, 0, 0),
-    ),
-    VLines = (
-        cycle = [:color => :vlinecolor],
-    ),
-    Mesh = (
-        color = :slategrey,
-        transparency = false
-    ),
-    Poly = (
-        color = :slategrey,
-        transparency = false,
-    )
+    figure_padding = (fontsize,fontsize,fontsize,fontsize)
 )
 
-set_theme!(theme_pub)
-
-
-
-function time2step(at,t)
-    atstep = findfirst((x)->x>=at, t)
-    @assert !isa(atstep,Nothing)
-    atstep
-end
-
-function get_groundmesh(f::Function,rect)
+function RB.get_groundmesh(f::Function,rect)
     GB.Mesh(f, rect, NaiveSurfaceNets()) |> make_patch(;color = :snow)
 end
 
-function get_groundmesh(plane::RB.Plane,rect)
+function RB.get_groundmesh(plane::RB.Plane,rect)
     GB.Mesh(rect, MarchingCubes()) do v
         RB.signed_distance(v,plane)
-    end |> make_patch(;color = :snow)
-end
-
-function get_groundmesh(::Nothing,rect)
-    plane_n = [0,0,1.0]
-    plane_r = zeros(3)
-    plane = RB.Plane(plane_n,plane_r)
-    get_groundmesh(plane,rect)
+    end |> RB.make_patch(;color = :snow)
 end
 
 function plot_traj!(bot::RB.Robot;
@@ -233,7 +139,7 @@ function plot_traj!(bot::RB.Robot;
         this_time = Observable(traj.t[this_step])
         RB.goto_step!(bot,this_step;actuate)
         tgob = Observable(deepcopy(structure))
-        axtitle = Makie.lift(this_time) do tt
+        axtitle = map(this_time) do tt
             titleformatfunc(sgi,tt)
         end
         if ndim == 2 && !showmesh
@@ -263,12 +169,12 @@ function plot_traj!(bot::RB.Robot;
         end
         if showground
             rect = Rect3f((xmin,ymin,zmin),(xwid,ywid,zwid))
-            groundmesh = get_groundmesh(ground,rect)
+            groundmesh = RB.get_groundmesh(ground,rect)
             mesh!(ax,groundmesh;color = :snow)
         end
         if showwire || showmesh || showcables || showlabels || showpoints
             if showinit
-                viz!(ax,tgobini;
+                RB.viz!(ax,tgobini;
                     showmesh,
                     showwire,
                     isref=true,
@@ -277,7 +183,7 @@ function plot_traj!(bot::RB.Robot;
                     kargs...
                 )
             end
-            viz!(ax,tgob;
+            RB.viz!(ax,tgob;
                 showmesh,
                 showwire,
                 showlabels,
@@ -320,19 +226,19 @@ function plot_traj!(bot::RB.Robot;
                 grid2 = sg[:,2] = GridLayout(;tellheight=false)
                 grid_info = grid2[1,1] = GridLayout(;tellheight=false)
                 dict_info = [
-                    "fig. height" => Makie.lift(string,ax.height),
-                    "fig. width" => Makie.lift(string,ax.width)
+                    "fig. height" => map(string,ax.height),
+                    "fig. width" => map(string,ax.width)
                 ]
                 if ndim == 3 && AxisType == Axis3
                     cam_info = [
-                        "azimuth" => Makie.lift(string,ax.azimuth),
-                        "elevation" => Makie.lift(string,ax.elevation)
+                        "azimuth" => map(string,ax.azimuth),
+                        "elevation" => map(string,ax.elevation)
                     ]
                     append!(dict_info,cam_info)
                 end
                 for (i,(infoname,infovalue)) in enumerate(dict_info)
                     Label(grid_info[i,1],
-                        Makie.lift(infovalue) do iv
+                        map(infovalue) do iv
                             "$infoname = $iv"
                         end,
                         justification = :left,
@@ -422,236 +328,6 @@ function savefig(fig,figname=nothing)
     fig
 end
 
-@recipe(Viz, structure) do scene
-    # theme_pub,
-    Attributes(        
-        isref=false,
-        showlabels=false,
-        show_cable_labels = false,
-        show_mass_center_labels = false,
-        show_node_labels = false,
-        showpoints=false,
-        show_mass_centers = false,
-        show_nodes = false,
-        showarrows=false,
-        showmesh=true,
-        showwire=false,
-        showcables=true,
-        pointcolor=:black,
-        slack_linestyle = :dash,
-        cablecolor=:deepskyblue,
-        cablelabelcolor=:darkgreen,
-        rigidlabelcolor=:darkblue,
-        refcolor=:lightgrey,
-        cablewidth=2,
-        meshcolor=nothing,
-    )
-end
-
-function Makie.plot!(viz::Viz{Tuple{S}};
-    ) where S <:RB.AbstractBody
-    body_ob = viz[:structure]
-    # body decorations
-    mass_center_ob = @lift $body_ob.state.mass_locus_state.position |> Makie.Point
-    nodes_ob = @lift begin
-        [
-            locus_state.position |> Makie.Point
-            for locus_state in $body_ob.state.loci_states
-        ]
-    end
-    # arrows_ob = @lift body_ob.state.as .|> Makie.Point
-    id  = @lift $body_ob.prop.id
-    if viz.show_mass_centers[]
-        scatter!(viz,mass_center_ob;)
-        if viz.show_mass_center_labels[]
-            text!(viz,
-                "r$(id[])g" ,
-                position = mass_center_ob,
-                color = viz.rigidlabelcolor[],
-                align = (:left, :top),
-                offset = (-5, -10)
-            )
-        end
-    end
-    if viz.show_nodes[]
-        scatter!(viz,nodes_ob;color=viz.pointcolor[])
-        if viz.show_node_labels[]
-            text!(viz,
-                ["r$(id[])p$pid" for (pid,rp) in enumerate(nodes_ob[])],
-                position = nodes_ob,
-                color = :darkred,
-                align = (:left, :top),
-                offset = (0,2fontsize*(rand()-0.5))
-            )
-        end
-    end
-    # body mesh
-    if viz.showmesh[] || viz.showwire[]
-        meshes_ob = @lift build_mesh($body_ob,color=viz.meshcolor[])
-        if viz.showwire[]
-            strokewidth = linewidth
-        else
-            strokewidth = 0
-        end
-        if viz.isref[]
-            mesh!(viz, meshes_ob; shading = true)
-        else
-            poly!(viz, meshes_ob; shading = true,
-                # strokewidth
-            )
-        end
-    end
-    viz
-end
-
-function Makie.plot!(viz::Viz{Tuple{Vector{S}}};
-    ) where S <: RB.Cable
-    cables_ob = viz[:structure]
-    point_mid_ob = @lift [
-        begin 
-            point_start = cab.state.start
-            point_stop = cab.state.stop 
-            (point_start .+ point_stop)./2 |> Makie.Point
-        end
-        for cab in $cables_ob
-    ]
-
-    slackseg_ob = @lift [
-        begin 
-            point_start = cab.state.start |> Makie.Point
-            point_stop = cab.state.stop |> Makie.Point
-            (point_start,point_stop)
-        end
-        for cab in $cables_ob if cab.state.length <= cab.state.restlen
-    ]
-
-    noslackseg_ob = @lift [
-        begin 
-            point_start = cab.state.start |> Makie.Point
-            point_stop = cab.state.stop |> Makie.Point
-            (point_start,point_stop)
-        end
-        for cab in $cables_ob if cab.state.length > cab.state.restlen
-    ]
-
-    ids_ob = @lift [
-        "c$(cab.id)"
-         for cab in $cables_ob
-    ]
-    # slackonly=false,
-    # noslackonly=true
-    linesegments!(
-        viz, noslackseg_ob, 
-        color = viz.cablecolor[], 
-        linewidth = viz.cablewidth[], 
-        linestyle = :solid
-    )
-    linesegments!(
-        viz, slackseg_ob, 
-        color = viz.cablecolor[], 
-        linewidth = viz.cablewidth[], 
-        linestyle = viz.slack_linestyle[]
-    )
-    # show cable labels
-    if viz.show_cable_labels[]
-        text!(viz,
-            ids_ob,
-            position = point_mid_ob,
-            color = viz.cablelabelcolor[],
-            align = (:left, :top),
-            offset = (-5, -10)
-        )
-    end
-    viz
-end
-
-function Makie.plot!(viz::Viz{Tuple{S}};
-    ) where S <:RB.AbstractStructure
-    if viz.isref[]
-        showlabels = false
-        cablecolor=
-        cablelabelcolor=viz.refcolor[]
-        meshcolor=viz.refcolor[]
-        viz.showcables[] = false
-    else
-        meshcolor=viz.meshcolor[]
-        cablecolor = viz.cablecolor[]
-        cablelabelcolor = viz.cablelabelcolor[]
-    end
-    if viz.showlabels[]
-        show_cable_labels = 
-        show_mass_center_labels = 
-        show_node_labels = true
-    else
-        show_cable_labels = viz.show_cable_labels[]
-        show_mass_center_labels = viz.show_mass_center_labels[]
-        show_node_labels = viz.show_node_labels[]
-    end
-    if viz.showpoints[]
-        show_mass_centers = show_nodes = true
-    else
-        show_mass_centers = viz.show_mass_centers[]
-        show_nodes = viz.show_nodes[]
-    end
-    tgob = viz[:structure]
-    (;tensiles,num_of_bodies) = tgob[]
-    ncables = length(tensiles.cables)
-    if ncables > 0 && viz.showcables[]
-        cables_ob = @lift $tgob.tensiles.cables
-        viz!(viz,cables_ob;
-            cablecolor,
-            cablewidth = viz.cablewidth[],
-            cablelabelcolor = viz.cablelabelcolor[],
-            slack_linestyle = viz.slack_linestyle[],
-            show_cable_labels,
-        )
-    end
-    if num_of_bodies > 0
-        bodies_ob = @lift RB.get_bodies($tgob)
-        bodies_array_ob = [
-            @lift $(bodies_ob)[i]
-            for i = 1:num_of_bodies
-        ]
-        for body_ob in bodies_array_ob
-            viz!(viz,body_ob;
-                show_mass_centers,
-                show_mass_center_labels,
-                show_nodes,
-                show_node_labels,
-                meshcolor,
-                pointcolor = viz.pointcolor[],
-                showmesh = viz.showmesh[],
-                # showwire = viz.showwire[],
-            )
-        end
-    end
-    viz
-end
-
-function get3Dstate(body)
-    (;state) = body
-    (;origin_position,R,origin_velocity,ω) = state
-    ndim = RB.get_num_of_dims(body)
-    T = RB.get_numbertype(body)
-    o = zero(T)
-    i = one(T)
-    if ndim == 3
-        return origin_position, R, origin_velocity, ω
-    else
-        origin_position_3D = MVector{3}(origin_position[1],origin_position[2],o)
-        origin_velocity_3D = MVector{3}(origin_velocity[1],origin_velocity[2],o)
-        R3 = MMatrix{3,3}(
-            [
-                 R[1,1] -R[2,1] o;
-                -R[1,2]  R[2,2] o;
-                o      o        i;
-            ]
-        )
-        ω3 = MVector{3}(o,o,ω[1])
-        return origin_position_3D, R3, origin_velocity_3D, ω3
-    end
-end
-
 function get_linesegs_cables(structure;slackonly=false,noslackonly=false)
     (;connected) = structure.connectivity.tensioned
     (;cables) = structure.tensiles
@@ -670,48 +346,6 @@ function get_linesegs_cables(structure;slackonly=false,noslackonly=false)
         end
     end
     linesegs_cables
-end
-
-function build_mesh(body::RB.AbstractRigidBody;update=true,color=nothing)
-    (;mesh) = body
-    @assert !(mesh isa Nothing)
-    if update
-        origin_position,R,_ = get3Dstate(body)
-    else
-        origin_position = SVector(0,0,0)
-        R = Matrix(1I,3,3)
-    end
-    trans = Translation(origin_position)
-    rot = LinearMap(R)
-    ct = trans ∘ rot
-    updated_pos = GB.Point3f.(ct.(mesh.position))
-    fac = GB.faces(mesh)
-    nls = GB.normals(updated_pos,fac)
-    
-    
-    if !(color isa Nothing)
-        parsedcolor = parse(Makie.RGBf,color)
-        colors = fill(parsedcolor,length(updated_pos))
-    elseif hasproperty(mesh,:color)
-        colors = mesh.color
-    else
-        parsedcolor = parse(Makie.RGBf,:slategrey) 
-        colors = fill(parsedcolor,length(updated_pos))
-    end
-    GB.Mesh(GB.meta(updated_pos,normals=nls,color=colors),fac)
-    # GB.Mesh(GB.meta(coloredpoints,normals=nls),fac)
-end
-
-function make_patch(;trans=[0.0,0,0],rot=RotX(0.0),scale=1,color=:slategrey)
-    parsedcolor = parse(Makie.ColorTypes.RGBA{Float32},color)
-    function patch(mesh)
-        ct = Translation(trans) ∘ LinearMap(rot)
-        updated_pos = ct.(mesh.position.*scale)
-        fac = GB.faces(mesh)
-        nls = GB.normals(updated_pos,fac)
-        colors = fill(parsedcolor,length(updated_pos))
-        GB.Mesh(GB.meta(updated_pos,normals=nls,color=colors),fac)
-    end
 end
 
 function endpoints2mesh(
@@ -743,7 +377,7 @@ function spbasis(n)
     t,b
 end
 
-function build_mesh(fb::RB.FlexibleBody,nsegs=100;color=:slategrey)
+function RB.build_mesh(fb::RB.FlexibleBody,nsegs=100;color=:slategrey)
     (;state) = fb
     (;cache) = state
     (;funcs,e) = cache
@@ -1103,7 +737,6 @@ function plot_self_stress_states(
     end
 end
 
-
 function plot_kinematic_indeterminacy(
         botinput,
         D,
@@ -1138,7 +771,6 @@ function plot_kinematic_indeterminacy(
         showinit = true,
     )
 end
-
 
 function plotsave_contactpoints(bot,figname=nothing)
     contacts_traj_voa = VectorOfArray(bot.contacts_traj)

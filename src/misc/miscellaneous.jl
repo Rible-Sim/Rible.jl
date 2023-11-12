@@ -32,7 +32,7 @@ function Plane(a::T,b::T,c::T,d::T) where T
 end
 
 function signed_distance(x::AbstractVector{T},p::Plane) where T
-    @unpack n, d = p
+    (;n, d) = p
     transpose(n)*x + d
 end
 

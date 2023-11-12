@@ -12,6 +12,7 @@ import ..Rible: HouseholderOrthogonalization, skew
 export get_num_of_cstr, get_num_of_coords
 export get_num_of_dof, get_num_of_local_dims
 export to_local_coords, to_transformation
+export find_rotation, find_angular_velocity
 
 export make_cstr_function
 export make_cstr_jacobian

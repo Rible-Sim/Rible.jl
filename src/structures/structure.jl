@@ -171,7 +171,7 @@ function assemble_M⁻¹(st::AbstractStructure)
     M⁻¹ = spzeros(T,num_of_full_coords,num_of_full_coords)
     foreach(st.bodies) do body
         memfull = bodyid2sys_full_coords[body.prop.id]
-        M⁻¹[memfull,memfull] .+= body.state.cache.M⁻¹
+        M⁻¹[memfull,memfull] .+= body.cache.coords_cache.M⁻¹
     end
     # @assert issymmetric(M⁻¹)
     M⁻¹
@@ -189,7 +189,7 @@ function assemble_∂Mq̇∂q(st::AbstractStructure)
     ∂Mq̇∂q = spzeros(T,num_of_full_coords,num_of_full_coords)
     foreach(st.bodies) do body
         memfull = bodyid2sys_full_coords[body.prop.id]
-        ∂Mq̇∂q[memfull,memfull] .+= body.state.cache.∂Mq̇∂q
+        ∂Mq̇∂q[memfull,memfull] .+= body.cache.coords_cache.∂Mq̇∂q
     end
     ∂Mq̇∂q
     # symsparsecsr(M;symmetrize=true)
@@ -201,7 +201,7 @@ function assemble_∂M⁻¹p∂q(st::AbstractStructure)
     ∂M⁻¹p∂q = spzeros(T,num_of_full_coords,num_of_full_coords)
     foreach(st.bodies) do body
         memfull = bodyid2sys_full_coords[body.prop.id]
-        ∂M⁻¹p∂q[memfull,memfull] .+= body.state.cache.∂M⁻¹p∂q
+        ∂M⁻¹p∂q[memfull,memfull] .+= body.cache.coords_cache.∂M⁻¹p∂q
     end
     ∂M⁻¹p∂q
     # symsparsecsr(M;symmetrize=true)

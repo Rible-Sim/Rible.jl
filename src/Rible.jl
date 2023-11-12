@@ -1,36 +1,57 @@
 module Rible
 
-using Logging
+
+# arrays
 using LinearAlgebra
 using SparseArrays
 using PreallocationTools
-using Parameters
 using StaticArrays
 using StructArrays
 using RecursiveArrayTools
 using SparseMatricesCSR
-using NLsolve
-import JuMP, COSMO, Clarabel
 using BlockArrays
 using BlockDiagonals
 using SymmetricFormats
+using RowEchelon
+using TypeSortedCollections
+using TypedTables
+# other
+using Quaternions
+using Rotations
+using CoordinateTransformations
+using Tullio
+using EponymTuples
+using Unitful
+# solvers
+using NLsolve
+import JuMP, COSMO, Clarabel
 using Polyhedra
 import CDDLib 
 lib = CDDLib.Library()
-using Tullio
-using Quaternions
+# diff
 using ForwardDiff
 using FiniteDiff
-using RowEchelon
+# poly
 using HomotopyContinuation
 using DynamicPolynomials
+# graph
 using Graphs
 using MetaGraphsNext
-using TypeSortedCollections
+# IO
 using EzXML
-using ProgressMeter, Printf
-using EponymTuples
+# print
+using ProgressMeter
+using Printf
+using Logging
+# visualize/plot
+import MakieCore
+using Observables
+import GeometryBasics as GB
+import ColorTypes as CT
+const lift = map
+# docs
 using DocStringExtensions
+# code
 using PrecompileTools
 using Test
 
@@ -53,8 +74,9 @@ import .NCF: make_cstr_forces_jacobian
 import .NCF: get_num_of_cstr, get_num_of_coords, get_num_of_dof
 import .NCF: get_num_of_dims, get_num_of_local_dims
 import .NCF: cartesian_frame2coords
+import .NCF: find_rotation, find_angular_velocity
 
-include("members/rigids/QCF.jl")
+include("members/rigids/quaternion_coordinates/QCF.jl")
 using .QCF
 
 include("members/abstract_body.jl")
@@ -100,10 +122,14 @@ include("mechanics/solvers.jl")
 
 include("misc/miscellaneous.jl")
 
+include("mechanics/dynamics.jl")
+
 include("postprocess/analysis.jl")
 
 include("preprocess/URDF.jl")
 import .URDF
+
+include("postprocess/vis.jl")
 
 include("precompile.jl")
 

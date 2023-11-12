@@ -1,7 +1,7 @@
 {
 	"files": [
 		{
-			"path": "examples/stiffness/main.jl",
+			"path": "demos/stiffness/main.jl",
 			"bookmarks": [
 				{
 					"line": 0,
@@ -51,42 +51,32 @@
 			]
 		},
 		{
-			"path": "examples/nonsmooth/main.jl",
+			"path": "demos/nonsmooth/main.jl",
 			"bookmarks": [
 				{
-					"line": 14,
-					"column": 6,
-					"label": ""
-				},
-				{
-					"line": 933,
-					"column": 10,
-					"label": ""
-				},
-				{
-					"line": 1021,
+					"line": 584,
 					"column": 12,
 					"label": ""
 				},
 				{
-					"line": 1385,
+					"line": 948,
 					"column": 7,
 					"label": ""
 				},
 				{
-					"line": 1554,
+					"line": 1117,
 					"column": 4,
 					"label": ""
 				},
 				{
-					"line": 1805,
+					"line": 1368,
 					"column": 9,
 					"label": ""
 				}
 			]
 		},
 		{
-			"path": "examples/ES/main.jl",
+			"path": "demos/ES/main.jl",
 			"bookmarks": [
 				{
 					"line": 0,
