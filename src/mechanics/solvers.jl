@@ -6,13 +6,13 @@ struct SimProblem{BotType,FuncsType}
     function SimProblem(bot,make_dynfuncs)
         dynfuncs_raw = make_dynfuncs(bot)
         if dynfuncs_raw isa NamedTuple{(:F!,)}
-            dynfuncs = (F! = dynfuncs_raw.F!, Jac_F! = nothing)
+            dynfuncs = (F! = dynfuncs_raw.F!, Jac_F! = missing)
         elseif dynfuncs_raw isa NamedTuple{(:F!,:Jac_F!)}
             dynfuncs = dynfuncs_raw
         elseif dynfuncs_raw isa NamedTuple{(:F!,:Jac_F!,:prepare_contacts!)}
             dynfuncs = dynfuncs_raw
         elseif dynfuncs_raw isa NamedTuple{(:F!, :apply_acu!)}
-            dynfuncs = (F! = dynfuncs_raw.F!, Jac_F! = nothing, apply_acu! = dynfuncs_raw.apply_acu!)
+            dynfuncs = (F! = dynfuncs_raw.F!, Jac_F! = missing, apply_acu! = dynfuncs_raw.apply_acu!)
         elseif dynfuncs_raw isa NamedTuple{(:F!, :Jac_F!, :apply_acu!)}
             dynfuncs = dynfuncs_raw
         else
@@ -102,6 +102,7 @@ include("solvers/CCP/CCPsolvers.jl")
 include("solvers/CCP/ZhongCCP.jl")
 include("solvers/CCP/ZhongQCCP.jl")
 include("solvers/CCP/AlphaCCP.jl")
+include("solvers/CCP/ZhongQCCPN.jl")
 
 # include("solvers/nonsmooth.jl")
 # include("solvers/Zhong06NSNH.jl")

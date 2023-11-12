@@ -14,7 +14,7 @@ includet("../../vis.jl")
 include("../../../examples/robots/spinningtop.jl")
 includet("../../../examples/robots/spinningtop.jl")
 function top_contact_dynfuncs(bot;checkpersist=true,)
-    RB.contact_dynfuncs(bot;
+    RB.frictionless_contact_dynfuncs(bot;
         flatplane = RB.Plane([0,0,1.0],[0,0,0.0]),
         checkpersist,
     )
@@ -36,12 +36,13 @@ topq = make_top(origin_position,R,origin_velocity,Ω;μ,e,loadmesh=true)
 #note initial guess can not improve it?
 RB.solve!(
     RB.SimProblem(topq,top_contact_dynfuncs),
-    RB.ZhongQCCP();
+    RB.ZhongQCCPN();
     tspan,
     dt=h,
     ftol=1e-10,
     maxiters=50,exception=false,verbose_contact=true
 )
+
 me = RB.mechanical_energy!(topq)
 lines(me.E)
 rp5 = RB.get_trajectory!(topq,1,5)

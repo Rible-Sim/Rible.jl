@@ -277,6 +277,82 @@ function IPM!(output,nu,nΛ,Λ,y,N,r;ftol=1e-14,Nmax=50)
     y_split
 end
 
+function frictionless_IPM!(output,nu,nΛ,Λ,y,N,r;ftol=1e-14,Nmax=50)
+    T = eltype(Λ)
+    𝐞 = ones(T,nu)
+    Λ_split = split_by_lengths(Λ,1)
+    y_split = split_by_lengths(y,1)
+    n1 = nΛ
+    n2 = 2nΛ
+    nx = n2
+    𝐫𝐞𝐬 = zeros(T,nx)
+    𝐉 = zeros(T,nx,nx)
+    μ = transpose(y)*Λ/nΛ
+
+    𝐉[   1:n1,   1:n1] .=  N
+    𝐉[   1:n1,n1+1:n2] .= -Matrix(1I,nΛ,nΛ)
+    Λp = zero(Λ)
+    yp = zero(y)
+    Δxp = zeros(T,nx)
+    ΔΛp = @view Δxp[   1:n1]
+    Δyp = @view Δxp[n1+1:n2]
+    ΔΛp_split = split_by_lengths(ΔΛp,1)
+    Δyp_split = split_by_lengths(Δyp,1)
+    Δxc = zeros(T,nx)
+    ΔΛc = @view Δxc[   1:n1]
+    Δyc = @view Δxc[n1+1:n2]
+    ΔΛc_split = split_by_lengths(ΔΛc,1)
+    Δyc_split = split_by_lengths(Δyc,1)
+    for k = 1:Nmax
+
+        𝐫𝐞𝐬[   1:n1] .= N*Λ .+ r .- y
+        𝐫𝐞𝐬[n1+1:n2] .= reduce(vcat,Λ_split⊙y_split)
+
+        res = norm(𝐫𝐞𝐬)
+        if res < ftol
+            # @show k, Λ_split[1],y_split[1]
+            # @show Λ_split[1]⊙y_split[1]
+            # @show k
+            break
+        elseif k == Nmax
+            # @warn "IPM: Max iteration $k reached"
+        end
+
+        𝐉[n1+1:n2,   1:n1] .=  BlockDiagonal(mat.(y_split))
+        𝐉[n1+1:n2,n1+1:n2] .=  BlockDiagonal(mat.(Λ_split))
+
+        lu𝐉 = lu(𝐉)
+        Δxp .= lu𝐉\(-𝐫𝐞𝐬)
+        αp_Λ = find_nonnegative_step_length(Λ_split,ΔΛp_split)
+        αp_y = find_nonnegative_step_length(y_split,Δyp_split)
+        αpmax = min(αp_Λ,αp_y)
+        # αpmax = find_nonnegative_step_length(z_split,W_blocks,Δyp_split,ΔΛp_split,J)
+        αp = min(one(αpmax),0.99αpmax)
+        Λp .= Λ .+ αp.*ΔΛp
+        yp .= y .+ αp.*Δyp
+        μp = transpose(yp)*Λp/nΛ
+        σ = (μp/μ)^3
+        if σ == NaN || μ == 0
+            break
+        end
+        τ = σ*μp
+        𝐫𝐞𝐬_c = -τ.*𝐞.+(Δyp.*ΔΛp)
+        𝐫𝐞𝐬[n1+1:n2] .+= 𝐫𝐞𝐬_c
+        Δxc .= lu𝐉\(-𝐫𝐞𝐬)
+        # η = exp(-0.1μ) + 0.9
+        α_Λ = find_nonnegative_step_length(Λ_split,ΔΛc_split)
+        # @show Λ_split,ΔΛc_split
+        α_y = find_nonnegative_step_length(y_split,Δyc_split)
+        αmax = min(α_Λ,α_y)
+        α = min(1,0.99αmax)
+        Λ .+= α.*ΔΛc
+        y .+= α.*Δyc
+        μ = transpose(y)*Λ/nΛ
+    end
+    output .= Λ
+    y_split
+end
+
 function ⊙(x::AbstractVector{T},y::AbstractVector{T}) where {T<:Real}
     x0 = x[begin]
     x1 = @view x[begin+1:end]
@@ -375,6 +451,20 @@ end
 function find_cone_step_length(z_split::AbstractVector{T},Δz_split::AbstractVector{T},J) where {T<:AbstractVector}
     α = [
         find_cone_step_length(zi,Δzi,J)
+        for (zi,Δzi) in zip(z_split,Δz_split)
+    ]
+    αmin = minimum(α)
+end
+
+
+function find_nonnegative_step_length(z::AbstractVector{T},Δz::AbstractVector{T}) where {T<:Real}
+    ρ = Δz./z
+    α = max(0,-minimum(ρ))^(-1)
+end
+
+function find_nonnegative_step_length(z_split::AbstractVector{T},Δz_split::AbstractVector{T}) where {T<:AbstractVector}
+    α = [
+        find_nonnegative_step_length(zi,Δzi)
         for (zi,Δzi) in zip(z_split,Δz_split)
     ]
     αmin = minimum(α)

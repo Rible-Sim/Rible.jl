@@ -120,7 +120,7 @@ function solve!(intor::Integrator,cache::Zhong06Cache;
         Aᵀₖ₋₁ = transpose(A(qₖ₋₁))
         Res_stepk! = make_Res_stepk(qₖ,q̌ₖ,λₖ,qₖ₋₁,p̌ₖ₋₁,F̌,Aᵀₖ₋₁,tₖ₋₁)
         isconverged = false
-        if Jac_F! isa Nothing
+        if Jac_F! isa Missing
             dfk = OnceDifferentiable(Res_stepk!,initial_x,initial_Res)
             Res_stepk_result = nlsolve(dfk, initial_x; ftol, iterations=maxiters, method=:newton)
             isconverged = converged(Res_stepk_result)

@@ -1,10 +1,10 @@
-struct ZhongQCCP <: AbstractSolver end
+struct ZhongQCCPN <: AbstractSolver end
 
-struct ZhongQCCPCache{CacheType}
+struct ZhongQCCPNCache{CacheType}
     cache::CacheType
 end
 
-function generate_cache(::ZhongQCCP,intor;dt,kargs...)
+function generate_cache(::ZhongQCCPN,intor;dt,kargs...)
     (;structure) = intor.prob.bot
     Mₘ = assemble_M(structure) 
     M⁻¹ₘ = assemble_M⁻¹(structure)
@@ -42,17 +42,17 @@ function generate_cache(::ZhongQCCP,intor;dt,kargs...)
         ∂Ψ∂q,
         ∂Aᵀλ∂q,∂Bᵀμ∂q,
     )
-    ZhongQCCPCache(cache)
+    ZhongQCCPNCache(cache)
 end
 
-function Momentum_k(qₖ₋₁,pₖ₋₁,qₖ,λₘ,Mₘ,A,Λₘ,Dₖ₋₁,Dₖ,H,scaling,h)
+function Momentum_ZhongQCCPN_k(qₖ₋₁,pₖ₋₁,qₖ,λₘ,Mₘ,A,Λₘ,Dₖ₋₁,Dₖ,H,scaling,h)
     pₖ = -pₖ₋₁ .+ 
         2/h.*Mₘ*(qₖ.-qₖ₋₁) .+ 
         scaling/h.*(transpose(A(qₖ))-transpose(A(qₖ₋₁)))*λₘ .+
         scaling.*(transpose(Dₖ)-transpose(Dₖ₋₁))*H*Λₘ
 end
 
-function make_zhongccp_ns_stepk(
+function make_zhongccpn_ns_stepk(
         nq,nλ,na,
         qₖ₋₁,vₖ₋₁,pₖ₋₁,tₖ₋₁,
         pₖ,vₖ,
@@ -74,7 +74,7 @@ function make_zhongccp_ns_stepk(
     # T = eltype(qₖ₋₁)
     n1 = nq
     n2 = nq+nλ
-    nΛ = 3na
+    na = na
     nx = n2
     function ns_stepk!(𝐫𝐞𝐬,𝐉,𝐁,𝐛,𝐜ᵀ,𝐍,𝐫,
             x,Λₘ,Dₖ₋₁,ŕₖ₋₁,
@@ -107,7 +107,7 @@ function make_zhongccp_ns_stepk(
         𝐉[n1+1:n2,   1:n1] .=  scaling.*Aₖ
         
         if na != 0
-            pₖ .= Momentum_k(qₖ₋₁,pₖ₋₁,qₖ,λₘ,Mₘ,A,Λₘ,Dₖ₋₁,Dₖ,H,scaling,h)
+            pₖ .= Momentum_ZhongQCCPN_k(qₖ₋₁,pₖ₋₁,qₖ,λₘ,Mₘ,A,Λₘ,Dₖ₋₁,Dₖ,H,scaling,h)
             M⁻¹!(M⁻¹ₖ,qₖ) 
             vₖ .= M⁻¹ₖ*pₖ
             M⁻¹!(M⁻¹ₘ,qₘ)
@@ -122,7 +122,7 @@ function make_zhongccp_ns_stepk(
             ∂vₖ∂qₖ = M⁻¹ₖ*∂pₖ∂qₖ .+ ∂M⁻¹ₖpₖ∂qₖ
             ∂vₖ∂λₘ = scaling/h.*M⁻¹ₘ*transpose(Aₖ-Aₖ₋₁)
             𝐁 .= 0
-            𝐁[  1:n1,   1:nΛ] .= scaling.*h .*transpose(Dₖ₋₁)*H
+            𝐁[  1:n1,   1:na] .= scaling.*h .*transpose(Dₖ₋₁)*H
             v́ₖ = Dₖ*vₖ
             ∂v́ₖ∂qₖ = Dₖ*∂vₖ∂qₖ .+ ∂Dₖvₖ∂qₖ 
             ∂v́ₘ∂qₖ = Dₖ./h 
@@ -131,32 +131,28 @@ function make_zhongccp_ns_stepk(
             v́ₘ = (ŕₖ .- ŕₖ₋₁)./h
             v́⁺ = copy(v́ₖ)
             for i = 1:na
-                is = 3(i-1)
-                vⁱₖ₋₁ = @view v́ₖ₋₁[is+1:is+3]
+                vⁱₖ₋₁ = v́ₖ₋₁[i]
                 # vₜⁱₖ₋₁ = norm(vⁱₖ₋₁[2:3])
                 if i in persistent_idx
-                    vⁱ⁺   = @view v́ₘ[is+1:is+3]
-                    vₙⁱₖ₋₁ = zero(vⁱₖ₋₁[1])
+                    vⁱ⁺   = v́ₘ[i]
+                    vₙⁱₖ₋₁ = zero(vⁱₖ₋₁)
                 else
-                    vⁱ⁺   = @view v́ₖ[is+1:is+3]
-                    vₙⁱₖ₋₁ = vⁱₖ₋₁[1]
+                    vⁱ⁺   = v́ₖ[i]
+                    vₙⁱₖ₋₁ = vⁱₖ₋₁
                 end
-                v́⁺[is+1:is+3] = vⁱ⁺
-                vₜⁱ⁺   = norm(vⁱ⁺[2:3])
-                # vₙⁱ   = vⁱ⁺[1]
+                v́⁺[i] = vⁱ⁺
+                # vₙⁱ   = vⁱ⁺
                 # @show timestep,iteration, vₙⁱₖ₋₁, vₙⁱ, vₜⁱₖ₋₁, vₜⁱ, Λₘ
-                v́ₜⁱ = vₜⁱ⁺ + restitution_coefficients[i]*min(vₙⁱₖ₋₁,zero(vₙⁱₖ₋₁))
-                𝐛[is+1:is+3] .= [v́ₜⁱ,0,0]
+                𝐛[i] = restitution_coefficients[i]*min(vₙⁱₖ₋₁,zero(vₙⁱₖ₋₁))
                 
-                Dⁱₖ = @view Dₖ[is+1:is+3,:]                
+                Dⁱₖ = @view Dₖ[[i],:]                
                 if i in persistent_idx
-                    𝐜ᵀ[is+1:is+3,   1:n1] .= ∂v́ₘ∂qₖ[is+1:is+3,:]                     
-                    𝐜ᵀ[is+1     ,   1:n1] .+= 1/(norm(v́ₘ[is+2:is+3])+1e-14)*(v́ₘ[is+2]*∂v́ₘ∂qₖ[is+2,:] .+ v́ₘ[is+3]*∂v́ₘ∂qₖ[is+3,:])
-                    𝐜ᵀ[is+1:is+3,n1+1:n2] .= 0
+                    𝐜ᵀ[i,   1:n1] .= ∂v́ₘ∂qₖ[i,:]                     
+                    𝐜ᵀ[i,n1+1:n2] .= 0
                 else
-                    𝐜ᵀ[is+1:is+3,   1:n1] .= ∂v́ₖ∂qₖ[is+1:is+3,:]
-                    𝐜ᵀ[is+1     ,   1:n1] .+= 1/(norm(v́ₖ[is+2:is+3])+1e-14)*(v́ₖ[is+2]*∂v́ₖ∂qₖ[is+2,:] .+ v́ₖ[is+3]*∂v́ₖ∂qₖ[is+3,:])
-                    𝐜ᵀ[is+1:is+3,n1+1:n2] .= Dⁱₖ*∂vₖ∂λₘ
+                    𝐜ᵀ[i,   1:n1] .= ∂v́ₖ∂qₖ[i,:]
+                    # @show size(Dₖ), size(Dⁱₖ), size(∂vₖ∂λₘ)
+                    𝐜ᵀ[i,n1+1:n2] .= Dⁱₖ*∂vₖ∂λₘ
                 end
             end
 
@@ -174,7 +170,7 @@ function make_zhongccp_ns_stepk(
     ns_stepk!
 end
 
-function solve!(intor::Integrator,solvercache::ZhongQCCPCache;
+function solve!(intor::Integrator,solvercache::ZhongQCCPNCache;
         dt,
         ftol=1e-14,xtol=ftol,maxiters=50,
         verbose=false, verbose_contact=false,
@@ -209,7 +205,6 @@ function solve!(intor::Integrator,solvercache::ZhongQCCPCache;
     Jac = zeros(T,nx,nx)
     mr = norm(Mₘ,Inf)
     scaling = mr
-    @show mr
     iteration = 0
     prog = Progress(totalstep; dt=1.0, enabled=progress)
     for timestep = 1:totalstep
@@ -233,19 +228,18 @@ function solve!(intor::Integrator,solvercache::ZhongQCCPCache;
         isconverged = false
         normRes = typemax(T)
         iteration_break = 0
-        nΛ = 3na
-        Λₘ = zeros(T,nΛ)
+        Λₘ = zeros(T,na)
         Λʳₖ = copy(Λₘ)
         ΔΛₖ = copy(Λₘ)
-        𝐁 = zeros(T,nx,nΛ)
-        𝐛 = zeros(T,nΛ)
-        𝐜ᵀ = zeros(T,nΛ,nx)
-        𝐍 = zeros(T,nΛ,nΛ)
-        𝐫 = zeros(T,nΛ)
+        𝐁 = zeros(T,nx,na)
+        𝐛 = zeros(T,na)
+        𝐜ᵀ = zeros(T,na,nx)
+        𝐍 = zeros(T,na,na)
+        𝐫 = zeros(T,na)
         get_directions_and_positions!(Dₖ₋₁, Dper, Dimp, ∂Dq̇∂q, ∂DᵀΛ∂q, ŕₖ₋₁, qₖ₋₁, q̇ₖ₋₁, Λₘ, bodyid2act_idx,)
         Dₖ = deepcopy(Dₖ₋₁)
         ŕₖ = deepcopy(ŕₖ₋₁)
-        ns_stepk! = make_zhongccp_ns_stepk(
+        ns_stepk! = make_zhongccpn_ns_stepk(
             nq,nλ,na,qₖ₋₁,q̇ₖ₋₁,pₖ₋₁,tₖ₋₁,pₖ,q̇ₖ,
             F!,Jac_F!,
             get_directions_and_positions!,
@@ -254,7 +248,7 @@ function solve!(intor::Integrator,solvercache::ZhongQCCPCache;
         restart_count = 0
         Λ_guess = 0.1
         while restart_count < 10
-            Λₘ .= repeat([Λ_guess,0,0],na)
+            Λₘ .= repeat([Λ_guess],na)
             x[      1:nq]          .= qₖ
             x[   nq+1:nq+nλ]       .= 0.0
             Λʳₖ .= Λₘ
@@ -286,7 +280,7 @@ function solve!(intor::Integrator,solvercache::ZhongQCCPCache;
                     yini .= abs.(yini)
                     yini[begin+1:3:end] .= 0.0
                     yini[begin+2:3:end] .= 0.0
-                    IPM!(Λₘ,na,nΛ,Λₘini,yini,𝐍,𝐫;ftol=1e-14,Nmax)
+                    frictionless_IPM!(Λₘ,na,na,Λₘini,yini,𝐍,𝐫;ftol=1e-14,Nmax)
                     ΔΛₖ .= Λₘ - Λʳₖ
                     minusResΛ = -Res + 𝐁*(ΔΛₖ)
                     normRes = norm(minusResΛ)
@@ -321,7 +315,7 @@ function solve!(intor::Integrator,solvercache::ZhongQCCPCache;
         qₖ₋½ .= (qₖ.+qₖ₋₁)./2
         M!(Mₘ,qₖ₋½)
         get_directions_and_positions!(Dₖ, Dper, Dimp, ∂Dq̇∂q, ∂DᵀΛ∂q, ŕₖ, qₖ, q̇ₖ, Λₘ, bodyid2act_idx)
-        pₖ .= Momentum_k(qₖ₋₁,pₖ₋₁,qₖ,λₘ,Mₘ,A,Λₘ,Dₖ₋₁,Dₖ,H,scaling,dt)
+        pₖ .= Momentum_ZhongQCCPN_k(qₖ₋₁,pₖ₋₁,qₖ,λₘ,Mₘ,A,Λₘ,Dₖ₋₁,Dₖ,H,scaling,dt)
         M⁻¹!(M⁻¹ₘ,qₖ)
         q̇ₖ .= M⁻¹ₘ*pₖ
         if na != 0

@@ -100,7 +100,7 @@ function solve!(intor::Integrator,solvercache::Zhong06QCache;
         initial_x[nq+1:nq+nλ] .= traj.λ[timestep]
         Aᵀ = transpose(A(qᵏ⁻¹))
         Res_stepk! = make_Res_stepk(qᵏ,λᵏ,qᵏ⁻¹,pᵏ⁻¹,M,F,Aᵀ,tᵏ⁻¹)
-        if Jac_F! isa Nothing
+        if Jac_F! isa Missing
             dfk = OnceDifferentiable(Res_stepk!,initial_x,initial_Res)
         else
 

@@ -150,11 +150,11 @@ function solve!(intor::Integrator,cache::FBZhong06Cache;
         initial_x[nq̌+nλ+1:nx] .= traj.s[timestep]
         initial_x
         Aᵀ = transpose(A(qᵏ⁻¹))
-        if !(actuate! isa Nothing)
+        if !(actuate! isa Missing)
             actuate!(bot.structure, tᵏ⁻¹; dt)
         end
         Res_stepk! = make_Res_stepk(qᵏ,q̌ᵏ,λᵏ,sᵏ,qᵏ⁻¹,p̌ᵏ⁻¹,F̌,Aᵀ,tᵏ⁻¹)
-        if Jac_F! isa Nothing
+        if Jac_F! isa Missing
             dfk = OnceDifferentiable(Res_stepk!,initial_x,initial_Res)
         else
 
