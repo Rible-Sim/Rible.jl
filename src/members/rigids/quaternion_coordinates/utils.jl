@@ -29,11 +29,11 @@ function ∂Lᵀη∂q(η::AbstractVector)
 end
 
 function quatVel2localAngular(q::AbstractVector,q̇::AbstractVector)
-    2Lmat(q)*q̇
+    Ω = 2Lmat(q)*q̇
 end
 
 function localAngular2quatVel(q::AbstractVector,Ω::AbstractVector)
-    Lᵀmat(q)*Ω./2
+    q̇ = Lᵀmat(q)*Ω./2
 end
 
 function Rmat(q::AbstractVector)

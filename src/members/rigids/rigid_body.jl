@@ -254,6 +254,16 @@ function body_state2coords_state(state::RigidBodyState,coords::NonminimalCoordin
     cartesian_frame2coords(coords.nmcs,origin_position,R,origin_velocity,ω)
 end
 
+"""
+    update_cache!(
+        cache::RigidBodyCache,
+        coords::NonminimalCoordinates{<:NCF.NC},
+        prop::RigidBodyProperty,
+        q,q̇
+    )
+
+update mass matrices/inertia related caches.
+"""
 function update_cache!(
         cache::RigidBodyCache,
         coords::NonminimalCoordinates{<:NCF.NC},
@@ -266,19 +276,27 @@ function update_cache!(
         cache::RigidBodyCache,
         coords::NonminimalCoordinates{<:QCF.QC},
         prop::RigidBodyProperty,
-        q,q̇
+        x,ẋ
     )
-    (;M,M⁻¹,∂Mq̇∂q,∂M⁻¹p∂q,∂T∂qᵀ) = cache
+    (;M,M⁻¹,∂Mq̇∂q,∂M⁻¹p∂q,∂T∂qᵀ) = cache.coords_cache
     # update inertia
     # @show x[4:7],ẋ[4:7]
     qcs = coords.nmcs
-    M .= funcs.build_M(x)
-    M⁻¹ .= funcs.build_M⁻¹(x)	
-    ∂Mq̇∂q .= funcs.build_∂Mẋ∂x(x,ẋ)
-    ∂M⁻¹p∂q .= funcs.build_∂M⁻¹y∂x(x,M*ẋ)
-    ∂T∂qᵀ .= funcs.build_∂T∂xᵀ(x,ẋ)
+    M .= QCF.build_M(qcs,x)
+    M⁻¹ .= QCF.build_M⁻¹(qcs,x)	
+    ∂Mq̇∂q .= QCF.build_∂Mẋ∂x(qcs,x,ẋ)
+    ∂M⁻¹p∂q .= QCF.build_∂M⁻¹y∂x(qcs,x,M*ẋ)
+    ∂T∂qᵀ .= QCF.build_∂T∂xᵀ(qcs,x,ẋ)
 end
 
+
+"""
+    lazy_update_state!(state::RigidBodyState,
+        coords::NonminimalCoordinates{<:NCF.NC},cache,
+        prop::RigidBodyProperty,q,q̇)
+
+update only position and velocity of mass center and local frame's origin
+"""
 function lazy_update_state!(state::RigidBodyState,
         coords::NonminimalCoordinates{<:NCF.NC},cache,
         prop::RigidBodyProperty,q,q̇)
@@ -294,6 +312,14 @@ function lazy_update_state!(state::RigidBodyState,
     mul!(mass_locus_state.velocity, Cg, q̇)
 end
 
+"""
+    update_state!(state::RigidBodyState,
+            coords::NonminimalCoordinates{<:NCF.NC},cache,
+            prop::RigidBodyProperty,q,q̇)
+
+update position and velocity of mass center and local frame's origin,
+and rotation matrix and angular velocity of local frame
+"""
 function update_state!(state::RigidBodyState,
             coords::NonminimalCoordinates{<:NCF.NC},cache,
             prop::RigidBodyProperty,q,q̇)
@@ -334,6 +360,16 @@ function update_state!(state::RigidBodyState,
     ω .= R*find_local_angular_velocity(nmcs,q,q̇)
 end
 
+
+"""
+    stretch_loci!(
+        coords::NonminimalCoordinates{<:NCF.NC},
+        cache,
+        prop::RigidBodyProperty,c
+    )
+
+update transformation matrix of locu from new *c* parameters.
+"""
 function stretch_loci!(
         coords::NonminimalCoordinates{<:NCF.NC},
         cache,
@@ -356,6 +392,14 @@ function stretch_loci!(
     # to be implemented
 end
 
+"""
+    update_transformations!(
+        coords::NonminimalCoordinates{<:NCF.NC},cache,
+        state::RigidBodyState,
+        prop::RigidBodyProperty,q)
+
+update transformation matrices of loci from new *coordinates*.
+"""
 function update_transformations!(
         coords::NonminimalCoordinates{<:NCF.NC},cache,
         state::RigidBodyState,
@@ -383,6 +427,14 @@ function update_transformations!(
 end
 
 
+"""
+    update_loci_states!(state::RigidBodyState,
+        coords::NonminimalCoordinates{<:NCF.NC},cache,
+        prop::RigidBodyProperty,q,q̇)
+
+update loci's postions and velocities using cached transformation matrices.
+
+"""
 function update_loci_states!(state::RigidBodyState,
         coords::NonminimalCoordinates{<:NCF.NC},cache,
         prop::RigidBodyProperty,q,q̇)

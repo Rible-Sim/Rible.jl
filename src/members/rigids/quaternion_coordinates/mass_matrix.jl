@@ -1,5 +1,5 @@
 
-function mass_matrix(J,q::AbstractVector)
+function singular_mass_matrix(J,q::AbstractVector)
     4Lᵀmat(q)*J*Lmat(q)
 end
 
@@ -31,117 +31,95 @@ function get_∂Tγ∂qᵀ∂q(Jγ,q̇::AbstractVector)
     4Lᵀmat(q̇)*Jγ*Lmat(q̇)
 end
 
-
-function make_M(qcs::QC)
+function build_M(qcs::QC,x)
     (;m,γ,Jγ) = qcs
-    function inner_M(x)
-        q = @view x[4:7]
-        T = eltype(x)
-        O34 = @SMatrix zeros(T,3,4)
-        hcat(
-            vcat(
-                SMatrix{3,3}(m*I),
-                transpose(O34)
-            ),
-            vcat(
-                O34,
-                get_Mγ(Jγ,γ,q)
-            )
+    q = @view x[4:7]
+    T = eltype(x)
+    O34 = @SMatrix zeros(T,3,4)
+    hcat(
+        vcat(
+            SMatrix{3,3}(m*I),
+            transpose(O34)
+        ),
+        vcat(
+            O34,
+            get_Mγ(Jγ,γ,q)
         )
-    end
+    )
 end
 
-function make_M⁻¹(qcs::QC)
+function build_M⁻¹(qcs::QC,x)
     (;m⁻¹,γ⁻¹,J⁻¹γ) = qcs
-    function inner_M(x)
-        q = @view x[4:7]
-        T = eltype(q)
-        O34 = @SMatrix zeros(T,3,4)
+    q = @view x[4:7]
+    T = eltype(q)
+    O34 = @SMatrix zeros(T,3,4)
+    hcat(
+        vcat(
+            SMatrix{3,3}(m⁻¹*I),
+            transpose(O34)
+        ),
+        vcat(
+            O34,
+            get_M⁻¹γ(J⁻¹γ,γ⁻¹,q)
+        )
+    )
+end
+
+function build_∂Mẋ∂x(qcs::QC,x,ẋ)
+    (;Jγ) = qcs
+    q = @view x[4:7]
+    q̇ = @view ẋ[4:7]
+    T = eltype(q)
+    O37 = @SMatrix zeros(T,3,7)
+    O43 = @SMatrix zeros(T,4,3)
+    vcat(
+        O37,
         hcat(
-            vcat(
-                SMatrix{3,3}(m⁻¹*I),
-                transpose(O34)
-            ),
-            vcat(
-                O34,
-                get_M⁻¹γ(J⁻¹γ,γ⁻¹,q)
-            )
+            O43,
+            get_∂Mγq̇∂q(Jγ,q,q̇)
         )
-    end
+    )
 end
 
-function make_∂Mẋ∂x(qcs::QC)
-    (;Jγ) = qcs
-    function inner_∂Mẋ∂x(x,ẋ)
-        q = @view x[4:7]
-        q̇ = @view ẋ[4:7]
-        T = eltype(q)
-        O37 = @SMatrix zeros(T,3,7)
-        O43 = @SMatrix zeros(T,4,3)
-        vcat(
-            O37,
-            hcat(
-                O43,
-                get_∂Mγq̇∂q(Jγ,q,q̇)
-            )
-        )
-    end
-end
-
-function make_∂M⁻¹y∂x(qcs::QC)
+function build_∂M⁻¹y∂x(qcs::QC,x,y)
     (;J⁻¹γ) = qcs
-    function inner_∂M⁻¹y∂x(x,y)
-        q = @view x[4:7]
-        p = @view y[4:7]
-        T = eltype(q)
-        O37 = @SMatrix zeros(T,3,7)
-        O43 = @SMatrix zeros(T,4,3)
-        vcat(
-            O37,
-            hcat(
-                O43,
-                get_∂M⁻¹γp∂q(J⁻¹γ,q,p)
-            )
+    q = @view x[4:7]
+    p = @view y[4:7]
+    T = eltype(q)
+    O37 = @SMatrix zeros(T,3,7)
+    O43 = @SMatrix zeros(T,4,3)
+    vcat(
+        O37,
+        hcat(
+            O43,
+            get_∂M⁻¹γp∂q(J⁻¹γ,q,p)
         )
-    end
+    )
 end
 
-
-cstr_forces_jacobian(λ::AbstractVector) = cstr_forces_jacobian(first(λ))
-
-function cstr_forces_jacobian(λ)
-    o = zero(λ)    
-    Diagonal(SA[o,o,o,λ,λ,λ,λ])
-end
-
-
-function make_∂T∂xᵀ(qcs::QC)
+function build_∂T∂xᵀ(qcs::QC,x,ẋ)
     (;Jγ) = qcs
-    function inner_∂T∂xᵀ(x,ẋ)
-        q = @view x[4:7]
-        q̇ = @view ẋ[4:7]
-        T = eltype(q)
-        o3 = @SVector zeros(T,3)
-        vcat(
-            o3,
-            get_∂Tγ∂qᵀ(Jγ,q,q̇)
-        )            
-    end
+    q = @view x[4:7]
+    q̇ = @view ẋ[4:7]
+    T = eltype(q)
+    o3 = @SVector zeros(T,3)
+    vcat(
+        o3,
+        get_∂Tγ∂qᵀ(Jγ,q,q̇)
+    )
 end
 
-function make_∂T∂xᵀ∂x(qcs::QC)
+function build_∂T∂xᵀ∂x(qcs::QC,ẋ)
     (;Jγ) = qcs
-    function inner_∂T∂xᵀ∂x(ẋ)
-        q̇ = @view ẋ[4:7]
-        T = eltype(q)
-        O37 = @SMatrix zeros(T,3,7)
-        O43 = @SMatrix zeros(T,4,3)
-        vcat(
-            O37,
-            hcat(
-                O43,
-                get_∂Tγ∂qᵀ∂q(Jγ,q̇)
-            )
+    q̇ = @view ẋ[4:7]
+    T = eltype(q)
+    O37 = @SMatrix zeros(T,3,7)
+    O43 = @SMatrix zeros(T,4,3)
+    vcat(
+        O37,
+        hcat(
+            O43,
+            get_∂Tγ∂qᵀ∂q(Jγ,q̇)
         )
-    end
+    )
 end

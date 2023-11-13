@@ -21,7 +21,7 @@ function top_contact_dynfuncs(bot;checkpersist=true,)
 end
 
 origin_position = [0,0,0.5]
-R = RotX(0.0)
+R = RotX(π/24)
 origin_velocity = [1.0,0.0,0.0]
 Ω = [0.0,0.0,200.0]
 
@@ -37,6 +37,15 @@ topq = make_top(origin_position,R,origin_velocity,Ω;μ,e,loadmesh=true)
 RB.solve!(
     RB.SimProblem(topq,top_contact_dynfuncs),
     RB.ZhongQCCPN();
+    tspan,
+    dt=h,
+    ftol=1e-10,
+    maxiters=50,exception=false,verbose_contact=true
+)
+
+RB.solve!(
+    RB.SimProblem(topq,top_contact_dynfuncs),
+    RB.ZhongQCCPNMono();
     tspan,
     dt=h,
     ftol=1e-10,

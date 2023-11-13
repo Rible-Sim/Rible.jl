@@ -11,11 +11,12 @@ struct QC{T,JT}
     J⁻¹γ::JT
 end
 
-function QC(m::T,J::AbstractMatrix{T};γ=maximum(diag(J))) where {T}
+function QC(m::T,Jmat::AbstractMatrix{T};γ=maximum(diag(Jmat))) where {T}
     m⁻¹ = inv(m)
-    Jγ = Diagonal(J) - γ*I
+    J = Diagonal(SVector{3}(diag(Jmat)))
+    Jγ = J - γ*I
     γ⁻¹ = inv(γ)
-    J⁻¹γ = Diagonal(inv(J)) - γ⁻¹*I
+    J⁻¹γ = inv(J) - γ⁻¹*I
     QC(m,m⁻¹,γ,Jγ,γ⁻¹,J⁻¹γ)
 end
 

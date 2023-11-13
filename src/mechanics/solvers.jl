@@ -103,6 +103,7 @@ include("solvers/CCP/ZhongCCP.jl")
 include("solvers/CCP/ZhongQCCP.jl")
 include("solvers/CCP/AlphaCCP.jl")
 include("solvers/CCP/ZhongQCCPN.jl")
+include("solvers/CCP/ZhongQCCPNMono.jl")
 
 # include("solvers/nonsmooth.jl")
 # include("solvers/Zhong06NSNH.jl")

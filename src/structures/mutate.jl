@@ -114,6 +114,7 @@ function update_bodies!(st)
     foreach(bodies) do body
         bodyid = body.prop.id
         (;q, q̇) = state.members[bodyid]
+        update_cache!(body,q,q̇)
         update_state!(body,q,q̇)
         update_transformations!(body,q)
         update_loci_states!(body,q,q̇)

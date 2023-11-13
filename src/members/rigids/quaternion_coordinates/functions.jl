@@ -71,7 +71,14 @@ end
 
 function find_rotation(::QC,x)
     q = @view x[4:7]
-    RotMatrix(QuatRotation(q))
+    # RotMatrix(QuatRotation(q))
+    q0, q1, q2, q3 = q
+    q0², q1², q2², q3² = q0^2, q1^2, q2^2, q3^2
+    SA[
+        2(q0²+q1²)-1   2(q1*q2-q0*q3) 2(q1*q3+q0*q2);
+        2(q1*q2+q0*q3) 2(q0²+q2²)-1   2(q2*q3-q0*q1);
+        2(q1*q3-q0*q2) 2(q2*q3+q0*q1) 2(q0²+q3²)-1;
+    ]
 end
 
 function find_local_angular_velocity(::QC,x,ẋ)
