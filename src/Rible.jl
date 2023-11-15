@@ -61,7 +61,6 @@ assetpath(files...) = normpath(joinpath(ASSETS_DIR, files...))
 
 include("utils.jl")
 
-
 include("members/loci.jl")
 
 include("members/rigids/natural_coordinates/NCF.jl")
@@ -75,6 +74,7 @@ import .NCF: get_num_of_cstr, get_num_of_coords, get_num_of_dof
 import .NCF: get_num_of_dims, get_num_of_local_dims
 import .NCF: cartesian_frame2coords
 import .NCF: find_rotation, find_angular_velocity
+import .NCF: build_joint_cache, get_joint_violations!, get_joint_jacobian!
 
 include("members/rigids/quaternion_coordinates/QCF.jl")
 using .QCF
@@ -90,11 +90,11 @@ import .ANCF
 
 include("members/flexibles/flexible_body.jl")
 
-include("members/joints.jl")
-
 include("structures/connectivity.jl")
 
 include("structures/structure.jl")
+
+include("members/joints.jl")
 
 include("structures/mutate.jl")
 
@@ -103,8 +103,6 @@ include("robots/robot.jl")
 include("control/control.jl")
 
 include("./get.jl")
-
-include("mechanics/constraints.jl")
 
 include("mechanics/inverse_statics.jl")
 

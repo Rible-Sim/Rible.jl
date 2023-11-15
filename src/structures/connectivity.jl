@@ -208,18 +208,6 @@ function join(joints,indexed)
     JointedMembers(njoints,num_of_extrinsic_cstr,type_sorted_joints,jointid2sys_extrinsic_cstr_idx)
 end
 
-function Base.isless(a::AbstractBody,b::AbstractBody)
-    isless(a.prop.id,b.prop.id)
-end
-
-function Base.isless(a::Hen2Egg,b::Hen2Egg)
-    isless(a.id,b.id)
-end
-
-function Base.sort(tsc::TypeSortedCollection)
-    sort!(reduce(vcat,tsc.data))
-end
-
 function connect(rbs,cm_input=Int[;;])
     _,nb = check_rbid_sanity(rbs)
     if size(cm_input,2) > nb

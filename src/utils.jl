@@ -104,3 +104,47 @@ function split_by_lengths(x::AbstractVector{T}, len::Int) where {T}
         for i = 1:num_of_segments
     ]
 end
+
+"""
+ID
+$(TYPEDEF)
+---
+$(TYPEDFIELDS)
+"""
+struct ID{sigType,pidType,aidType}
+    "Signifier of body"
+    rbsig::sigType
+    "Index of the anchor point"
+    pid::pidType
+    "Index of the translational axis"
+    trlid::aidType
+    "Index of the rotational axis"
+    rotid::aidType
+end
+
+function ID(rbsig,pid,trlid)
+    ID(rbsig,pid,trlid,trlid)
+end
+
+function ID(rbsig,pid)
+    ID(rbsig,pid,1,1)
+end
+
+"""
+Hen 2 Egg
+$(TYPEDEF)
+---
+$(TYPEDFIELDS)
+"""
+struct Hen2Egg{henType<:ID,eggType<:ID}
+    "id"
+    id::Int
+    "hen/parent/predecessor"
+    hen::henType
+    "egg/child/successor"
+    egg::eggType
+end
+
+function Base.isless(a::Hen2Egg,b::Hen2Egg)
+    isless(a.id,b.id)
+end

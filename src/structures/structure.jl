@@ -263,8 +263,8 @@ function build_mass_matrices(structure::Structure,)
 end
 
 function make_cstr_function(st::AbstractStructure,q0::AbstractVector)
-    (;bodies,num_of_cstr) = st
-    (;numbered,indexed,jointed) = st.connectivity
+    (;bodies,num_of_cstr,connectivity) = st
+    (;numbered,indexed,jointed) = connectivity
     (;
         num_of_free_coords,
         num_of_full_coords,
@@ -316,8 +316,8 @@ function make_cstr_function(st::AbstractStructure,q0::AbstractVector)
 end
 
 function make_cstr_function(st::AbstractStructure)
-    (;bodies,num_of_cstr) = st
-    (;indexed,jointed,numbered) = st.connectivity
+    (;bodies,num_of_cstr,connectivity) = st
+    (;indexed,jointed,numbered) = connectivity
     (;
         num_of_free_coords,
         bodyid2sys_full_coords,
@@ -352,8 +352,8 @@ function make_cstr_function(st::AbstractStructure)
 end
 
 function make_cstr_jacobian(st::AbstractStructure,q0::AbstractVector)
-    (;bodies,num_of_cstr) = st
-    (;numbered,indexed,jointed) = st.connectivity
+    (;bodies,num_of_cstr,connectivity) = st
+    (;numbered,indexed,jointed) = connectivity
     (;
         num_of_full_coords,
         num_of_free_coords,
@@ -399,8 +399,8 @@ function make_cstr_jacobian(st::AbstractStructure,q0::AbstractVector)
 end
 
 function make_cstr_jacobian(st::AbstractStructure)
-    (;bodies,num_of_cstr) = st
-    (;numbered,indexed,jointed) = st.connectivity
+    (;bodies,num_of_cstr,connectivity) = st
+    (;numbered,indexed,jointed) = connectivity
     (;
         num_of_free_coords,
         bodyid2sys_full_coords,

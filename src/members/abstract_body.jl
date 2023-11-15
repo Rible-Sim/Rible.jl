@@ -3,6 +3,14 @@ abstract type AbstractBodyProperty{N,T} end
 abstract type AbstractBodyState{N,T} end
 abstract type AbstractBodyCache end
 
+function Base.isless(a::AbstractBody,b::AbstractBody)
+    isless(a.prop.id,b.prop.id)
+end
+
+function Base.sort(tsc::TypeSortedCollection)
+    sort!(reduce(vcat,tsc.data))
+end
+
 update_cache!(body::AbstractBody,q,q̇) = update_cache!(body.cache,body.coords,body.prop,q,q̇)
 lazy_update_state!(body::AbstractBody,q,q̇) = lazy_update_state!(body.state,body.coords,body.cache,body.prop,q,q̇)
 update_state!(body::AbstractBody,q,q̇) = update_state!(body.state,body.coords,body.cache,body.prop,q,q̇)

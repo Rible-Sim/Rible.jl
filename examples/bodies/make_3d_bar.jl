@@ -80,8 +80,8 @@ qcs = RB.QCF.QC(mass,Īg[1]*I(3))
 # cf = RB.NCF.CoordinateFunctions(nmcs,q0,ci,free_idx)
 # @show typeof(nmcs)
 state = RB.RigidBodyState(prop,ri,R,ṙo,ω)
-coords = RB.NonminimalCoordinates(nmcs,ci)
-# coords = RB.NonminimalCoordinates(qcs,ci)
+# coords = RB.NonminimalCoordinates(nmcs,ci)
+coords = RB.NonminimalCoordinates(qcs,ci)
 if loadmesh
     barmesh = load(RB.assetpath("装配体3.STL")) |> RB.make_patch(;
         # trans=[0,0,0.025],

@@ -5,6 +5,7 @@ using Quaternions
 using StaticArrays
 using ForwardDiff
 using DocStringExtensions
+using EponymTuples
 
 import ..Rible: HouseholderOrthogonalization, skew
 import ..Rible: get_num_of_cstr, get_num_of_coords
@@ -17,6 +18,7 @@ import ..Rible: make_cstr_hessians
 import ..Rible: make_cstr_forces_jacobian
 import ..Rible: cartesian_frame2coords
 import ..Rible: find_rotation
+import ..Rible: build_joint_cache, get_joint_violations!, get_joint_jacobian!
 
 
 export get_num_of_cstr, get_num_of_coords
@@ -30,6 +32,8 @@ export make_cstr_forces_jacobian
 export cartesian_frame2coords
 export find_rotation
 export find_local_angular_velocity
+export build_joint_cache, get_joint_violations!, get_joint_jacobian!
+
 
 include("QC.jl")
 
@@ -40,5 +44,7 @@ include("constraints.jl")
 include("mass_matrix.jl")
 
 include("functions.jl")
+ 
+include("joints.jl")
 
 end
