@@ -292,10 +292,6 @@ function PrototypeJoint(id,hen2egg,joint_type::Symbol)
         mask_4th
     ) = joint_info
     mask_3rd = vcat(mask_3rd_hen,mask_3rd_egg.+3)
-    # bits_1st = in.([1,2,3],Ref(mask_1st))
-    # bits_2nd = in.([1,2,3],Ref(mask_2nd))
-    # bits_3rd = in.([1,2,3,4,5,6],Ref(mask_3rd))
-    # bits_4th = in.([1,],Ref(mask_4th))
     T = get_numbertype(hen.rbsig)
     nmcs_hen = hen.rbsig.coords.nmcs
     nmcs_egg = egg.rbsig.coords.nmcs
@@ -306,91 +302,150 @@ function PrototypeJoint(id,hen2egg,joint_type::Symbol)
     state_egg = egg.rbsig.state
     q_hen = cartesian_frame2coords(nmcs_hen,state_hen.origin_position,state_hen.R)
     q_egg = cartesian_frame2coords(nmcs_egg,state_egg.origin_position,state_egg.R)
-    X_hen = NCF.get_X(nmcs_hen,q_hen)
-    X_egg = NCF.get_X(nmcs_egg,q_egg)
-    invX̄_hen = nmcs_hen.data.invX̄
-    invX̄_egg = nmcs_egg.data.invX̄
+    q = vcat(q_hen,q_egg)
     # translate
     c_hen = to_local_coords(nmcs_hen,hen.rbsig.prop.loci[hen.pid].position)
-    C_hen = to_transformation(nmcs_hen,c_hen)
     c_egg = to_local_coords(nmcs_egg,egg.rbsig.prop.loci[egg.pid].position)
-    C_egg = to_transformation(nmcs_egg,c_egg)
-    J = [-C_hen C_egg;] |> sparse 
-    q = vcat(q_hen,q_egg)
-    axes_trl_hen = invX̄_hen*hen.rbsig.prop.loci[hen.rotid].axes
-    axes_trl_egg = invX̄_egg*egg.rbsig.prop.loci[egg.trlid].axes
-    axes_rot_egg = invX̄_egg*egg.rbsig.prop.loci[egg.rotid].axes
-    select_uvw_hen = BlockDiagonal([nmcs_hen.conversion_to_X,zero(nmcs_egg.conversion_to_X)])
-    select_uvw_egg = BlockDiagonal([zero(nmcs_hen.conversion_to_X),nmcs_egg.conversion_to_X])
-    I3_Bool = I(3)
+    C_hen = to_transformation(nmcs_hen,q_hen,c_hen)
+    C_egg = to_transformation(nmcs_egg,q_egg,c_egg)
+    J = [-C_hen C_egg;] |> sparse
+    transformations = J[mask_1st,:]
     # translate
     heros = spzeros(T,num_of_jointed_coords,num_of_jointed_coords)
-    # hes 1st
+    # half 1st
     half_1st = fill(heros,3)
-    # hes 4th
-    half_4th = [(J'*J) |> sparse]
-    # hes 3rd
+    # half 4th
+    half_4th = fill(heros,1)
+    # half 3rd
     half_3rd = fill(heros,6)
+    # half 2nd
     half_2nd = fill(heros,3)
-    if (nmcs_hen isa NCF.NC3D12C) && (nmcs_egg isa NCF.NC3D12C)
-        axes_rot_hen = inv(X_hen)*X_egg*axes_rot_egg
-        for i = 1:3
-            axis_hen = axes_trl_hen.X[:,i]
-            axis_zero = zero(axis_hen)
-            half_3rd[i] = select_uvw_hen'*kron(vcat(0,axis_hen,0,axis_zero),I3_Bool)*J |> sparse
+    # translate
+    I3_Bool = I(3)
+    if (nmcs_hen isa NCF.NC) && (nmcs_egg isa NCF.NC)
+
+        half_4th[1] = (J'*J) |> sparse
+
+        X_hen = NCF.get_X(nmcs_hen,q_hen)
+        X_egg = NCF.get_X(nmcs_egg,q_egg)
+        invX̄_hen = nmcs_hen.data.invX̄
+        invX̄_egg = nmcs_egg.data.invX̄
+        axes_trl_hen = invX̄_hen*hen.rbsig.prop.loci[hen.rotid].axes
+        axes_trl_egg = invX̄_egg*egg.rbsig.prop.loci[egg.trlid].axes
+        axes_rot_egg = invX̄_egg*egg.rbsig.prop.loci[egg.rotid].axes
+        select_uvw_hen = BlockDiagonal([nmcs_hen.conversion_to_X,zero(nmcs_egg.conversion_to_X)])
+        select_uvw_egg = BlockDiagonal([zero(nmcs_hen.conversion_to_X),nmcs_egg.conversion_to_X])
+        
+        if (nmcs_hen isa NCF.NC3D12C) && (nmcs_egg isa NCF.NC3D12C)
+            # hes 3rd on hen
+            # translate on hen
+            for i = 1:3
+                axis_hen = axes_trl_hen.X[:,i]
+                axis_zero = zero(axis_hen)
+                half_3rd[i] = select_uvw_hen'*kron(vcat(0,axis_hen,0,axis_zero),I3_Bool)*J |> sparse
+            end
+            # hes 3rd on egg
+            # translate on egg
+            for i = 1:3
+                axis_egg = axes_trl_egg.X[:,i]
+                axis_zero = zero(axis_egg)
+                half_3rd[3+i] = select_uvw_egg'*kron(vcat(0,axis_zero,0,axis_egg),I3_Bool)*J |> sparse
+            end
+            # hes 2nd
+            # rotate of egg
+            axes_rot_hen = inv(X_hen)*X_egg*axes_rot_egg
+            axes_idx = [
+                (2,3),
+                (2,1),
+                (3,1)
+            ]
+            for (i,(id_axis_hen,id_axis_egg)) in enumerate(axes_idx)
+                axis_hen = axes_rot_hen.X[:,id_axis_hen]
+                axis_egg = axes_rot_egg.X[:,id_axis_egg]
+                axis_zero = zero(axis_egg)
+                half_2nd[i] = select_uvw_hen'*
+                    kron(vcat(0,axis_hen,0,axis_zero),I3_Bool)*
+                    kron(vcat(0,axis_zero,0,axis_egg),I3_Bool)'*
+                    select_uvw_egg |> sparse
+            end
+        else
+            # not to be used
+            axes_rot_hen = axes_rot_egg
         end
-        # hes 3rd on egg
-        # translate on egg
-        for i = 1:3
-            axis_egg = axes_trl_egg.X[:,i]
-            axis_zero = zero(axis_egg)
-            half_3rd[3+i] = select_uvw_egg'*kron(vcat(0,axis_zero,0,axis_egg),I3_Bool)*J |> sparse
+
+        halves = vcat(
+            half_1st[mask_1st],
+            half_4th[mask_4th],
+            half_3rd[mask_3rd],
+            half_2nd[mask_2nd];
+        )
+        # cstr values
+        Refq = Ref(q)
+        RefqT = Ref(q')
+        values = RefqT.*halves.*Refq
+        values[mask_1st] .+= transformations*q
+    elseif (nmcs_hen isa QCF.QC) && (nmcs_egg isa QCF.QC)
+        if mask_3rd == [2,3]
+            mask_3rd = [1,2]
+        elseif mask_3rd == [1]
+            mask_3rd = [3]
         end
-        # hes 2nd
-        # rotate of egg
-        axes_idx = [
-            (2,3),
-            (2,1),
-            (3,1)
-        ]
-        for (i,(id_axis_hen,id_axis_egg)) in enumerate(axes_idx)
-            axis_hen = axes_rot_hen.X[:,id_axis_hen]
-            axis_egg = axes_rot_egg.X[:,id_axis_egg]
-            axis_zero = zero(axis_egg)
-            half_2nd[i] = select_uvw_hen'*
-                kron(vcat(0,axis_hen,0,axis_zero),I3_Bool)*
-                kron(vcat(0,axis_zero,0,axis_egg),I3_Bool)'*
-                select_uvw_egg |> sparse
+        if mask_3rd == [2,3] .+ 3
+            mask_3rd = [1,2] .+ 3
+        elseif mask_3rd == [1] .+ 3
+            mask_3rd = [3] .+ 3
         end
-    else
-        # not to be used
-        axes_rot_hen = axes_rot_egg
+        quat_hen = Quaternion(q_hen[4:7]...)
+        quat_egg = Quaternion(q_egg[4:7]...)
+        quat_trl_rel_hen = axes_trl_hen = QuatRotation(hen.rbsig.prop.loci[hen.rotid].axes.X[:,[2,3,1]]).q
+        quat_trl_rel_egg = axes_trl_egg = QuatRotation(egg.rbsig.prop.loci[egg.trlid].axes.X[:,[2,3,1]]).q
+        quat_rot_rel_hen = axes_rot_hen = QuatRotation(hen.rbsig.prop.loci[hen.rotid].axes.X[:,[2,3,1]]).q
+        quat_rot_rel_egg = axes_rot_egg = QuatRotation(egg.rbsig.prop.loci[egg.rotid].axes.X[:,[2,3,1]]).q
+        quat_trl_hen = quat_hen*quat_trl_rel_hen
+        quat_trl_egg = quat_egg*quat_trl_rel_egg
+        quat_rot_egg = quat_egg*quat_rot_rel_egg
+        # @show quat_trl_hen
+        # @show quat_trl_egg
+        # @show quat_rot_egg
+        r_hen = QCF.to_position(nmcs_hen,q_hen,c_hen)
+        r_egg = QCF.to_position(nmcs_egg,q_egg,c_egg)
+        d = r_egg - r_hen
+        # cstr 1st
+        vio_1st = d
+        vio_4th = [d'*d]
+        vio_3rd = vcat(
+            QCF.Rmat(quat_trl_hen)'*d,
+            QCF.Rmat(quat_trl_egg)'*d
+        )
+        vio_2nd = QCF.vec(inv(quat_rot_egg)*quat_hen)[2:4]
+        values = vcat(
+            vio_1st[mask_1st],
+            vio_4th[mask_4th],
+            vio_3rd[mask_3rd],
+            vio_2nd[mask_2nd];
+        )
+        halves = vcat(
+            half_1st[mask_1st],
+            half_4th[mask_4th],
+            half_3rd[mask_3rd],
+            half_2nd[mask_2nd];
+        )
     end
+
+
+    # valid for NC only, wrong for QC
     hess_1st = [(H .+ H') |> Symmetric for H in half_1st]
     hess_4th = [(H .+ H') |> Symmetric for H in half_4th]
     hess_3rd = [(H .+ H') |> Symmetric for H in half_3rd]
     hess_2nd = [(H .+ H') |> Symmetric for H in half_2nd]
-    # cstr cache
-    halves = vcat(
-        half_1st[mask_1st],
-        half_4th[mask_4th],
-        half_3rd[mask_3rd],
-        half_2nd[mask_2nd];
-    )
     hessians = vcat(
         hess_1st[mask_1st],
         hess_4th[mask_4th],
         hess_3rd[mask_3rd],
         hess_2nd[mask_2nd];
     )
-    # cstr values
-    Refq = Ref(q)
-    RefqT = Ref(q')
-    transformations = J[mask_1st,:]
-    values = RefqT.*halves.*Refq
-    values[mask_1st] .+= transformations*q
-    # @show joint_info
-    # @show values
+    @show joint_info
+    @show values
     PrototypeJoint(
         id,hen2egg,
         num_of_cstr,

@@ -94,7 +94,7 @@ function to_local_coords(nmcs::NC,r̄)
     invX̄*(r̄-r̄i)
 end
 
-function to_transformation(nmcs::NC,c)
+function to_transformation(nmcs::NC,q,c)
     num_of_dim = get_num_of_dims(nmcs)
     nlds = get_num_of_local_dims(nmcs)
     ncoords = get_num_of_coords(nmcs)

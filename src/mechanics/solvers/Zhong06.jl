@@ -148,6 +148,7 @@ function solve!(intor::Integrator,cache::Zhong06Cache;
             # @show iteration,D,ηs,restitution_coefficients,gaps
             for iteration = 1:maxiters
                 Res_stepk!(initial_Res,initial_x)
+                # @show initial_Res
                 normRes = norm(initial_Res)
                 if normRes < ftol
                     isconverged = true

@@ -164,10 +164,11 @@ function get_CoordinatesCache(prop::RigidBodyProperty{N,T},
     M⁻¹ = inv(M)
     ∂Mq̇∂q = zero(M)
     ∂M⁻¹p∂q = zero(M)
+    q = @MVector zeros(T,size(M,2))
     Ṁq̇ = @MVector zeros(T,size(M,2))
     ∂T∂qᵀ = @MVector zeros(T,size(M,2))
     c(x) = NCF.to_local_coords(nmcs,x)
-    C(c) = NCF.to_transformation(nmcs,c)
+    C(c) = NCF.to_transformation(nmcs,q,c)
     Co = C(c(zero(mass_center)))
     Cg = C(c(mass_center))
     Cps = [typeof(Cg)(C(c(loci[i].position))) for i in 1:num_of_loci]
@@ -378,10 +379,11 @@ function stretch_loci!(
     (;loci) = prop
     (;Cps,) = cache
     (;nmcs) = coords
-    nlocaldim = get_num_of_local_dims(nmcs)
-    for pid in eachindex(loci)
-        Cps[pid] = NCF.to_transformation(nmcs,c[nlocaldim*(pid-1)+1:nlocaldim*pid])
-    end
+    # to be reimplemented
+    # nlocaldim = get_num_of_local_dims(nmcs)
+    # for pid in eachindex(loci)
+    #     Cps[pid] = NCF.to_transformation(nmcs,q,c[nlocaldim*(pid-1)+1:nlocaldim*pid])
+    # end
 end
 
 function stretch_loci!(

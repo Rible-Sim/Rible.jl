@@ -10,7 +10,6 @@ import Rible as RB
 include("../../vis.jl")
 includet("../../vis.jl")
 
-include("../stability/gripper_define.jl"); includet("../stability/gripper_define.jl")
 fontsize = 8 |> pt2px
 tw = 468 |> pt2px
 th = 622 |> pt2px
