@@ -1,74 +1,3 @@
-#note -- preamble
-using OhMyREPL
-using LinearAlgebra
-using Statistics
-using SparseArrays
-using StaticArrays
-using ElasticArrays
-using TypeSortedCollections
-using TypedTables
-using Rotations
-using Tullio
-# import GeometricalPredicates as GP
-using CoordinateTransformations
-using OffsetArrays
-# using LDLFactorizations
-import DifferentialEquations as DE
-using BenchmarkTools
-using RecursiveArrayTools
-using CircularArrays
-const CA = CircularArray
-using Interpolations
-# using CubicSplines
-# import FLOWMath
-using Makie
-import GLMakie as GM
-import CairoMakie as CM
-import WGLMakie as WM
-GM.activate!()
-Makie.inline!(false)
-using FileIO, MeshIO
-using JLD2
-using LaTeXStrings
-using TexTables
-using DataStructures
-using Latexify
-using PrettyTables
-auto_display(false)
-using Unitful
-using EzXML
-using CSV, Tables
-using Printf
-using StructArrays
-using NLsolve
-using SymmetricFormats
-using Arpack
-using EponymTuples
-import GeometryBasics as GB
-using Meshing
-# using FloatingTableView
-import Meshes
-using Match
-using Cthulhu
-using COSMO
-import Clarabel
-using Polyhedra
-import CDDLib 
-lib = CDDLib.Library()
-using AbbreviatedStackTraces
-ENV["JULIA_STACKTRACE_ABBREVIATED"] = true
-ENV["JULIA_STACKTRACE_MINIMAL"] = true
-using Revise
-import Rible as RB
-cd(@__DIR__)
-include("../../vis.jl"); includet("../../vis.jl")
-include("../../dyn.jl"); includet("../../dyn.jl")
-include("../nonsmooth/def.jl"); includet("../nonsmooth/def.jl")
-include("../ES/def.jl"); includet("../ES/def.jl")
-include("../ES/def3d.jl"); includet("../ES/def3d.jl")
-include("../stability/gripper_define.jl"); includet("../stability/gripper_define.jl")
-include("examples.jl"); includet("examples.jl")
-include("../LC/mydef.jl"); includet("../LC/mydef.jl")
 figdir::String = ""
 if Sys.iswindows()
     figdir::String = raw"C:\Users\luo22\OneDrive\Papers\TensegrityStability"
@@ -76,6 +5,12 @@ elseif Sys.isapple()
     figdir::String = raw"/Users/jacob/Library/CloudStorage/OneDrive-SharedLibraries-onedrive/Papers/TensegrityStability"
 end
 
+includet("deps.jl")
+import Rible as RB
+include("../../vis.jl")
+includet("../../vis.jl")
+
+include("../stability/gripper_define.jl"); includet("../stability/gripper_define.jl")
 fontsize = 8 |> pt2px
 tw = 468 |> pt2px
 th = 622 |> pt2px
@@ -1786,6 +1721,8 @@ end
 #-- end tower
 
 #-- T bars
+include("../../../examples/robots/Tbars.jl")
+includet("../../../examples/robots/Tbars.jl")
 tbbot = Tbars(;θ=π/4)
 bot = tbbot
 @myshow bot.structure.num_of_dof
@@ -1793,11 +1730,12 @@ bodies = RB.get_bodies(bot)
 body1 = bodies[1]
 dt = 1e-3
 tspan = (0.0,5.0)
-prob = RB.SimProblem(bot,dynfuncs)
+prob = RB.SimProblem(bot,RB.dynfuncs)
 solver = RB.Zhong06()
 intor = RB.Integrator(prob,solver;tspan,dt,)
 solvercache = RB.generate_cache(solver,intor;dt)
-RB.solve!(intor,solvercache;dt,ftol=1e-10,maxiters=50,verbose=false,exception=true,progress=false,)
+RB.solve!(intor,solvercache;dt,ftol=1e-10,maxiters=50,verbose=true,exception=true,progress=false,)
+
 @time RB.solve!(intor,solvercache;dt,ftol=1e-10,maxiters=50,verbose=false,exception=true,progress=false,)
 
 plot_traj!(bot;showarrows = false, showground=false)

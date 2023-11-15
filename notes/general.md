@@ -57,6 +57,7 @@ To do this, use `include`, docs/test/benchmark; use `includet` dev;
           - [x] where to put `pres_idx`, `free_idx`, `cstr_idx`? To `NonminimalCoordinates` for now
           - [ ] how to cache hessians? to get both `∂Aq̇∂q` and `cstr_forces_jacobian`
         - [ ] quaternion-based
+          - [ ] differentiate position cache and velocity cache (acc cache not need for now) to_velocity_transformation is always at velocity level
           - [ ] similarly `∂M⁻¹p∂q` and `∂Mq̇∂q`
       - [ ] flexible bodies
         - [ ] absolute nodal coords
@@ -82,3 +83,6 @@ To do this, use `include`, docs/test/benchmark; use `includet` dev;
   - [ ] value/reward will always depends on position variables: final state or intermediate states
   - [ ] uppon convergence, an additional Newton iteration is performed to compute all the derivatives/gradients/jacobians/adjoint and cached
   - [ ] cache differentials, w.r.t action(forces/torques), structual parameters (stiffness/geometry), joints(location, axes), initial conditions, 
+
+# Show case
+  走钢丝

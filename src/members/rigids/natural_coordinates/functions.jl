@@ -115,7 +115,7 @@ function cartesian_frame2coords(nmcs::Union{NC2D2C,NC3D3C},origin_position,R,ori
     origin_position,origin_velocity
 end
 
-function cartesian_frame2coords(nmcs,origin_position,R)
+function cartesian_frame2coords(nmcs::NC,origin_position,R)
     (;r̄i,X̄) = nmcs.data
     ri = origin_position + R*r̄i
     X = R*X̄
@@ -125,7 +125,7 @@ function cartesian_frame2coords(nmcs,origin_position,R)
     q
 end
 
-function cartesian_frame2coords(nmcs,origin_position,R,origin_velocity,ω)
+function cartesian_frame2coords(nmcs::NC,origin_position,R,origin_velocity,ω)
     (;r̄i,X̄) = nmcs.data
     ri = origin_position + R*r̄i
     ṙi = origin_velocity + ω×(ri-origin_position)

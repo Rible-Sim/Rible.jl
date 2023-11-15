@@ -194,7 +194,7 @@ function MakieCore.plot!(viz::Viz{Tuple{S}};
         cables_ob = lift(tgob) do tgob
             tgob.tensiles.cables
         end
-        MakieCore.viz!(viz,cables_ob;
+        viz!(viz,cables_ob;
             cablecolor,
             cablewidth = viz.cablewidth[],
             cablelabelcolor = viz.cablelabelcolor[],

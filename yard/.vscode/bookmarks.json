@@ -4,47 +4,42 @@
 			"path": "demos/stiffness/main.jl",
 			"bookmarks": [
 				{
-					"line": 0,
-					"column": 17,
-					"label": ""
-				},
-				{
-					"line": 83,
+					"line": 17,
 					"column": 19,
 					"label": ""
 				},
 				{
-					"line": 115,
+					"line": 49,
 					"column": 10,
 					"label": ""
 				},
 				{
-					"line": 482,
+					"line": 416,
 					"column": 15,
 					"label": ""
 				},
 				{
-					"line": 989,
+					"line": 923,
 					"column": 17,
 					"label": ""
 				},
 				{
-					"line": 1267,
+					"line": 1201,
 					"column": 11,
 					"label": ""
 				},
 				{
-					"line": 1443,
+					"line": 1377,
 					"column": 14,
 					"label": ""
 				},
 				{
-					"line": 1787,
+					"line": 1721,
 					"column": 10,
 					"label": ""
 				},
 				{
-					"line": 2149,
+					"line": 2086,
 					"column": 17,
 					"label": ""
 				}

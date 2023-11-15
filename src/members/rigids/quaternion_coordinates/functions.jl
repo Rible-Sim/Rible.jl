@@ -1,16 +1,20 @@
 to_local_coords(::QC,c) = c
 
-function to_transformation(::QC,c)
+function to_position(::QC,x,c)
+    ro = @view x[1:3]
+    q = @view x[4:7]
+    ro .+ Rmat(q)*c
+end
+
+function to_transformation(::QC,x,c)
     ĉ = skew(c)
-    function inner_C(x)
-        q = @view x[4:7]
-        T = eltype(q)
-        I3 = SMatrix{3,3}(one(T)*I)
-        hcat(
-            I3,
-            -2Rmat(q)*ĉ*Lmat(q)
-        )
-    end
+    q = @view x[4:7]
+    T = eltype(q)
+    I3 = SMatrix{3,3}(one(T)*I)
+    hcat(
+        I3,
+        -2Rmat(q)*ĉ*Lmat(q)
+    )
 end
 
 function make_∂Cẋ∂x(c)
@@ -59,10 +63,17 @@ function make_∂Cẋ∂x_forwarddiff(C,nc,nx)
     end
 end
 
+function cartesian_frame2coords(::QC,origin_position,R)
+    rotation_matrix = RotMatrix(R)
+    q = QuatRotation(rotation_matrix).q |> vec
+    x = vcat(origin_position,q)
+    x
+end
+
 function cartesian_frame2coords(::QC,origin_position,R,origin_velocity,ω)
-    Rmat = RotMatrix(R)
-    q = QuatRotation(Rmat).q |> vec
-    Ω = inv(Rmat)*ω
+    rotation_matrix = RotMatrix(R)
+    q = QuatRotation(rotation_matrix).q |> vec
+    Ω = inv(rotation_matrix)*ω
     q̇ = localAngular2quatVel(q,Ω)
     x = vcat(origin_position,q)
     ẋ = vcat(origin_velocity,q̇)
