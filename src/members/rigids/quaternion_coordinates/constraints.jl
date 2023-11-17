@@ -43,3 +43,7 @@ function make_cstr_forces_jacobian(::QC,free_idx,cstr_idx,cstr_hessians)
         sum(ret)
     end
 end
+
+function find_independent_idx(::QC,q)
+    [1,2,3,5,6,7]
+end

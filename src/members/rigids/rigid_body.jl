@@ -68,7 +68,7 @@ function RigidBodyProperty(
             restitution_coefficients
         )
     ]
-    @show loci
+    # @show loci
     return RigidBodyProperty(
         movable,constrained,
         id,type,

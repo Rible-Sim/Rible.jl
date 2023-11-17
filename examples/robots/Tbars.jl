@@ -1,5 +1,5 @@
 includet("../bodies/make_3d_bar.jl")
-function Tbars(;θ = 0)
+function Tbars(;θ = 0, coordsType = RB.NCF.NC)
     SVo3 = SVector{3}([0.0,0.0,0.0])
     a = 1.0
     b = 1.0
@@ -42,15 +42,18 @@ function Tbars(;θ = 0)
                     constrained
                     )
 
-        nmcs = RB.NCF.NC1P3V(ri, ro, R)
-        qcs = RB.QCF.QC(m,Ī)
         state = RB.RigidBodyState(prop, ri, R, ṙo, ω)
-        # ci = collect(1:12)
-        # cstr_idx = Int[]    
-        # coords = RB.NonminimalCoordinates(nmcs, ci, cstr_idx)
-        ci = collect(1:7)
-        cstr_idx = Int[]    
-        coords = RB.NonminimalCoordinates(qcs, ci, cstr_idx)
+        if coordsType isa Type{RB.NCF.NC}
+            nmcs = RB.NCF.NC1P3V(ri, ro, R)
+            ci = collect(1:12)
+            cstr_idx = Int[]    
+            coords = RB.NonminimalCoordinates(nmcs, ci, cstr_idx)
+        else
+            qcs = RB.QCF.QC(m,Ī)
+            ci = collect(1:7)
+            cstr_idx = Int[]    
+            coords = RB.NonminimalCoordinates(qcs, ci, cstr_idx)
+        end
         basemesh = load(RB.assetpath("装配体1.STL")) |> RB.make_patch(;
             # trans=[-1.0,0,0],
             rot = RotZ(π),
@@ -86,8 +89,6 @@ function Tbars(;θ = 0)
             constrained
         )
 
-        nmcs = RB.NCF.NC1P3V(ri, ro, R)
-        qcs = RB.QCF.QC(m,Ī)
         # @show q[1:3]
         # @show q[4:6]
         # @show q[7:9]
@@ -96,8 +97,13 @@ function Tbars(;θ = 0)
         ṙo = zero(ro)
         ω = zero(ro)
         state = RB.RigidBodyState(prop, ri, R, ṙo, ω)
-        # coords = RB.NonminimalCoordinates(nmcs,)
-        coords = RB.NonminimalCoordinates(qcs,)
+        if coordsType isa Type{RB.NCF.NC}
+            nmcs = RB.NCF.NC1P3V(ri, ro, R)
+            coords = RB.NonminimalCoordinates(nmcs,)
+        else
+            qcs = RB.QCF.QC(m,Ī)
+            coords = RB.NonminimalCoordinates(qcs,)
+        end
         slidermesh = load(RB.assetpath("装配体2.2.STL")) |> RB.make_patch(;
             # trans=[-1.0,0,0],
             rot = begin

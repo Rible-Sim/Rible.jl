@@ -75,6 +75,7 @@ import .NCF: get_num_of_dims, get_num_of_local_dims
 import .NCF: cartesian_frame2coords
 import .NCF: find_rotation, find_angular_velocity
 import .NCF: build_joint_cache, get_joint_violations!, get_joint_jacobian!
+import .NCF: find_independent_idx
 
 include("members/rigids/quaternion_coordinates/QCF.jl")
 using .QCF

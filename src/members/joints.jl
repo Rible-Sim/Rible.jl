@@ -37,6 +37,7 @@ end
 $(TYPEDEF)
 """
 struct FixedBodyConstraint{T} <: ExtrinsicConstraints{T}
+    id::Int
     num_of_cstr::Int64
     idx::Vector{Int64}
     values::T
@@ -46,24 +47,29 @@ end
 固定约束构造子。
 $(TYPEDSIGNATURES)
 """
-function FixedBodyConstraint(rbs,bodyid2sys_full_coords,bodyid)
-    body = rbs[bodyid]
+function FixedBodyConstraint(id::Int,body::AbstractBody,indexed)
+    (;bodyid2sys_full_coords) = indexed
+    bodyid = body.prop.id
     nmcs = body.coords.nmcs
-    q_rb = body.state.coords.q
-    pres_idx = find_full_pres_idx(nmcs,q_rb)
-    idx = bodyid2q[bodyid][pres_idx]
-    values = q_rb[pres_idx]
-    FixedBodyConstraint(length(idx),idx,values)
+    state = body.state
+    q = cartesian_frame2coords(
+        nmcs,
+        state.origin_position,state.R
+    )
+    pres_idx = find_independent_idx(nmcs,q)
+    idx = bodyid2sys_full_coords[bodyid][pres_idx]
+    values = q[pres_idx]
+    FixedBodyConstraint(id,length(idx),idx,values)
 end
 
-function make_cstr_function(cst::FixedBodyConstraint)
+function make_cstr_function(cst::FixedBodyConstraint,st)
     (;idx, values) = cst
     @inline @inbounds inner_cstr_function(q)   = q[idx]-values
     @inline @inbounds inner_cstr_function(q,d) = q[idx]-d
     inner_cstr_function
 end
 
-function make_cstr_jacobian(cst::FixedBodyConstraint)
+function make_cstr_jacobian(cst::FixedBodyConstraint,st)
     num_of_cstr = cst.num_of_cstr
     idx = cst.idx
     @inline @inbounds function inner_cstr_jacobian(q)
@@ -75,49 +81,6 @@ function make_cstr_jacobian(cst::FixedBodyConstraint)
         ret
     end
 end
-
-"""
-刚体坐标固定约束类，适用于单个坐标。
-$(TYPEDEF)
-"""
-struct FixedIndicesConstraint{T} <: ExtrinsicConstraints{T}
-    id::Int64
-    num_of_cstr::Int64
-    idx::Vector{Int64}
-    values::T
-end
-
-"""
-刚体坐标固定约束构造子。
-$(TYPEDSIGNATURES)
-"""
-function FixedIndicesConstraint(id,idx,values)
-    FixedIndicesConstraint(id,length(idx),idx,values)
-end
-
-function make_cstr_function(cst::FixedIndicesConstraint,st)
-    (;idx, values) = cst
-    @inline @inbounds inner_cstr_function(q)   = q[idx]-values
-    @inline @inbounds inner_cstr_function(q,d) = q[idx]-d
-    inner_cstr_function
-end
-
-function make_cstr_jacobian(cst::FixedIndicesConstraint,st)
-    (;indexed,numbered) = st.connectivity
-    num_of_cstr = cst.num_of_cstr
-    idx = cst.idx
-    (;sys_free_idx,num_of_free_coords) = indexed
-    @inline @inbounds function inner_cstr_jacobian(q)
-        nq = length(q)
-        ret = zeros(eltype(q),num_of_cstr,nq)
-        for (iΦ,i) in enumerate(idx)
-            ret[iΦ,i] = 1
-        end
-        ret[:,sys_free_idx]
-    end
-end
-
-
 
 """
 刚体通用线性约束类。
@@ -264,6 +227,11 @@ function PrototypeJoint(id,hen2egg,joint_type::Symbol)
         elseif mask_3rd == [1] .+ 3
             mask_3rd = [3] .+ 3
         end
+        if mask_2nd == [2,3]
+            mask_2nd = [1,2]
+        elseif mask_2nd == [1]
+            mask_2nd = [3]
+        end
     end
     cache, values = build_joint_cache(
         nmcs_hen,nmcs_egg,
@@ -276,7 +244,7 @@ function PrototypeJoint(id,hen2egg,joint_type::Symbol)
         mask_1st,mask_2nd,mask_3rd,mask_4th,
         q_hen,q_egg
     )
-    @show joint_info
+    @show mask_1st,mask_2nd,mask_3rd,mask_4th
     @show values
     PrototypeJoint(
         id,hen2egg,
@@ -315,6 +283,7 @@ function make_cstr_function(cst::PrototypeJoint,st::Structure)
         q_egg = @view q[bodyid2sys_full_coords[id_egg]]
         q = vcat(q_hen,q_egg)
         # cstr violations
+        # @show cst.id
         get_joint_violations!(
             ret,
             nmcs_hen, nmcs_egg,
@@ -322,9 +291,9 @@ function make_cstr_function(cst::PrototypeJoint,st::Structure)
             egg.rbsig.prop.loci[egg.pid].position,
             cache,
             mask_1st,mask_2nd,mask_3rd,mask_4th,
-            q_hen,q_egg
+            q_hen,q_egg,
+            violations
         )
-        ret .-= violations
         ret
     end
     function inner_cstr_function(q)
@@ -444,16 +413,5 @@ function make_cstr_forces_jacobian(cst::LinearJoint,st)
     free_idx = get_jointed_free_idx(cst)
     function cstr_forces_jacobian(λ)
         zeros(eltype(λ),length(free_idx),length(free_idx))
-    end
-end
-
-function get_jointed_free(cst::FixedIndicesConstraint,indexed)
-    cst2sysfree = collect(1:indexed.num_of_free_coords)
-end
-
-function make_cstr_forces_jacobian(cst::FixedIndicesConstraint,st)
-    (;num_of_free_coords) = st.connectivity.indexed
-    function cstr_forces_jacobian(λ)
-        zeros(eltype(λ),num_of_free_coords,num_of_free_coords)
     end
 end

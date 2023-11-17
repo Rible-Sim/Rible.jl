@@ -374,3 +374,11 @@ function make_∂Aq̇∂q_forwarddiff(Φq,nq,nλ)
         ForwardDiff.jacobian!(out,Aq̇,ones(q̇T,nq))
     end
 end
+
+function find_independent_idx(nmcs::NC,q)
+    free_idx = collect(1:get_num_of_coords(nmcs))
+    cstr_idx = collect(1:get_num_of_cstr(nmcs))
+    A = make_cstr_jacobian(nmcs,free_idx,cstr_idx)(q)
+    col_index = GECP(A)
+    col_index[size(A,1)+1:end] |> sort
+end

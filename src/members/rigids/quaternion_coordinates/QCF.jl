@@ -19,7 +19,7 @@ import ..Rible: make_cstr_forces_jacobian
 import ..Rible: cartesian_frame2coords
 import ..Rible: find_rotation
 import ..Rible: build_joint_cache, get_joint_violations!, get_joint_jacobian!
-
+import ..Rible: find_independent_idx
 
 export get_num_of_cstr, get_num_of_coords
 export get_num_of_dof, get_num_of_local_dims
@@ -33,7 +33,7 @@ export cartesian_frame2coords
 export find_rotation
 export find_local_angular_velocity
 export build_joint_cache, get_joint_violations!, get_joint_jacobian!
-
+export find_independent_idx
 
 include("QC.jl")
 
