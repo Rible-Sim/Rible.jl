@@ -116,7 +116,8 @@ function Structure(bodies,tensiles,cnt::Connectivity)
         cnt,
         state
     )
-    # check_jacobian_singularity(st)
+    check_jacobian_singularity(st)
+    check_constraints_consistency(st)
     st
 end
 
@@ -477,26 +478,76 @@ function NonminimalCoordinatesCache(st::Structure)
 end
 
 """
-检查雅可比矩阵奇异性
+check constraints jacobian singularity
 $(TYPEDSIGNATURES)
 """
 function check_jacobian_singularity(st)
     (;bodies,state) = st
     q = get_coords(st)
-    A = make_cstr_jacobian(st)
-    Aq = A(q)
-    sys_rank = rank(Aq)
-    if sys_rank < minimum(size(Aq))
+    A = make_cstr_jacobian(st)(q)
+    sys_rank = rank(A)
+    if sys_rank < minimum(size(A))
         @warn "System's Jacobian is singular: rank(A(q))=$(sys_rank)<$(minimum(size(Aq)))"
+        foreach(bodies) do body
+            bodyid = body.prop.id
+            free_idx = body.coords.free_idx
+            q_body = state.members[bodyid].q
+            A_body = make_cstr_jacobian(body.coords)(q_body)
+            body_rank = rank(A_body)
+            if body_rank < minimum(size(A_body))
+                @warn "The $(bodyid)th body's Jacobian is singular: rank(A(q))=$(body_rank)<$(minimum(size(A_rb)))"
+            end
+        end
     end
-    foreach(bodies) do body
-        bodyid = body.prop.id
-        free_idx = body.state.cache.free_idx
-        q_rb = state.members[bodyid].q
-        Aq_rb = body.state.cache.funcs.Φq(q_rb)
-        rb_rank = rank(Aq_rb)
-        if rb_rank < minimum(size(Aq_rb))
-            @warn "The $(bodyid)th rigid body's Jacobian is singular: rank(A(q))=$(rb_rank)<$(minimum(size(Aq_rb)))"
+end
+
+function check_constraints_consistency(st;tol=1e-14)
+    (;bodies,state,connectivity) = st
+    (;joints) = connectivity.jointed
+    q = get_coords(st)
+    q̇ = get_velocs(st)
+    Φ = make_cstr_function(st)(q)
+    norm_position = norm(Φ)
+    if norm_position > tol
+        @warn "System's position-level constraints are inconsistent: norm_position=$(norm_position)"
+        foreach(bodies) do body
+            bodyid = body.prop.id
+            free_idx = body.coords.free_idx
+            q_body = state.members[bodyid].q
+            Φ_body = make_cstr_function(body.coords)(q_body)
+            norm_position_body = norm(Φ_body)
+            if norm_position_body > tol
+                @warn "The $(bodyid)th body's position-level constraints are inconsistent: norm_position_body=$(norm_position_body)"
+            end
+        end
+        foreach(joints) do joint
+            Φ_joint = make_cstr_jacobian(joint,st)(q)
+            norm_position_joint = norm(Φ_joint)
+            if norm_position_joint > tol
+                @warn "The $(joint.id)th body's position-level constraints are inconsistent: norm_position_joint=$(norm_position_joint)"
+            end
+        end
+    end
+    Aq̇ = make_cstr_jacobian(st)(q)*q̇
+    norm_velocity = norm(Aq̇)
+    if norm_velocity > tol
+        @warn "System's velocity-level constraints are inconsistent: norm_velocity=$(norm_velocity)"
+        foreach(bodies) do body
+            bodyid = body.prop.id
+            q_body = state.members[bodyid].q
+            q̇_body = state.members[bodyid].q̇
+            Aq̇_body = make_cstr_jacobian(body.coords)(q_body)*q̇_body
+            norm_velocity_body = norm(Aq̇_body)
+            if norm_velocity_body > tol
+                @warn "The $(bodyid)th body's velcoity-level constraints are inconsistent: norm_velocity_body=$(norm_velocity_body)"
+            end
+        end
+        foreach(joints) do joint
+            Aq̇_joint = make_cstr_jacobian(joint,st)(q)*q̇
+            norm_velocity_joint = norm(Aq̇_joint)
+            if norm_velocity_joint > tol
+                @warn "The $(joint.id)th joint's velcoity-level constraints are inconsistent: Aq̇_joint=$(Aq̇_joint)"
+            end
         end
     end
 end

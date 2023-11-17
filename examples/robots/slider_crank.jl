@@ -1,15 +1,34 @@
 function slider_crank(;θ = 0, coordsType = RB.NCF.NC)
     SVo3 = SVector{3}([0.0,0.0,0.0])
-    l = [0.1,0.2]
-    b = 0.04
-    a = 0.02
-    d = 0.05
-    θs0 = [
-        deg2rad(  0),
-        deg2rad( 45),
-        deg2rad(-30),
-        deg2rad( 15)
+    l = [0.153,0.306]
+    mass = [
+        0.038,
+        0.038,
+        0.076
     ]
+    J = [
+        7.4e-5,
+        5.9e-4,
+        2.7e-6
+    ]
+    ω0 = [
+        150.0,
+        -75.0,
+    ]
+    # ω0 = [
+    #     0.0,
+    #     0.0,
+    # ]
+    b = 0.05
+    a = 0.025
+    d = 0.05
+    # θ0 = [
+    #     deg2rad(  0),
+    #     deg2rad( 45),
+    #     deg2rad(-30),
+    #     deg2rad( 15)
+    # ]
+    θ0 = zeros(4)
     function make_base(i)
         movable = true
         constrained = false
@@ -19,9 +38,13 @@ function slider_crank(;θ = 0, coordsType = RB.NCF.NC)
         axes_normals = [
             SVector{3}([1.0,0.0,0.0]),
         ]
-        m = 1.0
-        Ī = SMatrix{3,3}(Matrix(1.0I,3,3))
-        R = RotX(θs0[i])
+        m = mass[1]
+        Ī = SMatrix{3,3}([
+            J[1] 0 0;
+            0 J[1] 0;
+            0 0 J[1];
+        ])
+        R = RotX(θ0[i])
         ω = SVo3
         ri = SVo3
         ro = ri
@@ -40,7 +63,7 @@ function slider_crank(;θ = 0, coordsType = RB.NCF.NC)
         if coordsType isa Type{RB.NCF.NC}
             nmcs = RB.NCF.NC1P3V(ri, ro, R)
             pres_idx = Int[]
-            cstr_idx = collect(1:12)
+            cstr_idx = collect(1:6)
             coords = RB.NonminimalCoordinates(nmcs, pres_idx, cstr_idx)
         else
             qcs = RB.QCF.QC(m,Ī)
@@ -71,22 +94,32 @@ function slider_crank(;θ = 0, coordsType = RB.NCF.NC)
             SVector{3}([1.0,0.0,0.0]),
             SVector{3}([1.0,0.0,0.0]),
         ]
-        m = 1.0
-        Ī = SMatrix{3,3}(Matrix(1.0I,3,3))
-        R = RotX(θs0[i])
-        ω = SVo3
+        m = mass[i-1]
+        Ī = SMatrix{3,3}([
+            J[i-1] 0 0;
+            0 J[i-1] 0;
+            0 0 J[i-1];
+        ])
+        R = RotX(θ0[i])
+        ω = SVector{3}(
+            ω0[i-1],0,0,
+        )
         ri = ro
         @show ro
-        ṙo = zero(ro)
+        if i == 2
+            ṙo = [0,0,ω0[i-1]*l[i-1]/2]
+        else
+            ṙo = [0,0,ω0[i-2]*l[i-2] .+ ω0[i-1]*l[i-1]/2]
+        end
 
         prop = RB.RigidBodyProperty(
-                    i,movable,m,
-                    Ī,
-                    r̄g,
-                    loci_positions,
-                    axes_normals;
-                    constrained
-                    )
+            i,movable,m,
+            Ī,
+            r̄g,
+            loci_positions,
+            axes_normals;
+            constrained
+        )
 
         state = RB.RigidBodyState(prop, ro, R, ṙo, ω)
         if coordsType isa Type{RB.NCF.NC}
@@ -130,9 +163,13 @@ function slider_crank(;θ = 0, coordsType = RB.NCF.NC)
             SVector{3}([1.0,0.0,0.0]),
             SVector{3}([1.0,0.0,0.0]),
         ]
-        m = 1.0
-        Ī = SMatrix{3,3}(Matrix(1.0I,3,3))
-        R = RotX(θs0[i])
+        m = mass[i-1]
+        Ī = SMatrix{3,3}([
+            J[i-1] 0 0;
+            0 J[i-1] 0;
+            0 0 J[i-1];
+        ])
+        R = RotX(θ0[i])
         ri = ro
         ṙo = zero(ro)
         ω = zero(ro)
@@ -173,10 +210,10 @@ function slider_crank(;θ = 0, coordsType = RB.NCF.NC)
         RB.RigidBody(prop,state,coords,slidermesh)
     end
     base = make_base(1)
-    d1 = SVector(0,l[1]*cos(θs0[2]),l[1]*sin(θs0[2]),)
+    d1 = SVector(0,l[1]*cos(θ0[2]),l[1]*sin(θ0[2]),)
     p1 = d1./2
     link1 = make_link(2;ro=p1)
-    d2 = SVector(0,l[2]*cos(θs0[3]),l[2]*sin(θs0[3]),)
+    d2 = SVector(0,l[2]*cos(θ0[3]),l[2]*sin(θ0[3]),)
     p2 = d1 + d2./2
     link2 = make_link(3;ro=p2)
     p3 = d1 + d2

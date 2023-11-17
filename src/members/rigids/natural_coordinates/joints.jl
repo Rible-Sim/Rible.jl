@@ -124,7 +124,8 @@ function get_joint_violations!(
         loci_position_egg,
         cache,
         mask_1st,mask_2nd,mask_3rd,mask_4th,
-        q_hen,q_egg
+        q_hen,q_egg,
+        violations
     )
     (;transformations,halves,) = cache
     q = vcat(q_hen,q_egg)
@@ -132,7 +133,7 @@ function get_joint_violations!(
         ret[icstr] = q'*half*q
     end
     ret[mask_1st] .+= transformations*q
-    ret
+    ret .-= violations
 end
 
 function get_joint_jacobian!(

@@ -82,7 +82,7 @@ function build_Y(bot)
 end
 
 """
-重置System State.
+Reset System State.
 $(TYPEDSIGNATURES)
 """
 function reset!(bot::Robot)
@@ -131,7 +131,7 @@ function mechanical_energy!(bot::Robot;actuate=false,gravity=true)
             if actuate
                 actuate!(bot,[trajstate.t])
             end
-            update!(structure)
+            update!(structure;gravity)
             mechanical_energy(structure;gravity)
         end
         for trajstate in traj
