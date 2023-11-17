@@ -6,6 +6,8 @@
 
 # Example documentation deployment
 pages:
+  tags:
+      - docker
   image: julia:1.9
   stage: deploy
   script:
@@ -40,6 +42,8 @@ pages:
 # images comes from Docker hub
 test:1.9:
   image: julia:1.9
+  tags:
+      - docker
   <<: *test_definition
 
 # REMARK: Do not forget to enable the coverage feature for your project, if you
