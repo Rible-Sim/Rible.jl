@@ -29,7 +29,7 @@ function generate_cache(::ZhongQCCPN,intor;dt,kargs...)
     B(q) = Matrix{T}(undef,0,nq)
 
     # ∂𝐌𝐚∂𝐪(q,a) = zeros(T,nq,nq)
-    ∂Aᵀλ∂q(q,λ) = cstr_forces_jacobian(structure,λ)
+    # ∂Aᵀλ∂q(q,λ) = cstr_forces_jacobian(structure,λ)
     # ∂𝚽𝐪𝐯∂𝒒(q,v) = RB.∂Aq̇∂q(st,v)
     ∂Bᵀμ∂q(q,μ) = zeros(T,nq,nq)
     cache = @eponymtuple(
@@ -40,7 +40,8 @@ function generate_cache(::ZhongQCCPN,intor;dt,kargs...)
         M⁻¹!,Jac_M⁻¹!,
         Φ,A,Ψ,B,
         ∂Ψ∂q,
-        ∂Aᵀλ∂q,∂Bᵀμ∂q,
+        # ∂Aᵀλ∂q,
+        ∂Bᵀμ∂q,
     )
     ZhongQCCPNCache(cache)
 end
@@ -69,7 +70,7 @@ function make_zhongccpn_ns_stepk(
         M!,Jac_M!,
         M⁻¹!,Jac_M⁻¹!,
         Φ,A,
-        ∂Aᵀλ∂q,
+        # ∂Aᵀλ∂q,
     ) = cache
     # T = eltype(qₖ₋₁)
     n1 = nq
@@ -113,16 +114,17 @@ function make_zhongccpn_ns_stepk(
             M⁻¹!(M⁻¹ₘ,qₘ)
             Jac_M!(∂Mₘq̇ₘ∂qₘ,qₘ,q̇ₘ)
             Jac_M⁻¹!(∂M⁻¹ₖpₖ∂qₖ,qₖ,pₖ)
-            ∂Aᵀₖλₘ∂qₖ = ∂Aᵀλ∂q(qₖ,λₘ)
+            # ∂Aᵀₖλₘ∂qₖ = ∂Aᵀλ∂q(qₖ,λₘ)
             get_directions_and_positions!(Dₖ,Dper, Dimp, ∂Dₖvₖ∂qₖ, ∂DᵀₖHΛₘ∂qₖ,ŕₖ,qₖ, vₖ, H*Λₘ,bodyid2act_idx)
             ∂pₖ∂qₖ = 2/h.*Mₘ + 
                     ∂Mₘq̇ₘ∂qₘ .+
-                    scaling/(h).*∂Aᵀₖλₘ∂qₖ .+ 
+                    # scaling/(h).*∂Aᵀₖλₘ∂qₖ .+ 
                     scaling.*∂DᵀₖHΛₘ∂qₖ
             ∂vₖ∂qₖ = M⁻¹ₖ*∂pₖ∂qₖ .+ ∂M⁻¹ₖpₖ∂qₖ
             ∂vₖ∂λₘ = scaling/h.*M⁻¹ₘ*transpose(Aₖ-Aₖ₋₁)
             𝐁 .= 0
             𝐁[  1:n1,   1:na] .= scaling.*h .*transpose(Dₖ₋₁)*H
+            # @show na
             v́ₖ = Dₖ*vₖ
             ∂v́ₖ∂qₖ = Dₖ*∂vₖ∂qₖ .+ ∂Dₖvₖ∂qₖ 
             ∂v́ₘ∂qₖ = Dₖ./h 
@@ -152,7 +154,7 @@ function make_zhongccpn_ns_stepk(
                 else
                     𝐜ᵀ[i,   1:n1] .= ∂v́ₖ∂qₖ[i,:]
                     # @show size(Dₖ), size(Dⁱₖ), size(∂vₖ∂λₘ)
-                    𝐜ᵀ[i,n1+1:n2] .= Dⁱₖ*∂vₖ∂λₘ
+                    𝐜ᵀ[[i],n1+1:n2] .= Dⁱₖ*∂vₖ∂λₘ
                 end
             end
 
@@ -273,13 +275,12 @@ function solve!(intor::Integrator,solvercache::ZhongQCCPNCache;
                     # @show timestep,iteration,normRes,Λₘ
                     # Λₘini = repeat([Λ_guess,0,0],na)
                     Λₘini = deepcopy(Λₘ)
-                    Λₘini[begin+1:3:end] .= 0.0
-                    Λₘini[begin+2:3:end] .= 0.0
                     # yini = deepcopy(Λₘini)
                     yini = 𝐍*Λₘ + 𝐫
                     yini .= abs.(yini)
-                    yini[begin+1:3:end] .= 0.0
-                    yini[begin+2:3:end] .= 0.0
+                    # @show iteration
+                    # display(𝐍)
+                    # display(𝐫)
                     frictionless_IPM!(Λₘ,na,na,Λₘini,yini,𝐍,𝐫;ftol=1e-14,Nmax)
                     ΔΛₖ .= Λₘ - Λʳₖ
                     minusResΛ = -Res + 𝐁*(ΔΛₖ)

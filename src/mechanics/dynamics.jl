@@ -308,21 +308,23 @@ function frictionless_contact_dynfuncs(bot;
             contacts_bits[bodyid2sys_loci_idx[bid]] .= false
             persistent_bits[bodyid2sys_loci_idx[bid]] .= false
             if body isa AbstractRigidBody
-                for pid in eachindex(loci_states)
-                    locus_state = loci_states[pid]
-                    (;position,contact_state) = locus_state
-                    gap = signed_distance(position,flatplane)
-                    if !checkpersist
-                        contact_state.active = false
-                    end
-                    activate!(contact_state,gap)
-                    if contact_state.active
-                        contacts_bits[bodyid2sys_loci_idx[bid][pid]] = true
-                        contact_state.frame = spatial_frame(flatplane.n)
-                        if contact_state.persistent
-                            persistent_bits[bodyid2sys_loci_idx[bid][pid]] = true
+                if body.prop.id == 4
+                    for pid in eachindex(loci_states)
+                        locus_state = loci_states[pid]
+                        (;position,contact_state) = locus_state
+                        gap, normal = contact_gap_and_normal(position,flatplane)
+                        if !checkpersist
+                            contact_state.active = false
                         end
-                        na += 1
+                        activate!(contact_state,gap)
+                        if contact_state.active
+                            contacts_bits[bodyid2sys_loci_idx[bid][pid]] = true
+                            contact_state.frame = spatial_frame(normal)
+                            if contact_state.persistent
+                                persistent_bits[bodyid2sys_loci_idx[bid][pid]] = true
+                            end
+                            na += 1
+                        end
                     end
                 end
             end
@@ -330,7 +332,7 @@ function frictionless_contact_dynfuncs(bot;
         # @show na, length(active_contacts)
         inv_friction_coefficients = ones(T,na)
         for (i,μ) in enumerate(μs_sys[contacts_bits])
-            inv_friction_coefficients[(i-1)+1] = 1/μ
+            inv_friction_coefficients[(i-1)+1] = 1
         end
         H = Diagonal(inv_friction_coefficients)
         restitution_coefficients = es_sys[contacts_bits]
@@ -348,6 +350,7 @@ function frictionless_contact_dynfuncs(bot;
             append!(persistent_idx,mem_idx[mem_per_idx])
             act_start += nactive_body
         end
+        # @show bodyid2act_idx
         Ls = [
             begin 
                 na_body = count(!iszero, mem)

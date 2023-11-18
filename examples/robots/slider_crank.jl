@@ -179,8 +179,10 @@ function slider_crank(;θ = 0, coordsType = RB.NCF.NC)
             Ī,
             r̄g,
             loci_positions,
-            axes_normals;
-            constrained
+            axes_normals,
+            fill(0.5,length(loci_positions)),
+            fill(0.4,length(loci_positions));
+            constrained,
         )
 
         # @show q[1:3]
