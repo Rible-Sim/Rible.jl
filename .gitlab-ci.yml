@@ -5,25 +5,36 @@
 # https://gitlab.com/gitlab-org/gitlab/-/blob/master/lib/gitlab/ci/templates/Julia.gitlab-ci.yml
 
 # Example documentation deployment
-pages:
+
+image: julia:1.9
+
+variables:
+  CACHE_DIR: "$CI_PROJECT_DIR/julia_pkg"
+
+cache: &juliacache
+  key: "julia-cache"
+  paths:
+    - "$CACHE_DIR"
+
+before_script:
+    - export JULIA_DEPOT_PATH="$CACHE_DIR"
+    - export JULIA_PROJECT="."
+
+build:
+  cache: *juliacache
   tags:
       - docker
-  image: julia:1.9
-  stage: deploy
+  stage: build
   script:
     - apt-get update -qq && apt-get install -y git xorg-dev mesa-utils xvfb libgl1 freeglut3-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev libxext-dev # needed by Documenter
-    - DISPLAY=:0 xvfb-run -s '-screen 0 1024x768x24' julia --project=yard/ -e 'using Pkg; Pkg.develop(PackageSpec(path=pwd())); Pkg.instantiate()'
-    - JULIA_DEBUG=Literate DISPLAY=:0 xvfb-run -s '-screen 0 1024x768x24' julia --project=yard/ --color=yes docs/make.jl
-    - mv docs/build public  # move to the directory picked up by Gitlab pages
-  artifacts:
-    paths:
-      - public
-  rules:
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-    - if: $CI_COMMIT_BRANCH == "dev"
+    - DISPLAY=:0 xvfb-run -s '-screen 0 1024x768x24' julia --project=yard/ -e 'using Pkg; Pkg.develop(PackageSpec(path=pwd())); Pkg.instantiate(); Pkg.precompile()'
 
 # Below is the template to run your tests in Julia
 .test_template: &test_definition
+  tags:
+      - docker
+  cache: *juliacache
+  stage: test
   # Uncomment below (and adjust as needed) to run the tests for specific references
   # only, such as the default branch, a `development` branch, and so on:
   rules:
@@ -32,7 +43,7 @@ pages:
   script:
     # Let's run the tests. Substitute `coverage = false` below, if you do not
     # want coverage results.
-    - julia -e 'using Pkg; Pkg.develop(path=pwd()); Pkg.build("Rible"); Pkg.test("Rible"; coverage = false)'
+    - julia --project=yard/ -e 'using Pkg; Pkg.test("Rible"; coverage = false)'
     # Comment out below if you do not want coverage results.
     # - julia -e 'using Pkg; Pkg.add("Coverage");
     #   import Rible; cd(joinpath(dirname(pathof(Rible)), ".."));
@@ -42,10 +53,23 @@ pages:
 # Name a test and select an appropriate image.
 # images comes from Docker hub
 test:1.9:
-  image: julia:1.9
+  <<: *test_definition
+
+pages:
+  cache: *juliacache
   tags:
       - docker
-  <<: *test_definition
+  stage: deploy
+  script:
+    - JULIA_DEBUG=Literate DISPLAY=:0 xvfb-run -s '-screen 0 1024x768x24' julia --project=yard/ --color=yes docs/make.jl
+    - mv docs/build public  # move to the directory picked up by Gitlab pages
+  artifacts:
+    paths:
+      - public
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_COMMIT_BRANCH == "dev"
+
 
 # REMARK: Do not forget to enable the coverage feature for your project, if you
 # are using code coverage reporting above. This can be done by
