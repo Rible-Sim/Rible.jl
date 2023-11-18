@@ -60,7 +60,7 @@ function man_ndof(num_of_dof,onedir=[1.0,0.0];θ=0.0,k=0.0,c=0.0,unit="mks",rest
     end
 
     function rigidbody(i,m,a,Ia,ri,rj)
-		movable = true
+		contactable = true
 		# if i == nbodies
 		# 	CoM_x = 0.05933624
 		# 	CoM_y = 0.03109915
@@ -111,34 +111,34 @@ function man_ndof(num_of_dof,onedir=[1.0,0.0];θ=0.0,k=0.0,c=0.0,unit="mks",rest
 			0 0.01Ia
 		])
 		# only to get nmcs
-		constrained = false
+		visible = true
         ci = Int[]
         prop = RB.RigidBodyProperty(
-					i,movable,m,
+					i,contactable,m,
 					Ī,
                     mass_locus,
 					aps;
-					constrained=constrained
+					visible=visible
                     )
 		α = 0.0
 		ω = 0.0
 		ro = ri
 		ṙo = zero(ro)
 
-		constrained = false
+		visible = true
 		ci = Int[]
 		cstr_idx =  collect(1:3)
 		prop = RB.RigidBodyProperty(
-					i,movable,m,
+					i,contactable,m,
 					Ī,
 					mass_locus,
 					aps;
-					constrained=ifelse(i in [1,2],true,false)
+					visible=ifelse(i in [1,2],true,false)
 					)
 		nmcs = RB.NCF.NC2P1V(SVector{2}(ri), SVector{2}(rj), ro, α)
 
         if i in [1,2]
-			constrained = true
+			visible = true
 			if i == 1
             	ci = RB.find_full_pres_idx(nmcs, q)
 				display(ci)

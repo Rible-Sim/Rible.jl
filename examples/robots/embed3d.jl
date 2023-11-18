@@ -84,7 +84,7 @@ plates = [
             R,
             ri;
             radius=3r,
-            movable = true,
+            contactable = true,
             m,
             height=1e-2,
             ci,

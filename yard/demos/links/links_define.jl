@@ -46,15 +46,15 @@ function links(n,di,rm;k=3e1,c=0.0)
     ap4 = SVector{3}([a*cos(θ), -a*sin(θ), h])
     aps = [ap1,ap2,ap3,ap4]
 
-    movable = ones(Bool,n)
-	# movable[1] = false
-    constrained = zeros(Bool,n)
-    constrained[1] = true
+    contactable = ones(Bool,n)
+	# contactable[1] = false
+    visible = zeros(Bool,n)
+    visible[1] = true
 
-    props = [RB.RigidBodyProperty(i,movable[i],mass,
+    props = [RB.RigidBodyProperty(i,contactable[i],mass,
                 SMatrix{3,3}(inertia),
                 SVector{3}(mass_locus),
-                aps;constrained=constrained[i]) for i = 1:n]
+                aps;visible=visible[i]) for i = 1:n]
 
     rs,Rs = bend(n,di,rm)
     ṙs = [zeros(3) for i = 1:n]

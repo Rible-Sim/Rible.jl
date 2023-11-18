@@ -5,11 +5,11 @@ function trapezoid(id,ri,ro=ri,
     cstr_idx = collect(1:3)
 
 )
-movable = true
+contactable = true
 if isempty(ci)
-    constrained = false
+    visible = true
 else
-    constrained = true
+    visible = true
 end
 # free_idx = collect(1:6)
 b2 = b - b1
@@ -39,8 +39,8 @@ Īg = SMatrix{2,2}(
     ]
 )
 
-prop = RB.RigidBodyProperty(id,movable,m,Īg,
-            mass_locus,loci;constrained=constrained
+prop = RB.RigidBodyProperty(id,contactable,m,Īg,
+            mass_locus,loci;visible=visible
             )
 ω = 0.0
 # ṙo = [0.0,0.0001]

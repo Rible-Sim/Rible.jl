@@ -29,7 +29,7 @@ function dualtri(num_of_dof,;onedir=[1.0,0.0],θ=0.0,k=400.0,c=0.0,restlen=0.16)
     end
 
     function rigidbody(i,m,a,Ia,ri,α)
-        movable = true
+        contactable = true
         mass_center_position = SVector{2}([0.0,0.0])
 
         r̄p1 = SVector{2}([-a/2,0.0])
@@ -53,11 +53,11 @@ function dualtri(num_of_dof,;onedir=[1.0,0.0],θ=0.0,k=400.0,c=0.0,restlen=0.16)
         ])
         
         if i == 1
-            constrained = true
+            visible = true
             ci = collect(1:6)
             cstr_idx = Int[]
         else
-            constrained = false
+            visible = true
             ci = Int[]
             cstr_idx = collect(1:3)
         end
@@ -67,12 +67,12 @@ function dualtri(num_of_dof,;onedir=[1.0,0.0],θ=0.0,k=400.0,c=0.0,restlen=0.16)
         ṙo = zero(ro)
 
         prop = RB.RigidBodyProperty(
-                    i,movable,m,
+                    i,contactable,m,
                     Ī,
                     mass_center_position,
                     nodes_positions,
                     axes;
-                    constrained=constrained
+                    visible=visible
                     )
 
         nmcs = RB.NCF.NC1P2V(SVector{2}(ri), ro, α)

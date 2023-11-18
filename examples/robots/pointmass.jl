@@ -5,8 +5,8 @@ function new_pointmass(;
         μ = 0.3,
         e = 0.9
     )
-    movable = false
-    constrained = true
+    contactable = false
+    visible = true
     Ia = SMatrix{3,3}(Matrix(m*I,3,3))
     mass_locus  = SVector{3}([ 0.0, 0.0, 0.0])
     r̄p1 = SVector{3}([ 0.0, 0.0, 0.0])
@@ -15,10 +15,10 @@ function new_pointmass(;
     friction_coefficients = [μ]
     restitution_coefficients = [e]
     prop = RB.RigidBodyProperty(
-        1,movable,m,Ia,
+        1,contactable,m,Ia,
         mass_locus,loci,axes,
         friction_coefficients,restitution_coefficients,
-        ;constrained=constrained
+        ;visible=visible
     )
     ω = zero(origin_position)
     R = RotX(0.0)

@@ -96,22 +96,22 @@ end
 
 function rigidbody(i,CoM,m,inertia,ri,rj,aps)
     if i==1
-        movable = true
-        constrained = true
+        contactable = true
+        visible = true
         pres_idx = [1,2,4]
     else
-        movable = true
-        constrained = false
+        contactable = true
+        visible = true
         pres_idx = Int[]
     end
 
     nap = length(aps)
     aps = [SVector{2}(aps[i]) for i = 1:nap]
 
-    prop = RB.RigidBodyProperty(i,movable,     #所以TR.RigidBodyProperty这个包怎么用啊？
+    prop = RB.RigidBodyProperty(i,contactable,     #所以TR.RigidBodyProperty这个包怎么用啊？
                     m,inertia,
                     SVector{2}(CoM),
-                    aps;constrained=constrained
+                    aps;visible=visible
                     )
     state = RB.RigidBodyState(prop,ri,rj,pres_idx)
     body = RB.RigidBody(prop,state)

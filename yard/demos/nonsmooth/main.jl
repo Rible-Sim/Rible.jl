@@ -601,8 +601,8 @@ mesh(cablemesh,transparency=false)
 function make_hammer(id,r̄ijkl,origin_position,R,ri,rj=nothing,rk=nothing,rl=nothing;
         μ,e,
         ω = zero(origin_position),
-        movable = true,
-        constrained = false,
+        contactable = true,
+        visible = true,
         pres_idx = Int[],
         cstr_idx = collect(1:6),
     )
@@ -640,10 +640,10 @@ function make_hammer(id,r̄ijkl,origin_position,R,ri,rj=nothing,rk=nothing,rl=no
     restitution_coefficients = fill(e,length(loci))
     @show m,diag(Īg),mass_locus,length(loci),friction_coefficients,restitution_coefficients
     prop = RB.RigidBodyProperty(
-                id,movable,m,Īg,
+                id,contactable,m,Īg,
                 mass_locus,loci,axes,
                 friction_coefficients,restitution_coefficients;
-                constrained=constrained
+                visible=visible
                 )
     origin_velocity = zero(origin_position)
     if rj isa Nothing
@@ -742,7 +742,7 @@ function make_flexcable(;
         μ,e,
         ω,
         pres_idx=rb_pres_idx,
-        constrained=ifelse(!isempty(rb_pres_idx),true,false)
+        visible=ifelse(!isempty(rb_pres_idx),true,false)
     )
     fbs = TypeSortedCollection(vcat(subfbs,rigidbody))
     # fbs = TypeSortedCollection([fb1,])
@@ -1415,7 +1415,7 @@ ballbot = superball(
     e = 0.0,
     l,d,
     z0 = l^2/(sqrt(5)*d) - 1e-3,
-    constrained = false,
+    visible = true,
     loadmesh = false,
 )
 
@@ -1613,7 +1613,7 @@ ballbot = superball(
     e = 0.8,
     l,d,
     z0 = l^2/(sqrt(5)*d) + 2.0,
-    constrained = false,
+    visible = true,
     loadmesh = false,
 )
 

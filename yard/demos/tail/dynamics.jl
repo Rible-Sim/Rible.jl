@@ -36,18 +36,18 @@ function make_new_tail(n)
     function rigidbody(i,O)
         lev,pos = divrem(i,2)
         if i == 1
-            movable = false
-            constrained = true
+            contactable = false
+            visible = true
             ci = collect(1:6)
             cstr_idx = Int[]
         else
-            movable = true
+            contactable = true
             if i == 2
-                constrained = true
+                visible = true
                 ci = collect(1:2)
                 cstr_idx = [1]
             else
-                constrained = false
+                visible = true
                 ci = Int[]
                 if isodd(pos)
                     cstr_idx = collect(1:3)
@@ -89,12 +89,12 @@ function make_new_tail(n)
         ṙo = zeros(2); ω = 0.0
         prop = RB.RigidBodyProperty(
             i,
-            movable,
+            contactable,
             m,
             Ī,
             SVector{2}(mass_locus),
             loci;
-            constrained = constrained,
+            visible = visible,
         )
         ro = ri
         if isodd(pos)

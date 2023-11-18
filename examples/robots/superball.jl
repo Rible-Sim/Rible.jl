@@ -10,7 +10,7 @@ function superball(c=0.0;
         l = 1.7/2,
         d = l/2,
         k = 4000.0,
-        constrained = true,
+        visible = true,
         addconst = Float64[],
         loadmesh = true,
     )
@@ -38,9 +38,9 @@ function superball(c=0.0;
         m = 5.0,
         μ,
         e,
-        constrained = ifelse(i==1 && constrained,true,false),
-        ci = ifelse(i==1 && constrained,collect(1:6),Int[]),
-        cstr_idx = ifelse(i==1 && constrained,Int[],[1]),
+        visible = ifelse(i==1 && visible,true,false),
+        ci = ifelse(i==1 && visible,collect(1:6),Int[]),
+        cstr_idx = ifelse(i==1 && visible,Int[],[1]),
         loadmesh,
         isbody =false,
         )

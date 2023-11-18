@@ -1,10 +1,10 @@
 function make_strut(id,ri,rj;ci = Int[])
 
-    movable = true
+    contactable = true
 	if ci == Int[]
-		constrained = false
+		visible = true
 	else
-		constrained = true
+		visible = true
 	end
 	u = rj - ri
 	b = norm(u)
@@ -26,8 +26,8 @@ function make_strut(id,ri,rj;ci = Int[])
 	r̄p1 = SVector{3}([0.0,0,0])
 	r̄p2 = SVector{3}([  b,0,0])
 	loci = [r̄p1,r̄p2]
-	prop = RB.RigidBodyProperty(id,movable,m,Īg,
-				mass_locus,loci;constrained=constrained
+	prop = RB.RigidBodyProperty(id,contactable,m,Īg,
+				mass_locus,loci;visible=visible
 				)
 	# @show prop.inertia
 	ro = ri

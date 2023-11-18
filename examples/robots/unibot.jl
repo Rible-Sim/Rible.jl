@@ -25,8 +25,8 @@ function uni(c=100.0;
     # fig
     ṙo_ref = SVector(0.0,0,0)
     function rigidbase(i,p)
-        movable = true
-        constrained = true
+        contactable = true
+        visible = true
         ci = collect(1:12)
         cstr_idx = Int[]
         ri = p[1]
@@ -49,13 +49,13 @@ function uni(c=100.0;
         )
         prop = RB.RigidBodyProperty(
             i,
-            movable,
+            contactable,
             m,
             Ī,
             mass_locus,
             loci,
             axes;
-            constrained = constrained,
+            visible = visible,
         )
         nmcs = RB.NCF.NC1P3V(ri, ro, R)
         state = RB.RigidBodyState(prop, nmcs, ri, R, ṙo, ω, ci, cstr_idx)
@@ -80,8 +80,8 @@ function uni(c=100.0;
         ṙi = ṙo_ref,
         ṙj = ṙo_ref,
         m = mbar,
-        movable = true,
-        constrained = false,
+        contactable = true,
+        visible = true,
         ci = Int[],
         cstr_idx = collect(1:6),
         # cstr_idx = [1],

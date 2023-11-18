@@ -2,7 +2,7 @@
 
 function new_gripper(;c=0.0,x1 = 41.02, ϕ1 = 0.7652, ϕ2 = 0.0)
 	function rigidbody(i,m,Ia,ri,rj,aps)
-		movable = true
+		contactable = true
 		# end
 		u = rj - ri
 		d = norm(u)
@@ -20,7 +20,7 @@ function new_gripper(;c=0.0,x1 = 41.02, ϕ1 = 0.7652, ϕ2 = 0.0)
 	
 	
 		if i in [1,2]
-			constrained = true
+			visible = true
 			if i == 1
 				ci = collect(1:6)
 				cstr_idx = Int[]
@@ -29,16 +29,16 @@ function new_gripper(;c=0.0,x1 = 41.02, ϕ1 = 0.7652, ϕ2 = 0.0)
 				cstr_idx = collect(1:3)
 			end
 		else
-			constrained = false
+			visible = true
 			ci = Int[]
 			cstr_idx = collect(1:3)
 		end
 		prop = RB.RigidBodyProperty(
-					i,movable,m,
+					i,contactable,m,
 					Ī,
 					mass_locus,
 					aps;
-					constrained
+					visible
 					)
 		nmcs = RB.NCF.NC2P1V(SVector{2}(ri), SVector{2}(rj), ro, α)
 	

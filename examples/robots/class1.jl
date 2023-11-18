@@ -37,7 +37,7 @@ rirjrkrl_by_rbid = [
 
 cycle3 = [2,3,4,2]
 rb1 = make_3d_tri(1,loci,ro_by_rbid[1],R_by_rbid[1],rirjrkrl_by_rbid[1][1];			
-    constrained = true,
+    visible = true,
     ci = collect(1:12),
     cstr_idx = Int[]
 )

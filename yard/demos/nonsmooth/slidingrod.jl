@@ -19,8 +19,8 @@ includet("../vis.jl")
 
 
 function make_rod()
-    movable = true
-    constrained = false
+    contactable = true
+    visible = true
     m = 0.402
     mass_locus = @SVector zeros(3)
     ṙo = zero(mass_locus)
@@ -47,7 +47,7 @@ function make_rod()
     ri = ro
     # @show ri,rj,ro
     Ro = Matrix(RotY(θ))
-    prop = RB.RigidBodyProperty(1,movable,m,Ī,mass_locus,loci;constrained)
+    prop = RB.RigidBodyProperty(1,contactable,m,Ī,mass_locus,loci;visible)
 
     nmcs = RB.NCF.NC1P3V(ri,ro,Ro)
     state = RB.RigidBodyState(prop,nmcs,ro,Ro,ṙo,ωo)
@@ -72,8 +72,8 @@ rod = make_rod()
 plot_traj!(rod;textsize=60)
 
 function make_bar()
-    movable = true
-    constrained = false
+    contactable = true
+    visible = true
     m = 0.402
     l = 1.0
     Ixx = 1/12*m*l^2
@@ -90,7 +90,7 @@ function make_bar()
     ṙo = zero(ro)
     ωo = zero(ro)
     Ro = Matrix(RotY(θ))
-    prop = RB.RigidBodyProperty(1,movable,m,Ī,mass_locus,loci;constrained)
+    prop = RB.RigidBodyProperty(1,contactable,m,Ī,mass_locus,loci;visible)
 
     nmcs = RB.NCF.NC3D2P(ri,rj,ro,Ro)
     state = RB.RigidBodyState(prop,nmcs,ro,Ro,ṙo,ωo)

@@ -68,6 +68,9 @@ To do this, use `include`, docs/test/benchmark; use `includet` dev;
     - [ ] ZhongQ06
     - [ ] ZhongCCP
     - [ ] ZhongQCCP
+    - [ ] ZhongQCCPN
+    - [ ] ZhongQCCPNMono
+      - [ ] use solver / contact model / for dispatch
 - [x] reduce functions fields
 - [ ] preallocations for autodiff
 - [ ] joint cstr

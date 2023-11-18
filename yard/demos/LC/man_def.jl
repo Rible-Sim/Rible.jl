@@ -9,12 +9,12 @@ function man_nd(n;θ=0.0,k=0.0,c=0.0)
     Ia = m.*a.^2
 
     function rigidbody(i,m,a,Ia,ri,rj)
-		movable = true
+		contactable = true
         if i == 1
-            constrained = true
+            visible = true
             pres_idx = [1,2,4]
         else
-            constrained = false
+            visible = true
             pres_idx = Int[]
         end
 
@@ -46,8 +46,8 @@ function man_nd(n;θ=0.0,k=0.0,c=0.0)
         end
 
 
-        prop = RB.RigidBodyProperty(i,movable,m,Ia,
-                    mass_locus,aps;constrained=constrained
+        prop = RB.RigidBodyProperty(i,contactable,m,Ia,
+                    mass_locus,aps;visible=visible
                     )
         state = RB.RigidBodyState(prop,ri,rj,pres_idx)
         body = RB.RigidBody(prop,state)

@@ -22,18 +22,18 @@ r̄p2 = SVector( r̄p_x,   0.0, -r̄p_y)
 r̄p1 = SVector(-r̄p_x,   0.0, -r̄p_y)
 loci = [r̄p1, r̄p2, r̄p3, r̄p4, r̄p5]
 
-movable = ones(Bool, n)
-movable[1] = false
-constrained = zeros(Bool, n)
-constrained[1] = true
+contactable = ones(Bool, n)
+contactable[1] = false
+visible = zeros(Bool, n)
+visible[1] = true
 
 props = [
     RB.RigidBodyProperty(
-        i, movable[i], mass,
+        i, contactable[i], mass,
         SMatrix{3,3}(inertia),
         SVector{3}(mass_locus),
         loci; 
-        constrained=constrained[i]
+        visible=visible[i]
     ) for i = 1:n
 ]
 

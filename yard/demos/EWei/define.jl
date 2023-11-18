@@ -131,14 +131,14 @@ function BuildTail()
     barIndex = collect(3:2:13)
     function rigidbody(i, rdsi, r̄si; rigidIndex=rigidIndex, barIndex=barIndex)
         if i == 1
-            movable = false
-            constrained = true
+            contactable = false
+            visible = true
             ci = collect(1:6)
             cstr_idx = Int[]
         else
-            movable = true
+            contactable = true
             if i in 2:3
-                constrained = true
+                visible = true
                 ci = collect(1:2)
                 if i == 2
                     cstr_idx = collect(1:3)
@@ -146,7 +146,7 @@ function BuildTail()
                     cstr_idx = [1]
                 end
             else
-                constrained = false
+                visible = true
                 ci = Int[]
                 if i in rigidIndex
                     cstr_idx = collect(1:3)
@@ -166,7 +166,7 @@ function BuildTail()
         ṙo = zeros(2); ω = 0.0
         prop = RB.RigidBodyProperty(
             i,
-            movable,
+            contactable,
             m,
             SMatrix{2, 2}([
                 I 0
@@ -174,7 +174,7 @@ function BuildTail()
             ]),
             SVector{2}(mass_locus),
             [SVector{2}(aps[i]) for i in 1:nrp],
-            constrained=constrained
+            visible=visible
         )
         ro = SVector{2}(ri)
         if i in rigidIndex
@@ -400,14 +400,14 @@ function BuildTail(type; β=1.0, μ=0.02)
     barIndex = collect(3:2:13)
     function rigidbody(i, rdsi, r̄si; rigidIndex=rigidIndex, barIndex=barIndex)
         if i == 1
-            movable = false
-            constrained = true
+            contactable = false
+            visible = true
             ci = collect(1:6)
             cstr_idx = Int[]
         else
-            movable = true
+            contactable = true
             if i in 2:3
-                constrained = true
+                visible = true
                 ci = collect(1:2)
                 if i == 2
                     cstr_idx = collect(1:3)
@@ -415,7 +415,7 @@ function BuildTail(type; β=1.0, μ=0.02)
                     cstr_idx = [1]
                 end
             else
-                constrained = false
+                visible = true
                 ci = Int[]
                 if i in rigidIndex
                     cstr_idx = collect(1:3)
@@ -435,7 +435,7 @@ function BuildTail(type; β=1.0, μ=0.02)
         ṙo = zeros(2); ω = 0.0
         prop = RB.RigidBodyProperty(
             i,
-            movable,
+            contactable,
             m,
             SMatrix{2, 2}([
                 0.99I 0
@@ -443,7 +443,7 @@ function BuildTail(type; β=1.0, μ=0.02)
             ]),
             SVector{2}(mass_locus),
             [SVector{2}(aps[i]) for i in 1:nrp],
-            constrained=constrained
+            visible=visible
         )
         ro = SVector{2}(ri)
         if i in rigidIndex

@@ -4,8 +4,8 @@ function rigidbar(i,
         m = 0.05,
         μ = 0.9,
         e = 0.0,
-        movable = true,
-        constrained = false,
+        contactable = true,
+        visible = true,
         ci = Int[],
         cstr_idx = [1],
         isbody = false,
@@ -36,7 +36,7 @@ function rigidbar(i,
     restitution_coefficients = fill(e,length(loci))
     prop = RB.RigidBodyProperty(
         i,
-        movable,
+        contactable,
         m,
         Ī,
         mass_locus,
@@ -44,7 +44,7 @@ function rigidbar(i,
         axes,
         friction_coefficients,
         restitution_coefficients;
-        constrained = constrained,
+        visible = visible,
     )
     pretty_table(
         SortedDict(

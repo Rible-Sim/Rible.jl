@@ -38,8 +38,8 @@ function one_tri_one_bar(;k=nothing)
         zero(P[8]),
         R,
         P[8];
-        movable = true,
-        constrained = true,
+        contactable = true,
+        visible = true,
         ci = collect(1:12),
         cstr_idx = Int[],
         radius = 0.04,

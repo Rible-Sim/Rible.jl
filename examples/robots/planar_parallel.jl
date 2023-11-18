@@ -5,8 +5,8 @@ function planar_parallel()
     b = 0.5
     θ = 2π/3
     function make_base(i)
-        movable = true
-        constrained = true
+        contactable = true
+        visible = true
         mass_center_position = SVo3
         r̄p1 = SVector{3}([0.0, a,0.0])
         r̄p2 = RotZ( θ)*r̄p1
@@ -27,12 +27,12 @@ function planar_parallel()
         ṙo = zero(ro)
 
         prop = RB.RigidBodyProperty(
-                    i,movable,m,
+                    i,contactable,m,
                     Ī,
                     mass_center_position,
                     nodes_positions,
                     axes;
-                    constrained
+                    visible
                     )
 
         nmcs = RB.NCF.NC1P3V(ri, ro, R)
@@ -42,8 +42,8 @@ function planar_parallel()
         RB.RigidBody(prop,state)
     end
     function make_platform(i;ri=SVo3,R=RotZ(0.0),)
-        movable = true
-        constrained = false
+        contactable = true
+        visible = true
         mass_center_position = SVo3
         r̄p1 = SVector{3}([0.0, b,0.0])
         r̄p2 = RotZ( θ)*r̄p1
@@ -57,12 +57,12 @@ function planar_parallel()
         m = 1.0
 
         prop = RB.RigidBodyProperty(
-                    i,movable,m,
+                    i,contactable,m,
                     Ī,
                     mass_center_position,
                     nodes_positions,
                     axes;
-                    constrained
+                    visible
                     )
 
         nmcs = RB.NCF.NC1P3V(ri, ro, R)

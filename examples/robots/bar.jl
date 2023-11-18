@@ -3,8 +3,8 @@ function make_bar(;
         μ = 0.1,
         e = 0.0
     )
-    movable = true
-    constrained = false
+    contactable = true
+    visible = true
     m = 0.402
     l = 1.0
     Ixx = 1/12*m*l^2
@@ -28,7 +28,7 @@ function make_bar(;
     # p⁺ = 1 + 3*cos(θ)^2-μ*cos(θ)*sin(θ)
     # @show b,p⁺
 
-    prop = RB.RigidBodyProperty(1,movable,m,Ī,mass_locus,loci;constrained)
+    prop = RB.RigidBodyProperty(1,contactable,m,Ī,mass_locus,loci;visible)
 
     nmcs = RB.NCF.NC3D2P(ri,rj,origin_position,R,origin_velocity,ω)
     state = RB.RigidBodyState(prop,nmcs,origin_position,R,origin_velocity,ω)

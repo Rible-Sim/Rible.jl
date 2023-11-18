@@ -38,9 +38,9 @@ function man(n,θ=0.0)
         name = Symbol("rb"*string(i))
         type = :generic
         if i == 1
-            movable = false
+            contactable = false
         else
-            movable = true
+            contactable = true
         end
         CoM_x = a/2
         CoM_y = √3/6*a
@@ -60,7 +60,7 @@ function man(n,θ=0.0)
         ap3 = SVector{2}([ap3_x,ap3_y])
         aps = [ap1,ap2,ap3]
 
-        prop = R2.RigidBodyProperty(movable,name,type,
+        prop = R2.RigidBodyProperty(contactable,name,type,
                     m,Ia,
                     mass_locus,
                     aps

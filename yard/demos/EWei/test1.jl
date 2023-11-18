@@ -22,18 +22,18 @@ includet("../vis.jl")
 
 function rigidbody(i, rij, apss, rg)
     if i == 1
-        movable = false
-        constrained = true
+        contactable = false
+        visible = true
         ci = collect(1:6)
         cstr_idx = Int[]
     else
-        movable = true
+        contactable = true
         if i == 2
-            constrained = true
+            visible = true
             ci = collect(1:2)
             cstr_idx = [1]
         else
-            constrained = false
+            visible = true
             ci = Int[]
             if i == 4
                 cstr_idx = [1]
@@ -53,7 +53,7 @@ function rigidbody(i, rij, apss, rg)
     ṙo = zeros(2); ω = 0.0
     prop = RB.RigidBodyProperty(
         i,
-        movable,
+        contactable,
         m,
         SMatrix{2, 2}([
             I 0
@@ -61,7 +61,7 @@ function rigidbody(i, rij, apss, rg)
         ]),
         SVector{2}(mass_locus),
         [SVector{2}(aps[i]) for i in 1:nrp],
-        constrained=constrained
+        visible=visible
     )
     ro = SVector{2}(ri)
     if isodd(i)

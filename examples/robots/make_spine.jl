@@ -7,13 +7,13 @@ function make_spine(n,θ=0.0)
 
     function vert(i,r,θ,a,b,α)
         if i == 1
-            movable = false
-            constrained = true
+            contactable = false
+            visible = true
             ci = collect(1:6)
 			cstr_idx = Int[]
         else
-            movable = true
-            constrained = false
+            contactable = true
+            visible = true
             ci = Int[]
 			cstr_idx = collect(1:3)
 	        # ap1 = b*[cos( α),sin( α)]
@@ -31,8 +31,8 @@ function make_spine(n,θ=0.0)
         inertia = SMatrix{2,2}(Diagonal(ones(2)))
         prop = RB.RigidBodyProperty(
 			i,
-			movable,m,inertia,mass_locus,aps;
-			constrained
+			contactable,m,inertia,mass_locus,aps;
+			visible
 		)
 
         ri = SVector{2}(r)

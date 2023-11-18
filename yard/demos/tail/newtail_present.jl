@@ -98,20 +98,20 @@ end
 ######################################分割线####################################
 function rigidbody(i,mass_locus,m,inertia,ri,rj,aps)
     if i == 1
-        movable = true
-        constrained = true
+        contactable = true
+        visible = true
         pres_idx = [1,2,4]
     else
-        movable = true
-        constrained = false
+        contactable = true
+        visible = true
         pres_idx = Int[]
     end
     nap = length(aps)
     aps = [SVector{2}(aps[i]) for i = 1:nap]
-    prop = RB.RigidBodyProperty(i,movable,
+    prop = RB.RigidBodyProperty(i,contactable,
                 m,inertia,
                 SVector{2}(mass_locus),
-                aps;constrained=constrained
+                aps;visible=visible
                 )
     state = RB.RigidBodyState(prop,ri,rj,pres_idx)
     body = RB.RigidBody(prop,state)
@@ -158,7 +158,7 @@ function jac_singularity_check(st)
         @warn "System's Jacobian is singular: rank(A(q))=$(sys_rank)<$(minimum(size(Aq)))"
     end
     for (bodyid,rb) in enumerate(st.rigidbodies)
-        if body.prop.movable && body.prop.constrained
+        if body.prop.contactable && body.prop.visible
             q_rb = body.state.coords.q
             Aq_rb = vcat(body.state.cache.cfuncs.Φq(q_rb),
                          body.state.cache.funcs.Φq(q_rb))

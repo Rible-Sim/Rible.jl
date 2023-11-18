@@ -19,15 +19,15 @@ function spine3d(n;c=0.0)
     ap1 = SVector{3}([-ap_x,   0.0, -ap_y])
     aps = [ap1,ap2,ap3,ap4]
 
-    movable = ones(Bool,n)
-    movable[1] = false
-    constrained = zeros(Bool,n)
-    constrained[1] = true
+    contactable = ones(Bool,n)
+    contactable[1] = false
+    visible = zeros(Bool,n)
+    visible[1] = true
 
-    props = [RB.RigidBodyProperty(i,movable[i],mass,
+    props = [RB.RigidBodyProperty(i,contactable[i],mass,
                 SMatrix{3,3}(inertia),
                 SVector{3}(mass_locus),
-                aps;constrained=constrained[i]) for i = 1:n]
+                aps;visible=visible[i]) for i = 1:n]
 
     rs = [[0.0,0.0,i*h] for i = 0:n-1]
     Rs = [RotX(0.0) for i = 1:n]

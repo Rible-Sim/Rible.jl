@@ -22,8 +22,8 @@ function quad(c=100.0;
     ṙo_ref = SVector(1.0,0,0)
     function rigidbase(i,p)
 
-    movable = true
-    constrained = false
+    contactable = true
+    visible = true
     ci = Int[]
     cstr_idx = collect(1:6)
     ri = p[0]
@@ -44,12 +44,12 @@ function quad(c=100.0;
     )
     prop = RB.RigidBodyProperty(
         i,
-        movable,
+        contactable,
         m,
         Ī,
         mass_locus,
         loci;
-        constrained = constrained,
+        visible = visible,
     )
     nmcs = RB.NCF.NC1P3V(ri, ro, R)
     state = RB.RigidBodyState(prop, nmcs, ri, R, ṙo, ω, ci, cstr_idx)
@@ -58,8 +58,8 @@ function quad(c=100.0;
     end
 
     function rigidbar(i,p)
-    movable = true
-    constrained = false
+    contactable = true
+    visible = true
     ci = Int[]
     cstr_idx = [1]
 
@@ -86,12 +86,12 @@ function quad(c=100.0;
     loci = [r̄p1,r̄p2]
     prop = RB.RigidBodyProperty(
         i,
-        movable,
+        contactable,
         m,
         Ī,
         mass_locus,
         loci;
-        constrained = constrained,
+        visible = visible,
     )
     nmcs = RB.NCF.NC3D2P(ri, rj, ro, R)
     state = RB.RigidBodyState(prop, nmcs, ro, R, ṙo, ω, ci, cstr_idx)

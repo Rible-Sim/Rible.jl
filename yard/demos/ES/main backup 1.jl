@@ -392,7 +392,7 @@ function plot_tower2d_mode_shape(bot,figname=nothing)
             begin
                 ax = Axis(
                     fig[1,i];
-                    # visible = false,
+                    # visible = true,
                     aspect = DataAspect(),
                     limits = (nothing,(0,0.4)),
                     titlegap = -40,

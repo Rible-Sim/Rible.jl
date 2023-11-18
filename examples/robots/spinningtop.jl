@@ -7,12 +7,12 @@ function make_top(origin_position = [0.0,0.0,0.0],
         μ = 0.5,
         e = 0.9,
         color = :slategray,
-        constrained=false,
+        visible = true,
         loadmesh=false,
     )
     ω = R*Ω
-    movable = true
-    if constrained
+    contactable = true
+    if visible
         pres_idx = [1,2,3]
     else
         pres_idx = Int[]
@@ -60,10 +60,10 @@ function make_top(origin_position = [0.0,0.0,0.0],
         topmesh = GB.Mesh(GB.meta(pts,normals=nls),fcs)
     end
     prop = RB.RigidBodyProperty(
-        1,movable,m,Ī,
+        1,contactable,m,Ī,
         mass_locus,loci,axes,
         friction_coefficients,restitution_coefficients;
-        constrained
+        visible
     )
     ri = origin_position+R*loci[5]
     @myshow ri

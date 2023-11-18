@@ -73,10 +73,10 @@ function links(n,a1=0.0,a2=0.0,α=0.0)
     ap4 = SVector{3}([a*cos(θ), -a*sin(θ), h])
     aps = [ap1,ap2,ap3,ap4]
 
-    movable = ones(Bool,n)
-    movable[1] = 0
+    contactable = ones(Bool,n)
+    contactable[1] = 0
 
-    props = [RB.RigidBodyProperty(i,movable[i],mass,
+    props = [RB.RigidBodyProperty(i,contactable[i],mass,
                 SMatrix{3,3}(inertia),
                 SVector{3}(mass_locus),
                 aps) for i = 1:n]

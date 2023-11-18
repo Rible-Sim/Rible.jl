@@ -18,9 +18,8 @@ include("../../../examples/robots/slider_crank.jl")
 includet("../../../examples/robots/slider_crank.jl")#jl
 sc = slider_crank(;coordsType=RB.QCF.QC)
 plot_traj!(sc;showmesh=false,showground=false)
-dt = 1e-4
+dt = 1e-3
 tspan = (0.0,1.0)
-
 
 function sc_contact_dynfuncs(bot;)
     ## horizontal Plane
@@ -44,6 +43,13 @@ RB.solve!(
     RB.ZhongQCCPN();
     dt,tspan,ftol=1e-14,maxiters=50,verbose=true,exception=true,progress=false,
 )
+
+RB.solve!(
+    prob,
+    RB.ZhongQCCPNMono();
+    dt,tspan,ftol=1e-14,maxiters=50,verbose=true,exception=true,progress=false,
+)
+
 
 plot_traj!(sc;showmesh=false,showground=false)
 me = RB.mechanical_energy!(sc)

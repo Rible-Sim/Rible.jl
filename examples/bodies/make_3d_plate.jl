@@ -8,7 +8,7 @@ function make_3d_plate(
     rj=nothing,
     rk=nothing,
     rl=nothing;
-    movable = true,
+    contactable = true,
     m = 3,
     height=1e-2,
     radius=1e-3,
@@ -18,7 +18,7 @@ function make_3d_plate(
     meshvisible = true,
 )
 # free_idx = collect(1:6)	
-constrained = ci != Int[]
+visible = ci != Int[]
 mat = filter(
     row -> row.name == "Teak", 
     material_properties
@@ -79,12 +79,12 @@ pretty_table(
 axes = [SVector(1.0,0.0,0.0) for _ in eachindex(nodes_positions)]
 prop = RB.RigidBodyProperty(
     id,
-    movable,mass,Īg,
+    contactable,mass,Īg,
     mass_center,
     nodes_positions,
     axes,
     ;
-    constrained=constrained
+    visible=visible
 )
 ṙo = zero(ro)
 ω = zero(ro)

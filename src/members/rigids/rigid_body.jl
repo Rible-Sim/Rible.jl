@@ -10,10 +10,10 @@ $(TYPEDEF)
 $(TYPEDFIELDS)
 """
 struct RigidBodyProperty{N,T} <: AbstractRigidBodyProperty{N,T}
-    "Is movable?"
-    movable::Bool
-    "Is constrained?"
-    constrained::Bool
+    "Is able to make contact with?"
+    contactable::Bool
+    "Is visible?"
+    visible::Bool
     "id. Unique in a system"
     id::Int
     "Type or name."
@@ -33,7 +33,7 @@ Rigid Body Property Constructor
 $(TYPEDSIGNATURES)
 """
 function RigidBodyProperty(
-        id::Integer,movable::Bool,
+        id::Integer,contactable::Bool,
         mass::T,inertia_input,
         mass_center_position::AbstractVector,
         positions=SVector{size(inertia_input,1),T}[],
@@ -43,12 +43,9 @@ function RigidBodyProperty(
         ],
         friction_coefficients=zeros(T,length(positions)),
         restitution_coefficients=zeros(T,length(positions));
-        constrained = false,
+        visible = true,
         type = :generic
     ) where T
-    if !movable
-        constrained = true
-    end
     mtype = StaticArrays.similar_type(inertia_input)
     VecType = SVector{size(inertia_input,1)}
     mass_locus = Locus(
@@ -70,7 +67,8 @@ function RigidBodyProperty(
     ]
     # @show loci
     return RigidBodyProperty(
-        movable,constrained,
+        contactable,
+        visible,
         id,type,
         mass,
         mtype(inertia_input),
@@ -238,13 +236,6 @@ struct RigidBody{N,M,T,coordsType,cacheType,meshType} <: AbstractRigidBody{N,T}
 end
 
 function RigidBody(prop,state,coords,mesh=nothing)
-    if prop.movable
-        if prop.constrained && coords.pres_idx == Int[]
-            @error "Rigid body constrained, but no index specified."
-        elseif !prop.constrained && !(coords.pres_idx == Int[])
-            @error "Rigid body not constrained. No index should be specified."
-        end
-    end
     (;nmcs,pres_idx,cstr_idx) = coords
     cache = get_CoordinatesCache(prop,nmcs,pres_idx,cstr_idx)
     RigidBody(prop,state,coords,cache,mesh)

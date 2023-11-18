@@ -27,7 +27,7 @@ the ``I``th rigid member.
 \end{figure} -->
 
 Consider a tetrahedron which exemplifies an arbitrary 3D rigid body, as shown in
-{fig:3D_NC}, where basic points
+fig:3DNC, where basic points
 ``\bm{r}_{I,i},\bm{r}_{I,j},\bm{r}_{I,k},\bm{r}_{I,l}\in \mathbb{R}^3`` and base
 vectors ``\bm{u}_I,\bm{v}_I,\bm{w}_I\in \mathbb{R}^3`` are fixed on the rigid body
 and expressed in the global inertial frame ``Oxyz``. Four types of natural
@@ -39,7 +39,7 @@ coordinates, i.e.
         \bm{q}_{I,\mathrm{rrrr}}=[\bm{r}^\mathrm{T}_{I,i},\bm{r}^\mathrm{T}_{I,j},\bm{r}^\mathrm{T}_{I,k},\bm{r}^\mathrm{T}_{I,l}]^\mathrm{T}\in \mathbb{R}^{12},
     \end{aligned}
 ```
-can be used to describe a 3D rigid body, corresponding to {fig:3D_NC} (a)
+can be used to describe a 3D rigid body, corresponding to fig:3DNC (a)
 to (d), respectively, where ``()_\mathrm{ruvw}``, etc, denote the type of natural
 coordinates. For the latter three types of natural coordinates, we can formally
 define ``\bm{u}_I=\bm{r}_{I,j}{-}\bm{r}_{I,i}``,
@@ -135,13 +135,13 @@ To ensure rigidity of the body, the natural coordinates
 where ``\bar{\bm{u}}_I``, ``\bar{\bm{v}}_I`` and ``\bar{\bm{w}}_I`` are constant
 vectors in a local frame, which is fixed on the rigid member (See also
 {sec:uni_mass}). Then, the position and orientation of a 6-DoF 3D rigid body
-can be defined by twelve coordinates (any type in {eq:3D_natural}) and six
-constraints {eq:3D_intrinsic}.
+can be defined by twelve coordinates (any type in {eq:3Dnatural}) and six
+constraints {eq:3Dintrinsic}.
 %done remove 2D bar
 ### 3D rigid bars
 \begin{figure}[tbh]
     \centering
-    \includegraphics[width=162pt]{Bar_162}
+    \includegraphics[width=162pt]{Bar162}
     \caption{A 3D rigid bar described by two types of natural coordinates.}
     \label{fig:Bar}
 \end{figure}
@@ -149,7 +149,7 @@ Two types of natural coordinates, i.e.
 ``\bm{q}_{I,\mathrm{ru}}=[\bm{r}^\mathrm{T}_{I,i},\bm{u}_I^\mathrm{T}]^\mathrm{T}``
 and 
 ``\bm{q}_{I,\mathrm{rr}}=[\bm{r}_{I,i}^\mathrm{T},\bm{r}_{I,j}^\mathrm{T}]^\mathrm{T}\in\mathbb{R}^{6}``,
-can describe a 3D rigid bar, corresponding to {fig:Bar} (a) and (b), respectively.
+can describe a 3D rigid bar, corresponding to fig:Bar (a) and (b), respectively.
 Define conversion matrices 
 ```math
     \bm{Y}_\mathrm{ru}=\begin{bmatrix}[r]
@@ -204,7 +204,7 @@ defined by six coordinates and one constraint {eq:bar_intrinsic}.
     \end{tabular}
 \end{table}
 
-The transformation relations {eq:bar_trans,eq:3D_trans} for the
+The transformation relations {eq:bartrans,eq:3Dtrans} for the
 standard types of natural coordinates can be put into a unifying form
 ```math
     \bm{r}=\bm{C}_{I}\bm{q}_{I},
@@ -248,7 +248,7 @@ It is possible to express the mass matrix by conventional inertia properties,
 such as the mass, the center of mass, 
 and the moments of inertia of a rigid member. 
 To this end, let's introduce a local Cartesian frame ``\bar{O}\bar{x}\bar{y}\bar{z}``
-which is fixed on the rigid member ``\CircledSmall{I}``, as shown in {fig:local}. 
+which is fixed on the rigid member ``\CircledSmall{I}``, as shown in fig:local. 
 Quantities expressed in this local frame are denoted by an overline ``\bar{()}``.
 Without loss of generality, let its origin ``\bar{O}`` coincide with the mass center, 
 such that ``\bar{\bm{r}}_{I,g}=\bm{0}``. 
@@ -258,7 +258,7 @@ For a 3D rigid bar, let its ``\bar{x}`` axis aligns along the longitudinal direc
 %done remove 2D
 \begin{figure}[tbh]
     \centering
-    \includegraphics[width=244pt]{local_244}
+    \includegraphics[width=244pt]{local244}
     \caption{The basic point ``\bar{\bm{r}}_{I,i}``, 
     the base vectors ``\bar{\bm{u}}_{I}``, ``\bar{\bm{v}}_{I}`` and ``\bar{\bm{w}}_{I}``, 
     the mass center ``\bar{\bm{r}}_{I,g}``, 
@@ -317,7 +317,7 @@ while the conventional inertia matrix is given by
 ``` 
 Hence, we have ``\bar{\bm{J}}_I =\tfrac{1}{2}\mathrm{trace}\left( \bar{\bm{I}}_I \right) \mathbf{I}_3-\bar{\bm{I}}_I``.
 
-For a 3D rigid bar, the expression of ``\bar{\bm{J}}_I`` is the same as {eq:J_3D}, except that only the element ``\bar{x}^2`` is nonzero. And the pseudoinverse of ``\bar{\bm{X}}_{I}=\left[ \bar{u}_x,0,0 \right] ^{\mathrm{T}}`` is ``\bar{\bm{X}}_{I}^{+}=\left[{1}/{\bar{u}_x},0,0\right]``. Therefore, we have ``\bar{\bm{X}}_{I}^{+}\bar{\bm{J}}_I\bar{\bm{X}}_{I}^{+\mathrm{T}}=\left(\int_{\Omega}\rho_I\bar{x}^2\mathrm{d}\Omega\right)/{\bar{u}^2_x}``.
+For a 3D rigid bar, the expression of ``\bar{\bm{J}}_I`` is the same as {eq:J3D}, except that only the element ``\bar{x}^2`` is nonzero. And the pseudoinverse of ``\bar{\bm{X}}_{I}=\left[ \bar{u}_x,0,0 \right] ^{\mathrm{T}}`` is ``\bar{\bm{X}}_{I}^{+}=\left[{1}/{\bar{u}_x},0,0\right]``. Therefore, we have ``\bar{\bm{X}}_{I}^{+}\bar{\bm{J}}_I\bar{\bm{X}}_{I}^{+\mathrm{T}}=\left(\int_{\Omega}\rho_I\bar{x}^2\mathrm{d}\Omega\right)/{\bar{u}^2_x}``.
 
 For an advanced treatment of the inertia representation for rigid multibody systems in terms of natural coordinates, 
 we refer the interested readers to our previous paper \cite{xuGeneralizedInertiaRepresentation2021}. 

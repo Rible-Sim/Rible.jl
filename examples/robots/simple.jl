@@ -45,7 +45,7 @@ rbs = [
         Rplate,ro;
         m,
         radius = r,
-        # constrained = !free,	
+        # visible = !free,	
         ci = ifelse(free,Int[],collect(1:12)),
         cstr_idx = ifelse(free,collect(1:6),Int[]),
     )

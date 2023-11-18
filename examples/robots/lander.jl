@@ -26,8 +26,8 @@ function lander(;k=nothing)
         P[[7,1,2,3]],
         zero(P[7]),
         RotX(0.0),P[7];
-        movable = true,
-        constrained = true,
+        contactable = true,
+        visible = true,
         ci = collect(1:12),
         cstr_idx = Int[],
     )

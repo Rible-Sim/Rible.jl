@@ -49,15 +49,15 @@ function spine(n,dis,rm,heating_law;k=1000.0,c=0.0)
     aps = SVector{3}.(map((x)->RotX(π)*x,pp)).*1e-3
 	# scatter(aps)
 
-    movable = ones(Bool,n)
-	# movable[1] = false
-    constrained = zeros(Bool,n)
-    constrained[1] = true
+    contactable = ones(Bool,n)
+	# contactable[1] = false
+    visible = zeros(Bool,n)
+    visible[1] = true
 
-    props = [RB.RigidBodyProperty(i,movable[i],mass,
+    props = [RB.RigidBodyProperty(i,contactable[i],mass,
                 SMatrix{3,3}(inertia),
                 SVector{3}(mass_locus),
-                aps;constrained=constrained[i]) for i = 1:n]
+                aps;visible=visible[i]) for i = 1:n]
 
     rs_raw,Rs = bend(n,dis,rm)
     ṙs = [zeros(3) for i = 1:n]
@@ -175,15 +175,15 @@ function spine_true(n,dis,rm;
 	# scatter(aps)
 	# markers = calculate_markers.(aps[16:-1:14])
 	# append!(aps,SVector{3}.(markers))
-    movable = ones(Bool,n)
-	# movable[1] = false
-    constrained = zeros(Bool,n)
-    constrained[1] = true
+    contactable = ones(Bool,n)
+	# contactable[1] = false
+    visible = zeros(Bool,n)
+    visible[1] = true
 
-    props = [RB.RigidBodyProperty(i,movable[i],mass,
+    props = [RB.RigidBodyProperty(i,contactable[i],mass,
                 SMatrix{3,3}(inertia),
                 SVector{3}(mass_locus),
-                aps;constrained=constrained[i]) for i = 1:n]
+                aps;visible=visible[i]) for i = 1:n]
 
     rs_raw,Rs = bend(n,dis,rm;o1,X1,dir)
     ṙs = [zeros(3) for i = 1:n]

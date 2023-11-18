@@ -100,18 +100,18 @@ function make_bai(meshes,质心,质量,惯量)
 
     function rigidbody(i,P)
         if i == 1
-            movable = false
-            constrained = true
+            contactable = false
+            visible = true
             ci = collect(1:6)
             cstr_idx = Int[]
         elseif i in [2,nb]
-            movable = true
-            constrained = true
+            contactable = true
+            visible = true
             ci = collect(1:2)
             cstr_idx = collect(1:3)
         else
-            movable = true
-            constrained = false
+            contactable = true
+            visible = true
             ci = Int[]
             cstr_idx = collect(1:3)
         end
@@ -155,12 +155,12 @@ function make_bai(meshes,质心,质量,惯量)
         ṙo = zeros(2); ω = 0.0
         prop = RB.RigidBodyProperty(
             i,
-            movable,
+            contactable,
             m,
             Ī,
             SVector{2}(mass_locus),
             loci;
-            constrained = constrained,
+            visible = visible,
         )
         nmcs = RB.NCF.NC2P1V(ri, rj, ro, α)
         state = RB.RigidBodyState(prop, nmcs, ro, α, ṙo, ω, ci, cstr_idx)

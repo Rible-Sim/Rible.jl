@@ -7,11 +7,11 @@ function build_2d_tri(id,ri,rj=nothing,rk=nothing;
     b1 = 0.05,
     m = 0.1271425597,
 )
-movable = true
+contactable = true
 if isempty(ci)
-    constrained = false
+    visible = true
 else
-    constrained = true
+    visible = true
 end
 # free_idx = collect(1:6)
 b2 = b - b1
@@ -44,11 +44,11 @@ Īg = SMatrix{2,2}(
 @show mass_center,atan(mass_center[2],mass_center[1])
 prop = RB.RigidBodyProperty(
     id,
-    movable,
+    contactable,
     m,Īg,
     mass_center,
     loci_positions,
-    ;constrained=constrained
+    ;visible=visible
 )
 ω = 0.0
 ro = ri

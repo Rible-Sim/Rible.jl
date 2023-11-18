@@ -13,7 +13,7 @@ function RigidBody(id;r = [0.0,0.0,-1.0],
                       R = Matrix(1.0I,3,3),
                       ṙ = [0.0,0.0,0.0],
                       ω = [0.0,0.0,0.0],
-                      movable = true)
+                      contactable = true)
     a = 0.5 #m
     h = 1.0 #m
     θ = 2π/3
@@ -27,7 +27,7 @@ function RigidBody(id;r = [0.0,0.0,-1.0],
     ap3 = SVector{3}([a*cos(θ), -a*sin(θ), 0.0] + offset)
     ap4 = SVector{3}([0.0, 0.0, -h] + offset)
 
-    prop = RB.RigidBodyProperty(id,movable,mass,
+    prop = RB.RigidBodyProperty(id,contactable,mass,
                 SMatrix{3,3}(inertia),
                 SVector(mass_locus...),
                 [ap1,ap2,ap3,ap4])
@@ -42,7 +42,7 @@ mass = 1.0 #kg
 inertia = Matrix(Diagonal([45.174,45.174,25.787]))*1e-1
 mass_locus = [0.0, 0.0, 17.56] .* 1e-4 # m
 rb1prop,rb1cache = RigidBody(1,mass = mass, inertia = inertia, mass_locus = mass_locus,
-                     r = [0.0,0.0, -1.0], movable = false)
+                     r = [0.0,0.0, -1.0], contactable = false)
 rb2 = RigidBody(:rb2,mass = mass, inertia = inertia, mass_locus = mass_locus,
                      r = [0.0,0.0,  -0.1], R = Matrix(RotX(0.45)))
 rb3 = RigidBody(:rb3,mass = mass, inertia = inertia, mass_locus = mass_locus,
@@ -65,7 +65,7 @@ rb3 = RigidBody(:rb3,mass = mass, inertia = inertia, mass_locus = mass_locus,
                      r = [0.0,0.0,  0.8])
 rbs = [rb1,rb2,rb3]
 
-mvbodyindex = [i for i in eachindex(rbs) if rbs[i].prop.movable]
+mvbodyindex = [i for i in eachindex(rbs) if rbs[i].prop.contactable]
 mvrbs = [rbs[i] for i in mvbodyindex]
 
 rbv = RB.RBVector(rbs,mvbodyindex,mvrbs)

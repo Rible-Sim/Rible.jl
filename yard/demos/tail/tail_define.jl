@@ -60,20 +60,20 @@ function make_tail(n)
     end
     function rigidbody(i,mass_locus,m,inertia,ri,rj,aps)
         if i == 1
-            movable = true
-            constrained = true
+            contactable = true
+            visible = true
             pres_idx = [1,2,4]
         else
-            movable = true
-            constrained = false
+            contactable = true
+            visible = true
             pres_idx = Int[]
         end
         nap = length(aps)
         aps = [SVector{2}(aps[i]) for i = 1:nap]
-        prop = RB.RigidBodyProperty(i,movable,
+        prop = RB.RigidBodyProperty(i,contactable,
                     m,inertia,
                     SVector{2}(mass_locus),
-                    aps;constrained=constrained
+                    aps;visible=visible
                     )
         state = RB.RigidBodyState(prop,ri,rj,pres_idx)
         body = RB.RigidBody(prop,state)
@@ -224,24 +224,24 @@ function make_curve_tail(n)
     end
     function rigidbody(i,mass_locus,m,inertia,ri,rj,vi,vj,aps)
         if i == 0
-            movable = true
-            constrained = true
+            contactable = true
+            visible = true
             pres_idx = [1,2]
         elseif i in [7,21]
-            movable = true
-            constrained = true
+            contactable = true
+            visible = true
             pres_idx = [1]
         else
-            movable = true
-            constrained = false
+            contactable = true
+            visible = true
             pres_idx = Int[]
         end
         nap = length(aps)
         aps = [SVector{2}(aps[i]) for i = 1:nap]
-        prop = RB.RigidBodyProperty(i,movable,
+        prop = RB.RigidBodyProperty(i,contactable,
                     m,inertia,
                     SVector{2}(mass_locus),
-                    aps;constrained=constrained
+                    aps;visible=visible
                     )
         state = RB.RigidBodyState(prop,ri,rj,vi,vj,pres_idx)
         body = RB.RigidBody(prop,state)

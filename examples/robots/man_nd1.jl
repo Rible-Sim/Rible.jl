@@ -2,8 +2,8 @@ function man_nd1(k=0.0,c=0.0;ratio=0.8)
     n = 3
 
 	function make_rb1(ri)
-		movable = false
-		constrained = true
+		contactable = false
+		visible = true
 		ci = collect(1:6)
 		cstr_idx = Int[]
 		h1 = 0.1
@@ -18,8 +18,8 @@ function man_nd1(k=0.0,c=0.0;ratio=0.8)
 		ap2 = SVector{2}([-b1 , -h1])
 		ap3 = SVector{2}([ b1 , -h1])
 	    aps = [ap1,ap2,ap3]
-	    prop = RB.RigidBodyProperty(1,movable,m,Ia,
-	                mass_locus,aps;constrained=constrained
+	    prop = RB.RigidBodyProperty(1,contactable,m,Ia,
+	                mass_locus,aps;visible=visible
 	                )
 		α = 0.0; ω = 0.0
 		ro = ri
@@ -30,8 +30,8 @@ function man_nd1(k=0.0,c=0.0;ratio=0.8)
 	end
 
 	function make_rb2(ri,rj,α)
-		movable = true
-		constrained = true
+		contactable = true
+		visible = true
 		pres_idx = [1,2]
 		# h2 = 0.1
 		b2 = 0.2
@@ -45,8 +45,8 @@ function man_nd1(k=0.0,c=0.0;ratio=0.8)
 		ap2 = SVector{2}([ b2  ,0.0])
 		ap3 = SVector{2}([ b2/2,0.0])
 	    aps = [ap1,ap2,ap3]
-	    prop = RB.RigidBodyProperty(2,movable,m,Ia,
-	                mass_locus,aps;constrained=constrained
+	    prop = RB.RigidBodyProperty(2,contactable,m,Ia,
+	                mass_locus,aps;visible=visible
 	                )
 		ω = 0.0
 		ro = ri
@@ -57,8 +57,8 @@ function man_nd1(k=0.0,c=0.0;ratio=0.8)
 	end
 
 	function make_bar2(ri,rj,α)
-		movable = true
-		constrained = true
+		contactable = true
+		visible = true
 		pres_idx = [1,2]
 		# h2 = 0.1
 		b2 = 0.2
@@ -71,8 +71,8 @@ function man_nd1(k=0.0,c=0.0;ratio=0.8)
 		ap1 = SVector{2}([0.0  ,0.0])
 		ap2 = SVector{2}([ b2  ,0.0])
 	    aps = [ap1,ap2]
-	    prop = RB.RigidBodyProperty(2,movable,m,Ia,
-	                mass_locus,aps;constrained=constrained
+	    prop = RB.RigidBodyProperty(2,contactable,m,Ia,
+	                mass_locus,aps;visible=visible
 	                )
 		ω = 0.0
 		ro = ri
@@ -83,8 +83,8 @@ function man_nd1(k=0.0,c=0.0;ratio=0.8)
 	end
 
 	function make_rb3(ri,α)
-		movable = true
-		constrained = false
+		contactable = true
+		visible = true
 		h3 = 0.1
 		b3 = 0.1
 		a = 0.2
@@ -97,8 +97,8 @@ function man_nd1(k=0.0,c=0.0;ratio=0.8)
 		ap2 = SVector{2}([-b3,-h3])
 		ap3 = SVector{2}([ b3,-h3])
 	    aps = [ap1,ap2,ap3]
-	    prop = RB.RigidBodyProperty(3,movable,m,Ia,
-	                mass_locus,aps;constrained=constrained
+	    prop = RB.RigidBodyProperty(3,contactable,m,Ia,
+	                mass_locus,aps;visible=visible
 	                )
 		ω = 0.0
 		ro = ri

@@ -1,8 +1,8 @@
 
 
 function build_2d_ground(id)
-    movable = false
-    constrained = true
+    contactable = false
+    visible = true
     h1 = 0.1
     b1 = 0.1
     a = 0.2
@@ -15,8 +15,8 @@ function build_2d_ground(id)
     r̄p2 = SVector{2}([ -b1, 0.0])
     r̄p3 = SVector{2}([ 2b1, 0.0])
     loci = [r̄p1,r̄p2,r̄p3]
-    prop = RB.RigidBodyProperty(id,movable,m,Ia,
-                mass_locus,loci;constrained=constrained
+    prop = RB.RigidBodyProperty(id,contactable,m,Ia,
+                mass_locus,loci;visible=visible
                 )
     α = 0.0; ω = 0.0
     R = RB.rotation_matrix(α)

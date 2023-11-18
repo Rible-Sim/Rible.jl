@@ -7,8 +7,8 @@ function make_3d_tri(
     rj = nothing,
     rk = nothing,
     rl = nothing;
-    movable = true,
-    constrained = false,
+    contactable = true,
+    visible = true,
     ci = Int[],
     cstr_idx = collect(1:6),
     radius = 0.005,
@@ -40,12 +40,12 @@ axes = [
 ]
 prop = RB.RigidBodyProperty(
     id,
-    movable,
+    contactable,
     mass,Īg,
     mass_center,
     Ref(inv(R)).*loci_positions,
     axes;
-    constrained=constrained
+    visible=visible
 )
 ṙo = zero(ro)
 ω = zero(ro)

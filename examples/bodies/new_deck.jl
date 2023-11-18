@@ -1,6 +1,6 @@
 function new_deck(id,loci,ro,R,ri,box;
-    movable = true,
-    constrained = false,
+    contactable = true,
+    visible = true,
     ci = Int[],
     cstr_idx = collect(1:6),
 )
@@ -41,12 +41,12 @@ pretty_table(
 
 prop = RB.RigidBodyProperty(
     id,
-    movable,
+    contactable,
     mass,
     Īg,
     mass_locus,
     loci;
-    constrained=constrained
+    visible=visible
 )
 ṙo = zero(ro)
 ω = zero(ro)

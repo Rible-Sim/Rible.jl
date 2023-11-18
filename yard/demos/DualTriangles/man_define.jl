@@ -53,7 +53,7 @@ function man_ndof(num_of_dof,onedir=[0.0,-1.0];θ=0.0,k=0.0,c=0.0,unit="mks",res
 
     function rigidbody(i,m,a,Ī,ri,rj)
 
-        movable = true
+        contactable = true
         sti_l = 0.01832
         rao_l = 0.00475
         ap3 = SVector{2}([0.0, a/2])
@@ -115,11 +115,11 @@ function man_ndof(num_of_dof,onedir=[0.0,-1.0];θ=0.0,k=0.0,c=0.0,unit="mks",res
 
         # only to get nmcs
         prop = RB.RigidBodyProperty(
-                    i,movable,m,
+                    i,contactable,m,
                     Ī,
                     mass_locus,
                     aps;
-                    constrained=ifelse(i==1,true,false)
+                    visible=ifelse(i==1,true,false)
                 )
         ro = copy(ri)
         ω = 0.0
@@ -303,18 +303,18 @@ function man_ndof_2022(num_of_dof,onedir=[1.0,0.0];θ=0.0,k=1250.0,c=0.0,unit="m
     # end
 
     function rigidbody(i,m,a,Ia,ri,rj)
-        movable = true
+        contactable = true
         if i == 1
-            constrained = true
+            visible = true
             # edi == 1 ? ci = [1,3,4] : ci = [1,2,4]
             ci = collect(1:6)
             cstr_idx = Int[]
         elseif i == 2
-            constrained = true
+            visible = true
             ci = collect(1:2)
             cstr_idx = collect(1:3)
         else
-            constrained = false
+            visible = true
             ci = Int[]
             cstr_idx = collect(1:3)
         end
@@ -428,8 +428,8 @@ function man_ndof_2022(num_of_dof,onedir=[1.0,0.0];θ=0.0,k=1250.0,c=0.0,unit="m
         ap8 = SVector{2}([ap8_x,ap8_y])
         aps = [ap1,ap2,ap3,ap4,ap5,ap6,ap7,ap8]
 
-        prop = RB.RigidBodyProperty(i,movable,m,Ia,
-                    mass_locus,aps;constrained=constrained
+        prop = RB.RigidBodyProperty(i,contactable,m,Ia,
+                    mass_locus,aps;visible=visible
                     )
 
         α = get_angle([1.0,0.0],rj-ri)

@@ -30,8 +30,8 @@ function slider_crank(;θ = 0, coordsType = RB.NCF.NC)
     # ]
     θ0 = zeros(4)
     function make_base(i)
-        movable = true
-        constrained = false
+        contactable = false
+        visible = true
         r̄g = SVo3
         r̄p1 = SVector{3}([0.0, 0,  0])
         loci_positions = [r̄p1,]
@@ -51,12 +51,12 @@ function slider_crank(;θ = 0, coordsType = RB.NCF.NC)
         ṙo = zero(ro)
 
         prop = RB.RigidBodyProperty(
-            i,movable,m,
+            i,contactable,m,
             Ī,
             r̄g,
             loci_positions,
             axes_normals;
-            constrained
+            visible
         )
 
         state = RB.RigidBodyState(prop, ri, R, ṙo, ω)
@@ -84,8 +84,8 @@ function slider_crank(;θ = 0, coordsType = RB.NCF.NC)
     function make_link(i;
             ro = SVo3
         )
-        movable = true
-        constrained = false
+        contactable = false
+        visible = true
         r̄p1 = SVector{3}([0.0, -l[i-1]/2, 0])
         r̄p2 = SVector{3}([0.0,  l[i-1]/2, 0])
         r̄g  = SVector{3}([0.0, 0,     0])
@@ -113,12 +113,12 @@ function slider_crank(;θ = 0, coordsType = RB.NCF.NC)
         end
 
         prop = RB.RigidBodyProperty(
-            i,movable,m,
+            i,contactable,m,
             Ī,
             r̄g,
             loci_positions,
             axes_normals;
-            constrained
+            visible
         )
 
         state = RB.RigidBodyState(prop, ro, R, ṙo, ω)
@@ -147,8 +147,8 @@ function slider_crank(;θ = 0, coordsType = RB.NCF.NC)
             ro=SVo3,
             R=RotZ(0.0),
         )
-        movable = true
-        constrained = false
+        contactable = true
+        visible = true
         r̄g = SVo3
         r̄p1 = SVector(0.0,-b,-a)
         r̄p2 = SVector(0.0, b,-a)
@@ -175,14 +175,14 @@ function slider_crank(;θ = 0, coordsType = RB.NCF.NC)
         ω = zero(ro)
         
         prop = RB.RigidBodyProperty(
-            i,movable,m,
+            i,contactable,m,
             Ī,
             r̄g,
             loci_positions,
             axes_normals,
             fill(0.5,length(loci_positions)),
             fill(0.4,length(loci_positions));
-            constrained,
+            visible,
         )
 
         # @show q[1:3]

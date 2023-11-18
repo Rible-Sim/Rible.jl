@@ -5,8 +5,8 @@ function Tbars(;θ = 0, coordsType = RB.NCF.NC)
     b = 1.0
     c = 0.05
     function make_base(i)
-        movable = true
-        constrained = true
+        contactable = true
+        visible = true
         mass_center_position = SVo3
         r̄p1 = SVector{3}([ -a, b,c])
         r̄p2 = SVector{3}([ -a,-b,c])
@@ -34,12 +34,12 @@ function Tbars(;θ = 0, coordsType = RB.NCF.NC)
         ṙo = zero(ro)
 
         prop = RB.RigidBodyProperty(
-                    i,movable,m,
+                    i,contactable,m,
                     Ī,
                     mass_center_position,
                     nodes_positions,
                     axes;
-                    constrained
+                    visible
                     )
 
         state = RB.RigidBodyState(prop, ri, R, ṙo, ω)
@@ -64,8 +64,8 @@ function Tbars(;θ = 0, coordsType = RB.NCF.NC)
         RB.RigidBody(prop,state,coords,basemesh)
     end
     function make_slider(i;ri=SVo3,R=RotZ(0.0),)
-        movable = true
-        constrained = false
+        contactable = true
+        visible = true
         mass_center_position = SVo3
         r̄p1 = SVector(0.0,0.0,c)
         r̄p2 = SVector(0.0,0.0,c/2)
@@ -81,12 +81,12 @@ function Tbars(;θ = 0, coordsType = RB.NCF.NC)
         m = 1.0
 
         prop = RB.RigidBodyProperty(
-            i,movable,m,
+            i,contactable,m,
             Ī,
             mass_center_position,
             nodes_positions,
             axes;
-            constrained
+            visible
         )
 
         # @show q[1:3]

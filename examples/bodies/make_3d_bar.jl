@@ -10,11 +10,11 @@ function make_3d_bar(
     coordsType = RB.NCF.NC
 )
 # @show id,ri,rj
-movable = true
+contactable = true
 if ci == Int[]
-    constrained = false
+    visible = true
 else
-    constrained = true
+    visible = true
 end
 u = rj - ri
 bar_length = norm(u)	
@@ -63,13 +63,13 @@ pretty_table(
 axes = [SVector(1.0,0.0,0.0) for _ in eachindex(loci)]
 prop = RB.RigidBodyProperty(
     id,
-    movable,
+    contactable,
     mass,
     Īg,
     mass_locus,
     loci,
     axes,;
-    constrained=constrained
+    visible=visible
 )
 # @show prop.inertia
 ṙo = zero(ri)

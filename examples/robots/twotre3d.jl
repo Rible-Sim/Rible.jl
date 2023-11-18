@@ -65,8 +65,8 @@ plates = [
             id,
             loci,ro,
             R,ri,;
-            # movable = true,
-            # constrained = false,
+            # contactable = true,
+            # visible = true,
             # ci = Int[],
             # cstr_idx = collect(1:6),
             color = :slategrey,

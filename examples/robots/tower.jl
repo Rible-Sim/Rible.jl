@@ -37,8 +37,8 @@ function tower(;k=nothing)
         zero(P[8]),
         RotX(0.0),
         P[8];
-        movable = true,
-        constrained = true,
+        contactable = true,
+        visible = true,
         ci = collect(1:12),
         cstr_idx = Int[],
         radius = 0.04,
@@ -60,8 +60,8 @@ function tower(;k=nothing)
         RotX(0.0),
         P[7];
         radius = 0.04,
-        movable = true,
-        constrained = false,
+        contactable = true,
+        visible = true,
     )
 
     # # #

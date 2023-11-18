@@ -1,9 +1,9 @@
 function build_2d_bar(id,ri,rj;α = 0.0, ci = Int[])
-    movable = true
+    contactable = true
     if ci == Int[]
-        constrained = false
+        visible = true
     else
-        constrained = true
+        visible = true
     end
     u = rj - ri
     b = norm(u)
@@ -19,8 +19,8 @@ function build_2d_bar(id,ri,rj;α = 0.0, ci = Int[])
                    0.0 0.0;
         ]
     )
-    prop = RB.RigidBodyProperty(id,movable,m,Īg,
-                mass_locus,loci;constrained=constrained
+    prop = RB.RigidBodyProperty(id,contactable,m,Īg,
+                mass_locus,loci;visible=visible
                 )
     ω = 0.0
     ro = ri

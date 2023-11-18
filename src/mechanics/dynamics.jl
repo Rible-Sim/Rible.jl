@@ -43,29 +43,39 @@ material_properties = Table(
     ]
 )
 
-function dynfuncs(bot;actuate=false,gravity=false,(Fˣ!)=(F,t)->nothing)
-    (;structure) = bot
-    function F!(F,q,q̇,t)
-        if actuate
-            actuate!(bot,[t])
-        end
-        clear_forces!(structure)
-        lazy_update_bodies!(structure,q,q̇)
-        update_tensiles!(structure)
-        if gravity
-            apply_gravity!(structure)
-        end
-        F .= assemble_force!(structure)
-        Fˣ!(F,t)
+
+function generalize_force!(F,bot,q,q̇,t;actuate=false,gravity=true,(user_defined_force!)=(F,t)->nothing)
+    if actuate
+        actuate!(bot,[t])
     end
-    function Jac_F!(∂F∂q̌,∂F∂q̌̇,q,q̇,t)
-        ∂F∂q̌ .= 0
-        ∂F∂q̌̇ .= 0
-        clear_forces!(structure)
-        lazy_update_bodies!(structure,q,q̇)
-        update_tensiles!(structure)
-        build_∂Q̌∂q̌!(∂F∂q̌,structure)
-        build_∂Q̌∂q̌̇!(∂F∂q̌̇,structure)
+    (;structure) = bot
+    clear_forces!(structure)
+    lazy_update_bodies!(structure,q,q̇)
+    update_tensiles!(structure)
+    if gravity
+        apply_gravity!(structure)
+    end
+    F .= assemble_force!(structure)
+    user_defined_force!(F,t)
+end
+
+function generalize_force_jacobain!(∂F∂q̌,∂F∂q̌̇,bot,q,q̇,t)
+    (;structure) = bot
+    ∂F∂q̌ .= 0
+    ∂F∂q̌̇ .= 0
+    clear_forces!(structure)
+    lazy_update_bodies!(structure,q,q̇)
+    update_tensiles!(structure)
+    build_∂Q̌∂q̌!(∂F∂q̌,structure)
+    build_∂Q̌∂q̌̇!(∂F∂q̌̇,structure)
+end
+
+function dynfuncs(bot;actuate=false,gravity=false,(Fˣ!)=(F,t)->nothing)
+    function F!(F,q,q̇,t)
+        generalize_force!(F,bot,q,q̇,t;actuate,gravity,(user_defined_force!)=(Fˣ!))
+    end
+    function Jac_F!(∂F∂q̌,∂F∂q̌̇,bot,q,q̇,t)
+        generalize_force_jacobain!(∂F∂q̌,∂F∂q̌̇,bot,q,q̇,t)
     end
     @eponymtuple(F!,Jac_F!)
 end
@@ -94,20 +104,10 @@ function contact_dynfuncs(bot;
     end
 
     function F!(F,q,q̇,t)
-        clear_forces!(structure)
-        update_bodies!(structure,q,q̇)
-        update_tensiles!(structure)
-        apply_gravity!(structure)
-        F .= assemble_force!(structure)
+        generalize_force!(F,bot,q,q̇,t;)
     end
-    function Jac_F!(∂F∂q̌,∂F∂q̌̇,q,q̇,t)
-        ∂F∂q̌ .= 0
-        ∂F∂q̌̇ .= 0
-        clear_forces!(structure)
-        update_bodies!(structure,q,q̇)
-        update_tensiles!(structure)
-        build_∂Q̌∂q̌!(∂F∂q̌,structure)
-        build_∂Q̌∂q̌̇!(∂F∂q̌̇,structure)
+    function Jac_F!(∂F∂q̌,∂F∂q̌̇,bot,q,q̇,t)
+        generalize_force_jacobain!(∂F∂q̌,∂F∂q̌̇,bot,q,q̇,t)
     end
     
     function prepare_contacts!(q)
@@ -280,20 +280,10 @@ function frictionless_contact_dynfuncs(bot;
     end
 
     function F!(F,q,q̇,t)
-        clear_forces!(structure)
-        update_bodies!(structure,q,q̇)
-        update_tensiles!(structure)
-        apply_gravity!(structure)
-        F .= assemble_force!(structure)
+        generalize_force!(F,bot,q,q̇,t;)
     end
     function Jac_F!(∂F∂q̌,∂F∂q̌̇,q,q̇,t)
-        ∂F∂q̌ .= 0
-        ∂F∂q̌̇ .= 0
-        clear_forces!(structure)
-        update_bodies!(structure,q,q̇)
-        update_tensiles!(structure)
-        build_∂Q̌∂q̌!(∂F∂q̌,structure)
-        build_∂Q̌∂q̌̇!(∂F∂q̌̇,structure)
+        generalize_force_jacobain!(∂F∂q̌,∂F∂q̌̇,bot,q,q̇,t)
     end
 
     function prepare_contacts!(q)
@@ -308,7 +298,7 @@ function frictionless_contact_dynfuncs(bot;
             contacts_bits[bodyid2sys_loci_idx[bid]] .= false
             persistent_bits[bodyid2sys_loci_idx[bid]] .= false
             if body isa AbstractRigidBody
-                if body.prop.id == 4
+                if body.prop.contactable
                     for pid in eachindex(loci_states)
                         locus_state = loci_states[pid]
                         (;position,contact_state) = locus_state

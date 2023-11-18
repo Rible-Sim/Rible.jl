@@ -23,8 +23,8 @@ function make_rollingdisk()
     ṙo = [0.0,0.0]
     ω = 4.0
     aps = [mass_locus]
-    movable = true
-	constrained = false
+    contactable = true
+	visible = true
     prop = RB.RigidBodyProperty(1,true,m,Īg,mass_locus,aps)
     ri = copy(ro)
     nmcs = RB.NCF.NC1P2V(ri,ro,α)

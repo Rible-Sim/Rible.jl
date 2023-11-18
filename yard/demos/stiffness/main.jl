@@ -63,7 +63,7 @@ ballbot = superball(;
     d = 2.0/2/2,
     z0 = 2.0/2,
     # k = 1.00,
-    constrained=true,
+    visible=true,
     loadmesh = false,
 )
 bot = ballbot

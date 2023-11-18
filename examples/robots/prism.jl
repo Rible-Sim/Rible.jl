@@ -90,7 +90,7 @@ if hasplate
         RotZ(0.0),
         ro;
         radius=r,
-        movable = true,
+        contactable = true,
         m=3,
         height=1e-2,
         ci = collect(1:12),
