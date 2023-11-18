@@ -34,10 +34,11 @@ using PrettyTables
 using Printf
 # IO
 using FileIO
-# code 
+# code
+using Revise
 using Cthulhu
 using JET
 using BenchmarkTools
-using AbbreviatedStackTraces
-ENV["JULIA_STACKTRACE_ABBREVIATED"] = true
-ENV["JULIA_STACKTRACE_MINIMAL"] = true
+# using AbbreviatedStackTraces
+# ENV["JULIA_STACKTRACE_ABBREVIATED"] = true
+# ENV["JULIA_STACKTRACE_MINIMAL"] = true

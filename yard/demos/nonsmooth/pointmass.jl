@@ -1,33 +1,39 @@
-#-- preamble
-cd(@__DIR__)
-include("deps.jl")
-include(RB.assetpath("vis.jl")); 
-includet(RB.assetpath("vis.jl"))
-#-- preamble end
+#-- deps
+include(joinpath(@__DIR__,"demos/nonsmooth/deps.jl"))
+import Rible as RB
+include(joinpath(@__DIR__,"vis.jl"))
+includet(joinpath(@__DIR__,"vis.jl")) #jl
+#-- deps end
 
 #-- point Mass
-includet("../robots/pointmass.jl")
+include(joinpath(@__DIR__,"../examples/robots/pointmass.jl"))
+includet(joinpath(@__DIR__,"../examples/robots/pointmass.jl")) #jl
+
+# pm_contact_dynfuncs
 function pm_contact_dynfuncs(bot;θ=0.0)
     a = tan(θ)
     n = [-a,0,1]
+    ## horizontal plane
     inclined_plane = RB.Plane(n,zeros(3))
     RB.contact_dynfuncs(bot;flatplane = inclined_plane)
 end
 
+# time
 tspan = (0.0,0.455)
 tspan = (0.0,1.5)
 h = 1e-3
 
-# horizontal plane
 restitution_coefficients = [0.5]
 v0s = [1.0]
 
+# pointmass
 pm = new_pointmass(;
     e = restitution_coefficients[1],
     μ=0.1,
     origin_velocity = [v0s[1],0,0]
-)
+);
 
+# simulation
 prob = RB.SimProblem(pm,pm_contact_dynfuncs)
 RB.solve!(
     prob,
@@ -36,9 +42,11 @@ RB.solve!(
     ftol=1e-14,
     maxiters=50,
     exception=false
-)
+);
 
-GM.activate!();with_theme(RB.theme_pub;
+# visualize
+GM.activate!()
+with_theme(RB.theme_pub;
             resolution = (0.8tw,0.2tw),
             figure_padding = (0,fontsize,0,0),
             Axis3 = (
@@ -65,7 +73,7 @@ GM.activate!();with_theme(RB.theme_pub;
         doslide=false,
         AxisType = Axis3,
         fig = gd,
-        # gridsize=(1,4),
+        ## gridsize=(1,4),
         xlims=(-1e-3,1.0),
         ylims=(-0.4,0.4),
         zlims=(-1e-3,1.0),
@@ -92,8 +100,8 @@ GM.activate!();with_theme(RB.theme_pub;
                 )
             end
         end
-        # figname="pointmass_e05_v00",
-        # figname="pointmass_e05_v10"
+        ## figname="pointmass_e05_v00",
+        ## figname="pointmass_e05_v10"
     )
     Label(gd[1,1,TopLeft()], 
         rich("($(alphabet[1]))",font=:bold)
@@ -103,19 +111,19 @@ GM.activate!();with_theme(RB.theme_pub;
     vp1 = RB.get_velocity!(bot,1,1)
     lines!(ax1,t,vp1[3,:])
     xlims!(ax1,t[begin],t[end])
-    # ylims!(ax1,-6,6)
+    ## ylims!(ax1,-6,6)
     Label(gd1[1,1,TopLeft()], 
         rich("($(alphabet[2]))",font=:bold)
     )
     hlines!(ax1,[0],color=:gray)
     ax2 = Axis(gd1[1,2], xlabel = tlabel, ylabel = L"\dot{x}~(\mathrm{m/s})")
-    # me = RB.mechanical_energy!(bot)
-    # lines!(ax2,t,me.E)
+    ## me = RB.mechanical_energy!(bot)
+    ## lines!(ax2,t,me.E)
     lines!(ax2,t,vp1[1,:])
     xlims!(ax2,t[begin],t[end])
-    # ylims!(ax2,-1,11)
-    # ax2.yticks = [0,0.3,0.7,1.0]
-    # ax2.xticks = collect(1:xtickmaxs[botid])
+    ## ylims!(ax2,-1,11)
+    ## ax2.yticks = [0,0.3,0.7,1.0]
+    ## ax2.xticks = collect(1:xtickmaxs[botid])
     Label(gd1[1,2,TopLeft()], 
         rich("($(alphabet[3]))",font=:bold)
     )
@@ -123,41 +131,47 @@ GM.activate!();with_theme(RB.theme_pub;
     fig
 end
 
+# inclined_plane
 θ = 15 |> deg2rad
 inclined_plane = RB.Plane([-tan(θ),0,1],zeros(3))
 origin_position = [0.0,0,-1e-7]
 origin_velocity = [2.0cos(θ),0,2.0sin(θ)]
-# origin_velocity = [0,-2.0,0]
+## origin_velocity = [0,-2.0,0]
 
 # analytical
 g = 9.81
 μ=0.3
 vo = norm(origin_velocity)
 a = -μ*g*cos(θ)-g*sin(θ)
-# μ*g*cos(θ)-g*sin(θ)
+## μ*g*cos(θ)-g*sin(θ)
 tf = -vo/a
-# d(t) -> vo*t+1/2*a*t^2
+## d(t) -> vo*t+1/2*a*t^2
+
+# simulation
 tspan = (0.0,0.6)
 pm = new_pointmass(;e=0.0, μ, origin_position, origin_velocity)
 
 prob = RB.SimProblem(pm,(x)->pm_contact_dynfuncs(x;θ))
-RB.solve!(prob,RB.ZhongCCP();tspan,dt=1e-3,ftol=1e-14,maxiters=50,exception=false)
+RB.solve!(prob,RB.ZhongCCP();tspan,dt=1e-3,ftol=1e-14,maxiters=50,exception=false);
 
+# post processing
 rp1 = RB.get_trajectory!(pm,1,1)
 ṙp1 = RB.get_velocity!(pm,1,1)
 dp1 = rp1.u .|> norm
 vl1 = [u ⋅ normalize(origin_velocity) for u in ṙp1]
-# overshoot!
+## overshoot!
 scatterlines(vl1)
-GM.activate!(); with_theme(theme_pub;
-        # fontsize = 6 |> pt2px,
+
+# visualize
+GM.activate!(); with_theme(RB.theme_pub;
+        ## fontsize = 6 |> pt2px,
         resolution = (1tw,0.2tw),
         figure_padding = (fontsize,fontsize,0,0),
         Axis3 = (
             azimuth = 4.575530633326984,
             elevation = 0.16269908169872405,
-            # zlabelvisible = false,
-            # yticklabelsvisible = false,
+            ## zlabelvisible = false,
+            ## yticklabelsvisible = false,
             zlabeloffset = 2.5fontsize,
         )
     ) do
@@ -189,12 +203,12 @@ GM.activate!(); with_theme(theme_pub;
         showtitle=false,
         ground=inclined_plane,
         sup! = (ax,tgob,sgi) -> begin
-            hidey(ax)
+            RB.hidey(ax)
             for (istep,step) in enumerate(steps)
                 suptg = deepcopy(bot.structure)
                 suptg.state.system.q .= bot.traj.q[step]
                 RB.update!(suptg)
-                viz!(ax,Observable(suptg);
+                RB.viz!(ax,Observable(suptg);
                     showlabels=false,
                     showmesh=false,
                     showcables=false,
@@ -204,7 +218,7 @@ GM.activate!(); with_theme(theme_pub;
                 )
             end
         end,
-        # figname="pointmass_sliding"
+        ## figname="pointmass_sliding"
     )
     ax1 = Axis(gd2[1,1], xlabel = tlabel, ylabel = "disp. (m)")
     Label(gd2[1,1,TopLeft()], 
@@ -219,13 +233,13 @@ GM.activate!(); with_theme(theme_pub;
     dp1 = rp1.u .|> norm
     vl1 = ṙp1.u .|> norm
     @myshow findmax(dp1)
-    stopstep = time2step(tf,t)
+    stopstep = RB.time2step(tf,t)
     lines!(ax1,t,dp1)
     xlims!(ax1,0,0.6)
     scatterlines!(ax2,t[1:stopstep],(t) -> vo*t+1/2*a*t^2,color=:red,label="Analytic")
     scatterlines!(ax2,t[stopstep:end],(t) -> vo*tf+1/2*a*tf^2,color=:red)
     scatter!(ax2,t,dp1,color=:blue,marker=:diamond,label="NMSI")
-    # lines!(ax2,t,vl1)
+    ## lines!(ax2,t,vl1)
     axislegend(ax2;position=:rt,orientation=:horizontal,)
     xlims!(ax2,0.369,0.389)
     ylims!(ax2,3.7161e-1,3.7164e-1)

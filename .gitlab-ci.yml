@@ -13,13 +13,14 @@ pages:
   script:
     - apt-get update -qq && apt-get install -y git xorg-dev mesa-utils xvfb libgl1 freeglut3-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev libxext-dev # needed by Documenter
     - DISPLAY=:0 xvfb-run -s '-screen 0 1024x768x24' julia --project=yard/ -e 'using Pkg; Pkg.develop(PackageSpec(path=pwd())); Pkg.instantiate()'
-    - DISPLAY=:0 xvfb-run -s '-screen 0 1024x768x24' julia --project=yard/ --color=yes docs/make.jl
+    - JULIA_DEBUG=Literate DISPLAY=:0 xvfb-run -s '-screen 0 1024x768x24' julia --project=yard/ --color=yes docs/make.jl
     - mv docs/build public  # move to the directory picked up by Gitlab pages
   artifacts:
     paths:
       - public
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_COMMIT_BRANCH == "dev"
 
 # Below is the template to run your tests in Julia
 .test_template: &test_definition

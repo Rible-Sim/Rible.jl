@@ -1,40 +1,55 @@
-using Documenter, DocStringExtensions, Literate
+using Documenter, DocStringExtensions, Literate, DemoCards
 using Rible
 
 cd(@__DIR__)
-function replace_includes(str)
+# function replace_includes(str)
 
-    included = [
-        "1Dfield_temporalprediction.jl",
-        "2Dfield_crossprediction.jl", 
-        "2Dfield_temporalprediction.jl"
-    ]
+#     included = [
+#         "1Dfield_temporalprediction.jl",
+#         "2Dfield_crossprediction.jl", 
+#         "2Dfield_temporalprediction.jl"
+#     ]
 
-    path = dirname(dirname(pathof(Rible)))*"/examples/"
+#     path = dirname(dirname(pathof(Rible)))*"/examples/"
 
-    for ex in included
-        content = read(path*ex, String)
-        str = replace(str, "include(\"$(ex)\")" => content)
-    end
-    return str
-end
+#     for ex in included
+#         content = read(path*ex, String)
+#         str = replace(str, "include(\"$(ex)\")" => content)
+#     end
+#     return str
+# end
 
 # Literate it:
+# Literate.markdown(
+#     "src/stexamples.jl", 
+#     "src/";
+#     name = "stexamples", 
+#     preprocess = replace_includes,
+#     documenter = true,
+# )
+
 Literate.markdown(
-    "src/stexamples.jl", 
+    "../yard/demos/nonsmooth/pointmass.jl", 
     "src/";
-    name = "stexamples", 
-    preprocess = replace_includes,
+    name="pointmass",
+    # execute = true,
     documenter = true,
 )
+# 1. generate demo files
+# demopage, postprocess_cb, demo_assets = makedemos("../yard/realdemos"; # this is the relative path to docs/
+#     root = @__DIR__,
+#     src = "src",
+#     build = "build",
+#     branch = "gh-pages",
+#     edit_branch = "main",
+#     credit = true,
+#     throw_error = false,
+# )
+# if there are generated css assets, pass it to Documenter.HTML
+# assets = []
+# isnothing(demo_assets) || (push!(assets, demo_assets))
 
-Literate.markdown(
-    "examples/tail/dynamics.jl", 
-    "src/";
-    name="tail"
-)
-
-#      
+# 2. normal Documenter usage
 makedocs(
     root = @__DIR__,
     source = "src", #where the markdown source files are read from
@@ -65,6 +80,9 @@ makedocs(
         # "Statics" => [
         #     "inverse_statics.md"
         # ],
+        "Demos" => [
+            "pointmass.md",
+        ],
         "Dynamics" => [
             "solvers.md"
         ],
@@ -88,18 +106,21 @@ makedocs(
     ),
     workdir = joinpath(@__DIR__, "../yard"), # the working directory where @example and @repl code blocks are executed. 
     format = Documenter.HTML(
-        mathengine = MathJax3(
-            Dict(
-                :loader => Dict("load" => ["[tex]/physics"]),
-                :tex => Dict(
-                    "inlineMath" => [["\$","\$"], ["\\(","\\)"]],
-                    "tags" => "ams",
-                    "packages" => ["base", "ams", "autoload", "physics"],
-                ),
-            )
-        )
+        # mathengine = MathJax3(
+        #     Dict(
+        #         :loader => Dict("load" => ["[tex]/physics"]),
+        #         :tex => Dict(
+        #             "inlineMath" => [["\$","\$"], ["\\(","\\)"]],
+        #             "tags" => "ams",
+        #             "packages" => ["base", "ams", "autoload", "physics"],
+        #         ),
+        #     )
+        # )
     ),
 )
+# 3. postprocess after makedocs
+# postprocess_cb()
+
 # Documenter can also automatically deploy documentation to gh-pages.
 # See "Hosting Documentation" and deploydocs() in the Documenter manual
 # for more information.

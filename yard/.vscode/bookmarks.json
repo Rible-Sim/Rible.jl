@@ -41,7 +41,7 @@
 			]
 		},
 		{
-			"path": "demos/nonsmooth/main.jl",
+			"path": "realdemos/nonsmooth/main.jl",
 			"bookmarks": [
 				{
 					"line": 594,
