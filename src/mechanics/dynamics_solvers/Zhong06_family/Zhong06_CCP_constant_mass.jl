@@ -255,8 +255,6 @@ function solve!(sim::Simulator,solvercache::ZhongCCPCache;
             Nmax = 50
             for iteration = 1:maxiters
                 # @show iteration,D,ηs,restitution_coefficients,gaps
-                get_frictional_distribution_law!(structure,contact_cache,x[1:nq])
-                (;L) = contact_cache.cache
                 luJac = ns_stepk!(
                     Res,Jac,
                     F,∂F∂q,∂F∂q̇,
@@ -269,6 +267,8 @@ function solve!(sim::Simulator,solvercache::ZhongCCPCache;
                 )
                 normRes = norm(Res)
                 if na == 0
+                    get_frictional_distribution_law!(structure,contact_cache,x[1:nq])
+                    (;L) = contact_cache.cache
                     if normRes < ftol
                         isconverged = true
                         iteration_break = iteration-1

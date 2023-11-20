@@ -19,7 +19,7 @@ includet("../../../examples/robots/slider_crank.jl")#jl
 sc = slider_crank(;coordsType=RB.NCF.NC)
 sc = slider_crank(;coordsType=RB.QCF.QC)
 plot_traj!(sc;showground=false)
-dt = 1e-4
+dt = 1e-3
 tspan = (0.0,1.0)
 
 planes = RB.StaticContactSurfaces(
@@ -40,7 +40,8 @@ RB.solve!(
 
 plot_traj!(sc;showground=false)
 
-prob = RB.DynamicsProblem(sc,
+prob = RB.DynamicsProblem(
+    sc,
     planes,
     RB.RestitutionFrictionCombined(
         RB.NewtonRestitution(),
@@ -70,7 +71,8 @@ RB.solve!(
     dt,tspan,ftol=1e-14,maxiters=50,verbose=true,exception=true,progress=false,
 )
 
-prob = RB.DynamicsProblem(sc,
+prob = RB.DynamicsProblem(
+    sc,
     planes,
     RB.RestitutionFrictionCombined(
         RB.NewtonRestitution(),

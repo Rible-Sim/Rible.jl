@@ -325,10 +325,13 @@ function solve!(sim::Simulator,solvercache::ZhongQCCPCache;
                 else # na!=0
                     # @show timestep,iteration,normRes,Λₘ
                     # Λₘini = repeat([Λ_guess,0,0],na)
+                    get_frictional_distribution_law!(structure,contact_cache,x[1:nq])
+                    (;L) = contact_cache.cache
                     Λₘini = deepcopy(Λₘ)
                     Λₘini[begin+1:3:end] .= 0.0
                     Λₘini[begin+2:3:end] .= 0.0
                     # yini = deepcopy(Λₘini)
+                    𝐍 .+= L
                     yini = 𝐍*Λₘ + 𝐫
                     yini .= abs.(yini)
                     yini[begin+1:3:end] .= 0.0
