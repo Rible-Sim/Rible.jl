@@ -137,7 +137,7 @@ plot_traj!(bot)
 #     @eponymtuple(F!)
 # end
 
-# prob = RB.SimProblem(bot,dynfuncs)
+# prob = RB.DynamicsProblem(bot,dynfuncs)
 # RB.solve!(prob,RB.Zhong06();dt=0.01,tspan=(0.0,10.0),ftol=1e-13,verbose=true)
 
 ω², δq̌ = RB.undamped_eigen(bot.st)

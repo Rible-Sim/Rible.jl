@@ -79,7 +79,7 @@ tw = 469 |> pt2px
 ## comparison with Adams
 obot = one_bar_one_tri()
 
-prob = RB.SimProblem(obot,(x)->dynfuncs(x;gravity=true))
+prob = RB.DynamicsProblem(obot,(x)->dynfuncs(x;gravity=true))
 
 dt = 1e-3
 
@@ -194,8 +194,8 @@ obot.traj.t
 
 ## comparison with Alpha
 obot_zhong = one_bar_one_tri(); obot_alpha = deepcopy(obot)
-prob_zhong = RB.SimProblem(obot_zhong,(x)->dynfuncs(x;gravity=true));
-prob_alpha = RB.SimProblem(obot_alpha,(x)->dynfuncs(x;gravity=true));
+prob_zhong = RB.DynamicsProblem(obot_zhong,(x)->dynfuncs(x;gravity=true));
+prob_alpha = RB.DynamicsProblem(obot_alpha,(x)->dynfuncs(x;gravity=true));
 
 dt = 1e-3
 RB.solve!(prob_zhong,RB.Zhong06();dt,tspan=(0.0,500.0),ftol=1e-14)
@@ -537,7 +537,7 @@ ratio1 = 0.998
 dt = 1e-3
 ## undamped noslack
 tower2dbot_undamped_noslack = tower2d(;k=100.0,c=0.0,ratio=0.95,ratio1,slack=false)
-RB.solve!(RB.SimProblem(tower2dbot_undamped_noslack,(x)->dynfuncs(x;gravity=true)),
+RB.solve!(RB.DynamicsProblem(tower2dbot_undamped_noslack,(x)->dynfuncs(x;gravity=true)),
           RB.Zhong06(),
           (
             prescribe! = (sysstate,st)->pres2d!(sysstate,st;aux=true),
@@ -552,7 +552,7 @@ plot_traj!(tower2dbot_undamped_noslack)
 
 ## damped noslack
 tower2dbot_damped_noslack = tower2d(;k=100.0,c=1.0,ratio=0.95,ratio1,slack=false)
-RB.solve!(RB.SimProblem(tower2dbot_damped_noslack,(x)->dynfuncs(x;gravity=true)),
+RB.solve!(RB.DynamicsProblem(tower2dbot_damped_noslack,(x)->dynfuncs(x;gravity=true)),
           RB.Zhong06(),
           (
             prescribe! = (sysstate,st)->pres2d!(sysstate,st;aux=true),
@@ -615,7 +615,7 @@ end
 GM.activate!(); plot_data_points(x0,y0)
 CM.activate!(); plot_data_points(x0,y0,"f_curve")
 
-RB.solve!(RB.SimProblem(tower2dbot_undamped_slack,(x)->dynfuncs(x;gravity=true)),
+RB.solve!(RB.DynamicsProblem(tower2dbot_undamped_slack,(x)->dynfuncs(x;gravity=true)),
           RB.Zhong06(),
           (
             prescribe! = (sysstate,st)->pres2d!(sysstate,st;aux=true),
@@ -628,7 +628,7 @@ plot_traj!(tower2dbot_undamped_slack;showmesh)
 
 ## undamped slack with fix aux
 tower2dbot_undamped_slack_noaux = tower2d(;k=100.0,c=0.0,ratio=0.95,ratio1,slack=true)
-RB.solve!(RB.SimProblem(tower2dbot_undamped_slack_noaux,(x)->dynfuncs(x;gravity=true)),
+RB.solve!(RB.DynamicsProblem(tower2dbot_undamped_slack_noaux,(x)->dynfuncs(x;gravity=true)),
           RB.Zhong06(),
           (
             prescribe! = (sysstate,st)->pres2d!(sysstate,st;aux=false),
@@ -844,7 +844,7 @@ newsim = simple(;
 plot_traj!(newsim)
 
 RB.solve!(
-    RB.SimProblem(newsim,(x)->dynfuncs(x;gravity)),
+    RB.DynamicsProblem(newsim,(x)->dynfuncs(x;gravity)),
     RB.Zhong06();
     dt=1e-3,tspan=(0.0,15.0),ftol=1e-14
 )
@@ -1136,7 +1136,7 @@ CM.activate!(); plot_first_frequencies([tower3dbot0,tower3dbot1],"first_frequenc
 
 ## seismic without deploy
 tower3dbot0_nodpl = deepcopy(tower3dbot0)
-RB.solve!(RB.SimProblem(tower3dbot0_nodpl,(x)->dynfuncs(x;gravity=true)),
+RB.solve!(RB.DynamicsProblem(tower3dbot0_nodpl,(x)->dynfuncs(x;gravity=true)),
             RB.Zhong06(),
             (
                 prescribe! = pres3d!,
@@ -1167,7 +1167,7 @@ with_theme(theme_pub;
 end
 
 tower3dbot1_nodpl = deepcopy(tower3dbot1)
-RB.solve!(RB.SimProblem(tower3dbot1_nodpl,(x)->dynfuncs(x;gravity=true)),
+RB.solve!(RB.DynamicsProblem(tower3dbot1_nodpl,(x)->dynfuncs(x;gravity=true)),
             RB.Zhong06(),
             (
                 prescribe! = pres3d!,
@@ -1396,14 +1396,14 @@ GM.activate!(); plot_tower3d_vis_nodpl([tower3dbot0_nodpl,tower3dbot1_nodpl], "t
 Td = [5.0,10.0,15.0,20.0]
 function do_noseis(;Td,tend=25.0)
     bot   = RB.Robot(deepcopy(tower3dbot0.st),(actuators=[make_pres_actor(μ0,μ1,0.0,Td)],))
-    RB.solve!(RB.SimProblem(bot,(x)->dynfuncs(x;actuate=true,gravity=true)),
+    RB.solve!(RB.DynamicsProblem(bot,(x)->dynfuncs(x;actuate=true,gravity=true)),
                 RB.Zhong06();
                 dt=1e-3,tspan=(0.0,tend),ftol=1e-14)
     bot
 end
 function do_seis(;ν,Td,tend=25.0)
     bot   = RB.Robot(deepcopy(tower3dbot0.st),(actuators=[make_pres_actor(μ0,μ1,0.0,Td)],))
-    RB.solve!(RB.SimProblem(bot,(x)->dynfuncs(x;actuate=true,gravity=true)),
+    RB.solve!(RB.DynamicsProblem(bot,(x)->dynfuncs(x;actuate=true,gravity=true)),
                 RB.Zhong06(),
                 (
                     prescribe! = (sysstate,st)->pres3d!(sysstate,st;ν),
@@ -1718,7 +1718,7 @@ CM.save(texroot*raw"\OneDrive - 中山大学\Papers\DynamicTensegrity\CS\images\
 tower3dbot0 = tower3d(;k=500.0,c=2.0)
 
 tower3d_seis   = RB.Robot(deepcopy(tower3dbot0.st),(actuators=[make_pres_actor(μ0,μ1,0.0,10.0)],))
-RB.solve!(RB.SimProblem(tower3d_seis,(x)->dynfuncs(x;actuate=true,gravity=true)),
+RB.solve!(RB.DynamicsProblem(tower3d_seis,(x)->dynfuncs(x;actuate=true,gravity=true)),
             RB.Zhong06(),(sysstate,st)->pres3d!(sysstate,st;T=0.5);
             dt=1e-3,tspan=(0.0,15.0),ftol=1e-14)
 
@@ -1736,13 +1736,13 @@ tower3dact_l = RB.Robot(
                     (actuators=[make_pres_actor(μ0,μ1,0.0,10.0)],))
 
 dt = 1e-3
-RB.solve!(RB.SimProblem(tower3dact_i,(x)->dynfuncs(x;actuate=true,gravity=true)),
+RB.solve!(RB.DynamicsProblem(tower3dact_i,(x)->dynfuncs(x;actuate=true,gravity=true)),
             RB.Zhong06(),(sysstate,st)->pres3d!(sysstate,st;T=1.0);dt=dt,tspan=(0.0,10.0),ftol=1e-14)
-RB.solve!(RB.SimProblem(tower3dact_j,(x)->dynfuncs(x;actuate=true,gravity=true)),
+RB.solve!(RB.DynamicsProblem(tower3dact_j,(x)->dynfuncs(x;actuate=true,gravity=true)),
             RB.Zhong06(),(sysstate,st)->pres3d!(sysstate,st;T=1.0);dt=dt,tspan=(0.0,10.0),ftol=1e-14)
-RB.solve!(RB.SimProblem(tower3dact_k,(x)->dynfuncs(x;actuate=true,gravity=true)),
+RB.solve!(RB.DynamicsProblem(tower3dact_k,(x)->dynfuncs(x;actuate=true,gravity=true)),
             RB.Zhong06(),(sysstate,st)->pres3d!(sysstate,st;T=1.0);dt=dt,tspan=(0.0,10.0),ftol=1e-14)
-RB.solve!(RB.SimProblem(tower3dact_l,(x)->dynfuncs(x;actuate=true,gravity=true)),
+RB.solve!(RB.DynamicsProblem(tower3dact_l,(x)->dynfuncs(x;actuate=true,gravity=true)),
             RB.Zhong06(),(sysstate,st)->pres3d!(sysstate,st;T=1.0);dt=dt,tspan=(0.0,10.0),ftol=1e-14)
 
 function plot_compare_ijkl(boti,botj,botk,botl)
@@ -1832,7 +1832,7 @@ tend = 10.0
 dstep = 45
 dt = 1e-4
 RB.solve!(
-    RB.SimProblem(
+    RB.DynamicsProblem(
         newbridge_tag_dyn,
         (x)->dynfuncs(x;actuate=false,gravity,(Fˣ!)=(F,t) -> begin
             F .+= F̌*sin(t)*1e2
@@ -1856,7 +1856,7 @@ RB.check_static_equilibrium_output_multipliers(bridge_deploy.st;gravity=true)
 q_tag = RB.get_coords(newbridge_tag.st)
 
 RB.solve!(
-    RB.SimProblem(
+    RB.DynamicsProblem(
         bridge_deploy,(x)->dynfuncs(x;actuate=false,gravity=true)),
         RB.Zhong06(),
         # (
@@ -2042,7 +2042,7 @@ newembed1_outer_deploy = RB.Robot(
 )
 
 RB.solve!(
-    RB.SimProblem(
+    RB.DynamicsProblem(
         newembed1_outer_deploy,
         (x)->dynfuncs(x;actuate=true,gravity=true)
     ),

@@ -85,7 +85,7 @@ _ = RB.check_static_equilibrium_output_multipliers(dpbridge.st)
 # 动力学仿真
 dt = 1e-3
 
-RB.solve!(RB.SimProblem(dpbridge,
+RB.solve!(RB.DynamicsProblem(dpbridge,
         (x)->dynfuncs(x;actuate=true,gravity=false)
         ),
         RB.Zhong06(),

@@ -242,7 +242,7 @@ function ipsolve(nq,nλ,nμ,q0,q̇0,dyfuncs,tspan;dt=0.01,ftol=1e-14,xtol=ftol,v
     prog = Progress(totalstep; dt=1.0, enabled=progress)
     for timestep = 1:totalstep
         #---------Step k Control-----------
-        # control!(intor,cache)
+        # control!(sim,cache)
         #---------Step k Control-----------
         q̃ₛ₋₁ = q̃s[timestep-1]
         qₛ₋₁ = qs[timestep-1]
@@ -335,7 +335,7 @@ function ipsolve(nq,nλ,nμ,q0,q̇0,dyfuncs,tspan;dt=0.01,ftol=1e-14,xtol=ftol,v
             if exception
                 error("Not converged!")
             else
-                # intor.convergence = false
+                # sim.convergence = false
                 # break
             end
         else

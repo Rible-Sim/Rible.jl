@@ -71,6 +71,10 @@ To do this, use `include`, docs/test/benchmark; use `includet` dev;
     - [ ] ZhongQCCPN
     - [ ] ZhongQCCPNMono
       - [ ] use solver / contact model / for dispatch
+      - [ ] solver: Zhong06, generalize-$\alpha$
+      - [ ] friction model: frictionless, Coulomb, PolyhedralCoulomb
+      - [ ] resitution: Inelastic, Newton, Poisson, Strange
+      - [ ] variants: Unclassified/Classified CCP, Mono/Two-layer,
 - [x] reduce functions fields
 - [ ] preallocations for autodiff
 - [ ] joint cstr

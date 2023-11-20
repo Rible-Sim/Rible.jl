@@ -1,11 +1,40 @@
-struct ZhongCCP <: AbstractSolver end
 
 struct ZhongCCPCache{CacheType}
     cache::CacheType
 end
 
-function generate_cache(::ZhongCCP,intor;dt,kargs...)
-    (;prob) = intor
+function generate_cache(
+        simulator::Simulator{DynamicsProblem{
+            RobotType,
+            FrictionRestitutionCombined{NewtonRestitution,CoulombFriction}
+        }},
+        solver::DynamicsSolver{
+            Zhong06,
+            InnerLayerContactSolver
+        };
+        dt,kargs...
+    ) where RobotType
+    generate_cache(
+        similator,
+        solver,
+        has_constant_mass_matrix(similator.prob.bot);
+        dt,kargs...
+    ) 
+end  
+
+function generate_cache(
+        simulator::Simulator{DynamicsProblem{
+            RobotType,
+            FrictionRestitutionCombined{NewtonRestitution,CoulombFriction}
+        }},
+        solver::DynamicsSolver{
+            Zhong06,
+            InnerLayerContactSolver
+        },
+        ::Val{true};
+        dt,kargs...
+    )   where RobotType
+    (;prob) = simulator
     (;bot,dynfuncs) = prob
     (;structure) = bot
     M = Matrix(assemble_M(structure))
@@ -112,13 +141,13 @@ function make_zhongccp_ns_stepk(nq,nλ,na,qₖ₋₁,vₖ₋₁,pₖ₋₁,tₖ�
     ns_stepk!
 end
 
-function solve!(intor::Integrator,solvercache::ZhongCCPCache;
+function solve!(sim::Simulator,solvercache::ZhongCCPCache;
                 dt,
                 ftol=1e-14,xtol=ftol,
                 verbose=false,verbose_contact=false,
                 maxiters=50,
                 progress=true,exception=true)
-    (;prob,controller,tspan,restart,totalstep) = intor
+    (;prob,controller,tspan,restart,totalstep) = sim
     (;bot,dynfuncs) = prob
     (;traj,contacts_traj) = bot
     (;F!, Jac_F!, 
@@ -154,7 +183,7 @@ function solve!(intor::Integrator,solvercache::ZhongCCPCache;
     prog = Progress(totalstep; dt=1.0, enabled=progress)
     for timestep = 1:totalstep
         #---------Time Step k Control-----------
-        # control!(intor,cache)
+        # control!(sim,cache)
         #---------Time Step k Control-----------
         cₖ₋₁ = contacts_traj[timestep]
         cₖ = contacts_traj[timestep+1]
@@ -282,7 +311,7 @@ function solve!(intor::Integrator,solvercache::ZhongCCPCache;
                 @error "Not converged!"
                 break
             else
-                # intor.convergence = false
+                # sim.convergence = false
                 # break
             end
         end

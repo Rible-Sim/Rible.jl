@@ -73,7 +73,7 @@ function dynfuncs(bot)
     Jac_F! = true
     @eponymtuple(F!, Jac_F!)
 end
-prob = RB.SimProblem(bot1,dynfuncs)
+prob = RB.DynamicsProblem(bot1,dynfuncs)
 
 function actuate!(st, t; dt=1e-2)
     function inner(t;dt=dt)

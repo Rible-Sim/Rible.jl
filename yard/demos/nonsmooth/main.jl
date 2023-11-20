@@ -35,7 +35,7 @@ topq = make_top(origin_position,R,origin_velocity,Ω;μ,e,loadmesh=true)
 #note subsequent iteration slow convergence 
 #note initial guess can not improve it?
 RB.solve!(
-    RB.SimProblem(topq,top_contact_dynfuncs),
+    RB.DynamicsProblem(topq,top_contact_dynfuncs),
     RB.ZhongQCCPN();
     tspan,
     dt=h,
@@ -44,7 +44,7 @@ RB.solve!(
 )
 
 RB.solve!(
-    RB.SimProblem(topq,top_contact_dynfuncs),
+    RB.DynamicsProblem(topq,top_contact_dynfuncs),
     RB.ZhongQCCPNMono();
     tspan,
     dt=h,
@@ -66,7 +66,7 @@ plot_traj!(
 
 topn = make_top(origin_position,R,origin_velocity,Ω,RB.NCF.NC;μ,e,loadmesh=true)
 RB.solve!(
-    RB.SimProblem(topn,top_contact_dynfuncs),
+    RB.DynamicsProblem(topn,top_contact_dynfuncs),
     RB.ZhongCCP();
     tspan,
     dt=h,
@@ -194,7 +194,7 @@ end
 topq_longtime = deepcopy(topq)
 RB.set_new_initial!(topq_longtime,topq.traj.q[end],topq.traj.q̇[end])
 RB.solve!(
-    RB.SimProblem(topq_longtime,top_contact_dynfuncs),
+    RB.DynamicsProblem(topq_longtime,top_contact_dynfuncs),
     RB.ZhongQCCP();
     tspan = (0.0,50.0),
     dt=2e-3,
@@ -216,7 +216,7 @@ topn_longtimes = [
         Ω = [0.0,0.0,200.0]
         bot = make_top(origin_position,R,origin_velocity,Ω,RB.NCF.NC;μ,e,loadmesh=true)
         RB.solve!(
-            RB.SimProblem(bot,(x)->top_contact_dynfuncs(x;checkpersist=check)),
+            RB.DynamicsProblem(bot,(x)->top_contact_dynfuncs(x;checkpersist=check)),
             RB.ZhongCCP();
             tspan = (0.0,500.0),
             dt=2e-3,
@@ -317,7 +317,7 @@ tops_e0 = [
     begin   
         topbot = make_top(origin_position,R,origin_velocity,Ω,RB.NCF.NC; μ = 0.01, e = 0.0,loadmesh=true)
         RB.solve!(
-            RB.SimProblem(topbot,(x)->top_contact_dynfuncs(x;checkpersist=check)),
+            RB.DynamicsProblem(topbot,(x)->top_contact_dynfuncs(x;checkpersist=check)),
             RB.ZhongCCP();
             tspan=(0.0,2.0),
             dt,ftol=1e-14,maxiters=50,exception=false,#verbose_contact=false
@@ -521,7 +521,7 @@ dts = [1e-2,5e-3,3e-3,2e-3,1e-3,5e-4,3e-4,2e-4,1e-4,1e-5]
 tops_dt = [
  begin
     top = deepcopy(tops_e0[1])
-     RB.solve!(RB.SimProblem(top,top_contact_dynfuncs),
+     RB.solve!(RB.DynamicsProblem(top,top_contact_dynfuncs),
              RB.ZhongCCP();
              tspan=(0.0,0.1),dt,ftol=1e-14,maxiters=50,exception=true)
  end
@@ -571,7 +571,7 @@ tspan = (0.0,0.4)
 h = 1e-3
 
 
-prob = RB.SimProblem(bar,bar_contact_dynfuncs)
+prob = RB.DynamicsProblem(bar,bar_contact_dynfuncs)
 
 RB.solve!(prob,RB.ZhongCCP();tspan,dt=h,ftol=1e-12,maxiters=50,exception=false)
 
@@ -829,7 +829,7 @@ tspan = (0.0,1.5)
 h = 2e-4
 
 RB.solve!(
-    RB.SimProblem(flexcable,(x)->flexcable_contact_dynfuncs(x,inclined_plane)),
+    RB.DynamicsProblem(flexcable,(x)->flexcable_contact_dynfuncs(x,inclined_plane)),
     RB.ZhongCCP();
     tspan,dt=h,ftol=1e-14,maxiters=50,exception=false,verbose=false
 )
@@ -849,7 +849,7 @@ flexcables_dt = [
     begin
         flexcable_dt = deepcopy(flexcable)
         RB.solve!(
-            RB.SimProblem(flexcable_dt,(x)->flexcable_contact_dynfuncs(x,inclined_plane)),
+            RB.DynamicsProblem(flexcable_dt,(x)->flexcable_contact_dynfuncs(x,inclined_plane)),
                 RB.ZhongCCP();
                 tspan=(0.0,0.12),dt,ftol=1e-14,maxiters=50,exception=false)
     end
@@ -996,7 +996,7 @@ end
 h = 2e-4
 tspan = (0.0,1.5)
 RB.solve!(
-    RB.SimProblem(flexcable,(x)->flexcable_contact_dynfuncs(x,inclined_plane)),
+    RB.DynamicsProblem(flexcable,(x)->flexcable_contact_dynfuncs(x,inclined_plane)),
     RB.ZhongCCP();
     tspan,dt=h,ftol=1e-14,maxiters=50,exception=false,verbose=false
 )
@@ -1146,7 +1146,7 @@ end
 tspan = (0.0,1.5)
 h = 1e-3
 
-prob = RB.SimProblem(unibot,uni_dynfuncs)
+prob = RB.DynamicsProblem(unibot,uni_dynfuncs)
 
 RB.solve!(prob,RB.Zhong06();tspan,dt=h,ftol=1e-14,maxiters=50,exception=false)
 
@@ -1189,7 +1189,7 @@ CM.activate!(); plotsave_energy(unibot,"unibot_energy")
 unibots = [
     begin
         RB.solve!(
-            RB.SimProblem(
+            RB.DynamicsProblem(
                 uni(0.0; μ = 0.9, e, z0 = 0.2),
                 uni_dynfuncs
             ),
@@ -1251,7 +1251,7 @@ GM.activate!(); plotsave_velocity_restitution(unibots,true)
 CM.activate!(); plotsave_velocity_restitution(unibots,true,"unibot_restitution")
 
 unibot_e5 = RB.solve!(
-    RB.SimProblem(
+    RB.DynamicsProblem(
         uni(0.0; μ = 0.01, e=0.5, z0 = 0.2),
         uni_dynfuncs
     ),
@@ -1347,7 +1347,7 @@ dts = [1e-2,3e-3,1e-3,3e-4,1e-4,1e-5]
 
 unibot_z0 = [
     RB.solve!(
-        RB.SimProblem(
+        RB.DynamicsProblem(
             uni(0.0; μ = 0.01, e=0.0, z0 = 0.2-0.13468-1e-5, ωz = 50.0, mbar = 1.0),
             uni_dynfuncs
         ),
@@ -1428,7 +1428,7 @@ end
 # testing
 tspan = (0.0,5.0)
 h = 1e-2
-prob = RB.SimProblem(ballbot,ball_dynfuncs)
+prob = RB.DynamicsProblem(ballbot,ball_dynfuncs)
 @time RB.solve!(prob,RB.ZhongCCP();tspan,dt=h,ftol=1e-14,maxiters=100,exception=false)
 #-- end testing
 GM.activate!(); plotsave_contactpoints(ballbot)
@@ -1453,7 +1453,7 @@ superballs_dt = [
     begin
         ballbot_dt = deepcopy(ballbot)
         # RB.set_new_initial!(ballbot_dt,ballbot.traj.q[step_start],ballbot.traj.q̇[step_start])
-        prob = RB.SimProblem(ballbot_dt,ball_dynfuncs)
+        prob = RB.DynamicsProblem(ballbot_dt,ball_dynfuncs)
         RB.solve!(prob,
             RB.ZhongCCP();
             tspan=(0.0,0.1),dt,ftol=1e-14,
@@ -1620,7 +1620,7 @@ ballbot = superball(
 # test rolling
 tspan = (0.0,5.0)
 h = 1e-2
-prob = RB.SimProblem(ballbot,ball_dynfuncs)
+prob = RB.DynamicsProblem(ballbot,ball_dynfuncs)
 @time RB.solve!(prob,RB.ZhongCCP();tspan,dt=h,ftol=1e-12,maxiters=200,exception=false)
 
 GM.activate!(); plotsave_contactpoints(ballbot)
@@ -1792,7 +1792,7 @@ tspan = (0.0,1.91)
 tspan = (0.0,1.0)
 h = 1e-3
 
-prob = RB.SimProblem(quadbot,quad_dynfuncs)
+prob = RB.DynamicsProblem(quadbot,quad_dynfuncs)
 
 RB.solve!(prob,RB.ZhongCCP();tspan,dt=h,ftol=1e-14,maxiters=50,exception=true)
 
@@ -1876,7 +1876,7 @@ qs = [
     end
     for origin_position in ros
 ]
-# p = RB.generalized_α(1.0)
+# p = RB.generalized_alpha(1.0)
 Ro = [
     0.368869  -0.824063   0.429949;
     0.769524   0.011314  -0.638518;
@@ -1891,7 +1891,7 @@ tspan = (0.0,1.91)
 tspan = (0.0,5.0)
 dt = 1e-3
 
-prob = RB.SimProblem(cube,cube_contact_dynfuncs)
+prob = RB.DynamicsProblem(cube,cube_contact_dynfuncs)
 RB.solve!(prob,
     RB.ZhongCCP();tspan,dt,ftol=1e-10,maxiters=50,exception=false
 )
@@ -1919,7 +1919,7 @@ ts,cs,qs,vs,ps,λs,friction_coefficients = RB.NSSFC.ipsolve(nq,nλ,nμ,q0,v0,con
 ts,qs,vs,as,ṽ̇s = RB.NSSFC.nssfc(n,b,q26026,v26026,p,h,contact_dynfuncs(cube),tspan;tol=1e-10,imax=100)
 
 cuberef = deepcopy(cube)
-prob = RB.SimProblem(cuberef,dynfuncs,tspan)
+prob = RB.DynamicsProblem(cuberef,dynfuncs,tspan)
 RB.solve!(prob,RB.Zhong06();dt=h,ftol=1e-14)
 
 vis(cuberef,contact_dynamics)

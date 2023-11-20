@@ -399,7 +399,7 @@ function nhsolve(prob,nq,nλ,nμ,nu,q0,q̇0;tspan,dt=0.01,ftol=1e-14,verbose=fal
     prog = Progress(totalstep; dt=1.0, enabled=progress)
     for timestep = 1:totalstep
         #---------Step k Control-----------
-        # control!(intor,cache)
+        # control!(sim,cache)
         #---------Step k Control-----------
         q̃ᵏ⁻¹ = q̃s[timestep]
         qᵏ⁻¹ = qs[timestep]
@@ -495,7 +495,7 @@ function nhsolve(prob,nq,nλ,nμ,nu,q0,q̇0;tspan,dt=0.01,ftol=1e-14,verbose=fal
             if exception
                 error("NLsolve max iterations $iterations, at timestep=$timestep, Res=$(res)")
             else
-                # intor.convergence = false
+                # sim.convergence = false
                 break
             end
         else
@@ -542,7 +542,7 @@ function snhsolve(prob,nq,nλ,nμ,nu,q0,q̇0;tspan,dt=0.01,ftol=1e-14,verbose=fa
     prog = Progress(totalstep; dt=1.0, enabled=progress)
     for timestep = 1:totalstep
         #---------Step k Control-----------
-        # control!(intor,cache)
+        # control!(sim,cache)
         #---------Step k Control-----------
         qᵏ⁻¹ = qs[timestep]
         q̇ᵏ⁻¹ = q̇s[timestep]
@@ -609,7 +609,7 @@ function snhsolve(prob,nq,nλ,nμ,nu,q0,q̇0;tspan,dt=0.01,ftol=1e-14,verbose=fa
             if exception
                 error("NLsolve max iterations $iterations, at timestep=$timestep, Res=$(res)")
             else
-                # intor.convergence = false
+                # sim.convergence = false
                 break
             end
         else
@@ -656,7 +656,7 @@ function ipsolve(prob,nq,nλ,nμ,q0,q̇0;dt=0.01,ftol=1e-14,verbose=false,iterat
     prog = Progress(totalstep; dt=1.0, enabled=progress)
     for timestep = 1:totalstep
         #---------Step k Control-----------
-        # control!(intor,cache)
+        # control!(sim,cache)
         #---------Step k Control-----------
         q̃ᵏ⁻¹ = q̃s[timestep]
         qᵏ⁻¹ = qs[timestep]
@@ -739,7 +739,7 @@ function ipsolve(prob,nq,nλ,nμ,q0,q̇0;dt=0.01,ftol=1e-14,verbose=false,iterat
             if exception
                 error("NLsolve max iterations $iterations, at timestep=$timestep, Res=$(res)")
             else
-                # intor.convergence = false
+                # sim.convergence = false
                 break
             end
         else

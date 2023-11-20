@@ -195,7 +195,7 @@ end
 
 
 dt = 0.01
-prob = RB.SimProblem(spine,dynfuncs,(0.0,5.0))
+prob = RB.DynamicsProblem(spine,dynfuncs,(0.0,5.0))
 RB.solve!(prob,RB.Zhong06(),dt=dt,ftol=1e-14,verbose=true)
 plotstructure(spine)
 plotstructure(spine;do_record=true)

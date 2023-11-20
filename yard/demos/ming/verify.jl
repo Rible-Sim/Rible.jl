@@ -160,7 +160,7 @@ end
 qzero,szero,λzero = find_initial_position(spine2)
 
 function dynamic_relax(tgbot,dynfuncs;dt=0.001,tend=10.0,verbose=false)
-    prob = RB.SimProblem(tgbot,dynfuncs,(0.0,tend))
+    prob = RB.DynamicsProblem(tgbot,dynfuncs,(0.0,tend))
     RB.solve!(prob,RB.Zhong06();dt,ftol=1e-14,verbose)
     tgbot,dynfuncs
 end

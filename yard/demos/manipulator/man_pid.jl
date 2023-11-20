@@ -84,10 +84,10 @@ M,Φ,A,F!,_ = dynfuncs(manipulator,q0)
 prob = TS.DyProblem(dynfuncs(manipulator,q0),q0,q̇0,λ0,(0.0,25.01))
 
 function make_affect!(robot2d,control!)
-    function inner_affect!(intor)
-        RB.distribute_q_to_rbs!(robot2d.tgstruct,intor.qprev,intor.q̇prev)
+    function inner_affect!(sim)
+        RB.distribute_q_to_rbs!(robot2d.tgstruct,sim.qprev,sim.q̇prev)
         RB.update_cables_apply_forces!(robot2d.tgstruct)
-        control!(robot2d,intor.tprev)
+        control!(robot2d,sim.tprev)
     end
 end
 cb = TS.DiscreteCallback((x)->true,make_affect!(rob,make_control!(get_angles)))

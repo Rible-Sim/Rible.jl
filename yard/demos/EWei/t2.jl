@@ -336,7 +336,7 @@ bot = RB.Robot(st, hub)
 #     Jac_F! = true
 #     @eponymtuple(F!, Jac_F!, apply_acu!)
 # end
-# prob = RB.SimProblem(bot,dynfuncs)
+# prob = RB.DynamicsProblem(bot,dynfuncs)
 # RB.solve!(prob,RB.FBZhong06();dt=0.01,tspan=(0.0,5.0),ftol=1e-7,verbose=true)
 
 plot_traj!(bot)

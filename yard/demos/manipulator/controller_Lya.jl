@@ -89,8 +89,8 @@ function make_control_lyapunov(bot)
         P = C3*T_num_T
         =#
 
-    function control_lyapunov!(intor,cache)
-        @unpack prob,state,nx,nq,nλ = intor
+    function control_lyapunov!(sim,cache)
+        @unpack prob,state,nx,nq,nλ = sim
         @unpack tspan,dyfuncs,restart = prob
         @unpack t,q,q̇,tprev,qprev,q̇prev = state
         @unpack totaltime,totalstep,ts,qs,q̇s,ps,λs,invM = cache
@@ -498,13 +498,13 @@ end
 t_tol =1.5
 lya_sevor_run(dt,t_tol,manipulator)
 
-prob = RB.SimProblem(manipulator,free,make_control_lyapunov(manipulator),(0.0,10.0))
+prob = RB.DynamicsProblem(manipulator,free,make_control_lyapunov(manipulator),(0.0,10.0))
 RB.solve!(prob,RB.Zhong06();dt,ftol=1e-14,exception=false)
 
-prob = RB.SimProblem(manipulator,free,(0.0,10.0))
+prob = RB.DynamicsProblem(manipulator,free,(0.0,10.0))
 RB.solve!(prob,RB.Zhong06();dt,ftol=1e-14,exception=false)
 
-prob = RB.SimProblem(man_inv,free,(0.0,10.0))
+prob = RB.DynamicsProblem(man_inv,free,(0.0,10.0))
 RB.solve!(prob,RB.Zhong06();dt,ftol=1e-14,exception=false)
 
 plotstructure(manipulator)

@@ -117,7 +117,7 @@ end
 
 man_inv = man_ndof(1,[1.0,0.0];θ=deg2rad(1),k,c,restlen=0.1480,isvirtual=false)
 dt = 0.01
-prob = RB.SimProblem(man_inv,free,(0.0,10.0))
+prob = RB.DynamicsProblem(man_inv,free,(0.0,10.0))
 
 RB.solve!(prob,RB.Zhong06();dt,ftol=1e-14)
 plotstructure(man_inv)

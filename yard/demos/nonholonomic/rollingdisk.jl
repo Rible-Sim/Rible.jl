@@ -148,7 +148,7 @@ h = 1e-3
 tspan = (0.0,10.0)
 q0 = RB.get_coords(disk.st)
 q̇0 = RB.get_velocs(disk.st)
-prob = RB.SimProblem(disk,dynfuncs)
+prob = RB.DynamicsProblem(disk,dynfuncs)
 ts,qs,q̇s,ps,λs,friction_coefficients = RB.nhsolve(prob,6,3,2,2,q0,q̇0;tspan,dt=h,ftol=1e-10,exception=false)
 ts,qs,q̇s,ps,λs,friction_coefficients = RB.snhsolve(prob,6,3,2,2,q0,q̇0;tspan,dt=h,ftol=1e-12,exception=true)
 ts,qs,q̇s,ps,λs,friction_coefficients = RB.ipsolve(prob,6,3,2,q0,q̇0;dt=h,ftol=1e-10,exception=false)

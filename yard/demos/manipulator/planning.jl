@@ -103,11 +103,11 @@ function nextstate(tr,x_k,a,tm;dt=0.01,ftol=1e-14)
     q̇_k = x_k[ncoords+1:2ncoords]
     RB.set_new_initial!(tr,q_k,q̇_k)
     prob = RB.DyProblem(dynamics(tr,a),tr,(0.0,tm))
-    intor = RB.solve!(tr,prob,RB.Zhong06();dt,ftol,exception=false,progress=false)
+    sim = RB.solve!(tr,prob,RB.Zhong06();dt,ftol,exception=false,progress=false)
     q_next = tr.traj.qs[end]
     q̇_next = tr.traj.q̇s[end]
     x_next = vcat(q_next,q̇_next)
-    x_next, intor.convergence
+    x_next, sim.convergence
 end
 actions = [sample_action(man,0.001) for i = 1:100]
 function simulate_action(tr,x_k,x_rand,actions,tm)

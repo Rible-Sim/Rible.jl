@@ -125,7 +125,7 @@ tspan = (0.0,0.4)
 h = 1e-3
 
 
-prob = RB.SimProblem(rod,dynfuncs)
+prob = RB.DynamicsProblem(rod,dynfuncs)
 
 contacts_traj = RB.solve!(prob,RB.ZhongCCP();tspan,dt=h,ftol=1e-7,maxiters=50,exception=true)
 
@@ -135,7 +135,7 @@ plot_traj!(rod;textsize=60)
 
 tspan = (0.0,0.4)
 
-prob = RB.SimProblem(bar,dynfuncs)
+prob = RB.DynamicsProblem(bar,dynfuncs)
 
 contacts_traj = RB.solve!(prob,RB.ZhongCCP();tspan,dt=h,ftol=1e-7,maxiters=50,exception=true)
 

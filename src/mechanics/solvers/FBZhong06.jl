@@ -1,4 +1,4 @@
-struct FBZhong06 <: AbstractSolver end
+
 
 struct FBZhong06Cache{MMT, AT, ΦT, ΨT}
     mass_matrices::MMT
@@ -7,8 +7,12 @@ struct FBZhong06Cache{MMT, AT, ΦT, ΨT}
     Ψ::ΨT
 end
 
-function generate_cache(::FBZhong06,intor;dt,kargs...)
-    (;prob) = intor
+function generate_cache(
+        simulator::Simulator{DynamicsProblem{RobotType,Contactless,SlidingTendon}},
+        solver::DynamicsSolver{Zhong06};
+        dt,kargs...
+    )   where RobotType
+    (;prob) = simulator
     (;bot,dynfuncs) = prob
     # F!,_ = dynfuncs
     mm = build_mass_matrices(bot)
@@ -19,10 +23,10 @@ function generate_cache(::FBZhong06,intor;dt,kargs...)
     FBZhong06Cache(mm,A,Φ,Ψ)
 end
 
-function solve!(intor::Integrator,cache::FBZhong06Cache;
+function solve!(simulator::Simulator,cache::FBZhong06Cache;
                 dt,ftol=1e-14,verbose=false,iterations=50,
                 progress=true,exception=true)
-    (;prob,controller,tspan,restart,totalstep) = intor
+    (;prob,controller,tspan,restart,totalstep) = simulator
     (;bot,dynfuncs) = prob
     (;traj) = bot
     (;F!,Jac_F!) = dynfuncs
@@ -132,7 +136,7 @@ function solve!(intor::Integrator,cache::FBZhong06Cache;
     prog = Progress(totalstep; dt=1.0, enabled=progress)
     for timestep = 1:totalstep
         #---------Step k Control-----------
-        # control!(intor,cache)
+        # control!(sim,cache)
         #---------Step k Control-----------
         tᵏ⁻¹ = traj.t[timestep]
         tᵏ = traj.t[timestep+1]
@@ -203,7 +207,7 @@ function solve!(intor::Integrator,cache::FBZhong06Cache;
             if exception
                 error("Not Converged! Step=$timestep")
             else
-                # intor.convergence = false
+                # sim.convergence = false
                 break
             end
         end

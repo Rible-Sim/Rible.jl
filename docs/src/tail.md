@@ -223,7 +223,7 @@ end
 动力学仿真问题
 
 ````@example tail
-prob = RB.SimProblem(tail,dynfuncs)
+prob = RB.DynamicsProblem(tail,dynfuncs)
 ````
 
 动力学仿真求解

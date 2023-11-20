@@ -1,19 +1,38 @@
-struct Zhong06 <: AbstractSolver end
-
 struct Zhong06Cache{solT,cacheType}
     solver::solT
     cache::cacheType
 end
 
-function generate_cache(solver::Zhong06,intor;dt,kargs...)
-    (;prob) = intor
-    (;bot,dynfuncs) = prob
+function generate_cache(
+        simulator::Simulator{<:DynamicsProblem},
+        solver::DynamicsSolver{Zhong06};
+        dt,kargs...
+    ) 
+
+    generate_cache(
+        simulator,
+        solver,
+        has_constant_mass_matrix(simulator.prob.bot);
+        dt,kargs...
+    )
+
+end
+
+function generate_cache(
+        simulator::Simulator{<:DynamicsProblem},
+        solver::DynamicsSolver{Zhong06},
+        ::Val{true};
+        dt,kargs...
+    )
+    (;bot) = simulator.prob
     (;traj) = bot
     # F!,_ = dynfuncs
     Ḿ,M̌,M̄,invM̌ = build_mass_matrices(bot)
     # (;M) = mass_matrices
     A = make_cstr_jacobian(bot)
     Φ = make_cstr_function(bot)
+    F!(F,q,q̇,t) = generalize_force!(F,bot,q,q̇,t)
+    Jac_F!(∂F∂q̌,∂F∂q̌̇,q,q̇,t) = generalize_force_jacobain!(∂F∂q̌,∂F∂q̌̇,bot,q,q̇,t)
     q̌0 = traj.q̌[begin]
     λ0 = traj.λ[begin]
     q̇0 = traj.q̇[begin]
@@ -30,6 +49,7 @@ function generate_cache(solver::Zhong06,intor;dt,kargs...)
     initial_Jac = initial_Res*transpose(initial_Res)
     Zhong06Cache(solver,
         @eponymtuple(
+            F!,Jac_F!,
             Ḿ,M̌,M̄,invM̌,A,Φ,
             ∂F∂q̌,∂F∂q̌̇,
             nq̌,nλ,nx,
@@ -40,18 +60,18 @@ function generate_cache(solver::Zhong06,intor;dt,kargs...)
     )
 end
 
-function retrieve!(intor,cache::Zhong06Cache)
+function retrieve!(sim,cache::Zhong06Cache)
 
 end
 
-function solve!(intor::Integrator,cache::Zhong06Cache;
+function solve!(sim::Simulator,cache::Zhong06Cache;
                 dt,ftol=1e-14,verbose=false,maxiters=50,
                 progress=true,exception=true)
-    (;prob,controller,tspan,restart,totalstep) = intor
-    (;bot,dynfuncs) = prob
+    (;prob,controller,tspan,restart,totalstep) = sim
+    (;bot,) = prob
     (;traj) = bot
-    (;F!,Jac_F!) = dynfuncs
     (;
+        F!,Jac_F!,
         Ḿ,M̌,M̄,invM̌,A,Φ,
         ∂F∂q̌,∂F∂q̌̇,
         nq̌,nλ,nx,
@@ -100,7 +120,7 @@ function solve!(intor::Integrator,cache::Zhong06Cache;
     
     for timestep = 1:totalstep
         #---------Step k Control-----------
-        # control!(intor,cache)
+        # control!(sim,cache)
         #---------Step k Control-----------
         tₖ₋₁ = traj.t[timestep]
         tₖ   = traj.t[timestep+1]
@@ -167,7 +187,7 @@ function solve!(intor::Integrator,cache::Zhong06Cache;
             if exception
                 error("Not Converged! Step=$timestep")
             else
-                # intor.convergence = false
+                # sim.convergence = false
                 break
             end
         end

@@ -72,10 +72,10 @@ function slider_crank(;θ = 0, coordsType = RB.NCF.NC)
             coords = RB.NonminimalCoordinates(qcs, pres_idx, cstr_idx)
         end
 
-        basemesh = load(RB.assetpath("装配体1.STL")) |> RB.make_patch(;
+        basemesh = load(RB.assetpath("crank_slider/base.STL")) |> RB.make_patch(;
             # trans=[-1.0,0,0],
-            rot = RotZ(π),
-            scale=1/500,
+            # rot = RotZ(π),
+            scale=1/1000,
             color = :silver,
         )
 
@@ -134,14 +134,22 @@ function slider_crank(;θ = 0, coordsType = RB.NCF.NC)
             coords = RB.NonminimalCoordinates(qcs, pres_idx, cstr_idx)
         end
 
-        basemesh = load(RB.assetpath("装配体1.STL")) |> RB.make_patch(;
-            # trans=[-1.0,0,0],
-            rot = RotZ(π),
-            scale=1/500,
+        linkmesh = load(RB.assetpath("crank_slider/crank$(i-1).STL")) |> RB.make_patch(;
+            trans=[
+                ifelse(
+                    i == 2,
+                    0.01*2,
+                    0.01
+                ),
+                -l[i-1]/2,
+                0
+            ],
+            # rot = RotZ(π),
+            scale=1/1000,
             color = :silver,
         )
 
-        RB.RigidBody(prop,state,coords,basemesh)
+        RB.RigidBody(prop,state,coords,linkmesh)
     end
     function make_slider(i;
             ro=SVo3,
@@ -197,16 +205,9 @@ function slider_crank(;θ = 0, coordsType = RB.NCF.NC)
             qcs = RB.QCF.QC(m,Ī)
             coords = RB.NonminimalCoordinates(qcs,)
         end
-        slidermesh = load(RB.assetpath("装配体2.2.STL")) |> RB.make_patch(;
-            # trans=[-1.0,0,0],
-            rot = begin
-                if i == 2
-                    RotYZ(π,π/2)
-                else
-                    RotY(π)
-                end
-            end,
-            scale=1/500,
+        slidermesh = load(RB.assetpath("crank_slider/slider.STL")) |> RB.make_patch(;
+            trans=[0.0,0,0],
+            scale=1/1000,
             color=:mediumpurple4
         )
         RB.RigidBody(prop,state,coords,slidermesh)

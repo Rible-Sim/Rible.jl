@@ -120,7 +120,7 @@ function get_d(st::Structure)
 end
 
 """
-Return System 维度。
+Return System dimensions
 $(TYPEDSIGNATURES)
 """
 get_num_of_dims(bot::Robot) = get_num_of_dims(bot.structure)
@@ -152,16 +152,39 @@ get_num_of_intrinsic_cstr(body::AbstractRigidBody) = get_num_of_cstr(body.coords
 get_num_of_coords(body::AbstractRigidBody) = get_num_of_coords(body.coords.nmcs)
 get_num_of_dof(body::AbstractRigidBody) = get_num_of_dof(body.coords.nmcs)
 get_num_of_local_dims(body::AbstractRigidBody) = get_num_of_local_dims(body.coords.nmcs)
-get_num_of_local_dims(cache::NonminimalCoordinatesCache) = get_num_of_local_dims(cache.nmcs)
 
 get_num_of_intrinsic_cstr(body::AbstractFlexibleBody) = get_num_of_cstr(body.coords.ancs)
 get_num_of_coords(body::AbstractFlexibleBody) = get_num_of_coords(body.coords.ancs)
 get_num_of_dof(body::AbstractFlexibleBody) = get_num_of_dof(body.coords.ancs)
 get_num_of_local_dims(body::AbstractFlexibleBody) = get_num_of_local_dims(body.coords.ancs)
-get_num_of_local_dims(cache::FlexibleBodyCoordinatesCache) = get_num_of_local_dims(cache.ancs)
+
+
+has_constant_mass_matrix(bot::Robot) = has_constant_mass_matrix(bot.structure)
+has_constant_mass_matrix(st::Structure) = has_constant_mass_matrix(st.bodies)
+has_constant_mass_matrix(rbs::AbstractVector{<:AbstractRigidBody}) = has_constant_mass_matrix(eltype(rbs))
+
+
+has_constant_mass_matrix(body::AbstractBody) = has_constant_mass_matrix(body.coords.nmcs)
+has_constant_mass_matrix(::NCF.NC) = Val{true}()
+has_constant_mass_matrix(::QCF.QC) = Val{false}()
+has_constant_mass_matrix(::ANCF.ANC) = Val{true}()
+
+function has_constant_mass_matrix(rbs::TypeSortedCollection)
+    mapreduce(
+        has_constant_mass_matrix,
+        both_true,
+        rbs;
+        init = Val{true}()
+    )
+end
+
+both_true(::Val{true},::Val{true}) = Val{true}()
+both_true(::Val{true},::Val{false}) = Val{false}()
+both_true(::Val{false},::Val{false}) = Val{false}()
+
 
 """
-Return System 重力。
+Return gravity
 $(TYPEDSIGNATURES)
 """
 get_gravity(bot::Robot) = get_gravity(bot.structure)
@@ -171,8 +194,6 @@ get_gravity(rbs::TypeSortedCollection) = get_gravity(eltype(rbs.data[1]))
 get_gravity(body::AbstractBody) = get_gravity(typeof(body))
 get_gravity(::Type{<:AbstractBody{2,T}}) where {T} = SVector(zero(T),        -9.81*one(T))
 get_gravity(::Type{<:AbstractBody{3,T}}) where {T} = SVector(zero(T),zero(T),-9.81*one(T))
-# get_gravity(::Type{<:AbstractBody{3,T}}) where {T} = SVector(zero(T),-9.81*one(T),zero(T))
-# get_gravity(::Type{<:AbstractBody{3,T}}) where {T} = SVector(-9.81*one(T),zero(T),zero(T))
 
 get_cables_len(bot::Robot) = get_cables_len(bot.structure)
 get_cables_deform(bot::Robot) = get_cables_deform(bot.structure)

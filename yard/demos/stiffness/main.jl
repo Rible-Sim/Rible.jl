@@ -1734,7 +1734,7 @@ plot_traj!(bot;showground=false)
 
 dt = 1e-3
 tspan = (0.0,5.0)
-prob = RB.SimProblem(bot,dynfuncs)
+prob = RB.DynamicsProblem(bot,dynfuncs)
 RB.solve!(prob,RB.Zhong06();tspan,dt,ftol=1e-7,maxiters=50,verbose=true,exception=false)
 
 plot_traj!(bot;showground=false)

@@ -69,7 +69,7 @@ function simulate_linkn(;dt=0.01,k=3e1,c=0.0,tend=10.0,verbose=false)
     refq0,refq̇0,refλ0 = RB.get_initial(reflinkn.st)
     RB.set_new_initial!(linkn,refq0,refq̇0)
 
-    prob = RB.SimProblem(linkn,dynfuncs,(0.0,tend))
+    prob = RB.DynamicsProblem(linkn,dynfuncs,(0.0,tend))
     RB.solve!(prob,RB.Zhong06();dt,ftol=1e-14,verbose)
 
     linkn,reflinkn

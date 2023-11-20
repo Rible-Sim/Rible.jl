@@ -1,10 +1,10 @@
 
 struct WendlandtCache end
-generate_cache(::Wendlandt,intor) = WendlandtCache()
+generate_cache(::Wendlandt,sim) = WendlandtCache()
 
-function solve(intor::Integrator,cache::WendlandtCache;dt=0.01,ftol=1e-14,verbose=false,
+function solve(sim::Simulator,cache::WendlandtCache;dt=0.01,ftol=1e-14,verbose=false,
                                  callback=DEFAULT_CALLBACK)
-    (;prob,sol) = intor
+    (;prob,sol) = sim
     (;ts,qs,q̇s,λs) = sol
     (;funcs,tspan,q0,q̇0,λ0,nx,nq,nλ) = prob
     M,Φ,A,F!,Jacs = funcs
@@ -48,13 +48,13 @@ function solve(intor::Integrator,cache::WendlandtCache;dt=0.01,ftol=1e-14,verbos
     #---------Step 1 finisher-----------
     step += 1
     push!(ts,ts[end] + dt)
-    intor.t = intor.tprev + dt
-    intor.q .= qs[end]
-    intor.q̇ .= q̇s[end]
+    sim.t = sim.tprev + dt
+    sim.q .= qs[end]
+    sim.q̇ .= q̇s[end]
     #---------Step 1 finisher-----------
     #---------Step 1 Callback-----------
-    if callback.condition(intor)
-        callback.affect!(intor)
+    if callback.condition(sim)
+        callback.affect!(sim)
     end
     #---------Step 1 Callback-----------
 
@@ -109,15 +109,15 @@ function solve(intor::Integrator,cache::WendlandtCache;dt=0.01,ftol=1e-14,verbos
         #---------Step k finisher-----------
         step += 1
         push!(ts,ts[end] + dt)
-        intor.tprev = intor.t
-        intor.qprev .= intor.q
-        intor.t = intor.tprev + dt
-        intor.q .= qs[end]
-        intor.q̇ .= q̇s[end]
+        sim.tprev = sim.t
+        sim.qprev .= sim.q
+        sim.t = sim.tprev + dt
+        sim.q .= qs[end]
+        sim.q̇ .= q̇s[end]
         #---------Step k finisher-----------
         #---------Step 1 Callback-----------
-        if callback.condition(intor)
-            callback.affect!(intor)
+        if callback.condition(sim)
+            callback.affect!(sim)
         end
         #---------Step 1 Callback-----------
         if verbose

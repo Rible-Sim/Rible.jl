@@ -1,43 +1,26 @@
-struct AlphaCCP{T} <: AbstractSolver
-    ρ∞::T
-end
 
-function generalized_α(ρ∞)
-    αm = (2ρ∞-1)/(ρ∞+1)
-    αf = ρ∞/(ρ∞+1)
-    γ = 1/2 + αf - αm
-    β = 1/4*(γ+1/2)^2
-    @eponymtuple(αm,αf,γ,β)
-end
-
-function generalized_α(ρ∞,h)
-    αm = (2ρ∞-1)/(ρ∞+1)
-    αf = ρ∞/(ρ∞+1)
-    γ = 1/2 + αf - αm
-    β = 1/4*(γ+1/2)^2
-    γₜ = (1-αm)/(1-αf)/(γ*h)
-    βₜ = h*β/γ - h/2
-    @eponymtuple(αm,αf,γ,β,γₜ,βₜ)
-end
-
-function Newmark(ρ∞)
-    αf = αm = 0.0
-    γ = 1/2
-    β = 1/4
-    @eponymtuple(αm,αf,γ,β)
-end
 
 struct AlphaCCPCache{CacheType}
     cache::CacheType
 end
 
-function generate_cache(solver::AlphaCCP,intor;dt,kargs...)
-    (;prob,state) = intor
+function generate_cache(
+        simulator::Simulator{DynamicsProblem{
+            RobotType,
+            FrictionRestitutionCombined{NewtonRestitution,CoulombFriction}
+        }},
+        solver::DynamicsSolver{
+            GeneralizedAlpha,
+            InnerLayerContactSolver
+        };
+        dt,kargs...
+    )   where RobotType
+    (;prob,state) = sim
     (;bot,dynfuncs) = prob
     (;st) = bot
     (;q,q̇) = state.now
     (;ρ∞) = solver
-    coeffs = generalized_α(ρ∞,dt)
+    coeffs = generalized_alpha(ρ∞,dt)
     # F!,_ = dynfuncs
     # mm = RB.build_mass_matrices(bot)
     M = Matrix(assemble_M(st))
@@ -131,10 +114,10 @@ function update_nonsmooth!(Res,Jac,nq,nλ,na,xe,vₛ,gₙ,Dₛ₊₁,H,restituti
     𝐁,𝐜ᵀ,𝐍,𝐫
 end
 
-function solve!(intor::Integrator,solvercache::AlphaCCPCache;
+function solve!(sim::Simulator,solvercache::AlphaCCPCache;
                 dt,ftol=1e-14,xtol=ftol,verbose=false,maxiters=50,
                 progress=true,exception=true)
-    (;prob,state,controller,tspan,restart,totalstep) = intor
+    (;prob,state,controller,tspan,restart,totalstep) = sim
     (;bot,dynfuncs) = prob
     (;traj) = bot
     # (;t,q,q̇,tprev,qprev,q̇prev) = state
@@ -252,7 +235,7 @@ function solve!(intor::Integrator,solvercache::AlphaCCPCache;
                 @error "Not converged!"
                 break
             else
-                # intor.convergence = false
+                # sim.convergence = false
                 # break
             end
         end

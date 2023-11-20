@@ -1,17 +1,4 @@
-struct Alpha{T} <: AbstractSolver
-    αm::T
-    αf::T
-    γ::T
-    β::T
-end
 
-function Alpha(ρ∞)
-    αm = (2ρ∞-1)/(ρ∞+1)
-    αf = ρ∞/(ρ∞+1)
-    γ = 1/2 + αf - αm
-    β = 1/4*(γ+1/2)^2
-    Alpha(αm,αf,γ,β)
-end
 
 struct AlphaCache{solverT,MMT,funcsT,T}
     solver::solverT
@@ -21,8 +8,16 @@ struct AlphaCache{solverT,MMT,funcsT,T}
     γ′::T
 end
 
-function generate_cache(solver::Alpha,intor;dt,kargs...)
-    (;prob,) = intor
+
+function generate_cache(
+        simulator::Simulator{DynamicsProblem{
+            RobotType,
+            Contactless
+        }},
+        solver::DynamicsSolver{GeneralizedAlpha};
+        dt,kargs...
+    )   where RobotType
+    (;prob,) = simulator
     (;bot,dynfuncs) = prob
     (;αm,αf,γ,β) = solver
     # F!,_ = dynfuncs
@@ -38,14 +33,14 @@ function generate_cache(solver::Alpha,intor;dt,kargs...)
     AlphaCache(solver,mm,funcs,β′,γ′)
 end
 
-function retrieve!(intor,cache::AlphaCache)
+function retrieve!(sim,cache::AlphaCache)
 
 end
 
-function solve!(intor::Integrator,cache::AlphaCache;
+function solve!(sim::Simulator,cache::AlphaCache;
                 dt,ftol=1e-14,verbose=false,iterations=50,
                 progress=true,exception=true)
-    (;prob,controller,tspan,restart,totalstep) = intor
+    (;prob,controller,tspan,restart,totalstep) = sim
     (;bot,dynfuncs) = prob
     (;traj) = bot
     (;F!,Jac_F!) = dynfuncs
@@ -112,7 +107,7 @@ function solve!(intor::Integrator,cache::AlphaCache;
     prog = Progress(totalstep; dt=1.0, enabled=progress)
     for timestep = 1:totalstep
         #---------Step k Control-----------
-        # control!(intor,cache)
+        # control!(sim,cache)
         #---------Step k Control-----------
         tᵏ⁻¹ = traj.t[timestep]
         qᵏ⁻¹ = traj.q[timestep]
@@ -180,5 +175,5 @@ function solve!(intor::Integrator,cache::AlphaCache;
         next!(prog)
     end
 
-    return intor,cache
+    return sim,cache
 end

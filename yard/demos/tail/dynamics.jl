@@ -198,7 +198,7 @@ function dynfuncs(bot)
 end
 
 # 动力学仿真问题
-prob = RB.SimProblem(tail,dynfuncs)
+prob = RB.DynamicsProblem(tail,dynfuncs)
 
 # 动力学仿真求解
 RB.solve!(prob,RB.Zhong06();dt=0.01,tspan=(0.0,10.0),ftol=1e-13,verbose=true)

@@ -16,8 +16,9 @@ include("../../vis.jl")
 includet("../../vis.jl") #jl
 include("../../../examples/robots/slider_crank.jl")
 includet("../../../examples/robots/slider_crank.jl")#jl
+sc = slider_crank(;coordsType=RB.NCF.NC)
 sc = slider_crank(;coordsType=RB.QCF.QC)
-plot_traj!(sc;showmesh=false,showground=false)
+plot_traj!(sc;showground=false)
 dt = 1e-3
 tspan = (0.0,1.0)
 
@@ -30,14 +31,18 @@ function sc_contact_dynfuncs(bot;)
     RB.frictionless_contact_dynfuncs(bot;flatplane = planes)
 end
 
-prob = RB.SimProblem(sc,(bot)->RB.dynfuncs(bot;gravity=true))
+RB.has_constant_mass_matrix(sc)
+prob = RB.DynamicsProblem(sc,)
+
 RB.solve!(
     prob,
-    RB.Zhong06();
+    RB.DynamicsSolver(RB.Zhong06());
     dt,tspan,ftol=1e-14,maxiters=50,verbose=true,exception=true,progress=false,
 )
 
-prob = RB.SimProblem(sc,sc_contact_dynfuncs)
+plot_traj!(sc;showground=false)
+
+prob = RB.DynamicsProblem(sc,sc_contact_dynfuncs)
 RB.solve!(
     prob,
     RB.ZhongQCCPN();
@@ -50,8 +55,8 @@ RB.solve!(
     dt,tspan,ftol=1e-14,maxiters=50,verbose=true,exception=true,progress=false,
 )
 
+plot_traj!(sc;showground=false)
 
-plot_traj!(sc;showmesh=false,showground=false)
 me = RB.mechanical_energy!(sc)
 lines(me.E)
 lines(me.V)

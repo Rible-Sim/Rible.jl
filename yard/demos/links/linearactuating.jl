@@ -82,7 +82,7 @@ function kinematics_control(; epe0, epef, c, target_t = 10.0, tend = 20.01, Alg 
 
     dt = 0.01
     aitp = actuation_interpolation(target_t, a0, af, Alg)
-    prob = RB.SimProblem(linkn,(x)->linearactuate(x, aitp), (0.0, tend))
+    prob = RB.DynamicsProblem(linkn,(x)->linearactuate(x, aitp), (0.0, tend))
     RB.solve!(prob, RB.Zhong06(), dt = dt, ftol = 1e-14)
     actuation_trajs = aitp.(linkn.traj.ts)
     for actuation_traj in actuation_trajs

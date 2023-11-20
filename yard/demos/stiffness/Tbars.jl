@@ -8,13 +8,13 @@ bodies = RB.get_bodies(bot)
 body1 = bodies[1]
 dt = 1e-3
 tspan = (0.0,5.0)
-prob = RB.SimProblem(bot,RB.dynfuncs)
+prob = RB.DynamicsProblem(bot,RB.dynfuncs)
 solver = RB.Zhong06()
-intor = RB.Integrator(prob,solver;tspan,dt,)
-solvercache = RB.generate_cache(solver,intor;dt)
-RB.solve!(intor,solvercache;dt,ftol=1e-10,maxiters=50,verbose=true,exception=true,progress=false,)
+sim = RB.Simulator(prob,solver;tspan,dt,)
+solvercache = RB.generate_cache(solver,sim;dt)
+RB.solve!(sim,solvercache;dt,ftol=1e-10,maxiters=50,verbose=true,exception=true,progress=false,)
 
-@time RB.solve!(intor,solvercache;dt,ftol=1e-10,maxiters=50,verbose=false,exception=true,progress=false,)
+@time RB.solve!(sim,solvercache;dt,ftol=1e-10,maxiters=50,verbose=false,exception=true,progress=false,)
 
 plot_traj!(bot;showarrows = false, showground=false)
 

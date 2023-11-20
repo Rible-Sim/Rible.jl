@@ -34,7 +34,7 @@ pm = new_pointmass(;
 );
 
 # simulation
-prob = RB.SimProblem(pm,pm_contact_dynfuncs)
+prob = RB.DynamicsProblem(pm,pm_contact_dynfuncs)
 RB.solve!(
     prob,
     RB.ZhongCCP();
@@ -151,7 +151,7 @@ tf = -vo/a
 tspan = (0.0,0.6)
 pm = new_pointmass(;e=0.0, μ, origin_position, origin_velocity)
 
-prob = RB.SimProblem(pm,(x)->pm_contact_dynfuncs(x;θ))
+prob = RB.DynamicsProblem(pm,(x)->pm_contact_dynfuncs(x;θ))
 RB.solve!(prob,RB.ZhongCCP();tspan,dt=1e-3,ftol=1e-14,maxiters=50,exception=false);
 
 # post processing

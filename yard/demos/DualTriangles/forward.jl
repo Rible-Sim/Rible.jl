@@ -595,7 +595,7 @@ plot_traj!(mandyn)
 dt = 0.0062
 
 RB.solve!(
-    RB.SimProblem(mandyn,
+    RB.DynamicsProblem(mandyn,
     (x)->dynfuncs(x;gravity=true)),
     RB.Zhong06(),
     dt=dt,
