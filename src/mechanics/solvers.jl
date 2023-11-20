@@ -197,12 +197,12 @@ end
 
 # include("dynamics_solvers/Wendlandt.jl")
 include("dynamics_solvers/complementarity_solvers.jl")
+include("dynamics_solvers/Zhong06_family/Zhong06_constant_mass.jl")
+include("dynamics_solvers/Zhong06_family/Zhong06_nonconstant_mass.jl")
 include("dynamics_solvers/Zhong06_family/Zhong06_CCP_constant_mass.jl")
 include("dynamics_solvers/Zhong06_family/Zhong06_CCP_nonconstant_mass.jl")
-include("dynamics_solvers/Zhong06_family/Zhong06_constant_mass.jl")
 include("dynamics_solvers/Zhong06_family/Zhong06_frictionless_nonconstant_mass.jl")
 include("dynamics_solvers/Zhong06_family/Zhong06_frictionless_nonconstant_mass_mono.jl")
-include("dynamics_solvers/Zhong06_family/Zhong06_nonconstant_mass.jl")
 include("dynamics_solvers/Zhong06_family/Zhong06_sliding_cable_FB.jl")
 # include("dynamics_solvers/Zhong06_family/Zhong06_nonholonomic_nonsmooth.jl")
 

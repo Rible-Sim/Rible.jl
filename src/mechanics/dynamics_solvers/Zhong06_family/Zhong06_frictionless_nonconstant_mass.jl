@@ -52,7 +52,7 @@ function generate_cache(
         μs_sys,
         es_sys,
         gaps_sys
-    ) = prepare_frictionless_contacts!(bot,env)
+    ) = prepare_contacts!(bot,env)
     cache = @eponymtuple(
         F!,Jac_F!,
         Mₘ,M⁻¹ₘ,M⁻¹ₖ,
@@ -109,7 +109,8 @@ function make_zhongccpn_ns_stepk(
             𝐁,𝐛,𝐜ᵀ,𝐍,𝐫,
             x,Λₘ,
             Dₖ₋₁,ŕₖ₋₁,
-            timestep,iteration)
+            timestep,iteration
+        )
         # @show timestep, iteration, na, persistent_idx
         qₖ = @view x[   1:n1]
         λₘ = @view x[n1+1:n2]
@@ -274,8 +275,8 @@ function solve!(sim::Simulator,solvercache::ZhongQCCPNCache;
         (;
             H
         ) = contact_cache.cache
-        Dₖ₋₁ = contact_cache.cache.D
-        ŕₖ₋₁ = contact_cache.cache.ŕ
+        Dₖ₋₁ = deepcopy(contact_cache.cache.D)
+        ŕₖ₋₁ = deepcopy(contact_cache.cache.ŕ)
         ns_stepk! = make_zhongccpn_ns_stepk(
             nq,nλ,na,qₖ₋₁,q̇ₖ₋₁,pₖ₋₁,tₖ₋₁,pₖ,q̇ₖ,
             structure,

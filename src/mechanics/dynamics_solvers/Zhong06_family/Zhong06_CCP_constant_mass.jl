@@ -4,39 +4,24 @@ struct ZhongCCPCache{CacheType}
 end
 
 function generate_cache(
-        simulator::Simulator{DynamicsProblem{
+        simulator::Simulator{<:DynamicsProblem{
             RobotType,
+            EnvType,
             RestitutionFrictionCombined{NewtonRestitution,CoulombFriction}
         }},
         solver::DynamicsSolver{
             Zhong06,
-            InnerLayerContactSolver
-        };
-        dt,kargs...
-    ) where RobotType
-    generate_cache(
-        similator,
-        solver,
-        has_constant_mass_matrix(similator.prob.bot);
-        dt,kargs...
-    ) 
-end  
-
-function generate_cache(
-        simulator::Simulator{DynamicsProblem{
-            RobotType,
-            RestitutionFrictionCombined{NewtonRestitution,CoulombFriction}
-        }},
-        solver::DynamicsSolver{
-            Zhong06,
-            InnerLayerContactSolver
+            <:InnerLayerContactSolver
         },
         ::Val{true};
         dt,kargs...
-    )   where RobotType
+    )   where {RobotType,EnvType}
     (;prob) = simulator
-    (;bot,dynfuncs) = prob
+    (;bot,env) = prob
     (;structure) = bot
+    F!(F,q,q̇,t) = generalize_force!(F,bot,q,q̇,t)
+    Jac_F!(∂F∂q̌,∂F∂q̌̇,q,q̇,t) = generalize_force_jacobain!(∂F∂q̌,∂F∂q̌̇,bot,q,q̇,t)
+    
     M = Matrix(assemble_M(structure))
     Φ = make_cstr_function(bot)
     A = make_cstr_jacobian(bot)
@@ -51,7 +36,23 @@ function generate_cache(
     ∂Aᵀλ∂q(q::AbstractVector,λ) = cstr_forces_jacobian(structure,λ)
     # ∂𝚽𝐪𝐯∂𝒒(q,v) = RB.∂Aq̇∂q(structure,v)
     ∂Bᵀμ∂q(q,μ) = zeros(T,nq,nq)
-    cache = @eponymtuple(M,Φ,A,Ψ,B,∂Ψ∂q,∂Aᵀλ∂q,∂Bᵀμ∂q)
+    (;
+        contacts_bits,
+        persistent_bits,
+        μs_sys,
+        es_sys,
+        gaps_sys
+    ) = prepare_contacts(bot,env)
+    
+    cache = @eponymtuple(
+        F!,Jac_F!,
+        M,Φ,A,Ψ,B,∂Ψ∂q,∂Aᵀλ∂q,∂Bᵀμ∂q,
+        contacts_bits,
+        persistent_bits,
+        μs_sys,
+        es_sys,
+        gaps_sys
+    )
     ZhongCCPCache(cache)
 end
 
@@ -59,15 +60,28 @@ function Momentum_k(qₖ₋₁,pₖ₋₁,qₖ,λₘ,Mₘ,A,scaling,h)
     pₖ = -pₖ₋₁ .+ 2/h.*Mₘ*(qₖ.-qₖ₋₁) .+ scaling/(h).*(transpose(A(qₖ))-transpose(A(qₖ₋₁)))*λₘ
 end
 
-function make_zhongccp_ns_stepk(nq,nλ,na,qₖ₋₁,vₖ₋₁,pₖ₋₁,tₖ₋₁,pₖ,vₖ,dynfuncs,cache,invM,h,scaling)
-    F!,Jac_F!,_ = dynfuncs
-    (;M,Φ,A,∂Aᵀλ∂q) = cache
+function make_zhongccp_ns_stepk(
+        nq,nλ,na,
+        qₖ₋₁,vₖ₋₁,pₖ₋₁,tₖ₋₁,
+        pₖ,vₖ,
+        solver_cache,
+        invM,
+        h,scaling)
+    (;F!,Jac_F!,M,Φ,A,∂Aᵀλ∂q) = solver_cache
 
     n1 = nq
     n2 = nq+nλ
     nΛ = 3na
     nx = n2
-    function ns_stepk!(𝐫𝐞𝐬,𝐉,Fₘ,∂F∂q,∂F∂q̇,𝐁,𝐛,𝐜ᵀ,𝐍,𝐫,x,Λₖ,D,Dₘ,Dₖ,H,restitution_coefficients,timestep,iteration)
+    function ns_stepk!(
+            𝐫𝐞𝐬,𝐉,
+            Fₘ,∂F∂q,∂F∂q̇,
+            𝐁,𝐛,𝐜ᵀ,𝐍,𝐫,
+            x,Λₖ,
+            structure,
+            contact_cache,
+            timestep,iteration
+        )
         # @show timestep, iteration, na
         qₖ = @view x[   1:n1]
         λₘ = @view x[n1+1:n2]
@@ -82,7 +96,6 @@ function make_zhongccp_ns_stepk(nq,nλ,na,qₖ₋₁,vₖ₋₁,pₖ₋₁,tₖ�
         Aₖ   = A(qₖ)
 
         𝐫𝐞𝐬[   1:n1] .= -h.*pₖ₋₁ .+ M*(qₖ.-qₖ₋₁) .-
-                        h.*scaling.*transpose(D)*H*Λₖ .-
                            scaling.*transpose(Aₖ₋₁)*λₘ .-
                         (h^2)/2 .*Fₘ
 
@@ -97,14 +110,22 @@ function make_zhongccp_ns_stepk(nq,nλ,na,qₖ₋₁,vₖ₋₁,pₖ₋₁,tₖ�
         lu𝐉 = lu(𝐉)
 
         if na != 0
+            (;
+                H,
+                restitution_coefficients,
+                D,
+            ) = contact_cache.cache
+            Dₘ = contact_cache.cache.Dper
+            Dₖ = contact_cache.cache.Dimp
+            𝐫𝐞𝐬[   1:n1] .-= h.*scaling.*transpose(D)*H*Λₖ 
+
             𝐁 .= 0
             𝐁[   1:n1,1:nΛ] .= h.*scaling.*transpose(D)*H
 
-            
             pₖ .= Momentum_k(qₖ₋₁,pₖ₋₁,qₖ,λₘ,M,A,scaling,h)
             vₖ .= invM*pₖ        
             ∂vₘ∂qₖ = 1/h*I
-            ∂vₖ∂qₖ = 2/h*I + 1/(h).*invM*(∂Aᵀλ∂q(qₖ,λₘ))
+            ∂vₖ∂qₖ = 2/h*I # + 1/(h).*invM*(∂Aᵀλ∂q(qₖ,λₘ))
             ∂vₖ∂λₘ = scaling.*invM*transpose(Aₖ-Aₖ₋₁)/(h)
             
             v́⁺ = Dₘ*vₘ .+ Dₖ*vₖ
@@ -148,19 +169,15 @@ function solve!(sim::Simulator,solvercache::ZhongCCPCache;
                 maxiters=50,
                 progress=true,exception=true)
     (;prob,controller,tspan,restart,totalstep) = sim
-    (;bot,dynfuncs) = prob
-    (;traj,contacts_traj) = bot
-    (;F!, Jac_F!, 
-        prepare_contacts!,
-        get_directions_and_positions!,
-        get_distribution_law!
-    ) = dynfuncs
-    (;cache) = solvercache
-    (;M,A) = cache
-    invM = inv(M)
+    (;bot,env) = prob
+    (;structure,traj,contacts_traj) = bot
+    solver_cache = solvercache.cache
+    (;M,A,contacts_bits) = solver_cache
     q0 = traj.q[begin]
     λ0 = traj.λ[begin]
     q̇0 = traj.q̇[begin]
+    activate_contacts!(structure,env,solver_cache,q0)
+    invM = inv(M)
     pₖ₋₁ = M*q̇0
     pₖ   = zero(pₖ₋₁)
     T = eltype(q0)
@@ -169,9 +186,7 @@ function solve!(sim::Simulator,solvercache::ZhongCCPCache;
     F = zeros(T,nq)
     ∂F∂q = zeros(T,nq,nq)
     ∂F∂q̇ = zeros(T,nq,nq)
-    prepare_contacts!(q0)
     nx = nq + nλ
-
     Δx = zeros(T,nx)
     x = zero(Δx)
     Res = zero(Δx)
@@ -200,7 +215,8 @@ function solve!(sim::Simulator,solvercache::ZhongCCPCache;
         qˣ = qₖ₋₁ .+ dt./2 .*q̇ₖ₋₁
         qₖ .= qₖ₋₁ .+ dt .*q̇ₖ₋₁
         q̇ₖ .= q̇ₖ₋₁
-        na,bodyid2act_idx,persistent_idx,contacts_bits,H,restitution_coefficients,D, Dₘ,Dₖ,∂Dq̇∂q, ∂DᵀΛ∂q,ŕ, L = prepare_contacts!(qˣ)
+        contact_cache = activate_frictional_contacts!(structure,env,solver_cache,qˣ)
+        (;na) = contact_cache.cache
         isconverged = false
         normRes = typemax(T)
         iteration_break = 0
@@ -216,9 +232,19 @@ function solve!(sim::Simulator,solvercache::ZhongCCPCache;
         𝐜ᵀ = zeros(T,nΛ,nx)
         𝐍 = zeros(T,nΛ,nΛ)
         𝐫 = zeros(T,nΛ)
-        get_directions_and_positions!(D, Dₘ,Dₖ,∂Dq̇∂q, ∂DᵀΛ∂q, ŕ, qˣ, q̇ₖ₋₁, Λₖ,bodyid2act_idx,)        
-        ns_stepk! = make_zhongccp_ns_stepk(nq,nλ,na,qₖ₋₁,q̇ₖ₋₁,pₖ₋₁,tₖ₋₁,pₖ,q̇ₖ,dynfuncs,cache,invM,dt,scaling)
-        
+        # get_directions_and_positions!(D, Dₘ,Dₖ,∂Dq̇∂q, ∂DᵀΛ∂q, ŕ, qˣ, q̇ₖ₋₁, Λₖ,bodyid2act_idx,)        
+        get_frictional_directions_and_positions!(structure, contact_cache, qₖ₋₁, q̇ₖ₋₁, Λₖ)
+        (;
+            H
+        ) = contact_cache.cache
+        ns_stepk! = make_zhongccp_ns_stepk(
+            nq,nλ,na,
+            qₖ₋₁,q̇ₖ₋₁,pₖ₋₁,tₖ₋₁,
+            pₖ,q̇ₖ,
+            solver_cache,
+            invM,
+            dt,scaling
+        )
         restart_count = 0
         Λ_guess = 0.1
         while restart_count < 10
@@ -229,8 +255,18 @@ function solve!(sim::Simulator,solvercache::ZhongCCPCache;
             Nmax = 50
             for iteration = 1:maxiters
                 # @show iteration,D,ηs,restitution_coefficients,gaps
-                get_distribution_law!(L,bodyid2act_idx,x[1:nq])
-                luJac = ns_stepk!(Res,Jac,F,∂F∂q,∂F∂q̇,𝐁,𝐛,𝐜ᵀ,𝐍,𝐫,x,Λₖ,D,Dₘ,Dₖ,H,restitution_coefficients,timestep,iteration)
+                get_frictional_distribution_law!(structure,contact_cache,x[1:nq])
+                (;L) = contact_cache.cache
+                luJac = ns_stepk!(
+                    Res,Jac,
+                    F,∂F∂q,∂F∂q̇,
+                    𝐁,𝐛,𝐜ᵀ,𝐍,𝐫,
+                    x,Λₖ,
+                    structure,
+                    contact_cache,
+                    # D,Dₘ,Dₖ,H,restitution_coefficients,
+                    timestep,iteration
+                )
                 normRes = norm(Res)
                 if na == 0
                     if normRes < ftol
@@ -300,7 +336,8 @@ function solve!(sim::Simulator,solvercache::ZhongCCPCache;
         λₘ .= x[   nq+1:nq+nλ]
         pₖ .= Momentum_k(qₖ₋₁,pₖ₋₁,qₖ,λₘ,M,A,scaling,dt)
         q̇ₖ .= invM*pₖ
-
+        Dₘ = contact_cache.cache.Dper
+        Dₖ = contact_cache.cache.Dimp
         if na != 0
             update_contacts!(cₖ[contacts_bits],cₖ₋₁[contacts_bits],Dₘ*(qₖ.-qₖ₋₁).+Dₖ*q̇ₖ,2*Λₖ./(scaling*dt))
         end

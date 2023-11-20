@@ -19,9 +19,8 @@ includet("../../../examples/robots/slider_crank.jl")#jl
 sc = slider_crank(;coordsType=RB.NCF.NC)
 sc = slider_crank(;coordsType=RB.QCF.QC)
 plot_traj!(sc;showground=false)
-dt = 1e-3
+dt = 1e-4
 tspan = (0.0,1.0)
-
 
 planes = RB.StaticContactSurfaces(
     [
@@ -46,6 +45,36 @@ prob = RB.DynamicsProblem(sc,
     RB.RestitutionFrictionCombined(
         RB.NewtonRestitution(),
         RB.Frictionless(),
+    )
+)
+
+RB.solve!(
+    prob,
+    RB.DynamicsSolver(
+        RB.Zhong06(),
+        RB.InnerLayerContactSolver(
+            RB.InteriorPointMethod()
+        )
+    );
+    dt,tspan,ftol=1e-14,maxiters=50,verbose=true,exception=true,progress=false,
+)
+
+RB.solve!(
+    prob,
+    RB.DynamicsSolver(
+        RB.Zhong06(),
+        RB.MonolithicContactSolver(
+            RB.InteriorPointMethod()
+        )
+    );
+    dt,tspan,ftol=1e-14,maxiters=50,verbose=true,exception=true,progress=false,
+)
+
+prob = RB.DynamicsProblem(sc,
+    planes,
+    RB.RestitutionFrictionCombined(
+        RB.NewtonRestitution(),
+        RB.CoulombFriction(),
     )
 )
 
