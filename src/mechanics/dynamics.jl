@@ -70,16 +70,6 @@ function generalize_force_jacobain!(∂F∂q̌,∂F∂q̌̇,bot,q,q̇,t)
     build_∂Q̌∂q̌̇!(∂F∂q̌̇,structure)
 end
 
-function dynfuncs(bot;actuate=false,gravity=false,(Fˣ!)=(F,t)->nothing)
-    function F!(F,q,q̇,t)
-        generalize_force!(F,bot,q,q̇,t;actuate,gravity,(user_defined_force!)=(Fˣ!))
-    end
-    function Jac_F!(∂F∂q̌,∂F∂q̌̇,bot,q,q̇,t)
-        generalize_force_jacobain!(∂F∂q̌,∂F∂q̌̇,bot,q,q̇,t)
-    end
-    @eponymtuple(F!,Jac_F!)
-end
-
 function contact_dynfuncs(bot;
         flatplane = Plane([0,0,1.0],[0,0,0.0]),
         checkpersist = true,
@@ -101,13 +91,6 @@ function contact_dynfuncs(bot;
         (;loci) = prop
         μs_sys[bodyid2sys_loci_idx[bid]] .= [locus.friction_coefficient for locus in loci]
         es_sys[bodyid2sys_loci_idx[bid]] .= [locus.restitution_coefficient for locus in loci]
-    end
-
-    function F!(F,q,q̇,t)
-        generalize_force!(F,bot,q,q̇,t;)
-    end
-    function Jac_F!(∂F∂q̌,∂F∂q̌̇,bot,q,q̇,t)
-        generalize_force_jacobain!(∂F∂q̌,∂F∂q̌̇,bot,q,q̇,t)
     end
     
     function prepare_contacts!(q)
@@ -256,8 +239,174 @@ function contact_dynfuncs(bot;
     )
 end
 
-function frictionless_contact_dynfuncs(bot;
-        flatplane = Plane([0,0,1.0],[0,0,0.0]),
+struct ContactCache{cacheType}
+    cache::cacheType
+end
+
+function activate_contacts!(structure,contact_env,solver_cache,q;checkpersist=true)
+    (;  
+        μs_sys,
+        es_sys,
+        contacts_bits,
+        persistent_bits,
+    ) = solver_cache
+
+    (;bodyid2sys_loci_idx) = structure.connectivity.numbered
+    (;surfaces) = contact_env
+    T = eltype(q)
+    nq = length(q)
+    na = 0
+    update_bodies!(structure,q)
+    foreach(structure.bodies) do body
+        (;prop,state) = body
+        bid = prop.id
+        (;loci_states) = state
+        contacts_bits[bodyid2sys_loci_idx[bid]] .= false
+        persistent_bits[bodyid2sys_loci_idx[bid]] .= false
+        if body isa AbstractRigidBody
+            if body.prop.contactable
+                for pid in eachindex(loci_states)
+                    locus_state = loci_states[pid]
+                    (;position,contact_state) = locus_state
+                    gap, normal = contact_gap_and_normal(position,surfaces)
+                    if !checkpersist
+                        contact_state.active = false
+                    end
+                    activate!(contact_state,gap)
+                    if contact_state.active
+                        contacts_bits[bodyid2sys_loci_idx[bid][pid]] = true
+                        contact_state.frame = spatial_frame(normal)
+                        if contact_state.persistent
+                            persistent_bits[bodyid2sys_loci_idx[bid][pid]] = true
+                        end
+                        na += 1
+                    end
+                end
+            end
+        end
+    end
+    # @show na, length(active_contacts)
+    inv_friction_coefficients = ones(T,na)
+    for (i,μ) in enumerate(μs_sys[contacts_bits])
+        inv_friction_coefficients[(i-1)+1] = 1
+    end
+    H = Diagonal(inv_friction_coefficients)
+    restitution_coefficients = es_sys[contacts_bits]
+    # member's points idx to system's active points' idx
+    bodyid2act_idx = deepcopy(bodyid2sys_loci_idx)
+    act_start = 0
+    persistent_idx = Int[]
+    for bid = 1:structure.num_of_bodies
+        bodyid2act_idx[bid] .= 0
+        contacts_bits_body = findall(contacts_bits[bodyid2sys_loci_idx[bid]])
+        nactive_body = length(contacts_bits_body)
+        mem_idx = act_start+1:act_start+nactive_body
+        bodyid2act_idx[bid][contacts_bits_body] .= mem_idx
+        mem_per_idx = findall(persistent_bits[bodyid2sys_loci_idx[bid]][contacts_bits_body])
+        append!(persistent_idx,mem_idx[mem_per_idx])
+        act_start += nactive_body
+    end
+    # @show bodyid2act_idx
+    Ls = [
+        begin 
+            na_body = count(!iszero, mem)
+            zeros(T,na_body,na_body)
+        end
+        for mem in bodyid2act_idx
+    ]
+    L = BlockDiagonal(Ls)
+    D = zeros(T,na,nq)
+    Dper = zero(D)
+    Dimp = zero(D)
+    ∂Dq̇∂q = zeros(T,na,nq)
+    ∂DᵀΛ∂q = zeros(T,nq,nq)
+    ŕ = Vector{T}(undef,na)
+    cache = @eponymtuple(
+        na, bodyid2act_idx, persistent_idx, contacts_bits, H, restitution_coefficients, D, Dper, Dimp, ∂Dq̇∂q, ∂DᵀΛ∂q, ŕ, L
+    )
+    ContactCache(cache)
+end
+
+function get_directions_and_positions!(structure,cache, q, q̇, Λ, )
+    (;
+        D, Dper,Dimp, 
+        ∂Dq̇∂q, ∂DᵀΛ∂q, ŕ, 
+        bodyid2act_idx,
+    ) = cache.cache
+    update_bodies!(structure,q)
+    ∂Dq̇∂q .= 0
+    ∂DᵀΛ∂q .= 0
+    foreach(structure.bodies) do body
+        (;prop,state,coords,cache) = body
+        bid = prop.id
+        (;loci_states) = state
+        for (pid,locus_state) in enumerate(loci_states)
+            (;contact_state) = locus_state
+            if contact_state.active
+                (;position) = loci_states[pid]
+                (;normal,tangent,bitangent) = contact_state.frame
+                C = cache.Cps[pid]
+                CT = C*build_T(structure,bid)
+                dm = normal |> transpose
+                ci = bodyid2act_idx[bid][pid]
+                epi = ci
+                D[epi,:] = dm*CT
+                ŕ[epi]   = dm*position
+                if coords.nmcs isa QCF.QC
+                    Tbody = build_T(structure,bid)
+                    locus = prop.loci[pid]
+                    ∂Cẋ∂x = QCF.make_∂Cẋ∂x(locus.position)
+                    ∂Cq̇∂q = ∂Cẋ∂x(Tbody*q,Tbody*q̇)*Tbody
+                    ∂Dq̇∂q[epi,:] = dm*∂Cq̇∂q
+                    ∂Cᵀf∂x = QCF.make_∂Cᵀf∂x(locus.position)
+                    fi = Λ[epi]*normal
+                    ∂Cᵀfi∂x = ∂Cᵀf∂x(Tbody*q,fi)
+                    ∂DᵀΛ∂q .+= transpose(Tbody)*∂Cᵀfi∂x*Tbody
+                end
+                if contact_state.persistent
+                    Dper[epi,:] .= D[epi,:]
+                else
+                    Dimp[epi,:] .= D[epi,:]
+                end
+            end
+        end
+    end
+end
+
+function get_distribution_law!(structure,cache,q)
+    (;
+        L,bodyid2act_idx
+    ) = cache.cache
+    T = eltype(q)
+    update_bodies!(structure,q)
+    foreach(structure.bodies) do body
+        (;prop,state) = body
+        bid = prop.id
+        (;loci) = prop
+        (;loci_states) = state
+        active_idx = findall(!iszero,bodyid2act_idx[bid])
+        na_body = length(active_idx)
+        if na_body > 1
+            R = zeros(T,na_body,6)
+            inv_μs_body = ones(T,na_body)
+            for (i,pid) in enumerate(active_idx)
+                locus_state = loci_states[pid]
+                locus = loci[pid]
+                (;position,contact_state) = locus_state
+                (;normal,tangent,bitangent) = contact_state.frame
+                inv_μs_body[i] = 1/locus.friction_coefficient
+                dm = hcat(normal,tangent,bitangent) |> transpose
+                R[i,1:3] = dm
+                R[i,4:6] = dm*(-skew(position))
+            end
+            BlockDiagonals.blocks(L)[bid] .= (I-pinv(R)'*R')*Diagonal(inv_μs_body)
+        end
+    end
+end
+
+function prepare_frictionless_contacts!(
+        bot,
+        contact_env;
         checkpersist = true,
     )
     (;structure) = bot
@@ -279,159 +428,12 @@ function frictionless_contact_dynfuncs(bot;
         es_sys[bodyid2sys_loci_idx[bid]] .= [locus.restitution_coefficient for locus in loci]
     end
 
-    function F!(F,q,q̇,t)
-        generalize_force!(F,bot,q,q̇,t;)
-    end
-    function Jac_F!(∂F∂q̌,∂F∂q̌̇,q,q̇,t)
-        generalize_force_jacobain!(∂F∂q̌,∂F∂q̌̇,bot,q,q̇,t)
-    end
-
-    function prepare_contacts!(q)
-        T = eltype(q)
-        nq = length(q)
-        na = 0
-        update_bodies!(structure,q)
-        foreach(structure.bodies) do body
-            (;prop,state) = body
-            bid = prop.id
-            (;loci_states) = state
-            contacts_bits[bodyid2sys_loci_idx[bid]] .= false
-            persistent_bits[bodyid2sys_loci_idx[bid]] .= false
-            if body isa AbstractRigidBody
-                if body.prop.contactable
-                    for pid in eachindex(loci_states)
-                        locus_state = loci_states[pid]
-                        (;position,contact_state) = locus_state
-                        gap, normal = contact_gap_and_normal(position,flatplane)
-                        if !checkpersist
-                            contact_state.active = false
-                        end
-                        activate!(contact_state,gap)
-                        if contact_state.active
-                            contacts_bits[bodyid2sys_loci_idx[bid][pid]] = true
-                            contact_state.frame = spatial_frame(normal)
-                            if contact_state.persistent
-                                persistent_bits[bodyid2sys_loci_idx[bid][pid]] = true
-                            end
-                            na += 1
-                        end
-                    end
-                end
-            end
-        end
-        # @show na, length(active_contacts)
-        inv_friction_coefficients = ones(T,na)
-        for (i,μ) in enumerate(μs_sys[contacts_bits])
-            inv_friction_coefficients[(i-1)+1] = 1
-        end
-        H = Diagonal(inv_friction_coefficients)
-        restitution_coefficients = es_sys[contacts_bits]
-        # member's points idx to system's active points' idx
-        bodyid2act_idx = deepcopy(bodyid2sys_loci_idx)
-        act_start = 0
-        persistent_idx = Int[]
-        for bid = 1:structure.num_of_bodies
-            bodyid2act_idx[bid] .= 0
-            contacts_bits_body = findall(contacts_bits[bodyid2sys_loci_idx[bid]])
-            nactive_body = length(contacts_bits_body)
-            mem_idx = act_start+1:act_start+nactive_body
-            bodyid2act_idx[bid][contacts_bits_body] .= mem_idx
-            mem_per_idx = findall(persistent_bits[bodyid2sys_loci_idx[bid]][contacts_bits_body])
-            append!(persistent_idx,mem_idx[mem_per_idx])
-            act_start += nactive_body
-        end
-        # @show bodyid2act_idx
-        Ls = [
-            begin 
-                na_body = count(!iszero, mem)
-                zeros(T,na_body,na_body)
-            end
-            for mem in bodyid2act_idx
-        ]
-        L = BlockDiagonal(Ls)
-        D = zeros(T,na,nq)
-        Dper = zero(D)
-        Dimp = zero(D)
-        ∂Dq̇∂q = zeros(T,na,nq)
-        ∂DᵀΛ∂q = zeros(T,nq,nq)
-        ŕ = Vector{T}(undef,na)
-        na, bodyid2act_idx, persistent_idx, contacts_bits, H, restitution_coefficients, D, Dper, Dimp, ∂Dq̇∂q, ∂DᵀΛ∂q, ŕ, L
-    end
-
-    function get_directions_and_positions!(D, Dper,Dimp, ∂Dq̇∂q, ∂DᵀΛ∂q, ŕ, q, q̇, Λ, bodyid2act_idx,)
-        update_bodies!(structure,q)
-        ∂Dq̇∂q .= 0
-        ∂DᵀΛ∂q .= 0
-        foreach(structure.bodies) do body
-            (;prop,state,coords,cache) = body
-            bid = prop.id
-            (;loci_states) = state
-            for (pid,locus_state) in enumerate(loci_states)
-                (;contact_state) = locus_state
-                if contact_state.active
-                    (;position) = loci_states[pid]
-                    (;normal,tangent,bitangent) = contact_state.frame
-                    C = cache.Cps[pid]
-                    CT = C*build_T(structure,bid)
-                    dm = normal |> transpose
-                    ci = bodyid2act_idx[bid][pid]
-                    epi = ci
-                    D[epi,:] = dm*CT
-                    ŕ[epi]   = dm*position
-                    if coords.nmcs isa QCF.QC
-                        Tbody = build_T(structure,bid)
-                        locus = prop.loci[pid]
-                        ∂Cẋ∂x = QCF.make_∂Cẋ∂x(locus.position)
-                        ∂Cq̇∂q = ∂Cẋ∂x(Tbody*q,Tbody*q̇)*Tbody
-                        ∂Dq̇∂q[epi,:] = dm*∂Cq̇∂q
-                        ∂Cᵀf∂x = QCF.make_∂Cᵀf∂x(locus.position)
-                        fi = Λ[epi]*normal
-                        ∂Cᵀfi∂x = ∂Cᵀf∂x(Tbody*q,fi)
-                        ∂DᵀΛ∂q .+= transpose(Tbody)*∂Cᵀfi∂x*Tbody
-                    end
-                    if contact_state.persistent
-                        Dper[epi,:] .= D[epi,:]
-                    else
-                        Dimp[epi,:] .= D[epi,:]
-                    end
-                end
-            end
-        end
-    end
-
-    function get_distribution_law!(L,bodyid2act_idx,q)
-        T = eltype(q)
-        update_bodies!(structure,q)
-        foreach(structure.bodies) do body
-            (;prop,state) = body
-            bid = prop.id
-            (;loci) = prop
-            (;loci_states) = state
-            active_idx = findall(!iszero,bodyid2act_idx[bid])
-            na_body = length(active_idx)
-            if na_body > 1
-                R = zeros(T,na_body,6)
-                inv_μs_body = ones(T,na_body)
-                for (i,pid) in enumerate(active_idx)
-                    locus_state = loci_states[pid]
-                    locus = loci[pid]
-                    (;position,contact_state) = locus_state
-                    (;normal,tangent,bitangent) = contact_state.frame
-                    inv_μs_body[i] = 1/locus.friction_coefficient
-                    dm = hcat(normal,tangent,bitangent) |> transpose
-                    R[i,1:3] = dm
-                    R[i,4:6] = dm*(-skew(position))
-                end
-                BlockDiagonals.blocks(L)[bid] .= (I-pinv(R)'*R')*Diagonal(inv_μs_body)
-            end
-        end
-    end
-
-    @eponymtuple(
-        F!,Jac_F!,
-        prepare_contacts!,
-        get_directions_and_positions!,
-        get_distribution_law!
+    prepared = @eponymtuple(
+        contacts_bits,
+        persistent_bits,
+        μs_sys,
+        es_sys,
+        gaps_sys
     )
 end
 

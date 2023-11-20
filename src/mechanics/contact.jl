@@ -52,6 +52,19 @@ function ApproxFrictionalContact(ϵ::T,μ::T,m::Int) where T
     )
 end
 
+
+abstract type AbstractContactEnvironment end
+abstract type StaticContactEnvironment <: AbstractContactEnvironment end
+struct StaticContactSurfaces{surfacesType} <: StaticContactEnvironment 
+    surfaces::surfacesType
+end
+
+struct EmptySpace <: StaticContactEnvironment end
+
+abstract type ContactGeometry end
+abstract type ContactPrimitive <: ContactGeometry end
+abstract type ConvexContactPrimitive <: ContactPrimitive end
+
 struct Plane{T}
     n::SArray{Tuple{3},T,1,3}
     d::T
@@ -85,6 +98,20 @@ function Plane(a::T,b::T,c::T,d::T) where T
     Plane(n,d)
 end
 
+struct Sphere{T} <: ConvexContactPrimitive
+    radius::T
+end
+
+struct Halfspace{T} <: ConvexContactPrimitive
+    normal::SArray{Tuple{3},T,1,3}
+    d::T
+end
+
+function Halfspace(normal,d)
+    norm_normal = normal ./ norm(normal)
+    Halfspace(SVector{3}(norm_normal),d)
+end
+
 function signed_distance(x::AbstractVector{T},p::Plane) where T
     (;n, d) = p
     transpose(n)*x + d
@@ -112,4 +139,3 @@ function contact_gap_and_normal(x::AbstractVector,planes::Vector{<:Plane})
     end
     gap_first, n_first
 end
-

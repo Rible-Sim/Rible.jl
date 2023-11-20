@@ -22,17 +22,16 @@ plot_traj!(sc;showground=false)
 dt = 1e-3
 tspan = (0.0,1.0)
 
-function sc_contact_dynfuncs(bot;)
-    ## horizontal Plane
-    planes = [
+
+planes = RB.StaticContactSurfaces(
+    [
         RB.Plane([0,0, 1.0],[0,0,-0.026]),
         RB.Plane([0,0,-1.0],[0,0, 0.026])
     ]
-    RB.frictionless_contact_dynfuncs(bot;flatplane = planes)
-end
+)
 
 RB.has_constant_mass_matrix(sc)
-prob = RB.DynamicsProblem(sc,)
+prob = RB.DynamicsProblem(sc,planes)
 
 RB.solve!(
     prob,
@@ -42,16 +41,33 @@ RB.solve!(
 
 plot_traj!(sc;showground=false)
 
-prob = RB.DynamicsProblem(sc,sc_contact_dynfuncs)
+prob = RB.DynamicsProblem(sc,
+    planes,
+    RB.RestitutionFrictionCombined(
+        RB.NewtonRestitution(),
+        RB.Frictionless(),
+    )
+)
+
 RB.solve!(
     prob,
-    RB.ZhongQCCPN();
+    RB.DynamicsSolver(
+        RB.Zhong06(),
+        RB.InnerLayerContactSolver(
+            RB.InteriorPointMethod()
+        )
+    );
     dt,tspan,ftol=1e-14,maxiters=50,verbose=true,exception=true,progress=false,
 )
 
 RB.solve!(
     prob,
-    RB.ZhongQCCPNMono();
+    RB.DynamicsSolver(
+        RB.Zhong06(),
+        RB.MonolithicContactSolver(
+            RB.InteriorPointMethod()
+        )
+    );
     dt,tspan,ftol=1e-14,maxiters=50,verbose=true,exception=true,progress=false,
 )
 

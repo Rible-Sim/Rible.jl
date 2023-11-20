@@ -1,17 +1,17 @@
 abstract type AbstractContactModel end
 struct Contactless <: AbstractContactModel end
-struct FrictionRestitutionCombined{frictionType,restitutionType} <: AbstractContactModel 
+struct RestitutionFrictionCombined{restitutionType,frictionType} <: AbstractContactModel 
     restitution::restitutionType
     friction::frictionType
 end
 
-abstract type AbstractFrictionModel end
+abstract type AbstractFrictionModel <: AbstractContactModel end
 struct Frictionless <: AbstractFrictionModel end
 struct CoulombFriction <: AbstractFrictionModel end
 struct PolyhedralCoulombFriction <: AbstractFrictionModel end
 struct MaximumDissipation <: AbstractFrictionModel end
 
-abstract type AbstractRestitutionModel end
+abstract type AbstractRestitutionModel <: AbstractContactModel end
 struct Inelastic <: AbstractRestitutionModel end
 struct NewtonRestitution <: AbstractRestitutionModel end
 struct PoissonRestitution <: AbstractRestitutionModel end
@@ -70,19 +70,34 @@ struct DynamicsSolver{integratorType,contact_solverType,tendon_solverType} <: Ab
     tendon_solver::tendon_solverType
 end
 
-function DynamicsSolver(integrator)
+function DynamicsSolver(integrator::AbstractIntegrator)
     DynamicsSolver(integrator,nothing,nothing)
 end
 
-struct DynamicsProblem{RobotType,contact_modelType,tendon_modelType}
+function DynamicsSolver(integrator::AbstractIntegrator,contact_solver::AbstractContactSolver)
+    DynamicsSolver(integrator,contact_solver,nothing)
+end
+
+struct DynamicsProblem{RobotType,envType,contact_modelType,tendon_modelType}
     bot::RobotType
+    env::envType
     contact_model::contact_modelType
     tendon_model::tendon_modelType
 end
 
-function DynamicsProblem(bot)
-    DynamicsProblem(bot,Contactless(),NoTendon())
+function DynamicsProblem(bot::Robot)
+    DynamicsProblem(bot::Robot,EmptySpace(),Contactless(),NoTendon())
 end
+
+function DynamicsProblem(bot::Robot,contact_model::AbstractContactModel)
+    DynamicsProblem(bot::Robot,EmptySpace(),contact_model,NoTendon())
+end
+
+function DynamicsProblem(bot::Robot,env::AbstractContactEnvironment,contact_model::AbstractContactModel)
+    DynamicsProblem(bot::Robot,env,contact_model,NoTendon())
+end
+
+
 struct Simulator{ProbType,CtrlType,T}
     prob::ProbType
     controller::CtrlType
@@ -180,17 +195,20 @@ function solve!(simulator::Simulator,solver::DynamicsSolver;karg...)
     # simulator.prob.bot
 end
 
-# include("solvers/Wendlandt.jl")
-include("solvers/Zhong06.jl")
-include("solvers/Zhong06Q.jl")
-include("solvers/FBZhong06.jl")
-include("solvers/Alpha.jl")
-include("solvers/CCP/CCPsolvers.jl")
-include("solvers/CCP/ZhongCCP.jl")
-include("solvers/CCP/ZhongQCCP.jl")
-include("solvers/CCP/AlphaCCP.jl")
-include("solvers/CCP/ZhongQCCPN.jl")
-include("solvers/CCP/ZhongQCCPNMono.jl")
+# include("dynamics_solvers/Wendlandt.jl")
+include("dynamics_solvers/complementarity_solvers.jl")
+include("dynamics_solvers/Zhong06_family/Zhong06_CCP_constant_mass.jl")
+include("dynamics_solvers/Zhong06_family/Zhong06_CCP_nonconstant_mass.jl")
+include("dynamics_solvers/Zhong06_family/Zhong06_constant_mass.jl")
+include("dynamics_solvers/Zhong06_family/Zhong06_frictionless_nonconstant_mass.jl")
+include("dynamics_solvers/Zhong06_family/Zhong06_frictionless_nonconstant_mass_mono.jl")
+include("dynamics_solvers/Zhong06_family/Zhong06_nonconstant_mass.jl")
+include("dynamics_solvers/Zhong06_family/Zhong06_sliding_cable_FB.jl")
+# include("dynamics_solvers/Zhong06_family/Zhong06_nonholonomic_nonsmooth.jl")
 
-# include("solvers/nonsmooth.jl")
-# include("solvers/Zhong06NSNH.jl")
+include("dynamics_solvers/Alpha_family/Alpha.jl")
+include("dynamics_solvers/Alpha_family/AlphaCCP.jl")
+# include("dynamics_solvers/Alpha_family/nonsmooth.jl")
+# include("dynamics_solvers/Alpha_family/NSSFC.jl")
+
+# include("dynamics_solvers/nonsmooth.jl")

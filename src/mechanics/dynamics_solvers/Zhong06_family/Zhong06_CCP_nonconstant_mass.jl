@@ -6,7 +6,7 @@ end
 function generate_cache(
         simulator::Simulator{DynamicsProblem{
             RobotType,
-            FrictionRestitutionCombined{NewtonRestitution,CoulombFriction}
+            RestitutionFrictionCombined{NewtonRestitution,CoulombFriction}
         }},
         solver::DynamicsSolver{
             Zhong06,

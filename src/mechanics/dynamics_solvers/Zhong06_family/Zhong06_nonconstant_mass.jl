@@ -4,7 +4,7 @@ end
 
 function generate_cache(
         simulator::Simulator{<:DynamicsProblem},
-        solver::DynamicsSolver{Zhong06},
+        solver::DynamicsSolver{Zhong06,Nothing},
         ::Val{false};
         dt,kargs...
     )
