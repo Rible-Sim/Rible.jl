@@ -63,19 +63,44 @@ end
 
 ∂Rη∂q(q::Quaternion,η::AbstractVector) = ∂Rη∂q(vec(q),η)
 
+function ∂²Rη∂qᵀ∂q(η::AbstractVector)
+    H = -skew(η)
+    hessians = [
+        begin
+            rb = @SMatrix [
+                ifelse(
+                    (i==k),
+                    η[j],
+                    0
+                ) + 
+                ifelse(
+                    (j==k),
+                    η[i],
+                    0
+                )
+                for i = 1:3, j = 1:3
+            ]
+            2vcat(
+                hcat(η[k],transpose(H[k,:])),
+                hcat(H[k,:],rb-η[k]I)
+            )
+        end
+        for k = 1:3
+    ]
+end
 
-function ∂Rᵀη∂q(q::AbstractVector,η::AbstractVector)
+function ∂Rᵀf∂q(q::AbstractVector,f::AbstractVector)
     q0,q1,q2,q3 = q
     v = SA[q1,q2,q3]
     Q = q0*I - skew(v)
-    Qη = Q*η    
+    Qf = Q*f    
     2hcat(
-        Qη,
-        transpose(v)*η*I + skew(Qη)
+        Qf,
+        transpose(v)*f*I + skew(Qf)
     )
 end
 
-∂Rᵀη∂q(q::Quaternion,η::AbstractVector) = ∂Rᵀη∂q(vec(q),η)
+∂Rᵀf∂q(q::Quaternion,f::AbstractVector) = ∂Rᵀf∂q(vec(q),f)
 
 function Pmat(q::AbstractVector)
     q0,q1,q2,q3 = q

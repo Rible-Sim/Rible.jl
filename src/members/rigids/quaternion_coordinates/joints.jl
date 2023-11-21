@@ -143,11 +143,11 @@ function get_joint_jacobian!(
     # jac 3rd on hen
     # translate on hen
     jac_3rd[1:3,:]                         .= Rmat(quat_trl_hen)'*J
-    jac_3rd[1:3,4:7]                      .+= ∂Rᵀη∂q(quat_trl_hen,d)*Mmat(quat_trl_rel_hen)
+    jac_3rd[1:3,4:7]                      .+= ∂Rᵀf∂q(quat_trl_hen,d)*Mmat(quat_trl_rel_hen)
     # jac 3rd on egg
     # translate on egg
     jac_3rd[4:6,:]                         .= Rmat(quat_trl_egg)'*J
-    jac_3rd[4:6,num_of_coords_hen.+(4:7)] .+= ∂Rᵀη∂q(quat_trl_egg,d)*Mmat(quat_trl_rel_egg)
+    jac_3rd[4:6,num_of_coords_hen.+(4:7)] .+= ∂Rᵀf∂q(quat_trl_egg,d)*Mmat(quat_trl_rel_egg)
     # jac 2nd
     # rotate of egg
     O43 = @SMatrix zeros(T,4,3)

@@ -123,3 +123,14 @@ me = RB.mechanical_energy!(sc)
 lines(me.E)
 lines(me.V)
 lines(me.T)
+
+η = @SVector rand(3)
+q = normalize(@SVector rand(4))
+ω = @SVector rand(3)
+q̇ = RB.QCF.Lᵀmat(q)*ω
+RB.QCF.∂Rη∂q(q,η)*q̇
+-2RB.QCF.Rmat(q)*RB.skew(η)*RB.QCF.Lmat(q)*q̇
+
+
+
+H = RB.QCF.∂²Rη∂qᵀ∂q(η)

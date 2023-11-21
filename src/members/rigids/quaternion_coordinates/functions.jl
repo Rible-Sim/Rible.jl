@@ -46,7 +46,7 @@ function make_∂Cᵀf∂x(c)
             O37,
             hcat(
                 O43,
-                -2(Lᵀmat(q)*ĉᵀ*∂Rᵀη∂q(q,f) + ∂Lᵀη∂q(ĉᵀRᵀf))
+                -2(Lᵀmat(q)*ĉᵀ*∂Rᵀf∂q(q,f) + ∂Lᵀη∂q(ĉᵀRᵀf))
             )
         )        
     end

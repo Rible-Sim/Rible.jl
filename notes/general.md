@@ -73,7 +73,10 @@ To do this, use `include`, docs/test/benchmark; use `includet` dev;
 - [ ] preallocations for autodiff
 - [ ] joint cstr
   - [x] quadratic forms
-  - [ ] put joint into `NCF`, `QCF`
+  - [x] put joint into `NCF`, `QCF`
+  - [ ] reorder basic joint numbering
+  - [ ] reorder normal, tangent, bitangent
+  - [ ] `QCF` joints constraints hessians
 - [x] put contacts into loci
 - [ ] local distribution law
 - [ ] try SNAKE/RATTLE scheme

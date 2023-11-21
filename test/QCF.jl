@@ -8,7 +8,7 @@ q̇ = (@SVector rand(4)) |> normalize
 @btime RB.QCF.∂Lᵀη∂q($η)
 @btime RB.QCF.Rmat($q)
 @btime RB.QCF.∂Rη∂q($q,$η)
-@btime RB.QCF.∂Rᵀη∂q($q,$η)
+@btime RB.QCF.∂Rᵀf∂q($q,$η)
 @btime RB.QCF.quatVel2localAngular($q, $q̇)
 @btime RB.QCF.localAngular2quatVel($q, $Ω)
 
