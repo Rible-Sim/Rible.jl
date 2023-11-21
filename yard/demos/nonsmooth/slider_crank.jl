@@ -22,6 +22,9 @@ includet("../../../examples/robots/slider_crank.jl")#jl
 # natural coordinates
 sc = slider_crank(;coordsType=RB.NCF.NC)
 
+# Quaternion coordinates
+sc = slider_crank(;coordsType=RB.QCF.QC)
+
 plot_traj!(sc;showground=false)
 
 RB.has_constant_mass_matrix(sc)
@@ -29,7 +32,7 @@ RB.has_constant_mass_matrix(sc)
 dt = 1e-3
 tspan = (0.0,1.0)
 
-# No Contact 
+# No Contact Dynamics
 prob = RB.DynamicsProblem(sc,)
 
 RB.solve!(
@@ -47,10 +50,6 @@ planes = RB.StaticContactSurfaces(
         RB.Plane([0,0,-1.0],[0,0, 0.026])
     ]
 )
-
-
-# Quaternion coordinates
-sc = slider_crank(;coordsType=RB.QCF.QC)
 
 # Frictionless Contact Dynamics
 
@@ -100,17 +99,6 @@ RB.solve!(
     RB.DynamicsSolver(
         RB.Zhong06(),
         RB.InnerLayerContactSolver(
-            RB.InteriorPointMethod()
-        )
-    );
-    dt,tspan,ftol=1e-14,maxiters=50,verbose=true,exception=true,progress=false,
-)
-
-RB.solve!(
-    prob,
-    RB.DynamicsSolver(
-        RB.Zhong06(),
-        RB.MonolithicContactSolver(
             RB.InteriorPointMethod()
         )
     );

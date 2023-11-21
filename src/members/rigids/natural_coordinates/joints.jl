@@ -26,11 +26,11 @@ function build_joint_cache(
     # half 1st
     half_1st = fill(heros,3)
     # half 4th
-    half_4th = fill(heros,1)
+    half_2nd = fill(heros,1)
     # half 3rd
     half_3rd = fill(heros,6)
     # half 2nd
-    half_2nd = fill(heros,3)
+    half_4th = fill(heros,3)
     # translate
 
     # translate
@@ -41,7 +41,7 @@ function build_joint_cache(
 
     I3_Bool = I(3)
 
-    half_4th[1] = (J'*J) |> sparse
+    half_2nd[1] = (J'*J) |> sparse
 
     X_hen = get_X(nmcs_hen,q_hen)
     X_egg = get_X(nmcs_egg,q_egg)
@@ -75,7 +75,7 @@ function build_joint_cache(
             axis_hen = axes_rot_hen.X[:,id_axis_hen]
             axis_egg = axes_rot_egg.X[:,id_axis_egg]
             axis_zero = zero(axis_egg)
-            half_2nd[i] = select_uvw_hen'*
+            half_4th[i] = select_uvw_hen'*
                 kron(vcat(0,axis_hen,0,axis_zero),I3_Bool)*
                 kron(vcat(0,axis_zero,0,axis_egg),I3_Bool)'*
                 select_uvw_egg |> sparse
@@ -87,9 +87,9 @@ function build_joint_cache(
 
     halves = vcat(
         half_1st[mask_1st],
-        half_4th[mask_4th],
+        half_2nd[mask_2nd],
         half_3rd[mask_3rd],
-        half_2nd[mask_2nd];
+        half_4th[mask_4th];
     )
     # cstr values
     Refq = Ref(q)
@@ -100,14 +100,14 @@ function build_joint_cache(
 
     # valid for NC only, wrong for QC
     hess_1st = [(H .+ H') |> Symmetric for H in half_1st]
-    hess_4th = [(H .+ H') |> Symmetric for H in half_4th]
-    hess_3rd = [(H .+ H') |> Symmetric for H in half_3rd]
     hess_2nd = [(H .+ H') |> Symmetric for H in half_2nd]
+    hess_3rd = [(H .+ H') |> Symmetric for H in half_3rd]
+    hess_4th = [(H .+ H') |> Symmetric for H in half_4th]
     hessians = vcat(
         hess_1st[mask_1st],
-        hess_4th[mask_4th],
+        hess_2nd[mask_2nd],
         hess_3rd[mask_3rd],
-        hess_2nd[mask_2nd];
+        hess_4th[mask_4th];
     )
 
     cache = @eponymtuple(

@@ -30,18 +30,18 @@ function build_joint_cache(
     d = r_egg - r_hen
     # cstr 1st
     vio_1st = d
-    vio_4th = [d'*d]
+    vio_2nd = [d'*d]
     vio_3rd = vcat(
         Rmat(quat_trl_hen)'*d,
         Rmat(quat_trl_egg)'*d
     )
     rot_quat = conj(quat_rot_egg)*quat_rot_hen
-    vio_2nd = vec(conj(rot_quat)*rot_quat)[2:4] # always zero
+    vio_4th = vec(conj(rot_quat)*rot_quat)[2:4] # always zero
     violations = vcat(
         vio_1st[mask_1st],
-        vio_4th[mask_4th],
+        vio_2nd[mask_2nd],
         vio_3rd[mask_3rd],
-        vio_2nd[mask_2nd];
+        vio_4th[mask_4th];
     )
 
     @show r_egg, r_hen
@@ -77,19 +77,19 @@ function get_joint_violations!(
     d = r_egg - r_hen
     # cstr 1st
     vio_1st = d
-    vio_4th = [d'*d]
+    vio_2nd = [d'*d]
     vio_3rd = vcat(
         Rmat(quat_trl_hen)'*d,
         Rmat(quat_trl_egg)'*d
     )
-    vio_2nd = vec(conj(rot_quat)*conj(quat_rot_egg)*quat_rot_hen)[2:4]
+    vio_4th = vec(conj(rot_quat)*conj(quat_rot_egg)*quat_rot_hen)[2:4]
     # @show vio_1st |> norm
     # @show violations[1:3]  |> norm
     ret .= vcat(
         vio_1st[mask_1st],
-        vio_4th[mask_4th],
+        vio_2nd[mask_2nd],
         vio_3rd[mask_3rd],
-        vio_2nd[mask_2nd];
+        vio_4th[mask_4th];
     ) .- violations
 end
 
@@ -131,15 +131,15 @@ function get_joint_jacobian!(
     # hes 1st
     jac_1st = zeros(T,3,num_of_jointed_coords)
     # hes 4th
-    jac_4th = zeros(T,1,num_of_jointed_coords)
+    jac_2nd = zeros(T,1,num_of_jointed_coords)
     # hes 3rd
     jac_3rd = zeros(T,6,num_of_jointed_coords)
     # rotate
-    jac_2nd = zeros(T,3,num_of_jointed_coords)
+    jac_4th = zeros(T,3,num_of_jointed_coords)
     # jac 1st 
     jac_1st[1:3,:] .= J
     # jac 4th 
-    jac_4th[:,:]   .= 2d'*J
+    jac_2nd[:,:]   .= 2d'*J
     # jac 3rd on hen
     # translate on hen
     jac_3rd[1:3,:]                         .= Rmat(quat_trl_hen)'*J
@@ -152,16 +152,16 @@ function get_joint_jacobian!(
     # rotate of egg
     O43 = @SMatrix zeros(T,4,3)
     Pcq_egg = Pmat(conj(rot_quat)*conj(quat_rot_rel_egg))
-    jac_2nd[1:3,:] = (
+    jac_4th[1:3,:] = (
         [
             O43 Pcq_egg*Pmat(conj(quat_egg))*Mmat(quat_rot_rel_hen) O43 Pcq_egg*Mmat(quat_rot_hen)*Inv_mat
         ]
     )[2:4,:]
     jac = vcat(
         jac_1st[mask_1st,:],
-        jac_4th[mask_4th,:],
+        jac_2nd[mask_2nd,:],
         jac_3rd[mask_3rd,:],
-        jac_2nd[mask_2nd,:];
+        jac_4th[mask_4th,:];
     )
     # @show jac
     ret[:,free_hen] .= jac[:,free_idx_hen]

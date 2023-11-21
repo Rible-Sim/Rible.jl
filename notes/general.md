@@ -74,7 +74,7 @@ To do this, use `include`, docs/test/benchmark; use `includet` dev;
 - [ ] joint cstr
   - [x] quadratic forms
   - [x] put joint into `NCF`, `QCF`
-  - [ ] reorder basic joint numbering
+  - [x] reorder basic joint numbering
   - [ ] reorder normal, tangent, bitangent
   - [ ] `QCF` joints constraints hessians
 - [x] put contacts into loci

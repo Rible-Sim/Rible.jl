@@ -7,51 +7,52 @@ function to_position(::QC,x,c)
 end
 
 function to_transformation(::QC,x,c)
-    ĉ = skew(c)
     q = @view x[4:7]
     T = eltype(q)
     I3 = SMatrix{3,3}(one(T)*I)
     hcat(
         I3,
-        -2Rmat(q)*ĉ*Lmat(q)
+        ∂Rη∂q(q,c)
     )
 end
 
 function make_∂Cẋ∂x(c)
-    ĉ = skew(c)
     function ∂Cẋ∂x(x,ẋ)
-        q = @view x[4:7]
+        η = SA[c[1],c[2],c[3]]
         q̇ = @view ẋ[4:7]
-        R = Rmat(q)
-        ĉL̇ = ĉ*Lmat(q̇)
-        η = ĉL̇*q
-        T = eltype(q)
+        q̇0 = q̇[1]
+        v̇ = SA[q̇[2],q̇[3],q̇[4]]
+        T = eltype(x)
         O3 = @SMatrix zeros(T,3,3)
         hcat(
             O3,
-            2(R*ĉL̇ + ∂Rη∂q(q,η))
-        )        
-    end
-end
-
-function make_∂Cᵀf∂x(c)
-    ĉᵀ = transpose(skew(c))
-    function ∂Cᵀf∂x(x,f)
-        q = @view x[4:7]
-        ĉᵀRᵀf = ĉᵀ*transpose(Rmat(q))*f
-        T = eltype(q)
-        O37 = @SMatrix zeros(T,3,7)
-        O43 = @SMatrix zeros(T,4,3)
-        vcat(
-            O37,
-            hcat(
-                O43,
-                -2(Lᵀmat(q)*ĉᵀ*∂Rᵀf∂q(q,f) + ∂Lᵀη∂q(ĉᵀRᵀf))
+            2hcat(
+                 q̇0*c-skew(v̇)*η,
+                -q̇0*skew(η)+kron(transpose(η),v̇)+skew(v̇)*skew(η)
             )
         )        
     end
 end
 
+function make_∂Cᵀf∂x(c)
+    function ∂Cᵀf∂x(x,f)
+        η = SA[c[1],c[2],c[3]]
+        T = eltype(x)
+        O37 = @SMatrix zeros(T,3,7)
+        O43 = @SMatrix zeros(T,4,3)
+        hessians = ∂²Rη∂qᵀ∂q(η)
+        vcat(
+            O37,
+            hcat(
+                O43,
+                sum(
+                    hessians[k]*f[k]
+                    for k = 1:3
+                )
+            )
+        )        
+    end
+end
 
 function make_∂Cẋ∂x_forwarddiff(C,nc,nx)
     function ∂Cẋ∂x(x,ẋ)
