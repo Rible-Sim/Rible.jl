@@ -4,9 +4,8 @@ if Sys.iswindows()
 elseif Sys.isapple()
     figdir::String = raw"/Users/jacob/Library/CloudStorage/OneDrive-SharedLibraries-onedrive/Papers/FrictionalContact/CMAME"
 end
-#-- point mass end
+#-- end
 
-#--  Spinning top
 include("deps.jl")
 using AbbreviatedStackTraces #jl
 ENV["JULIA_STACKTRACE_ABBREVIATED"] = true #jl
@@ -14,23 +13,24 @@ ENV["JULIA_STACKTRACE_MINIMAL"] = true #jl
 import Rible as RB
 include("../../vis.jl")
 includet("../../vis.jl") #jl
+
+
+#--  slider crank 
 include("../../../examples/robots/slider_crank.jl")
 includet("../../../examples/robots/slider_crank.jl")#jl
+
+# natural coordinates
 sc = slider_crank(;coordsType=RB.NCF.NC)
-sc = slider_crank(;coordsType=RB.QCF.QC)
+
 plot_traj!(sc;showground=false)
+
+RB.has_constant_mass_matrix(sc)
+
 dt = 1e-3
 tspan = (0.0,1.0)
 
-planes = RB.StaticContactSurfaces(
-    [
-        RB.Plane([0,0, 1.0],[0,0,-0.026]),
-        RB.Plane([0,0,-1.0],[0,0, 0.026])
-    ]
-)
-
-RB.has_constant_mass_matrix(sc)
-prob = RB.DynamicsProblem(sc,planes)
+# No Contact 
+prob = RB.DynamicsProblem(sc,)
 
 RB.solve!(
     prob,
@@ -39,6 +39,20 @@ RB.solve!(
 )
 
 plot_traj!(sc;showground=false)
+
+# Contact Surfaces
+planes = RB.StaticContactSurfaces(
+    [
+        RB.Plane([0,0, 1.0],[0,0,-0.026]),
+        RB.Plane([0,0,-1.0],[0,0, 0.026])
+    ]
+)
+
+
+# Quaternion coordinates
+sc = slider_crank(;coordsType=RB.QCF.QC)
+
+# Frictionless Contact Dynamics
 
 prob = RB.DynamicsProblem(
     sc,
@@ -68,9 +82,10 @@ RB.solve!(
             RB.InteriorPointMethod()
         )
     );
-    dt,tspan,ftol=1e-14,maxiters=50,verbose=true,exception=true,progress=false,
+    dt,tspan,ftol=1e-11,maxiters=50,verbose=true,exception=true,progress=false,
 )
 
+# Frictional Contact Dynamics
 prob = RB.DynamicsProblem(
     sc,
     planes,

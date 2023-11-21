@@ -61,19 +61,13 @@ To do this, use `include`, docs/test/benchmark; use `includet` dev;
           - [ ] similarly `∂M⁻¹p∂q` and `∂Mq̇∂q`
       - [ ] flexible bodies
         - [ ] absolute nodal coords
-  - [ ] integrator cache, used for all timesteps
-    - [ ] timestep cache, contacts related, because the num of contacts no known in advance,
-    - [ ] 
-    - [ ] Zhong06
-    - [ ] ZhongQ06
-    - [ ] ZhongCCP
-    - [ ] ZhongQCCP
-    - [ ] ZhongQCCPN
-    - [ ] ZhongQCCPNMono
-      - [ ] use solver / contact model / for dispatch
-      - [ ] solver: Zhong06, generalize-$\alpha$
-      - [ ] friction model: frictionless, Coulomb, PolyhedralCoulomb
-      - [ ] resitution: Inelastic, Newton, Poisson, Strange
+  - [x] integrator cache, used for all timesteps
+    - [x] timestep cache, contacts related, because the num of contacts no known in advance,
+      - [x] use solver / contact model / for dispatch
+    - [x] Zhong06 family
+    - [ ] Alpha family
+      - [x] friction model: frictionless, Coulomb, PolyhedralCoulomb
+      - [x] resitution: Inelastic, Newton, Poisson, Strange
       - [ ] variants: Unclassified/Classified CCP, Mono/Two-layer,
 - [x] reduce functions fields
 - [ ] preallocations for autodiff

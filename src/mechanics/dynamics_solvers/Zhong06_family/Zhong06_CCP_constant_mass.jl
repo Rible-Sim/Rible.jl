@@ -1,5 +1,5 @@
 
-struct ZhongCCPCache{CacheType}
+struct Zhong06_CCP_Constant_Mass_Cache{CacheType}
     cache::CacheType
 end
 
@@ -53,21 +53,21 @@ function generate_cache(
         es_sys,
         gaps_sys
     )
-    ZhongCCPCache(cache)
+    Zhong06_CCP_Constant_Mass_Cache(cache)
 end
 
 function Momentum_k(qₖ₋₁,pₖ₋₁,qₖ,λₘ,Mₘ,A,scaling,h)
     pₖ = -pₖ₋₁ .+ 2/h.*Mₘ*(qₖ.-qₖ₋₁) .+ scaling/(h).*(transpose(A(qₖ))-transpose(A(qₖ₋₁)))*λₘ
 end
 
-function make_zhongccp_ns_stepk(
+function make_step_k(
+        solver_cache::Zhong06_CCP_Constant_Mass_Cache,
         nq,nλ,na,
         qₖ₋₁,vₖ₋₁,pₖ₋₁,tₖ₋₁,
         pₖ,vₖ,
-        solver_cache,
         invM,
         h,scaling)
-    (;F!,Jac_F!,M,Φ,A,∂Aᵀλ∂q) = solver_cache
+    (;F!,Jac_F!,M,Φ,A,∂Aᵀλ∂q) = solver_cache.cache
 
     n1 = nq
     n2 = nq+nλ
@@ -162,7 +162,7 @@ function make_zhongccp_ns_stepk(
     ns_stepk!
 end
 
-function solve!(sim::Simulator,solvercache::ZhongCCPCache;
+function solve!(sim::Simulator,solver_cache::Zhong06_CCP_Constant_Mass_Cache;
                 dt,
                 ftol=1e-14,xtol=ftol,
                 verbose=false,verbose_contact=false,
@@ -171,8 +171,7 @@ function solve!(sim::Simulator,solvercache::ZhongCCPCache;
     (;prob,controller,tspan,restart,totalstep) = sim
     (;bot,env) = prob
     (;structure,traj,contacts_traj) = bot
-    solver_cache = solvercache.cache
-    (;M,A,contacts_bits) = solver_cache
+    (;M,A,contacts_bits) = solver_cache.cache
     q0 = traj.q[begin]
     λ0 = traj.λ[begin]
     q̇0 = traj.q̇[begin]
@@ -237,11 +236,11 @@ function solve!(sim::Simulator,solvercache::ZhongCCPCache;
         (;
             H
         ) = contact_cache.cache
-        ns_stepk! = make_zhongccp_ns_stepk(
+        ns_stepk! = make_step_k(
+            solver_cache,
             nq,nλ,na,
             qₖ₋₁,q̇ₖ₋₁,pₖ₋₁,tₖ₋₁,
             pₖ,q̇ₖ,
-            solver_cache,
             invM,
             dt,scaling
         )

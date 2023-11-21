@@ -1,4 +1,4 @@
-struct Zhong06Cache{solT,cacheType}
+struct Zhong06_Constant_Mass_Cache{solT,cacheType}
     solver::solT
     cache::cacheType
 end
@@ -47,7 +47,7 @@ function generate_cache(
     initial_x = vcat(q̌0,λ0)
     initial_Res = zero(initial_x)
     initial_Jac = initial_Res*transpose(initial_Res)
-    Zhong06Cache(solver,
+    Zhong06_Constant_Mass_Cache(solver,
         @eponymtuple(
             F!,Jac_F!,
             Ḿ,M̌,M̄,invM̌,A,Φ,
@@ -60,11 +60,11 @@ function generate_cache(
     )
 end
 
-function retrieve!(sim,cache::Zhong06Cache)
+function retrieve!(sim,cache::Zhong06_Constant_Mass_Cache)
 
 end
 
-function solve!(sim::Simulator,cache::Zhong06Cache;
+function solve!(sim::Simulator,cache::Zhong06_Constant_Mass_Cache;
                 dt,ftol=1e-14,verbose=false,maxiters=50,
                 progress=true,exception=true)
     (;prob,controller,tspan,restart,totalstep) = sim

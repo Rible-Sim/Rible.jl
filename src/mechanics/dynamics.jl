@@ -114,7 +114,7 @@ function activate_frictional_contacts!(structure,contact_env,solver_cache,q;chec
         es_sys,
         contacts_bits,
         persistent_bits,
-    ) = solver_cache
+    ) = solver_cache.cache
 
     (;bodyid2sys_loci_idx) = structure.connectivity.numbered
     (;surfaces) = contact_env
@@ -197,7 +197,7 @@ function activate_contacts!(structure,contact_env,solver_cache,q;checkpersist=tr
         es_sys,
         contacts_bits,
         persistent_bits,
-    ) = solver_cache
+    ) = solver_cache.cache
 
     (;bodyid2sys_loci_idx) = structure.connectivity.numbered
     (;surfaces) = contact_env

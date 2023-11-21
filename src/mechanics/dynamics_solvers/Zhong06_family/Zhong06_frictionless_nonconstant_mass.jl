@@ -1,5 +1,5 @@
 
-struct ZhongQCCPNCache{CacheType}
+struct Zhong06_Frictionless_Nonconstant_Mass_Cache{CacheType}
     cache::CacheType
 end
 
@@ -52,7 +52,7 @@ function generate_cache(
         μs_sys,
         es_sys,
         gaps_sys
-    ) = prepare_contacts!(bot,env)
+    ) = prepare_contacts(bot,env)
     cache = @eponymtuple(
         F!,Jac_F!,
         Mₘ,M⁻¹ₘ,M⁻¹ₖ,
@@ -70,7 +70,7 @@ function generate_cache(
         es_sys,
         gaps_sys
     )
-    ZhongQCCPNCache(cache)
+    Zhong06_Frictionless_Nonconstant_Mass_Cache(cache)
 end
 
 function Momentum_ZhongQCCPN_k(qₖ₋₁,pₖ₋₁,qₖ,λₘ,Mₘ,A,Λₘ,Dₖ₋₁,Dₖ,H,scaling,h)
@@ -80,12 +80,12 @@ function Momentum_ZhongQCCPN_k(qₖ₋₁,pₖ₋₁,qₖ,λₘ,Mₘ,A,Λₘ,D�
         scaling.*(transpose(Dₖ)-transpose(Dₖ₋₁))*H*Λₘ
 end
 
-function make_zhongccpn_ns_stepk(
+function make_step_k(
+        solver_cache::Zhong06_Frictionless_Nonconstant_Mass_Cache,
         nq,nλ,na,
         qₖ₋₁,vₖ₋₁,pₖ₋₁,tₖ₋₁,
         pₖ,vₖ,
         structure,
-        solver_cache,
         contact_cache,
         h,scaling,
     )
@@ -98,7 +98,7 @@ function make_zhongccpn_ns_stepk(
         M⁻¹!,Jac_M⁻¹!,
         Φ,A,
         # ∂Aᵀλ∂q,
-    ) = solver_cache
+    ) = solver_cache.cache
     # T = eltype(qₖ₋₁)
     n1 = nq
     n2 = nq+nλ
@@ -211,7 +211,7 @@ function make_zhongccpn_ns_stepk(
     ns_stepk!
 end
 
-function solve!(sim::Simulator,solvercache::ZhongQCCPNCache;
+function solve!(sim::Simulator,solver_cache::Zhong06_Frictionless_Nonconstant_Mass_Cache;
         dt,
         ftol=1e-14,xtol=ftol,maxiters=50,
         verbose=false, verbose_contact=false,
@@ -221,8 +221,7 @@ function solve!(sim::Simulator,solvercache::ZhongQCCPNCache;
     (;prob,totalstep) = sim
     (;bot,env,) = prob
     (;structure,traj,contacts_traj) = bot
-    solver_cache = solvercache.cache
-    (;Mₘ,M⁻¹ₘ,M!,M⁻¹!,A,contacts_bits) = solver_cache
+    (;Mₘ,M⁻¹ₘ,M!,M⁻¹!,A,contacts_bits) = solver_cache.cache
     q0 = traj.q[begin]
     λ0 = traj.λ[begin]
     q̇0 = traj.q̇[begin]
@@ -277,10 +276,10 @@ function solve!(sim::Simulator,solvercache::ZhongQCCPNCache;
         ) = contact_cache.cache
         Dₖ₋₁ = deepcopy(contact_cache.cache.D)
         ŕₖ₋₁ = deepcopy(contact_cache.cache.ŕ)
-        ns_stepk! = make_zhongccpn_ns_stepk(
+        ns_stepk! = make_step_k(
+            solver_cache,
             nq,nλ,na,qₖ₋₁,q̇ₖ₋₁,pₖ₋₁,tₖ₋₁,pₖ,q̇ₖ,
-            structure,
-            solver_cache,contact_cache,
+            structure,contact_cache,
             dt,scaling
         )
         restart_count = 0

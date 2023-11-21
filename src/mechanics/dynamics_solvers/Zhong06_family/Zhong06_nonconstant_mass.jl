@@ -1,4 +1,4 @@
-struct Zhong06QCache{CacheType}
+struct Zhong06_Nonconstant_Mass_Cache{CacheType}
     cache::CacheType
 end
 
@@ -19,10 +19,10 @@ function generate_cache(
     F!(F,q,q̇,t) = generalize_force!(F,bot,q,q̇,t)
     Jac_F!(∂F∂q̌,∂F∂q̌̇,q,q̇,t) = generalize_force_jacobain!(∂F∂q̌,∂F∂q̌̇,bot,q,q̇,t)
     cache = @eponymtuple(F!,Jac_F!,M,∂Mq̇∂q,M!,Jac_M!,Φ,A)
-    Zhong06QCache(cache)
+    Zhong06_Nonconstant_Mass_Cache(cache)
 end
 
-function solve!(simulator::Simulator,solvercache::Zhong06QCache;
+function solve!(simulator::Simulator,solvercache::Zhong06_Nonconstant_Mass_Cache;
                 dt,ftol=1e-14,verbose=false,maxiters=50,
                 progress=true,exception=true)
     (;prob,controller,tspan,restart,totalstep) = simulator
