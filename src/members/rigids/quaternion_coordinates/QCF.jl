@@ -6,7 +6,9 @@ using StaticArrays
 using ForwardDiff
 using DocStringExtensions
 using EponymTuples
+using PreallocationTools
 
+import Rible as RB
 import ..Rible: HouseholderOrthogonalization, skew
 import ..Rible: get_num_of_cstr, get_num_of_coords
 import ..Rible: get_num_of_dof, get_num_of_local_dims

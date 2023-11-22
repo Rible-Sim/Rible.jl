@@ -1,4 +1,4 @@
-function build_joint_cache(
+function RB.build_joint_cache(
         nmcs_hen::QC,
         nmcs_egg::QC,
         loci_position_hen,
@@ -13,18 +13,18 @@ function build_joint_cache(
     # translate
     c_hen = to_local_coords(nmcs_hen,loci_position_hen)
     c_egg = to_local_coords(nmcs_egg,loci_position_egg)
-    quat_trl_rel_hen = QuatRotation(loci_axes_trl_hen.X[:,[2,3,1]]).q
-    quat_trl_rel_egg = QuatRotation(loci_axes_trl_egg.X[:,[2,3,1]]).q
-    # quat_rot_rel_hen = QuatRotation(loci_axes_rot_hen.X[:,[2,3,1]]).q
-    quat_rot_rel_egg = QuatRotation(loci_axes_rot_egg.X[:,[2,3,1]]).q
+    quat_trl_rel_hen = QuatRotation(loci_axes_trl_hen.X[:,[2,3,1]]).q |> vec
+    quat_trl_rel_egg = QuatRotation(loci_axes_trl_egg.X[:,[2,3,1]]).q |> vec
+    # quat_rot_rel_hen = QuatRotation(loci_axes_rot_hen.X[:,[2,3,1]]).q |> vec
+    quat_rot_rel_egg = QuatRotation(loci_axes_rot_egg.X[:,[2,3,1]]).q |> vec
     @show loci_axes_rot_egg.X
-    quat_hen = Quaternion(q_hen[4:7]...)
-    quat_egg = Quaternion(q_egg[4:7]...)
-    quat_trl_hen = quat_hen*quat_trl_rel_hen
-    quat_trl_egg = quat_egg*quat_trl_rel_egg
-    quat_rot_egg = quat_egg*quat_rot_rel_egg
-    quat_rot_rel_hen = conj(quat_hen)*quat_rot_egg
-    quat_rot_hen = quat_hen*quat_rot_rel_hen
+    quat_hen = @view q_hen[4:7]
+    quat_egg = @view q_egg[4:7]
+    quat_trl_hen = Pmat(quat_hen)*quat_trl_rel_hen
+    quat_trl_egg = Pmat(quat_egg)*quat_trl_rel_egg
+    quat_rot_egg = Pmat(quat_egg)*quat_rot_rel_egg
+    quat_rot_rel_hen = Pmat(Inv_mat*quat_hen)*quat_rot_egg
+    quat_rot_hen = Pmat(quat_hen)*quat_rot_rel_hen
     r_hen = to_position(nmcs_hen,q_hen,c_hen)
     r_egg = to_position(nmcs_egg,q_egg,c_egg)
     d = r_egg - r_hen
@@ -35,15 +35,14 @@ function build_joint_cache(
         Rmat(quat_trl_hen)'*d,
         Rmat(quat_trl_egg)'*d
     )
-    rot_quat = conj(quat_rot_egg)*quat_rot_hen
-    vio_4th = vec(conj(rot_quat)*rot_quat)[2:4] # always zero
+    rot_quat = Pmat(Inv_mat*quat_rot_egg)*quat_rot_hen
+    vio_4th = (Pmat(Inv_mat*rot_quat)*rot_quat)[2:4] # always zero
     violations = vcat(
         vio_1st[mask_1st],
         vio_2nd[mask_2nd],
         vio_3rd[mask_3rd],
         vio_4th[mask_4th];
     )
-
     @show r_egg, r_hen
     cache = @eponymtuple(
         quat_trl_rel_hen, quat_trl_rel_egg, quat_rot_rel_hen, quat_rot_rel_egg,
@@ -52,7 +51,7 @@ function build_joint_cache(
     cache, violations
 end
 
-function get_joint_violations!(
+function RB.get_joint_violations!(
         ret,
         nmcs_hen::QC, 
         nmcs_egg::QC,
@@ -66,12 +65,12 @@ function get_joint_violations!(
     c_hen = to_local_coords(nmcs_hen,loci_position_hen)
     c_egg = to_local_coords(nmcs_egg,loci_position_egg)
     (;quat_trl_rel_hen, quat_trl_rel_egg, quat_rot_rel_hen, quat_rot_rel_egg,rot_quat) = cache
-    quat_hen = Quaternion(q_hen[4:7]...)
-    quat_egg = Quaternion(q_egg[4:7]...)
-    quat_trl_hen = quat_hen*quat_trl_rel_hen
-    quat_trl_egg = quat_egg*quat_trl_rel_egg
-    quat_rot_hen = quat_hen*quat_rot_rel_hen
-    quat_rot_egg = quat_egg*quat_rot_rel_egg
+    quat_hen = @view q_hen[4:7]
+    quat_egg = @view q_egg[4:7]
+    quat_trl_hen = Pmat(quat_hen)*quat_trl_rel_hen
+    quat_trl_egg = Pmat(quat_egg)*quat_trl_rel_egg
+    quat_rot_hen = Pmat(quat_hen)*quat_rot_rel_hen
+    quat_rot_egg = Pmat(quat_egg)*quat_rot_rel_egg
     r_hen = to_position(nmcs_hen,q_hen,c_hen)
     r_egg = to_position(nmcs_egg,q_egg,c_egg)
     d = r_egg - r_hen
@@ -82,7 +81,7 @@ function get_joint_violations!(
         Rmat(quat_trl_hen)'*d,
         Rmat(quat_trl_egg)'*d
     )
-    vio_4th = vec(conj(rot_quat)*conj(quat_rot_egg)*quat_rot_hen)[2:4]
+    vio_4th = (Pmat(Inv_mat*rot_quat)*(Pmat(Inv_mat*quat_rot_egg)*quat_rot_hen))[2:4]
     # @show vio_1st |> norm
     # @show violations[1:3]  |> norm
     ret .= vcat(
@@ -93,7 +92,93 @@ function get_joint_violations!(
     ) .- violations
 end
 
-function get_joint_jacobian!(
+function RB.make_cstr_jacobian(
+        nmcs_hen::QC, 
+        nmcs_egg::QC,
+        loci_position_hen,
+        loci_position_egg,
+        cache,
+        mask_1st,mask_2nd,mask_3rd,mask_4th,
+    )
+    num_of_coords_hen = get_num_of_coords(nmcs_hen)
+    num_of_coords_egg = get_num_of_coords(nmcs_egg)
+    num_of_jointed_coords = num_of_coords_hen + num_of_coords_egg
+    c_hen = to_local_coords(nmcs_hen,loci_position_hen)
+    c_egg = to_local_coords(nmcs_egg,loci_position_egg)
+    (;quat_trl_rel_hen, quat_trl_rel_egg, quat_rot_rel_hen, quat_rot_rel_egg, rot_quat) = cache
+    T = eltype(loci_position_hen)
+    _jac_1st = zeros(T,3,num_of_jointed_coords)
+    # hes 4th
+    _jac_2nd = zeros(T,1,num_of_jointed_coords)
+    # hes 3rd
+    _jac_3rd = zeros(T,6,num_of_jointed_coords)
+    # rotate
+    _jac_4th = zeros(T,3,num_of_jointed_coords)
+    jac_1st = DiffCache(_jac_1st)
+    jac_2nd = DiffCache(_jac_2nd)
+    jac_3rd = DiffCache(_jac_3rd)
+    jac_4th = DiffCache(_jac_4th)
+    _jac = vcat(
+        _jac_1st[mask_1st,:],
+        _jac_2nd[mask_2nd,:],
+        _jac_3rd[mask_3rd,:],
+        _jac_4th[mask_4th,:];
+    )
+    jac = DiffCache(_jac)
+    function inner_cstr_jacobian(q)
+        inner_jac = get_tmp(jac,q)
+        inner_jac_1st = get_tmp(jac_1st,q)
+        inner_jac_2nd = get_tmp(jac_2nd,q)
+        inner_jac_3rd = get_tmp(jac_3rd,q)
+        inner_jac_4th = get_tmp(jac_4th,q)
+        inner_q_hen = @view q[1:num_of_coords_hen]
+        inner_q_egg = @view q[num_of_coords_hen+1:end]
+        quat_hen = @view inner_q_hen[4:7]
+        quat_egg = @view inner_q_egg[4:7]
+        quat_trl_hen = Pmat(quat_hen)*quat_trl_rel_hen
+        quat_trl_egg = Pmat(quat_egg)*quat_trl_rel_egg
+        quat_rot_hen = Pmat(quat_hen)*quat_rot_rel_hen
+        quat_rot_egg = Pmat(quat_egg)*quat_rot_rel_egg
+        # @show quat_trl_hen
+        # @show quat_trl_egg
+        # @show quat_rot_egg
+        C_hen = to_transformation(nmcs_hen,inner_q_hen,c_hen)
+        C_egg = to_transformation(nmcs_egg,inner_q_egg,c_egg)
+        J = [-C_hen C_egg;] 
+        r_hen = to_position(nmcs_hen,inner_q_hen,c_hen)
+        r_egg = to_position(nmcs_egg,inner_q_egg,c_egg)
+        d = r_egg - r_hen
+        # hes 1st
+        # jac 1st 
+        inner_jac_1st[1:3,:] .= J
+        # jac 4th 
+        inner_jac_2nd[:,:]   .= 2d'*J
+        # jac 3rd on hen
+        # translate on hen
+        inner_jac_3rd[1:3,:]                         .= Rmat(quat_trl_hen)'*J
+        inner_jac_3rd[1:3,4:7]                      .+= ∂Rᵀf∂q(quat_trl_hen,d)*Mmat(quat_trl_rel_hen)
+        # jac 3rd on egg
+        # translate on egg
+        inner_jac_3rd[4:6,:]                         .= Rmat(quat_trl_egg)'*J
+        inner_jac_3rd[4:6,num_of_coords_hen.+(4:7)] .+= ∂Rᵀf∂q(quat_trl_egg,d)*Mmat(quat_trl_rel_egg)
+        # jac 2nd
+        # rotate of egg
+        O43 = @SMatrix zeros(T,4,3)
+        Pcq_egg = Pmat(Inv_mat*rot_quat)*(Inv_mat*quat_rot_rel_egg)
+        inner_jac_4th[1:3,:] = (
+            [
+                O43 Pmat(Pcq_egg)*Pmat(Inv_mat*quat_egg)*Mmat(quat_rot_rel_hen) O43 Pmat(Pcq_egg)*Mmat(quat_rot_hen)*Inv_mat
+            ]
+        )[2:4,:]
+        inner_jac[mask_1st,:] = inner_jac_1st[mask_1st,:]
+        inner_jac[length(mask_1st).+mask_2nd,:] = inner_jac_2nd[mask_2nd,:]
+        inner_jac[length(mask_1st)+length(mask_2nd).+mask_3rd,:] = inner_jac_3rd[mask_3rd,:]
+        inner_jac[length(mask_1st)+length(mask_2nd)+length(mask_3rd).+mask_4th,:] = inner_jac_3rd[mask_4th,:]
+        inner_jac
+    end
+end
+
+function RB.get_joint_jacobian!(
         ret,
         nmcs_hen::QC, 
         nmcs_egg::QC,
@@ -105,65 +190,48 @@ function get_joint_jacobian!(
         free_hen,free_egg,
         q_hen,q_egg
     )
-
     num_of_coords_hen = get_num_of_coords(nmcs_hen)
     num_of_coords_egg = get_num_of_coords(nmcs_egg)
-    num_of_jointed_coords = num_of_coords_hen + num_of_coords_egg
-    c_hen = to_local_coords(nmcs_hen,loci_position_hen)
-    c_egg = to_local_coords(nmcs_egg,loci_position_egg)
-    (;quat_trl_rel_hen, quat_trl_rel_egg, quat_rot_rel_hen, quat_rot_rel_egg, rot_quat) = cache
-    quat_hen = Quaternion(q_hen[4:7]...)
-    quat_egg = Quaternion(q_egg[4:7]...)
-    quat_trl_hen = quat_hen*quat_trl_rel_hen
-    quat_trl_egg = quat_egg*quat_trl_rel_egg
-    quat_rot_hen = quat_hen*quat_rot_rel_hen
-    quat_rot_egg = quat_egg*quat_rot_rel_egg
-    T = eltype(q_hen)
-    # @show quat_trl_hen
-    # @show quat_trl_egg
-    # @show quat_rot_egg
-    C_hen = to_transformation(nmcs_hen,q_hen,c_hen)
-    C_egg = to_transformation(nmcs_egg,q_egg,c_egg)
-    J = [-C_hen C_egg;] 
-    r_hen = to_position(nmcs_hen,q_hen,c_hen)
-    r_egg = to_position(nmcs_egg,q_egg,c_egg)
-    d = r_egg - r_hen
-    # hes 1st
-    jac_1st = zeros(T,3,num_of_jointed_coords)
-    # hes 4th
-    jac_2nd = zeros(T,1,num_of_jointed_coords)
-    # hes 3rd
-    jac_3rd = zeros(T,6,num_of_jointed_coords)
-    # rotate
-    jac_4th = zeros(T,3,num_of_jointed_coords)
-    # jac 1st 
-    jac_1st[1:3,:] .= J
-    # jac 4th 
-    jac_2nd[:,:]   .= 2d'*J
-    # jac 3rd on hen
-    # translate on hen
-    jac_3rd[1:3,:]                         .= Rmat(quat_trl_hen)'*J
-    jac_3rd[1:3,4:7]                      .+= ∂Rᵀf∂q(quat_trl_hen,d)*Mmat(quat_trl_rel_hen)
-    # jac 3rd on egg
-    # translate on egg
-    jac_3rd[4:6,:]                         .= Rmat(quat_trl_egg)'*J
-    jac_3rd[4:6,num_of_coords_hen.+(4:7)] .+= ∂Rᵀf∂q(quat_trl_egg,d)*Mmat(quat_trl_rel_egg)
-    # jac 2nd
-    # rotate of egg
-    O43 = @SMatrix zeros(T,4,3)
-    Pcq_egg = Pmat(conj(rot_quat)*conj(quat_rot_rel_egg))
-    jac_4th[1:3,:] = (
-        [
-            O43 Pcq_egg*Pmat(conj(quat_egg))*Mmat(quat_rot_rel_hen) O43 Pcq_egg*Mmat(quat_rot_hen)*Inv_mat
-        ]
-    )[2:4,:]
-    jac = vcat(
-        jac_1st[mask_1st,:],
-        jac_2nd[mask_2nd,:],
-        jac_3rd[mask_3rd,:],
-        jac_4th[mask_4th,:];
+    q_jointed = vcat(
+        q_hen,q_egg
     )
-    # @show jac
-    ret[:,free_hen] .= jac[:,free_idx_hen]
-    ret[:,free_egg] .= jac[:,(free_idx_egg.+num_of_coords_hen)]
+    A = make_cstr_jacobian(
+        nmcs_hen::QC, 
+        nmcs_egg::QC,
+        loci_position_hen,
+        loci_position_egg,
+        cache,
+        mask_1st,mask_2nd,mask_3rd,mask_4th,
+    )(q_jointed)
+    ret[:,free_hen] = A[:,free_idx_hen]
+    ret[:,free_egg] = A[:,(free_idx_egg.+num_of_coords_hen)]
+end
+
+
+function RB.make_cstr_forces_jacobian(
+        ret,
+        nmcs_hen::QC, 
+        nmcs_egg::QC,
+        loci_position_hen,
+        loci_position_egg,
+        cache,
+        mask_1st,mask_2nd,mask_3rd,mask_4th,
+        free_idx_hen,free_idx_egg,
+        free_hen,free_egg,
+        q_hen,q_egg,
+    )
+    λ = rand(size(ret,1))
+    A = make_cstr_jacobian(
+        nmcs_hen::QC, 
+        nmcs_egg::QC,
+        loci_position_hen,
+        loci_position_egg,
+        cache,
+        mask_1st,mask_2nd,mask_3rd,mask_4th,
+    )
+    function inner_cstr_forces_jacobian(q)
+        jac = inner_cstr_jacobian(q)
+        transpose(jac)*λ
+    end
+    ForwardDiff.jacobian(inner_cstr_forces_jacobian, q_jointed)
 end

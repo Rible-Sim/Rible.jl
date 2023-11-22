@@ -73,6 +73,9 @@ RB.solve!(
     dt,tspan,ftol=1e-14,maxiters=50,verbose=true,exception=true,progress=false,
 )
 
+q = RB.get_coords(sc.structure)
+RB.make_cstr_jacobian(sc.structure)(q)
+
 RB.solve!(
     prob,
     RB.DynamicsSolver(
@@ -122,3 +125,32 @@ RB.QCF.∂Rη∂q(q,η)*q̇
 
 
 H = RB.QCF.∂²Rη∂qᵀ∂q(η)
+using PreallocationTools
+using ForwardDiff
+
+randmat = rand(5, 3)
+sto = similar(randmat)
+stod = DiffCache(sto)
+
+sto = get_tmp(sto, 0.0)
+
+function claytonsample!(sto, τ, α; randmat = randmat)
+    sto = get_tmp(sto, τ)
+    sto .= randmat
+    τ == 0 && return sto
+
+    n = size(sto, 1)
+    for i in 1:n
+        v = sto[i, 2]
+        u = sto[i, 1]
+        sto[i, 1] = (1 - u^(-τ) + u^(-τ) * v^(-(τ / (1 + τ))))^(-1 / τ) * α
+        sto[i, 2] = (1 - u^(-τ) + u^(-τ) * v^(-(τ / (1 + τ))))^(-1 / τ)
+    end
+    return sto
+end
+
+ForwardDiff.derivative(τ -> claytonsample!(stod, τ, 0.0), 0.3)
+ForwardDiff.jacobian(x -> claytonsample!(stod, x[1], x[2]), [0.3; 0.0])
+ForwardDiff.hessian(τ -> claytonsample!(stod, τ, 0.0), [0.3])
+ForwardDiff.derivative(τ -> claytonsample!(stod, τ, 0.0), 0.3)
+

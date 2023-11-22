@@ -219,34 +219,6 @@ function assemble_∂T∂qᵀ(st::AbstractStructure)
     ∂T∂qᵀ
 end
 
-function make_M!(st)
-    function inner_M!(M,q)
-        update_bodies!(st,q)
-        M .= assemble_M(st)
-    end
-end
-
-
-function make_M⁻¹!(st)
-    function inner_M⁻¹!(M⁻¹,q)
-        update_bodies!(st,q)
-        M⁻¹ .= assemble_M⁻¹(st)
-    end
-end
-
-function make_Jac_M!(st)
-    function Jac_M!(∂Mq̇∂q,q,q̇)
-        update_bodies!(st,q,q̇)
-        ∂Mq̇∂q .= assemble_∂Mq̇∂q(st)
-    end
-end
-
-function make_Jac_M⁻¹!(st)
-    function Jac_M⁻¹!(∂M⁻¹p∂q,q,q̇)
-        update_bodies!(st,q,q̇)
-        ∂M⁻¹p∂q .= assemble_∂M⁻¹p∂q(st)
-    end
-end
 
 """
 Return System mass matrices
