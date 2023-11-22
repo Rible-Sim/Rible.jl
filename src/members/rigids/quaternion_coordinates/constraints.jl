@@ -1,19 +1,18 @@
-
-function make_cstr_function(::QC,cstr_idx)
-    function inner_cstr_function(x::AbstractVector)
-        q = @view x[4:7]
-        (transpose(q)*q - 1)/2
-    end
+function get_deform(::QC{T}) where T
+    one(T)
 end
 
-function make_cstr_jacobian(::QC,free_idx,cstr_idx)
-    function inner_cstr_jacobian(x::AbstractVector)
-        q = @view x[4:7]
-        o = zero(eltype(q))
-        SA[
-            o o o q[1] q[2] q[3] q[4];
-        ]
-    end
+function cstr_function(qcs::QC,cstr_idx,x,d=get_deform(qcs))
+    q = @view x[4:7]
+    (transpose(q)*q - d)/2
+end
+
+function cstr_jacobian(::QC,free_idx,cstr_idx,x)
+    q = @view x[4:7]
+    o = zero(eltype(q))
+    SA[
+        o o o q[1] q[2] q[3] q[4];
+    ]
 end
 
 cstr_forces_jacobian(λ::AbstractVector) = cstr_forces_jacobian(first(λ))

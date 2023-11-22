@@ -263,7 +263,7 @@ function build_mass_matrices(structure::Structure,)
     @eponymtuple(M,M⁻¹,M̌,M̌⁻¹,Ḿ,M̄)
 end
 
-function cstr_function(structure::AbstractStructure,q,d=get_d(structure),c=get_local_coords(structure))
+function cstr_function(structure::AbstractStructure,q,c=get_local_coords(structure))
     (;bodies,num_of_cstr,connectivity) = structure
     (;numbered,indexed,jointed) = connectivity
     (;
@@ -294,28 +294,12 @@ function cstr_function(structure::AbstractStructure,q,d=get_d(structure),c=get_l
     end
     foreach(jointed.joints) do joint
         jointexcst = num_of_intrinsic_cstr.+jointid2sys_extrinsic_cstr_idx[joint.id]
-        ret[jointexcst] .= make_cstr_function(joint,structure)(
+        ret[jointexcst] .= cstr_function(joint,structure,
             q,
             c
         )
     end
     ret
-end
-
-function make_cstr_function(structure::AbstractStructure,q0::AbstractVector)
-    (;connectivity) = structure
-    (;indexed,) = connectivity
-    (;
-        num_of_full_coords,
-        sys_pres_idx,
-        sys_free_idx,
-    ) = indexed
-    function inner_cstr_function(q̌,d=get_d(structure),c=get_local_coords(structure))
-        q = Vector{eltype(q̌)}(undef,num_of_full_coords)
-        q[sys_pres_idx] .= q0[sys_pres_idx]
-        q[sys_free_idx] .= q̌
-        cstr_function(q,d,c)
-    end
 end
 
 function cstr_jacobian(structure::AbstractStructure,q,c=get_local_coords(structure))
@@ -349,9 +333,28 @@ function cstr_jacobian(structure::AbstractStructure,q,c=get_local_coords(structu
     end
     foreach(jointed.joints) do joint
         jointexcst = num_of_intrinsic_cstr.+jointid2sys_extrinsic_cstr_idx[joint.id]
-        ret[jointexcst,:] .= make_cstr_jacobian(joint,structure)(q)
+        ret[jointexcst,:] .= cstr_jacobian(joint,structure,q)
     end
     ret
+end
+
+make_cstr_jacobian(structure::AbstractStructure) = (q) -> cstr_jacobian(structure,q)
+make_cstr_function(structure::AbstractStructure) = (q) -> cstr_function(structure,q)
+
+function make_cstr_function(structure::AbstractStructure,q0::AbstractVector)
+    (;connectivity) = structure
+    (;indexed,) = connectivity
+    (;
+        num_of_full_coords,
+        sys_pres_idx,
+        sys_free_idx,
+    ) = indexed
+    function inner_cstr_function(q̌,d=get_d(structure),c=get_local_coords(structure))
+        q = Vector{eltype(q̌)}(undef,num_of_full_coords)
+        q[sys_pres_idx] .= q0[sys_pres_idx]
+        q[sys_free_idx] .= q̌
+        cstr_function(q,d,c)
+    end
 end
 
 function make_cstr_jacobian(structure::AbstractStructure,q0::AbstractVector)

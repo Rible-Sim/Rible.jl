@@ -303,13 +303,12 @@ function get_frictional_directions_and_positions!(structure,cache, q, q̇, Λ, )
                 if coords.nmcs isa QCF.QC
                     Tbody = build_T(structure,bid)
                     locus = prop.loci[pid]
-                    ∂Cẋ∂x = QCF.make_∂Cẋ∂x(locus.position)
-                    ∂Cq̇∂q = ∂Cẋ∂x(Tbody*q,Tbody*q̇)*Tbody
+                    ∂Cq̇∂q = QCF.∂Cẋ∂x(Tbody*q,Tbody*q̇,locus.position)*Tbody
                     ∂Dq̇∂q[epi,:] = dm*∂Cq̇∂q
-                    ∂Cᵀf∂x = QCF.make_∂Cᵀf∂x(locus.position)
                     Λi = @view Λ[epi]
                     fi = dm'*Λi
-                    ∂DᵀΛ∂q .+= transpose(Tbody)*∂Cᵀf∂x(Tbody*q,fi)*Tbody
+                    ∂Cᵀfi∂q = QCF.∂Cᵀf∂x(Tbody*q,fi,locus.position)
+                    ∂DᵀΛ∂q .+= transpose(Tbody)*∂Cᵀfi∂q*Tbody
                 end
                 if contact_state.persistent
                     Dper[epi,:] .= D[epi,:]
@@ -349,13 +348,11 @@ function get_directions_and_positions!(structure,cache, q, q̇, Λ, )
                 if coords.nmcs isa QCF.QC
                     Tbody = build_T(structure,bid)
                     locus = prop.loci[pid]
-                    ∂Cẋ∂x = QCF.make_∂Cẋ∂x(locus.position)
-                    ∂Cq̇∂q = ∂Cẋ∂x(Tbody*q,Tbody*q̇)*Tbody
+                    ∂Cq̇∂q = QCF.∂Cẋ∂x(Tbody*q,Tbody*q̇,locus.position)*Tbody
                     ∂Dq̇∂q[epi,:] = dm*∂Cq̇∂q
-                    ∂Cᵀf∂x = QCF.make_∂Cᵀf∂x(locus.position)
                     fi = Λ[epi]*normal
-                    ∂Cᵀfi∂x = ∂Cᵀf∂x(Tbody*q,fi)
-                    ∂DᵀΛ∂q .+= transpose(Tbody)*∂Cᵀfi∂x*Tbody
+                    ∂Cᵀfi∂q = QCF.∂Cᵀf∂x(Tbody*q,fi,locus.position)
+                    ∂DᵀΛ∂q .+= transpose(Tbody)*∂Cᵀfi∂q*Tbody
                 end
                 if contact_state.persistent
                     Dper[epi,:] .= D[epi,:]

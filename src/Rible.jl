@@ -80,6 +80,7 @@ function to_transformation end
 function cartesian_frame2coords end
 function find_rotation end
 function find_angular_velocity end
+function find_local_angular_velocity end
 function build_joint_cache end
 function get_joint_violations! end
 function get_joint_jacobian! end

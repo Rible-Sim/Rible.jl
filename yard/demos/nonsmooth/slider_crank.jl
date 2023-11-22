@@ -29,7 +29,7 @@ plot_traj!(sc;showground=false)
 RB.has_constant_mass_matrix(sc)
 
 dt = 1e-3
-tspan = (0.0,60dt)
+tspan = (0.0,1.0)
 
 # No Contact Dynamics
 prob = RB.DynamicsProblem(sc,)
@@ -70,9 +70,8 @@ RB.solve!(
             RB.InteriorPointMethod()
         )
     );
-    dt,tspan,ftol=1e-14,maxiters=50,verbose=true,exception=true,progress=false,
+    dt,tspan,ftol=1e-10,maxiters=50,verbose=true,exception=true,progress=false,
 )
-
 
 # Mono
 RB.solve!(

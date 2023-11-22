@@ -46,7 +46,6 @@ $(TYPEDSIGNATURES)
 """
 function cstr_function(nmcs::Union{NC2D2C,NC3D3C},cstr_idx,q,deforms = get_deform(nmcs))
     eltype(q)[]
-    # make_inner_cstr_function(inner_cstr_function,deforms = get_deform(nmcs))
 end
 
 """
@@ -311,21 +310,6 @@ function make_∂Aq̇∂q(nmcs::NC,free_idx,cstr_idx)
             for j in cstr_idx
         ]
         sum(ret)
-    end
-end
-
-"""
-Return cstr_forces_jacobian的前向自动微分结果。
-$(TYPEDSIGNATURES)
-"""
-function make_cstr_forces_jacobian_forwarddiff(Φq,nq,nuc)
-    function cstr_forces_jacobian(λ)
-        function ATλ(q)
-            transpose(Φq(q))*λ
-        end
-        λT = eltype(λ)
-        out = zeros(λT,nuc,nq)
-        ForwardDiff.jacobian!(out,ATλ,ones(λT,nq))
     end
 end
 

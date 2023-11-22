@@ -15,24 +15,6 @@ end
 get_numbertype(cst::ExtrinsicConstraints{<:AbstractArray{T}}) where T = T
 
 """
-空约束构造子。
-$(TYPEDEF)
-"""
-function EmptyConstraint(values=Vector{Float64}())
-    EmptyConstraint(0,Vector{Int64}(),values)
-end
-
-function make_cstr_function(::EmptyConstraint)
-    inner_cstr_function(q) = Vector{eltype(q)}()
-    inner_cstr_function(q,d) = Vector{eltype(q)}()
-    inner_cstr_function
-end
-
-function make_cstr_jacobian(::EmptyConstraint)
-    inner_cstr_jacobian(q) = Array{eltype(q)}(undef,0,length(q))
-end
-
-"""
 刚体固定约束类。
 $(TYPEDEF)
 """
@@ -62,22 +44,20 @@ function FixedBodyConstraint(id::Int,body::AbstractBody,indexed)
     FixedBodyConstraint(id,length(idx),idx,violations)
 end
 
-function make_cstr_function(cst::FixedBodyConstraint,st)
+function cstr_function(cst::FixedBodyConstraint,st,q,c)
     (;idx, violations) = cst
-    inner_cstr_function(q,c)   = q[idx]
+    q[idx]
 end
 
-function make_cstr_jacobian(cst::FixedBodyConstraint,st)
+function cstr_jacobian(cst::FixedBodyConstraint,st,q)
     num_of_cstr = cst.num_of_cstr
     idx = cst.idx
-    @inline @inbounds function inner_cstr_jacobian(q)
-        nq = length(q)
-        ret = zeros(eltype(q),num_of_cstr,nq)
-        for (iΦ,i) in enumerate(idx)
-            ret[iΦ,i] = 1
-        end
-        ret
+    nq = length(q)
+    ret = zeros(eltype(q),num_of_cstr,nq)
+    for (iΦ,i) in enumerate(idx)
+        ret[iΦ,i] = 1
     end
+    ret
 end
 
 """
@@ -259,7 +239,7 @@ function PrototypeJoint(id,hen2egg,joint_type::Symbol)
 end
 
 
-function make_cstr_function(cst::PrototypeJoint,structure::Structure, c = get_local_coords(structure))
+function cstr_function(cst::PrototypeJoint,structure::Structure,q, c = get_local_coords(structure))
     (;indexed,numbered) = structure.connectivity
     (;bodyid2sys_full_coords) = indexed
     (;sys_loci2coords_idx,bodyid2sys_loci_idx) = numbered
@@ -275,29 +255,27 @@ function make_cstr_function(cst::PrototypeJoint,structure::Structure, c = get_lo
     id_egg = egg.rbsig.prop.id
     nmcs_hen = hen.rbsig.coords.nmcs
     nmcs_egg = egg.rbsig.coords.nmcs
-    function _inner_cstr_function(q, c = get_local_coords(structure))
-        T = eltype(q)
-        ret = zeros(T,num_of_cstr)
-        q_hen = @view q[bodyid2sys_full_coords[id_hen]]
-        q_egg = @view q[bodyid2sys_full_coords[id_egg]]
-        q = vcat(q_hen,q_egg)
-        # cstr violations
-        # @show cst.id
-        get_joint_violations!(
-            ret,
-            nmcs_hen, nmcs_egg,
-            hen.rbsig.prop.loci[hen.pid].position,
-            egg.rbsig.prop.loci[egg.pid].position,
-            cache,
-            mask_1st,mask_2nd,mask_3rd,mask_4th,
-            q_hen,q_egg,
-            violations
-        )
-        ret
-    end
+    T = eltype(q)
+    ret = zeros(T,num_of_cstr)
+    q_hen = @view q[bodyid2sys_full_coords[id_hen]]
+    q_egg = @view q[bodyid2sys_full_coords[id_egg]]
+    q = vcat(q_hen,q_egg)
+    # cstr violations
+    # @show cst.id
+    get_joint_violations!(
+        ret,
+        nmcs_hen, nmcs_egg,
+        hen.rbsig.prop.loci[hen.pid].position,
+        egg.rbsig.prop.loci[egg.pid].position,
+        cache,
+        mask_1st,mask_2nd,mask_3rd,mask_4th,
+        q_hen,q_egg,
+        violations
+    )
+    ret
 end
 
-function make_cstr_jacobian(cst::PrototypeJoint,structure::Structure,c = get_local_coords(structure))
+function cstr_jacobian(cst::PrototypeJoint,structure::Structure,q,c = get_local_coords(structure))
     (;indexed,numbered) = structure.connectivity
     (;bodyid2sys_free_coords,
       bodyid2sys_full_coords,
@@ -320,24 +298,22 @@ function make_cstr_jacobian(cst::PrototypeJoint,structure::Structure,c = get_loc
     nmcs_egg = egg.rbsig.coords.nmcs
     free_idx_hen =  hen.rbsig.coords.free_idx
     free_idx_egg =  egg.rbsig.coords.free_idx
-    function _inner_cstr_jacobian(q,c=get_local_coords(structure))
-        T = eltype(q)
-        ret = zeros(T,num_of_cstr,num_of_free_coords)
-        q_hen = @view q[bodyid2sys_full_coords[id_hen]]
-        q_egg = @view q[bodyid2sys_full_coords[id_egg]]
-        # translate
-        get_joint_jacobian!(ret,
-            nmcs_hen, nmcs_egg,
-            hen.rbsig.prop.loci[hen.pid].position,
-            egg.rbsig.prop.loci[egg.pid].position,
-            cache,
-            mask_1st,mask_2nd,mask_3rd,mask_4th,
-            free_idx_hen,free_idx_egg,
-            free_hen,free_egg,
-            q_hen,q_egg
-        )
-        ret
-    end
+    T = eltype(q)
+    ret = zeros(T,num_of_cstr,num_of_free_coords)
+    q_hen = @view q[bodyid2sys_full_coords[id_hen]]
+    q_egg = @view q[bodyid2sys_full_coords[id_egg]]
+    # translate
+    get_joint_jacobian!(ret,
+        nmcs_hen, nmcs_egg,
+        hen.rbsig.prop.loci[hen.pid].position,
+        egg.rbsig.prop.loci[egg.pid].position,
+        cache,
+        mask_1st,mask_2nd,mask_3rd,mask_4th,
+        free_idx_hen,free_idx_egg,
+        free_hen,free_egg,
+        q_hen,q_egg
+    )
+    ret
 end
 
 function get_jointed_free_idx(cst)
