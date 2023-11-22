@@ -24,6 +24,7 @@ struct NC{N,M,T,L}
     data::LNCData{N,M,T,L}
     conversion_to_std::SparseMatrixCSC{Int64,Int64}
     conversion_to_X::SparseMatrixCSC{Int64,Int64}
+    hessians::Vector{Symmetric{Int64, SparseMatrixCSC{Int64, Int64}}}
 end
 
 
@@ -124,16 +125,69 @@ function get_conversion_to_X(ndim,nld,np,nv)
     )
 end
 
+
+function get_hessians_idx(::LNCData{N,0,T,L}) where {N,T,L}
+    [
+        CartesianIndex{2}[]
+    ]
+end
+
+function get_hessians_idx(::LNCData{N,1,T,L}) where {N,T,L}
+    [
+        [CartesianIndex(2,2),CartesianIndex(2,2)],
+    ]
+end
+
+function get_hessians_idx(::LNCData{2,2,T,4}) where {T}
+    [
+        [CartesianIndex(2,2),CartesianIndex(2,2)],
+        [CartesianIndex(3,3),CartesianIndex(3,3)],
+        [CartesianIndex(2,3),CartesianIndex(3,2)]
+    ]
+end
+
+function get_hessians_idx(::LNCData{3,3,T,9}) where {T}
+    [
+        [CartesianIndex(2,2),CartesianIndex(2,2)],
+        [CartesianIndex(3,3),CartesianIndex(3,3)],
+        [CartesianIndex(4,4),CartesianIndex(4,4)],
+        [CartesianIndex(3,4),CartesianIndex(4,3)],
+        [CartesianIndex(2,4),CartesianIndex(4,2)],
+        [CartesianIndex(2,3),CartesianIndex(3,2)]
+    ]
+end
+
+#todo cache cstr_hessians
+function get_cstr_hessians(data::LNCData,cv)
+    ndim = get_num_of_dims(data)
+    nld = get_num_of_local_dims(data)
+    I_Bool = IMatrix(ndim)
+    idx = get_hessians_idx(data)
+    [
+        begin
+            ret_raw = zeros(Int,nld+1,nld+1)
+            for ij in id
+                ret_raw[ij] += 1
+            end
+            Symmetric(sparse(transpose(cv)*kron(ret_raw,I_Bool)*cv))
+        end
+        for id in idx
+    ]
+end
+
 function NC(np,nv,ndim,nld,r̄i::AbstractVector{T},X̄) where T
+    data = LNCData(
+        SVector{ndim}(r̄i),
+        SMatrix{ndim,nld,T}(X̄)
+    )
+    cv = get_conversion_to_std(ndim,np,nv)
     NC(
         np,
         nv,
-        LNCData(
-            SVector{ndim}(r̄i),
-            SMatrix{ndim,nld,T}(X̄)
-        ),
-        get_conversion_to_std(ndim,np,nv),
-        get_conversion_to_X(ndim,nld,np,nv)
+        data,
+        cv,
+        get_conversion_to_X(ndim,nld,np,nv),
+        get_cstr_hessians(data,cv),
     )
 end
 

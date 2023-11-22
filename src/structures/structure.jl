@@ -369,7 +369,7 @@ function make_cstr_jacobian(structure::AbstractStructure,q0::AbstractVector)
         q = Vector{eltype(q̌)}(undef,num_of_full_coords)
         q[sys_pres_idx] .= q0[sys_pres_idx]
         q[sys_free_idx] .= q̌
-        cstr_jacobian(q,c)
+        cstr_jacobian(structure,q,c)
     end
     inner_cstr_jacobian
 end
@@ -407,9 +407,7 @@ function NonminimalCoordinatesCache(st::Structure)
     ∂M⁻¹p∂q = spzeros(T,num_of_full_coords,num_of_full_coords)
     ∂T∂qᵀ = spzeros(T,num_of_full_coords)
     Ṁq̇ = spzeros(T,num_of_full_coords)
-    cstr_hessians = [nothing]
     NonminimalCoordinatesCache(
-        cstr_hessians,
         M,M⁻¹,
         # M̌,M̌⁻¹,
         # Ḿ,M̄,
@@ -447,7 +445,7 @@ function check_constraints_consistency(st;tol=1e-14)
     (;bodies,state,connectivity) = st
     (;joints) = connectivity.jointed
     q = get_coords(st)
-    q̇ = get_velocs(st)
+    q̌̇ = get_free_velocs(st)
     Φ = cstr_function(st,q)
     norm_position = norm(Φ)
     if norm_position > tol
@@ -470,7 +468,7 @@ function check_constraints_consistency(st;tol=1e-14)
             end
         end
     end
-    Aq̇ = cstr_jacobian(st,q)*q̇
+    Aq̇ = cstr_jacobian(st,q)*q̌̇
     norm_velocity = norm(Aq̇)
     if norm_velocity > tol
         @warn "System's velocity-level constraints are inconsistent: norm_velocity=$(norm_velocity)"

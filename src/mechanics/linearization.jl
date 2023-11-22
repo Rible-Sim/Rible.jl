@@ -14,12 +14,10 @@ function cstr_forces_jacobian(st::AbstractStructure,λ)
         memincst = bodyid2sys_intrinsic_cstr_idx[bodyid]
         free_idx = body.coords.free_idx
         if !isempty(memincst)
-            ret[memfree,memfree] .+= make_cstr_forces_jacobian(
-                body.coords.nmcs,
-                body.coords.free_idx,
-                body.coords.cstr_idx,
-                body.cache.coords_cache.cstr_hessians
-            )(λ[memincst])#[:,free_idx]
+            ret[memfree,memfree] .+= cstr_forces_jacobian(
+                body.coords,
+                λ[memincst]
+            )
         end
     end
     #todo skip 2D for now

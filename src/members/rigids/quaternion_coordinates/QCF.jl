@@ -16,8 +16,7 @@ import ..Rible: to_local_coords, to_transformation
 import ..Rible: get_deform
 import ..Rible: cstr_function
 import ..Rible: cstr_jacobian
-import ..Rible: make_cstr_hessians
-import ..Rible: make_cstr_forces_jacobian
+import ..Rible: cstr_forces_jacobian
 import ..Rible: cartesian_frame2coords
 import ..Rible: find_rotation, find_local_angular_velocity
 import ..Rible: build_joint_cache, get_joint_violations!, get_joint_jacobian!

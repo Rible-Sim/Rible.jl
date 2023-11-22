@@ -1,6 +1,22 @@
+figdir::String = ""
+if Sys.iswindows()
+    figdir::String = raw"C:\Users\luo22\OneDrive\Papers\FrictionalContact\CMAME"
+elseif Sys.isapple()
+    figdir::String = raw"/Users/jacob/Library/CloudStorage/OneDrive-SharedLibraries-onedrive/Papers/FrictionalContact/CMAME"
+end
+#-- end
+
+include("deps.jl")
+using AbbreviatedStackTraces #jl
+ENV["JULIA_STACKTRACE_ABBREVIATED"] = true #jl
+ENV["JULIA_STACKTRACE_MINIMAL"] = true #jl
+import Rible as RB
+include("../../vis.jl")
+includet("../../vis.jl") #jl
+
 #-- T bars
 include("../../../examples/robots/Tbars.jl")
-includet("../../../examples/robots/Tbars.jl")
+includet("../../../examples/robots/Tbars.jl")#jl
 tbbot = Tbars(;θ=π/4)
 bot = tbbot
 @myshow bot.structure.num_of_dof
@@ -8,13 +24,15 @@ bodies = RB.get_bodies(bot)
 body1 = bodies[1]
 dt = 1e-3
 tspan = (0.0,5.0)
-prob = RB.DynamicsProblem(bot,RB.dynfuncs)
+prob = RB.DynamicsProblem(bot,)
 solver = RB.Zhong06()
-sim = RB.Simulator(prob,solver;tspan,dt,)
-solvercache = RB.generate_cache(solver,sim;dt)
-RB.solve!(sim,solvercache;dt,ftol=1e-10,maxiters=50,verbose=true,exception=true,progress=false,)
-
-@time RB.solve!(sim,solvercache;dt,ftol=1e-10,maxiters=50,verbose=false,exception=true,progress=false,)
+RB.solve!(
+    prob,
+    RB.DynamicsSolver(
+        solver
+    );
+    dt,tspan,ftol=1e-10,maxiters=50,verbose=false,exception=true,progress=false,
+)
 
 plot_traj!(bot;showarrows = false, showground=false)
 

@@ -71,9 +71,10 @@ function get_num_of_local_dims end
 function get_deform end
 function cstr_function end
 function cstr_jacobian end
+function cstr_hessians end
+function cstr_forces_jacobian end
 function make_cstr_function end
 function make_cstr_jacobian end
-function make_cstr_hessians end
 function make_cstr_forces_jacobian end
 function to_local_coords end
 function to_transformation end

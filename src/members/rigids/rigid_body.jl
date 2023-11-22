@@ -157,7 +157,6 @@ function get_CoordinatesCache(prop::RigidBodyProperty{N,T},
     (;mass,inertia,mass_locus,loci) = prop
     mass_center = mass_locus.position
     num_of_loci = length(loci)
-    cstr_hessians = make_cstr_hessians(nmcs)
     M = NCF.make_M(nmcs,mass,inertia,mass_center)
     M⁻¹ = inv(M)
     ∂Mq̇∂q = zero(M)
@@ -171,7 +170,6 @@ function get_CoordinatesCache(prop::RigidBodyProperty{N,T},
     Cg = C(c(mass_center))
     Cps = [typeof(Cg)(C(c(loci[i].position))) for i in 1:num_of_loci]
     coords_cache = NonminimalCoordinatesCache(
-        cstr_hessians,
         M,M⁻¹,
         ∂Mq̇∂q,∂M⁻¹p∂q,
         Ṁq̇,∂T∂qᵀ
@@ -191,7 +189,6 @@ function get_CoordinatesCache(
     (;mass,inertia,mass_locus,loci) = prop
     mass_center = mass_locus.position
     num_of_loci = length(loci)
-    cstr_hessians = make_cstr_hessians(qcs)
     M = MMatrix{7,7}(Matrix(one(T)*I,7,7))
     M⁻¹ = MMatrix{7,7}(Matrix(one(T)*I,7,7))
     ∂Mq̇∂q = @MMatrix zeros(T,7,7)
@@ -205,7 +202,6 @@ function get_CoordinatesCache(
     Cg = deepcopy(Co)
     Cps = [deepcopy(Co) for i in 1:num_of_loci]
     coords_cache = NonminimalCoordinatesCache(
-        cstr_hessians,
         M,M⁻¹,
         ∂Mq̇∂q,∂M⁻¹p∂q,
         Ṁq̇,∂T∂qᵀ

@@ -229,88 +229,22 @@ function make_nullspace(nmcs::NC3D12C)
     end
 end
 
-get_idx(nmcs::Union{NC2D2C,NC3D3C}) = CartesianIndex{2}[]
-
-get_idx(nmcs::Union{NC2D4C,NC3D6C}) = [
-    [CartesianIndex(2,2),CartesianIndex(2,2)],
-]
-
-get_idx(nmcs::NC2D6C) = [
-    [CartesianIndex(2,2),CartesianIndex(2,2)],
-    [CartesianIndex(3,3),CartesianIndex(3,3)],
-    [CartesianIndex(2,3),CartesianIndex(3,2)]
-]
-
-get_idx(nmcs::NC3D12C) = [
-    [CartesianIndex(2,2),CartesianIndex(2,2)],
-    [CartesianIndex(3,3),CartesianIndex(3,3)],
-    [CartesianIndex(4,4),CartesianIndex(4,4)],
-    [CartesianIndex(3,4),CartesianIndex(4,3)],
-    [CartesianIndex(2,4),CartesianIndex(4,2)],
-    [CartesianIndex(2,3),CartesianIndex(3,2)]
-]
-
-#todo cache cstr_hessians
-function make_cstr_hessians(nmcs::NC)
-    cv = nmcs.conversion_to_std
-    nld = get_num_of_local_dims(nmcs)
-    num_of_dim = get_num_of_dims(nmcs)
-    I_Bool = IMatrix(num_of_dim)
-    idx = get_idx(nmcs)
-    cstr_hessians = [
-        begin
-            ret_raw = zeros(Int,nld+1,nld+1)
-            for ij in id
-                ret_raw[ij] += 1
-            end
-            SymmetricPacked(transpose(cv)*kron(ret_raw,I_Bool)*cv)
-        end
-        for id in idx
-    ]
-end
 
 #todo use SymmetricPacked to the end
-function make_cstr_forces_jacobian(nmcs::Union{NC2D2C,NC3D3C},free_idx,cstr_idx)
-    function cstr_forces_jacobian(λ)
-        nothing
-    end
+function cstr_forces_jacobian(nmcs::Union{NC2D2C,NC3D3C},free_idx,cstr_idx,λ)
+    nothing
 end
 
-function make_cstr_forces_jacobian(nmcs::NC,free_idx,cstr_idx,cstr_hessians)
-    function cstr_forces_jacobian(λ)
-        ret = [
-            begin
-                a = -λ[i] .* cstr_hessians[j][free_idx,free_idx]
-                # display(a)
-                a 
-            end
-            for (i,j) in enumerate(cstr_idx)
-        ]
-        sum(ret)
-    end
-end
-
-function make_∂Aq̇∂q(nmcs::Union{NC2D2C,NC3D3C},free_idx,cstr_idx)
-    function ∂Aq̇∂q(q̇)
-        nothing
-    end
-end
-
-# this is wrong
-function make_∂Aq̇∂q(nmcs::NC,free_idx,cstr_idx)
-    cstr_hessians = make_cstr_hessians(nmcs)
-    function ∂Aq̇∂q(q̇)
-        q̇uc = @view q̇[free_idx]
-        ret = [
-            begin
-                a = transpose(q̇uc)*cstr_hessians[j][free_idx,free_idx]
-                # display(a)
-                a 
-            end
-            for j in cstr_idx
-        ]
-        sum(ret)
-    end
+function cstr_forces_jacobian(nmcs::NC,free_idx,cstr_idx,λ)
+    ret = [
+        begin
+            a = -λ[i] .* nmcs.hessians[j][free_idx,free_idx]
+            # display(a)
+            a 
+        end
+        for (i,j) in enumerate(cstr_idx)
+    ]
+    sum(ret)
 end
 
 """

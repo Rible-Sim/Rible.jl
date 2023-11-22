@@ -89,8 +89,11 @@ function cstr_jacobian(coords::NonminimalCoordinates,q)
     cstr_jacobian(coords.nmcs,coords.free_idx,coords.cstr_idx,q)
 end
 
-struct NonminimalCoordinatesCache{MType,JType,HType,GType}
-    cstr_hessians::Vector{HType}
+function cstr_forces_jacobian(coords::NonminimalCoordinates,λ)
+    cstr_forces_jacobian(coords.nmcs,coords.free_idx,coords.cstr_idx,λ)
+end
+
+struct NonminimalCoordinatesCache{MType,JType,GType}
     M::MType
     M⁻¹::MType
     ∂Mq̇∂q::JType
