@@ -81,12 +81,12 @@ function NonminimalCoordinates(nmcs,
     NonminimalCoordinates(nmcs,pres_idx,free_idx,cstr_idx)
 end
 
-function make_cstr_function(coords::NonminimalCoordinates)
-    make_cstr_function(coords.nmcs,coords.cstr_idx)
+function cstr_function(coords::NonminimalCoordinates,q,d=get_deform(coords.nmcs))
+    cstr_function(coords.nmcs,coords.cstr_idx,q,d)
 end
 
-function make_cstr_jacobian(coords::NonminimalCoordinates)
-    make_cstr_jacobian(coords.nmcs,coords.free_idx,coords.cstr_idx)
+function cstr_jacobian(coords::NonminimalCoordinates,q)
+    cstr_jacobian(coords.nmcs,coords.free_idx,coords.cstr_idx,q)
 end
 
 struct NonminimalCoordinatesCache{MType,JType,HType,GType}

@@ -263,8 +263,8 @@ function build_mass_matrices(structure::Structure,)
     @eponymtuple(M,M⁻¹,M̌,M̌⁻¹,Ḿ,M̄)
 end
 
-function make_cstr_function(st::AbstractStructure,q0::AbstractVector)
-    (;bodies,num_of_cstr,connectivity) = st
+function cstr_function(structure::AbstractStructure,q,d=get_d(structure),c=get_local_coords(structure))
+    (;bodies,num_of_cstr,connectivity) = structure
     (;numbered,indexed,jointed) = connectivity
     (;
         num_of_free_coords,
@@ -280,87 +280,54 @@ function make_cstr_function(st::AbstractStructure,q0::AbstractVector)
     (;
         jointid2sys_extrinsic_cstr_idx
     ) = jointed
-    function _inner_cstr_function(q̌,d,c)
+    ret = Vector{eltype(q)}(undef,num_of_cstr)
+    foreach(bodies) do body
+        bodyid = body.prop.id
+        memfull = bodyid2sys_full_coords[bodyid]
+        memfree = bodyid2sys_free_coords[bodyid]
+        memincst = bodyid2sys_intrinsic_cstr_idx[bodyid]
+        if !isempty(memincst)
+            ret[memincst] .= cstr_function(
+                body.coords,q[memfull]#,d[memincst]
+            )
+        end
+    end
+    foreach(jointed.joints) do joint
+        jointexcst = num_of_intrinsic_cstr.+jointid2sys_extrinsic_cstr_idx[joint.id]
+        ret[jointexcst] .= make_cstr_function(joint,structure)(
+            q,
+            c
+        )
+    end
+    ret
+end
+
+function make_cstr_function(structure::AbstractStructure,q0::AbstractVector)
+    (;connectivity) = structure
+    (;indexed,) = connectivity
+    (;
+        num_of_full_coords,
+        sys_pres_idx,
+        sys_free_idx,
+    ) = indexed
+    function inner_cstr_function(q̌,d=get_d(structure),c=get_local_coords(structure))
         q = Vector{eltype(q̌)}(undef,num_of_full_coords)
         q[sys_pres_idx] .= q0[sys_pres_idx]
         q[sys_free_idx] .= q̌
-        ret = Vector{eltype(q̌)}(undef,num_of_cstr)
-        foreach(bodies) do body
-            bodyid = body.prop.id
-            memfull = bodyid2sys_full_coords[bodyid]
-            memfree = bodyid2sys_free_coords[bodyid]
-            memincst = bodyid2sys_intrinsic_cstr_idx[bodyid]
-            if !isempty(memincst)
-                ret[memincst] .= make_cstr_function(
-                    body.state.cache.funcs
-                )(q[memfull],d[memincst])
-            end
-        end
-        foreach(jointed.joints) do joint
-            jointexcst = num_of_intrinsic_cstr.+jointid2sys_extrinsic_cstr_idx[joint.id]
-            ret[jointexcst] .= make_cstr_function(joint,st)(q,c)
-        end
-        ret
+        cstr_function(q,d,c)
     end
-
-    function inner_cstr_function(q̌)
-        _inner_cstr_function(q̌,get_d(st),get_local_coords(st))
-    end
-    function inner_cstr_function(q̌,d)
-        _inner_cstr_function(q̌,d,get_local_coords(st))
-    end
-    function inner_cstr_function(q̌,d,c)
-        _inner_cstr_function(q̌,d,c)
-    end
-
-    inner_cstr_function
 end
 
-function make_cstr_function(st::AbstractStructure)
-    (;bodies,num_of_cstr,connectivity) = st
-    (;indexed,jointed,numbered) = connectivity
+function cstr_jacobian(structure::AbstractStructure,q,c=get_local_coords(structure))
+    (;bodies,num_of_cstr,connectivity) = structure
+    (;indexed,jointed) = connectivity
     (;
         num_of_free_coords,
-        bodyid2sys_full_coords,
-        bodyid2sys_free_coords,
-        num_of_intrinsic_cstr,
-        bodyid2sys_intrinsic_cstr_idx
-    ) = indexed
-    (;
-        jointid2sys_extrinsic_cstr_idx
-    ) = jointed
-    @inline @inbounds function inner_cstr_function(q)
-        ret = Vector{eltype(q)}(undef,num_of_cstr)
-        is = Ref(num_of_intrinsic_cstr)
-        foreach(bodies) do body
-            bodyid = body.prop.id
-            memfull = bodyid2sys_full_coords[bodyid]
-            memfree = bodyid2sys_free_coords[bodyid]
-            memincst = bodyid2sys_intrinsic_cstr_idx[bodyid]
-            if !isempty(memincst)
-                ret[memincst] .= make_cstr_function(
-                    body.coords
-                )(q[memfull])
-            end
-        end
-        foreach(jointed.joints) do joint
-            jointexcst = num_of_intrinsic_cstr.+jointid2sys_extrinsic_cstr_idx[joint.id]
-            ret[jointexcst] .= make_cstr_function(joint,st)(q)
-        end
-        ret
-    end
-    inner_cstr_function
-end
-
-function make_cstr_jacobian(st::AbstractStructure,q0::AbstractVector)
-    (;bodies,num_of_cstr,connectivity) = st
-    (;numbered,indexed,jointed) = connectivity
-    (;
         num_of_full_coords,
-        num_of_free_coords,
         sys_pres_idx,
         sys_free_idx,
         bodyid2sys_full_coords,
+        bodyid2sys_pres_coords,
         bodyid2sys_free_coords,
         num_of_intrinsic_cstr,
         bodyid2sys_intrinsic_cstr_idx
@@ -368,69 +335,40 @@ function make_cstr_jacobian(st::AbstractStructure,q0::AbstractVector)
     (;
         jointid2sys_extrinsic_cstr_idx
     ) = jointed
-    function _inner_cstr_jacobian(q̌,c)
+    ret = zeros(eltype(q),num_of_cstr,num_of_free_coords)
+    foreach(bodies) do body
+        bodyid = body.prop.id
+        memfull = bodyid2sys_full_coords[bodyid]
+        memfree = bodyid2sys_free_coords[bodyid]
+        memincst = bodyid2sys_intrinsic_cstr_idx[bodyid]
+        if !isempty(memincst)
+            ret[memincst,memfree] .= cstr_jacobian(
+                body.coords,q[memfull]
+            )
+        end
+    end
+    foreach(jointed.joints) do joint
+        jointexcst = num_of_intrinsic_cstr.+jointid2sys_extrinsic_cstr_idx[joint.id]
+        ret[jointexcst,:] .= make_cstr_jacobian(joint,structure)(q)
+    end
+    ret
+end
+
+function make_cstr_jacobian(structure::AbstractStructure,q0::AbstractVector)
+    (;connectivity) = structure
+    (;indexed,) = connectivity
+    (;
+        num_of_full_coords,
+        sys_pres_idx,
+        sys_free_idx,
+    ) = indexed
+    function inner_cstr_jacobian(q̌,c=get_local_coords(structure))
         q = Vector{eltype(q̌)}(undef,num_of_full_coords)
         q[sys_pres_idx] .= q0[sys_pres_idx]
         q[sys_free_idx] .= q̌
-        ret = zeros(eltype(q̌),num_of_cstr,num_of_free_coords)
-        foreach(bodies) do body
-            bodyid = body.prop.id
-            memfull = bodyid2sys_full_coords[bodyid]
-            memfree = bodyid2sys_free_coords[bodyid]
-            memincst = bodyid2sys_intrinsic_cstr_idx[bodyid]
-            if !isempty(memincst)
-                ret[memincst,memfree] .= make_cstr_jacobian(
-                    body.coords
-                )(q[memfull])
-            end
-        end
-        foreach(jointed.joints) do joint
-            jointexcst = num_of_intrinsic_cstr.+jointid2sys_extrinsic_cstr_idx[joint.id]
-            ret[jointexcst,:] .= make_cstr_jacobian(joint,st)(q,c)
-        end
-        ret
-    end
-    function inner_cstr_jacobian(q̌)
-        _inner_cstr_jacobian(q̌,get_local_coords(st))
-    end
-    function inner_cstr_jacobian(q̌,c)
-        _inner_cstr_jacobian(q̌,c)
+        cstr_jacobian(q,c)
     end
     inner_cstr_jacobian
-end
-
-function make_cstr_jacobian(st::AbstractStructure)
-    (;bodies,num_of_cstr,connectivity) = st
-    (;numbered,indexed,jointed) = connectivity
-    (;
-        num_of_free_coords,
-        bodyid2sys_full_coords,
-        bodyid2sys_free_coords,
-        num_of_intrinsic_cstr,
-        bodyid2sys_intrinsic_cstr_idx
-    ) = indexed
-    (;
-        jointid2sys_extrinsic_cstr_idx
-    ) = jointed
-    @inline @inbounds function inner_cstr_jacobian(q)
-        ret = zeros(eltype(q),num_of_cstr,num_of_free_coords)
-        foreach(bodies) do body
-            bodyid = body.prop.id
-            memfull = bodyid2sys_full_coords[bodyid]
-            memfree = bodyid2sys_free_coords[bodyid]
-            memincst = bodyid2sys_intrinsic_cstr_idx[bodyid]
-            if !isempty(memincst)
-                ret[memincst,memfree] .= make_cstr_jacobian(
-                    body.coords
-                )(q[memfull])
-            end
-        end
-        foreach(jointed.joints) do joint
-            jointexcst = num_of_intrinsic_cstr.+jointid2sys_extrinsic_cstr_idx[joint.id]
-            ret[jointexcst,:] .= make_cstr_jacobian(joint,st)(q)
-        end
-        ret
-    end
 end
 
 function build_F̌(st,bodyid,pid,f)
@@ -484,7 +422,7 @@ $(TYPEDSIGNATURES)
 function check_jacobian_singularity(st)
     (;bodies,state) = st
     q = get_coords(st)
-    A = make_cstr_jacobian(st)(q)
+    A = cstr_jacobian(st,q)
     sys_rank = rank(A)
     if sys_rank < minimum(size(A))
         @show A
@@ -493,7 +431,7 @@ function check_jacobian_singularity(st)
             bodyid = body.prop.id
             free_idx = body.coords.free_idx
             q_body = state.members[bodyid].q
-            A_body = make_cstr_jacobian(body.coords)(q_body)
+            A_body = cstr_jacobian(body.coords,q_body)
             body_rank = rank(A_body)
             if body_rank < minimum(size(A_body))
                 @warn "The $(bodyid)th body's Jacobian is singular: rank(A(q))=$(body_rank)<$(minimum(size(A_rb)))"
@@ -507,7 +445,7 @@ function check_constraints_consistency(st;tol=1e-14)
     (;joints) = connectivity.jointed
     q = get_coords(st)
     q̇ = get_velocs(st)
-    Φ = make_cstr_function(st)(q)
+    Φ = cstr_function(st,q)
     norm_position = norm(Φ)
     if norm_position > tol
         @warn "System's position-level constraints are inconsistent: norm_position=$(norm_position)"
@@ -515,7 +453,7 @@ function check_constraints_consistency(st;tol=1e-14)
             bodyid = body.prop.id
             free_idx = body.coords.free_idx
             q_body = state.members[bodyid].q
-            Φ_body = make_cstr_function(body.coords)(q_body)
+            Φ_body = cstr_function(body.coords,q_body)
             norm_position_body = norm(Φ_body)
             if norm_position_body > tol
                 @warn "The $(bodyid)th body's position-level constraints are inconsistent: norm_position_body=$(norm_position_body)"
@@ -529,7 +467,7 @@ function check_constraints_consistency(st;tol=1e-14)
             end
         end
     end
-    Aq̇ = make_cstr_jacobian(st)(q)*q̇
+    Aq̇ = cstr_jacobian(st,q)*q̇
     norm_velocity = norm(Aq̇)
     if norm_velocity > tol
         @warn "System's velocity-level constraints are inconsistent: norm_velocity=$(norm_velocity)"
@@ -537,7 +475,7 @@ function check_constraints_consistency(st;tol=1e-14)
             bodyid = body.prop.id
             q_body = state.members[bodyid].q
             q̇_body = state.members[bodyid].q̇
-            Aq̇_body = make_cstr_jacobian(body.coords)(q_body)*q̇_body
+            Aq̇_body = cstr_jacobian(body.coords,q_body)*q̇_body
             norm_velocity_body = norm(Aq̇_body)
             if norm_velocity_body > tol
                 @warn "The $(bodyid)th body's velcoity-level constraints are inconsistent: norm_velocity_body=$(norm_velocity_body)"

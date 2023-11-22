@@ -14,7 +14,6 @@ import Rible as RB
 include("../../vis.jl")
 includet("../../vis.jl") #jl
 
-
 #--  slider crank 
 include("../../../examples/robots/slider_crank.jl")
 includet("../../../examples/robots/slider_crank.jl")#jl
@@ -30,7 +29,7 @@ plot_traj!(sc;showground=false)
 RB.has_constant_mass_matrix(sc)
 
 dt = 1e-3
-tspan = (0.0,1.0)
+tspan = (0.0,60dt)
 
 # No Contact Dynamics
 prob = RB.DynamicsProblem(sc,)
@@ -62,6 +61,7 @@ prob = RB.DynamicsProblem(
     )
 )
 
+# two-layer
 RB.solve!(
     prob,
     RB.DynamicsSolver(
@@ -73,9 +73,8 @@ RB.solve!(
     dt,tspan,ftol=1e-14,maxiters=50,verbose=true,exception=true,progress=false,
 )
 
-q = RB.get_coords(sc.structure)
-RB.make_cstr_jacobian(sc.structure)(q)
 
+# Mono
 RB.solve!(
     prob,
     RB.DynamicsSolver(
@@ -97,6 +96,7 @@ prob = RB.DynamicsProblem(
     )
 )
 
+# two-layer
 RB.solve!(
     prob,
     RB.DynamicsSolver(

@@ -39,66 +39,44 @@ end
 end
 
 # Intrinsic Constraints
-## Intrinsic Constraints: Dispatch
-"""
-Return 2D or 3D intrinsic cstr(s) ，用于Dispatch。
-$(TYPEDSIGNATURES)
-"""
-function make_cstr_function(nmcs::NC,cstr_idx)
-    deforms = get_deform(nmcs)
-    make_cstr_function(nmcs,cstr_idx,deforms)
-end
-
-# function make_inner_cstr_function(func,deforms)
-#     @inline @inbounds function ret_func(q,d=deforms)
-#         func(q,d)
-#     end
-#     ret_func
-# end
 
 """
 Return 2D or 3D intrinsic cstr(s) for point mass。
 $(TYPEDSIGNATURES)
 """
-function make_cstr_function(nmcs::Union{NC2D2C,NC3D3C},cstr_idx,deforms)
-    @inline @inbounds function inner_cstr_function(q,d=deforms)
-        nothing
-    end
-    # make_inner_cstr_function(inner_cstr_function,deforms)
+function cstr_function(nmcs::Union{NC2D2C,NC3D3C},cstr_idx,q,deforms = get_deform(nmcs))
+    eltype(q)[]
+    # make_inner_cstr_function(inner_cstr_function,deforms = get_deform(nmcs))
 end
 
 """
 Return 2D or 3D intrinsic cstr(s) for rigid bars。
 $(TYPEDSIGNATURES)
 """
-function make_cstr_function(nmcs::Union{NC2D4C,NC3D6C},cstr_idx,deforms)
+function cstr_function(nmcs::Union{NC2D4C,NC3D6C},cstr_idx,q,d = get_deform(nmcs))
     ndim = get_num_of_dims(nmcs)
     cv = nmcs.conversion_to_std
-    @inline @inbounds function inner_cstr_function(q,d=deforms)
-        qstd = cv*q
-        u = @view qstd[ndim+1:2ndim]
-        all = [u⋅u - d[1]^2]
-        all[cstr_idx]
-    end
+    qstd = cv*q
+    u = @view qstd[ndim+1:2ndim]
+    all = [u⋅u - d[1]^2]
+    @view all[cstr_idx]
 end
 
 """
 Return 2D intrinsic cstr(s) , for rigid bodies。
 $(TYPEDSIGNATURES)
 """
-function make_cstr_function(nmcs::NC2D6C,cstr_idx,deforms)
+function cstr_function(nmcs::NC2D6C,cstr_idx,q,d = get_deform(nmcs))
     cv = nmcs.conversion_to_std
-    @inline @inbounds function inner_cstr_function(q,d=deforms)
-        qstd = cv*q
-        u = @view qstd[3:4]
-        v = @view qstd[5:6]
-        all = [
-            (u⋅u - d[1]^2), 
-            (v⋅v - d[2]^2), 
-            (u⋅v - d[3])
-        ]
-        all[cstr_idx]
-    end
+    qstd = cv*q
+    u = @view qstd[3:4]
+    v = @view qstd[5:6]
+    all = [
+        (u⋅u - d[1]^2), 
+        (v⋅v - d[2]^2), 
+        (u⋅v - d[3])
+    ]
+    @view all[cstr_idx]
 end
 
 
@@ -106,23 +84,21 @@ end
 Return 3D intrinsic cstr(s) , for rigid bodies。
 $(TYPEDSIGNATURES)
 """
-function make_cstr_function(nmcs::NC3D12C,cstr_idx,deforms)
+function cstr_function(nmcs::NC3D12C,cstr_idx,q,d = get_deform(nmcs))
     cv = nmcs.conversion_to_std
-    @inline @inbounds function inner_cstr_function(q,d=deforms)
-        qstd = cv*q
-        u = @view qstd[4:6]
-        v = @view qstd[7:9]
-        w = @view qstd[10:12]
-        all = [
-            u⋅u - d[1]^2, 
-            v⋅v - d[2]^2, 
-            w⋅w - d[3]^2, 
-            v⋅w - d[4], 
-            u⋅w - d[5], 
-            u⋅v - d[6]
-        ]
-        @view all[cstr_idx]
-    end
+    qstd = cv*q
+    u = @view qstd[4:6]
+    v = @view qstd[7:9]
+    w = @view qstd[10:12]
+    all = [
+        u⋅u - d[1]^2, 
+        v⋅v - d[2]^2, 
+        w⋅w - d[3]^2, 
+        v⋅w - d[4], 
+        u⋅w - d[5], 
+        u⋅v - d[6]
+    ]
+    @view all[cstr_idx]
 end
 
 ## Jacobians
@@ -130,68 +106,61 @@ end
 Return 2D or 3D Jacobian matrix for rigid bars。
 $(TYPEDSIGNATURES)
 """
-function make_cstr_jacobian(nmcs::Union{NC2D2C,NC3D3C},free_idx,cstr_idx)
-    @inline @inbounds function inner_cstr_jacobian(q)
-        nothing
-    end
+function cstr_jacobian(nmcs::Union{NC2D2C,NC3D3C},free_idx,cstr_idx,q)
+    ndim = get_num_of_dims(nmcs)
+    zeros(eltype(q),0,ndim)
 end
 
 """
 Return 2D or 3D Jacobian matrix for rigid bars。
 $(TYPEDSIGNATURES)
 """
-function make_cstr_jacobian(nmcs::Union{NC2D4C,NC3D6C},free_idx,cstr_idx)
+function cstr_jacobian(nmcs::Union{NC2D4C,NC3D6C},free_idx,cstr_idx,q)
     ndim = get_num_of_dims(nmcs)
     cv = nmcs.conversion_to_std
-    @inline @inbounds function inner_cstr_jacobian(q)
-        qstd = cv*q
-        u = @view qstd[ndim+1:2ndim]
-        ret = zeros(eltype(q),1,2ndim)
-        ret[ndim+1:2ndim] = 2u
-        @view (ret*cv)[cstr_idx,free_idx]
-    end
+    qstd = cv*q
+    u = @view qstd[ndim+1:2ndim]
+    ret = zeros(eltype(q),1,2ndim)
+    ret[ndim+1:2ndim] = 2u
+    @view (ret*cv)[cstr_idx,free_idx]
 end
 
 """
 Return 2D Jacobian matrix , for rigid bodies。
 $(TYPEDSIGNATURES)
 """
-function make_cstr_jacobian(nmcs::NC2D6C,free_idx,cstr_idx)
+function cstr_jacobian(nmcs::NC2D6C,free_idx,cstr_idx,q)
     cv = nmcs.conversion_to_std
-    @inline @inbounds function inner_cstr_jacobian(q)
-        u,v = get_uv(nmcs,q)
-        ret = zeros(eltype(q),3,6)
-        ret[1,3:4] = 2u
-        ret[2,5:6] = 2v
-        ret[3,3:4] =  v
-        ret[3,5:6] =  u
-        @view (ret*cv)[cstr_idx,free_idx]
-    end
+    u,v = get_uv(nmcs,q)
+    ret = zeros(eltype(q),3,6)
+    ret[1,3:4] = 2u
+    ret[2,5:6] = 2v
+    ret[3,3:4] =  v
+    ret[3,5:6] =  u
+    @view (ret*cv)[cstr_idx,free_idx]
 end
 """
 Return 3D Jacobian matrix , for rigid bodies。
 $(TYPEDSIGNATURES)
 """
-function make_cstr_jacobian(nmcs::NC3D12C,free_idx,cstr_idx)
+function cstr_jacobian(nmcs::NC3D12C,free_idx,cstr_idx,q)
     cv = nmcs.conversion_to_std
-    @inline @inbounds function inner_cstr_jacobian(q)
-        u,v,w = get_uvw(nmcs,q)
-        ret = zeros(eltype(q), 6, 12)
-        ret[1,4:6]   = 2u
-        ret[2,7:9]   = 2v
-        ret[3,10:12] = 2w
+    u,v,w = get_uvw(nmcs,q)
+    ret = zeros(eltype(q), 6, 12)
+    ret[1,4:6]   = 2u
+    ret[2,7:9]   = 2v
+    ret[3,10:12] = 2w
 
-        ret[4 ,7:9]  = w
-        ret[4,10:12] = v
+    ret[4 ,7:9]  = w
+    ret[4,10:12] = v
 
-        ret[5, 4:6]  = w
-        ret[5,10:12] = u
+    ret[5, 4:6]  = w
+    ret[5,10:12] = u
 
-        ret[6,4:6] =  v
-        ret[6,7:9] =  u
+    ret[6,4:6] =  v
+    ret[6,7:9] =  u
 
-        @view (ret*cv)[cstr_idx,free_idx]
-    end
+    @view (ret*cv)[cstr_idx,free_idx]
 end
 
 """
@@ -378,7 +347,7 @@ end
 function find_independent_idx(nmcs::NC,q)
     free_idx = collect(1:get_num_of_coords(nmcs))
     cstr_idx = collect(1:get_num_of_cstr(nmcs))
-    A = make_cstr_jacobian(nmcs,free_idx,cstr_idx)(q)
+    A = cstr_jacobian(nmcs,free_idx,cstr_idx,q)
     col_index = GECP(A)
     col_index[size(A,1)+1:end] |> sort
 end

@@ -1,4 +1,4 @@
-function RB.build_joint_cache(
+function build_joint_cache(
         nmcs_hen::QC,
         nmcs_egg::QC,
         loci_position_hen,
@@ -51,7 +51,7 @@ function RB.build_joint_cache(
     cache, violations
 end
 
-function RB.get_joint_violations!(
+function get_joint_violations!(
         ret,
         nmcs_hen::QC, 
         nmcs_egg::QC,
@@ -92,7 +92,7 @@ function RB.get_joint_violations!(
     ) .- violations
 end
 
-function RB.make_cstr_jacobian(
+function make_cstr_jacobian(
         nmcs_hen::QC, 
         nmcs_egg::QC,
         loci_position_hen,
@@ -181,7 +181,7 @@ function RB.make_cstr_jacobian(
     end
 end
 
-function RB.get_joint_jacobian!(
+function get_joint_jacobian!(
         ret,
         nmcs_hen::QC, 
         nmcs_egg::QC,
@@ -211,7 +211,7 @@ function RB.get_joint_jacobian!(
 end
 
 
-function RB.make_cstr_forces_jacobian(
+function make_cstr_forces_jacobian(
         ret,
         nmcs_hen::QC, 
         nmcs_egg::QC,

@@ -40,7 +40,7 @@ struct FixedBodyConstraint{T} <: ExtrinsicConstraints{T}
     id::Int
     num_of_cstr::Int64
     idx::Vector{Int64}
-    values::T
+    violations::T
 end
 
 """
@@ -58,15 +58,13 @@ function FixedBodyConstraint(id::Int,body::AbstractBody,indexed)
     )
     pres_idx = find_independent_idx(nmcs,q)
     idx = bodyid2sys_full_coords[bodyid][pres_idx]
-    values = q[pres_idx]
-    FixedBodyConstraint(id,length(idx),idx,values)
+    violations = q[pres_idx]
+    FixedBodyConstraint(id,length(idx),idx,violations)
 end
 
 function make_cstr_function(cst::FixedBodyConstraint,st)
-    (;idx, values) = cst
-    @inline @inbounds inner_cstr_function(q)   = q[idx]-values
-    @inline @inbounds inner_cstr_function(q,d) = q[idx]-d
-    inner_cstr_function
+    (;idx, violations) = cst
+    inner_cstr_function(q,c)   = q[idx]
 end
 
 function make_cstr_jacobian(cst::FixedBodyConstraint,st)
@@ -261,8 +259,8 @@ function PrototypeJoint(id,hen2egg,joint_type::Symbol)
 end
 
 
-function make_cstr_function(cst::PrototypeJoint,st::Structure)
-    (;indexed,numbered) = st.connectivity
+function make_cstr_function(cst::PrototypeJoint,structure::Structure, c = get_local_coords(structure))
+    (;indexed,numbered) = structure.connectivity
     (;bodyid2sys_full_coords) = indexed
     (;sys_loci2coords_idx,bodyid2sys_loci_idx) = numbered
     (;
@@ -277,7 +275,7 @@ function make_cstr_function(cst::PrototypeJoint,st::Structure)
     id_egg = egg.rbsig.prop.id
     nmcs_hen = hen.rbsig.coords.nmcs
     nmcs_egg = egg.rbsig.coords.nmcs
-    function _inner_cstr_function(q,c)
+    function _inner_cstr_function(q, c = get_local_coords(structure))
         T = eltype(q)
         ret = zeros(T,num_of_cstr)
         q_hen = @view q[bodyid2sys_full_coords[id_hen]]
@@ -297,15 +295,10 @@ function make_cstr_function(cst::PrototypeJoint,st::Structure)
         )
         ret
     end
-    function inner_cstr_function(q)
-        c = get_local_coords(st)
-        _inner_cstr_function(q,c)
-    end
-    inner_cstr_function
 end
 
-function make_cstr_jacobian(cst::PrototypeJoint,st::Structure)
-    (;indexed,numbered) = st.connectivity
+function make_cstr_jacobian(cst::PrototypeJoint,structure::Structure,c = get_local_coords(structure))
+    (;indexed,numbered) = structure.connectivity
     (;bodyid2sys_free_coords,
       bodyid2sys_full_coords,
       num_of_free_coords,
@@ -327,7 +320,7 @@ function make_cstr_jacobian(cst::PrototypeJoint,st::Structure)
     nmcs_egg = egg.rbsig.coords.nmcs
     free_idx_hen =  hen.rbsig.coords.free_idx
     free_idx_egg =  egg.rbsig.coords.free_idx
-    function _inner_cstr_jacobian(q,c)
+    function _inner_cstr_jacobian(q,c=get_local_coords(structure))
         T = eltype(q)
         ret = zeros(T,num_of_cstr,num_of_free_coords)
         q_hen = @view q[bodyid2sys_full_coords[id_hen]]
@@ -345,14 +338,6 @@ function make_cstr_jacobian(cst::PrototypeJoint,st::Structure)
         )
         ret
     end
-    function inner_cstr_jacobian(q,c)
-        _inner_cstr_jacobian(q,c)
-    end
-    function inner_cstr_jacobian(q)
-        c = get_local_coords(st)
-        _inner_cstr_jacobian(q,c)
-    end
-    inner_cstr_jacobian
 end
 
 function get_jointed_free_idx(cst)

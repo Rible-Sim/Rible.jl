@@ -39,8 +39,8 @@ function Robot(structure,hub=nothing)
 end
 
 
-make_cstr_jacobian(bot::Robot) = make_cstr_jacobian(bot.structure)
-make_cstr_function(bot::Robot) = make_cstr_function(bot.structure)
+make_cstr_jacobian(bot::Robot) = (q) -> cstr_jacobian(bot.structure,q)
+make_cstr_function(bot::Robot) = (q) -> cstr_function(bot.structure,q)
 
 """
 Return System 质量矩阵。

@@ -108,12 +108,12 @@ function get_d(st::Structure)
         bodyid = body.prop.id
         memincst = bodyid2sys_intrinsic_cstr_idx[bodyid]
         if !isempty(memincst)
-            d[memincst] .= NCF.get_deform(body.state.cache.funcs.nmcs)
+            d[memincst] .= NCF.get_deform(body.coords.nmcs)
         end
     end
     foreach(jointed.joints) do joint
         nc = joint.num_of_cstr
-        d[is[]+1:is[]+nc] .= joint.values
+        d[is[]+1:is[]+nc] .= joint.violations
         is[] += nc
     end
     d

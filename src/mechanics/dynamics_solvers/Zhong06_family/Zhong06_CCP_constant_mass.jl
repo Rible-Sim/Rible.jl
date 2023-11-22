@@ -266,8 +266,6 @@ function solve!(sim::Simulator,solver_cache::Zhong06_CCP_Constant_Mass_Cache;
                 )
                 normRes = norm(Res)
                 if na == 0
-                    get_frictional_distribution_law!(structure,contact_cache,x[1:nq])
-                    (;L) = contact_cache.cache
                     if normRes < ftol
                         isconverged = true
                         iteration_break = iteration-1
@@ -276,6 +274,8 @@ function solve!(sim::Simulator,solver_cache::Zhong06_CCP_Constant_Mass_Cache;
                     Δx .= luJac\(-Res)
                     x .+= Δx
                 else # na!=0
+                    get_frictional_distribution_law!(structure,contact_cache,x[1:nq])
+                    (;L) = contact_cache.cache
                     if iteration < 2
                         Nmax = 50
                     else

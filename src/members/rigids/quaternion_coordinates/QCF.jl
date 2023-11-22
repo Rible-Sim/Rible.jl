@@ -8,7 +8,6 @@ using DocStringExtensions
 using EponymTuples
 using PreallocationTools
 
-import Rible as RB
 import ..Rible: HouseholderOrthogonalization, skew
 import ..Rible: get_num_of_cstr, get_num_of_coords
 import ..Rible: get_num_of_dof, get_num_of_local_dims
@@ -22,20 +21,6 @@ import ..Rible: cartesian_frame2coords
 import ..Rible: find_rotation
 import ..Rible: build_joint_cache, get_joint_violations!, get_joint_jacobian!
 import ..Rible: find_independent_idx
-
-export get_num_of_cstr, get_num_of_coords
-export get_num_of_dof, get_num_of_local_dims
-export to_local_coords, to_transformation
-
-export make_cstr_function
-export make_cstr_jacobian
-export make_cstr_hessians
-export make_cstr_forces_jacobian
-export cartesian_frame2coords
-export find_rotation
-export find_local_angular_velocity
-export build_joint_cache, get_joint_violations!, get_joint_jacobian!
-export find_independent_idx
 
 include("QC.jl")
 

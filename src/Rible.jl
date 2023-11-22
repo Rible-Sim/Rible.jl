@@ -63,22 +63,33 @@ include("utils.jl")
 
 include("members/loci.jl")
 
-include("members/rigids/natural_coordinates/NCF.jl")
-using .NCF
+function get_num_of_cstr end
+function get_num_of_coords end
+function get_num_of_dof end
+function get_num_of_dims end
+function get_num_of_local_dims end
+function get_deform end
+function cstr_function end
+function cstr_jacobian end
+function make_cstr_function end
+function make_cstr_jacobian end
+function make_cstr_hessians end
+function make_cstr_forces_jacobian end
+function to_local_coords end
+function to_transformation end
+function cartesian_frame2coords end
+function find_rotation end
+function find_angular_velocity end
+function build_joint_cache end
+function get_joint_violations! end
+function get_joint_jacobian! end
+function find_independent_idx end
 
-import .NCF: make_cstr_function
-import .NCF: make_cstr_jacobian
-import .NCF: make_cstr_hessians
-import .NCF: make_cstr_forces_jacobian
-import .NCF: get_num_of_cstr, get_num_of_coords, get_num_of_dof
-import .NCF: get_num_of_dims, get_num_of_local_dims
-import .NCF: cartesian_frame2coords
-import .NCF: find_rotation, find_angular_velocity
-import .NCF: build_joint_cache, get_joint_violations!, get_joint_jacobian!
-import .NCF: find_independent_idx
+include("members/rigids/natural_coordinates/NCF.jl")
+# using .NCF
 
 include("members/rigids/quaternion_coordinates/QCF.jl")
-using .QCF
+# using .QCF
 
 include("members/abstract_body.jl")
 
