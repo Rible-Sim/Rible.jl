@@ -53,11 +53,10 @@ Rmat(q::Quaternion) = Rmat(vec(q))
 function ∂Rη∂q(q::AbstractVector,η::AbstractVector)
     q0,q1,q2,q3 = q
     v = SA[q1,q2,q3]
-    Q = q0*I + skew(v)
-    Qη = Q*η    
+    Qη = q0*η - skew(η)*v
     2hcat(
         Qη,
-        transpose(v)*η*I - skew(Qη)
+        transpose(η)*v*I - skew(Qη)
     )
 end
 

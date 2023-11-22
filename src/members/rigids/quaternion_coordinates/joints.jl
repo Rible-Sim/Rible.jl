@@ -170,10 +170,13 @@ function RB.make_cstr_jacobian(
                 O43 Pmat(Pcq_egg)*Pmat(Inv_mat*quat_egg)*Mmat(quat_rot_rel_hen) O43 Pmat(Pcq_egg)*Mmat(quat_rot_hen)*Inv_mat
             ]
         )[2:4,:]
-        inner_jac[mask_1st,:] = inner_jac_1st[mask_1st,:]
-        inner_jac[length(mask_1st).+mask_2nd,:] = inner_jac_2nd[mask_2nd,:]
-        inner_jac[length(mask_1st)+length(mask_2nd).+mask_3rd,:] = inner_jac_3rd[mask_3rd,:]
-        inner_jac[length(mask_1st)+length(mask_2nd)+length(mask_3rd).+mask_4th,:] = inner_jac_3rd[mask_4th,:]
+        n1 = length(mask_1st)
+        n2 = n1 + length(mask_2nd)
+        n3 = n2 + length(mask_3rd)
+        inner_jac[    mask_1st,:] = inner_jac_1st[mask_1st,:]
+        inner_jac[n1.+mask_2nd,:] = inner_jac_2nd[mask_2nd,:]
+        inner_jac[n2.+mask_3rd,:] = inner_jac_3rd[mask_3rd,:]
+        inner_jac[n3.+mask_4th,:] = inner_jac_4th[mask_4th,:]
         inner_jac
     end
 end
