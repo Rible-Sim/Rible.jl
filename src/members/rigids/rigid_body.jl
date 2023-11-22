@@ -1,7 +1,6 @@
 abstract type AbstractRigidBody{N,T} <: AbstractBody{N,T}end
 abstract type AbstractRigidBodyProperty{N,T} <: AbstractBodyProperty{N,T} end
 abstract type AbstractRigidBodyState{N,T} <: AbstractBodyState{N,T} end
-abstract type ExtrinsicConstraints{T} end
 
 """
 Rigid Body Property Type 

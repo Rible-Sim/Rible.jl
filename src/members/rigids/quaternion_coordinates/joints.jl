@@ -189,52 +189,50 @@ function get_joint_jacobian!(
         loci_position_egg,
         cache,
         mask_1st,mask_2nd,mask_3rd,mask_4th,
-        free_idx_hen,free_idx_egg,
-        free_hen,free_egg,
+        free_idx,
         q_hen,q_egg
     )
-    num_of_coords_hen = get_num_of_coords(nmcs_hen)
-    num_of_coords_egg = get_num_of_coords(nmcs_egg)
     q_jointed = vcat(
         q_hen,q_egg
     )
     A = make_cstr_jacobian(
-        nmcs_hen::QC, 
-        nmcs_egg::QC,
+        nmcs_hen, 
+        nmcs_egg,
         loci_position_hen,
         loci_position_egg,
         cache,
         mask_1st,mask_2nd,mask_3rd,mask_4th,
     )(q_jointed)
-    ret[:,free_hen] = A[:,free_idx_hen]
-    ret[:,free_egg] = A[:,(free_idx_egg.+num_of_coords_hen)]
+    ret .= A[:,free_idx]
 end
 
 
-function make_cstr_forces_jacobian(
+function get_joint_forces_jacobian!(
         ret,
-        nmcs_hen::QC, 
-        nmcs_egg::QC,
+        num_of_cstr,
+        nmcs_hen::QC, nmcs_egg::QC,
         loci_position_hen,
         loci_position_egg,
         cache,
         mask_1st,mask_2nd,mask_3rd,mask_4th,
-        free_idx_hen,free_idx_egg,
-        free_hen,free_egg,
+        free_idx,
         q_hen,q_egg,
+        λ
     )
-    λ = rand(size(ret,1))
     A = make_cstr_jacobian(
-        nmcs_hen::QC, 
-        nmcs_egg::QC,
+        nmcs_hen, 
+        nmcs_egg,
         loci_position_hen,
         loci_position_egg,
         cache,
         mask_1st,mask_2nd,mask_3rd,mask_4th,
     )
-    function inner_cstr_forces_jacobian(q)
-        jac = inner_cstr_jacobian(q)
+    function cstr_forces(q)
+        jac = A(q)
         transpose(jac)*λ
     end
-    ForwardDiff.jacobian(inner_cstr_forces_jacobian, q_jointed)
+    q_jointed = vcat(
+        q_hen,q_egg,
+    )
+    ret .= ForwardDiff.jacobian(cstr_forces, q_jointed)[free_idx,free_idx]
 end

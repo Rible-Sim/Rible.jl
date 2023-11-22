@@ -41,9 +41,8 @@ function generate_cache(
     Ψ(q,q̇) = Vector{T}()
     ∂Ψ∂q(q,q̇) = Matrix{T}(undef,0,nq)
     B(q) = Matrix{T}(undef,0,nq)
-
     # ∂𝐌𝐚∂𝐪(q,a) = zeros(T,nq,nq)
-    # ∂Aᵀλ∂q(q,λ) = cstr_forces_jacobian(structure,λ)
+    ∂Aᵀλ∂q(q,λ) = cstr_forces_jacobian(structure,q,λ)
     # ∂𝚽𝐪𝐯∂𝒒(q,v) = RB.∂Aq̇∂q(st,v)
     ∂Bᵀμ∂q(q,μ) = zeros(T,nq,nq)
     (;
@@ -62,7 +61,7 @@ function generate_cache(
         M⁻¹!,Jac_M⁻¹!,
         Φ,A,Ψ,B,
         ∂Ψ∂q,
-        # ∂Aᵀλ∂q,
+        ∂Aᵀλ∂q,
         ∂Bᵀμ∂q,
         contacts_bits,
         persistent_bits,
@@ -97,7 +96,7 @@ function make_step_k(
         M!,Jac_M!,
         M⁻¹!,Jac_M⁻¹!,
         Φ,A,
-        # ∂Aᵀλ∂q,
+        ∂Aᵀλ∂q,
     ) = solver_cache.cache
     # T = eltype(qₖ₋₁)
     n1 = nq
@@ -155,7 +154,7 @@ function make_step_k(
             M⁻¹!(M⁻¹ₘ,qₘ)
             Jac_M!(∂Mₘq̇ₘ∂qₘ,qₘ,q̇ₘ)
             Jac_M⁻¹!(∂M⁻¹ₖpₖ∂qₖ,qₖ,pₖ)
-            # ∂Aᵀₖλₘ∂qₖ = ∂Aᵀλ∂q(qₖ,λₘ)
+            ∂Aᵀₖλₘ∂qₖ = ∂Aᵀλ∂q(qₖ,λₘ)
             ∂pₖ∂qₖ = 2/h.*Mₘ + 
                     ∂Mₘq̇ₘ∂qₘ .+
                     # scaling/(h).*∂Aᵀₖλₘ∂qₖ .+ 

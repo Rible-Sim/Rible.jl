@@ -166,67 +166,59 @@ end
 Return nullspace matrix
 $(TYPEDSIGNATURES)
 """
-function make_nullspace(nmcs::NC2D4C)
+function nullspace_mat(nmcs::NC2D4C,q)
     cv = nmcs.conversion_to_std
-    @inline @inbounds function inner_nullspace(q)
-        u,v = get_uv(nmcs,q)
-        o2 = zero(u)
-        ret = [
-            I2_Bool  o2;
-            o2 o2     v;
-        ]
-        cv\ret
-    end
+    u,v = get_uv(nmcs,q)
+    o2 = zero(u)
+    ret = [
+        I2_Bool  o2;
+        o2 o2     v;
+    ]
+    cv\ret
 end
 
-function make_nullspace(nmcs::NC2D6C)
+function nullspace_mat(nmcs::NC2D6C,q)
     cv = nmcs.conversion_to_std
-    @inline @inbounds function inner_nullspace(q)
-        u,v = get_uv(nmcs,q)
-        o2 = zero(u)
-        ret = [
-            I2_Bool    o2;
-            o2 o2       v;
-            o2 o2      -u;
-        ]
-        cv\ret
-    end
+    u,v = get_uv(nmcs,q)
+    o2 = zero(u)
+    ret = [
+        I2_Bool    o2;
+        o2 o2       v;
+        o2 o2      -u;
+    ]
+    cv\ret
 end
 
-function make_nullspace(nmcs::NC3D6C)
+function nullspace_mat(nmcs::NC3D6C,q)
     cv = nmcs.conversion_to_std
-    @inline @inbounds function inner_nullspace(q)
-        u,v,w = get_uvw(nmcs,q)
-        o3 = zero(u)
-        O3 = [o3 o3 o3;]
-        ret = [
-            I3_Bool  o3 o3;
-            O3       -w  v;
-        ]
-        cv\ret
-    end
+    u,v,w = get_uvw(nmcs,q)
+    o3 = zero(u)
+    O3 = [o3 o3 o3;]
+    ret = [
+        I3_Bool  o3 o3;
+        O3       -w  v;
+    ]
+    cv\ret
 end
 
-function make_nullspace(nmcs::NC3D12C)
+function nullspace_mat(nmcs::NC3D12C,q)
     cv = nmcs.conversion_to_std
-    @inline @inbounds function inner_nullspace(q)
-        u,v,w = get_uvw(nmcs,q)
-        o3 = zero(u)
-        O3 = [o3 o3 o3;]
-        # ret = [
-        #     I3_Bool   O3;
-        #     O3 -skew(u);
-        #     O3 -skew(v);
-        #     O3 -skew(w);
-        # ]
-        ret = [
-            I3_Bool    O3;
-            O3  o3  -w  v;
-            O3   w  o3 -u;
-            O3  -v   u o3;
-        ]
-        cv\ret
-    end
+    u,v,w = get_uvw(nmcs,q)
+    o3 = zero(u)
+    O3 = [o3 o3 o3;]
+    # ret = [
+    #     I3_Bool   O3;
+    #     O3 -skew(u);
+    #     O3 -skew(v);
+    #     O3 -skew(w);
+    # ]
+    ret = [
+        I3_Bool    O3;
+        O3  o3  -w  v;
+        O3   w  o3 -u;
+        O3  -v   u o3;
+    ]
+    cv\ret
 end
 
 
@@ -262,7 +254,7 @@ function make_∂Aq̇∂q_forwarddiff(Φq,nq,nλ)
     end
 end
 
-function find_independent_idx(nmcs::NC,q)
+function find_independent_free_idx(nmcs::NC,q)
     free_idx = collect(1:get_num_of_coords(nmcs))
     cstr_idx = collect(1:get_num_of_cstr(nmcs))
     A = cstr_jacobian(nmcs,free_idx,cstr_idx,q)

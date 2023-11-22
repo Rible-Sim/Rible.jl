@@ -1,5 +1,5 @@
 
-function cstr_forces_jacobian(st::AbstractStructure,λ)
+function cstr_forces_jacobian(st::AbstractStructure,q,λ)
     (;numbered,indexed,jointed) = st.connectivity
     (;num_of_free_coords,
     num_of_intrinsic_cstr,
@@ -23,9 +23,9 @@ function cstr_forces_jacobian(st::AbstractStructure,λ)
     #todo skip 2D for now
     if get_num_of_dims(st) == 3
         foreach(joints) do joint
-            jointexcst = num_of_intrinsic_cstr .+ jointid2sys_extrinsic_cstr_idx[joint.id]
-            jointfree = get_jointed_free(joint,indexed)
-            ret[jointfree,jointfree] .+= make_cstr_forces_jacobian(joint,st)(λ[jointexcst])
+            joint_cstr_idx = num_of_intrinsic_cstr .+ jointid2sys_extrinsic_cstr_idx[joint.id]
+            jointed_sys_free_idx = joint.sys_free_idx
+            ret[jointed_sys_free_idx,jointed_sys_free_idx] .+= cstr_forces_jacobian(joint,st,q,λ[joint_cstr_idx])
         end
     end
     ret
@@ -93,7 +93,7 @@ function linearize(tginput,λ,u,q,q̇=zero(q))
 end
 
 
-function make_intrinsic_nullspace(st,q)
+function intrinsic_nullspace(st,q)
     (;bodies,connectivity) = st
     (;indexed,) = connectivity
     (;num_of_full_coords,bodyid2sys_full_coords,sys_num_of_dof,bodyid2sys_dof_idx,) = indexed
@@ -102,7 +102,7 @@ function make_intrinsic_nullspace(st,q)
         bodyid = body.prop.id
         (;nmcs) = body.coords
         mem2full = bodyid2sys_full_coords[bodyid]
-        ret[mem2full,bodyid2sys_dof_idx[bodyid]] = NCF.make_nullspace(nmcs)(q[mem2full])
+        ret[mem2full,bodyid2sys_dof_idx[bodyid]] = nullspace_mat(nmcs,q[mem2full])
     end
     ret
 end

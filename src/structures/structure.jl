@@ -333,7 +333,8 @@ function cstr_jacobian(structure::AbstractStructure,q,c=get_local_coords(structu
     end
     foreach(jointed.joints) do joint
         jointexcst = num_of_intrinsic_cstr.+jointid2sys_extrinsic_cstr_idx[joint.id]
-        ret[jointexcst,:] .= cstr_jacobian(joint,structure,q)
+        jointed_sys_free_idx = joint.sys_free_idx
+        ret[jointexcst,jointed_sys_free_idx] .= cstr_jacobian(joint,structure,q)
     end
     ret
 end
@@ -461,7 +462,7 @@ function check_constraints_consistency(st;tol=1e-14)
             end
         end
         foreach(joints) do joint
-            Φ_joint = make_cstr_jacobian(joint,st)(q)
+            Φ_joint = cstr_jacobian(joint,st,q)
             norm_position_joint = norm(Φ_joint)
             if norm_position_joint > tol
                 @warn "The $(joint.id)th body's position-level constraints are inconsistent: norm_position_joint=$(norm_position_joint)"
@@ -483,7 +484,7 @@ function check_constraints_consistency(st;tol=1e-14)
             end
         end
         foreach(joints) do joint
-            Aq̇_joint = make_cstr_jacobian(joint,st)(q)*q̇
+            Aq̇_joint = cstr_jacobian(joint,st,q)*q̇
             norm_velocity_joint = norm(Aq̇_joint)
             if norm_velocity_joint > tol
                 @warn "The $(joint.id)th joint's velcoity-level constraints are inconsistent: Aq̇_joint=$(Aq̇_joint)"

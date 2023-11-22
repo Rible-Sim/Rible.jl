@@ -19,8 +19,9 @@ import ..Rible: cstr_jacobian
 import ..Rible: cstr_forces_jacobian
 import ..Rible: cartesian_frame2coords
 import ..Rible: find_rotation, find_local_angular_velocity
-import ..Rible: build_joint_cache, get_joint_violations!, get_joint_jacobian!
-import ..Rible: find_independent_idx
+import ..Rible: build_joint_cache, get_joint_violations!
+import ..Rible: get_joint_jacobian!, get_joint_forces_jacobian!
+import ..Rible: find_independent_free_idx
 
 include("QC.jl")
 

@@ -138,14 +138,12 @@ end
 
 function get_joint_jacobian!(
         ret,
-        nmcs_hen::NC, 
-        nmcs_egg::NC,
+        nmcs_hen::NC,nmcs_egg::NC,
         loci_position_hen,
         loci_position_egg,
         cache,
         mask_1st,mask_2nd,mask_3rd,mask_4th,
-        free_idx_hen,free_idx_egg,
-        free_hen,free_egg,
+        free_idx,
         q_hen,q_egg
     )
     (;transformations,hessians) = cache
@@ -153,9 +151,26 @@ function get_joint_jacobian!(
     num_of_coords_hen = get_num_of_coords(nmcs_hen)
     for (icstr,hess) = enumerate(hessians)
         A = q'*hess
-        ret[icstr,free_hen] .= A[1,free_idx_hen]
-        ret[icstr,free_egg] .= A[1,(free_idx_egg.+num_of_coords_hen)]
+        ret[icstr,:] .= A[1,free_idx]
     end
-    ret[mask_1st,free_hen] .+= transformations[mask_1st,free_idx_hen]
-    ret[mask_1st,free_egg] .+= transformations[mask_1st,(free_idx_egg.+num_of_coords_hen)]
+    ret[mask_1st,:] .+= transformations[mask_1st,free_idx]
+end
+
+function get_joint_forces_jacobian!(
+        ret,
+        num_of_cstr,
+        nmcs_hen::NC, nmcs_egg::NC,
+        loci_position_hen,
+        loci_position_egg,
+        cache,
+        mask_1st,mask_2nd,mask_3rd,mask_4th,
+        free_idx,
+        q_hen,q_egg,
+        λ
+    )
+    (;hessians) = cache
+    ret .= 0.0
+    for i = 1:num_of_cstr
+        ret .+= -λ[i] .* hessians[i][free_idx,free_idx]
+    end
 end

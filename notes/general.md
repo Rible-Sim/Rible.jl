@@ -17,11 +17,9 @@ type-stable code unavoidably requires `generated` functions.
 
 aim for closed-loop kinematics, not open loop
 
-
 performance
   no recursive algorithms
   parallel algorithms
-
 
 aim for parametric optimization
 
@@ -55,9 +53,9 @@ To do this, use `include`, docs/test/benchmark; use `includet` dev;
         - [ ] natural coords
           - [x] get rid of functions fields
           - [x] where to put `pres_idx`, `free_idx`, `cstr_idx`? To `NonminimalCoordinates` for now
-          - [ ] how to cache hessians? to get both `∂Aq̇∂q` and `cstr_forces_jacobian`
+          - [x] how to cache hessians? to get both `∂Aq̇∂q` and `cstr_forces_jacobian`
         - [ ] quaternion-based
-          - [ ] differentiate position cache and velocity cache (acc cache not need for now) to_velocity_transformation is always at velocity level
+          - [x] differentiate position cache and velocity cache (acc cache not need for now) to_velocity_transformation is always at velocity level
           - [ ] similarly `∂M⁻¹p∂q` and `∂Mq̇∂q`
       - [ ] flexible bodies
         - [ ] absolute nodal coords
@@ -70,13 +68,13 @@ To do this, use `include`, docs/test/benchmark; use `includet` dev;
       - [x] resitution: Inelastic, Newton, Poisson, Strange
       - [ ] variants: Unclassified/Classified CCP, Mono/Two-layer,
 - [x] reduce functions fields
-- [ ] preallocations for autodiff
+- [x] preallocations for autodiff: `QCF`  cstr_forces_jacobian
 - [ ] joint cstr
   - [x] quadratic forms
   - [x] put joint into `NCF`, `QCF`
   - [x] reorder basic joint numbering
   - [ ] reorder normal, tangent, bitangent
-  - [ ] `QCF` joints constraints hessians
+  - [x] `QCF` joints constraints hessians -> cstr_forces_jacobian
 - [x] put contacts into loci
 - [ ] local distribution law
 - [ ] try SNAKE/RATTLE scheme

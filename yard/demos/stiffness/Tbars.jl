@@ -110,10 +110,10 @@ bot = tbbot
 
 RB.check_static_equilibrium_output_multipliers(bot.structure)
 
-function make_nullspace_on_free(st)    
+function nullspace_on_free(st)    
     (;sys_free_idx,bodyid2sys_full_coords,bodyid2sys_dof_idx) = st.connectivity.indexed
     q = RB.get_coords(bot.structure)
-    Nin = RB.make_intrinsic_nullspace(st,q)[
+    Nin = RB.intrinsic_nullspace(st,q)[
         sys_free_idx,
         reduce(vcat,bodyid2sys_dof_idx[2:end])
     ]
@@ -151,7 +151,7 @@ Ǎ = RB.make_cstr_jacobian(bot.structure)(q)
 Ň_ = RB.nullspace(Ǎ)
 Ň = RB.modified_gram_schmidt(Ň_)
 
-Ň = make_nullspace_on_free(bot.structure)
+Ň = nullspace_on_free(bot.structure)
 
 # done construct null space 
 #note only work in θ = 0
@@ -187,7 +187,7 @@ struct𝒦 = [
         # @show s
         λ = inv(Ǎ*transpose(Ǎ))*Ǎ*Bᵀ*s
         @show λ
-        Ǩa = - RB.cstr_forces_jacobian(bot.structure,λ)
+        Ǩa = - RB.cstr_forces_jacobian(bot.structure,q,λ)
 
         Ǩg = RB.build_geometric_stiffness_matrix!(bot.structure,q,s)
 

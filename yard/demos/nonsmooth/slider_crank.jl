@@ -24,12 +24,20 @@ sc = slider_crank(;coordsType=RB.NCF.NC)
 # Quaternion coordinates
 sc = slider_crank(;coordsType=RB.QCF.QC)
 
+# Contact Surfaces
+planes = RB.StaticContactSurfaces(
+    [
+        RB.Plane([0,0, 1.0],[0,0,-0.026]),
+        RB.Plane([0,0,-1.0],[0,0, 0.026])
+    ]
+)
+
 plot_traj!(sc;showground=false)
 
 RB.has_constant_mass_matrix(sc)
 
 dt = 1e-3
-tspan = (0.0,1.0)
+tspan = (0.0,683dt)
 
 # No Contact Dynamics
 prob = RB.DynamicsProblem(sc,)
@@ -41,14 +49,6 @@ RB.solve!(
 )
 
 plot_traj!(sc;showground=false)
-
-# Contact Surfaces
-planes = RB.StaticContactSurfaces(
-    [
-        RB.Plane([0,0, 1.0],[0,0,-0.026]),
-        RB.Plane([0,0,-1.0],[0,0, 0.026])
-    ]
-)
 
 # Frictionless Contact Dynamics
 

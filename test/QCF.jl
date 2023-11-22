@@ -46,7 +46,7 @@ ẋ = vcat(ṙo,q̇)
 RB.QCF.to_transformation(qcs,x,c)
 
 ∂Cẋ∂x_ref = ForwardDiff.jacobian((x) -> RB.QCF.to_transformation(qcs,x,c)*ẋ,x)
-∂Cẋ∂x = RB.QCF.make_∂Cẋ∂x(c)(x,ẋ)
+∂Cẋ∂x = RB.QCF.∂Cẋ∂x(x,ẋ,c)
 ∂Cẋ∂x - ∂Cẋ∂x_ref
 
 ∂²Rη∂qᵀ∂q_ref = ForwardDiff.jacobian((q) -> RB.QCF.∂Rη∂q(q,c),q)
