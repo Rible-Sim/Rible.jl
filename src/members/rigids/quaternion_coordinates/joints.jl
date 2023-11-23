@@ -1,6 +1,5 @@
 function build_joint_cache(
-        nmcs_hen::QC,
-        nmcs_egg::QC,
+        nmcs_hen::QC, nmcs_egg::QC,
         loci_position_hen,
         loci_position_egg,
         loci_axes_trl_hen,
@@ -13,11 +12,10 @@ function build_joint_cache(
     # translate
     c_hen = to_local_coords(nmcs_hen,loci_position_hen)
     c_egg = to_local_coords(nmcs_egg,loci_position_egg)
-    quat_trl_rel_hen = QuatRotation(loci_axes_trl_hen.X[:,[2,3,1]]).q |> vec
-    quat_trl_rel_egg = QuatRotation(loci_axes_trl_egg.X[:,[2,3,1]]).q |> vec
-    # quat_rot_rel_hen = QuatRotation(loci_axes_rot_hen.X[:,[2,3,1]]).q |> vec
-    quat_rot_rel_egg = QuatRotation(loci_axes_rot_egg.X[:,[2,3,1]]).q |> vec
-    @show loci_axes_rot_egg.X
+    quat_trl_rel_hen = QuatRotation(loci_axes_trl_hen.X).q |> vec
+    quat_trl_rel_egg = QuatRotation(loci_axes_trl_egg.X).q |> vec
+    # quat_rot_rel_hen = QuatRotation(loci_axes_rot_hen.X).q |> vec
+    quat_rot_rel_egg = QuatRotation(loci_axes_rot_egg.X).q |> vec
     quat_hen = @view q_hen[4:7]
     quat_egg = @view q_egg[4:7]
     quat_trl_hen = Pmat(quat_hen)*quat_trl_rel_hen
@@ -53,8 +51,7 @@ end
 
 function get_joint_violations!(
         ret,
-        nmcs_hen::QC, 
-        nmcs_egg::QC,
+        nmcs_hen::QC, nmcs_egg::QC,
         loci_position_hen,
         loci_position_egg,
         cache,
@@ -93,8 +90,7 @@ function get_joint_violations!(
 end
 
 function make_cstr_jacobian(
-        nmcs_hen::QC, 
-        nmcs_egg::QC,
+        nmcs_hen::QC, nmcs_egg::QC,
         loci_position_hen,
         loci_position_egg,
         cache,
@@ -171,12 +167,13 @@ function make_cstr_jacobian(
             ]
         )[2:4,:]
         n1 = length(mask_1st)
-        n2 = n1 + length(mask_2nd)
-        n3 = n2 + length(mask_3rd)
-        inner_jac[    mask_1st,:] = inner_jac_1st[mask_1st,:]
-        inner_jac[n1.+mask_2nd,:] = inner_jac_2nd[mask_2nd,:]
-        inner_jac[n2.+mask_3rd,:] = inner_jac_3rd[mask_3rd,:]
-        inner_jac[n3.+mask_4th,:] = inner_jac_4th[mask_4th,:]
+        n2 = length(mask_2nd)
+        n3 = length(mask_3rd)
+        n4 = length(mask_4th)
+        inner_jac[            (1:n1),:] = inner_jac_1st[mask_1st,:]
+        inner_jac[        n1.+(1:n2),:] = inner_jac_2nd[mask_2nd,:]
+        inner_jac[    n1.+n2.+(1:n3),:] = inner_jac_3rd[mask_3rd,:]
+        inner_jac[n1.+n2.+n3.+(1:n4),:] = inner_jac_4th[mask_4th,:]
         inner_jac
     end
 end

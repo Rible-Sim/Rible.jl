@@ -36,8 +36,8 @@ plot_traj!(sc;showground=false)
 
 RB.has_constant_mass_matrix(sc)
 
-dt = 1e-3
-tspan = (0.0,683dt)
+dt = 5e-4
+tspan = (0.0,2*683dt)
 
 # No Contact Dynamics
 prob = RB.DynamicsProblem(sc,)

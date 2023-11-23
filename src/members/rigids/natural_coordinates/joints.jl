@@ -67,9 +67,9 @@ function build_joint_cache(
         # rotate of egg
         axes_rot_hen = inv(X_hen)*X_egg*axes_rot_egg
         axes_idx = [
-            (2,3),
-            (2,1),
-            (3,1)
+            (3,1), #normal * tangent
+            (3,2), #normal * bitangent
+            (1,2)  #tangent * bitangent
         ]
         for (i,(id_axis_hen,id_axis_egg)) in enumerate(axes_idx)
             axis_hen = axes_rot_hen.X[:,id_axis_hen]

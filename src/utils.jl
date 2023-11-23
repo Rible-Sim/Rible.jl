@@ -75,17 +75,6 @@ end
     u, v
 end
 
-function get_orthonormal_axes(normal::AbstractVector)
-    normal /= norm(normal)
-    tangent, bitangent = HouseholderOrthogonalization(normal)
-    SMatrix{3,3}(
-        normal[1], normal[2], normal[3],
-        tangent[1], tangent[2], tangent[3],
-        bitangent[1], bitangent[2], bitangent[3],
-    )
-end
-
-
 function split_by_lengths(x::AbstractVector, n::AbstractVector{<:Int})
     result = Vector{Vector{eltype(x)}}()
     start = firstindex(x)

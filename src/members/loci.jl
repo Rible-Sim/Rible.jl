@@ -4,9 +4,9 @@ end
 
 function Base.getproperty(a::Axes{2}, p::Symbol) 
     if (p === :n) || (p === :normal)
-        return a.X[:,1]
+        return a.X[:,2]
     elseif (p === :t) || (p === :tangent)
-        return  a.X[:,2]
+        return  a.X[:,1]
     else # fallback to getfield
         return getfield(a, p)
     end
@@ -14,11 +14,11 @@ end
 
 function Base.getproperty(a::Axes{3}, p::Symbol) 
     if (p === :n) || (p === :normal)
-        return a.X[:,1]
+        return a.X[:,3]
     elseif (p === :t) || (p === :tangent)
-        return  a.X[:,2]
+        return  a.X[:,1]
     elseif (p === :b) || (p === :bitangent)
-        return  a.X[:,3]
+        return  a.X[:,2]
     else # fallback to getfield
         return getfield(a, p)
     end
@@ -28,8 +28,18 @@ function planar_frame(n)
     n /= norm(n)
     Axes(
         SMatrix{2,2}(
-            n[1], n[2], -n[2], n[1]
+            -n[2], n[1], n[1], n[2]
         )
+    )
+end
+
+function get_orthonormal_axes(normal::AbstractVector)
+    normal /= norm(normal)
+    tangent, bitangent = HouseholderOrthogonalization(normal)
+    SMatrix{3,3}(
+        tangent[1], tangent[2], tangent[3],
+        bitangent[1], bitangent[2], bitangent[3],
+        normal[1], normal[2], normal[3],
     )
 end
 
@@ -37,14 +47,8 @@ function spatial_frame(n)
     n |> SVector{3} |> get_orthonormal_axes |> Axes
 end
 
-function orthonormal_frame(n::SVector{N}) where {N}
-    if N == 2
-        axes = planar_frame(n)
-    elseif N == 3
-        axes = spatial_frame(n)
-    end
-    axes
-end
+orthonormal_frame(n::SVector{2}) = planar_frame(n)
+orthonormal_frame(n::SVector{3}) = spatial_frame(n)
 
 function (Base.:*)(R::StaticArray{Tuple{N,N}},axes::Axes{N}) where N
     Axes(SMatrix{N,N}(R*axes.X))

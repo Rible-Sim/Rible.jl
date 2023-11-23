@@ -484,7 +484,8 @@ function check_constraints_consistency(st;tol=1e-14)
             end
         end
         foreach(joints) do joint
-            Aq̇_joint = cstr_jacobian(joint,st,q)*q̇
+            q̇_jointed = state.system.q̌̇[joint.sys_free_idx]
+            Aq̇_joint = cstr_jacobian(joint,st,q)*q̇_jointed
             norm_velocity_joint = norm(Aq̇_joint)
             if norm_velocity_joint > tol
                 @warn "The $(joint.id)th joint's velcoity-level constraints are inconsistent: Aq̇_joint=$(Aq̇_joint)"
