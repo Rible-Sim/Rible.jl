@@ -156,6 +156,7 @@ end
 
 function assemble_M!(M,st::AbstractStructure)
     (;num_of_full_coords,bodyid2sys_full_coords) = st.connectivity.indexed
+    M .= 0
     foreach(st.bodies) do body
         memfull = bodyid2sys_full_coords[body.prop.id]
         M[memfull,memfull] .+= body.cache.coords_cache.M
@@ -174,6 +175,7 @@ end
 
 function assemble_M⁻¹!(M⁻¹,st::AbstractStructure)
     (;num_of_full_coords,bodyid2sys_full_coords) = st.connectivity.indexed
+    M⁻¹ .= 0
     foreach(st.bodies) do body
         memfull = bodyid2sys_full_coords[body.prop.id]
         M⁻¹[memfull,memfull] .+= body.cache.coords_cache.M⁻¹
@@ -198,6 +200,7 @@ end
 
 function assemble_∂Mq̇∂q!(∂Mq̇∂q,st::AbstractStructure)
     (;num_of_full_coords,bodyid2sys_full_coords) = st.connectivity.indexed
+    ∂Mq̇∂q .= 0
     foreach(st.bodies) do body
         memfull = bodyid2sys_full_coords[body.prop.id]
         ∂Mq̇∂q[memfull,memfull] .+= body.cache.coords_cache.∂Mq̇∂q
@@ -215,6 +218,7 @@ end
 
 function assemble_∂M⁻¹p∂q!(∂M⁻¹p∂q,st::AbstractStructure)
     (;num_of_full_coords,bodyid2sys_full_coords) = st.connectivity.indexed
+    ∂M⁻¹p∂q .= 0
     foreach(st.bodies) do body
         memfull = bodyid2sys_full_coords[body.prop.id]
         ∂M⁻¹p∂q[memfull,memfull] .+= body.cache.coords_cache.∂M⁻¹p∂q
@@ -232,6 +236,7 @@ end
 
 function assemble_∂T∂qᵀ!(∂T∂qᵀ,st::AbstractStructure)
     (;num_of_full_coords,bodyid2sys_full_coords) = st.connectivity.indexed
+    ∂T∂qᵀ .= 0
     foreach(st.bodies) do body
         memfull = bodyid2sys_full_coords[body.prop.id]
         ∂T∂qᵀ[memfull] .+= body.state.cache.∂T∂qᵀ
@@ -249,7 +254,7 @@ end
 function make_M!(st)
     function inner_M!(M,q)
         update_bodies!(st,q)
-        M .= assemble_M(st)
+        assemble_M!(M,st)
     end
 end
 
@@ -257,21 +262,23 @@ end
 function make_M⁻¹!(st)
     function inner_M⁻¹!(M⁻¹,q)
         update_bodies!(st,q)
-        M⁻¹ .= assemble_M⁻¹(st)
+        assemble_M⁻¹!(M⁻¹,st)
     end
 end
 
-function make_Jac_M!(st)
-    function Jac_M!(∂Mq̇∂q,q,q̇)
+function make_M_and_Jac_M!(st)
+    function inner_M_and_Jac_M!(M,∂Mq̇∂q,q,q̇)
         update_bodies!(st,q,q̇)
-        ∂Mq̇∂q .= assemble_∂Mq̇∂q(st)
+        assemble_M!(M,st)
+        assemble_∂Mq̇∂q!(∂Mq̇∂q,st)
     end
 end
 
-function make_Jac_M⁻¹!(st)
-    function Jac_M⁻¹!(∂M⁻¹p∂q,q,q̇)
+function make_M⁻¹_and_Jac_M⁻¹!(st)
+    function inner_M⁻¹_and_Jac_M⁻¹!(M⁻¹,∂M⁻¹p∂q,q,q̇)
         update_bodies!(st,q,q̇)
-        ∂M⁻¹p∂q .= assemble_∂M⁻¹p∂q(st)
+        assemble_M⁻¹!(M⁻¹,st)
+        assemble_∂M⁻¹p∂q!(∂M⁻¹p∂q,st)
     end
 end
 

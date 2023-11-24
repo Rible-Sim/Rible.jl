@@ -57,6 +57,11 @@ To do this, use `include`, docs/test/benchmark; use `includet` dev;
         - [ ] quaternion-based
           - [x] differentiate position cache and velocity cache (acc cache not need for now) to_velocity_transformation is always at velocity level
           - [ ] similarly `∂M⁻¹p∂q` and `∂Mq̇∂q`
+          - [ ] merge mass matrices cache and `∂T∂qᵀ`
+          - [ ] use `∂T∂xᵀ∂x` and  `∂T∂xᵀ∂ẋ`
+          - [ ] split `F!` into inertia (merged with mass matrices cache) and body internal strain and disspation and intra-bodies tensional forces and joints forces.
+            - [ ] order matter! 
+            - [ ] `Zhong06` familiy all depend on position coordinates
       - [ ] flexible bodies
         - [ ] absolute nodal coords
   - [x] integrator cache, used for all timesteps
@@ -64,16 +69,16 @@ To do this, use `include`, docs/test/benchmark; use `includet` dev;
       - [x] use solver / contact model / for dispatch
     - [x] Zhong06 family
     - [ ] Alpha family
-      - [x] friction model: frictionless, Coulomb, PolyhedralCoulomb
-      - [x] resitution: Inelastic, Newton, Poisson, Strange
-      - [ ] variants: Unclassified/Classified CCP, Mono/Two-layer,
+    - [x] friction model: frictionless, Coulomb, PolyhedralCoulomb
+    - [x] resitution: Inelastic, Newton, Poisson, Strange
+    - [x] variants: Unclassified/Classified CCP, Mono/Two-layer,
 - [x] reduce functions fields
 - [x] preallocations for autodiff: `QCF`  cstr_forces_jacobian
 - [ ] joint cstr
   - [x] quadratic forms
   - [x] put joint into `NCF`, `QCF`
   - [x] reorder basic joint numbering
-  - [ ] reorder normal, tangent, bitangent
+  - [x] reorder normal, tangent, bitangent
   - [x] `QCF` joints constraints hessians -> cstr_forces_jacobian
 - [x] put contacts into loci
 - [ ] local distribution law

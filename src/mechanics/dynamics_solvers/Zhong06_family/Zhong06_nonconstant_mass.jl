@@ -10,15 +10,23 @@ function generate_cache(
     )
     (;bot) = simulator.prob
     (;structure) = bot
-    M = assemble_M(structure) |> Matrix
-    ∂Mq̇∂q = assemble_∂Mq̇∂q(structure)
+    Mₘ = assemble_M(structure)
+    M⁻¹ₖ = assemble_M⁻¹(structure)
+    ∂Mₘhq̇ₘ∂qₘ = assemble_∂Mq̇∂q(structure)
     M! = make_M!(structure)
-    Jac_M! = make_Jac_M!(structure)
+    M⁻¹! = make_M⁻¹!(structure)
+    M_and_Jac_M! = make_M_and_Jac_M!(structure)
     Φ = make_cstr_function(structure)
     A = make_cstr_jacobian(structure)
     F!(F,q,q̇,t) = generalize_force!(F,bot,q,q̇,t)
     Jac_F!(∂F∂q̌,∂F∂q̌̇,q,q̇,t) = generalize_force_jacobain!(∂F∂q̌,∂F∂q̌̇,bot,q,q̇,t)
-    cache = @eponymtuple(F!,Jac_F!,M,∂Mq̇∂q,M!,Jac_M!,Φ,A)
+    cache = @eponymtuple(
+        F!,Jac_F!,
+        Mₘ,M⁻¹ₖ,
+        ∂Mₘhq̇ₘ∂qₘ,
+        M!,M⁻¹!,
+        M_and_Jac_M!,
+        Φ,A)
     Zhong06_Nonconstant_Mass_Cache(cache)
 end
 
@@ -28,7 +36,12 @@ function solve!(simulator::Simulator,solvercache::Zhong06_Nonconstant_Mass_Cache
     (;prob,controller,tspan,restart,totalstep) = simulator
     (;bot,) = prob
     (;structure,traj) = bot
-    (;F!,Jac_F!,M,∂Mq̇∂q,M!,Jac_M!,Φ,A) = solvercache.cache
+    (;
+        F!,Jac_F!,
+        Mₘ,M⁻¹ₖ,∂Mₘhq̇ₘ∂qₘ,
+        M!,M⁻¹!,M_and_Jac_M!,
+        Φ,A
+    ) = solvercache.cache
     q0 = traj.q[begin]
     λ0 = traj.λ[begin]
     q̇0 = traj.q̇[begin]
@@ -37,13 +50,13 @@ function solve!(simulator::Simulator,solvercache::Zhong06_Nonconstant_Mass_Cache
     nλ = length(λ0)
     ∂F∂q = zeros(T,nq,nq)
     ∂F∂q̇ = zeros(T,nq,nq)
-    M!(M,q0)
-    pᵏ⁻¹ = M*q̇0
+    M!(Mₘ,q0)
+    pᵏ⁻¹ = Mₘ*q̇0
     pᵏ   = zero(pᵏ⁻¹)
     step = 0
     initial_x = vcat(q0,λ0)
     initial_Res = zero(initial_x)
-    mr = norm(M,Inf)
+    mr = norm(Mₘ,Inf)
     scaling = mr
 
     function make_Res_stepk(qᵏ,λₘ,qᵏ⁻¹,pᵏ⁻¹,Mₘ,Fₘ,Aᵀ,tᵏ⁻¹)
@@ -71,8 +84,7 @@ function solve!(simulator::Simulator,solvercache::Zhong06_Nonconstant_Mass_Cache
             tₘ = tᵏ⁻¹+h/2
             qₘ = (qᵏ.+qᵏ⁻¹)./2
             q̇ₘ = (qᵏ.-qᵏ⁻¹)./h
-            M!(Mₘ,qₘ)
-            Jac_M!(∂Mₘhq̇ₘ∂qₘ,qₘ,h.*q̇ₘ)
+            M_and_Jac_M!(Mₘ,∂Mₘhq̇ₘ∂qₘ,qₘ,h.*q̇ₘ)
             Jac_F!(∂F∂q,∂F∂q̇,qₘ,q̇ₘ,tₘ)
             Jac[   1:nq ,   1:nq ] .=  Mₘ .+ 1/2 .*∂Mₘhq̇ₘ∂qₘ.-(h^2)/2 .*(1/2 .*∂F∂q.+1/h.*∂F∂q̇)
             Jac[   1:nq ,nq+1:end] .=  scaling.*Aᵀ
@@ -103,12 +115,12 @@ function solve!(simulator::Simulator,solvercache::Zhong06_Nonconstant_Mass_Cache
         initial_x[   1:nq]    .= traj.q[timestep]
         initial_x[nq+1:nq+nλ] .= traj.λ[timestep]
         Aᵀ = transpose(A(qᵏ⁻¹))
-        Res_stepk! = make_Res_stepk(qᵏ,λᵏ,qᵏ⁻¹,pᵏ⁻¹,M,F,Aᵀ,tᵏ⁻¹)
+        Res_stepk! = make_Res_stepk(qᵏ,λᵏ,qᵏ⁻¹,pᵏ⁻¹,Mₘ,F,Aᵀ,tᵏ⁻¹)
         if Jac_F! isa Missing
             dfk = OnceDifferentiable(Res_stepk!,initial_x,initial_Res)
         else
 
-            Jac_stepk! = make_Jac_stepk(qᵏ,qᵏ⁻¹,M,∂Mq̇∂q,∂F∂q,∂F∂q̇,Aᵀ,tᵏ⁻¹)
+            Jac_stepk! = make_Jac_stepk(qᵏ,qᵏ⁻¹,Mₘ,∂Mₘhq̇ₘ∂qₘ,∂F∂q,∂F∂q̇,Aᵀ,tᵏ⁻¹)
             # Jac_ref = zeros(nq+nλ,nq+nλ)
             # FiniteDiff.finite_difference_jacobian!(Jac_ref,Res_stepk!,initial_x)
             # Jac_my = zeros(nq+nλ,nq+nλ)
@@ -134,10 +146,10 @@ function solve!(simulator::Simulator,solvercache::Zhong06_Nonconstant_Mass_Cache
         xᵏ = Res_stepk_result.zero
         qᵏ .= xᵏ[   1:nq   ]
         λᵏ .= xᵏ[nq+1:nq+nλ]     
-        M!(M,(qᵏ.+qᵏ⁻¹)./2)
-        Momentum_k!(pᵏ,pᵏ⁻¹,qᵏ,qᵏ⁻¹,λᵏ,M,A,Aᵀ,dt)           
-        M!(M,qᵏ)
-        q̇ᵏ .= inv(Matrix(M))*(pᵏ)
+        M!(Mₘ,(qᵏ.+qᵏ⁻¹)./2)
+        Momentum_k!(pᵏ,pᵏ⁻¹,qᵏ,qᵏ⁻¹,λᵏ,Mₘ,A,Aᵀ,dt)           
+        M⁻¹!(M⁻¹ₖ,qᵏ)
+        q̇ᵏ .= M⁻¹ₖ*pᵏ
         #---------Step k finisher-----------
         step += 1
         pᵏ,pᵏ⁻¹ = pᵏ⁻¹,pᵏ

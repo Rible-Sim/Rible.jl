@@ -26,8 +26,8 @@ function generate_cache(
     ∂M⁻¹ₖpₖ∂qₖ = assemble_∂M⁻¹p∂q(structure)
     M! = make_M!(structure)
     M⁻¹! = make_M⁻¹!(structure)
-    Jac_M! = make_Jac_M!(structure)
-    Jac_M⁻¹! = make_Jac_M⁻¹!(structure)
+    M_and_Jac_M! = make_M_and_Jac_M!(structure)
+    M⁻¹_and_Jac_M⁻¹! = make_M⁻¹_and_Jac_M⁻¹!(structure)
     Φ = make_cstr_function(structure)
     A = make_cstr_jacobian(structure)
 
@@ -56,8 +56,9 @@ function generate_cache(
         ∂Mₘhq̇ₘ∂qₘ,
         ∂M⁻¹ₖpₖ∂qₖ,
         Fₘ,∂Fₘ∂qₘ,∂Fₘ∂q̇ₘ,
-        M!,Jac_M!,
-        M⁻¹!,Jac_M⁻¹!,
+        M!,M⁻¹!,
+        M_and_Jac_M!,
+        M⁻¹_and_Jac_M⁻¹!,
         Φ,A,Ψ,B,
         ∂Ψ∂q,
         ∂Aᵀλ∂q,
@@ -93,8 +94,9 @@ function make_step_k(
         ∂Mₘhq̇ₘ∂qₘ,
         ∂M⁻¹ₖpₖ∂qₖ,
         Fₘ,∂Fₘ∂qₘ,∂Fₘ∂q̇ₘ,
-        M!,Jac_M!,
-        M⁻¹!,Jac_M⁻¹!,
+        M!,M⁻¹!,
+        M_and_Jac_M!,
+        M⁻¹_and_Jac_M⁻¹!,
         Φ,A,
         ∂Aᵀλ∂q,
     ) = solver_cache.cache
@@ -117,8 +119,7 @@ function make_step_k(
         q̇ₘ = (qₖ.-qₖ₋₁)./h
         vₘ = q̇ₘ
         tₘ = tₖ₋₁+h/2
-        M!(Mₘ,qₘ)
-        Jac_M!(∂Mₘhq̇ₘ∂qₘ,qₘ,h.*q̇ₘ)
+        M_and_Jac_M!(Mₘ,∂Mₘhq̇ₘ∂qₘ,qₘ,h.*q̇ₘ)
         F!(Fₘ,qₘ,q̇ₘ,tₘ)
         Jac_F!(∂Fₘ∂qₘ,∂Fₘ∂q̇ₘ,qₘ,q̇ₘ,tₘ)
         Aₖ₋₁ = A(qₖ₋₁)
@@ -149,8 +150,7 @@ function make_step_k(
             ∂Dₖvₖ∂qₖ = contact_cache.cache.∂Dq̇∂q
             ∂DᵀₖHΛₘ∂qₖ = contact_cache.cache.∂DᵀΛ∂q
             pₖ .= Momentum_k(qₖ₋₁,pₖ₋₁,qₖ,λₘ,Mₘ,A,Λₘ,Dₖ₋₁,Dₖ,H,scaling,h)
-            M⁻¹!(M⁻¹ₖ,qₖ)
-            Jac_M⁻¹!(∂M⁻¹ₖpₖ∂qₖ,qₖ,pₖ)
+            M⁻¹_and_Jac_M⁻¹!(M⁻¹ₖ,∂M⁻¹ₖpₖ∂qₖ,qₖ,pₖ)
             vₖ .= M⁻¹ₖ*pₖ
             ∂Aᵀₖλₘ∂qₖ = ∂Aᵀλ∂q(qₖ,λₘ)
             ∂pₖ∂qₖ = 2/h.*Mₘ + 
