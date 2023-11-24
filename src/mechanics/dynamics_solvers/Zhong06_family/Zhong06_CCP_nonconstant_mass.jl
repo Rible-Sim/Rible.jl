@@ -21,10 +21,8 @@ function generate_cache(
     F!(F,q,q̇,t) = generalize_force!(F,bot,q,q̇,t)
     Jac_F!(∂F∂q̌,∂F∂q̌̇,q,q̇,t) = generalize_force_jacobain!(∂F∂q̌,∂F∂q̌̇,bot,q,q̇,t)
     Mₘ = assemble_M(structure) 
-    M⁻¹ₘ = assemble_M⁻¹(structure)
-    M⁻¹ₖ = deepcopy(M⁻¹ₘ)
-    ∂Mₘq̇ₘ∂qₘ = assemble_∂Mq̇∂q(structure)
-    ∂Mₘqₖ∂qₘ = zero(∂Mₘq̇ₘ∂qₘ)
+    M⁻¹ₖ = assemble_M⁻¹(structure)
+    ∂Mₘhq̇ₘ∂qₘ = assemble_∂Mq̇∂q(structure)
     ∂M⁻¹ₖpₖ∂qₖ = assemble_∂M⁻¹p∂q(structure)
     M! = make_M!(structure)
     M⁻¹! = make_M⁻¹!(structure)
@@ -54,8 +52,9 @@ function generate_cache(
     ) = prepare_contacts(bot,env)
     cache = @eponymtuple(
         F!,Jac_F!,
-        Mₘ,M⁻¹ₘ,M⁻¹ₖ,
-        ∂Mₘq̇ₘ∂qₘ,∂Mₘqₖ∂qₘ,∂M⁻¹ₖpₖ∂qₖ,
+        Mₘ,M⁻¹ₖ,
+        ∂Mₘhq̇ₘ∂qₘ,
+        ∂M⁻¹ₖpₖ∂qₖ,
         Fₘ,∂Fₘ∂qₘ,∂Fₘ∂q̇ₘ,
         M!,Jac_M!,
         M⁻¹!,Jac_M⁻¹!,
@@ -90,8 +89,9 @@ function make_step_k(
     )
     (;
         F!,Jac_F!,
-        Mₘ,M⁻¹ₘ,M⁻¹ₖ,
-        ∂Mₘq̇ₘ∂qₘ,∂Mₘqₖ∂qₘ,∂M⁻¹ₖpₖ∂qₖ,
+        Mₘ,M⁻¹ₖ,
+        ∂Mₘhq̇ₘ∂qₘ,
+        ∂M⁻¹ₖpₖ∂qₖ,
         Fₘ,∂Fₘ∂qₘ,∂Fₘ∂q̇ₘ,
         M!,Jac_M!,
         M⁻¹!,Jac_M⁻¹!,
@@ -118,7 +118,7 @@ function make_step_k(
         vₘ = q̇ₘ
         tₘ = tₖ₋₁+h/2
         M!(Mₘ,qₘ)
-        Jac_M!(∂Mₘqₖ∂qₘ,qₘ,qₖ)
+        Jac_M!(∂Mₘhq̇ₘ∂qₘ,qₘ,h.*q̇ₘ)
         F!(Fₘ,qₘ,q̇ₘ,tₘ)
         Jac_F!(∂Fₘ∂qₘ,∂Fₘ∂q̇ₘ,qₘ,q̇ₘ,tₘ)
         Aₖ₋₁ = A(qₖ₋₁)
@@ -131,7 +131,7 @@ function make_step_k(
         𝐫𝐞𝐬[n1+1:n2] .= scaling.*Φ(qₖ)
         
         𝐉 .= 0.0
-        𝐉[   1:n1,   1:n1] .=  Mₘ .+ 1/2 .*∂Mₘqₖ∂qₘ .-h^2/2 .*(1/2 .*∂Fₘ∂qₘ .+ 1/h.*∂Fₘ∂q̇ₘ)
+        𝐉[   1:n1,   1:n1] .=  Mₘ .+ 1/2 .*∂Mₘhq̇ₘ∂qₘ .-h^2/2 .*(1/2 .*∂Fₘ∂qₘ .+ 1/h.*∂Fₘ∂q̇ₘ)
         𝐉[   1:n1,n1+1:n2] .= -scaling.*transpose(Aₖ₋₁)
         𝐉[n1+1:n2,   1:n1] .=  scaling.*Aₖ
         
@@ -150,17 +150,16 @@ function make_step_k(
             ∂DᵀₖHΛₘ∂qₖ = contact_cache.cache.∂DᵀΛ∂q
             pₖ .= Momentum_k(qₖ₋₁,pₖ₋₁,qₖ,λₘ,Mₘ,A,Λₘ,Dₖ₋₁,Dₖ,H,scaling,h)
             M⁻¹!(M⁻¹ₖ,qₖ)
-            vₖ .= M⁻¹ₖ*pₖ
-            M⁻¹!(M⁻¹ₘ,qₘ)
-            Jac_M!(∂Mₘq̇ₘ∂qₘ,qₘ,q̇ₘ)
             Jac_M⁻¹!(∂M⁻¹ₖpₖ∂qₖ,qₖ,pₖ)
+            vₖ .= M⁻¹ₖ*pₖ
             ∂Aᵀₖλₘ∂qₖ = ∂Aᵀλ∂q(qₖ,λₘ)
             ∂pₖ∂qₖ = 2/h.*Mₘ + 
-                    ∂Mₘq̇ₘ∂qₘ .+
-                    # scaling/(h).*∂Aᵀₖλₘ∂qₖ .+ 
-                    scaling.*∂DᵀₖHΛₘ∂qₖ
+                     1/h.*∂Mₘhq̇ₘ∂qₘ .+
+                     scaling/h.*∂Aᵀₖλₘ∂qₖ .+ 
+                     scaling.*∂DᵀₖHΛₘ∂qₖ
+            ∂pₖ∂λₘ = scaling/h.*transpose(Aₖ-Aₖ₋₁)
             ∂vₖ∂qₖ = M⁻¹ₖ*∂pₖ∂qₖ .+ ∂M⁻¹ₖpₖ∂qₖ
-            ∂vₖ∂λₘ = scaling/h.*M⁻¹ₘ*transpose(Aₖ-Aₖ₋₁)
+            ∂vₖ∂λₘ = M⁻¹ₖ*∂pₖ∂λₘ
             𝐁 .= 0
             𝐁[  1:n1,   1:nΛ] .= scaling.*h .*transpose(Dₖ₋₁)*H
             v́ₖ = Dₖ*vₖ
@@ -224,7 +223,7 @@ function solve!(sim::Simulator,solver_cache::Zhong06_CCP_Nonconstant_Mass_Cache;
     (;prob,totalstep) = sim
     (;bot,env,) = prob
     (;structure,traj,contacts_traj) = bot
-    (;Mₘ,M⁻¹ₘ,M!,M⁻¹!,A,contacts_bits) = solver_cache.cache
+    (;Mₘ,M⁻¹ₖ,M!,M⁻¹!,A,contacts_bits) = solver_cache.cache
     q0 = traj.q[begin]
     λ0 = traj.λ[begin]
     q̇0 = traj.q̇[begin]
@@ -372,8 +371,8 @@ function solve!(sim::Simulator,solver_cache::Zhong06_CCP_Nonconstant_Mass_Cache;
         get_frictional_directions_and_positions!(structure, contact_cache, qₖ, q̇ₖ, Λₘ,)
         Dₖ = contact_cache.cache.D
         pₖ .= Momentum_k(qₖ₋₁,pₖ₋₁,qₖ,λₘ,Mₘ,A,Λₘ,Dₖ₋₁,Dₖ,H,scaling,dt)
-        M⁻¹!(M⁻¹ₘ,qₖ)
-        q̇ₖ .= M⁻¹ₘ*pₖ
+        M⁻¹!(M⁻¹ₖ,qₖ)
+        q̇ₖ .= M⁻¹ₖ*pₖ
         if na != 0
             update_contacts!(cₖ[contacts_bits],cₖ₋₁[contacts_bits],Dₖ*q̇ₖ,Λₘ./(scaling*dt))
         end

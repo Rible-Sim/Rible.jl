@@ -227,6 +227,7 @@ function assemble_∂M⁻¹p∂q(st::AbstractStructure)
     T = get_numbertype(st)
     ∂M⁻¹p∂q = spzeros(T,num_of_full_coords,num_of_full_coords)
     assemble_∂M⁻¹p∂q!(∂M⁻¹p∂q,st)
+    ∂M⁻¹p∂q
 end
 
 function assemble_∂T∂qᵀ!(∂T∂qᵀ,st::AbstractStructure)

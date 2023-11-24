@@ -64,7 +64,7 @@ function solve!(simulator::Simulator,solvercache::Zhong06_Nonconstant_Mass_Cache
         end
     end
 
-    function make_Jac_stepk(qᵏ,qᵏ⁻¹,Mₘ,∂Mq̇∂q,∂F∂q,∂F∂q̇,Aᵀ,tᵏ⁻¹)
+    function make_Jac_stepk(qᵏ,qᵏ⁻¹,Mₘ,∂Mₘhq̇ₘ∂qₘ,∂F∂q,∂F∂q̇,Aᵀ,tᵏ⁻¹)
         @inline @inbounds function inner_Jac_stepk!(Jac,x)
             h = dt
             qᵏ .= x[1:nq]
@@ -72,11 +72,10 @@ function solve!(simulator::Simulator,solvercache::Zhong06_Nonconstant_Mass_Cache
             qₘ = (qᵏ.+qᵏ⁻¹)./2
             q̇ₘ = (qᵏ.-qᵏ⁻¹)./h
             M!(Mₘ,qₘ)
-            Jac_M!(∂Mq̇∂q,qₘ,qᵏ)
+            Jac_M!(∂Mₘhq̇ₘ∂qₘ,qₘ,h.*q̇ₘ)
             Jac_F!(∂F∂q,∂F∂q̇,qₘ,q̇ₘ,tₘ)
-            Jac[   1:nq ,   1:nq ] .=  Mₘ .+ ∂Mq̇∂q.-(h^2)/2 .*(1/2 .*∂F∂q.+1/h.*∂F∂q̇)
+            Jac[   1:nq ,   1:nq ] .=  Mₘ .+ 1/2 .*∂Mₘhq̇ₘ∂qₘ.-(h^2)/2 .*(1/2 .*∂F∂q.+1/h.*∂F∂q̇)
             Jac[   1:nq ,nq+1:end] .=  scaling.*Aᵀ
-            # Jac[nq+1:end,   1:nq ] .=  scaling.*transpose(Aᵀ)
             Jac[nq+1:end,   1:nq ] .=  scaling.*A(qᵏ)
             Jac[nq+1:end,nq+1:end] .=  0.0
         end
