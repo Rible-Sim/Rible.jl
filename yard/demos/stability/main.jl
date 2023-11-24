@@ -548,7 +548,7 @@ function plotsave_Vkθ(Vkθs,figname=nothing)
 	end
 	with_theme(theme_pub;
 		figure_padding = (0,fontsize,0,fontsize),
-		resolution = (0.5tw,0.3tw),	
+		size = (0.5tw,0.3tw),	
 		palette = (
 			color = colormap,
 		),
@@ -978,7 +978,7 @@ tggriper, cripath = path_follow_critical(polyP, ini, pv; Δc7, Δu6)
 VectorOfArray(cripath.q̌)[1,:] 
 cripath.V
 CM.activate!(); with_theme(theme_pub;
-		resolution = (1.0tw,0.42tw),
+		size = (1.0tw,0.42tw),
 		figure_padding = (0,fontsize,0,0),
 		palette = (
 			color = cgrad(:RdYlGn, 11, categorical=true),

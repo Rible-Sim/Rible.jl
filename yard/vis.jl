@@ -487,7 +487,7 @@ function simple2mesh(sp,color=:slategrey)
 end
 
 function plotsave_friction_direction(bots,x,xs,figname=nothing;
-        resolution = (0.9tw,0.4tw),
+        size = (0.9tw,0.4tw),
         mo = 8,
         mo_α = mo,
         vtol=1e-5,
@@ -777,7 +777,7 @@ function plotsave_contactpoints(bot,figname=nothing)
     (;t) = bot.traj
     with_theme(theme_pub;
             figure_padding = (0,fontsize,0,0),
-            resolution = (0.9tw,0.3tw),
+            size = (0.9tw,0.3tw),
         ) do 
         fig = Figure()
         ax = Axis(fig[1,1], xlabel = tlabel, ylabel = "Contact No.")

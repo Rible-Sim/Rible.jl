@@ -213,7 +213,7 @@ function plot_graph(bot,seqs,pid,figname=nothing)
     u3 = RB.get_trajectory!(bot,2,pid)
 
     with_theme(theme_pub;
-            resolution = (0.7tw,0.4tw),
+            size = (0.7tw,0.4tw),
             Scatter = (
                 markersize = fontsize,
             )
@@ -274,7 +274,7 @@ seq2 = RB.forward_sequence(spine2_video.st,start_sol,parameters1,parameters2,RB.
 fig = plotstructure(spine2,seq2)
 
 function plot_video(bot,seq_sol,bodyid,pid,f)
-    fig = Figure(resolution = (1280, 720))
+    fig = Figure(size = (1280, 720))
     azimuth = 1.385530633326996
     elevation = 0.05269908169872413
     # ax1 = Axis3(fig[1, 1]; aspect = :data, viewmode = :fit, azimuth, elevation)

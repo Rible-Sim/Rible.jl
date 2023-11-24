@@ -125,7 +125,7 @@ function plot_comparison(sol,M,bot,figname=nothing)
     θ2 = atan.(rb2rg_[1,:],-rb2rg_[2,:])#.-sol[4,:]
 
     with_theme(theme_pub;
-            resolution = (0.8cw,0.5cw),
+            size = (0.8cw,0.5cw),
             palette = (
                 color = [:black],
                 red = [:red]
@@ -263,7 +263,7 @@ function plot_comparison_and_energy(sol,M,bot,bot_zhong,bot_alpha,figname=nothin
     θ2 = atan.(rb2rg_[1,:],-rb2rg_[2,:])#.-sol[4,:]
 
     with_theme(theme_pub;
-            resolution = (0.8cw,0.3cw),
+            size = (0.8cw,0.3cw),
             figure_padding = (fontsize,fontsize,0,0.5fontsize),
             # palette = (
             #     color = [:black],
@@ -576,7 +576,7 @@ x4,y4 = approx_slack(;k=k[11],μ=μ[11],l0=l[11],filename="xy4")
 x0,y0 = approx_slack(;k=100.0,μ=0.0,l0=0.0)
 function plot_data_points(x,y,figname=nothing)
     with_theme(theme_pub;
-        resolution = (cw,0.8cw),
+        size = (cw,0.8cw),
         Scatter = (
             marker=:xcross,
         )
@@ -982,10 +982,10 @@ function plot_restlengths(bots,figname=nothing)
     #         Lines = (cycle = [:color],),
     # )
     with_theme(theme_pub;
-            # resolution = (0.7tw,0.3tw),
+            # size = (0.7tw,0.3tw),
             # font = "Nimbus Rom No9 L",
             # font = "Times New Roman",
-            resolution = (2cw,0.7cw),
+            size = (2cw,0.7cw),
         ) do
         fig = Figure(;)
         ax1 = Axis(fig[1,1]; 
@@ -1036,10 +1036,10 @@ function plot_tensions(bots,figname=nothing)
     #         Lines = (cycle = [:color],),
     # )
     with_theme(theme_pub;
-            # resolution = (0.7tw,0.3tw),
+            # size = (0.7tw,0.3tw),
             # font = "Nimbus Rom No9 L",
             # font = "Times New Roman",
-            resolution = (2cw,0.7cw),
+            size = (2cw,0.7cw),
         ) do
         fig = Figure(;)
         ax1 = Axis(fig[1,1]; 
@@ -1094,10 +1094,10 @@ function plot_first_frequencies(bots,figname=nothing)
     #         Lines = (cycle = [:color],),
     # )
     with_theme(theme_pub;
-            # resolution = (0.7tw,0.3tw),
+            # size = (0.7tw,0.3tw),
             # font = "Nimbus Rom No9 L",
             # font = "Times New Roman",
-            resolution = (cw,0.5cw),
+            size = (cw,0.5cw),
         ) do
         fig = Figure(;)
         ax1 = Axis(fig[1,1]; 
@@ -1466,8 +1466,8 @@ function plot_tower3d_dpl_traj(bots,figname=nothing;
     )
     cg = cgrad(:seaborn_bright6, 6, categorical = true)
     with_theme(theme_pub;
-            # resolution = (tw,0.8tw),
-            resolution = (tw,1.25cw),
+            # size = (tw,0.8tw),
+            size = (tw,1.25cw),
             palette = (color = cg, ),
             Lines = (cycle = [:color], linewidth = 2),
         ) do

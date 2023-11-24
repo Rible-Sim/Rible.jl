@@ -38,7 +38,7 @@ plot_traj!(bot;showarrows = false, showground=false)
 
 #todo slider with no hook
 GM.activate!();with_theme(theme_pub;
-        resolution = (1tw,0.15tw),
+        size = (1tw,0.15tw),
         figure_padding = (0,0,fontsize/2,0),
         Axis3 = (
             # azimuth = -1.8701322643948965,
@@ -207,7 +207,7 @@ mat𝒦as = reduce(hcat,struct𝒦.𝒦a)
 mat𝒦ps = reduce(hcat,struct𝒦.𝒦p)
 
 GM.activate!();with_theme(RB.theme_pub;
-        resolution = (0.95tw,0.18tw),
+        size = (0.95tw,0.18tw),
         figure_padding = (0,0,0,0),
         Axis3 = (
             azimuth = -π/2-1e-10,
@@ -326,7 +326,7 @@ Vals =  [
 ] |> VectorOfArray
 
 GM.activate!();with_theme(RB.theme_pub;
-        resolution = (0.45tw,0.2tw),
+        size = (0.45tw,0.2tw),
         figure_padding = (0,fontsize,0,fontsize),
     ) do 
     fig = Figure()

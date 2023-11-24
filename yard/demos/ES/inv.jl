@@ -79,7 +79,7 @@ function plotsave_inv_restlen(bots,xs,figname=nothing;
     @show fs[round(Int,length(fs)/2)]
     with_theme(theme_pub;
         figure_padding = (0,fontsize,0,0),
-        resolution = (0.9tw,0.23tw),
+        size = (0.9tw,0.23tw),
         markersize = 0.8fontsize,
         palette = (
             marker = [

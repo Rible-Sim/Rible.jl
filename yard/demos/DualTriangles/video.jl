@@ -315,8 +315,8 @@ RB.distribute_q_to_rbs!(man_inv,qsol)
 scene,_ = plotstructure(man_inv)
 scene
 
-fig = Figure(resolution = (1600, 1000))
-ax1 = fig[1, 1] = Axis(fig,resolution = (800, 800))
+fig = Figure(size = (1600, 1000))
+ax1 = fig[1, 1] = Axis(fig,size = (800, 800))
 bars,cables,_ = plotstructure!(ax1,man_inv)
 ls_g = labelslider!(fig, "Gravity:", 0:0.0001:0.01;
             format = x -> "$(x)×9.8 m/s²")

@@ -18,7 +18,7 @@ th = 622 |> pt2px
 #-- one_tri_one_bar
 tb = one_tri_one_bar(;)
 GM.activate!();with_theme(
-        # resolution = (1tw,0.4tw),
+        # size = (1tw,0.4tw),
         theme_pub;
         Axis3 = (
             azimuth = 1.8345150083269814,
@@ -172,7 +172,7 @@ vm[:,1] = v
 orthovm = RB.modified_gram_schmidt(vm)
 
 with_theme(theme_pub;
-    resolution = (0.9tw,0.3tw),
+    size = (0.9tw,0.3tw),
     fontsize = 6.5 |> pt2px,
     figure_padding = (2fontsize,fontsize,0,0),
     Axis3 = (        
@@ -306,7 +306,7 @@ maxminmodes = hcat(
 
 with_theme(theme_pub;
     fontsize = 6.5 |> pt2px,
-    resolution = (0.8tw,0.18tw),
+    size = (0.8tw,0.18tw),
     figure_padding = (0,0,-fontsize,0),
     Axis3 = (        
         azimuth = 3.7555306333269844,
@@ -378,7 +378,7 @@ size(rρs,1)
 ]
 
 with_theme(theme_pub;
-        resolution = (0.3tw,0.2tw),
+        size = (0.3tw,0.2tw),
         figure_padding = (0,fontsize,0,fontsize),
     ) do 
     fig = Figure()
@@ -488,7 +488,7 @@ ns = size(S,2)
 nk = size(D,2)
 
 GM.activate!();with_theme(theme_pub;
-        resolution = (0.95tw,0.24tw),
+        size = (0.95tw,0.24tw),
         figure_padding = (2fontsize,0,0,0),
         fontsize = 6.5 |> pt2px,
         Axis3 = (
@@ -760,7 +760,7 @@ Vals =  [
 ] |> VectorOfArray
 
 with_theme(theme_pub;
-        resolution = (0.6tw,0.2tw),
+        size = (0.6tw,0.2tw),
         figure_padding = (0,fontsize,0,0),
     ) do 
     fig = Figure()
@@ -865,7 +865,7 @@ Vals_α =  [
 ] |> VectorOfArray
 
 with_theme(theme_pub;
-        resolution = (0.6tw,0.2tw),
+        size = (0.6tw,0.2tw),
         figure_padding = (0,fontsize,0,0),
     ) do 
     fig = Figure()
@@ -985,7 +985,7 @@ nk = size(D,2)
 ns = size(S,2)
 
 GM.activate!();with_theme(theme_pub;
-        resolution = (0.9tw,0.22tw),
+        size = (0.9tw,0.22tw),
         figure_padding = (fontsize,0,0,0),
         fontsize = 6.5 |> pt2px,
         Axis3 = (
@@ -1159,7 +1159,7 @@ Vals =  [
 ] |> VectorOfArray
 
 GM.activate!();with_theme(theme_pub;
-        resolution = (0.5tw,0.2tw),
+        size = (0.5tw,0.2tw),
         figure_padding = (0,fontsize,0,fontsize),
     ) do 
     fig = Figure()
@@ -1326,7 +1326,7 @@ Vals =  [
 ] |> VectorOfArray
 
 with_theme(theme_pub;
-        resolution = (0.5tw,0.2tw),
+        size = (0.5tw,0.2tw),
         figure_padding = (0,fontsize,0,fontsize),
     ) do 
     fig = Figure()
@@ -1436,7 +1436,7 @@ l = RB.get_cables_len(bot.structure)
 
 isis = [8,14,24]
 GM.activate!();with_theme(theme_pub;
-        resolution = (0.95tw,0.2tw),
+        size = (0.95tw,0.2tw),
         figure_padding = (2fontsize,0,0,0),
         fontsize = 6.5 |> pt2px,
         Axis3 = (
@@ -1661,7 +1661,7 @@ Vals_alpha3 =  [
 
 
 with_theme(theme_pub;
-        resolution = (0.35tw,0.2tw),
+        size = (0.35tw,0.2tw),
         figure_padding = (0,fontsize,0,fontsize),
     ) do 
     fig = Figure()
@@ -1777,7 +1777,7 @@ k = RB.get_cables_stiffness(bot.structure)
 f =  S*ᾱ
 
 GM.activate!();with_theme(theme_pub;
-        resolution = (0.95tw,0.24tw),
+        size = (0.95tw,0.24tw),
         figure_padding = (2fontsize,0,0,0),
         fontsize = 6.5 |> pt2px,
         Axis3 = (
@@ -2007,7 +2007,7 @@ Vals =  [
 ] |> VectorOfArray
 
 with_theme(theme_pub;
-        resolution = (0.35tw,0.2tw),
+        size = (0.35tw,0.2tw),
         figure_padding = (0,fontsize,0,fontsize),
     ) do 
     fig = Figure()

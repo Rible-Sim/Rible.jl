@@ -38,7 +38,7 @@ function linkmesh(r=0.5,h=1.0,d=r/10)
     linkmesh = merge(meshbar...,torusmesh)
 end
 linkmesh(0.5,1.0)
-set_theme!(resolution = (1280,720),center = false)
+set_theme!(size = (1280,720),center = false)
 scene = Scene()
 function update_rb_position!(scene,bodyid,rb)
     qtn = Rotations.Quat(body.state.R)

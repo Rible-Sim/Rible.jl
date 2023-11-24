@@ -84,7 +84,7 @@ plot_traj!(
 )
 
 GM.activate!();with_theme(RB.theme_pub;
-        resolution = (1.0tw,0.3tw),
+        size = (1.0tw,0.3tw),
         figure_padding = (0,fontsize,0,0),
         Axis3 = (
             azimuth = 5.1155306333269825,
@@ -248,7 +248,7 @@ lines!(false_rp5)
 plot_traj!(topn_longtimes[1])
 # vp5 = RB.get_velocity!(topn,1,5)
 with_theme(theme_pub;
-        resolution = (1tw,0.25tw),
+        size = (1tw,0.25tw),
         figure_padding = (0,fontsize,0,fontsize/2)
     ) do
     bot = topn_longtimes[1]
@@ -330,7 +330,7 @@ plot_traj!(tops_e0[1])
 vp5 = RB.get_velocity!(tops_e0[1],1,5)
 
 GM.activate!();with_theme(theme_pub;
-        resolution = (1.0tw,0.45tw),
+        size = (1.0tw,0.45tw),
         figure_padding = (0,1fontsize,0,0),
         Axis3 = (
             azimuth = 4.695530633326983,
@@ -466,7 +466,7 @@ GM.activate!();with_theme(theme_pub;
 end
 
 with_theme(theme_pub;
-        resolution = (0.95tw, 0.18tw),
+        size = (0.95tw, 0.18tw),
         figure_padding = (0,fontsize/2,0,0)
     ) do
     fig = Figure()
@@ -540,7 +540,7 @@ fig
 _,traj_err_avg = get_err_avg(tops_dt;bid=1,pid=1,di=1,field=:traj)
 _,vel_err_avg = get_err_avg(tops_dt;bid=1,pid=1,di=1,field=:vel)
 GM.activate!();with_theme(theme_pub;
-        resolution = (0.7tw,0.2tw),
+        size = (0.7tw,0.2tw),
         figure_padding = (0,fontsize/2,0,0)
     ) do 
     fig = Figure()
@@ -859,7 +859,7 @@ flexcables_dt = [
 _, err_avg = get_err_avg(flexcables_dt;bid=6,pid=10,di=1)
 
 with_theme(theme_pub;
-        resolution = (0.9tw,0.45tw),
+        size = (0.9tw,0.45tw),
         figure_padding = (fontsize,fontsize,0,0),
         Axis3=(
             azimuth = 7.595530633326987,
@@ -1011,7 +1011,7 @@ lines(pnvp2)
 plotsave_contact_persistent(flexcable,tol=0)
 
 with_theme(theme_pub;
-        resolution = (0.95tw,0.5tw),
+        size = (0.95tw,0.5tw),
         figure_padding = (0,fontsize,0,0),
         Axis3=(
             azimuth = 8.125530633326981,
@@ -1207,7 +1207,7 @@ function plotsave_velocity_restitution(bots,showlegend,
         ymids = [1.0,0.7,0.3,0.0]
     )
     with_theme(theme_pub;
-            resolution = (tw,0.4th),
+            size = (tw,0.4th),
             figure_padding = (fontsize,fontsize,0,0),
 
         ) do
@@ -1265,14 +1265,14 @@ me.E |> lines
 
 GM.activate!(); plotsave_friction_direction(
     [unibot_e5],L"e",[0.5]; 
-    resolution = (0.9tw,0.28tw),
+    size = (0.9tw,0.28tw),
     cid=2
     )
 
 CM.activate!(); plotsave_friction_direction(
         [unibot_e5],L"e=",[0.5], 
         "unibot_friction_direction"; 
-        resolution = (0.9tw,0.28tw)
+        size = (0.9tw,0.28tw)
 )
 
 function plotsave_point_traj_vel(bots,figname=nothing)
@@ -1362,8 +1362,8 @@ plot_traj!(unibot_z0[6];
     showground = true
 )
 
-GM.activate!(); plotsave_error(unibot_z0,dts;resolution = (0.4tw,0.3tw),)
-CM.activate!(); plotsave_error(unibot_z0,dts,"unibot_err";resolution = (0.4tw,0.3tw),)
+GM.activate!(); plotsave_error(unibot_z0,dts;size = (0.4tw,0.3tw),)
+CM.activate!(); plotsave_error(unibot_z0,dts,"unibot_err";size = (0.4tw,0.3tw),)
 
 GM.activate!(); plotsave_velocity_restitution([unibot_z0],true; ymids = [0.0])
 plot_traj!(unibot_z0)
@@ -1468,7 +1468,7 @@ _,err_avg = get_err_avg(superballs_dt;bid=2,pid=1,di=1)
 
 GM.activate!(); with_theme(theme_pub;
         figure_padding = (0,0.5fontsize,0,0),
-        resolution = (1.0tw,0.45tw),
+        size = (1.0tw,0.45tw),
         Axis3 = (
             azimuth = 4.825530633326982,
             elevation = 0.6726990816987243
@@ -1546,7 +1546,7 @@ function plotsave_velocity_restitution(bots,showlegend,
         figname=nothing;
         cps,
         ymids = 0.5ones(length(cps)),
-        resolution = (tw,0.5th),
+        size = (tw,0.5th),
     )
     with_theme(theme_pub;
             resolution,
@@ -1629,7 +1629,7 @@ plot_traj!(ballbot;auto=true)
 
 GM.activate!(); with_theme(theme_pub;
         figure_padding = (0,0.5fontsize,0,0),
-        resolution = (1.0tw,0.40tw),
+        size = (1.0tw,0.40tw),
         Axis3 = (
             azimuth = 4.7855306333269805,
             elevation = 0.03269908169872391
@@ -1756,7 +1756,7 @@ check_Coulomb(1,c6_1)
 GM.activate!(); plotsave_friction_direction(
         [ballbot,ballbot,ballbot],L"\mathrm{Cable~No.}",
         [3,6,12]; 
-        resolution = (tw,0.5tw),
+        size = (tw,0.5tw),
         mo_α = 8,
         mo = 8,
         vtol=1e-7,
@@ -1766,7 +1766,7 @@ CM.activate!(); plotsave_friction_direction(
         [ballbot,ballbot,ballbot],L"\mathrm{Cable~No.}",
         [3,6,12], 
         "ballbot_friction_direction"; 
-        resolution = (tw,0.5tw),
+        size = (tw,0.5tw),
         mo_α = 8,
         mo = 8,
         vtol=1e-7,

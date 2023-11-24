@@ -154,10 +154,8 @@ function update!(st::Structure,q::AbstractVector,q̇::AbstractVector=zero(q))
     update!(st)
 end
 
-function assemble_M(st::AbstractStructure)
+function assemble_M!(M,st::AbstractStructure)
     (;num_of_full_coords,bodyid2sys_full_coords) = st.connectivity.indexed
-    T = get_numbertype(st)
-    M = spzeros(T,num_of_full_coords,num_of_full_coords)
     foreach(st.bodies) do body
         memfull = bodyid2sys_full_coords[body.prop.id]
         M[memfull,memfull] .+= body.cache.coords_cache.M
@@ -166,15 +164,29 @@ function assemble_M(st::AbstractStructure)
     M
 end
 
-function assemble_M⁻¹(st::AbstractStructure)
+function assemble_M(st::AbstractStructure)
     (;num_of_full_coords,bodyid2sys_full_coords) = st.connectivity.indexed
     T = get_numbertype(st)
-    M⁻¹ = spzeros(T,num_of_full_coords,num_of_full_coords)
+    M = spzeros(T,num_of_full_coords,num_of_full_coords)
+    assemble_M!(M,st)
+    M
+end
+
+function assemble_M⁻¹!(M⁻¹,st::AbstractStructure)
+    (;num_of_full_coords,bodyid2sys_full_coords) = st.connectivity.indexed
     foreach(st.bodies) do body
         memfull = bodyid2sys_full_coords[body.prop.id]
         M⁻¹[memfull,memfull] .+= body.cache.coords_cache.M⁻¹
     end
     # @assert issymmetric(M⁻¹)
+    M⁻¹
+end
+
+function assemble_M⁻¹(st::AbstractStructure)
+    (;num_of_full_coords,bodyid2sys_full_coords) = st.connectivity.indexed
+    T = get_numbertype(st)
+    M⁻¹ = spzeros(T,num_of_full_coords,num_of_full_coords)
+    assemble_M⁻¹!(M⁻¹,st)
     M⁻¹
 end
 
@@ -184,15 +196,29 @@ function assemble_M̌(st::AbstractStructure)
     M̌ = Symmetric(M[sys_free_coords_idx,sys_free_coords_idx])
 end
 
-function assemble_∂Mq̇∂q(st::AbstractStructure)
+function assemble_∂Mq̇∂q!(∂Mq̇∂q,st::AbstractStructure)
     (;num_of_full_coords,bodyid2sys_full_coords) = st.connectivity.indexed
-    T = get_numbertype(st)
-    ∂Mq̇∂q = spzeros(T,num_of_full_coords,num_of_full_coords)
     foreach(st.bodies) do body
         memfull = bodyid2sys_full_coords[body.prop.id]
         ∂Mq̇∂q[memfull,memfull] .+= body.cache.coords_cache.∂Mq̇∂q
     end
+end
+
+function assemble_∂Mq̇∂q(st::AbstractStructure)
+    (;num_of_full_coords,bodyid2sys_full_coords) = st.connectivity.indexed
+    T = get_numbertype(st)
+    ∂Mq̇∂q = spzeros(T,num_of_full_coords,num_of_full_coords)
+    assemble_∂Mq̇∂q!(∂Mq̇∂q,st::AbstractStructure)
     ∂Mq̇∂q
+    # symsparsecsr(M;symmetrize=true)
+end
+
+function assemble_∂M⁻¹p∂q!(∂M⁻¹p∂q,st::AbstractStructure)
+    (;num_of_full_coords,bodyid2sys_full_coords) = st.connectivity.indexed
+    foreach(st.bodies) do body
+        memfull = bodyid2sys_full_coords[body.prop.id]
+        ∂M⁻¹p∂q[memfull,memfull] .+= body.cache.coords_cache.∂M⁻¹p∂q
+    end
     # symsparsecsr(M;symmetrize=true)
 end
 
@@ -200,22 +226,22 @@ function assemble_∂M⁻¹p∂q(st::AbstractStructure)
     (;num_of_full_coords,bodyid2sys_full_coords) = st.connectivity.indexed
     T = get_numbertype(st)
     ∂M⁻¹p∂q = spzeros(T,num_of_full_coords,num_of_full_coords)
+    assemble_∂M⁻¹p∂q!(∂M⁻¹p∂q,st)
+end
+
+function assemble_∂T∂qᵀ!(∂T∂qᵀ,st::AbstractStructure)
+    (;num_of_full_coords,bodyid2sys_full_coords) = st.connectivity.indexed
     foreach(st.bodies) do body
         memfull = bodyid2sys_full_coords[body.prop.id]
-        ∂M⁻¹p∂q[memfull,memfull] .+= body.cache.coords_cache.∂M⁻¹p∂q
+        ∂T∂qᵀ[memfull] .+= body.state.cache.∂T∂qᵀ
     end
-    ∂M⁻¹p∂q
-    # symsparsecsr(M;symmetrize=true)
 end
 
 function assemble_∂T∂qᵀ(st::AbstractStructure)
     (;num_of_full_coords,bodyid2sys_full_coords) = st.connectivity.indexed
     T = get_numbertype(st)
     ∂T∂qᵀ = zeros(T,num_of_full_coords)
-    foreach(st.bodies) do body
-        memfull = bodyid2sys_full_coords[body.prop.id]
-        ∂T∂qᵀ[memfull] .+= body.state.cache.∂T∂qᵀ
-    end
+    assemble_∂T∂qᵀ!(∂T∂qᵀ,st)
     ∂T∂qᵀ
 end
 

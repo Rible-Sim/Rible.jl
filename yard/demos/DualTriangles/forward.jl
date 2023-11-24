@@ -238,7 +238,7 @@ function plot_angles(bot,seq,seq_g,figname=nothing)
     # resolution = to_resolution.(dpi,(fig_width,fig_height))
     # @show resolution
     with_theme(theme_pub;
-            resolution = (0.7tw,0.4tw),
+            size = (0.7tw,0.4tw),
             Scatter = (
                 markersize = fontsize,
             )
@@ -447,7 +447,7 @@ plot_sweeping(man_inv,seqs[2],seqs[4])
 
 function get_actuate_video(bot_input)
     bot = deepcopy(bot_input)
-    fig = Figure(resolution = (1280, 720))
+    fig = Figure(size = (1280, 720))
     ax1 = fig[1, 1] = Axis(fig)
     ax1.aspect = DataAspect()
     ax1.tellheight = false
@@ -633,7 +633,7 @@ figdir = raw"C:\Users\luo22\OneDrive\Papers\DynamicTensegrity\CS"
 
 function plotsave_dyn(figname=nothing)
     with_theme(theme_pub;
-            resolution = (0.9cw,0.6cw),
+            size = (0.9cw,0.6cw),
             figure_padding = (fontsize/2,fontsize,fontsize/2,fontsize),
 
         ) do

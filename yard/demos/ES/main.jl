@@ -126,7 +126,7 @@ function plot_comparison(sol,M,bot,figname=nothing)
     θ2 = atan.(rb2rg_[1,:],-rb2rg_[2,:])#.-sol[4,:]
 
     with_theme(theme_pub;
-            resolution = (0.8cw,0.5cw),
+            size = (0.8cw,0.5cw),
             palette = (
                 color = [:black],
                 red = [:red]
@@ -264,7 +264,7 @@ function plot_comparison_and_energy(sol,M,bot,bot_zhong,bot_alpha,figname=nothin
     θ2 = atan.(rb2rg_[1,:],-rb2rg_[2,:])#.-sol[4,:]
 
     with_theme(theme_pub;
-            resolution = (0.8cw,0.3cw),
+            size = (0.8cw,0.3cw),
             figure_padding = (fontsize,fontsize,0,fontsize),
             # palette = (
             #     color = [:black],
@@ -352,7 +352,7 @@ newsim_fixed = simple(;
 )
 GM.activate!(); with_theme(
         theme_pub;
-        resolution = (0.5cw,0.25cw),
+        size = (0.5cw,0.25cw),
         figure_padding = (2fontsize,0,0,0),
         Axis3 = (
             azimuth = 5.13952996194027,
@@ -450,7 +450,7 @@ GM.activate!();plot_traj!(newsim_freed;)
 
 GM.activate!(); with_theme(
         theme_pub;
-        resolution = (0.6cw,0.3cw),
+        size = (0.6cw,0.3cw),
         figure_padding = (0,0,0,0),
         Axis3 = (
             azimuth = 5.13952996194027,
@@ -512,7 +512,7 @@ GM.activate!(); with_theme(
 end
 
 GM.activate!(); with_theme(theme_pub;
-        resolution = (0.7cw,0.2cw),
+        size = (0.7cw,0.2cw),
         figure_padding = (fontsize/2,fontsize/2,0,0),
         Lines = (
             cycle = Cycle([:linestyle,:color];covary=true),
@@ -583,7 +583,7 @@ GM.activate!();with_theme(theme_pub;
         )
     ) do    
     fig = Figure(
-        resolution = (0.9cw,0.42cw)
+        size = (0.9cw,0.42cw)
     )
     subfig1 = fig[1,1] = GridLayout()
     plot_traj!(newbridge;
@@ -769,7 +769,7 @@ plot_traj!(newbridge_loads)
 
 function plot_bridge_vibes(bots,νs,figname=nothing)
     with_theme(theme_pub;
-            resolution = (0.4cw,0.15cw),
+            size = (0.4cw,0.15cw),
             figure_padding = (0,0,0,fontsize/2),
             Lines = (
                 cycle = Cycle([:linestyle,:color],covary=true),
@@ -842,7 +842,7 @@ newembed0 = embed3d(;
 
 plot_traj!(newembed11)
 GM.activate!(); with_theme(theme_pub;
-        resolution = (0.6cw,0.2cw),
+        size = (0.6cw,0.2cw),
         figure_padding = (0,0,-fontsize/2,0),
         Axis3 = (
             azimuth = 3.907532586451984,
@@ -1116,7 +1116,7 @@ RB.solve!(
 plot_traj!(newembed0_outer_deploy)
 GM.activate!();with_theme(theme_pub;
         figure_padding = (0,fontsize,-fontsize/2,fontsize/2),
-        # resolution = (0.9cw,0.25cw),
+        # size = (0.9cw,0.25cw),
         Axis3 = (
             azimuth = 4.995530633326985,
             elevation = 0.18269908169872415
@@ -1153,7 +1153,7 @@ end
 nb = newembed0_outer_deploy.st.nbodies
 ps = [RB.get_trajectory!(newembed0_outer_deploy,nb,j) for j = m+1:m+m]
 GM.activate!();with_theme(theme_pub;
-        resolution = (0.7cw,0.2cw),
+        size = (0.7cw,0.2cw),
         figure_padding = (0,fontsize,0,0)
     ) do 
     fig = Figure()
@@ -1275,7 +1275,7 @@ spine1 = twotre3d(;
 
 GM.activate!();with_theme(theme_pub;
         figure_padding = (0,0,-fontsize/2,0),
-        resolution = (0.65cw,0.25cw),
+        size = (0.65cw,0.25cw),
         Axis3 = (
             azimuth = 7.20553063332698,
             elevation = 0.22269908169872407
@@ -1461,10 +1461,10 @@ function plot_tensions(bots,figname=nothing)
     #         Lines = (cycle = [:color],),
     # )
     with_theme(theme_pub;
-            # resolution = (0.7tw,0.3tw),
+            # size = (0.7tw,0.3tw),
             # font = "Nimbus Rom No9 L",
             # font = "Times New Roman",
-            resolution = (2cw,0.7cw),
+            size = (2cw,0.7cw),
         ) do
         fig = Figure(;)
         ax1 = Axis(fig[1,1]; 
@@ -1519,10 +1519,10 @@ function plot_first_frequencies(bots,figname=nothing)
     #         Lines = (cycle = [:color],),
     # )
     with_theme(theme_pub;
-            # resolution = (0.7tw,0.3tw),
+            # size = (0.7tw,0.3tw),
             # font = "Nimbus Rom No9 L",
             # font = "Times New Roman",
-            resolution = (cw,0.5cw),
+            size = (cw,0.5cw),
         ) do
         fig = Figure(;)
         ax1 = Axis(fig[1,1]; 
@@ -1885,8 +1885,8 @@ function plot_tower3d_dpl_traj(bots,figname=nothing;
     )
     cg = cgrad(:seaborn_bright6, 6, categorical = true)
     with_theme(theme_pub;
-            # resolution = (cw,0.8cw),
-            resolution = (0.8cw,0.20cw),
+            # size = (cw,0.8cw),
+            size = (0.8cw,0.20cw),
             # palette = (color = cg, ),
             figure_padding = (0,0,0,0),
             Lines = (cycle = Cycle([:color,]), linewidth = 4),
@@ -2511,7 +2511,7 @@ size(rρs,1)
 ]
 
 with_theme(theme_pub;
-        resolution = (0.3tw,0.2tw),
+        size = (0.3tw,0.2tw),
         figure_padding = (0,fontsize,0,fontsize),
     ) do 
     fig = Figure()

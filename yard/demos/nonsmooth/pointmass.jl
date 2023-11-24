@@ -47,7 +47,7 @@ RB.solve!(
 # visualize
 GM.activate!()
 with_theme(RB.theme_pub;
-            resolution = (0.8tw,0.2tw),
+            size = (0.8tw,0.2tw),
             figure_padding = (0,fontsize,0,0),
             Axis3 = (
                 azimuth = 4.575530633326986,
@@ -165,7 +165,7 @@ scatterlines(vl1)
 # visualize
 GM.activate!(); with_theme(RB.theme_pub;
         ## fontsize = 6 |> pt2px,
-        resolution = (1tw,0.2tw),
+        size = (1tw,0.2tw),
         figure_padding = (fontsize,fontsize,0,0),
         Axis3 = (
             azimuth = 4.575530633326984,

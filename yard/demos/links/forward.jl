@@ -39,8 +39,8 @@ RB.check_static_equilibrium(linkn,q0,λ)
 RB.forward(linkn,(q0,s,λ),(rl,0.0),(rl,1.0))
 
 fig
-fig = Figure(resolution = (1600, 1000))
-ax1 = fig[1, 1] = LScene(fig, scenekw = (camera = cam3d!, raw = false,resolution = (1200, 900)))
+fig = Figure(size = (1600, 1000))
+ax1 = fig[1, 1] = LScene(fig, scenekw = (camera = cam3d!, raw = false,size = (1200, 900)))
 bars,cables,_ = plotstructure!(ax1,linkn)
 ls_g = labelslider!(fig, "Gravity:", 0:0.01:1; format = x -> "$(x)×9.8 m/s²")
 fig[2, 1] = ls_g.layout

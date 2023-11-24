@@ -80,9 +80,9 @@ function MakieCore.plot!(viz::Viz{Tuple{S}};
             strokewidth = 0
         end
         if viz.isref[]
-            MakieCore.mesh!(viz, meshes_ob; shading = true)
+            MakieCore.mesh!(viz, meshes_ob; shading = MakieCore.Automatic())
         else
-            MakieCore.poly!(viz, meshes_ob; shading = true,
+            MakieCore.poly!(viz, meshes_ob; shading = MakieCore.Automatic(),
                 # strokewidth
             )
         end
@@ -274,7 +274,7 @@ function make_patch(;trans=[0.0,0,0],rot=RotX(0.0),scale=1,color=:slategrey)
 end
 
 theme_pub = MakieCore.Attributes(;
-    resolution = (1280,720),
+    size = (1280,720),
     palette = (
         vlinecolor = [:slategrey],
         linestyle = [
