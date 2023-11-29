@@ -275,6 +275,10 @@ end
 
 theme_pub = MakieCore.Attributes(;
     size = (1280,720),
+    fontsize = 8 ,#pt
+    linewidth = 0.5,
+    markersize = 1.0,
+    figure_padding = (0,8,0,-8*2),
     palette = (
         vlinecolor = [:slategrey],
         linestyle = [
@@ -297,17 +301,33 @@ theme_pub = MakieCore.Attributes(;
         # titlefont = "CMU Serif Bold",
         # titlesize = fontsize,
         titlegap = 0,
+        spinewidth=0.2,
+        xgridwidth=0.2,ygridwidth=0.2,
+        xminorgridwidth=0.2,yminorgridwidth=0.2,
+        xtickwidth = 0.2, ytickwidth = 0.2,
+        xminortickwidth = 0.2, yminortickwidth = 0.2,
     ),
     Axis3 = (
         # titlefont = "CMU Serif Bold",
         # titlesize = fontsize,
         titlegap = 0,
+        xspinewidth=0.2,yspinewidth=0.2,zspinewidth=0.2,
+        xgridwidth=0.2,ygridwidth=0.2,zgridwidth=0.2,
+        xminorgridwidth=0.2,yminorgridwidth=0.2,zminorgridwidth=0.2,
+        xtickwidth = 0.2, ytickwidth = 0.2,ztickwidth=0.2,
+        xminortickwidth = 0.2, yminortickwidth = 0.2, zminortickwidth=0.2,
+        xlabeloffset = 2*8,
+        ylabeloffset = 2*8,
+        zlabeloffset = 4*8,
     ),
     Label = (
         # fontsize = fontsize,
         # font = "CMU Serif Bold",
         halign = :left,
         padding = (0, 0, 0, 0),
+        justification = :right,
+        lineheight = 1.0,
+        valign = :bottom,
     ),
     VLines = (
         cycle = [:color => :vlinecolor],

@@ -13,7 +13,8 @@ ENV["JULIA_STACKTRACE_MINIMAL"] = true #jl
 import Rible as RB
 include("../../vis.jl")
 includet("../../vis.jl") #jl
-# tw = 455.8843 |> pt2px
+
+tw = 455.8843 #pt |> pt2px
 
 #--  slider crank 
 include("../../../examples/robots/slider_crank.jl")
@@ -33,7 +34,9 @@ planes = RB.StaticContactSurfaces(
     ]
 )
 
-plot_traj!(sc;showground=false)
+GM.activate!(;px_per_unit=1,scalefactor = 2); 
+
+GM.activate!(;px_per_unit=2,scalefactor = 2); plot_traj!(sc;showground=false)
 
 RB.has_constant_mass_matrix(sc)
 
@@ -49,9 +52,12 @@ RB.solve!(
     dt,tspan,ftol=1e-14,maxiters=50,verbose=true,exception=true,progress=false,
 )
 
-plot_traj!(sc;showground=false)
+GM.activate!(;px_per_unit=1,scalefactor = 2);plot_traj!(sc;showground=false)
 
 # Frictionless Contact Dynamics
+
+dt = 1e-4
+tspan = (0.0,0.1)
 
 prob = RB.DynamicsProblem(
     sc,
@@ -61,10 +67,6 @@ prob = RB.DynamicsProblem(
         RB.Frictionless(),
     )
 )
-
-
-dt = 1e-4
-tspan = (0.0,0.1)
 
 # two-layer
 simulator = RB.solve!(
@@ -214,8 +216,6 @@ function get_mono_itertaions_stats(simulator)
 end
 
 get_mono_itertaions_stats.(sim_sc_iters[:,1])
-using StructArrays
-using TexTables
 
 dts_strings = [
     "\$h=\\qty{$dt}{\\second}\$"
@@ -223,6 +223,7 @@ dts_strings = [
         "1e-3", "5e-4", "2e-4", "1e-4"
     ]
 ]
+
 stats = StructArray(get_two_itertaions_stats.(sim_sc_iters[:,1]))
 
 t1 = TableCol("", dts_strings, string.(VectorOfArray(stats.outer_mean_max)[1,:]))
@@ -265,25 +266,24 @@ sc_mono_dt = [
 ]
 _, err_avg = get_err_avg(sc_mono_dt;bid=4,pid=1,di=3)
 
-GM.activate!();with_theme(RB.theme_pub;
+GM.activate!(;px_per_unit=4,scalefactor = 4);with_theme(RB.theme_pub;
         fonts = (; 
             regular = "CMU Serif", 
             bold = "CMU Serif Bold",
             italic = "CMU Serif Italic",
             math = "NewComputerModern 10 Italic"
         ),
-        fontsize = 8 |> pt2px,
-        # markersize,
-        # linewidth,
-        figure_padding = (2fontsize,fontsize,0,0),
         size = (tw,0.2tw),
+        figure_padding = (fontsize,fontsize,0,-fontsize*2),
         Axis3 = (
             azimuth = 6.338616570826984,
-            elevation = 0.1470350191987241
+            elevation = 0.1470350191987241,
         )
     ) do 
     fig = Figure()
     gl1 = fig[1,1] = GridLayout()
+    gl2 = fig[1,2] = GridLayout()
+    gl3 = fig[1,3] = GridLayout()
     r1 = RB.get_trajectory!(sc,4,1)
     r2 = RB.get_trajectory!(sc,4,2)
     r3 = RB.get_trajectory!(sc,4,3)
@@ -308,30 +308,35 @@ GM.activate!();with_theme(RB.theme_pub;
                 Point3(r1[thestep]),
                 markersize = fontsize/2,
             )
-            ax.zlabeloffset = 2.5fontsize
         end
     )
     # traj
-    gl2 = fig[1,2] = GridLayout()
-    ax = Axis(gl2[1,1],xlabel=tlabel, ylabel = L"z~(\mathrm{m})")
+    ax = Axis(gl2[1,1];
+        xlabel=tlabel, ylabel = L"z~(\mathrm{m})"
+    )
     lines!(ax,sc.traj.t,r1[3,:])
     xlims!(ax,extrema(sc.traj.t)...)
 
-    gl3 = fig[1,3] = GridLayout()
-    ax3 = Axis(fig[1,3],ylabel="Abs. Err. (m)")
+    ax3 = Axis(gl3[1,1];
+        ylabel="Abs. Err. (m)"
+    )
     plot_convergence_order!(ax3,dts[begin:end-1],err_avg;show_orders=true)
-    axislegend(ax3;position=:rb)
+    # axislegend(ax3;position=:rb)
 
     Label(gl1[1,1,TopLeft()],"($(alphabet[1]))",font=:bold)
     Label(gl2[1,1,TopLeft()],"($(alphabet[2]))",font=:bold)
     Label(gl3[1,1,TopLeft()],"($(alphabet[3]))",font=:bold)
     colsize!(fig.layout,2,Relative(0.30))
     colsize!(fig.layout,3,Relative(0.23))
-    colgap!(fig.layout,0)
+    colgap!(fig.layout,fontsize/2)
+    colgap!(fig.layout,1,-fontsize*3)
    # ylims!(ax,-0.)
     savefig(fig,"slider_crank")
     fig
 end
+
+fig = Figure()
+ax  = Axis(fig[1,1])
 
 GM.activate!(); with_theme(RB.theme_pub;
         fonts = (; 

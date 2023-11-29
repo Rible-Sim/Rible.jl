@@ -367,7 +367,7 @@ function solve!(sim::Simulator,solver_cache::Zhong06_Frictionless_Nonconstant_Ma
                     # Λₘ .+= α.*ΔΛc
                     # y .+= α.*Δyc
 
-                    @show Λₘ, y
+                    # @show Λₘ, y
                     x .+= α.*Δxc
                     μ = transpose(y)*Λₘ/na
                     # @show timestep, iteration, normRes, norm(Δx), norm(ΔΛₖ),persistent_idx

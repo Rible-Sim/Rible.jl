@@ -9,10 +9,11 @@ using BlockDiagonals
 using TypeSortedCollections
 using RecursiveArrayTools
 using Interpolations
-using TypedTables
+using StructArrays
 # AD
 using ForwardDiff
 # data
+using TypedTables
 using DataStructures
 using Rotations
 using CoordinateTransformations
@@ -32,6 +33,7 @@ using Match
 # print
 using PrettyTables
 using Printf
+using TexTables
 # IO
 using FileIO
 # code

@@ -6,15 +6,10 @@ to_resolution(dpi,len) = uconvert(Unitful.NoUnits,dpi*len)
 pt2px(x, ppi = 300*u"px"/1u"inch") = ustrip(u"px",x*u"pt"*ppi)
 px2pt(x, ppi = 300*u"px"/1u"inch") = ustrip(u"pt",x*u"px"/ppi)
 
-fontsize::Float64 = 8 |> pt2px
-markersize::Float64 = 0.5fontsize
-linewidth::Float64 = 0.5 |> pt2px
-# cablewidth = 0.75 |> pt2px
-# barwidth = 1.5 |> pt2px
-cw::Float64 = 455 |> pt2px
-tw::Float64 = 455 |> pt2px
-th::Float64 = 688.5 |> pt2px
-# 455.24411
+fontsize::Float64 = 8 #|> pt2px
+markersize::Float64 = 0.5#fontsize
+linewidth::Float64 = 0.5 #|> pt2px
+tw::Float64 = 455.24411 #|> pt2px
 mks_cyc::Base.Iterators.Cycle{Vector{String}} = Iterators.cycle(["o","v","^","s","P","X","d","<",">","h"])
 lss_cyc::Base.Iterators.Cycle{Vector{String}} = Iterators.cycle(["-","--","-.",":"])
 alphabet::String = join('a':'z')
@@ -88,13 +83,13 @@ function plot_traj!(bot::RB.Robot;
         figname=nothing,
         showinit=false,
         auto=false,
-        titleformatfunc = (sgi,tt)-> begin
+        titleformatfunc = (subgrid_idx,tt)-> begin
             rich(
-                rich("($(alphabet[sgi])) ", font=:bold),
+                rich("($(alphabet[subgrid_idx])) ", font=:bold),
                 (@sprintf "t = %.10G (s)" tt)
             )
         end,
-        sup! = (ax,tgob,sgi)->nothing,
+        sup! = (ax,tgob,subgrid_idx)->nothing,
         kargs...
     )
     (;structure,traj) = bot
@@ -115,11 +110,11 @@ function plot_traj!(bot::RB.Robot;
     ] |> permutedims
     parsed_steps = @match (attimes,atsteps) begin
         (a::Nothing,b::Nothing) => [
-                1 for sgi in eachindex(subgrids)
+                1 for subgrid_idx in eachindex(subgrids)
             ]
         (a,b::Nothing) => [
-                time2step(a[sgi],traj.t)
-                for sgi in eachindex(subgrids)
+                time2step(a[subgrid_idx],traj.t)
+                for subgrid_idx in eachindex(subgrids)
             ]
         (a::Nothing,b) => b
         (a,b) => begin
@@ -129,30 +124,31 @@ function plot_traj!(bot::RB.Robot;
     end
     # @warn "Overwriting `atsteps`"
     # @warn "Ignoring `attimes`"
-    for sgi in eachindex(parsed_steps)
-        if sgi > length(subgrids)
-            sg = subgrids[end]
+    for subgrid_idx in eachindex(parsed_steps)
+        if subgrid_idx > length(subgrids)
+            subgrid = subgrids[end]
         else
-            sg = subgrids[sgi]
+            subgrid = subgrids[subgrid_idx]
         end
-        this_step = parsed_steps[sgi]
+        this_step = parsed_steps[subgrid_idx]
         this_time = Observable(traj.t[this_step])
         RB.goto_step!(bot,this_step;actuate)
         tgob = Observable(deepcopy(structure))
         axtitle = map(this_time) do tt
-            titleformatfunc(sgi,tt)
+            titleformatfunc(subgrid_idx,tt)
         end
         if ndim == 2 && !showmesh
             # showinfo = false
             showground = false
-            ax = Axis(sg[1,1],)
+            ax = Axis(subgrid[1,1],)
             ax.aspect = DataAspect()
             xlims!(ax,xmin,xmax)
             ylims!(ax,ymin,ymax)
         elseif AxisType <: Axis3
-            ax = Axis3(sg[1,1],
+            ax = Axis3(subgrid[1,1],
                 # title=axtitle,
                 aspect=:data,
+                # tellheight=false,
             )
             xlims!(ax,xmin,xmax)
             ylims!(ax,ymin,ymax)
@@ -192,10 +188,10 @@ function plot_traj!(bot::RB.Robot;
                 kargs...
             )
         end
-        sup!(ax,tgob,sgi)
+        sup!(ax,tgob,subgrid_idx)
         if showtitle    
             Label(
-                sg[1, 1, Top()],
+                subgrid[1, 1, Top()],
                 axtitle,
                 padding = (0,0,0,0),
                 justification = :right,
@@ -203,6 +199,7 @@ function plot_traj!(bot::RB.Robot;
                 halign = :center,
                 valign = :bottom,
             )
+            # Label(subgrid[1,1,TopLeft()],"($(alphabet[1]))",font=:bold)
         end
         # add background
         if showback
@@ -223,7 +220,7 @@ function plot_traj!(bot::RB.Robot;
         end
         if doslide || dorecord
             if showinfo
-                grid2 = sg[:,2] = GridLayout(;tellheight=false)
+                grid2 = subgrid[:,2] = GridLayout(;tellheight=false)
                 grid_info = grid2[1,1] = GridLayout(;tellheight=false)
                 dict_info = [
                     "fig. height" => map(string,ax.height),
@@ -275,7 +272,7 @@ function plot_traj!(bot::RB.Robot;
                     tgob[] = structure
                 end
             else
-                grid3 = sg[2,:] = GridLayout()
+                grid3 = subgrid[2,:] = GridLayout()
                 slidergrid = SliderGrid(
                     grid3[1,1],
                     (label = "Step", range = 1:length(traj), startvalue = this_step),
@@ -310,7 +307,7 @@ function plot_traj!(bot::RB.Robot;
     fig
 end
 
-function savefig(fig,figname=nothing)
+function savefig(fig,figname=nothing;)
     if !isa(figname,Nothing)
         if isdefined(Main,:figdir)
             figpath = joinpath(figdir,figname)
@@ -319,10 +316,11 @@ function savefig(fig,figname=nothing)
         end
         if Makie.current_backend() == CM
             @info "Saving to $figpath.pdf"
-            CM.save(figpath*".pdf",fig)
+            CM.save(figpath*".pdf",fig;pt_per_unit=1)
         else
+            px_per_unit = ustrip(u"inch",tw*u"pt")*600/tw # 300dpi
             @info "Saving to $figpath.png"
-            GM.save(figpath*".png",fig)
+            GM.save(figpath*".png",fig;px_per_unit)
         end
     end
     fig
@@ -688,12 +686,12 @@ function plot_self_stress_states(
             ylims = (-4e-1,4e-1),
             zlims = (-4e-1,4e-1),
             showground = false,
-            sup! = (ax,tgob,sgi)-> begin
+            sup! = (ax,tgob,subgrid_idx)-> begin
             # cables
                 hidexyz(ax)
-                @myshow Sbool[:,sgi]
+                @myshow Sbool[:,subgrid_idx]
                 linesegs_cables = @lift begin
-                    get_linesegs_cables($tgob;)[Sbool[:,sgi]]
+                    get_linesegs_cables($tgob;)[Sbool[:,subgrid_idx]]
                 end
                 linesegments!(ax, 
                     linesegs_cables, 
@@ -718,15 +716,15 @@ function plot_self_stress_states(
                 end
                 # @show rcs_by_cables
                 Stext = [
-                        @sprintf "%4.2f"  S[i,sgi] 
+                        @sprintf "%4.2f"  S[i,subgrid_idx] 
                         for i in axes(S,1)
-                        if Sbool[i,sgi]
+                        if Sbool[i,subgrid_idx]
                     ]
                 @myshow Stext
                 text!(
                     ax,
                     Stext,
-                    position = rcs_by_cables[][Sbool[:,sgi]],
+                    position = rcs_by_cables[][Sbool[:,subgrid_idx]],
                     fontsize = fontsize,
                     color = :red,
                     align = (:right, :top),
