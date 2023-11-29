@@ -197,8 +197,8 @@ function PrototypeJoint(id,indexed,hen2egg,joint_type::Symbol)
         mask_1st,mask_2nd,mask_3rd,mask_4th,
         q_hen,q_egg
     )
-    @show mask_1st,mask_2nd,mask_3rd,mask_4th
-    @show values
+    # @show mask_1st,mask_2nd,mask_3rd,mask_4th
+    # @show values
     PrototypeJoint(
         id,hen2egg,
         num_of_cstr,

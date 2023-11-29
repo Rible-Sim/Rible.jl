@@ -100,6 +100,6 @@ struct NonminimalCoordinatesCache{MType,JType,GType}
     ∂M⁻¹p∂q::JType
     "Coriolis force"
     Ṁq̇::GType
-    "Centripetal force"
+    "centrifugal force"
     ∂T∂qᵀ::GType
 end

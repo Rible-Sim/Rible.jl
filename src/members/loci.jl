@@ -137,12 +137,23 @@ function FrictionalContactState(normal::StaticArray{Tuple{N},T}) where {N,T}
     )
 end
 
+
+function reset!(contact_state::FrictionalContactState{N,T}) where {N,T}
+    contact_state.active = false
+    contact_state.persistent = true
+    contact_state.gap = typemax(T)
+    contact_state.relative_velocity = @SVector zeros(T,N)
+    contact_state.force = @SVector zeros(T,N)
+end
+
+
 function activate!(contact_state::FrictionalContactState,gap)
     contact_state.gap = gap
     pre_active = contact_state.active
     contact_state.active = (gap<=0)
     contact_state.persistent = (pre_active == contact_state.active)
 end
+
 
 mutable struct LocusState{N,M,T}
     position::MVector{N,T}

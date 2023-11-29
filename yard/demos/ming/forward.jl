@@ -145,7 +145,7 @@ function plot2(bot,qs,bodyid,pid,f)
     font_size = 10u"pt"
     dpi=300/(1u"inch")
     font_pixel = to_resolution(dpi,font_size)
-    resolution = to_resolution.(dpi,(fig_width,fig_height))
+    size = to_resolution.(dpi,(fig_width,fig_height))
     @show resolution
     fig = Figure(;resolution)
     eyepos = Vec3f(0.21623512, 0.5631353, 0.21988256)

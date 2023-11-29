@@ -41,7 +41,7 @@ function build_joint_cache(
         vio_3rd[mask_3rd],
         vio_4th[mask_4th];
     )
-    @show r_egg, r_hen
+    # @show r_egg, r_hen
     cache = @eponymtuple(
         quat_trl_rel_hen, quat_trl_rel_egg, quat_rot_rel_hen, quat_rot_rel_egg,
         rot_quat,

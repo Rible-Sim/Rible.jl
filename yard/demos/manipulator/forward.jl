@@ -256,7 +256,7 @@ function plot_angles(bot,seq,seq_g)
     font_size = 10u"pt"
     dpi=300/(1u"inch")
     font_pixel = to_resolution(dpi,font_size)
-    resolution = to_resolution.(dpi,(fig_width,fig_height))
+    size = to_resolution.(dpi,(fig_width,fig_height))
     # @show resolution
     fig = Figure(;resolution)
     ax1 = Axis(fig[1,1])
@@ -396,7 +396,7 @@ function plot_sweeping_compare(bot,seqs1,seqs2,seqs3)
     font_size = 10u"pt"
     dpi=300/(1u"inch")
     font_pixel = to_resolution(dpi,font_size)
-    resolution = to_resolution.(dpi,(fig_width,fig_height))
+    size = to_resolution.(dpi,(fig_width,fig_height))
     fig = Figure(;resolution)
     ax1 = fig[1, 1] = Axis(fig)
     ax2 = fig[1, 2] = Axis(fig)

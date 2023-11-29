@@ -12,11 +12,7 @@ function make_top(origin_position = [0.0,0.0,0.0],
     )
     ω = R*Ω
     contactable = true
-    if visible
-        pres_idx = [1,2,3]
-    else
-        pres_idx = Int[]
-    end
+    pres_idx = Int[]
 
     m =  0.58387070
     mass_locus = @SVector zeros(3)

@@ -74,11 +74,11 @@ function generate_cache(
     Zhong06_Frictionless_Nonconstant_Mass_Cache(cache)
 end
 
-function Momentum_ZhongQCCPN_k(qₖ₋₁,pₖ₋₁,qₖ,λₘ,Mₘ,A,Λₘ,Dₖ₋₁,Dₖ,H,scaling,h)
+function Momentum_ZhongQCCPN_k(qₖ₋₁,pₖ₋₁,qₖ,λₘ,Mₘ,A,Λₘ,Dₖ₋₁,Dₖ,H,mass_norm,scalingΛ,h)
     pₖ = -pₖ₋₁ .+ 
         2/h.*Mₘ*(qₖ.-qₖ₋₁) .+ 
-        scaling/h.*(transpose(A(qₖ))-transpose(A(qₖ₋₁)))*λₘ .+
-        scaling.*(transpose(Dₖ)-transpose(Dₖ₋₁))*H*Λₘ
+        mass_norm/h.*(transpose(A(qₖ))-transpose(A(qₖ₋₁)))*λₘ .+
+        mass_norm*scalingΛ/h.*(transpose(Dₖ)-transpose(Dₖ₋₁))*H*Λₘ
 end
 
 function make_step_k(
@@ -88,7 +88,7 @@ function make_step_k(
         pₖ,vₖ,
         structure,
         contact_cache,
-        h,scaling,
+        h,mass_norm,scalingΛ,scalingy
     )
     (;
         F!,Jac_F!,
@@ -129,13 +129,13 @@ function make_step_k(
         𝐫𝐞𝐬[   1:n1] .= h.*Mₘ*vₘ .- 
                         h.*pₖ₋₁ .-
                         (h^2)/2 .*Fₘ .-
-                        scaling.*transpose(Aₖ₋₁)*λₘ 
-        𝐫𝐞𝐬[n1+1:n2] .= scaling.*Φ(qₖ)
+                        mass_norm.*transpose(Aₖ₋₁)*λₘ 
+        𝐫𝐞𝐬[n1+1:n2] .= mass_norm.*Φ(qₖ)
         
         𝐉 .= 0.0
         𝐉[   1:n1,   1:n1] .=  Mₘ .+ 1/2 .*∂Mₘhq̇ₘ∂qₘ .-h^2/2 .*(1/2 .*∂Fₘ∂qₘ .+ 1/h.*∂Fₘ∂q̇ₘ)
-        𝐉[   1:n1,n1+1:n2] .= -scaling.*transpose(Aₖ₋₁)
-        𝐉[n1+1:n2,   1:n1] .=  scaling.*Aₖ
+        𝐉[   1:n1,n1+1:n2] .= -mass_norm.*transpose(Aₖ₋₁)
+        𝐉[n1+1:n2,   1:n1] .=  mass_norm.*Aₖ
         
         if na != 0
             (;
@@ -143,25 +143,25 @@ function make_step_k(
                 restitution_coefficients,
                 persistent_idx
             ) = contact_cache.cache
-            𝐫𝐞𝐬[   1:n1] .-= scaling*h .*transpose(Dₖ₋₁)*H*Λₘ 
+            𝐫𝐞𝐬[   1:n1] .-= mass_norm*scalingΛ.*transpose(Dₖ₋₁)*H*Λₘ 
             get_directions_and_positions!(structure, contact_cache, qₖ, vₖ, H*Λₘ)
             Dₖ = contact_cache.cache.D
             ŕₖ = contact_cache.cache.ŕ
             ∂Dₖvₖ∂qₖ = contact_cache.cache.∂Dq̇∂q
             ∂DᵀₖHΛₘ∂qₖ = contact_cache.cache.∂DᵀΛ∂q
-            pₖ .= Momentum_ZhongQCCPN_k(qₖ₋₁,pₖ₋₁,qₖ,λₘ,Mₘ,A,Λₘ,Dₖ₋₁,Dₖ,H,scaling,h)
+            pₖ .= Momentum_ZhongQCCPN_k(qₖ₋₁,pₖ₋₁,qₖ,λₘ,Mₘ,A,Λₘ,Dₖ₋₁,Dₖ,H,mass_norm,scalingΛ,h)
             M⁻¹_and_Jac_M⁻¹!(M⁻¹ₖ,∂M⁻¹ₖpₖ∂qₖ,qₖ,pₖ)
             vₖ .= M⁻¹ₖ*pₖ
             ∂Aᵀₖλₘ∂qₖ = ∂Aᵀλ∂q(qₖ,λₘ)
             ∂pₖ∂qₖ = 2/h.*Mₘ + 
                      1/h.*∂Mₘhq̇ₘ∂qₘ .+
-                     scaling/h.*∂Aᵀₖλₘ∂qₖ .+ 
-                     scaling.*∂DᵀₖHΛₘ∂qₖ
-            ∂pₖ∂λₘ = scaling/h.*transpose(Aₖ-Aₖ₋₁)
+                     mass_norm/h.*∂Aᵀₖλₘ∂qₖ .+ 
+                     mass_norm*scalingΛ/h.*∂DᵀₖHΛₘ∂qₖ
+            ∂pₖ∂λₘ = mass_norm/h.*transpose(Aₖ-Aₖ₋₁)
             ∂vₖ∂qₖ = M⁻¹ₖ*∂pₖ∂qₖ .+ ∂M⁻¹ₖpₖ∂qₖ
             ∂vₖ∂λₘ = M⁻¹ₖ*∂pₖ∂λₘ
             𝐁 .= 0
-            𝐁[  1:n1,   1:na] .= scaling.*h .*transpose(Dₖ₋₁)*H
+            𝐁[  1:n1,   1:na] .= mass_norm*scalingΛ .*transpose(Dₖ₋₁)*H
             # @show na
             v́ₖ = Dₖ*vₖ
             ∂v́ₖ∂qₖ = Dₖ*∂vₖ∂qₖ .+ ∂Dₖvₖ∂qₖ 
@@ -195,15 +195,16 @@ function make_step_k(
                     𝐜ᵀ[[i],n1+1:n2] .= Dⁱₖ*∂vₖ∂λₘ
                 end
             end
-
-            𝐜ᵀinv𝐉 = 𝐜ᵀ*inv(𝐉)
-            𝐍 .= 𝐜ᵀinv𝐉*𝐁
+            lu𝐉 = lu(𝐉)
+            # 𝐜ᵀinv𝐉 = 𝐜ᵀ*inv(𝐉)
+            𝐍 .= scalingy.*𝐜ᵀ*(lu𝐉\𝐁)
+            # @show norm(𝐜ᵀ),norm(𝐁),𝐍
             # debug
             # @show norm(D*vₖ + 𝐛), norm(𝐫𝐞𝐬)
             # @show Λₘ, D*vₖ, 𝐛
             # @show v́ₖ
             # @show Λₘ[1:3]⋅(v́ₖ + 𝐛)[1:3]
-            𝐫 .= (v́⁺ + 𝐛) - 𝐜ᵀinv𝐉*(𝐫𝐞𝐬 + 𝐁*Λₘ)
+            𝐫 .= scalingy.*(v́⁺ + 𝐛) - scalingy.*𝐜ᵀ*(lu𝐉\(𝐫𝐞𝐬 + 𝐁*Λₘ))
         end
 
     end
@@ -238,9 +239,16 @@ function solve!(sim::Simulator,solver_cache::Zhong06_Frictionless_Nonconstant_Ma
     Res = zero(Δx)
     Jac = zeros(T,nx,nx)
     mr = norm(Mₘ,Inf)
-    scaling = mr
-    iteration = 0
+    mass_norm = mr
+    # scalingΛ = dt^0;  scalingy = dt^1    # position 
+    scalingΛ = dt  ;  scalingy = dt^0    # velocity 
+    # scalingΛ = dt^2;  scalingy = dt^(-1) # accel/force
+   
     prog = Progress(totalstep; dt=1.0, enabled=progress)
+    outer_condition_number = typemax(T)
+    inner_condition_number = typemax(T)
+    outer_iteration = 0
+    inner_iteration = 0
     for timestep = 1:totalstep
         #---------Time Step k Control-----------
         # control!(sim,cache)
@@ -260,7 +268,6 @@ function solve!(sim::Simulator,solver_cache::Zhong06_Frictionless_Nonconstant_Ma
         (;na,) = contact_cache.cache
         isconverged = false
         normRes = typemax(T)
-        iteration_break = 0
         Λₘ = zeros(T,na)
         Λʳₖ = copy(Λₘ)
         ΔΛₖ = copy(Λₘ)
@@ -279,7 +286,7 @@ function solve!(sim::Simulator,solver_cache::Zhong06_Frictionless_Nonconstant_Ma
             solver_cache,
             nq,nλ,na,qₖ₋₁,q̇ₖ₋₁,pₖ₋₁,tₖ₋₁,pₖ,q̇ₖ,
             structure,contact_cache,
-            dt,scaling
+            dt,mass_norm,scalingΛ,scalingy
         )
         restart_count = 0
         Λ_guess = 0.1
@@ -289,6 +296,10 @@ function solve!(sim::Simulator,solver_cache::Zhong06_Frictionless_Nonconstant_Ma
             x[   nq+1:nq+nλ]       .= 0.0
             Λʳₖ .= Λₘ
             Nmax = 50
+            outer_condition_number = typemax(T)
+            inner_condition_number = typemax(T)
+            outer_iteration = 0
+            inner_iteration = 0
             for iteration = 1:maxiters
                 # @show iteration,D,ηs,restitution_coefficients,gaps
                 ns_stepk!(
@@ -298,14 +309,15 @@ function solve!(sim::Simulator,solver_cache::Zhong06_Frictionless_Nonconstant_Ma
                     Dₖ₋₁,ŕₖ₋₁,
                     timestep,iteration
                 )
+                # outer_condition_number = cond(Jac)
                 if na == 0
                     normRes = norm(Res)
                     if normRes < ftol
                         isconverged = true
-                        iteration_break = iteration-1
+                        outer_iteration = iteration-1
                         break
                     end
-                    Δx .= -Jac\Res
+                    Δx .= Jac\(-Res)
                     x .+= Δx
                 else # na!=0
                     # @show timestep,iteration,normRes,Λₘ
@@ -317,21 +329,21 @@ function solve!(sim::Simulator,solver_cache::Zhong06_Frictionless_Nonconstant_Ma
                     # @show iteration
                     # display(𝐍)
                     # display(𝐫)
-                    frictionless_IPM!(Λₘ,na,na,Λₘini,yini,𝐍,𝐫;ftol=1e-14,Nmax)
+                    inner_iteration, inner_condition_number = frictionless_IPM!(Λₘ,na,na,Λₘini,yini,𝐍,𝐫,dt;ftol,Nmax)
                     ΔΛₖ .= Λₘ - Λʳₖ
                     minusResΛ = -Res + 𝐁*(ΔΛₖ)
                     normRes = norm(minusResΛ)
                     if  normRes < ftol
                         isconverged = true
-                        iteration_break = iteration-1
+                        outer_iteration = iteration-1
                         break
                     elseif normRes > 1e10
                         # force restart
-                        iteration_break = iteration-1
+                        outer_iteration = iteration-1
                         isconverged = false
                         break
                     elseif iteration == maxiters
-                        iteration_break = iteration-1
+                        outer_iteration = iteration-1
                         isconverged = false
                     end
                     Δx .= Jac\minusResΛ
@@ -355,11 +367,11 @@ function solve!(sim::Simulator,solver_cache::Zhong06_Frictionless_Nonconstant_Ma
         # (;Dper, Dimp, ∂Dq̇∂q, ∂DᵀΛ∂q) = contact_cache.cache
         Dₖ = contact_cache.cache.D
         # ŕₖ = contact_cache.cache.ŕ
-        pₖ .= Momentum_ZhongQCCPN_k(qₖ₋₁,pₖ₋₁,qₖ,λₘ,Mₘ,A,Λₘ,Dₖ₋₁,Dₖ,H,scaling,dt)
+        pₖ .= Momentum_ZhongQCCPN_k(qₖ₋₁,pₖ₋₁,qₖ,λₘ,Mₘ,A,Λₘ,Dₖ₋₁,Dₖ,H,mass_norm,scalingΛ,dt)
         M⁻¹!(M⁻¹ₖ,qₖ)
         q̇ₖ .= M⁻¹ₖ*pₖ
         if na != 0
-            update_contacts!(cₖ[contacts_bits],cₖ₋₁[contacts_bits],Dₖ*q̇ₖ,Λₘ./(scaling*dt))
+            update_contacts!(cₖ[contacts_bits],cₖ₋₁[contacts_bits],Dₖ*q̇ₖ,Λₘ./(mass_norm*dt))
         end
         if !isconverged
             @warn "Newton max iterations $maxiters, at timestep=$timestep, normRes=$(normRes)"
@@ -374,13 +386,26 @@ function solve!(sim::Simulator,solver_cache::Zhong06_Frictionless_Nonconstant_Ma
 
         #---------Time Step k finisher-----------
         pₖ₋₁, pₖ = pₖ, pₖ₋₁
+        record!(
+            sim.solver_history,
+            (
+                residual=normRes,
+                inner_iteration=inner_iteration,
+                outer_iteration=outer_iteration,
+                walltime = 1.0,
+                num_of_contacts = na,
+                outer_condition_number = outer_condition_number,
+                inner_condition_number = inner_condition_number,
+            ),
+            timestep
+        )
         if verbose || (na>0 && verbose_contact)
             dg_step = ceil(Int,log10(totalstep))+1
             dg_dt = max(1,-floor(Int,log10(dt)))
             wd_t = ceil(Int,log10(traj.t[end]))+dg_dt+1+1
             progfmt = Printf.Format("Prog.: %5.1f%%, step: %$(dg_step)u, time: %$(wd_t).$(dg_dt)f, iters: %s, contacts: %s \n")
             progstr = Printf.format(progfmt,
-                floor(timestep/totalstep*100;digits=1), timestep, traj.t[timestep], iteration_break, na
+                floor(timestep/totalstep*100;digits=1), timestep, traj.t[timestep], outer_iteration, na
             )
             print(progstr)
         end

@@ -4,15 +4,17 @@ end
 
 function cstr_function(qcs::QC,cstr_idx,x,d=get_deform(qcs))
     q = @view x[4:7]
-    (transpose(q)*q - d)/2
+    Φ = [(transpose(q)*q - d)/2]
+    @view Φ[cstr_idx]
 end
 
 function cstr_jacobian(::QC,free_idx,cstr_idx,x)
     q = @view x[4:7]
     o = zero(eltype(q))
-    SA[
+    jac =  SA[
         o o o q[1] q[2] q[3] q[4];
     ]
+    @view jac[cstr_idx,free_idx]
 end
 
 cstr_forces_jacobian(qcs::QC,free_idx,cstr_idx,λ::AbstractVector) = cstr_forces_jacobian(qcs,free_idx,cstr_idx,first(λ))

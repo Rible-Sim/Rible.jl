@@ -15,10 +15,6 @@ function slider_crank(;θ = 0, coordsType = RB.NCF.NC)
         150.0,
         -75.0,
     ]
-    # ω0 = [
-    #     0.0,
-    #     0.0,
-    # ]
     b = 0.05
     a = 0.025
     d = 0.05
@@ -105,7 +101,7 @@ function slider_crank(;θ = 0, coordsType = RB.NCF.NC)
             ω0[i-1],0,0,
         )
         ri = ro
-        @show ro
+        # @show ro
         if i == 2
             ṙo = [0,0,ω0[i-1]*l[i-1]/2]
         else
@@ -146,7 +142,7 @@ function slider_crank(;θ = 0, coordsType = RB.NCF.NC)
             ],
             # rot = RotZ(π),
             scale=1/1000,
-            color = :silver,
+            color = :slategrey,
         )
 
         RB.RigidBody(prop,state,coords,linkmesh)

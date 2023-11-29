@@ -277,7 +277,7 @@ function IPM!(output,nu,nΛ,Λ,y,N,r;ftol=1e-14,Nmax=50)
     y_split
 end
 
-function frictionless_IPM!(output,nu,nΛ,Λ,y,N,r;ftol=1e-14,Nmax=50)
+function frictionless_IPM!(output,nu,nΛ,Λ,y,N,r,h;ftol=1e-12,Nmax=50)
     T = eltype(Λ)
     𝐞 = ones(T,nu)
     Λ_split = split_by_lengths(Λ,1)
@@ -303,23 +303,25 @@ function frictionless_IPM!(output,nu,nΛ,Λ,y,N,r;ftol=1e-14,Nmax=50)
     Δyc = @view Δxc[n1+1:n2]
     ΔΛc_split = split_by_lengths(ΔΛc,1)
     Δyc_split = split_by_lengths(Δyc,1)
+    iteration = Nmax
+    condition_number = typemax(T)
     for k = 1:Nmax
 
         𝐫𝐞𝐬[   1:n1] .= N*Λ .+ r .- y
         𝐫𝐞𝐬[n1+1:n2] .= reduce(vcat,Λ_split⊙y_split)
 
+        𝐉[n1+1:n2,   1:n1] .= BlockDiagonal(mat.(y_split))
+        𝐉[n1+1:n2,n1+1:n2] .= BlockDiagonal(mat.(Λ_split))
         res = norm(𝐫𝐞𝐬)
         if res < ftol
             # @show k, Λ_split[1],y_split[1]
             # @show Λ_split[1]⊙y_split[1]
+            iteration = k
             # @show k
             break
         elseif k == Nmax
             # @warn "IPM: Max iteration $k reached"
         end
-
-        𝐉[n1+1:n2,   1:n1] .=  BlockDiagonal(mat.(y_split))
-        𝐉[n1+1:n2,n1+1:n2] .=  BlockDiagonal(mat.(Λ_split))
 
         lu𝐉 = lu(𝐉)
         Δxp .= lu𝐉\(-𝐫𝐞𝐬)
@@ -348,9 +350,11 @@ function frictionless_IPM!(output,nu,nΛ,Λ,y,N,r;ftol=1e-14,Nmax=50)
         Λ .+= α.*ΔΛc
         y .+= α.*Δyc
         μ = transpose(y)*Λ/nΛ
+        # @show k, 𝐫𝐞𝐬, Λ, y, α
     end
     output .= Λ
-    y_split
+    # condition_number = cond(𝐉)
+    iteration, condition_number
 end
 
 function ⊙(x::AbstractVector{T},y::AbstractVector{T}) where {T<:Real}

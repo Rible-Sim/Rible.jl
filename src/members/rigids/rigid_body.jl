@@ -530,6 +530,7 @@ function clear_forces!(body::AbstractRigidBody)
     foreach(loci_states) do locus_state
         locus_state.force .= 0
         locus_state.torque .= 0
+        reset!(locus_state.contact_state)
     end
 end
 

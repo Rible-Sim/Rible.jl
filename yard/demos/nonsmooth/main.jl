@@ -13,12 +13,13 @@ include("../../vis.jl")
 includet("../../vis.jl")
 include("../../../examples/robots/spinningtop.jl")
 includet("../../../examples/robots/spinningtop.jl")
-function top_contact_dynfuncs(bot;checkpersist=true,)
-    RB.frictionless_contact_dynfuncs(bot;
-        flatplane = RB.Plane([0,0,1.0],[0,0,0.0]),
-        checkpersist,
-    )
-end
+
+# Contact Surfaces
+planes = RB.StaticContactSurfaces(
+    [
+        RB.Plane([0,0,1.0],[0,0,0.0]),
+    ]
+)
 
 origin_position = [0,0,0.5]
 R = RotX(π/24)
@@ -35,8 +36,20 @@ topq = make_top(origin_position,R,origin_velocity,Ω;μ,e,loadmesh=true)
 #note subsequent iteration slow convergence 
 #note initial guess can not improve it?
 RB.solve!(
-    RB.DynamicsProblem(topq,top_contact_dynfuncs),
-    RB.ZhongQCCPN();
+    RB.DynamicsProblem(
+        topq,
+        planes,
+        RB.RestitutionFrictionCombined(
+            RB.NewtonRestitution(),
+            RB.Frictionless(),
+        )
+    ),
+    RB.DynamicsSolver(
+        RB.Zhong06(),
+        RB.InnerLayerContactSolver(
+            RB.InteriorPointMethod()
+        )
+    );
     tspan,
     dt=h,
     ftol=1e-10,
@@ -44,8 +57,20 @@ RB.solve!(
 )
 
 RB.solve!(
-    RB.DynamicsProblem(topq,top_contact_dynfuncs),
-    RB.ZhongQCCPNMono();
+    RB.DynamicsProblem(
+        topq,
+        planes,
+        RB.RestitutionFrictionCombined(
+            RB.NewtonRestitution(),
+            RB.Frictionless(),
+        )
+    ),
+    RB.DynamicsSolver(
+        RB.Zhong06(),
+        RB.MonolithicContactSolver(
+            RB.InteriorPointMethod()
+        )
+    );
     tspan,
     dt=h,
     ftol=1e-10,

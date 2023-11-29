@@ -190,14 +190,15 @@ function make_step_k(
                     ∂y∂x[[i],n1+1:n2] .= Dⁱₖ*∂vₖ∂λₘ
                 end
             end
-            𝐫𝐞𝐬[(n2   +1):(n2+ na)] .= v́⁺ .+ 𝐰 .- y
+            𝐫𝐞𝐬[(n2   +1):(n2+ na)] .= (h.*(v́⁺ .+ 𝐰) .- h.*y)
             𝐫𝐞𝐬[n2+na+1:n2+2na]     .= reduce(vcat,Λ_split⊙y_split)
 
-            𝐉[      1:n1    , n2+   1:n2+ na] .=  -scaling.*h .*transpose(Dₖ₋₁)*H
-            𝐉[n2+1:n2+ na,      1:n2    ]     .=  ∂y∂x
-            𝐉[n2+1:n2+ na, n2+na+1:n2+2na]    .= -I(na)
+            𝐉[      1:n1    , n2+   1:n2+ na] .=  -scaling*h .*transpose(Dₖ₋₁)*H
+            𝐉[n2+1:n2+ na,      1:n2    ]     .=  h.*∂y∂x
+            𝐉[n2+1:n2+ na,    n2+na+1:n2+2na] .= -h.*I(na)
             𝐉[n2+na+1:n2+2na, n2+   1:n2+ na] .=  BlockDiagonal(mat.(y_split))
             𝐉[n2+na+1:n2+2na, n2+na+1:n2+2na] .=  BlockDiagonal(mat.(Λ_split))
+            # @show cond(𝐉)
         end
     end
     ns_stepk!
@@ -228,6 +229,8 @@ function solve!(sim::Simulator,solver_cache::Zhong06_Frictionless_Nonconstant_Ma
     mr = norm(Mₘ,Inf)
     scaling = mr
     iteration = 0
+    α_record = ones(T,maxiters)
+    condition_number = typemax(T)
     prog = Progress(totalstep; dt=1.0, enabled=progress)
     for timestep = 1:totalstep
         #---------Time Step k Control-----------
@@ -298,6 +301,7 @@ function solve!(sim::Simulator,solver_cache::Zhong06_Frictionless_Nonconstant_Ma
             x[      1:nq]          .= qₖ
             x[   nq+1:nq+nλ]       .= 0.0
             Nmax = 50
+            α_record = fill(typemax(T),maxiters)
             for iteration = 1:maxiters
                 # @show iteration,D,ηs,restitution_coefficients,gaps
                 ns_stepk!(
@@ -307,6 +311,7 @@ function solve!(sim::Simulator,solver_cache::Zhong06_Frictionless_Nonconstant_Ma
                     Dₖ₋₁,ŕₖ₋₁,
                     timestep,iteration
                 )
+                condition_number = cond(Jac)
                 if na == 0
                     normRes = norm(Res)
                     if normRes < ftol
@@ -337,17 +342,6 @@ function solve!(sim::Simulator,solver_cache::Zhong06_Frictionless_Nonconstant_Ma
                     τ = σ*μp
                     Res_c = -τ.*𝐞.+(Δyp.*ΔΛp)
                     Res[n2+na+1:n2+2na] .+= Res_c
-                    Δxc .= lu𝐉\(-Res)
-                    # η = exp(-0.1μ) + 0.9
-                    α_Λ = find_nonnegative_step_length(Λ_split,ΔΛc_split)
-                    # @show Λ_split,ΔΛc_split
-                    α_y = find_nonnegative_step_length(y_split,Δyc_split)
-                    αmax = min(α_Λ,α_y)
-                    α = min(1,0.99αmax)
-                    # Λₘ .+= α.*ΔΛc
-                    # y .+= α.*Δyc
-                    x .+= α.*Δxc
-                    μ = transpose(y)*Λₘ/na
                     normRes = norm(Res)
                     if  normRes < ftol
                         isconverged = true
@@ -362,6 +356,20 @@ function solve!(sim::Simulator,solver_cache::Zhong06_Frictionless_Nonconstant_Ma
                         iteration_break = iteration-1
                         isconverged = false
                     end
+                    Δxc .= lu𝐉\(-Res)
+                    # η = exp(-0.1μ) + 0.9
+                    α_Λ = find_nonnegative_step_length(Λ_split,ΔΛc_split)
+                    # @show Λ_split,ΔΛc_split
+                    α_y = find_nonnegative_step_length(y_split,Δyc_split)
+                    αmax = min(α_Λ,α_y)
+                    α = min(1,0.999αmax)
+                    α_record[iteration] = α
+                    # Λₘ .+= α.*ΔΛc
+                    # y .+= α.*Δyc
+
+                    @show Λₘ, y
+                    x .+= α.*Δxc
+                    μ = transpose(y)*Λₘ/na
                     # @show timestep, iteration, normRes, norm(Δx), norm(ΔΛₖ),persistent_idx
                 end
             end
@@ -397,6 +405,18 @@ function solve!(sim::Simulator,solver_cache::Zhong06_Frictionless_Nonconstant_Ma
 
         #---------Time Step k finisher-----------
         pₖ₋₁, pₖ = pₖ, pₖ₋₁
+        record!(
+            sim.solver_history,
+            (
+                residual=normRes,
+                iteration=iteration_break,
+                walltime = 1.0,
+                num_of_contacts = na,
+                stepsizes = α_record,
+                condition_number = condition_number
+            ),
+            timestep
+        )
         if verbose || (na>0 && verbose_contact)
             dg_step = ceil(Int,log10(totalstep))+1
             dg_dt = max(1,-floor(Int,log10(dt)))

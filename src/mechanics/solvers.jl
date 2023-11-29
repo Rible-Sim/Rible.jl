@@ -98,14 +98,87 @@ function DynamicsProblem(bot::Robot,env::AbstractContactEnvironment,contact_mode
 end
 
 
-struct Simulator{ProbType,CtrlType,T}
+struct SolverHistory{dataType}
+    data::dataType
+end
+
+function SolverHistory(data::NamedTuple,n)
+    SolverHistory(
+        StructArray{typeof(data)}(undef,n)
+    )
+end
+
+function SolverHistory(bot::Robot,solver::DynamicsSolver,n)
+    T = get_numbertype(bot)
+    ini_record = (
+        residual=zero(T),
+        iteration=1,
+        walltime = 1.0,
+        num_of_contacts = 2
+    )
+    SolverHistory(
+        ini_record,
+        n
+    )
+end
+
+
+function SolverHistory(
+        bot::Robot,
+        solver::DynamicsSolver{IntorType,<:InnerLayerContactSolver},
+        n
+    ) where {IntorType}
+    T = get_numbertype(bot)
+    ini_record = (
+        residual=zero(T),
+        inner_iteration=1,
+        outer_iteration=2,
+        walltime = 1.0,
+        num_of_contacts = 2,
+        outer_condition_number = typemax(T),
+        inner_condition_number = typemax(T)
+    )
+    SolverHistory(
+        ini_record,
+        n
+    )
+end
+
+
+function SolverHistory(
+        bot::Robot,
+        solver::DynamicsSolver{IntorType,<:MonolithicContactSolver},
+        n
+    ) where {IntorType}
+    T = get_numbertype(bot)
+    ini_record = (
+        residual=zero(T),
+        iteration = 2,
+        walltime = 1.0,
+        num_of_contacts = 2,
+        stepsizes = [one(T)],
+        condition_number = typemax(T)
+    )
+    SolverHistory(
+        ini_record,
+        n
+    )
+end
+
+
+function record!(sh::SolverHistory,data,k)
+    sh.data[k] = data
+end
+
+
+struct Simulator{ProbType,CtrlType,T,dataType}
     prob::ProbType
     controller::CtrlType
     tspan::Tuple{T,T}
     restart::Bool
     totalstep::Int
+    solver_history::SolverHistory{dataType}
 end
-
 
 function Simulator(prob::DynamicsProblem,solver::DynamicsSolver,
         controller = (prescribe! = nothing, actuate! = nothing);
@@ -120,7 +193,12 @@ function Simulator(prob::DynamicsProblem,solver::DynamicsSolver,
             prescribe!(traj[i],structure)
         end
     end
-    Simulator(prob,controller,tspan,restart,totalstep)
+    solver_history = SolverHistory(
+        bot,
+        solver,
+        totalstep
+    )
+    Simulator(prob,controller,tspan,restart,totalstep,solver_history)
 end
 
 function GeneralizedAlpha(ρ∞)
@@ -185,6 +263,7 @@ function solve!(prob::DynamicsProblem,solver::DynamicsSolver,
                 tspan,dt,restart=true,karg...)
     simulator = Simulator(prob,solver,controller;tspan,dt,restart)
     solve!(simulator,solver;dt,karg...)
+    simulator
 end
 
 function solve!(simulator::Simulator,solver::DynamicsSolver;karg...)
@@ -194,6 +273,8 @@ function solve!(simulator::Simulator,solver::DynamicsSolver;karg...)
     # simulator,solvercache
     # simulator.prob.bot
 end
+
+
 
 # include("dynamics_solvers/Wendlandt.jl")
 include("dynamics_solvers/complementarity_solvers.jl")
