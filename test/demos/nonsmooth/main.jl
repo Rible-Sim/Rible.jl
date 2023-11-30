@@ -108,7 +108,7 @@ plot_traj!(
     # figsize=(0.6tw,0.6tw)
 )
 
-GM.activate!();with_theme(RB.theme_pub;
+GM.activate!();with_theme(theme_pub;
         size = (1.0tw,0.3tw),
         figure_padding = (0,fontsize,0,0),
         Axis3 = (

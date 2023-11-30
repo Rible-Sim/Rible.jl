@@ -1,16 +1,15 @@
-figdir::String = ""
-if Sys.iswindows()
-    figdir::String = raw"C:\Users\luo22\OneDrive\Papers\IMSD 2025\LaTex_Abstract"
-elseif Sys.isapple()
-    figdir::String = raw"/Users/jacob/Library/CloudStorage/OneDrive-SharedLibraries-onedrive/Papers/IMSD 2024/LaTex_Abstract"
-end
-#-- end
 
 include("deps.jl")
 using AbbreviatedStackTraces #jl
 ENV["JULIA_STACKTRACE_ABBREVIATED"] = true #jl
 ENV["JULIA_STACKTRACE_MINIMAL"] = true #jl
 import Rible as RB
+figdir::String = joinpath(pathof(RB),"../../tmp")
+if Sys.iswindows()
+    figdir::String = raw"C:\Users\luo22\OneDrive\Papers\IMSD 2025\LaTex_Abstract"
+elseif Sys.isapple()
+    figdir::String = raw"/Users/jacob/Library/CloudStorage/OneDrive-SharedLibraries-onedrive/Papers/IMSD 2024/LaTex_Abstract"
+end
 include("../../vis.jl")
 includet("../../vis.jl") #jl
 
@@ -34,8 +33,6 @@ planes = RB.StaticContactSurfaces(
     ]
 )
 
-GM.activate!(;px_per_unit=1,scalefactor = 2); 
-
 GM.activate!(;px_per_unit=2,scalefactor = 2); plot_traj!(sc;showground=false)
 
 RB.has_constant_mass_matrix(sc)
@@ -52,7 +49,7 @@ RB.solve!(
     dt,tspan,ftol=1e-14,maxiters=50,verbose=true,exception=true,progress=false,
 )
 
-GM.activate!(;px_per_unit=1,scalefactor = 2);plot_traj!(sc;showground=false)
+GM.activate!(;px_per_unit=2,scalefactor = 2);plot_traj!(sc;showground=false)
 
 # Frictionless Contact Dynamics
 
@@ -264,9 +261,9 @@ sc_mono_dt = [
     ).prob.bot
     for dt in dts
 ]
-_, err_avg = get_err_avg(sc_mono_dt;bid=4,pid=1,di=3)
+_, err_avg = RB.get_err_avg(sc_mono_dt;bid=4,pid=1,di=3)
 
-GM.activate!(;px_per_unit=4,scalefactor = 4);with_theme(RB.theme_pub;
+GM.activate!(;px_per_unit=4,scalefactor = 4);with_theme(theme_pub;
         fonts = (; 
             regular = "CMU Serif", 
             bold = "CMU Serif Bold",
@@ -335,25 +332,6 @@ GM.activate!(;px_per_unit=4,scalefactor = 4);with_theme(RB.theme_pub;
     fig
 end
 
-fig = Figure()
-ax  = Axis(fig[1,1])
-
-GM.activate!(); with_theme(RB.theme_pub;
-        fonts = (; 
-            regular = "CMU Serif", 
-            bold = "CMU Serif Bold",
-            italic = "CMU Serif Italic",
-            math = "NewComputerModern 10 Italic"
-        ),
-        linewidth,
-        markersize,
-        fontsize = 8 |> pt2px,
-        resolution = (0.4tw,0.2tw)
-    ) do 
-    fig = Figure()
-    savefig(fig,"convergence")
-    fig
-end
 r1_dt1 = RB.get_trajectory!(sc_mono_dt[5],4,1)
 r1_dt1[3,:] |> lines
 
@@ -378,15 +356,5 @@ RB.solve!(
     );
     dt,tspan,ftol=1e-14,maxiters=50,verbose=true,exception=true,progress=false,
 )
-
-plot_traj!(sc;showground=false)
-
-me = RB.mechanical_energy!(sc)
-lines(me.E)
-lines(me.V)
-lines(me.T)
-
-using PreallocationTools
-using ForwardDiff
 
 

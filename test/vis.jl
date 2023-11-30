@@ -20,6 +20,7 @@ tenmarkers::Vector{Symbol} = [
     :diamond,:hexagon,
     :star8,:star5
 ]
+
 tlabel::LaTeXString = L"t~(\mathrm{s})"
 
 macro myshow(exs...)
@@ -33,28 +34,80 @@ macro myshow(exs...)
     return blk
 end
 
-set_theme!(RB.theme_pub;
+theme_pub = Makie.Attributes(;
     fonts = (; 
         regular = "CMU Serif", 
         bold = "CMU Serif Bold",
         italic = "CMU Serif Italic",
         math = "NewComputerModern 10 Italic"
     ),
-    fontsize,
-    markersize,
+    size = (1280,720),
+    fontsize,#pt
     linewidth,
-    figure_padding = (fontsize,fontsize,fontsize,fontsize)
+    markersize,
+    figure_padding = (0,fontsize,0,-2fontsize),
+    palette = (
+        vlinecolor = [:slategrey],
+        linestyle = [
+            :solid,
+            :dash, 
+            :dot,
+            :dashdot,
+            :dashdotdot,
+        ],
+        marker = [
+            :xcross,:cross,
+            :utriangle,:dtriangle,
+            :ltriangle,:rtriangle,
+            :diamond,:hexagon,
+            :star8,:star5
+        ],
+        markercolor = [:red, :blue],
+    ),
+    Axis = (
+        # titlefont = "CMU Serif Bold",
+        # titlesize = fontsize,
+        titlegap = 0,
+        spinewidth=0.2,
+        xgridwidth=0.2,ygridwidth=0.2,
+        xminorgridwidth=0.2,yminorgridwidth=0.2,
+        xtickwidth = 0.2, ytickwidth = 0.2,
+        xminortickwidth = 0.2, yminortickwidth = 0.2,
+    ),
+    Axis3 = (
+        # titlefont = "CMU Serif Bold",
+        # titlesize = fontsize,
+        titlegap = 0,
+        xspinewidth=0.2,yspinewidth=0.2,zspinewidth=0.2,
+        xgridwidth=0.2,ygridwidth=0.2,zgridwidth=0.2,
+        xminorgridwidth=0.2,yminorgridwidth=0.2,zminorgridwidth=0.2,
+        xtickwidth = 0.2, ytickwidth = 0.2,ztickwidth=0.2,
+        xminortickwidth = 0.2, yminortickwidth = 0.2, zminortickwidth=0.2,
+        xlabeloffset = 2*8,
+        ylabeloffset = 2*8,
+        zlabeloffset = 4*8,
+    ),
+    Label = (
+        # fontsize = fontsize,
+        # font = "CMU Serif Bold",
+        halign = :left,
+        padding = (0, 0, 0, 0),
+        justification = :right,
+        lineheight = 1.0,
+        valign = :bottom,
+    ),
+    VLines = (
+        cycle = [:color => :vlinecolor],
+    ),
+    Mesh = (
+        color = :slategrey,
+        transparency = false
+    ),
+    Poly = (
+        color = :slategrey,
+        transparency = false,
+    )
 )
-
-function RB.get_groundmesh(f::Function,rect)
-    GB.Mesh(f, rect, NaiveSurfaceNets()) |> make_patch(;color = :snow)
-end
-
-function RB.get_groundmesh(plane::RB.Plane,rect)
-    GB.Mesh(rect, MarchingCubes()) do v
-        RB.signed_distance(v,plane)
-    end |> RB.make_patch(;color = :snow)
-end
 
 function plot_traj!(bot::RB.Robot;
         AxisType=LScene,
@@ -326,162 +379,145 @@ function savefig(fig,figname=nothing;)
     fig
 end
 
-function get_linesegs_cables(structure;slackonly=false,noslackonly=false)
-    (;connected) = structure.connectivity.tensioned
-    (;cables) = structure.tensiles
-    ndim = RB.get_num_of_dims(structure)
-    T = RB.get_numbertype(structure)
-    linesegs_cables = Vector{Tuple{Point{ndim,T},Point{ndim,T}}}()
-    foreach(connected) do scnt
-        scable = cables[scnt.id]
-        ret = (Point(scnt.hen.rbsig.state.loci_states[scnt.hen.pid].position),
-                Point(scnt.egg.rbsig.state.loci_states[scnt.egg.pid].position))
-        slacking = scable.state.tension <= 0
-        if (slackonly && slacking) ||
-           (noslackonly && !slacking) ||
-           (!slackonly && !noslackonly)
-            push!(linesegs_cables,ret)
-        end
-    end
-    linesegs_cables
-end
-
-function endpoints2mesh(
-        p1,p2;
-        radius=norm(p2-p1)/40,
-        n1=10,n2=2,
-        color=:slategrey
+function plot_kinematic_indeterminacy(
+        botinput,
+        D,
+        Ň,
+        # Ň = build_nullspace_on_free(bot.structure)
     )
-    cyl_bar = Meshes.Cylinder(
-        Meshes.Point(p1),
-        Meshes.Point(p2),
-        radius
+    bot = deepcopy(botinput)
+    nk = size(D,2)
+    δq̌ = [Ň*D[:,i] for i in axes(D,2)]
+    scaling=0.3
+    for i = 1:nk
+        push!(bot.traj,deepcopy(bot.traj[end]))
+        bot.traj.t[end] = i
+        δq̌i = δq̌[i]
+        ratio = norm(δq̌i)/norm(q̌)
+        bot.traj.q̌[end] .= q̌ .+ scaling.*δq̌i/ratio
+    end
+    plot_traj!(
+        bot;
+        AxisType=Axis3,
+        gridsize=(1,nk),        
+        atsteps=2:nk+1,
+        doslide=false,
+        showlabels=false,
+        showpoints=false,
+        # showcables = false,
+        showground = false,
+        # xlims = (-4e-2,4e-2),
+        # ylims = (-4e-2,4e-2),
+        # zlims = (-4e-2,4e-2),        
+        slack_linestyle = :solid,
+        showinit = true,
     )
-    cylsurf_bar = Meshes.boundary(cyl_bar)
-    # Meshes.sample(cylsurf_bar,Meshes.RegularSampling(10,3))
-    cyl_bar_simple = Meshes.discretize(cylsurf_bar,Meshes.RegularDiscretization(n1,n2))
-    simple2mesh(cyl_bar_simple,color)
 end
 
-function spbasis(n)
-    a = abs.(n)
-    if (a[1]≥0 && a[2]≥0) || (a[1]≤0 && a[2]≤0) 
-        v = SVector(n[1]+1,n[2]-1,n[3])
-    else
-        v = SVector(n[1]-1,n[2]-1,n[3])
+function plot_self_stress_states(
+        botinput,
+        S;
+        rtol = 1e-14
+        # Ň = build_nullspace_on_free(bot.structure)
+    )
+    bot = deepcopy(botinput)
+    @myshow S
+    maxS = maximum(abs.(S))
+    Sbool = S.> maxS*rtol
+    S[.!Sbool] .= 0.0
+    ns = size(S,2)
+    with_theme(theme_pub;
+        ) do 
+        plot_traj!(
+            bot;
+            AxisType=Axis3,
+            gridsize=(1,ns), 
+            doslide=false,
+            showlabels=false,
+            showpoints=false,
+            showcables = false,
+            xlims = (-4e-1,4e-1),
+            ylims = (-4e-1,4e-1),
+            zlims = (-4e-1,4e-1),
+            showground = false,
+            sup! = (ax,tgob,subgrid_idx)-> begin
+            # cables
+                hidexyz(ax)
+                @myshow Sbool[:,subgrid_idx]
+                linesegs_cables = @lift begin
+                    get_linesegs_cables($tgob;)[Sbool[:,subgrid_idx]]
+                end
+                linesegments!(ax, 
+                    linesegs_cables, 
+                    color = :red, 
+                    # linewidth = cablewidth
+                    )
+                rcs_by_cables = @lift begin
+                    (;tensioned) = $tgob.connectivity
+                    ndim = get_num_of_dims($tgob)
+                    T = get_numbertype($tgob)
+                    ret = Vector{MVector{ndim,T}}()
+                    mapreduce(
+                        (scnt)->
+                        [(
+                            scnt.hen.rbsig.state.loci_states[scnt.hen.pid].+
+                            scnt.egg.rbsig.state.loci_states[scnt.egg.pid]
+                        )./2],
+                        vcat,
+                        tensioned.connected
+                        ;init=ret
+                    )
+                end
+                # @show rcs_by_cables
+                Stext = [
+                        @sprintf "%4.2f"  S[i,subgrid_idx] 
+                        for i in axes(S,1)
+                        if Sbool[i,subgrid_idx]
+                    ]
+                @myshow Stext
+                text!(
+                    ax,
+                    Stext,
+                    position = rcs_by_cables[][Sbool[:,subgrid_idx]],
+                    fontsize = fontsize,
+                    color = :red,
+                    align = (:right, :top),
+                    offset = (-fontsize/2, 0)
+                )
+            end
+        )
     end
-    t = n×v |> normalize
-    b = n×t |> normalize
-    t,b
 end
 
-function RB.build_mesh(fb::RB.FlexibleBody,nsegs=100;color=:slategrey)
-    (;state) = fb
-    (;cache) = state
-    (;funcs,e) = cache
-    (;ancs) = funcs
-    (;L,radius) = ancs
-    T = typeof(L)
-    V = T <: AbstractFloat ? T : Float64
-    _r = RB.ANCF.make_r(ancs,e)
-    _rₓ = RB.ANCF.make_rₓ(ancs,e)
+function plot_convergence_order!(ax,dts,err_avg;show_orders=true)
 
-    sz = (10,nsegs)
-    φmin, φmax = V(0), V(2π)
-    xmin, xmax = V(0), V(L)
-    δφ = (φmax - φmin) / sz[1]
-    φrange = range(φmin, stop=φmax-δφ, length=sz[1])
-    xrange = range(xmin, stop=xmax,    length=sz[2])
+    scatterlines!(ax,
+        dts,
+        err_avg;
+        marker=:rect,
+        color=:red,
+        label="NMSI"
+    )
+    
 
-    function point(φ, x)
-        o = _r(x) |> Meshes.Point
-        n = _rₓ(x) |> normalize
-        u,v = spbasis(n)
-        R = [u v n]
-        R*Meshes.Vec(radius*cos(φ), radius*sin(φ), 0.0) + o
-    end
-
-    points = IterTools.ivec(point(φ, x) for φ in φrange, x in xrange) |> collect
-     # connect regular samples with quadrangles
-    nx, ny = sz
-    topo   = Meshes.GridTopology((nx-1, ny-1))
-    middle = collect(Meshes.elements(topo))
-    for j in 1:ny-1
-        u = (j  )*nx
-        v = (j-1)*nx + 1
-        w = (j  )*nx + 1
-        z = (j+1)*nx
-        quad = Meshes.connect((u, v, w, z))
-        push!(middle, quad)
-    end
-
-    connec = middle
-    Meshes.SimpleMesh(points, connec) |> (x)->simple2mesh(x,color)
-end
-
-function parse_Adams_dynamic(url)
-    adams_xml = readxml(url)
-    ns = namespaces(adams_xml.root)
-    ns[1] = "adams" => ns[1][2]
-    entities = findall("//adams:Entity[@entType='ADAMS_Variable']", adams_xml.root, ns)
-    names = Symbol.(vcat("time",[replace(ele["entity"],"."=>"_") for ele in entities]))
-    step_initialConditions = findfirst("//adams:Step[@type='initialConditions']",adams_xml.root, ns)
-    initialConditions = (;zip(names,parse.(Float64,split(step_initialConditions.content,"\n")[2:end-1]))...)
-    ret = StructArray([initialConditions])
-    step_dynamic = findall("//adams:Step[@type='dynamic']",adams_xml.root, ns)
-    for step in step_dynamic
-        step_values = parse.(Float64,split(step.content,"\n")[2:end-1])
-        # @assert length(variable_names) == length(step_data)
-        push!(ret,(;zip(names,step_values)...))
-    end
-    ret
-end
-
-function parse_Adams_static(url)
-    adams_xml = readxml(url)
-    ns = namespaces(adams_xml.root)
-    ns[1] = "adams" => ns[1][2]
-    entities = findall("//adams:Entity[@entType='ADAMS_Variable']", adams_xml.root, ns)
-    names = Symbol.(vcat("time",[replace(ele["entity"],"."=>"_") for ele in entities]))
-    step_initialConditions = findfirst("//adams:Step[@type='initialConditions']",adams_xml.root, ns)
-    step_static = findfirst("//adams:Step[@type='static']",adams_xml.root, ns)
-    step_values = parse.(Float64,split(step_static.content,"\n")[2:end-1])
-    (;zip(names,step_values)...)
-end
-
-function parse_Adams_frequency(url)
-    adams_xml = readxml(url)
-    ns = namespaces(adams_xml.root)
-    ns[1] = "adams" => ns[1][2]
-    frequency_node = findfirst("//adams:ModalEnergyHeader[@type='undamped_natural_freqs']",adams_xml.root, ns)
-    frequency_string = split(frequency_node.content,"\n")[2]
-    frequency = parse.(Float64,split(frequency_string," "))
-end
-
-function simple2mesh(sp,color=:slategrey)
-    dim   = Meshes.embeddim(sp)
-    nvert = Meshes.nvertices(sp)
-    nelem = Meshes.nelements(sp)
-    verts = Meshes.vertices(sp)
-    topo  = Meshes.topology(sp)
-    elems = Meshes.elements(topo)
-
-    # coords of vertices
-    coords = Meshes.coordinates.(verts)
-    # fan triangulation (assume convexity)
-    tris4elem = map(elems) do elem
-      I = Meshes.indices(elem)
-      [[I[1], I[i], I[i+1]] for i in 2:length(I)-1]
+    if show_orders
+        o2 = err_avg[1] .*(dts./dts[1]).^2
+        lines!(ax,dts,o2,label=L"\mathcal{O}(h^2)")
+        o1 = err_avg[1] .*(dts./dts[1])
+        lines!(ax,dts,o1,label=L"\mathcal{O}(h)")
     end
 
-    # flatten vector of triangles
-    tris = [tri for tris in tris4elem for tri in tris]
-    points  = GB.Point.(coords)
-    faces  = GB.TriangleFace{UInt64}.(tris)
-    nls = GB.normals(points,faces)
-    parsedcolor = parse(Makie.ColorTypes.RGB{Float32},color)
-    colors = fill(parsedcolor,length(points))
-    GB.Mesh(GB.meta(points,normals=nls,color=colors),faces)
+    ax.xlabel = L"h~(\mathrm{s})"
+    ax.yscale = Makie.log10
+    ax.yminorticksvisible = true 
+    ax.yminorgridvisible = true 
+    ax.yminorticks = IntervalsBetween(8)
+    ax.xscale = Makie.log10
+    ax.xminorticksvisible = true 
+    ax.xminorgridvisible = true 
+    ax.xminorticks = IntervalsBetween(8)
+
+    ax
 end
 
 function plotsave_friction_direction(bots,x,xs,figname=nothing;
@@ -493,7 +529,7 @@ function plotsave_friction_direction(bots,x,xs,figname=nothing;
     )
     with_theme(theme_pub;
         resolution
-    ) do
+        ) do
         fig = Figure()
         for (botid,bot) in enumerate(bots)
             ax1 = Axis(fig[botid,1],
@@ -566,75 +602,6 @@ function plotsave_friction_direction(bots,x,xs,figname=nothing;
     end
 end
 
-function get_err_avg(bots;bid=1,pid=1,di=1,field=:traj)
-    nbots = length(bots)
-    lastbot = bots[nbots]
-    if field == :traj
-        get! = RB.get_trajectory!
-    elseif field == :vel
-        get! = RB.get_velocity!
-    end
-    lastbot_traj = get!(lastbot,bid,pid)
-    lastbot_t = lastbot.traj.t
-    lastbot_dt = lastbot_t[begin+1]-lastbot_t[begin]
-    lastbot_traj_itp = begin 
-        itp = interpolate(lastbot_traj[di,:], BSpline(Linear()))
-        scale(
-            itp,
-            lastbot_t[begin]:lastbot_dt:lastbot_t[end]
-        )
-    end
-    dts = [
-        bot.traj.t[begin+1]-bot.traj.t[begin]
-        for bot in bots[begin:end-1]
-    ]
-    err_avg = [
-        begin
-            (;t) = bot.traj
-            bot_traj_di = get!(
-                bots[i],bid,pid
-            )[di,begin:end-1]
-            ref_traj_di = lastbot_traj_itp(
-                t[begin:end-1]
-            ) 
-            bot_traj_di .- ref_traj_di .|> abs |> mean
-        end
-        for (i,bot) in enumerate(bots[1:nbots-1])
-    ]
-    dts,err_avg
-end
-
-function plot_convergence_order!(ax,dts,err_avg;show_orders=true)
-
-    scatterlines!(ax,
-        dts,
-        err_avg;
-        marker=:rect,
-        color=:red,
-        label="NMSI"
-    )
-    
-
-    if show_orders
-        o2 = err_avg[1] .*(dts./dts[1]).^2
-        lines!(ax,dts,o2,label=L"\mathcal{O}(h^2)")
-        o1 = err_avg[1] .*(dts./dts[1])
-        lines!(ax,dts,o1,label=L"\mathcal{O}(h)")
-    end
-
-    ax.xlabel = L"h~(\mathrm{s})"
-    ax.yscale = Makie.log10
-    ax.yminorticksvisible = true 
-    ax.yminorgridvisible = true 
-    ax.yminorticks = IntervalsBetween(8)
-    ax.xscale = Makie.log10
-    ax.xminorticksvisible = true 
-    ax.xminorgridvisible = true 
-    ax.xminorticks = IntervalsBetween(8)
-
-    ax
-end
-
 function plotsave_contact_persistent(bot,figname=nothing;
     cid=1,
     tol = 1e-7 # rule out false active
@@ -658,116 +625,6 @@ function plotsave_contact_persistent(bot,figname=nothing;
         savefig(fig,figname)
         fig
     end
-end
-
-function plot_self_stress_states(
-        botinput,
-        S;
-        rtol = 1e-14
-        # Ň = build_nullspace_on_free(bot.structure)
-    )
-    bot = deepcopy(botinput)
-    @myshow S
-    maxS = maximum(abs.(S))
-    Sbool = S.> maxS*rtol
-    S[.!Sbool] .= 0.0
-    ns = size(S,2)
-    with_theme(theme_pub;
-        ) do 
-        plot_traj!(
-            bot;
-            AxisType=Axis3,
-            gridsize=(1,ns), 
-            doslide=false,
-            showlabels=false,
-            showpoints=false,
-            showcables = false,
-            xlims = (-4e-1,4e-1),
-            ylims = (-4e-1,4e-1),
-            zlims = (-4e-1,4e-1),
-            showground = false,
-            sup! = (ax,tgob,subgrid_idx)-> begin
-            # cables
-                hidexyz(ax)
-                @myshow Sbool[:,subgrid_idx]
-                linesegs_cables = @lift begin
-                    get_linesegs_cables($tgob;)[Sbool[:,subgrid_idx]]
-                end
-                linesegments!(ax, 
-                    linesegs_cables, 
-                    color = :red, 
-                    # linewidth = cablewidth
-                    )
-                rcs_by_cables = @lift begin
-                    (;tensioned) = $tgob.connectivity
-                    ndim = RB.get_num_of_dims($tgob)
-                    T = RB.get_numbertype($tgob)
-                    ret = Vector{MVector{ndim,T}}()
-                    mapreduce(
-                        (scnt)->
-                        [(
-                            scnt.hen.rbsig.state.loci_states[scnt.hen.pid].+
-                            scnt.egg.rbsig.state.loci_states[scnt.egg.pid]
-                        )./2],
-                        vcat,
-                        tensioned.connected
-                        ;init=ret
-                    )
-                end
-                # @show rcs_by_cables
-                Stext = [
-                        @sprintf "%4.2f"  S[i,subgrid_idx] 
-                        for i in axes(S,1)
-                        if Sbool[i,subgrid_idx]
-                    ]
-                @myshow Stext
-                text!(
-                    ax,
-                    Stext,
-                    position = rcs_by_cables[][Sbool[:,subgrid_idx]],
-                    fontsize = fontsize,
-                    color = :red,
-                    align = (:right, :top),
-                    offset = (-fontsize/2, 0)
-                )
-            end
-        )
-    end
-end
-
-function plot_kinematic_indeterminacy(
-        botinput,
-        D,
-        Ň,
-        # Ň = build_nullspace_on_free(bot.structure)
-    )
-    bot = deepcopy(botinput)
-    nk = size(D,2)
-    δq̌ = [Ň*D[:,i] for i in axes(D,2)]
-    scaling=0.3
-    for i = 1:nk
-        push!(bot.traj,deepcopy(bot.traj[end]))
-        bot.traj.t[end] = i
-        δq̌i = δq̌[i]
-        ratio = norm(δq̌i)/norm(q̌)
-        bot.traj.q̌[end] .= q̌ .+ scaling.*δq̌i/ratio
-    end
-    plot_traj!(
-        bot;
-        AxisType=Axis3,
-        gridsize=(1,nk),        
-        atsteps=2:nk+1,
-        doslide=false,
-        showlabels=false,
-        showpoints=false,
-        # showcables = false,
-        showground = false,
-        # xlims = (-4e-2,4e-2),
-        # ylims = (-4e-2,4e-2),
-        # zlims = (-4e-2,4e-2),        
-        slack_linestyle = :solid,
-        showinit = true,
-    )
 end
 
 function plotsave_contactpoints(bot,figname=nothing)
@@ -807,3 +664,4 @@ function plotsave_contactpoints(bot,figname=nothing)
         fig
     end
 end
+

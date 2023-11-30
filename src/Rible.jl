@@ -1,9 +1,10 @@
 module Rible
 
-
-# arrays
+# std
 using LinearAlgebra
 using SparseArrays
+using Statistics
+# arrays
 using PreallocationTools
 using StaticArrays
 using StructArrays
@@ -15,11 +16,12 @@ using SymmetricFormats
 using RowEchelon
 using TypeSortedCollections
 using TypedTables
-# other
+using Tullio
+# data structure
+using Interpolations
 using Quaternions
 using Rotations
 using CoordinateTransformations
-using Tullio
 using EponymTuples
 using Unitful
 # solvers
@@ -53,7 +55,6 @@ const lift = map
 using DocStringExtensions
 # code
 using PrecompileTools
-using Test
 
 const ASSETS_DIR = joinpath(@__DIR__, "..", "assets")
 assetpath(files...) = normpath(joinpath(ASSETS_DIR, files...))

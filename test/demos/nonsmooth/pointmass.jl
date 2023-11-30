@@ -46,7 +46,7 @@ RB.solve!(
 
 # visualize
 GM.activate!()
-with_theme(RB.theme_pub;
+with_theme(theme_pub;
             size = (0.8tw,0.2tw),
             figure_padding = (0,fontsize,0,0),
             Axis3 = (
@@ -163,7 +163,7 @@ vl1 = [u ⋅ normalize(origin_velocity) for u in ṙp1]
 scatterlines(vl1)
 
 # visualize
-GM.activate!(); with_theme(RB.theme_pub;
+GM.activate!(); with_theme(theme_pub;
         ## fontsize = 6 |> pt2px,
         size = (1tw,0.2tw),
         figure_padding = (fontsize,fontsize,0,0),

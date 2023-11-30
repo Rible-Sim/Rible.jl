@@ -206,7 +206,7 @@ mat𝒦gs = reduce(hcat,struct𝒦.𝒦g)
 mat𝒦as = reduce(hcat,struct𝒦.𝒦a)
 mat𝒦ps = reduce(hcat,struct𝒦.𝒦p)
 
-GM.activate!();with_theme(RB.theme_pub;
+GM.activate!();with_theme(theme_pub;
         size = (0.95tw,0.18tw),
         figure_padding = (0,0,0,0),
         Axis3 = (
@@ -325,7 +325,7 @@ Vals =  [
     for σ in σs
 ] |> VectorOfArray
 
-GM.activate!();with_theme(RB.theme_pub;
+GM.activate!();with_theme(theme_pub;
         size = (0.45tw,0.2tw),
         figure_padding = (0,fontsize,0,fontsize),
     ) do 
