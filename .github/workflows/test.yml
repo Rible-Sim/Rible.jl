@@ -9,12 +9,24 @@ on:
 
 jobs:
   test:
-    runs-on: ${{ matrix.os }}
+    runs-on: self-hosted
+    # runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
-        julia-version: ['1.9.3']
+        julia-version: ['1.9']
         julia-arch: [x64]
         os: [ubuntu-latest, windows-latest, macOS-latest]
+        group:
+          - InterfaceI
+          - InterfaceII
+          - InterfaceIII
+          - Integrators_I
+          - AlgConvergence_I
+          - AlgConvergence_II
+          - AlgConvergence_III
+          - ODEInterfaceRegression
+          - Multithreading
     steps:
     - uses: actions/checkout@v4
     - name: Setup Julia environment
@@ -22,6 +34,19 @@ jobs:
       with:
         version: ${{ matrix.julia-version }}
         arch: ${{ matrix.julia-arch }}
-    
+    - uses: actions/cache@v3
+      env:
+        cache-name: cache-artifacts
+      with:
+        path: ~/.julia/artifacts
+        key: ${{ runner.os }}-test-${{ env.cache-name }}-${{ hashFiles('**/Project.toml') }}
+        restore-keys: |
+          ${{ runner.os }}-test-${{ env.cache-name }}-
+          ${{ runner.os }}-test-
+          ${{ runner.os }}-
+    - name: Build Julia Dependency Packages
+      uses: julia-actions/julia-buildpkg@v1
     - name: Run Julia package tests
       uses: julia-actions/julia-runtest@v1
+      env:
+        GROUP: ${{ matrix.group }}

@@ -68,8 +68,8 @@ function StructureState(bodies,tensiles,cnt::Connectivity{<:Any,<:Any,<:NamedTup
         for bodyid = 1:nb
     ]
     foreach(bodies) do body
-        (;ro,R,ṙo,ω,cache) = body.state
-        q,q̇ = cartesian_frame2coords(cache.funcs.nmcs,ro,R,ṙo,ω)
+        (;origin_frame,cache) = body.state
+        q,q̇ = cartesian_frame2coords(cache.funcs.nmcs,origin_frame)
         members[body.prop.id].q .= q
         members[body.prop.id].q̇ .= q̇
     end

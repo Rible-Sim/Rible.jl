@@ -84,13 +84,7 @@ $(TYPEDFIELDS)
 """
 mutable struct RigidBodyState{N,M,T} <: AbstractRigidBodyState{N,T}
     "Origin of local frame"
-    origin_position::MVector{N,T}
-    "Rotation Matrix of local frame"
-    R::MMatrix{N,N,T}
-    "Translational velocity of local frame"
-    origin_velocity::MVector{N,T}
-    "Angular velocity of local frame (expressed in the global frame)"
-    ω::MVector{M,T}
+    origin_frame::CartesianFrame{N,M,T}
     "Position of mass center in global frame"
     mass_locus_state::LocusState{N,M,T}
     "Positions of anchor points in global frame"
@@ -110,32 +104,35 @@ function RigidBodyState(prop::RigidBodyProperty{N,T},
     ) where {N,T}
     (;mass_locus,loci) = prop
     num_of_loci = length(loci)
-    origin_position = MVector{N}(origin_position_input)
-    origin_velocity = MVector{N}(origin_velocity_input)
+    origin_position = SVector{N}(origin_position_input)
+    origin_velocity = SVector{N}(origin_velocity_input)
     if rotation_input isa Number
         rotation = rotation_matrix(rotation_input)
     else
         rotation = Matrix(rotation_input)
     end
-    R = MMatrix{N,N,T}(rotation)
+    axes = Axes(SMatrix{N,N,T}(rotation))
     M = 2N-3
-    ω = MVector{M}(angular_velocity_input)
+    ω = SVector{M}(angular_velocity_input)
+    origin_frame = CartesianFrame(
+        origin_position,
+        origin_velocity,
+        axes,
+        ω
+    )
     mass_locus_state = LocusState(
         mass_locus,
-        origin_position,R,
-        origin_velocity,ω
+        origin_frame,
     )
     loci_states = [
         LocusState(
             lo,
-            origin_position,R,
-            origin_velocity,ω
+            origin_frame,
         )
         for lo in loci
     ]
     RigidBodyState(
-        origin_position,R,
-        origin_velocity,ω,
+        origin_frame,
         mass_locus_state,
         loci_states,
     )
@@ -237,8 +234,8 @@ function RigidBody(prop,state,coords,mesh=nothing)
 end
 
 function body_state2coords_state(state::RigidBodyState,coords::NonminimalCoordinates)
-    (;origin_position,R,origin_velocity,ω) = state
-    cartesian_frame2coords(coords.nmcs,origin_position,R,origin_velocity,ω)
+    (;origin_frame) = state
+    cartesian_frame2coords(coords.nmcs,origin_frame)
 end
 
 """
@@ -288,13 +285,12 @@ function lazy_update_state!(state::RigidBodyState,
         coords::NonminimalCoordinates{<:NCF.NC},cache,
         prop::RigidBodyProperty,q,q̇)
     (;
-    origin_position,R,
-    origin_velocity,ω,
-    mass_locus_state,
+        origin_frame,
+        mass_locus_state,
     ) = state
     (;Co,Cg) = cache
-    mul!(origin_position, Co, q)
-    mul!(origin_velocity, Co, q̇)
+    mul!(origin_frame.position, Co, q)
+    mul!(origin_frame.velocity, Co, q̇)
     mul!(mass_locus_state.position, Cg, q)
     mul!(mass_locus_state.velocity, Cg, q̇)
 end
@@ -311,40 +307,38 @@ function update_state!(state::RigidBodyState,
             coords::NonminimalCoordinates{<:NCF.NC},cache,
             prop::RigidBodyProperty,q,q̇)
     (;
-        origin_position,R,
-        origin_velocity,ω,
+        origin_frame,
         mass_locus_state,
     ) = state
     (;nmcs) = coords
     lazy_update_state!(state,coords,cache,prop,q,q̇)
-    R .= find_rotation(nmcs,q)
-    ω .= find_angular_velocity(nmcs,q,q̇)
+    origin_frame.axes .= find_rotation(nmcs,q)
+    origin_frame.angular_velocity .= find_angular_velocity(nmcs,q,q̇)
 end
 
 function lazy_update_state!(state::RigidBodyState,
         coords::NonminimalCoordinates{<:QCF.QC},cache,
         prop::RigidBodyProperty,x,ẋ)
     (;
-        origin_position,R,
-        origin_velocity,ω,
+        origin_frame,
         mass_locus_state,
     ) = state
-    origin_position .= mass_locus_state.position .= x[1:3]
-    origin_velocity .= mass_locus_state.velocity .= ẋ[1:3]
+    origin_frame.position = mass_locus_state.frame.position = x[1:3]
+    origin_frame.velocity = mass_locus_state.frame.velocity = ẋ[1:3]
 end
 
 function update_state!(state::RigidBodyState,
         coords::NonminimalCoordinates{<:QCF.QC},cache,
         prop::RigidBodyProperty,q,q̇)
     (;
-        origin_position,R,
-        origin_velocity,ω,
+        origin_frame,
         mass_locus_state,
     ) = state
     (;nmcs) = coords
     lazy_update_state!(state,coords,cache,prop,q,q̇)
-    R .= find_rotation(nmcs,q)
-    ω .= R*find_local_angular_velocity(nmcs,q,q̇)
+    axes = Axes(find_rotation(nmcs,q))
+    origin_frame.axes = axes
+    origin_frame.angular_velocity = axes*find_local_angular_velocity(nmcs,q,q̇)
 end
 
 
@@ -399,19 +393,19 @@ function update_transformations!(
         state::RigidBodyState,
         prop::RigidBodyProperty,q)
     (;mass_locus,loci) = prop
-    (;R,) = state
+    (;X,) = state.origin_frame.axes
     (;Cg,Cps) = cache
     L = QCF.Lmat(q[4:7])
     for (Cp,lo) in zip(Cps,loci)
         for i = 1:3 
         	Cp[i,i] = 1
         end
-        Cp[1:3,4:7] .= -2R*skew(lo.position)*L
+        Cp[1:3,4:7] .= -2X*skew(lo.position)*L
     end 
     for i = 1:3 
     	Cg[i,i] = 1
     end
-    Cg[1:3,4:7] .= -2R*skew(mass_locus.position)*L
+    Cg[1:3,4:7] .= -2X*skew(mass_locus.position)*L
 end
 
 
@@ -437,16 +431,15 @@ end
 function update_loci_states!(state::RigidBodyState,
         coords::NonminimalCoordinates{<:QCF.QC},cache,
         prop::RigidBodyProperty,q,q̇)
-    # assuming origin_position,R, origin_velocity,ω has been updated
+    # assuming origin_frame has been updated
     (;loci) = prop
     (;loci_states,
-        origin_position,R,
-        origin_velocity,ω,
+        origin_frame
     ) = state
     for (locus,locus_state) in zip(loci,loci_states)
-        relative_velocity = R * locus.position
-        locus_state.position .= origin_position .+ relative_velocity
-        locus_state.velocity .= origin_velocity .+ ω × relative_velocity
+        relative_velocity = origin_frame.axes * locus.position
+        locus_state.frame.position = origin_frame.position .+ relative_velocity
+        locus_state.frame.velocity = origin_frame.velocity .+ origin_frame.angular_velocity × relative_velocity
     end
 end
 
@@ -531,30 +524,5 @@ function clear_forces!(body::AbstractRigidBody)
         locus_state.force .= 0
         locus_state.torque .= 0
         reset!(locus_state.contact_state)
-    end
-end
-
-
-function get3Dstate(body)
-    (;state) = body
-    (;origin_position,R,origin_velocity,ω) = state
-    ndim = get_num_of_dims(body)
-    T = get_numbertype(body)
-    o = zero(T)
-    i = one(T)
-    if ndim == 3
-        return origin_position, R, origin_velocity, ω
-    else
-        origin_position_3D = MVector{3}(origin_position[1],origin_position[2],o)
-        origin_velocity_3D = MVector{3}(origin_velocity[1],origin_velocity[2],o)
-        R3 = MMatrix{3,3}(
-            [
-                 R[1,1] -R[2,1] o;
-                -R[1,2]  R[2,2] o;
-                o      o        i;
-            ]
-        )
-        ω3 = MVector{3}(o,o,ω[1])
-        return origin_position_3D, R3, origin_velocity_3D, ω3
     end
 end

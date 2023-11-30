@@ -9,7 +9,7 @@ using SymmetricFormats
 using EponymTuples
 using BlockDiagonals
 
-import ..Rible: HouseholderOrthogonalization, skew, Axes, GECP
+import ..Rible: HouseholderOrthogonalization, skew, Axes, GECP, CartesianFrame
 
 import ..Rible: get_num_of_cstr, get_num_of_coords
 import ..Rible: get_num_of_dof, get_num_of_local_dims

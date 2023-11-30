@@ -55,9 +55,9 @@ function FixedBodyConstraint(id::Int,indexed,body::AbstractBody)
     bodyid = body.prop.id
     nmcs = body.coords.nmcs
     state = body.state
-    q = cartesian_frame2coords(
+    q,_ = cartesian_frame2coords(
         nmcs,
-        state.origin_position,state.R
+        state.origin_frame
     )
     independent_free_idx = find_independent_free_idx(nmcs,q)
     jointed_sys_free_idx = bodyid2sys_free_coords[bodyid][independent_free_idx]
@@ -183,8 +183,8 @@ function PrototypeJoint(id,indexed,hen2egg,joint_type::Symbol)
 
     state_hen = hen.rbsig.state
     state_egg = egg.rbsig.state
-    q_hen = cartesian_frame2coords(nmcs_hen,state_hen.origin_position,state_hen.R)
-    q_egg = cartesian_frame2coords(nmcs_egg,state_egg.origin_position,state_egg.R)
+    q_hen,_ = cartesian_frame2coords(nmcs_hen,state_hen.origin_frame)
+    q_egg,_ = cartesian_frame2coords(nmcs_egg,state_egg.origin_frame)
     
     cache, values = build_joint_cache(
         nmcs_hen,nmcs_egg,

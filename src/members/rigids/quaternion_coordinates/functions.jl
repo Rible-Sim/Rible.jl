@@ -50,20 +50,14 @@ function ∂Cᵀf∂x(x,f,c)
     )
 end
 
-function cartesian_frame2coords(::QC,origin_position,R)
-    rotation_matrix = RotMatrix(R)
+function cartesian_frame2coords(::QC,origin_frame)
+    (;position,velocity,axes,angular_velocity) = origin_frame
+    rotation_matrix = RotMatrix(axes.X)
     q = QuatRotation(rotation_matrix).q |> vec
-    x = vcat(origin_position,q)
-    x
-end
-
-function cartesian_frame2coords(::QC,origin_position,R,origin_velocity,ω)
-    rotation_matrix = RotMatrix(R)
-    q = QuatRotation(rotation_matrix).q |> vec
-    Ω = inv(rotation_matrix)*ω
+    Ω = inv(rotation_matrix)*angular_velocity
     q̇ = localAngular2quatVel(q,Ω)
-    x = vcat(origin_position,q)
-    ẋ = vcat(origin_velocity,q̇)
+    x = vcat(position,q)
+    ẋ = vcat(velocity,q̇)
     x, ẋ
 end
 

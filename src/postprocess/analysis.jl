@@ -164,13 +164,16 @@ end
 
 function test_slackness(tr)
     (;structure, traj) = tr
-    @testset "Test Slackness" begin
-        @testset "Solution $j" for (j,q) in enumerate(traj.qs)
+     "Test Slackness" 
+     begin
+         for (j,q) in enumerate(traj.qs)
+            "Solution $j" 
             distribute_q_to_rbs!(structure,q)
-            @testset "String $i" for (i,s) in enumerate(structure.cables)
+             for (i,s) in enumerate(structure.cables)
+                "String $i" 
                 len = s.state.length
                 restlen = s.state.restlen
-                @test len > restlen
+                @assert  len > restlen
             end
         end
     end

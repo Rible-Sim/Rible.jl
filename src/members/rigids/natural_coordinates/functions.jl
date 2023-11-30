@@ -107,29 +107,16 @@ end
 Return rigid body natural coodinates 
 $(TYPEDSIGNATURES)
 """
-function cartesian_frame2coords(nmcs::Union{NC2D2C,NC3D3C},origin_position,R)
-    origin_position
+function cartesian_frame2coords(nmcs::Union{NC2D2C,NC3D3C},origin_frame)
+    (;position,velocity) = origin_frame
 end
 
-function cartesian_frame2coords(nmcs::Union{NC2D2C,NC3D3C},origin_position,R,origin_velocity,ω)
-    origin_position,origin_velocity
-end
-
-function cartesian_frame2coords(nmcs::NC,origin_position,R)
+function cartesian_frame2coords(nmcs::NC,origin_frame)
+    (;position,velocity,axes,angular_velocity) = origin_frame
     (;r̄i,X̄) = nmcs.data
-    ri = origin_position + R*r̄i
-    X = R*X̄
-    qstd = vcat(ri,vec(X))
-    Y = nmcs.conversion_to_std
-    q = Y\qstd
-    q
-end
-
-function cartesian_frame2coords(nmcs::NC,origin_position,R,origin_velocity,ω)
-    (;r̄i,X̄) = nmcs.data
-    ri = origin_position + R*r̄i
-    ṙi = origin_velocity + ω×(ri-origin_position)
-    X = R*X̄
+    ri = position + axes*r̄i
+    ṙi = velocity + angular_velocity×(ri-position)
+    X = axes*X̄
     Ẋ = reduce(hcat,Ref(ω) .× eachcol(X))
     qstd = vcat(ri,vec(X))
     q̇std = vcat(ṙi,vec(Ẋ))

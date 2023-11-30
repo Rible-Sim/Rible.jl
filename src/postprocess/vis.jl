@@ -30,11 +30,11 @@ function MakieCore.plot!(viz::Viz{Tuple{S}};
     body_ob = viz[:structure]
     # body decorations
     mass_center_ob = lift(body_ob) do body_ob
-        body_ob.state.mass_locus_state.position |> GB.Point
+        body_ob.state.mass_locus_state.frame.position |> GB.Point
     end
     nodes_ob = lift(body_ob) do body_ob
         [
-            locus_state.position |> GB.Point
+            locus_state.frame.position |> GB.Point
             for locus_state in body_ob.state.loci_states
         ]
     end
@@ -235,7 +235,9 @@ function build_mesh(body::AbstractRigidBody;update=true,color=nothing)
     (;mesh) = body
     @assert !(mesh isa Nothing)
     if update
-        origin_position,R,_ = get3Dstate(body)
+        frame = to_3D(body.state.origin_frame)
+        origin_position = frame.position
+        R = frame.axes.X
     else
         origin_position = SVector(0,0,0)
         R = Matrix(1I,3,3)

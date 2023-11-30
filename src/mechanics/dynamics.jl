@@ -140,7 +140,7 @@ function activate_frictional_contacts!(structure,contact_env,solver_cache,q;chec
                     activate!(contact_state,gap)
                     if contact_state.active
                         contacts_bits[bodyid2sys_loci_idx[bid][pid]] = true
-                        contact_state.frame = spatial_frame(normal)
+                        contact_state.axes = spatial_axes(normal)
                         if contact_state.persistent
                             persistent_bits[bodyid2sys_loci_idx[bid][pid]] = true
                         end
@@ -215,15 +215,15 @@ function activate_contacts!(structure,contact_env,solver_cache,q;checkpersist=tr
             if body.prop.contactable
                 for pid in eachindex(loci_states)
                     locus_state = loci_states[pid]
-                    (;position,contact_state) = locus_state
-                    gap, normal = contact_gap_and_normal(position,surfaces)
+                    (;frame,contact_state) = locus_state
+                    gap, normal = contact_gap_and_normal(frame.position,surfaces)
                     if !checkpersist
                         contact_state.active = false
                     end
                     activate!(contact_state,gap)
                     if contact_state.active
                         contacts_bits[bodyid2sys_loci_idx[bid][pid]] = true
-                        contact_state.frame = spatial_frame(normal)
+                        contact_state.axes = spatial_axes(normal)
                         if contact_state.persistent
                             persistent_bits[bodyid2sys_loci_idx[bid][pid]] = true
                         end
@@ -292,7 +292,7 @@ function get_frictional_directions_and_positions!(structure,cache, q, q̇, Λ, )
             (;contact_state) = locus_state
             if contact_state.active
                 (;position) = loci_states[pid]
-                (;normal,tangent,bitangent) = contact_state.frame
+                (;normal,tangent,bitangent) = contact_state.axes
                 C = cache.Cps[pid]
                 CT = C*build_T(structure,bid)
                 dm = hcat(normal,tangent,bitangent) |> transpose
@@ -336,8 +336,8 @@ function get_directions_and_positions!(structure,cache, q, q̇, Λ, )
         for (pid,locus_state) in enumerate(loci_states)
             (;contact_state) = locus_state
             if contact_state.active
-                (;position) = loci_states[pid]
-                (;normal,tangent,bitangent) = contact_state.frame
+                (;position) = loci_states[pid].frame
+                (;normal,tangent,bitangent) = contact_state.axes
                 C = cache.Cps[pid]
                 CT = C*build_T(structure,bid)
                 dm = normal |> transpose
@@ -384,7 +384,7 @@ function get_frictional_distribution_law!(structure,cache,q)
                 locus_state = loci_states[pid]
                 locus = loci[pid]
                 (;position,contact_state) = locus_state
-                (;normal,tangent,bitangent) = contact_state.frame
+                (;normal,tangent,bitangent) = contact_state.axes
                 inv_μs_body[3(i-1)+1] = 1/locus.friction_coefficient
                 dm = hcat(normal,tangent,bitangent) |> transpose
                 R[3(i-1)+1:3(i-1)+3,1:3] = dm
@@ -416,7 +416,7 @@ function get_distribution_law!(structure,cache,q)
                 locus_state = loci_states[pid]
                 locus = loci[pid]
                 (;position,contact_state) = locus_state
-                (;normal,tangent,bitangent) = contact_state.frame
+                (;normal,tangent,bitangent) = contact_state.axes
                 inv_μs_body[i] = 1/locus.friction_coefficient
                 dm = hcat(normal,tangent,bitangent) |> transpose
                 R[i,1:3] = dm

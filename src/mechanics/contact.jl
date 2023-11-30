@@ -2,7 +2,7 @@ struct Contact{T}
     id::Int
     μ::T
     e::T
-    state::FrictionalContactState{3,T}
+    state::ContactState{3,T}
 end
 
 function Contact(id,μ,e)
@@ -12,10 +12,10 @@ function Contact(id,μ,e)
     o = zero(μ)
     gap = i
     n = SVector(i,o,o)
-    frame = spatial_frame(n)
+    frame = spatial_axes(n)
     v = SVector(o,o,o)
     Λ = SVector(o,o,o)
-    state = FrictionalContactState(active,persistent,gap,frame,v,Λ)
+    state = ContactState(active,persistent,gap,frame,v,Λ)
     Contact(id,μ,e,state)
 end
 
@@ -39,7 +39,7 @@ struct ApproxFrictionalContact{T}
 end
 
 function ApproxFrictionalContact(ϵ::T,μ::T,m::Int) where T
-    frame = spatial_frame{T}()
+    frame = spatial_axes{T}()
     e = ones(m)
     d = [SVector{3,T}(cos(2π*i/m),sin(2π*i/m),0.0) for i = 0:m-1]
     D = Matrix{T}(undef,3,m)

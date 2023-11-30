@@ -2,6 +2,7 @@ struct Axes{N,T}
     X::SMatrix{N,N,T}
 end
 
+
 function Base.getproperty(a::Axes{2}, p::Symbol) 
     if (p === :n) || (p === :normal)
         return a.X[:,2]
@@ -24,7 +25,7 @@ function Base.getproperty(a::Axes{3}, p::Symbol)
     end
 end
 
-function planar_frame(n)
+function planar_axes(n)
     n /= norm(n)
     Axes(
         SMatrix{2,2}(
@@ -33,36 +34,98 @@ function planar_frame(n)
     )
 end
 
-function get_orthonormal_axes(normal::AbstractVector)
+function spatial_axes(n)
+    normal = SVector{3}(n) 
     normal /= norm(normal)
     tangent, bitangent = HouseholderOrthogonalization(normal)
     SMatrix{3,3}(
         tangent[1], tangent[2], tangent[3],
         bitangent[1], bitangent[2], bitangent[3],
         normal[1], normal[2], normal[3],
-    )
+    ) |> Axes
 end
 
-function spatial_frame(n)
-    n |> SVector{3} |> get_orthonormal_axes |> Axes
-end
+orthonormal_axes(n::SVector{2}) = planar_axes(n)
+orthonormal_axes(n::SVector{3}) = spatial_axes(n)
 
-orthonormal_frame(n::SVector{2}) = planar_frame(n)
-orthonormal_frame(n::SVector{3}) = spatial_frame(n)
+Axes(X::Axes) = X
+Axes(n::SVector) = orthonormal_axes(n)
 
 function (Base.:*)(R::StaticArray{Tuple{N,N}},axes::Axes{N}) where N
     Axes(SMatrix{N,N}(R*axes.X))
 end
-function (Base.:*)(n::StaticArray{Tuple{1,N}},axes::Axes{N}) where N
-    orthonormal_frame(SVector{N}(n)).X*axes
+
+function (Base.:*)(axes1::Axes{N},axes2::Axes{N}) where N
+    Axes(axes1.X*axes2.X)
 end
 
-struct CartesianFrame{N,M,T}
+# work around
+function (Base.:*)(n::StaticArray{Tuple{1,N}},axes::Axes{N}) where N
+    orthonormal_axes(SVector{N}(n)).X*axes
+end
+
+function (Base.:*)(axes::Axes{N},n::SVector{N}) where N
+    axes.X*n
+end
+
+mutable struct CartesianFrame{N,M,T}
     position::SVector{N,T}
     axes::Axes{N,T}
     velocity::SVector{N,T}
     angular_velocity::SVector{M,T}
     local_angular_velocity::SVector{M,T}
+end
+
+function CartesianFrame(
+        position::SVector{N,T},R,
+        velocity::SVector{N,T}=zero(position),
+        ω=zeros(SVector{2N-3,T})
+    ) where {N,T}
+    axes = Axes(R)
+    M = 2N-3
+    angular_velocity = SVector{M}(ω)
+    if N == 2
+        local_angular_velocity = SVector{M}(ω)
+    else
+        local_angular_velocity = transpose(R.X)*SVector{M}(ω) # cause 3 allocations
+    end
+    CartesianFrame(
+        position,
+        axes,
+        velocity,
+        angular_velocity,
+        local_angular_velocity
+    )
+end
+
+function CartesianFrame(r::SVector{N},v::SVector{N},R,ω) where {N}
+    CartesianFrame(r,R,v,ω)
+end
+
+to_3D(frame::CartesianFrame{3}) = frame
+
+function to_3D(frame::CartesianFrame{2,M,T}) where {M,T}
+    (;position,velocity,axes,angular_velocity) = frame
+    o = zero(T)
+    i = one(T)
+    position_3D = SVector{3}(position[1],position[2],o)
+    velocity_3D = SVector{3}(velocity[1],velocity[2],o)
+    axes_3D = Axes(
+        SMatrix{3,3}(
+            [
+                 axes.X[1,1] -axes.X[2,1] o;
+                -axes.X[1,2]  axes.X[2,2] o;
+                        o      o     i;
+            ]
+        )
+    )
+    angular_velocity_3D = SVector{3}(o,o,angular_velocity[1])
+    CartesianFrame(
+        position_3D, 
+        axes_3D, 
+        velocity_3D, 
+        angular_velocity_3D
+    )
 end
 
 struct Locus{N,T}
@@ -91,14 +154,13 @@ function Locus(
         restitution_coefficient = zero(T)
     ) where {N,T}
     normal = SVector{N}(ifelse(i==1,one(T),zero(T)) for i = 1:N)
-    axes = orthonormal_frame(normal)
+    axes = orthonormal_axes(normal)
     Locus(
         position,axes,
         friction_coefficient,
         restitution_coefficient
     )
 end
-
 
 function Locus(
         position::SVector{N,T},
@@ -106,7 +168,7 @@ function Locus(
         friction_coefficient = zero(T),
         restitution_coefficient = zero(T)
     ) where {N,T}
-    axes = orthonormal_frame(normal)
+    axes = orthonormal_axes(normal)
     Locus(
         position,axes,
         friction_coefficient,
@@ -114,69 +176,63 @@ function Locus(
     )
 end
 
-mutable struct FrictionalContactState{N,T}
+mutable struct ContactState{N,T}
     active::Bool
     persistent::Bool
     gap::T
-    frame::Axes{N,T}
+    axes::Axes{N,T}
     relative_velocity::SVector{N,T}
     force::SVector{N,T}
 end
 
-function FrictionalContactState(normal::StaticArray{Tuple{N},T}) where {N,T}
+function ContactState(normal::StaticArray{Tuple{N},T}) where {N,T}
     active = false
     persistent = true
     gap = typemax(T)
-    frame = orthonormal_frame(normal)
-    relative_velocity = @SVector zeros(T,N)
-    force = @SVector zeros(T,N)
-    FrictionalContactState(
+    axes = orthonormal_axes(normal)
+    relative_velocity = zeros(SVector{N,T})
+    force = zeros(SVector{N,T})
+    ContactState(
         active,persistent,
-        gap,frame,
+        gap,axes,
         relative_velocity,force
     )
 end
 
-
-function reset!(contact_state::FrictionalContactState{N,T}) where {N,T}
+function reset!(contact_state::ContactState{N,T}) where {N,T}
     contact_state.active = false
     contact_state.persistent = true
     contact_state.gap = typemax(T)
-    contact_state.relative_velocity = @SVector zeros(T,N)
-    contact_state.force = @SVector zeros(T,N)
+    contact_state.relative_velocity = zeros(SVector{N,T})
+    contact_state.force = zeros(SVector{N,T})
 end
 
-
-function activate!(contact_state::FrictionalContactState,gap)
+function activate!(contact_state::ContactState,gap)
     contact_state.gap = gap
     pre_active = contact_state.active
     contact_state.active = (gap<=0)
     contact_state.persistent = (pre_active == contact_state.active)
 end
 
-
 mutable struct LocusState{N,M,T}
-    position::MVector{N,T}
-    velocity::MVector{N,T}
-    axes::Axes{N,T}
+    frame::CartesianFrame{N,M,T}
     force::MVector{N,T}
     torque::MVector{M,T}
-    contact_state::FrictionalContactState{N,T}
+    contact_state::ContactState{N,T}
 end
 
 function LocusState(
         position::StaticArray{Tuple{N},T},
-        velocity::StaticArray{Tuple{N},T}
+        velocity::StaticArray{Tuple{N},T},
+        force = zeros(MVector{N,T}),
+        torque = zeros(MVector{2N-3,T})
     ) where {N,T}
-    M = 2N-3
     normal = SVector{N}(ifelse(i==1,one(T),zero(T)) for i = 1:N)
-    axes = orthonormal_frame(normal)
-    force = @MVector zeros(T,N)
-    torque = @MVector zeros(T,M)
-    contact_state = FrictionalContactState(normal)
+    axes = orthonormal_axes(normal)
+    frame = CartesianFrame(position,axes,velocity)
+    contact_state = ContactState(normal)
     LocusState(
-        position,velocity,
-        axes,
+        frame,
         force,torque,
         contact_state
     )
@@ -184,35 +240,20 @@ end
 
 function LocusState(
         locus::Locus{N,T},
-        origin_position,R,
-        origin_velocity,ω,
-        force,torque
-    ) where {N,T}
-    relative_position = R*locus.position
-    position = origin_position+relative_position
-    velocity = origin_velocity+ω×relative_position
-    axes = R*locus.axes
-    contact_state = FrictionalContactState(axes.normal)
-    LocusState(
-        position,velocity,
-        axes,
-        force,torque,
-        contact_state
-    )
-end
-
-function LocusState(
-        locus::Locus{N,T},
-        origin_position,R,
-        origin_velocity,ω::StaticArray{Tuple{M}}
+        origin_frame::CartesianFrame{N,M,T},
+        force = zeros(MVector{N,T}),
+        torque = zeros(MVector{M,T})
     ) where {N,M,T}
-    force = @MVector zeros(T,N)
-    torque = @MVector zeros(T,M)
+    relative_position = origin_frame.axes*locus.position
+    position = origin_frame.position+relative_position
+    velocity = origin_frame.velocity+origin_frame.angular_velocity×relative_position
+    axes = origin_frame.axes*locus.axes
+    frame = CartesianFrame(position,axes,velocity,origin_frame.angular_velocity)
+    contact_state = ContactState(axes.normal)
     LocusState(
-        locus,
-        origin_position,R,
-        origin_velocity,ω,
-        force,torque
+        frame,
+        force,torque,
+        contact_state
     )
 end
 

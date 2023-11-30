@@ -5,11 +5,11 @@ ENV["JULIA_STACKTRACE_ABBREVIATED"] = true #jl
 ENV["JULIA_STACKTRACE_MINIMAL"] = true #jl
 import Rible as RB
 figdir::String = joinpath(pathof(RB),"../../tmp")
-if Sys.iswindows()
-    figdir::String = raw"C:\Users\luo22\OneDrive\Papers\IMSD 2025\LaTex_Abstract"
-elseif Sys.isapple()
-    figdir::String = raw"/Users/jacob/Library/CloudStorage/OneDrive-SharedLibraries-onedrive/Papers/IMSD 2024/LaTex_Abstract"
-end
+if Sys.iswindows() #src
+    figdir::String = raw"C:\Users\luo22\OneDrive\Papers\IMSD 2025\LaTex_Abstract" #src
+elseif Sys.isapple() #src
+    figdir::String = raw"/Users/jacob/Library/CloudStorage/OneDrive-SharedLibraries-onedrive/Papers/IMSD 2024/LaTex_Abstract" #src
+end #src
 include("../../vis.jl")
 includet("../../vis.jl") #jl
 
