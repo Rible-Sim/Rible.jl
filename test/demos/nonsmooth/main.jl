@@ -721,7 +721,7 @@ function cable_ancf(pres_idx, 𝐞, L = 1.0)
         # length(loci),
         loci
     )
-    # cache = RB.get_CoordinatesCache(prop,ancs,𝐞)
+    # cache = RB.BodyCache(prop,ancs,𝐞)
     state = RB.FlexibleBodyState(prop,ancs,𝐞;pres_idx)
     fb = RB.FlexibleBody(prop,state)
 end

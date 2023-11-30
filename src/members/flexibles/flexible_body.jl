@@ -73,7 +73,7 @@ function get_idx_mask(ancs::ANCF.ANC,pres_idx)
     free_idx_mask, pres_idx_mask
 end
 
-function get_CoordinatesCache(
+function BodyCache(
         prop::FlexibleBodyProperty{N,T},
         ancs::ANCF.ANC,
         e::AbstractVector,
@@ -127,7 +127,7 @@ function FlexibleBodyState(prop::FlexibleBodyProperty{N,T},
     (;mass_locus,loci) = prop
     num_of_loci = length(loci)
     nc = ANCF.get_num_of_coords(ancs)
-    cache = get_CoordinatesCache(
+    cache = BodyCache(
         prop,
         ancs,
         MVector{nc}(e),
@@ -207,14 +207,29 @@ function update_loci_states!(
     end
 end
 
-function generalize_force!(F,state::AbstractFlexibleBodyState)
+function centrifugal_force!(F,state::AbstractFlexibleBodyState)
+	(;cache,mass_locus_state,loci_states) = state
+	(;Sps,Sg,e,∂T∂eᵀ) = cache
+	F .+= ∂T∂eᵀ
+end
+
+function mass_center_force!(F,state::AbstractFlexibleBodyState)
+	(;cache,mass_locus_state,loci_states) = state
+	(;Sps,Sg,e,∂T∂eᵀ) = cache
+	mul!(F,transpose(Sg),mass_locus_state.force,1,1)
+end
+
+function concentrated_force!(F,state::AbstractFlexibleBodyState)
 	(;cache,mass_locus_state,loci_states) = state
 	(;Sps,Sg,e,∂T∂eᵀ) = cache
 	for (pid,locus_state) in enumerate(loci_states)
 		mul!(F,transpose(Sps[pid]),locus_state.force,1,1)
-	end
-	mul!(F,transpose(Sg),mass_locus_state.force,1,1)
-	F .+= ∂T∂eᵀ
+	end    
+end
+
+function strain!(F,state::AbstractFlexibleBodyState)
+	(;cache,mass_locus_state,loci_states) = state
+	(;Sps,Sg,e,∂T∂eᵀ) = cache
     Q = ANCF.make_Q(cache.funcs.ancs)
 	F .-= Q(e)
 	F
@@ -298,7 +313,7 @@ function subdivide(fb::FlexibleBody,nx=1,ny=1,nz=1)
                 sub_pres_idx = filter((j)->false, pres_idx)
             end
             # @show sub_pres_idx
-            # cache = get_CoordinatesCache(prop,ancs,𝐞)
+            # cache = BodyCache(prop,ancs,𝐞)
             state = FlexibleBodyState(prop,subancs,esegs[i],ėsegs[i];pres_idx=sub_pres_idx)
             fb = FlexibleBody(prop,state)
         end

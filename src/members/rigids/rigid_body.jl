@@ -146,7 +146,7 @@ struct RigidBodyCache{CType,cacheType} <: AbstractBodyCache
 end
 
 
-function get_CoordinatesCache(prop::RigidBodyProperty{N,T},
+function BodyCache(prop::RigidBodyProperty{N,T},
         nmcs::NCF.NC,
         pres_idx=Int[],
         cstr_idx=get_cstr_idx(nmcs)) where {N,T}
@@ -165,7 +165,7 @@ function get_CoordinatesCache(prop::RigidBodyProperty{N,T},
     Co = C(c(zero(mass_center)))
     Cg = C(c(mass_center))
     Cps = [typeof(Cg)(C(c(loci[i].position))) for i in 1:num_of_loci]
-    coords_cache = NonminimalCoordinatesCache(
+    coords_cache = InertiaCache(
         M,M⁻¹,
         ∂Mq̇∂q,∂M⁻¹p∂q,
         Ṁq̇,∂T∂qᵀ
@@ -176,7 +176,7 @@ function get_CoordinatesCache(prop::RigidBodyProperty{N,T},
     )
 end
 
-function get_CoordinatesCache(
+function BodyCache(
         prop::RigidBodyProperty{N,T},
         qcs::QCF.QC,
         pres_idx=Int[],
@@ -197,7 +197,7 @@ function get_CoordinatesCache(
     end
     Cg = deepcopy(Co)
     Cps = [deepcopy(Co) for i in 1:num_of_loci]
-    coords_cache = NonminimalCoordinatesCache(
+    coords_cache = InertiaCache(
         M,M⁻¹,
         ∂Mq̇∂q,∂M⁻¹p∂q,
         Ṁq̇,∂T∂qᵀ
@@ -229,7 +229,7 @@ end
 
 function RigidBody(prop,state,coords,mesh=nothing)
     (;nmcs,pres_idx,cstr_idx) = coords
-    cache = get_CoordinatesCache(prop,nmcs,pres_idx,cstr_idx)
+    cache = BodyCache(prop,nmcs,pres_idx,cstr_idx)
     RigidBody(prop,state,coords,cache,mesh)
 end
 
@@ -239,7 +239,7 @@ function body_state2coords_state(state::RigidBodyState,coords::NonminimalCoordin
 end
 
 """
-    update_cache!(
+    update_inertia_cache!(
         cache::RigidBodyCache,
         coords::NonminimalCoordinates{<:NCF.NC},
         prop::RigidBodyProperty,
@@ -248,7 +248,7 @@ end
 
 update mass matrices/inertia related caches.
 """
-function update_cache!(
+function update_inertia_cache!(
         cache::RigidBodyCache,
         coords::NonminimalCoordinates{<:NCF.NC},
         prop::RigidBodyProperty,
@@ -256,7 +256,7 @@ function update_cache!(
     )
 end
 
-function update_cache!(
+function update_inertia_cache!(
         cache::RigidBodyCache,
         coords::NonminimalCoordinates{<:QCF.QC},
         prop::RigidBodyProperty,
@@ -289,10 +289,10 @@ function lazy_update_state!(state::RigidBodyState,
         mass_locus_state,
     ) = state
     (;Co,Cg) = cache
-    mul!(origin_frame.position, Co, q)
-    mul!(origin_frame.velocity, Co, q̇)
-    mul!(mass_locus_state.position, Cg, q)
-    mul!(mass_locus_state.velocity, Cg, q̇)
+    origin_frame.position = Co*q
+    origin_frame.velocity = Co*q̇
+    mass_locus_state.frame.position = Cg*q
+    mass_locus_state.frame.velocity = Cg*q̇
 end
 
 """
@@ -393,19 +393,12 @@ function update_transformations!(
         state::RigidBodyState,
         prop::RigidBodyProperty,q)
     (;mass_locus,loci) = prop
-    (;X,) = state.origin_frame.axes
+    (;nmcs) = coords
     (;Cg,Cps) = cache
-    L = QCF.Lmat(q[4:7])
     for (Cp,lo) in zip(Cps,loci)
-        for i = 1:3 
-        	Cp[i,i] = 1
-        end
-        Cp[1:3,4:7] .= -2X*skew(lo.position)*L
+        Cp .= to_transformation(nmcs,q,lo.position)
     end 
-    for i = 1:3 
-    	Cg[i,i] = 1
-    end
-    Cg[1:3,4:7] .= -2X*skew(mass_locus.position)*L
+    Cg .= to_transformation(nmcs,q,mass_locus.position)
 end
 
 
@@ -423,36 +416,45 @@ function update_loci_states!(state::RigidBodyState,
     (;loci_states) = state
     (;Cps) = cache
     for (i,locus_state) in enumerate(loci_states)
-        mul!(locus_state.position, Cps[i], q)
-        mul!(locus_state.velocity, Cps[i], q̇)
+        locus_state.frame.position = Cps[i]*q
+        locus_state.frame.velocity = Cps[i]*q̇
     end
 end
 
 function update_loci_states!(state::RigidBodyState,
         coords::NonminimalCoordinates{<:QCF.QC},cache,
-        prop::RigidBodyProperty,q,q̇)
-    # assuming origin_frame has been updated
+        prop::RigidBodyProperty,x,ẋ)
     (;loci) = prop
-    (;loci_states,
-        origin_frame
-    ) = state
-    for (locus,locus_state) in zip(loci,loci_states)
-        relative_velocity = origin_frame.axes * locus.position
-        locus_state.frame.position = origin_frame.position .+ relative_velocity
-        locus_state.frame.velocity = origin_frame.velocity .+ origin_frame.angular_velocity × relative_velocity
+    (;loci_states,) = state
+    (;Cps) = cache
+    r = @view x[1:3]
+    q = @view x[4:7]
+    for (i,(locus,locus_state)) in enumerate(zip(loci,loci_states))
+        locus_state.frame.position = r .+ QCF.Rmat(q) * locus.position
+        locus_state.frame.velocity = Cps[i]*ẋ
     end
 end
 
-function generalize_force!(F,state::AbstractBodyState,cache::AbstractBodyCache)
+function centrifugal_force!(F,state::AbstractBodyState,cache::AbstractBodyCache)
+    (;mass_locus_state,loci_states) = state
+    (;Cps,Cg,coords_cache) = cache
+    F .+= coords_cache.∂T∂qᵀ
+end
+
+function mass_center_force!(F,state::AbstractBodyState,cache::AbstractBodyCache)
+    (;mass_locus_state,loci_states) = state
+    (;Cps,Cg,coords_cache) = cache
+    mul!(F,transpose(Cg),mass_locus_state.force,1,1)
+end
+
+function concentrated_force!(F,state::AbstractBodyState,cache::AbstractBodyCache)
     (;mass_locus_state,loci_states) = state
     (;Cps,Cg,coords_cache) = cache
     for (pid,locus_state) in enumerate(loci_states)
         mul!(F,transpose(Cps[pid]),locus_state.force,1,1)
     end
-    mul!(F,transpose(Cg),mass_locus_state.force,1,1)
-    F .+= coords_cache.∂T∂qᵀ
-    F
 end
+
 
 # kinematic joint cstr
 
@@ -516,6 +518,10 @@ function potential_energy_strain(body::AbstractRigidBody)
 end
 
 
+"""
+Clear Rigid Body Forces and torques。
+$(TYPEDSIGNATURES)
+"""
 function clear_forces!(body::AbstractRigidBody)
     (;mass_locus_state,loci_states,) = body.state
     mass_locus_state.force .= 0

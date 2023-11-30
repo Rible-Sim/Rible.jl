@@ -43,7 +43,6 @@ material_properties = Table(
     ]
 )
 
-
 function generalize_force!(F,bot,q,q̇,t;actuate=false,gravity=true,(user_defined_force!)=(F,t)->nothing)
     if actuate
         actuate!(bot,[t])
@@ -69,8 +68,6 @@ function generalize_force_jacobain!(∂F∂q̌,∂F∂q̌̇,bot,q,q̇,t)
     build_∂Q̌∂q̌!(∂F∂q̌,structure)
     build_∂Q̌∂q̌̇!(∂F∂q̌̇,structure)
 end
-
-
 
 struct ContactCache{cacheType}
     cache::cacheType
@@ -106,7 +103,6 @@ function prepare_contacts(bot,env;
         gaps_sys
     )
 end
-
 
 function activate_frictional_contacts!(structure,contact_env,solver_cache,q;checkpersist=true)
     (;  

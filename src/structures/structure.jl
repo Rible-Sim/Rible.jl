@@ -427,14 +427,14 @@ end
 struct StructureCache{sysType}
     system::sysType
     function StructureCache(st::Structure)
-        system_cache = NonminimalCoordinatesCache(st,)
+        system_cache = InertiaCache(st,)
         new{typeof(system_cache)}(
             system_cache,
         )
     end
 end
 
-function NonminimalCoordinatesCache(st::Structure)
+function InertiaCache(st::Structure)
     (;M,M⁻¹,M̌,M̌⁻¹,Ḿ,M̄) = build_mass_matrices(st)
     T = get_numbertype(st)
     (;num_of_full_coords) = st.connectivity.indexed
@@ -442,7 +442,7 @@ function NonminimalCoordinatesCache(st::Structure)
     ∂M⁻¹p∂q = spzeros(T,num_of_full_coords,num_of_full_coords)
     ∂T∂qᵀ = spzeros(T,num_of_full_coords)
     Ṁq̇ = spzeros(T,num_of_full_coords)
-    NonminimalCoordinatesCache(
+    InertiaCache(
         M,M⁻¹,
         # M̌,M̌⁻¹,
         # Ḿ,M̄,

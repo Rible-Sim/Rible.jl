@@ -18,7 +18,7 @@ $(TYPEDSIGNATURES)
 function Robot(structure,hub=nothing)
     (;numbered) = structure.connectivity
     (;bodyid2sys_loci_idx) = numbered
-    structure_cache = NonminimalCoordinatesCache(structure)
+    structure_cache = InertiaCache(structure)
     update!(structure)
     traj = StructArray([deepcopy(structure.state.system)])
     contacts_traj = [

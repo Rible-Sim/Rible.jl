@@ -11,7 +11,7 @@ function Base.sort(tsc::TypeSortedCollection)
     sort!(reduce(vcat,tsc.data))
 end
 
-update_cache!(body::AbstractBody,q,q̇) = update_cache!(body.cache,body.coords,body.prop,q,q̇)
+update_inertia_cache!(body::AbstractBody,q,q̇) = update_inertia_cache!(body.cache,body.coords,body.prop,q,q̇)
 lazy_update_state!(body::AbstractBody,q,q̇) = lazy_update_state!(body.state,body.coords,body.cache,body.prop,q,q̇)
 update_state!(body::AbstractBody,q,q̇) = update_state!(body.state,body.coords,body.cache,body.prop,q,q̇)
 update_loci_states!(body::AbstractBody,q,q̇) = update_loci_states!(body.state,body.coords,body.cache,body.prop,q,q̇)
@@ -93,7 +93,7 @@ function cstr_forces_jacobian(coords::NonminimalCoordinates,λ)
     cstr_forces_jacobian(coords.nmcs,coords.free_idx,coords.cstr_idx,λ)
 end
 
-struct NonminimalCoordinatesCache{MType,JType,GType}
+struct InertiaCache{MType,JType,GType}
     M::MType
     M⁻¹::MType
     ∂Mq̇∂q::JType

@@ -1,8 +1,3 @@
-
-"""
-Clear Rigid Body 所受作用力和力矩。
-$(TYPEDSIGNATURES)
-"""
 function clear_forces!(st::AbstractStructure)
     st.state.system.F .= 0
     clear_forces!(st.bodies)
@@ -19,7 +14,7 @@ Update Cable Tension
 $(TYPEDSIGNATURES)
 """
 function update_tensiles!(st::AbstractStructure)
-    update_tensiles!(st, st.connectivity.tensioned)
+    update_tensiles!(st::AbstractStructure, st.connectivity.tensioned)
 end
 
 function update_tensiles!(st::Structure, @eponymargs(connected,))
@@ -40,7 +35,7 @@ function update_tensiles!(st::Structure, @eponymargs(connected,))
     end
 end
 
-function stretch_rigids!(st,c)
+function stretch_rigids!(st::AbstractStructure,c)
     st.state.system.c .= c
     stretch_rigids!(st)
 end
@@ -55,7 +50,7 @@ function stretch_rigids!(st)
     end
 end
 
-function move_rigids!(st,q,q̇=zero(q))
+function move_rigids!(st::AbstractStructure,q,q̇=zero(q))
     st.state.system.q .= q
     st.state.system.q̇ .= q̇
     move_rigids!(st)
@@ -70,23 +65,19 @@ function move_rigids!(st)
     end
 end
 
-"""
-Update Rigid Body State.
-$(TYPEDSIGNATURES)
-"""
-function lazy_update_bodies!(st,q)
+function lazy_update_bodies!(st::AbstractStructure,q)
     st.state.system.q .= q
     st.state.system.q̇ .= 0.0
     lazy_update_bodies!(st)
 end
 
-function lazy_update_bodies!(st,q,q̇)
+function lazy_update_bodies!(st::AbstractStructure,q,q̇)
     st.state.system.q .= q
     st.state.system.q̇ .= q̇
     lazy_update_bodies!(st)
 end
 
-function lazy_update_bodies!(st)
+function lazy_update_bodies!(st::AbstractStructure)
     (;bodies,state) = st
     foreach(bodies) do body
         bodyid = body.prop.id
@@ -97,24 +88,24 @@ function lazy_update_bodies!(st)
     end
 end
 
-function update_bodies!(st,q)
+function update_bodies!(st::AbstractStructure,q)
     st.state.system.q .= q
     st.state.system.q̇ .= 0.0
     update_bodies!(st)
 end
 
-function update_bodies!(st,q,q̇)
+function update_bodies!(st::AbstractStructure,q,q̇)
     st.state.system.q .= q
     st.state.system.q̇ .= q̇
     update_bodies!(st)
 end
 
-function update_bodies!(st)
+function update_bodies!(st::AbstractStructure)
     (;bodies,state) = st
     foreach(bodies) do body
         bodyid = body.prop.id
         (;q, q̇) = state.members[bodyid]
-        update_cache!(body,q,q̇)
+        update_inertia_cache!(body,q,q̇)
         update_state!(body,q,q̇)
         update_transformations!(body,q)
         update_loci_states!(body,q,q̇)
@@ -131,7 +122,11 @@ function assemble_force!(st::Structure)
     system.F .= 0.0
     foreach(bodies) do body
         (;F) = members[body.prop.id]
-        generalize_force!(F,body.state,body.cache)
+        (;state,cache) = body
+        centrifugal_force!(F,state,cache)
+        mass_center_force!(F,state,cache)
+        concentrated_force!(F,state,cache)
+        # strain!(F,state)
     end
     system.F̌
 end
