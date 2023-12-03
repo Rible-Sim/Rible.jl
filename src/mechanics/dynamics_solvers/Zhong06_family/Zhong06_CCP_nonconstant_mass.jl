@@ -72,13 +72,6 @@ function generate_cache(
     Zhong06_CCP_Nonconstant_Mass_Cache(cache)
 end
 
-function Momentum_k(qₖ₋₁,pₖ₋₁,qₖ,λₘ,Mₘ,A,Λₘ,Dₖ₋₁,Dₖ,H,scaling,h)
-    pₖ = -pₖ₋₁ .+ 
-        2/h.*Mₘ*(qₖ.-qₖ₋₁) .+ 
-        scaling/h.*(transpose(A(qₖ))-transpose(A(qₖ₋₁)))*λₘ .+
-        scaling.*(transpose(Dₖ)-transpose(Dₖ₋₁))*H*Λₘ
-end
-
 function make_step_k(
         solver_cache,
         nq,nλ,na,

@@ -15,7 +15,11 @@ Random.seed!(100)
     ω = @SVector rand(M)
     @time "CartesianFrame $(N)D" frame1 = RB.CartesianFrame(position,axes,velocity,ω)
     frame2 = RB.CartesianFrame(position,velocity,axes,ω)
-    @test  frame1 == frame2
+    @test  frame1.position == frame2.position
+    @test  frame1.axes == frame2.axes
+    @test  frame1.velocity == frame2.velocity
+    @test  frame1.angular_velocity == frame2.angular_velocity
+    @test  frame1.local_angular_velocity == frame2.local_angular_velocity
     force  = @MVector rand(N)
     torque = @MVector rand(M)
     @time "ContactState $(N)D" cs = RB.ContactState(normal)

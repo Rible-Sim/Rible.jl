@@ -56,10 +56,6 @@ function generate_cache(
     Zhong06_CCP_Constant_Mass_Cache(cache)
 end
 
-function Momentum_k(qₖ₋₁,pₖ₋₁,qₖ,λₘ,Mₘ,A,scaling,h)
-    pₖ = -pₖ₋₁ .+ 2/h.*Mₘ*(qₖ.-qₖ₋₁) .+ scaling/(h).*(transpose(A(qₖ))-transpose(A(qₖ₋₁)))*λₘ
-end
-
 function make_step_k(
         solver_cache::Zhong06_CCP_Constant_Mass_Cache,
         nq,nλ,na,

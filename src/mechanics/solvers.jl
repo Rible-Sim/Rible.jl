@@ -278,6 +278,7 @@ end
 
 # include("dynamics_solvers/Wendlandt.jl")
 include("dynamics_solvers/complementarity_solvers.jl")
+include("dynamics_solvers/Zhong06_family/Zhong06_momentum.jl")
 include("dynamics_solvers/Zhong06_family/Zhong06_constant_mass.jl")
 include("dynamics_solvers/Zhong06_family/Zhong06_nonconstant_mass.jl")
 include("dynamics_solvers/Zhong06_family/Zhong06_CCP_constant_mass.jl")

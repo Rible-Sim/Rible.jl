@@ -1,10 +1,4 @@
 
-function Momentum_k(qᵏ⁻¹,pᵏ⁻¹,qᵏ,λᵏ,μᵏ,M,A,B,h)
-    pᵏ = -pᵏ⁻¹ .+ 2/h.*M*(qᵏ.-qᵏ⁻¹) .+
-        1/(2h).*(transpose(A(qᵏ))-transpose(A(qᵏ⁻¹)))*λᵏ .+
-        1/(2h).*(transpose(B(qᵏ))-transpose(B(qᵏ⁻¹)))*μᵏ
-end
-
 function stepk_maker(nq,nλ,nμ,qₛ₋₁,q̇ₛ₋₁,pₛ₋₁,tₛ₋₁,dynfuncs,invM,h)
     M,Φ,A,Ψ,B,F!,jacobians,contact_funcs = dynfuncs
     Jac_F!,Ψq,cstr_forces_jacobian,∂Bᵀμ∂q = jacobians

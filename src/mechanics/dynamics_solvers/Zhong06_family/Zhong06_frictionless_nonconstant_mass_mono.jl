@@ -73,13 +73,6 @@ function generate_cache(
     Zhong06_Frictionless_Nonconstant_Mass_Mono_Cache(cache)
 end
 
-function Momentum_ZhongQCCPNMono_k(qₖ₋₁,pₖ₋₁,qₖ,λₘ,Mₘ,A,Λₘ,Dₖ₋₁,Dₖ,H,scaling,h)
-    pₖ = -pₖ₋₁ .+ 
-        2/h.*Mₘ*(qₖ.-qₖ₋₁) .+ 
-        scaling/h.*(transpose(A(qₖ))-transpose(A(qₖ₋₁)))*λₘ .+
-        scaling.*(transpose(Dₖ)-transpose(Dₖ₋₁))*H*Λₘ
-end
-
 function make_step_k(
         solver_cache::Zhong06_Frictionless_Nonconstant_Mass_Mono_Cache,
         nq,nλ,na,
@@ -147,7 +140,7 @@ function make_step_k(
             ŕₖ = contact_cache.cache.ŕ
             ∂Dₖvₖ∂qₖ = contact_cache.cache.∂Dq̇∂q
             ∂DᵀₖHΛₘ∂qₖ = contact_cache.cache.∂DᵀΛ∂q
-            pₖ .= Momentum_ZhongQCCPNMono_k(qₖ₋₁,pₖ₋₁,qₖ,λₘ,Mₘ,A,Λₘ,Dₖ₋₁,Dₖ,H,scaling,h)
+            pₖ .= Momentum_k(qₖ₋₁,pₖ₋₁,qₖ,λₘ,Mₘ,A,Λₘ,Dₖ₋₁,Dₖ,H,scaling,h)
             M⁻¹_and_Jac_M⁻¹!(M⁻¹ₖ,∂M⁻¹ₖpₖ∂qₖ,qₖ,pₖ)
             vₖ .= M⁻¹ₖ*pₖ
             ∂Aᵀₖλₘ∂qₖ = ∂Aᵀλ∂q(qₖ,λₘ)
@@ -386,7 +379,7 @@ function solve!(sim::Simulator,solver_cache::Zhong06_Frictionless_Nonconstant_Ma
         M!(Mₘ,qₖ₋½)
         get_directions_and_positions!(structure, contact_cache, qₖ, q̇ₖ, Λₘ,)
         Dₖ = contact_cache.cache.D
-        pₖ .= Momentum_ZhongQCCPNMono_k(qₖ₋₁,pₖ₋₁,qₖ,λₘ,Mₘ,A,Λₘ,Dₖ₋₁,Dₖ,H,scaling,dt)
+        pₖ .= Momentum_k(qₖ₋₁,pₖ₋₁,qₖ,λₘ,Mₘ,A,Λₘ,Dₖ₋₁,Dₖ,H,scaling,dt)
         M⁻¹!(M⁻¹ₖ,qₖ)
         q̇ₖ .= M⁻¹ₖ*pₖ
         if na != 0
