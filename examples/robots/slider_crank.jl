@@ -14,7 +14,7 @@ function slider_crank(;θ = 0, coordsType = RB.NCF.NC)
     ω0 = [
         150.0,
         -75.0,
-    ]
+    ]./10
     b = 0.05
     a = 0.025
     d = 0.05

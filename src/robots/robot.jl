@@ -42,21 +42,7 @@ end
 make_cstr_jacobian(bot::Robot) = (q) -> cstr_jacobian(bot.structure,q)
 make_cstr_function(bot::Robot) = (q) -> cstr_function(bot.structure,q)
 
-"""
-Return System 质量矩阵。
-$(TYPEDSIGNATURES)
-"""
-function build_mass_matrices(bot::Robot)
-    (;structure) = bot
-    (;num_of_free_coords,num_of_pres_coords,sys_free_idx,sys_pres_idx) = structure.connectivity.indexed
-    M = assemble_M(structure)
-    Ḿ = M[sys_free_idx,:]
-    M̌ = Symmetric(M[sys_free_idx,sys_free_idx])
-    M̄ =           M[sys_free_idx,sys_pres_idx]
-    invM̌_raw = inv(Matrix(M̌))
-    invM̌ = Symmetric(sparse(invM̌_raw))
-    @eponymtuple(Ḿ,M̌,M̄,invM̌)
-end
+build_mass_matrices(bot::Robot) = build_mass_matrices(bot.structure)
 
 
 function build_Y(bot)

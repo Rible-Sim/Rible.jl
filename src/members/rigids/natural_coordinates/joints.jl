@@ -174,3 +174,24 @@ function get_joint_forces_jacobian!(
         ret .+= -λ[i] .* hessians[i][free_idx,free_idx]
     end
 end
+
+function get_joint_velocity_jacobian!(
+        ret,
+        num_of_cstr,
+        nmcs_hen::NC, nmcs_egg::NC,
+        loci_position_hen,
+        loci_position_egg,
+        cache,
+        mask_1st,mask_2nd,mask_3rd,mask_4th,
+        free_idx,
+        q_hen,q_egg,
+        q̇_hen,q̇_egg,
+    )
+    (;hessians) = cache
+    q̇_jointed = vcat(
+        q̇_hen,q̇_egg,
+    )
+    for i = 1:num_of_cstr
+        ret[[i],:] .= transpose(q̇_jointed)*hessians[i][:,free_idx]
+    end
+end

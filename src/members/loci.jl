@@ -55,6 +55,10 @@ function (Base.:*)(R::StaticArray{Tuple{N,N}},axes::Axes{N}) where N
     Axes(SMatrix{N,N}(R*axes.X))
 end
 
+function (Base.:*)(axes::Axes{N},R::StaticArray{Tuple{N,N}}) where N
+    Axes(SMatrix{N,N}(axes.X*R))
+end
+
 function (Base.:*)(axes1::Axes{N},axes2::Axes{N}) where N
     Axes(axes1.X*axes2.X)
 end

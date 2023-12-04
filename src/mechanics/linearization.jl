@@ -31,20 +31,30 @@ function cstr_forces_jacobian(st::AbstractStructure,q,λ)
     ret
 end
 
-function ∂Aq̇∂q(st,q̇)
+function cstr_velocity_jacobian(st::AbstractStructure,q,q̇)
     (;num_of_free_coords) = st.connectivity.indexed
     (;bodies,num_of_cstr) = st
     (;indexed,jointed) = st.connectivity
     (;num_of_intrinsic_cstr,bodyid2sys_free_coords,bodyid2sys_intrinsic_cstr_idx) = indexed
+    (;njoints,num_of_extrinsic_cstr,joints,jointid2sys_extrinsic_cstr_idx) = jointed
     ret = zeros(eltype(q̇),num_of_cstr,num_of_free_coords)
     foreach(bodies) do body
         bodyid = body.prop.id
         memfree = bodyid2sys_free_coords[bodyid]
         memincst = bodyid2sys_intrinsic_cstr_idx[bodyid]
-        free_idx = body.state.cache.free_idx
-        cstr_idx = body.state.cache.cstr_idx
         if !isempty(memincst)
-            ret[memincst,memfree] .+= body.state.cache.funcs.∂Aq̇∂q(q̇[memfree])[cstr_idx,free_idx]
+            ret[memincst,memfree] .= cstr_velocity_jacobian(
+                body.coords,
+                q̇[memfree]
+            )
+        end
+    end
+    #todo skip 2D for now
+    if get_num_of_dims(st) == 3
+        foreach(joints) do joint
+            joint_cstr_idx = num_of_intrinsic_cstr .+ jointid2sys_extrinsic_cstr_idx[joint.id]
+            jointed_sys_free_idx = joint.sys_free_idx
+            ret[joint_cstr_idx,jointed_sys_free_idx] .= cstr_velocity_jacobian(joint,st,q,q̇)
         end
     end
     ret

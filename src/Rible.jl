@@ -74,6 +74,7 @@ function cstr_function end
 function cstr_jacobian end
 function cstr_hessians end
 function cstr_forces_jacobian end
+function cstr_velocity_jacobian end
 function make_cstr_function end
 function make_cstr_jacobian end
 function to_local_coords end
@@ -86,6 +87,7 @@ function build_joint_cache end
 function get_joint_violations! end
 function get_joint_jacobian! end
 function get_joint_forces_jacobian! end
+function get_joint_velocity_jacobian! end
 function find_independent_free_idx end
 function nullspace_mat end
 

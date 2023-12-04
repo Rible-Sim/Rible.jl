@@ -43,7 +43,7 @@ material_properties = Table(
     ]
 )
 
-function generalize_force!(F,bot,q,q̇,t;actuate=false,gravity=true,(user_defined_force!)=(F,t)->nothing)
+function generalized_force!(F,bot,q,q̇,t;actuate=false,gravity=true,(user_defined_force!)=(F,t)->nothing)
     if actuate
         actuate!(bot,[t])
     end
@@ -58,7 +58,7 @@ function generalize_force!(F,bot,q,q̇,t;actuate=false,gravity=true,(user_define
     user_defined_force!(F,t)
 end
 
-function generalize_force_jacobain!(∂F∂q̌,∂F∂q̌̇,bot,q,q̇,t)
+function generalized_force_jacobain!(∂F∂q̌,∂F∂q̌̇,bot,q,q̇,t)
     (;structure) = bot
     ∂F∂q̌ .= 0
     ∂F∂q̌̇ .= 0
@@ -391,7 +391,6 @@ function get_frictional_distribution_law!(structure,cache,q)
     end
 end
 
-
 function get_distribution_law!(structure,cache,q)
     (;
         L,bodyid2act_idx
@@ -422,7 +421,6 @@ function get_distribution_law!(structure,cache,q)
         end
     end
 end
-
 
 function make_pres_actor(μ0,μ1,start,stop)
     nμ = length(μ0)

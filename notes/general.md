@@ -72,6 +72,7 @@ To do this, use `include`, docs/test/benchmark; use `includet` dev;
     - [x] friction model: frictionless, Coulomb, PolyhedralCoulomb
     - [x] resitution: Inelastic, Newton, Poisson, Strange
     - [x] variants: Unclassified/Classified CCP, Mono/Two-layer,
+    - [ ] Moreau-$\theta$ scheme
 - [x] reduce functions fields
 - [x] preallocations for autodiff: `QCF`  cstr_forces_jacobian
 - [ ] joint cstr
@@ -92,4 +93,5 @@ To do this, use `include`, docs/test/benchmark; use `includet` dev;
   - [ ] cache differentials, w.r.t action(forces/torques), structual parameters (stiffness/geometry), joints(location, axes), initial conditions, 
 
 # Show case
-  走钢丝
+- [ ] pecking wood bird examples
+- [ ] 走钢丝

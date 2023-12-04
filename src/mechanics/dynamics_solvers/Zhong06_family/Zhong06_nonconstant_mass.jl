@@ -18,8 +18,8 @@ function generate_cache(
     M_and_Jac_M! = make_M_and_Jac_M!(structure)
     Φ = make_cstr_function(structure)
     A = make_cstr_jacobian(structure)
-    F!(F,q,q̇,t) = generalize_force!(F,bot,q,q̇,t)
-    Jac_F!(∂F∂q̌,∂F∂q̌̇,q,q̇,t) = generalize_force_jacobain!(∂F∂q̌,∂F∂q̌̇,bot,q,q̇,t)
+    F!(F,q,q̇,t) = generalized_force!(F,bot,q,q̇,t)
+    Jac_F!(∂F∂q̌,∂F∂q̌̇,q,q̇,t) = generalized_force_jacobain!(∂F∂q̌,∂F∂q̌̇,bot,q,q̇,t)
     cache = @eponymtuple(
         F!,Jac_F!,
         Mₘ,M⁻¹ₖ,

@@ -46,6 +46,12 @@ function cstr_forces_jacobian(cst::LinearJoint,st,q,λ)
     zeros(eltype(λ),n,n)
 end
 
+function cstr_velocity_jacobian(cst::LinearJoint,st,q,q̇)
+    (;num_of_cstr,sys_free_idx) = cst
+    n = length(sys_free_idx)
+    zeros(eltype(q̇),num_of_cstr,n)
+end
+
 """
 固定约束构造子。
 $(TYPEDSIGNATURES)
@@ -330,3 +336,44 @@ function cstr_forces_jacobian(cst::PrototypeJoint,structure,q,λ)
     ret
 end
 
+function cstr_velocity_jacobian(cst::PrototypeJoint,structure,q,q̇)
+    (;indexed,numbered) = structure.connectivity
+    (;bodyid2sys_free_coords,
+      bodyid2sys_full_coords,
+      num_of_free_coords,
+      num_of_full_coords,
+    ) = indexed
+    (;
+        num_of_cstr,
+        hen2egg,
+        free_idx,
+        mask_1st,
+        cache,
+        mask_1st,mask_2nd,mask_3rd,mask_4th
+    ) = cst
+    (;hen,egg) = hen2egg
+    id_hen = hen.rbsig.prop.id
+    id_egg = egg.rbsig.prop.id
+    q_hen = @view q[bodyid2sys_full_coords[id_hen]]
+    q_egg = @view q[bodyid2sys_full_coords[id_egg]]
+    q̇_hen = @view q̇[bodyid2sys_full_coords[id_hen]]
+    q̇_egg = @view q̇[bodyid2sys_full_coords[id_egg]]
+    nmcs_hen = hen.rbsig.coords.nmcs
+    nmcs_egg = egg.rbsig.coords.nmcs
+    T = eltype(q̇)
+    num_of_free_idx = length(free_idx)
+    ret = zeros(T,num_of_cstr,num_of_free_idx)
+    get_joint_velocity_jacobian!(
+        ret,
+        num_of_cstr,
+        nmcs_hen, nmcs_egg,
+        hen.rbsig.prop.loci[hen.pid].position,
+        egg.rbsig.prop.loci[egg.pid].position,
+        cache,
+        mask_1st,mask_2nd,mask_3rd,mask_4th,
+        free_idx,
+        q_hen,q_egg,
+        q̇_hen,q̇_egg,
+    )
+    ret
+end

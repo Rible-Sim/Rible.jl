@@ -1,4 +1,3 @@
-
 include("deps.jl")
 using AbbreviatedStackTraces #jl
 ENV["JULIA_STACKTRACE_ABBREVIATED"] = true #jl
@@ -37,8 +36,9 @@ GM.activate!(;px_per_unit=2,scalefactor = 2); plot_traj!(sc;showground=false)
 
 RB.has_constant_mass_matrix(sc)
 
-dt = 5e-4
+dt = 1e-4
 tspan = (0.0,2*683dt)
+# tspan = (0.0,1dt)
 
 # No Contact Dynamics
 prob = RB.DynamicsProblem(sc,)
@@ -46,11 +46,19 @@ prob = RB.DynamicsProblem(sc,)
 RB.solve!(
     prob,
     RB.DynamicsSolver(RB.Zhong06());
-    dt,tspan,ftol=1e-14,maxiters=50,verbose=true,exception=true,progress=false,
+    dt,tspan,ftol=1e-12,maxiters=50,verbose=true,exception=true,progress=false,
 )
 
-GM.activate!(;px_per_unit=2,scalefactor = 2);plot_traj!(sc;showground=false)
+RB.solve!(
+    prob,
+    RB.DynamicsSolver(RB.Moreau(0.5));
+    dt,tspan,ftol=1e-12,maxiters=5,verbose=true,exception=true,progress=false,
+)
 
+GM.activate!(;px_per_unit=1,scalefactor = 1);plot_traj!(sc;showground=false)
+
+me = RB.mechanical_energy!(sc)
+lines(me.E)
 # Frictionless Contact Dynamics
 
 dt = 1e-4

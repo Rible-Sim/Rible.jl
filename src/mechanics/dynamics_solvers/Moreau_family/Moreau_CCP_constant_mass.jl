@@ -1,5 +1,5 @@
 
-struct Zhong06_CCP_Constant_Mass_Cache{CacheType}
+struct Moreau_CCP_Constant_Mass_Cache{CacheType}
     cache::CacheType
 end
 
@@ -10,7 +10,7 @@ function generate_cache(
             RestitutionFrictionCombined{NewtonRestitution,CoulombFriction}
         }},
         solver::DynamicsSolver{
-            Zhong06,
+            <:Moreau,
             <:InnerLayerContactSolver
         },
         ::Val{true};
@@ -53,11 +53,11 @@ function generate_cache(
         es_sys,
         gaps_sys
     )
-    Zhong06_CCP_Constant_Mass_Cache(cache)
+    Moreau_CCP_Constant_Mass_Cache(cache)
 end
 
 function make_step_k(
-        solver_cache::Zhong06_CCP_Constant_Mass_Cache,
+        solver_cache::Moreau_CCP_Constant_Mass_Cache,
         nq,nλ,na,
         qₖ₋₁,vₖ₋₁,pₖ₋₁,tₖ₋₁,
         pₖ,vₖ,
@@ -158,7 +158,7 @@ function make_step_k(
     ns_stepk!
 end
 
-function solve!(sim::Simulator,solver_cache::Zhong06_CCP_Constant_Mass_Cache;
+function solve!(sim::Simulator,solver_cache::Moreau_CCP_Constant_Mass_Cache;
                 dt,
                 ftol=1e-14,xtol=ftol,
                 verbose=false,verbose_contact=false,

@@ -25,14 +25,12 @@ function generate_cache(
         dt,kargs...
     )
     (;bot) = simulator.prob
-    (;traj) = bot
-    # F!,_ = dynfuncs
-    Ḿ,M̌,M̄,invM̌ = build_mass_matrices(bot)
-    # (;M) = mass_matrices
-    A = make_cstr_jacobian(bot)
-    Φ = make_cstr_function(bot)
-    F!(F,q,q̇,t) = generalize_force!(F,bot,q,q̇,t)
-    Jac_F!(∂F∂q̌,∂F∂q̌̇,q,q̇,t) = generalize_force_jacobain!(∂F∂q̌,∂F∂q̌̇,bot,q,q̇,t)
+    (;traj,structure) = bot
+    (;M,M⁻¹,M̌,M̌⁻¹,Ḿ,M̄)= build_mass_matrices(structure)
+    A = make_cstr_jacobian(structure)
+    Φ = make_cstr_function(structure)
+    F!(F,q,q̇,t) = generalized_force!(F,bot,q,q̇,t)
+    Jac_F!(∂F∂q̌,∂F∂q̌̇,q,q̇,t) = generalized_force_jacobain!(∂F∂q̌,∂F∂q̌̇,bot,q,q̇,t)
     q̌0 = traj.q̌[begin]
     λ0 = traj.λ[begin]
     q̇0 = traj.q̇[begin]
@@ -50,7 +48,7 @@ function generate_cache(
     Zhong06_Constant_Mass_Cache(solver,
         @eponymtuple(
             F!,Jac_F!,
-            Ḿ,M̌,M̄,invM̌,A,Φ,
+            Ḿ,M̌,M̄,M̌⁻¹,A,Φ,
             ∂F∂q̌,∂F∂q̌̇,
             nq̌,nλ,nx,
             initial_x,
@@ -72,7 +70,7 @@ function solve!(sim::Simulator,cache::Zhong06_Constant_Mass_Cache;
     (;traj) = bot
     (;
         F!,Jac_F!,
-        Ḿ,M̌,M̄,invM̌,A,Φ,
+        Ḿ,M̌,M̄,M̌⁻¹,A,Φ,
         ∂F∂q̌,∂F∂q̌̇,
         nq̌,nλ,nx,
         initial_x,
@@ -194,7 +192,7 @@ function solve!(sim::Simulator,cache::Zhong06_Constant_Mass_Cache;
         q̌ₖ .= xₖ[   1:nq̌   ]
         λₖ .= xₖ[nq̌+1:nq̌+nλ]
         Momentum_k!(p̌ₖ,p̌ₖ₋₁,qₖ,qₖ₋₁,λₖ,Ḿ,A,Aᵀₖ₋₁,h)
-        q̌̇ₖ .= invM̌*(p̌ₖ.-M̄*q̃̇ₖ )
+        q̌̇ₖ .= M̌⁻¹*(p̌ₖ.-M̄*q̃̇ₖ )
         #---------Step k finisher-----------
         #---------Step k finisher-----------
         if verbose

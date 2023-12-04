@@ -64,6 +64,10 @@ struct GeneralizedAlpha{T} <: AbstractIntegrator
     β::T
 end
 
+struct Moreau{T} <: AbstractIntegrator
+    θ::T
+end
+
 struct DynamicsSolver{integratorType,contact_solverType,tendon_solverType} <: AbstractSolver 
     integrator::integratorType
     contact_solver::contact_solverType
@@ -278,6 +282,11 @@ end
 
 # include("dynamics_solvers/Wendlandt.jl")
 include("dynamics_solvers/complementarity_solvers.jl")
+
+include("dynamics_solvers/Moreau_family/Moreau_constant_mass.jl")
+include("dynamics_solvers/Moreau_family/Moreau_CCP_constant_mass.jl")
+# include("dynamics_solvers/Moreau_family/Moreau_CCP_nonconstant_mass.jl")
+
 include("dynamics_solvers/Zhong06_family/Zhong06_momentum.jl")
 include("dynamics_solvers/Zhong06_family/Zhong06_constant_mass.jl")
 include("dynamics_solvers/Zhong06_family/Zhong06_nonconstant_mass.jl")

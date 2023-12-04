@@ -18,8 +18,8 @@ function generate_cache(
     )   where {RobotType,EnvType}
     (;bot,env) = simulator.prob
     (;structure) = bot
-    F!(F,q,q̇,t) = generalize_force!(F,bot,q,q̇,t)
-    Jac_F!(∂F∂q̌,∂F∂q̌̇,q,q̇,t) = generalize_force_jacobain!(∂F∂q̌,∂F∂q̌̇,bot,q,q̇,t)
+    F!(F,q,q̇,t) = generalized_force!(F,bot,q,q̇,t)
+    Jac_F!(∂F∂q̌,∂F∂q̌̇,q,q̇,t) = generalized_force_jacobain!(∂F∂q̌,∂F∂q̌̇,bot,q,q̇,t)
     Mₘ = assemble_M(structure) 
     M⁻¹ₖ = assemble_M⁻¹(structure)
     ∂Mₘhq̇ₘ∂qₘ = assemble_∂Mq̇∂q(structure)
@@ -73,7 +73,7 @@ function generate_cache(
 end
 
 function make_step_k(
-        solver_cache,
+        solver_cache::Zhong06_CCP_Nonconstant_Mass_Cache,
         nq,nλ,na,
         qₖ₋₁,vₖ₋₁,pₖ₋₁,tₖ₋₁,
         pₖ,vₖ,

@@ -312,8 +312,9 @@ function update_state!(state::RigidBodyState,
     ) = state
     (;nmcs) = coords
     lazy_update_state!(state,coords,cache,prop,q,q̇)
-    origin_frame.axes .= find_rotation(nmcs,q)
-    origin_frame.angular_velocity .= find_angular_velocity(nmcs,q,q̇)
+    axes = Axes(find_rotation(nmcs,q))
+    origin_frame.axes = axes
+    origin_frame.angular_velocity = find_angular_velocity(nmcs,q,q̇)
 end
 
 function lazy_update_state!(state::RigidBodyState,
@@ -336,8 +337,6 @@ function update_state!(state::RigidBodyState,
     ) = state
     (;nmcs) = coords
     lazy_update_state!(state,coords,cache,prop,q,q̇)
-    axes = Axes(find_rotation(nmcs,q))
-    origin_frame.axes = axes
     origin_frame.angular_velocity = axes*find_local_angular_velocity(nmcs,q,q̇)
 end
 
@@ -506,7 +505,7 @@ function potential_energy_gravity(body::AbstractRigidBody)
     (;mass) = body.prop
     (;mass_locus_state) = body.state
     gravity_acceleration = get_gravity(body)
-    -transpose(mass_locus_state.position)*gravity_acceleration*mass
+    -transpose(mass_locus_state.frame.position)*gravity_acceleration*mass
 end
 
 """

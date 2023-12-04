@@ -20,9 +20,12 @@ import ..Rible: get_deform
 import ..Rible: cstr_function
 import ..Rible: cstr_jacobian
 import ..Rible: cstr_forces_jacobian
+import ..Rible: cstr_velocity_jacobian
 import ..Rible: cartesian_frame2coords
 import ..Rible: build_joint_cache, get_joint_violations!
-import ..Rible: get_joint_jacobian!, get_joint_forces_jacobian!
+import ..Rible: get_joint_jacobian!
+import ..Rible: get_joint_forces_jacobian!
+import ..Rible: get_joint_velocity_jacobian!
 import ..Rible: find_independent_free_idx
 import ..Rible: nullspace_mat
 

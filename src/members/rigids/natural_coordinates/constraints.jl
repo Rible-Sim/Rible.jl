@@ -239,6 +239,21 @@ function cstr_forces_jacobian(nmcs::NC,free_idx,cstr_idx,λ)
     sum(ret)
 end
 
+#todo use SymmetricPacked to the end
+function cstr_velocity_jacobian(nmcs::Union{NC2D2C,NC3D3C},free_idx,cstr_idx,q̇)
+    nothing
+end
+
+function cstr_velocity_jacobian(nmcs::NC,free_idx,cstr_idx,q̇)
+    reduce(vcat,
+        [
+            transpose(q̇)*nmcs.hessians[j][:,free_idx]
+            for j in cstr_idx
+        ]
+    )
+end
+
+
 """
 Return ∂Aq̇∂q的前向自动微分结果。
 $(TYPEDSIGNATURES)

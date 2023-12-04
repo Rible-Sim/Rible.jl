@@ -93,6 +93,11 @@ function cstr_forces_jacobian(coords::NonminimalCoordinates,λ)
     cstr_forces_jacobian(coords.nmcs,coords.free_idx,coords.cstr_idx,λ)
 end
 
+function cstr_velocity_jacobian(coords::NonminimalCoordinates,q̇)
+    cstr_velocity_jacobian(coords.nmcs,coords.free_idx,coords.cstr_idx,q̇)
+end
+
+
 struct InertiaCache{MType,JType,GType}
     M::MType
     M⁻¹::MType

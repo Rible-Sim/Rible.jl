@@ -8,40 +8,29 @@ const GROUP = get(ENV,"GROUP","ALL")
     if GROUP == "ALL" || GROUP == "UNIT"
         # unit tests
         @time @safetestset "utils Test" include("unit/loci.jl")
-        # @time @safetestset "utils Test" include("unit/nonsmooth/pointmass.jl")
-        # @time @safetestset "utils Test" include("unit/nonsmooth/pointmass.jl")
-        # @time @safetestset "utils Test" include("unit/nonsmooth/pointmass.jl")
-        # @time @safetestset "utils Test" include("unit/nonsmooth/pointmass.jl")
-        # @time @safetestset "utils Test" include("unit/nonsmooth/pointmass.jl")
+        # @time @safetestset "utils Test" include("unit/pointmass.jl")
+        # @time @safetestset "utils Test" include("unit/pointmass.jl")
+        # @time @safetestset "utils Test" include("unit/pointmass.jl")
+        # @time @safetestset "utils Test" include("unit/pointmass.jl")
+        # @time @safetestset "utils Test" include("unit/pointmass.jl")
     end
 
     if GROUP == "ALL" || GROUP == "MODELING"
         # interface / modeling tests
-        @time @safetestset "utils Test" include("modeling/nonsmooth/pointmass.jl")
-        @time @safetestset "utils Test" include("modeling/nonsmooth/pointmass.jl")
-        @time @safetestset "utils Test" include("modeling/nonsmooth/pointmass.jl")
-        @time @safetestset "utils Test" include("modeling/nonsmooth/pointmass.jl")
-        @time @safetestset "utils Test" include("modeling/nonsmooth/pointmass.jl")
-        @time @safetestset "utils Test" include("modeling/nonsmooth/pointmass.jl")
+        @time @safetestset "bodies Test" include("modeling/bodies.jl")
+        @time @safetestset "robots Test" include("modeling/robots.jl")
     end
 
     if GROUP == "ALL" || GROUP == "MECHANICS"
         # mechanics tests
-        # inverse_statics tests
-        # forward_statics tests
-        # stiffness/stability/linearization tests
-        # adjoint statics dynamics tests
-        # dynamic_relax tests
-        # dynamics tests
-        # adjoint dynamics tests
-        # contact dynamics tests
-        # adjoint contact dynamics tests
-        @time @safetestset "utils Test" include("mechanics/nonsmooth/pointmass.jl")
-        @time @safetestset "utils Test" include("mechanics/nonsmooth/pointmass.jl")
-        @time @safetestset "utils Test" include("mechanics/nonsmooth/pointmass.jl")
-        @time @safetestset "utils Test" include("mechanics/nonsmooth/pointmass.jl")
-        @time @safetestset "utils Test" include("mechanics/nonsmooth/pointmass.jl")
-        @time @safetestset "utils Test" include("mechanics/nonsmooth/pointmass.jl")
+        @time @safetestset "inverse_statics tests"                   include("mechanics/pointmass.jl")
+        @time @safetestset "forward_statics tests"                   include("mechanics/pointmass.jl")
+        @time @safetestset "stiffness/stability/linearization tests" include("mechanics/pointmass.jl")
+        @time @safetestset "adjoint statics dynamics tests"          include("mechanics/pointmass.jl")
+        @time @safetestset "dynamic_relax tests"                     include("mechanics/pointmass.jl")
+        @time @safetestset "dynamics tests"                          include("mechanics/pointmass.jl")
+        @time @safetestset "adjoint dynamics tests"                  include("mechanics/pointmass.jl")
+        @time @safetestset "adjoint contact dynamics tests"          include("mechanics/pointmass.jl")
     end
 
     if GROUP == "ALL" || GROUP == "DEMOS"
