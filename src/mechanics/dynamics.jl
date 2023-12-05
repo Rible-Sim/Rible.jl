@@ -128,8 +128,8 @@ function activate_frictional_contacts!(structure,contact_env,solver_cache,q;chec
             if body.prop.contactable
                 for pid in eachindex(loci_states)
                     locus_state = loci_states[pid]
-                    (;position,contact_state) = locus_state
-                    gap, normal = contact_gap_and_normal(position,surfaces)
+                    (;frame,contact_state) = locus_state
+                    gap, normal = contact_gap_and_normal(frame.position,surfaces)
                     if !checkpersist
                         contact_state.active = false
                     end
@@ -167,14 +167,7 @@ function activate_frictional_contacts!(structure,contact_env,solver_cache,q;chec
         append!(persistent_idx,mem_idx[mem_per_idx])
         act_start += nactive_body
     end
-    Ls = [
-        begin 
-            na_body = count(!iszero, mem)
-            zeros(T,3na_body,3na_body)
-        end
-        for mem in bodyid2act_idx
-    ]
-    L = BlockDiagonal(Ls)
+    L = zeros(T,3na,3na)
     D = zeros(T,3na,nq)
     Dper = zero(D)
     Dimp = zero(D)
@@ -285,9 +278,8 @@ function get_frictional_directions_and_positions!(structure,cache, q, q̇, Λ, )
         bid = prop.id
         (;loci_states) = state
         for (pid,locus_state) in enumerate(loci_states)
-            (;contact_state) = locus_state
+            (;frame,contact_state) = locus_state
             if contact_state.active
-                (;position) = loci_states[pid]
                 (;normal,tangent,bitangent) = contact_state.axes
                 C = cache.Cps[pid]
                 CT = C*build_T(structure,bid)
@@ -295,7 +287,7 @@ function get_frictional_directions_and_positions!(structure,cache, q, q̇, Λ, )
                 ci = bodyid2act_idx[bid][pid]
                 epi = 3(ci-1)+1:3ci
                 D[epi,:] = dm*CT
-                ŕ[epi]   = dm*position
+                ŕ[epi]   = dm*frame.position
                 if coords.nmcs isa QCF.QC
                     Tbody = build_T(structure,bid)
                     locus = prop.loci[pid]
@@ -360,66 +352,16 @@ function get_directions_and_positions!(structure,cache, q, q̇, Λ, )
     end
 end
 
-function get_frictional_distribution_law!(structure,cache,q)
-    (;
-        L,bodyid2act_idx
-    ) = cache.cache
-    T = eltype(q)
-    update_bodies!(structure,q)
-    foreach(structure.bodies) do body
-        (;prop,state) = body
-        bid = prop.id
-        (;loci) = prop
-        (;loci_states) = state
-        active_idx = findall(!iszero,bodyid2act_idx[bid])
-        na_body = length(active_idx)
-        if na_body > 1
-            R = zeros(T,3na_body,6)
-            inv_μs_body = ones(T,3na_body)
-            for (i,pid) in enumerate(active_idx)
-                locus_state = loci_states[pid]
-                locus = loci[pid]
-                (;position,contact_state) = locus_state
-                (;normal,tangent,bitangent) = contact_state.axes
-                inv_μs_body[3(i-1)+1] = 1/locus.friction_coefficient
-                dm = hcat(normal,tangent,bitangent) |> transpose
-                R[3(i-1)+1:3(i-1)+3,1:3] = dm
-                R[3(i-1)+1:3(i-1)+3,4:6] = dm*(-skew(position))
-            end
-            BlockDiagonals.blocks(L)[bid] .= (I-pinv(R)'*R')*Diagonal(inv_μs_body)
-        end
-    end
-end
-
 function get_distribution_law!(structure,cache,q)
     (;
-        L,bodyid2act_idx
+        D,L,H,bodyid2act_idx
     ) = cache.cache
-    T = eltype(q)
-    update_bodies!(structure,q)
-    foreach(structure.bodies) do body
-        (;prop,state) = body
-        bid = prop.id
-        (;loci) = prop
-        (;loci_states) = state
-        active_idx = findall(!iszero,bodyid2act_idx[bid])
-        na_body = length(active_idx)
-        if na_body > 1
-            R = zeros(T,na_body,6)
-            inv_μs_body = ones(T,na_body)
-            for (i,pid) in enumerate(active_idx)
-                locus_state = loci_states[pid]
-                locus = loci[pid]
-                (;position,contact_state) = locus_state
-                (;normal,tangent,bitangent) = contact_state.axes
-                inv_μs_body[i] = 1/locus.friction_coefficient
-                dm = hcat(normal,tangent,bitangent) |> transpose
-                R[i,1:3] = dm
-                R[i,4:6] = dm*(-skew(position))
-            end
-            BlockDiagonals.blocks(L)[bid] .= (I-pinv(R)'*R')*Diagonal(inv_μs_body)
-        end
-    end
+    N_in = intrinsic_nullspace(structure,q)
+    A = make_cstr_jacobian(structure)(q)
+    N_ex = nullspace(A*N_in)
+    N = N_in*N_ex
+    R = D*N
+    L .= (I-pinv(R)'*R')*H
 end
 
 function make_pres_actor(μ0,μ1,start,stop)

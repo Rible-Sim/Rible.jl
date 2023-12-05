@@ -315,7 +315,7 @@ function solve!(sim::Simulator,solver_cache::Zhong06_CCP_Nonconstant_Mass_Cache;
                 else # na!=0
                     # @show timestep,iteration,normRes,Λₘ
                     # Λₘini = repeat([Λ_guess,0,0],na)
-                    get_frictional_distribution_law!(structure,contact_cache,x[1:nq])
+                    get_distribution_law!(structure,contact_cache,x[1:nq])
                     (;L) = contact_cache.cache
                     Λₘini = deepcopy(Λₘ)
                     Λₘini[begin+1:3:end] .= 0.0

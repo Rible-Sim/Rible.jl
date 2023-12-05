@@ -33,8 +33,8 @@ function generate_cache(
     B(q) = Matrix{T}(undef,0,nq)
 
     # ∂𝐌𝐚∂𝐪(q,a) = zeros(T,nq,nq)
-    ∂Aᵀλ∂q(q::AbstractVector,λ) = cstr_forces_jacobian(structure,λ)
-    # ∂𝚽𝐪𝐯∂𝒒(q,v) = RB.∂Aq̇∂q(structure,v)
+    ∂Aᵀλ∂q(q::AbstractVector,λ) = cstr_forces_jacobian(structure,q,λ)
+    ∂Aq̇∂q(q::AbstractVector,q̇) = cstr_velocity_jacobian(structure,q,q̇)
     ∂Bᵀμ∂q(q,μ) = zeros(T,nq,nq)
     (;
         contacts_bits,
@@ -45,8 +45,10 @@ function generate_cache(
     ) = prepare_contacts(bot,env)
     
     cache = @eponymtuple(
+        solver,
         F!,Jac_F!,
-        M,Φ,A,Ψ,B,∂Ψ∂q,∂Aᵀλ∂q,∂Bᵀμ∂q,
+        M,Φ,A,∂Aᵀλ∂q,∂Aq̇∂q,
+        Ψ,B,∂Ψ∂q,∂Bᵀμ∂q,
         contacts_bits,
         persistent_bits,
         μs_sys,
@@ -59,11 +61,12 @@ end
 function make_step_k(
         solver_cache::Moreau_CCP_Constant_Mass_Cache,
         nq,nλ,na,
-        qₖ₋₁,vₖ₋₁,pₖ₋₁,tₖ₋₁,
-        pₖ,vₖ,
+        qₖ,vₖ,tₖ₊θ,
+        vₖ₊₁,
         invM,
-        h,scaling)
-    (;F!,Jac_F!,M,Φ,A,∂Aᵀλ∂q) = solver_cache.cache
+        h,mass_norm)
+    (;F!,Jac_F!,M,A,∂Aᵀλ∂q,∂Aq̇∂q,solver) = solver_cache.cache
+    (;θ) = solver.integrator
 
     n1 = nq
     n2 = nq+nλ
@@ -71,37 +74,38 @@ function make_step_k(
     nx = n2
     function ns_stepk!(
             𝐫𝐞𝐬,𝐉,
-            Fₘ,∂F∂q,∂F∂q̇,
+            F,∂F∂q,∂F∂q̇,
             𝐁,𝐛,𝐜ᵀ,𝐍,𝐫,
-            x,Λₖ,
+            x,Λₖ₊₁,
             structure,
             contact_cache,
             timestep,iteration
         )
         # @show timestep, iteration, na
-        qₖ = @view x[   1:n1]
-        λₘ = @view x[n1+1:n2]
-        qₘ = (qₖ.+qₖ₋₁)./2
-        q̇ₘ = (qₖ.-qₖ₋₁)./h
-        vₘ = q̇ₘ
-        tₘ = tₖ₋₁+h/2
-        F!(Fₘ,qₘ,q̇ₘ,tₘ)
-        Jac_F!(∂F∂q,∂F∂q̇,qₘ,q̇ₘ,tₘ)
+        qₖ₊₁ = @view x[   1:n1]
+        λₖ₊₁ = @view x[n1+1:n2]
 
-        Aₖ₋₁ = A(qₖ₋₁)
-        Aₖ   = A(qₖ)
+        vₖ₊θ = (qₖ₊₁.-qₖ)./h
+        vₖ₊₁ .= (1/θ)*vₖ₊θ .- (1/θ-1)*vₖ
+        qₖ₊θ = (1-θ)*qₖ.+θ*qₖ₊₁
 
-        𝐫𝐞𝐬[   1:n1] .= -h.*pₖ₋₁ .+ M*(qₖ.-qₖ₋₁) .-
-                           scaling.*transpose(Aₖ₋₁)*λₘ .-
-                        (h^2)/2 .*Fₘ
+        F!(F,qₖ₊θ,vₖ₊θ,tₖ₊θ)
+        Jac_F!(∂F∂q,∂F∂q̇,qₖ₊θ,vₖ₊θ,tₖ₊θ)
 
-        𝐫𝐞𝐬[n1+1:n2] .= -scaling.*Φ(qₖ)
+        Aₖ₊₁ = A(qₖ₊₁)
+        
+
+        𝐫𝐞𝐬[   1:n1] .= h.*M*(vₖ₊₁.-vₖ) .-
+                        mass_norm.*transpose(Aₖ₊₁)*λₖ₊₁ .-
+                        (h^2) .*F
+
+        𝐫𝐞𝐬[n1+1:n2] .= -mass_norm.*h.*Aₖ₊₁*vₖ₊₁
         
         𝐉 .= 0.0
-        𝐉[   1:n1,   1:n1] .=  M .-h^2/2 .*(1/2 .*∂F∂q .+ 1/h.*∂F∂q̇)
-        𝐉[   1:n1,n1+1:n2] .= -scaling.*transpose(Aₖ₋₁)
+        𝐉[   1:n1,   1:n1] .=  1/θ .*M .-h^2 .*(θ .*∂F∂q .+ 1/h.*∂F∂q̇) .- mass_norm.*∂Aᵀλ∂q(qₖ₊₁,λₖ₊₁)
+        𝐉[   1:n1,n1+1:n2] .= -mass_norm.*transpose(Aₖ₊₁)
 
-        𝐉[n1+1:n2,   1:n1] .=  -scaling.*Aₖ
+        𝐉[n1+1:n2,   1:n1] .= -mass_norm.*(h.*∂Aq̇∂q(qₖ₊₁,vₖ₊₁) .+ 1/θ.*Aₖ₊₁)
 
         lu𝐉 = lu(𝐉)
 
@@ -109,44 +113,33 @@ function make_step_k(
             (;
                 H,
                 restitution_coefficients,
-                D,
             ) = contact_cache.cache
-            Dₘ = contact_cache.cache.Dper
-            Dₖ = contact_cache.cache.Dimp
-            𝐫𝐞𝐬[   1:n1] .-= h.*scaling.*transpose(D)*H*Λₖ 
+            Dₖ₊₁ = contact_cache.cache.Dimp
+            𝐫𝐞𝐬[   1:n1] .-= h.*mass_norm.*transpose(Dₖ₊₁)*H*Λₖ₊₁ 
 
             𝐁 .= 0
-            𝐁[   1:n1,1:nΛ] .= h.*scaling.*transpose(D)*H
+            𝐁[   1:n1,1:nΛ] .= h.*mass_norm.*transpose(Dₖ₊₁)*H
 
-            pₖ .= Momentum_k(qₖ₋₁,pₖ₋₁,qₖ,λₘ,M,A,scaling,h)
-            vₖ .= invM*pₖ        
-            ∂vₘ∂qₖ = 1/h*I
-            ∂vₖ∂qₖ = 2/h*I # + 1/(h).*invM*(∂Aᵀλ∂q(qₖ,λₘ))
-            ∂vₖ∂λₘ = scaling.*invM*transpose(Aₖ-Aₖ₋₁)/(h)
-            
-            v́⁺ = Dₘ*vₘ .+ Dₖ*vₖ
-            ∂v́⁺∂qₖ = Dₘ*∂vₘ∂qₖ .+ Dₖ*∂vₖ∂qₖ
+            ∂vₖ₊₁∂q₊₁ = 1/(θ*h)*I
+            v́⁺ = Dₖ₊₁*vₖ₊₁
+            ∂v́⁺∂qₖ₊₁ = Dₖ₊₁*∂vₖ₊₁∂q₊₁
             𝐜ᵀ .= 0
-            v́ₖ₋₁ = Dₖ*vₖ₋₁
+            v́ₖ = Dₖ₊₁*vₖ
             for i = 1:na
                 is = 3(i-1)
-                vⁱₖ₋₁ = @view v́ₖ₋₁[is+1:is+3]
+                vⁱₖ = @view v́ₖ[is+1:is+3]
                 vⁱ⁺   = @view v́⁺[is+1:is+3]
-                vₜⁱₖ₋₁ = norm(vⁱₖ₋₁[2:3])
                 vₜⁱ⁺   = norm(vⁱ⁺[2:3])
-                vₙⁱₖ₋₁ = vⁱₖ₋₁[1]
-                vₙⁱ   = vⁱ⁺[1]
-                v́ₜⁱ = vₜⁱ⁺ + restitution_coefficients[i]*min(vₙⁱₖ₋₁,0)
+                v́ₖₙⁱ = vⁱₖ[1]
+                v́ₜⁱ = vₜⁱ⁺ + restitution_coefficients[i]*min(v́ₖₙⁱ,0)
                 𝐛[is+1:is+3] .= [v́ₜⁱ,0,0]
-                Dⁱₘ = @view Dₘ[is+1:is+3,:]
-                Dⁱₖ = @view Dₖ[is+1:is+3,:]
-                𝐜ᵀ[is+1     ,   1:n1] .= 1/(norm(v́⁺[is+2:is+3])+1e-14)*(v́⁺[is+2]*∂v́⁺∂qₖ[is+2,:] .+ v́⁺[is+3]*∂v́⁺∂qₖ[is+3,:])
-                𝐜ᵀ[is+1:is+3,   1:n1] .+= ∂v́⁺∂qₖ[is+1:is+3,:]
-                𝐜ᵀ[is+1:is+3,n1+1:n2] .= Dⁱₖ*∂vₖ∂λₘ
+                𝐜ᵀ[is+1     ,   1:n1] .= 1/(norm(v́⁺[is+2:is+3])+1e-14)*(v́⁺[is+2]*∂v́⁺∂qₖ₊₁[is+2,:] .+ v́⁺[is+3]*∂v́⁺∂qₖ₊₁[is+3,:])
+                𝐜ᵀ[is+1:is+3,   1:n1] .+= ∂v́⁺∂qₖ₊₁[is+1:is+3,:]
+                𝐜ᵀ[is+1:is+3,n1+1:n2] .= 0.0 #Dⁱₖ₊₁*∂vₖ₊₁∂λₘ
             end
             # 𝐜ᵀinv𝐉 = 𝐜ᵀ*inv(𝐉)
             𝐍 .= 𝐜ᵀ*(lu𝐉\𝐁)
-            𝐫 .= (v́⁺ + 𝐛) .-𝐜ᵀ*(lu𝐉\(𝐫𝐞𝐬 + 𝐁*Λₖ))
+            𝐫 .= (v́⁺ + 𝐛) .-𝐜ᵀ*(lu𝐉\(𝐫𝐞𝐬 + 𝐁*Λₖ₊₁))
         end
         lu𝐉
         # debug
@@ -173,8 +166,8 @@ function solve!(sim::Simulator,solver_cache::Moreau_CCP_Constant_Mass_Cache;
     q̇0 = traj.q̇[begin]
     activate_contacts!(structure,env,solver_cache,q0)
     invM = inv(M)
-    pₖ₋₁ = M*q̇0
-    pₖ   = zero(pₖ₋₁)
+    pₖ = M*q̇0
+    pₖ   = zero(pₖ)
     T = eltype(q0)
     nq = length(q0)
     nλ = length(λ0)
@@ -187,7 +180,7 @@ function solve!(sim::Simulator,solver_cache::Moreau_CCP_Constant_Mass_Cache;
     Res = zero(Δx)
     Jac = zeros(T,nx,nx)
     mr = norm(M,Inf)
-    scaling = mr
+    mass_norm = mr
 
     iteration = 0
     prog = Progress(totalstep; dt=1.0, enabled=progress)
@@ -195,58 +188,51 @@ function solve!(sim::Simulator,solver_cache::Moreau_CCP_Constant_Mass_Cache;
         #---------Time Step k Control-----------
         # control!(sim,cache)
         #---------Time Step k Control-----------
-        cₖ₋₁ = contacts_traj[timestep]
-        cₖ = contacts_traj[timestep+1]
-        qₖ₋₁ = traj.q[timestep]
-        q̇ₖ₋₁ = traj.q̇[timestep]
-        # pₖ₋₁ = traj.p[timestep]
-        # λₖ₋₁ = traj.λ[timestep]
-        tₖ₋₁ = traj.t[timestep]
-        qₖ   = traj.q[timestep+1]
-        q̇ₖ   = traj.q̇[timestep+1]
-        # pₖ   = traj.p[timestep+1]
-        λₘ   = traj.λ[timestep+1]
-        pₖ₋₁ = M*q̇ₖ₋₁
-        qˣ = qₖ₋₁ .+ dt./2 .*q̇ₖ₋₁
-        qₖ .= qₖ₋₁ .+ dt .*q̇ₖ₋₁
-        q̇ₖ .= q̇ₖ₋₁
-        contact_cache = activate_frictional_contacts!(structure,env,solver_cache,qˣ)
+        cₖ = contacts_traj[timestep]
+        cₖ₊₁ = contacts_traj[timestep+1]
+        qₖ = traj.q[timestep]
+        q̇ₖ = traj.q̇[timestep]
+        # pₖ = traj.p[timestep]
+        # λₖ = traj.λ[timestep]
+        tₖ = traj.t[timestep]
+        qₖ₊₁ = traj.q[timestep+1]
+        q̇ₖ₊₁ = traj.q̇[timestep+1]
+        # pₖ₊₁ = traj.p[timestep+1]
+        λₖ₊₁ = traj.λ[timestep+1]
+        qˣ = qₖ .+ dt./2 .*q̇ₖ
+        qₖ₊₁ .= qₖ .+ dt .*q̇ₖ₊₁
+        q̇ₖ₊₁ .= q̇ₖ
+        contact_cache = activate_frictional_contacts!(structure,env,solver_cache,qˣ;checkpersist=false)
         (;na) = contact_cache.cache
         isconverged = false
         normRes = typemax(T)
         iteration_break = 0
-        x[      1:nq]          .= qₖ
-        x[   nq+1:nq+nλ]       .= 0.0
         isconverged = false
         nΛ = 3na
-        Λₖ = zeros(T,nΛ)
-        Λʳₖ = copy(Λₖ)
-        ΔΛₖ = copy(Λₖ)
+        Λₖ₊₁ = zeros(T,nΛ)
+        Λʳₖ₊₁ = copy(Λₖ₊₁)
+        ΔΛₖ₊₁ = copy(Λₖ₊₁)
         𝐁 = zeros(T,nx,nΛ)
         𝐛 = zeros(T,nΛ)
         𝐜ᵀ = zeros(T,nΛ,nx)
         𝐍 = zeros(T,nΛ,nΛ)
         𝐫 = zeros(T,nΛ)
-        # get_directions_and_positions!(D, Dₘ,Dₖ,∂Dq̇∂q, ∂DᵀΛ∂q, ŕ, qˣ, q̇ₖ₋₁, Λₖ,bodyid2act_idx,)        
-        get_frictional_directions_and_positions!(structure, contact_cache, qₖ₋₁, q̇ₖ₋₁, Λₖ)
-        (;
-            H
-        ) = contact_cache.cache
+        get_frictional_directions_and_positions!(structure, contact_cache, qₖ₊₁, q̇ₖ₊₁, Λₖ₊₁)
         ns_stepk! = make_step_k(
             solver_cache,
             nq,nλ,na,
-            qₖ₋₁,q̇ₖ₋₁,pₖ₋₁,tₖ₋₁,
-            pₖ,q̇ₖ,
+            qₖ,q̇ₖ,tₖ,
+            q̇ₖ₊₁,
             invM,
-            dt,scaling
+            dt,mass_norm
         )
         restart_count = 0
         Λ_guess = 0.1
         while restart_count < 10
-            Λₖ .= repeat([Λ_guess,0,0],na)
-            x[      1:nq]          .= qₖ
+            Λₖ₊₁ .= repeat([Λ_guess,0,0],na)
+            x[      1:nq]          .= qₖ₊₁
             x[   nq+1:nq+nλ]       .= 0.0
-            Λʳₖ .= Λₖ
+            Λʳₖ₊₁ .= Λₖ₊₁
             Nmax = 50
             for iteration = 1:maxiters
                 # @show iteration,D,ηs,restitution_coefficients,gaps
@@ -254,10 +240,9 @@ function solve!(sim::Simulator,solver_cache::Moreau_CCP_Constant_Mass_Cache;
                     Res,Jac,
                     F,∂F∂q,∂F∂q̇,
                     𝐁,𝐛,𝐜ᵀ,𝐍,𝐫,
-                    x,Λₖ,
+                    x,Λₖ₊₁,
                     structure,
                     contact_cache,
-                    # D,Dₘ,Dₖ,H,restitution_coefficients,
                     timestep,iteration
                 )
                 normRes = norm(Res)
@@ -270,7 +255,7 @@ function solve!(sim::Simulator,solver_cache::Moreau_CCP_Constant_Mass_Cache;
                     Δx .= luJac\(-Res)
                     x .+= Δx
                 else # na!=0
-                    get_frictional_distribution_law!(structure,contact_cache,x[1:nq])
+                    get_distribution_law!(structure,contact_cache,x[1:nq])
                     (;L) = contact_cache.cache
                     if iteration < 2
                         Nmax = 50
@@ -278,9 +263,9 @@ function solve!(sim::Simulator,solver_cache::Moreau_CCP_Constant_Mass_Cache;
                         Nmax = 50
                     end
                     # Λₖini = repeat([Λ_guess,0,0],na)
-                    Λₖini = deepcopy(Λₖ)
-                    Λₖini[begin+1:3:end] .= 0.0
-                    Λₖini[begin+2:3:end] .= 0.0
+                    Λₖ₊₁ini = deepcopy(Λₖ₊₁)
+                    Λₖ₊₁ini[begin+1:3:end] .= 0.0
+                    Λₖ₊₁ini[begin+2:3:end] .= 0.0
                     if false 
                         # @show timestep, iteration
                         # @show norm(𝐍),norm(L)
@@ -289,17 +274,17 @@ function solve!(sim::Simulator,solver_cache::Moreau_CCP_Constant_Mass_Cache;
                         # @show :befor, size(𝐍), rank(𝐍), cond(𝐍)
                     end
                     𝐍 .+= L
-                    yₖini = 𝐍*Λₖ + 𝐫
+                    yₖ₊₁ini = 𝐍*Λₖ₊₁ + 𝐫
                     if false 
                         # @show :after, size(𝐍), rank(𝐍), cond(𝐍)
                         # @show yₖini
                     end
-                    yₖini .= abs.(yₖini)
-                    yₖini[begin+1:3:end] .= 0.0
-                    yₖini[begin+2:3:end] .= 0.0
-                    IPM!(Λₖ,na,nΛ,Λₖini,yₖini,𝐍,𝐫;ftol=1e-14,Nmax)                    
-                    ΔΛₖ .= Λₖ - Λʳₖ
-                    minusResΛ = -Res + 𝐁*(ΔΛₖ)
+                    yₖ₊₁ini .= abs.(yₖ₊₁ini)
+                    yₖ₊₁ini[begin+1:3:end] .= 0.0
+                    yₖ₊₁ini[begin+2:3:end] .= 0.0
+                    IPM!(Λₖ₊₁,na,nΛ,Λₖ₊₁ini,yₖ₊₁ini,𝐍,𝐫;ftol,Nmax)                    
+                    ΔΛₖ₊₁ .= Λₖ₊₁ - Λʳₖ₊₁
+                    minusResΛ = -Res + 𝐁*(ΔΛₖ₊₁)
                     normRes = norm(minusResΛ)
                     if  normRes < ftol
                         isconverged = true
@@ -315,7 +300,7 @@ function solve!(sim::Simulator,solver_cache::Moreau_CCP_Constant_Mass_Cache;
                         isconverged = false
                     end
                     Δx .= luJac\minusResΛ
-                    Λʳₖ .= Λₖ
+                    Λʳₖ₊₁ .= Λₖ₊₁
                     x .+= Δx
                     # @show timestep, iteration, normRes, norm(Δx), norm(ΔΛₖ)
                 end
@@ -327,14 +312,11 @@ function solve!(sim::Simulator,solver_cache::Moreau_CCP_Constant_Mass_Cache;
             Λ_guess /= 10
             # @warn "restarting step: $timestep, count: $restart_count, Λ_guess = $Λ_guess"
         end
-        qₖ .= x[      1:nq]
-        λₘ .= x[   nq+1:nq+nλ]
-        pₖ .= Momentum_k(qₖ₋₁,pₖ₋₁,qₖ,λₘ,M,A,scaling,dt)
-        q̇ₖ .= invM*pₖ
-        Dₘ = contact_cache.cache.Dper
-        Dₖ = contact_cache.cache.Dimp
+        qₖ₊₁ .= x[      1:nq]
+        λₖ₊₁ .= x[   nq+1:nq+nλ]
+        Dₖ₊₁ = contact_cache.cache.Dimp
         if na != 0
-            update_contacts!(cₖ[contacts_bits],cₖ₋₁[contacts_bits],Dₘ*(qₖ.-qₖ₋₁).+Dₖ*q̇ₖ,2*Λₖ./(scaling*dt))
+            update_contacts!(cₖ₊₁[contacts_bits],cₖ[contacts_bits],Dₖ₊₁*q̇ₖ₊₁,2*Λₖ₊₁./(mass_norm*dt))
         end
 
         if !isconverged

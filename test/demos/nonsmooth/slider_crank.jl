@@ -344,6 +344,10 @@ r1_dt1 = RB.get_trajectory!(sc_mono_dt[5],4,1)
 r1_dt1[3,:] |> lines
 
 # Frictional Contact Dynamics
+
+dt = 1e-4
+tspan = (0.0,1.0)
+
 prob = RB.DynamicsProblem(
     sc,
     planes,
@@ -362,7 +366,23 @@ RB.solve!(
             RB.InteriorPointMethod()
         )
     );
-    dt,tspan,ftol=1e-14,maxiters=50,verbose=true,exception=true,progress=false,
+    dt,tspan,ftol=1e-14,maxiters=50,verbose_contact=true,exception=true,progress=false,
 )
 
 
+# two-layer
+RB.solve!(
+    prob,
+    RB.DynamicsSolver(
+        RB.Moreau(1.0),
+        RB.InnerLayerContactSolver(
+            RB.InteriorPointMethod()
+        )
+    );
+    dt,tspan,ftol=1e-14,maxiters=50,verbose=true,exception=true,progress=false,
+)
+
+GM.activate!(;px_per_unit=2,scalefactor = 2);plot_traj!(sc;showground=false)
+
+me = RB.mechanical_energy!(sc)
+Makie.lines(me.E)

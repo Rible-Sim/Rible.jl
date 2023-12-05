@@ -113,10 +113,9 @@ function make_step_k(
             ) = contact_cache.cache
             Dₘ = contact_cache.cache.Dper
             Dₖ = contact_cache.cache.Dimp
-            𝐫𝐞𝐬[   1:n1] .-= h.*scaling.*transpose(D)*H*Λₖ 
-
             𝐁 .= 0
             𝐁[   1:n1,1:nΛ] .= h.*scaling.*transpose(D)*H
+            𝐫𝐞𝐬  .-= 𝐁*Λₖ 
 
             pₖ .= Momentum_k(qₖ₋₁,pₖ₋₁,qₖ,λₘ,M,A,scaling,h)
             vₖ .= invM*pₖ        
@@ -215,8 +214,6 @@ function solve!(sim::Simulator,solver_cache::Zhong06_CCP_Constant_Mass_Cache;
         isconverged = false
         normRes = typemax(T)
         iteration_break = 0
-        x[      1:nq]          .= qₖ
-        x[   nq+1:nq+nλ]       .= 0.0
         isconverged = false
         nΛ = 3na
         Λₖ = zeros(T,nΛ)
@@ -227,11 +224,7 @@ function solve!(sim::Simulator,solver_cache::Zhong06_CCP_Constant_Mass_Cache;
         𝐜ᵀ = zeros(T,nΛ,nx)
         𝐍 = zeros(T,nΛ,nΛ)
         𝐫 = zeros(T,nΛ)
-        # get_directions_and_positions!(D, Dₘ,Dₖ,∂Dq̇∂q, ∂DᵀΛ∂q, ŕ, qˣ, q̇ₖ₋₁, Λₖ,bodyid2act_idx,)        
         get_frictional_directions_and_positions!(structure, contact_cache, qₖ₋₁, q̇ₖ₋₁, Λₖ)
-        (;
-            H
-        ) = contact_cache.cache
         ns_stepk! = make_step_k(
             solver_cache,
             nq,nλ,na,
@@ -241,7 +234,7 @@ function solve!(sim::Simulator,solver_cache::Zhong06_CCP_Constant_Mass_Cache;
             dt,scaling
         )
         restart_count = 0
-        Λ_guess = 0.1
+        Λ_guess = 1.0
         while restart_count < 10
             Λₖ .= repeat([Λ_guess,0,0],na)
             x[      1:nq]          .= qₖ
@@ -249,7 +242,6 @@ function solve!(sim::Simulator,solver_cache::Zhong06_CCP_Constant_Mass_Cache;
             Λʳₖ .= Λₖ
             Nmax = 50
             for iteration = 1:maxiters
-                # @show iteration,D,ηs,restitution_coefficients,gaps
                 luJac = ns_stepk!(
                     Res,Jac,
                     F,∂F∂q,∂F∂q̇,
@@ -257,7 +249,6 @@ function solve!(sim::Simulator,solver_cache::Zhong06_CCP_Constant_Mass_Cache;
                     x,Λₖ,
                     structure,
                     contact_cache,
-                    # D,Dₘ,Dₖ,H,restitution_coefficients,
                     timestep,iteration
                 )
                 normRes = norm(Res)
@@ -270,7 +261,7 @@ function solve!(sim::Simulator,solver_cache::Zhong06_CCP_Constant_Mass_Cache;
                     Δx .= luJac\(-Res)
                     x .+= Δx
                 else # na!=0
-                    get_frictional_distribution_law!(structure,contact_cache,x[1:nq])
+                    get_distribution_law!(structure,contact_cache,x[1:nq])
                     (;L) = contact_cache.cache
                     if iteration < 2
                         Nmax = 50
@@ -283,21 +274,21 @@ function solve!(sim::Simulator,solver_cache::Zhong06_CCP_Constant_Mass_Cache;
                     Λₖini[begin+2:3:end] .= 0.0
                     if false 
                         # @show timestep, iteration
-                        # @show norm(𝐍),norm(L)
-                        @show norm(L*Λₖ)
+                        @show 𝐍
+                        @show L
                         # @show qr(L).R |> diag
-                        # @show :befor, size(𝐍), rank(𝐍), cond(𝐍)
+                        @show :befor, size(𝐍), rank(𝐍), cond(𝐍)
                     end
                     𝐍 .+= L
                     yₖini = 𝐍*Λₖ + 𝐫
-                    if false 
-                        # @show :after, size(𝐍), rank(𝐍), cond(𝐍)
-                        # @show yₖini
+                    if false
+                        @show :after, size(𝐍), rank(𝐍), cond(𝐍)
+                        @show yₖini
                     end
                     yₖini .= abs.(yₖini)
                     yₖini[begin+1:3:end] .= 0.0
                     yₖini[begin+2:3:end] .= 0.0
-                    IPM!(Λₖ,na,nΛ,Λₖini,yₖini,𝐍,𝐫;ftol=1e-14,Nmax)                    
+                    IPM!(Λₖ,na,nΛ,Λₖini,yₖini,𝐍,𝐫;ftol,Nmax)                    
                     ΔΛₖ .= Λₖ - Λʳₖ
                     minusResΛ = -Res + 𝐁*(ΔΛₖ)
                     normRes = norm(minusResΛ)
