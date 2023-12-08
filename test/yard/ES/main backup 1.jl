@@ -716,7 +716,7 @@ function plot_slack_cables(bots,figname=nothing;at=1.23)
         fig = Figure(;)
         linewidth = 1 |> pt2px
         for i = 1:2
-            ax = Axis(fig[i,1]; xlabel = tlabel, ylabel = L"\mathrm{Cable}~j")
+            ax = Axis(fig[i,1]; xlabel = tlabel, ylabel = L"\mathrm{DistanceSpringDamper}~j")
             vlines!(ax,[at],color=:slategrey)
             if i == 1
                 ax.xlabelvisible = false
@@ -989,7 +989,7 @@ function plot_restlengths(bots,figname=nothing)
         ) do
         fig = Figure(;)
         ax1 = Axis(fig[1,1]; 
-            xlabel = "Cable No.", 
+            xlabel = "DistanceSpringDamper No.", 
             ylabel = "Rest length (m)"
         )
         x = vec([collect(1:24)';collect(1:24)'])
@@ -1043,7 +1043,7 @@ function plot_tensions(bots,figname=nothing)
         ) do
         fig = Figure(;)
         ax1 = Axis(fig[1,1]; 
-            xlabel = "Cable No.", 
+            xlabel = "DistanceSpringDamper No.", 
             ylabel = "Tension (N)"
         )
         x = vec([collect(1:24)';collect(1:24)'])

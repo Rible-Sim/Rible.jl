@@ -101,18 +101,20 @@ include("members/abstract_body.jl")
 
 include("members/rigids/rigid_body.jl")
 
-include("members/flexibles/cables.jl")
-
 include("members/flexibles/finite_elements/ANCF.jl")
 import .ANCF
 
 include("members/flexibles/flexible_body.jl")
+
+include("members/forces/spring_dampers.jl")
 
 include("structures/connectivity.jl")
 
 include("structures/structure.jl")
 
 include("members/joints.jl")
+
+include("members/linearization.jl")
 
 include("structures/mutate.jl")
 
@@ -122,6 +124,8 @@ include("control/control.jl")
 
 include("./get.jl")
 
+include("mechanics/linearized_mechanics.jl")
+
 include("mechanics/inverse_statics.jl")
 
 include("mechanics/forward_statics.jl")
@@ -130,22 +134,20 @@ include("mechanics/dynamic_relax.jl")
 
 include("mechanics/contact.jl")
 
-include("mechanics/linearization.jl")
-
 include("mechanics/stiffness.jl")
 
 include("mechanics/solvers.jl")
-
-include("misc/miscellaneous.jl")
 
 include("mechanics/dynamics.jl")
 
 include("postprocess/analysis.jl")
 
+include("postprocess/vis.jl")
+
 include("preprocess/URDF.jl")
 import .URDF
 
-include("postprocess/vis.jl")
+include("misc/miscellaneous.jl")
 
 include("precompile.jl")
 

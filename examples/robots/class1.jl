@@ -56,7 +56,7 @@ restlen = 0.01
 restlens = fill(restlen,ncables)
 ks = fill(k,ncables)
 cs = fill(c,ncables)
-cables = [RB.Cable3D(i,restlens[i],ks[i],cs[i];slack=true) for i = 1:ncables]
+cables = [RB.DistanceSpringDamper3D(i,restlens[i],ks[i],cs[i];slack=true) for i = 1:ncables]
 acs = [RB.ManualActuator(1,collect(1:ncables),restlens[1:ncables])]
 tensiles = (cables = cables,)
 hub = (actuators = acs,)

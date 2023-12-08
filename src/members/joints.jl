@@ -8,7 +8,6 @@ get_numbertype(cst::ExtrinsicConstraints{<:AbstractArray{T}}) where T = T
 
 
 """
-刚体通用线性约束类。
 $(TYPEDEF)
 """
 struct LinearJoint{T} <: ExtrinsicConstraints{T}
@@ -21,7 +20,6 @@ struct LinearJoint{T} <: ExtrinsicConstraints{T}
 end
 
 """
-铰接约束构造子。
 $(TYPEDSIGNATURES)
 """
 function LinearJoint(id,indexed,A,violations)
@@ -52,10 +50,6 @@ function cstr_velocity_jacobian(cst::LinearJoint,st,q,q̇)
     zeros(eltype(q̇),num_of_cstr,n)
 end
 
-"""
-固定约束构造子。
-$(TYPEDSIGNATURES)
-"""
 function FixedBodyConstraint(id::Int,indexed,body::AbstractBody)
     (;bodyid2sys_free_coords,num_of_free_coords) = indexed
     bodyid = body.prop.id
@@ -133,7 +127,6 @@ const PinJoint = SphericalJoint
 
 
 """
-刚体铰接约束类。
 $(TYPEDEF)
 """
 struct PrototypeJoint{hen2eggType,maskType,valueType,cacheType} <: ExtrinsicConstraints{valueType}
@@ -152,7 +145,6 @@ struct PrototypeJoint{hen2eggType,maskType,valueType,cacheType} <: ExtrinsicCons
 end
 
 """
-铰接约束构造子。
 $(TYPEDSIGNATURES)
 """
 function PrototypeJoint(id,indexed,hen2egg,joint_type::Symbol) 
@@ -168,18 +160,18 @@ function PrototypeJoint(id,indexed,hen2egg,joint_type::Symbol)
     ) = joint_info
     (;bodyid2sys_free_coords,bodyid2sys_full_coords,num_of_free_coords) = indexed
     mask_3rd = vcat(mask_3rd_hen,mask_3rd_egg.+3)
-    nmcs_hen = hen.rbsig.coords.nmcs
-    nmcs_egg = egg.rbsig.coords.nmcs
-    free_idx_hen = hen.rbsig.coords.free_idx
-    free_idx_egg = egg.rbsig.coords.free_idx
+    nmcs_hen = hen.bodysig.coords.nmcs
+    nmcs_egg = egg.bodysig.coords.nmcs
+    free_idx_hen = hen.bodysig.coords.free_idx
+    free_idx_egg = egg.bodysig.coords.free_idx
     ncoords_hen = NCF.get_num_of_coords(nmcs_hen)
     ncoords_egg = NCF.get_num_of_coords(nmcs_egg)
     free_idx = vcat(
         free_idx_hen,
         free_idx_egg .+ ncoords_hen
     )
-    id_hen = hen.rbsig.prop.id
-    id_egg = egg.rbsig.prop.id
+    id_hen = hen.bodysig.prop.id
+    id_egg = egg.bodysig.prop.id
     free_hen = bodyid2sys_free_coords[id_hen]
     free_egg = bodyid2sys_free_coords[id_egg]
     sys_free_idx = vcat(
@@ -187,19 +179,19 @@ function PrototypeJoint(id,indexed,hen2egg,joint_type::Symbol)
         free_egg
     )
 
-    state_hen = hen.rbsig.state
-    state_egg = egg.rbsig.state
+    state_hen = hen.bodysig.state
+    state_egg = egg.bodysig.state
     q_hen,_ = cartesian_frame2coords(nmcs_hen,state_hen.origin_frame)
     q_egg,_ = cartesian_frame2coords(nmcs_egg,state_egg.origin_frame)
     
     cache, values = build_joint_cache(
         nmcs_hen,nmcs_egg,
-        hen.rbsig.prop.loci[hen.pid].position,
-        egg.rbsig.prop.loci[egg.pid].position,
-        hen.rbsig.prop.loci[hen.trlid].axes,
-        egg.rbsig.prop.loci[egg.trlid].axes,
-        hen.rbsig.prop.loci[hen.rotid].axes,
-        egg.rbsig.prop.loci[egg.rotid].axes,
+        hen.bodysig.prop.loci[hen.pid].position,
+        egg.bodysig.prop.loci[egg.pid].position,
+        hen.bodysig.prop.loci[hen.trlid].axes,
+        egg.bodysig.prop.loci[egg.trlid].axes,
+        hen.bodysig.prop.loci[hen.rotid].axes,
+        egg.bodysig.prop.loci[egg.rotid].axes,
         mask_1st,mask_2nd,mask_3rd,mask_4th,
         q_hen,q_egg
     )
@@ -226,16 +218,15 @@ function cstr_function(cst::PrototypeJoint,structure::Structure,q, c = get_local
     (;sys_loci2coords_idx,bodyid2sys_loci_idx) = numbered
     (;
         num_of_cstr,hen2egg,
-        mask_1st,
         violations,
         cache,
         mask_1st,mask_2nd,mask_3rd,mask_4th
     ) = cst
     (;hen,egg) = hen2egg
-    id_hen = hen.rbsig.prop.id
-    id_egg = egg.rbsig.prop.id
-    nmcs_hen = hen.rbsig.coords.nmcs
-    nmcs_egg = egg.rbsig.coords.nmcs
+    id_hen = hen.bodysig.prop.id
+    id_egg = egg.bodysig.prop.id
+    nmcs_hen = hen.bodysig.coords.nmcs
+    nmcs_egg = egg.bodysig.coords.nmcs
     T = eltype(q)
     ret = zeros(T,num_of_cstr)
     q_hen = @view q[bodyid2sys_full_coords[id_hen]]
@@ -246,8 +237,8 @@ function cstr_function(cst::PrototypeJoint,structure::Structure,q, c = get_local
     get_joint_violations!(
         ret,
         nmcs_hen, nmcs_egg,
-        hen.rbsig.prop.loci[hen.pid].position,
-        egg.rbsig.prop.loci[egg.pid].position,
+        hen.bodysig.prop.loci[hen.pid].position,
+        egg.bodysig.prop.loci[egg.pid].position,
         cache,
         mask_1st,mask_2nd,mask_3rd,mask_4th,
         q_hen,q_egg,
@@ -269,15 +260,14 @@ function cstr_jacobian(cst::PrototypeJoint,structure::Structure,q,c = get_local_
         free_idx,
         sys_free_idx,
         hen2egg,
-        mask_1st,
         cache,
         mask_1st,mask_2nd,mask_3rd,mask_4th
     ) = cst
     (;hen,egg) = hen2egg
-    id_hen = hen.rbsig.prop.id
-    id_egg = egg.rbsig.prop.id
-    nmcs_hen = hen.rbsig.coords.nmcs
-    nmcs_egg = egg.rbsig.coords.nmcs
+    id_hen = hen.bodysig.prop.id
+    id_egg = egg.bodysig.prop.id
+    nmcs_hen = hen.bodysig.coords.nmcs
+    nmcs_egg = egg.bodysig.coords.nmcs
     T = eltype(q)
     ret = zeros(T,num_of_cstr,length(sys_free_idx))
     q_hen = @view q[bodyid2sys_full_coords[id_hen]]
@@ -286,8 +276,8 @@ function cstr_jacobian(cst::PrototypeJoint,structure::Structure,q,c = get_local_
     get_joint_jacobian!(
         ret,
         nmcs_hen, nmcs_egg,
-        hen.rbsig.prop.loci[hen.pid].position,
-        egg.rbsig.prop.loci[egg.pid].position,
+        hen.bodysig.prop.loci[hen.pid].position,
+        egg.bodysig.prop.loci[egg.pid].position,
         cache,
         mask_1st,mask_2nd,mask_3rd,mask_4th,
         free_idx,
@@ -307,17 +297,16 @@ function cstr_forces_jacobian(cst::PrototypeJoint,structure,q,λ)
         num_of_cstr,
         hen2egg,
         free_idx,
-        mask_1st,
         cache,
         mask_1st,mask_2nd,mask_3rd,mask_4th
     ) = cst
     (;hen,egg) = hen2egg
-    id_hen = hen.rbsig.prop.id
-    id_egg = egg.rbsig.prop.id
+    id_hen = hen.bodysig.prop.id
+    id_egg = egg.bodysig.prop.id
     q_hen = @view q[bodyid2sys_full_coords[id_hen]]
     q_egg = @view q[bodyid2sys_full_coords[id_egg]]
-    nmcs_hen = hen.rbsig.coords.nmcs
-    nmcs_egg = egg.rbsig.coords.nmcs
+    nmcs_hen = hen.bodysig.coords.nmcs
+    nmcs_egg = egg.bodysig.coords.nmcs
     T = eltype(λ)
     num_of_free_idx = length(free_idx)
     ret = zeros(T,num_of_free_idx,num_of_free_idx)
@@ -325,8 +314,8 @@ function cstr_forces_jacobian(cst::PrototypeJoint,structure,q,λ)
         ret,
         num_of_cstr,
         nmcs_hen, nmcs_egg,
-        hen.rbsig.prop.loci[hen.pid].position,
-        egg.rbsig.prop.loci[egg.pid].position,
+        hen.bodysig.prop.loci[hen.pid].position,
+        egg.bodysig.prop.loci[egg.pid].position,
         cache,
         mask_1st,mask_2nd,mask_3rd,mask_4th,
         free_idx,
@@ -347,19 +336,18 @@ function cstr_velocity_jacobian(cst::PrototypeJoint,structure,q,q̇)
         num_of_cstr,
         hen2egg,
         free_idx,
-        mask_1st,
         cache,
         mask_1st,mask_2nd,mask_3rd,mask_4th
     ) = cst
     (;hen,egg) = hen2egg
-    id_hen = hen.rbsig.prop.id
-    id_egg = egg.rbsig.prop.id
+    id_hen = hen.bodysig.prop.id
+    id_egg = egg.bodysig.prop.id
     q_hen = @view q[bodyid2sys_full_coords[id_hen]]
     q_egg = @view q[bodyid2sys_full_coords[id_egg]]
     q̇_hen = @view q̇[bodyid2sys_full_coords[id_hen]]
     q̇_egg = @view q̇[bodyid2sys_full_coords[id_egg]]
-    nmcs_hen = hen.rbsig.coords.nmcs
-    nmcs_egg = egg.rbsig.coords.nmcs
+    nmcs_hen = hen.bodysig.coords.nmcs
+    nmcs_egg = egg.bodysig.coords.nmcs
     T = eltype(q̇)
     num_of_free_idx = length(free_idx)
     ret = zeros(T,num_of_cstr,num_of_free_idx)
@@ -367,8 +355,8 @@ function cstr_velocity_jacobian(cst::PrototypeJoint,structure,q,q̇)
         ret,
         num_of_cstr,
         nmcs_hen, nmcs_egg,
-        hen.rbsig.prop.loci[hen.pid].position,
-        egg.rbsig.prop.loci[egg.pid].position,
+        hen.bodysig.prop.loci[hen.pid].position,
+        egg.bodysig.prop.loci[egg.pid].position,
         cache,
         mask_1st,mask_2nd,mask_3rd,mask_4th,
         free_idx,

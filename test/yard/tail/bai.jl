@@ -197,7 +197,7 @@ function make_bai(meshes,质心,质量,惯量)
         ks[i] = 1000.0
     end
     cables =
-        [RB.Cable2D(i, original_restlens[i], ks[i], 0.0;slack=true) for i = 1:ncables]  #
+        [RB.DistanceSpringDamper2D(i, original_restlens[i], ks[i], 0.0;slack=true) for i = 1:ncables]  #
     tensiles = (cables = cables,)
     acs = [
         RB.ManualActuator(1,

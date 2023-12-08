@@ -121,7 +121,7 @@ ncables = size(connecting,1)
 κ0 = 72e9*π*(3e-3)^2/1.0
 @show κ0
 
-cables = [RB.Cable3D(i,0.8*2h,1e3,0.0;slack=true) for i = 1:ncables]
+cables = [RB.DistanceSpringDamper3D(i,0.8*2h,1e3,0.0;slack=true) for i = 1:ncables]
 
 acs = [
     RB.ManualActuator(

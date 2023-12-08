@@ -121,7 +121,7 @@ function quad(c=100.0;
     end
     end
     cables = [
-    RB.Cable3D(i, original_restlens[i], ks[i], c) for i = 1:ncables
+    RB.DistanceSpringDamper3D(i, original_restlens[i], ks[i], c) for i = 1:ncables
     ]
     #
     tensiles = (cables = cables,)

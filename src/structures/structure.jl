@@ -135,7 +135,7 @@ function update!(st::AbstractStructure; gravity=false)
     if gravity
         apply_gravity!(st)
     end
-    assemble_force!(st)
+    assemble_forces!(st)
 end
 
 function lazy_update!(st::AbstractStructure; gravity=false)
@@ -145,7 +145,7 @@ function lazy_update!(st::AbstractStructure; gravity=false)
     if gravity
         apply_gravity!(st)
     end
-    assemble_force!(st)
+    assemble_forces!(st)
 end
 
 function update!(st::Structure,q::AbstractVector,q̇::AbstractVector=zero(q))
@@ -159,7 +159,7 @@ function assemble_M!(M,st::AbstractStructure)
     M .= 0
     foreach(st.bodies) do body
         memfull = bodyid2sys_full_coords[body.prop.id]
-        M[memfull,memfull] .+= body.cache.coords_cache.M
+        M[memfull,memfull] .+= body.cache.inertia_cache.M
     end
     # @assert issymmetric(M)
     M
@@ -178,7 +178,7 @@ function assemble_M⁻¹!(M⁻¹,st::AbstractStructure)
     M⁻¹ .= 0
     foreach(st.bodies) do body
         memfull = bodyid2sys_full_coords[body.prop.id]
-        M⁻¹[memfull,memfull] .+= body.cache.coords_cache.M⁻¹
+        M⁻¹[memfull,memfull] .+= body.cache.inertia_cache.M⁻¹
     end
     # @assert issymmetric(M⁻¹)
     M⁻¹
@@ -203,7 +203,7 @@ function assemble_∂Mq̇∂q!(∂Mq̇∂q,st::AbstractStructure)
     ∂Mq̇∂q .= 0
     foreach(st.bodies) do body
         memfull = bodyid2sys_full_coords[body.prop.id]
-        ∂Mq̇∂q[memfull,memfull] .+= body.cache.coords_cache.∂Mq̇∂q
+        ∂Mq̇∂q[memfull,memfull] .+= body.cache.inertia_cache.∂Mq̇∂q
     end
 end
 
@@ -221,7 +221,7 @@ function assemble_∂M⁻¹p∂q!(∂M⁻¹p∂q,st::AbstractStructure)
     ∂M⁻¹p∂q .= 0
     foreach(st.bodies) do body
         memfull = bodyid2sys_full_coords[body.prop.id]
-        ∂M⁻¹p∂q[memfull,memfull] .+= body.cache.coords_cache.∂M⁻¹p∂q
+        ∂M⁻¹p∂q[memfull,memfull] .+= body.cache.inertia_cache.∂M⁻¹p∂q
     end
     # symsparsecsr(M;symmetrize=true)
 end

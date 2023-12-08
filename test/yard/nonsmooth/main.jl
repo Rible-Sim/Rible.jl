@@ -1779,7 +1779,7 @@ c6_1.state.v
 check_Coulomb(1,c6_1)
 
 GM.activate!(); plotsave_friction_direction(
-        [ballbot,ballbot,ballbot],L"\mathrm{Cable~No.}",
+        [ballbot,ballbot,ballbot],L"\mathrm{DistanceSpringDamper~No.}",
         [3,6,12]; 
         size = (tw,0.5tw),
         mo_α = 8,
@@ -1788,7 +1788,7 @@ GM.activate!(); plotsave_friction_direction(
 )
 
 CM.activate!(); plotsave_friction_direction(
-        [ballbot,ballbot,ballbot],L"\mathrm{Cable~No.}",
+        [ballbot,ballbot,ballbot],L"\mathrm{DistanceSpringDamper~No.}",
         [3,6,12], 
         "ballbot_friction_direction"; 
         size = (tw,0.5tw),

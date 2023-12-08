@@ -265,8 +265,8 @@ GM.activate!();with_theme(theme_pub;
                 mapreduce(
                     (scnt)->
                     [(
-                        scnt.hen.rbsig.state.loci_states[scnt.hen.pid].position.+
-                        scnt.egg.rbsig.state.loci_states[scnt.egg.pid].position
+                        scnt.hen.bodysig.state.loci_states[scnt.hen.pid].position.+
+                        scnt.egg.bodysig.state.loci_states[scnt.egg.pid].position
                     )./2],
                     vcat,
                     tensioned.connected

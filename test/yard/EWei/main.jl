@@ -51,7 +51,7 @@ function dynfuncs(bot)
         RB.distribute_s̄!(st,s)
         RB.update_tensiles!(st)
         ## RB.apply_gravity!(st)
-        RB.assemble_force!(st)
+        RB.assemble_forces!(st)
         RB.get_force!(F,st)
         ## F .= 0
     end

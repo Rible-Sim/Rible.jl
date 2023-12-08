@@ -310,3 +310,215 @@ function get_start_system(bot,mode=PrimalMode();F=reshape(build_Ǧ(bot.structur
     end
     start_sol, start_parameters
 end
+
+
+function check_stability!(bot::Robot,Ň;
+    gravity=false,
+    scaling=0.01,
+    scalings=nothing
+)
+(;st,traj) = bot
+static_equilibrium,λ = check_static_equilibrium_output_multipliers(st)
+@assert static_equilibrium
+q̌ = get_free_coords(st)
+_, Ň0, er = check_stability(bot.structure,λ,Ň;verbose=true)
+resize!(traj,1)
+for i in 1:length(er.values)
+    push!(traj,deepcopy(traj[end]))
+    traj.t[end] = er.values[i]
+    δq̌i = Ň0*er.vectors[:,i]
+    # @show δq̌i, er.vectors[:,i]
+    if scalings isa Nothing
+        si = scaling
+    else
+        si = scalings[i]
+    end
+    ratio = norm(δq̌i) / norm(q̌) 
+    traj.q̌[end] .= q̌ .+ si.*δq̌i/ratio
+end
+bot
+end
+
+function get_poly(bot_input;
+    Ň
+)
+bot = deepcopy(bot_input)
+(;st) = bot
+# (;num_of_dof,num_of_cstr,connectivity) = bot.structure
+# (;cables) = st.tensiles
+# (;num_of_full_coords,num_of_free_coords) = connectivity.indexed
+# ncables = length(cables)
+# nλ = num_of_cstr
+gue = get_initial(st)
+Φ = make_cstr_function(st,gue.q)
+A = make_cstr_jacobian(st,gue.q)
+Q̌ = make_Q̌(st,gue.q)
+S = make_S(st,gue.q)
+Ǩm_Ǩg = make_Ǩm_Ǩg(st,gue.q)
+
+pv = get_polyvar(st)
+
+pnq̌ = 1.0pv.q̌ .+ 0.0
+pns = 1.0pv.s .+ 0.0
+pnλ = 1.0pv.λ .+ 0.0
+pnd = 1.0pv.d .+ 0.0
+pnc = 1.0pv.c .+ 0.0
+pnk = 1.0pv.k .+ 0.0
+pnμ = 1.0pv.μ .+ 0.0
+polyΦ = Φ(pnq̌,pnd,pnc)
+polyA = A(pnq̌,pnc)
+polyQ̌ = Q̌(pnq̌,pns,pnμ,pnk,pnc)
+polyS = S(pnq̌,pns,pnc)
+polyQ̌a = transpose(polyA)*pnλ
+polyǨa = reduce(hcat,differentiate.(-polyQ̌a,Ref(pv.q̌))) |> transpose
+polyǨm, polyǨg = Ǩm_Ǩg(pnq̌,pns,pnμ,pnk,pnc)
+polyǨ = polyǨm .+ polyǨg .+ polyǨa
+polyŇ = Ň(pnq̌,pnc)
+poly𝒦 = transpose(polyŇ)*polyǨ*polyŇ
+
+polyP = [
+    - polyQ̌ .- transpose(polyA)*pnλ ;
+    polyS;
+    polyΦ;
+    # poly𝒦*pnξ.-pnζ.*pnξ;
+    # transpose(pnξ)*pnξ-1;
+]
+
+# Ǩ0 = RB.build_Ǩ(bot.structure,gue.λ)
+# Ǩx = map(polyǨ) do z
+# 		z(
+# 			pv.q̌=>gue.q̌,
+# 			pv.s=>gue.s,
+# 			pv.λ=>gue.λ,
+# 			pv.μ=>gue.μ,
+# 			pv.k=>gue.k,
+# 			pv.d=>gue.d,
+# 			pv.c=>gue.c
+# 		)
+# 	end
+# # @show Ǩ0
+# @show Ǩ0.- Ǩx |> norm
+
+# P0 = map(polyP) do z
+# 	z(
+# 		pvq̌=>q̌0,
+# 		pvs=>s0,
+# 		pvλ=>λ0,
+# 		# pvξ=>ξ0,
+# 		pvμ=>μ0,
+# 		pvk=>k0,
+# 	    pvd=>d0,
+# 		pvc=>c0,
+# 		# pv.ζ=>ζ0
+# 	)
+# end
+# @show P0[                 1:num_of_free_coords] |> norm
+# @show P0[           num_of_free_coords+1:num_of_free_coords+ncables] |> norm
+# @show P0[   num_of_free_coords+ncables+1:num_of_free_coords+ncables+nλ] |> norm
+# @show P0[num_of_free_coords+ncables+nλ+1:num_of_free_coords+ncables+nλ+num_of_dof]
+# @show P0[end]
+polyP,poly𝒦,gue,pv
+end
+
+function pinpoint(bot_input;
+    Ň
+)
+polyP, poly𝒦, gue, pv = get_poly(bot_input;Ň)
+ň = length(pv.q̌)
+ns = length(pv.s)
+nλ = length(pv.λ)
+function make_bf()
+    function inner_pp!(f,x)
+        q̌x = @view x[        1:ň]
+        sx = @view x[      ň+1:ň+ns]
+        λx = @view x[   ň+ns+1:ň+ns+nλ]
+        Px = map(polyP) do z
+            z(
+                pv.q̌=>q̌x,
+                pv.s=>sx,
+                pv.λ=>λx,
+                pv.μ=>gue.μ,
+                pv.k=>gue.k,
+                pv.d=>gue.d,
+                pv.c=>gue.c,
+            )
+        end
+
+        f .= Px
+    end
+end
+f_holder = zeros(ň+ns+nλ)
+x_initial = vcat(gue.q̌,gue.s,gue.λ)
+pp! = make_bf()
+
+pp = nlsolve(pp!,x_initial,ftol=1e-10,iterations=100,method=:newton)
+# @show
+pp!(f_holder,pp.zero)
+# @show f_holder |> norm
+# @show f_holder[                 1:ň+ns+nλ] |> norm
+# @show f_holder[ň+ns+nλ+1:ň+ns+nλ+num_of_dof] |> norm
+# @show f_holder[end]
+# @show  pp.zero[ň+ns+nλ+1:ň+ns+nλ+num_of_dof]
+# @show  pp.zero[end]
+q̌ = pp.zero[        1:ň]
+s = pp.zero[      ň+1:ň+ns]
+λ = pp.zero[   ň+ns+1:ň+ns+nλ]
+ini = @eponymtuple(
+        q̌,s,λ,
+        isconverged=converged(pp),
+        d=gue.d, c=gue.c, μ=gue.μ, k=gue.k
+)
+polyP, poly𝒦, ini, pv
+end
+
+function path_follow(bot_input;Ň)
+polyP, poly𝒦, ini, pv = pinpoint(bot_input;Ň)
+variable_groups = [pv.q̌,pv.s,pv.λ]
+parameters = [pv.d;pv.c;pv.k;pv.μ]
+startsols = [[ini.q̌;ini.s;ini.λ]]
+start_parameters = [ini.d;ini.c;ini.k;ini.μ]
+target_parameters = [ini.d;ini.c;ini.k;ini.μ.+1.0]
+Psys = System(polyP;parameters)
+result = HomotopyContinuation.solve(
+        Psys,
+        startsols;
+        start_parameters,
+        target_parameters,
+        threading = false
+)
+path_results = results(result)
+if length(path_results) != 1
+    @show failed(result)
+    error("Tracking failed.")
+end
+path_result1 = path_results[1]
+sol = real(solution(path_result1))
+q̌,s,λ = split_by_lengths(sol,length.(variable_groups))
+@eponymtuple(q̌,s,λ)
+end
+
+function path_follow_critical(bot_input)
+polyP, ini, pv = pinpoint_critical(bot_input)
+variable_groups = [pv.q̌,pv.s,pv.λ,pv.ξ,[pv.ζ]]
+parameters = [pv.d;pv.c;pv.k;pv.μ]
+startsols = [[ini.q̌;ini.s;ini.λ;ini.ξ;ini.ζ]]
+start_parameters = [ini.d;ini.c;ini.k;ini.μ]
+target_parameters = [ini.d;ini.c;ini.k;ini.μ.+1.0]
+Psys = System(polyP;parameters)
+result = HomotopyContinuation.solve(
+        Psys,
+        startsols;
+        start_parameters,
+        target_parameters,
+        threading = false
+)
+path_results = results(result)
+if length(path_results) != 1
+    @show failed(result)
+    error("Tracking failed.")
+end
+path_result1 = path_results[1]
+sol = real(solution(path_result1))
+q̌,s,λ,ξ,ζ = RB.split_by_lengths(sol,length.(variable_groups))
+@eponymtuple(q̌,s,λ,ξ,ζ)
+end

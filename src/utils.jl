@@ -151,7 +151,7 @@ $(TYPEDFIELDS)
 """
 struct ID{sigType,pidType,aidType}
     "Signifier of body"
-    rbsig::sigType
+    bodysig::sigType
     "Index of the anchor point"
     pid::pidType
     "Index of the translational axis"
@@ -160,12 +160,12 @@ struct ID{sigType,pidType,aidType}
     rotid::aidType
 end
 
-function ID(rbsig,pid,trlid)
-    ID(rbsig,pid,trlid,trlid)
+function ID(bodysig,pid,trlid)
+    ID(bodysig,pid,trlid,trlid)
 end
 
-function ID(rbsig,pid)
-    ID(rbsig,pid,1,1)
+function ID(bodysig,pid)
+    ID(bodysig,pid,1,1)
 end
 
 """

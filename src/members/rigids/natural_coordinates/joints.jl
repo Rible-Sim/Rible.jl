@@ -80,6 +80,7 @@ function build_joint_cache(
                 kron(vcat(0,axis_zero,0,axis_egg),I3_Bool)'*
                 select_uvw_egg |> sparse
         end
+        relative_core = axes_rot_egg*axes_rot_hen.X'
     else
         # rotational joint not to be used for bars
         axes_rot_hen = axes_rot_egg
@@ -97,8 +98,6 @@ function build_joint_cache(
     values = RefqT.*halves.*Refq
     values[mask_1st] .+= transformations*q
 
-
-    # valid for NC only, wrong for QC
     hess_1st = [(H .+ H') |> Symmetric for H in half_1st]
     hess_2nd = [(H .+ H') |> Symmetric for H in half_2nd]
     hess_3rd = [(H .+ H') |> Symmetric for H in half_3rd]
@@ -109,8 +108,8 @@ function build_joint_cache(
         hess_3rd[mask_3rd],
         hess_4th[mask_4th];
     )
-
     cache = @eponymtuple(
+        relative_core,
         transformations,halves,hessians
     )
     cache, values

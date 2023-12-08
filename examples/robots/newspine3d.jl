@@ -80,7 +80,7 @@ kR = 400e1
 ks = repeat(vcat(fill(kH, 4), fill(kR, 4)), n - 1)
 # c = 0.0
 cs = repeat(fill(c, 8), n - 1)
-cables = [RB.Cable3D(i, cablelens[i], ks[i], cs[i]) for i = 1:ncables]
+cables = [RB.DistanceSpringDamper3D(i, cablelens[i], ks[i], cs[i]) for i = 1:ncables]
 tensiles = (cables=cables,)
 acs = [RB.ManualActuator(1, collect(1:ncables), cablelens[1:ncables])]
 hub = (actuators=acs,)

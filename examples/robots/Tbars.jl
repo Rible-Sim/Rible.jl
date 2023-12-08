@@ -149,7 +149,7 @@ function Tbars(;θ = 0, coordsType = RB.NCF.NC)
     ks = fill(100.0,ncables)
     ks[2] = 400.0
     cs = zeros(ncables)
-    ss = [RB.Cable3D(i, original_restlens[i],ks[i],cs[i];slack=false) for i = 1:ncables]
+    ss = [RB.DistanceSpringDamper3D(i, original_restlens[i],ks[i],cs[i];slack=false) for i = 1:ncables]
     tensiles = (cables=ss,)
 
     cm = [

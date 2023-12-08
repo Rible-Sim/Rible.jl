@@ -206,7 +206,7 @@ cable_length = 0.1Unitful.m
 κ = (mat_cable.modulus_elas)*π*(diameter/2)^2/cable_length
 # @show κ
 @show uconvert(Unitful.N/Unitful.m,κ),ustrip(Unitful.N/Unitful.m,κ)
-cables_prism = [RB.Cable3D(i,0.0,   ustrip(Unitful.N/Unitful.m,κ),0.0;slack=true) for i = 1:ncables_prism]
+cables_prism = [RB.DistanceSpringDamper3D(i,0.0,   ustrip(Unitful.N/Unitful.m,κ),0.0;slack=true) for i = 1:ncables_prism]
 cables = cables_prism
 acs = [
     RB.ManualActuator(

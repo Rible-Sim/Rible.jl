@@ -33,7 +33,7 @@ halfspaces = RB.StaticContactSurfaces(
 # Frictional Contact Dynamics
 
 dt = 1e-3
-tspan = (0.0,0.2)
+tspan = (0.0,2.0)
 
 prob = RB.DynamicsProblem(
     wt,
@@ -53,12 +53,13 @@ RB.solve!(
             RB.InteriorPointMethod()
         )
     );
-    dt,tspan,ftol=1e-14,maxiters=50,verbose_contact=true,exception=true,progress=false,
+    dt,tspan,ftol=1e-14,maxiters=50,verbose=true,
+    exception=true,progress=false,
 )
 
 GM.activate!(;scalefactor=1);plot_traj!(wt;showmesh=false,showground=false)
 
-# two-layer
+# Moreau
 RB.solve!(
     prob,
     RB.DynamicsSolver(
@@ -70,7 +71,43 @@ RB.solve!(
     dt,tspan,ftol=1e-14,maxiters=50,verbose=true,exception=true,progress=false,
 )
 
-GM.activate!(;px_per_unit=2,scalefactor = 2);plot_traj!(sc;showground=false)
+GM.activate!(;px_per_unit=2,scalefactor = 2);plot_traj!(wt;showmesh=false,showground=false)
 
-me = RB.mechanical_energy!(sc)
+me = RB.mechanical_energy!(wt)
 Makie.lines(me.E)
+
+using FileIO
+using GLMakie
+brain = load(assetpath("brain.stl"))
+
+GLMakie.activate!(;scalefactor = 1) 
+GM.activate!(;scalefactor = 2) #bug
+
+fig = Figure()
+ax1 = Axis3(fig[1, 1], aspect = :equal, title = "aspect = :equal")
+ax2 = Axis3(fig[1, 2], aspect = :data, title = "aspect = :data")
+for ax in [ax1, ax2]
+    mesh!(ax, brain, color = :gray80)
+end
+DataInspector(fig)
+fig
+
+using ForwardDiff
+
+ForwardDiff.gradient((x)->atan(x[2],x[1]),[0,1.0])
+using FiniteDiff
+FiniteDiff.finite_difference_gradient((x)->atan(x[2],x[1]),[0,1.0])
+
+R = exp(RB.skew(rand(3)))
+
+rR = rand(RotMatrix3)
+rotation2angles(vec(R))
+RotZYX(rR)
+
+function myfun(x)
+    [x[1]^2,x[2]^2,x[4]*x[2]]
+end
+x = rand(4)
+angles_jacobian = ForwardDiff.jacobian(myfun,x)
+angles_hessians = reshape(ForwardDiff.jacobian(x -> ForwardDiff.jacobian(myfun, x), x),3,4,4)
+

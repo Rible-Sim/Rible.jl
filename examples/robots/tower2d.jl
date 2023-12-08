@@ -54,7 +54,7 @@ function tower2d(;k=100.0,c=0.0,ratio=0.8,ratio1=ratio,slack=true)
     ness = 10
     ks = vcat(fill(k,naux),fill(k,ness))
     cs = fill(c,ncables)
-    cables = [RB.Cable2D(i,restlens[i],ks[i],cs[i];slack) for i = 1:ncables]
+    cables = [RB.DistanceSpringDamper2D(i,restlens[i],ks[i],cs[i];slack) for i = 1:ncables]
     acs = [RB.ManualActuator(1,collect(1:ncables),restlens[1:ncables])]
     tensiles = (cables = cables,)
     hub = (actuators = acs,)

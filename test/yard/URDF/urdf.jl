@@ -595,8 +595,8 @@ function dynfuncs(bot)
         RB.clear_forces!(st)
         RB.update_rigids!(st,q,q̇)
         # RB.update_tensiles!(st)
-        # RB.build_∂Q̌∂q̌!(∂F∂q̌,st)
-        # RB.build_∂Q̌∂q̌̇!(∂F∂q̌̇,st)
+        # RB.build_tangent_stiffness_matrix!(∂F∂q̌,st)
+        # RB.build_tangent_stiffness_matriẋ!(∂F∂q̌̇,st)
     end
 
 	@eponymtuple(F!,Jac_F!)

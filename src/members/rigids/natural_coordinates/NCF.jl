@@ -3,11 +3,12 @@ using LinearAlgebra
 using StaticArrays
 using SparseArrays
 using LuxurySparse
+using SymmetricFormats
+using BlockDiagonals
+using Rotations
+using EponymTuples
 using ForwardDiff
 using DocStringExtensions
-using SymmetricFormats
-using EponymTuples
-using BlockDiagonals
 
 import ..Rible: HouseholderOrthogonalization, skew, Axes, GECP, CartesianFrame
 

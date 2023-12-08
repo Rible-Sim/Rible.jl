@@ -10,28 +10,125 @@ function clear_forces!(bodies::TypeSortedCollection)
 end
 
 """
-Update Cable Tension 
+Update DistanceSpringDamper Tension 
 $(TYPEDSIGNATURES)
 """
 function update_tensiles!(st::AbstractStructure)
     update_tensiles!(st::AbstractStructure, st.connectivity.tensioned)
+    update_tensiles!(st::AbstractStructure, st.connectivity.jointed)
 end
 
-function update_tensiles!(st::Structure, @eponymargs(connected,))
+function update_tensiles!(st::AbstractStructure, @eponymargs(connected,))
     (;cables) = st.tensiles
     foreach(connected) do scnt
-        scable = cables[scnt.id]
-        locus_state_hen = scnt.hen.rbsig.state.loci_states[scnt.hen.pid]
-        locus_state_egg = scnt.egg.rbsig.state.loci_states[scnt.egg.pid]
-        p_hen = locus_state_hen.position
-        ṗ_hen = locus_state_hen.velocity
+        cable = cables[scnt.id]
+        locus_state_hen = scnt.hen.bodysig.state.loci_states[scnt.hen.pid]
+        locus_state_egg = scnt.egg.bodysig.state.loci_states[scnt.egg.pid]
+        p_hen = locus_state_hen.frame.position
+        ṗ_hen = locus_state_hen.frame.velocity
         f_hen = locus_state_hen.force
-        p_egg = locus_state_egg.position
-        ṗ_egg = locus_state_egg.velocity
+        p_egg = locus_state_egg.frame.position
+        ṗ_egg = locus_state_egg.frame.velocity
         f_egg = locus_state_egg.force
-        update!(scable,p_hen,p_egg,ṗ_hen,ṗ_egg)
-        f_hen .+= scable.state.force
-        f_egg .-= scable.state.force
+        update!(cable,p_hen,p_egg,ṗ_hen,ṗ_egg)
+        f_hen .+= cable.state.force
+        f_egg .-= cable.state.force
+    end
+end
+
+function rotation2angles(R::AbstractVector{T}) where {T}
+    rotation2angles(reshape(R,3,:))
+end
+
+function rotation2angles(R::AbstractMatrix{T}) where {T}
+    R31 = R[3,1]
+    if R31 < 1
+        if R31 > -1
+            θy = asin(-R31)
+            θz = atan(R[2,1],R[1,1])
+            θx = atan(R[3,2],R[3,3])
+        else # R31 == -1
+            # Not a unique solution
+            θx = zero(T)
+            θy = T(π/2)
+            θz =  -atan(-R[2,3],R[2,2])
+        end
+    else # R31 == 1
+        # Not a unique solution
+        θx = zero(T)
+        θy = -π/2
+        θz = atan(-R[2,3],R[2,2])
+    end
+    [θz,θy,θx]
+end
+
+function make_jointed2angles(hen2egg,relative_core)
+    (;hen,egg) = hen2egg
+    nmcs_hen = hen.bodysig.coords.nmcs
+    nmcs_egg = egg.bodysig.coords.nmcs
+    num_of_coords_hen = get_num_of_coords(nmcs_hen)
+    num_of_coords_egg = get_num_of_coords(nmcs_egg)
+    num_of_jointed_coords = num_of_coords_hen + num_of_coords_egg
+    function inner_jointed2angles(q_jointed)
+        q_hen = @view q_jointed[1:num_of_coords_hen]
+        q_egg = @view q_jointed[num_of_coords_hen+1:end]
+        X_hen = NCF.get_X(nmcs_hen,q_hen)
+        X_egg = NCF.get_X(nmcs_egg,q_egg)
+        relative_axes = X_egg*relative_core*X_hen'
+        angles = rotation2angles(relative_axes.X)
+    end
+end
+
+function update_tensiles!(st::AbstractStructure, jointed::JointedMembers)
+    (;spring_dampers) = st.tensiles
+    (;indexed,numbered) = st.connectivity
+    (;system) = st.state
+    (;bodyid2sys_free_coords,
+      bodyid2sys_full_coords,
+      num_of_free_coords,
+      num_of_full_coords,
+    ) = indexed
+    q = get_coords(st)
+    foreach(jointed.joints) do joint
+        if joint isa PrototypeJoint
+            (;
+                num_of_cstr,
+                free_idx,
+                sys_free_idx,
+                hen2egg,
+                cache,
+                mask_1st,mask_2nd,mask_3rd,mask_4th
+            ) = joint
+            (;
+                relative_core
+            ) = cache
+            spring_damper = spring_dampers[joint.id]
+            (;mask) = spring_damper
+            (;hen,egg) = hen2egg
+            nmcs_hen = hen.bodysig.coords.nmcs
+            nmcs_egg = egg.bodysig.coords.nmcs
+            num_of_coords_hen = get_num_of_coords(nmcs_hen)
+            num_of_coords_egg = get_num_of_coords(nmcs_egg)
+            id_hen = hen.bodysig.prop.id
+            id_egg = egg.bodysig.prop.id
+            q_hen = @view q[bodyid2sys_full_coords[id_hen]]
+            q_egg = @view q[bodyid2sys_full_coords[id_egg]]
+            q_jointed = vcat(
+                q_hen,
+                q_egg
+            )
+            jointed2angles = make_jointed2angles(hen2egg,relative_core)
+            angles = jointed2angles(q_jointed)
+            update!(spring_damper,angles,)
+            angles_jacobian = ForwardDiff.jacobian(jointed2angles,q_jointed)
+            for i in mask
+                torque = spring_damper.state.torques[i]
+                angle = spring_damper.state.angles[i]
+                @show angles_jacobian[i,  4:12]
+                @show angles_jacobian[i,16:end]
+                system.F̌[sys_free_idx] .-= angles_jacobian[i,free_idx]*torque
+            end
+        end
     end
 end
 
@@ -113,13 +210,11 @@ function update_bodies!(st::AbstractStructure)
 end
 
 """
-计算System 力的大小。
 $(TYPEDSIGNATURES)
 """
-function assemble_force!(st::Structure)
+function assemble_forces!(st::Structure)
     (;bodies,state) = st
     (;system,members) = state
-    system.F .= 0.0
     foreach(bodies) do body
         (;F) = members[body.prop.id]
         (;state,cache) = body
@@ -140,7 +235,6 @@ function get_force!(F,st::AbstractStructure)
 end
 
 """
-施加重力。
 $(TYPEDSIGNATURES)
 """
 function apply_gravity!(st;factor=1)

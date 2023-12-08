@@ -183,9 +183,9 @@ diameter = 1e-2
 κ = (mat_cable.modulus_elas |> ustrip)*1e9*π*(diameter/2)^2/10
 @show κ
 if k isa Nothing
-    cables = [RB.Cable3D(i,0.0,κ,0.0;slack=false) for i = 1:ncables]
+    cables = [RB.DistanceSpringDamper3D(i,0.0,κ,0.0;slack=false) for i = 1:ncables]
 else
-    cables = [RB.Cable3D(i,0.0,k[i],0.0;slack=false) for i = 1:ncables]
+    cables = [RB.DistanceSpringDamper3D(i,0.0,k[i],0.0;slack=false) for i = 1:ncables]
 end
 acs = [
     RB.ManualActuator(i,[i,i+hncables],zeros(2))

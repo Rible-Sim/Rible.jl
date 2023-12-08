@@ -142,7 +142,7 @@ struct RigidBodyCache{CType,cacheType} <: AbstractBodyCache
     Co::CType
     Cg::CType
     Cps::Vector{CType}
-    coords_cache::cacheType
+    inertia_cache::cacheType
 end
 
 
@@ -165,14 +165,14 @@ function BodyCache(prop::RigidBodyProperty{N,T},
     Co = C(c(zero(mass_center)))
     Cg = C(c(mass_center))
     Cps = [typeof(Cg)(C(c(loci[i].position))) for i in 1:num_of_loci]
-    coords_cache = InertiaCache(
+    inertia_cache = InertiaCache(
         M,M⁻¹,
         ∂Mq̇∂q,∂M⁻¹p∂q,
         Ṁq̇,∂T∂qᵀ
     )
     RigidBodyCache(
         Co,Cg,Cps,
-        coords_cache
+        inertia_cache
     )
 end
 
@@ -197,14 +197,14 @@ function BodyCache(
     end
     Cg = deepcopy(Co)
     Cps = [deepcopy(Co) for i in 1:num_of_loci]
-    coords_cache = InertiaCache(
+    inertia_cache = InertiaCache(
         M,M⁻¹,
         ∂Mq̇∂q,∂M⁻¹p∂q,
         Ṁq̇,∂T∂qᵀ
     )
     RigidBodyCache(
         Co,Cg,Cps,
-        coords_cache
+        inertia_cache
     )
 end
 
@@ -262,7 +262,7 @@ function update_inertia_cache!(
         prop::RigidBodyProperty,
         x,ẋ
     )
-    (;M,M⁻¹,∂Mq̇∂q,∂M⁻¹p∂q,∂T∂qᵀ) = cache.coords_cache
+    (;M,M⁻¹,∂Mq̇∂q,∂M⁻¹p∂q,∂T∂qᵀ) = cache.inertia_cache
     # update inertia
     # @show x[4:7],ẋ[4:7]
     qcs = coords.nmcs
@@ -436,19 +436,19 @@ end
 
 function centrifugal_force!(F,state::AbstractBodyState,cache::AbstractBodyCache)
     (;mass_locus_state,loci_states) = state
-    (;Cps,Cg,coords_cache) = cache
-    F .+= coords_cache.∂T∂qᵀ
+    (;Cps,Cg,inertia_cache) = cache
+    F .+= inertia_cache.∂T∂qᵀ
 end
 
 function mass_center_force!(F,state::AbstractBodyState,cache::AbstractBodyCache)
     (;mass_locus_state,loci_states) = state
-    (;Cps,Cg,coords_cache) = cache
+    (;Cps,Cg,inertia_cache) = cache
     mul!(F,transpose(Cg),mass_locus_state.force,1,1)
 end
 
 function concentrated_force!(F,state::AbstractBodyState,cache::AbstractBodyCache)
     (;mass_locus_state,loci_states) = state
-    (;Cps,Cg,coords_cache) = cache
+    (;Cps,Cg,inertia_cache) = cache
     for (pid,locus_state) in enumerate(loci_states)
         mul!(F,transpose(Cps[pid]),locus_state.force,1,1)
     end

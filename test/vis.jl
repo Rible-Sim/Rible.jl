@@ -460,8 +460,8 @@ function plot_self_stress_states(
                     mapreduce(
                         (scnt)->
                         [(
-                            scnt.hen.rbsig.state.loci_states[scnt.hen.pid].+
-                            scnt.egg.rbsig.state.loci_states[scnt.egg.pid]
+                            scnt.hen.bodysig.state.loci_states[scnt.hen.pid].+
+                            scnt.egg.bodysig.state.loci_states[scnt.egg.pid]
                         )./2],
                         vcat,
                         tensioned.connected

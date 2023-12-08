@@ -243,14 +243,14 @@ for i in 4*8+1:nstrings
     ks[i] = 0.3
 end
 
-cables = [RB.Cable2D(i, restlens[i], ks[i], 0.0) for i in 1:nstrings]
+cables = [RB.DistanceSpringDamper2D(i, restlens[i], ks[i], 0.0) for i in 1:nstrings]
 
 ncsegs = 3
 lens = [44.71, 50, 50]
 pre = [10.0 for i in 1:ncsegs]
-c_section = StructArray([RB.CableSegment(i, lens[i], .2, prestress=pre[i]) for i in 1:ncsegs])
-cs1 = RB.ClusterCables(1, ncsegs-1, deepcopy(c_section); μ=0.02)
-cs2 = RB.ClusterCables(2, ncsegs-1, deepcopy(c_section); μ=0.02)
+c_section = StructArray([RB.DistanceSpringDamperSegment(i, lens[i], .2, prestress=pre[i]) for i in 1:ncsegs])
+cs1 = RB.ClusterDistanceSpringDampers(1, ncsegs-1, deepcopy(c_section); μ=0.02)
+cs2 = RB.ClusterDistanceSpringDampers(2, ncsegs-1, deepcopy(c_section); μ=0.02)
 
 tensiles = (cables=cables, clustercables=[cs1, cs2])
 # tensiles = (cables=cables,)
@@ -313,7 +313,7 @@ bot = RB.Robot(st, hub)
 #         RB.distribute_s̄!(st,s)
 #         RB.update_tensiles!(st)
 #         ## RB.apply_gravity!(st)
-#         RB.assemble_force!(st)
+#         RB.assemble_forces!(st)
 #         RB.get_force!(F,st)
 #         ## F .= 0
 #     end

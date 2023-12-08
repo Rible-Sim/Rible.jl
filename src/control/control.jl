@@ -137,7 +137,7 @@ end
 # end
 #
 # function heat!(ctrller::ManualSerialHeater,
-#                 SMA_cables::AbstractVector{<:SMACable},u;inc=false,abs=true)
+#                 SMA_cables::AbstractVector{<:SMADistanceSpringDamper},u;inc=false,abs=true)
 #     (;acts, heating_laws) = ctrller
 #     (;id_cables, original_values) = acts
 #     for (id, original_value, heating_law) in zip(id_cables,original_values,heating_laws)
@@ -155,7 +155,7 @@ end
 #     end
 # end
 #
-# function heat!(s::SMACable,heating_law)
+# function heat!(s::SMADistanceSpringDamper,heating_law)
 #     s.law.F0, s.law.k = heating_law(s.state.temp)
 # end
 

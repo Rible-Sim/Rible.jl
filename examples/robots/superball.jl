@@ -68,7 +68,7 @@ function superball(c=0.0;
     )
     )
     cables = [
-    RB.Cable3D(i, original_restlens[i], ks[i], c;slack=false) for i = 1:ncables
+    RB.DistanceSpringDamper3D(i, original_restlens[i], ks[i], c;slack=false) for i = 1:ncables
     ]
     #
     tensiles = (cables = cables,)

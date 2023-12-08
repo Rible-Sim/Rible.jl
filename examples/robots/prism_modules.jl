@@ -184,7 +184,7 @@ ncables = size(connecting,1)
 # @assert ncables == ncables_prism + ncables_outer
 
 cables_prism = [
-    RB.Cable3D(
+    RB.DistanceSpringDamper3D(
     i,
     friction_coefficients[i], #restlength  
     κs[i],

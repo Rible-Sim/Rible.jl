@@ -1049,11 +1049,11 @@ barplot!(μ1o)
 pretty_table(
     Dict(
         [
-            ("Folded, Cables 1~6", μ0o[1]),
-            ("Deployed, Cables 1~6", μ0o[7]),
-            ("Folded, Cables 1~6", μ1o[1]),
-            ("Deployed, Cables 1~6", μ1o[7]),
-            ("Outer Cables 1~6", μ1o[end-2:end]),
+            ("Folded, DistanceSpringDampers 1~6", μ0o[1]),
+            ("Deployed, DistanceSpringDampers 1~6", μ0o[7]),
+            ("Folded, DistanceSpringDampers 1~6", μ1o[1]),
+            ("Deployed, DistanceSpringDampers 1~6", μ1o[7]),
+            ("Outer DistanceSpringDampers 1~6", μ1o[end-2:end]),
         ]
     )
 )
@@ -1468,7 +1468,7 @@ function plot_tensions(bots,figname=nothing)
         ) do
         fig = Figure(;)
         ax1 = Axis(fig[1,1]; 
-            xlabel = "Cable No.", 
+            xlabel = "DistanceSpringDamper No.", 
             ylabel = "Tension (N)"
         )
         x = vec([collect(1:24)';collect(1:24)'])

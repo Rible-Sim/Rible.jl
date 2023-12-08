@@ -135,7 +135,7 @@ function make_new_tail(n)
         ks[i] = ifelse(j ∈ [1, 0], 100, 100.0)
     end
     cables =
-        [RB.Cable2D(i, 0.5original_restlens[i], ks[i], 0.0) for i = 1:ncables]  #
+        [RB.DistanceSpringDamper2D(i, 0.5original_restlens[i], ks[i], 0.0) for i = 1:ncables]  #
     tensiles = (cables = cables,)
     acs = [
         RB.ManualActuator(1,
@@ -190,7 +190,7 @@ function dynfuncs(bot)
         RB.update_bodies!(st,q,q̇)
         RB.update_tensiles!(st)
         ## RB.apply_gravity!(st)
-        RB.assemble_force!(st)
+        RB.assemble_forces!(st)
         RB.get_force!(F,st)
     end
     Jac_F! = missing

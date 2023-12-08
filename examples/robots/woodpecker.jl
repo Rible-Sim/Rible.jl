@@ -22,8 +22,7 @@ function woodpecker(;coordsType = RB.NCF.NC)
     # initial conditions 
     sleeve_angular_position = -0.1036 #rad 
     woodpecker_angular_position = -0.2788 #rad 
-    # woodpecker_vertical_velocity = -0.3411 #m/s 
-    sleeve_vertical_velocity = -0.3411 #m/s 
+    woodpecker_vertical_velocity = -0.3411 #m/s
     sleeve_angular_velocity = 0.0 #rad/s 
     woodpecker_angular_velocity = -7.4583 #rad/s 
     sleeve_position_X = 0 #m
@@ -84,9 +83,9 @@ function woodpecker(;coordsType = RB.NCF.NC)
     end
     function make_sleeve(i;
             ro=SVo3,
-            ṙo=SVector(0,0,sleeve_vertical_velocity),
             R=RotX(sleeve_angular_position),
             ω = SVo3,
+            spring_velocity = SVo3,
         )
         contactable = true
         visible = true
@@ -110,6 +109,8 @@ function woodpecker(;coordsType = RB.NCF.NC)
         Ī = SMatrix{3,3}(sleeve_moment_of_inertia*I(3))
         ri = ro
         
+        ṙo=spring_velocity
+
         prop = RB.RigidBodyProperty(
             i,contactable,m,
             Ī,
@@ -137,11 +138,10 @@ function woodpecker(;coordsType = RB.NCF.NC)
         RB.RigidBody(prop,state,coords,sleevemesh)
     end
     function make_link(i;
-            spring_position = SVo3,
-            spring_velocity = SVo3,
             ω = SVector{3}(woodpecker_angular_velocity,0,0),
             R = RotX(woodpecker_angular_position),
-            ṙo = spring_velocity + ω×R*SVector(0,distance_spring_COM_woodpecker,0),
+            spring_position = SVo3,
+            ṙo = SVector(0,0,woodpecker_vertical_velocity),
         )
         contactable = true
         visible = true
@@ -201,17 +201,31 @@ function woodpecker(;coordsType = RB.NCF.NC)
         RB.RigidBody(prop,state,coords,linkmesh)
     end
     pole = make_pole(1)
-    sleeve1 = make_sleeve(2;)
-    spring_position = sleeve1.state.loci_states[5].frame.position
-    spring_velocity = sleeve1.state.loci_states[5].frame.velocity
-    link1 = make_link(3;spring_position,spring_velocity)
+    spring_position = make_sleeve(2;).state.loci_states[5].frame.position
+    link1 = make_link(3;spring_position)
+    spring_velocity = link1.state.loci_states[1].frame.velocity
+    @show spring_velocity
+    sleeve1 = make_sleeve(2;spring_velocity)
     rbs = [pole,sleeve1,link1]
     rigdibodies = TypeSortedCollection(rbs)
     numbered = RB.number(rigdibodies)
     indexed = RB.index(rigdibodies,)
 
-    ss = Int[]
-    tensiles = (cables = ss,)
+    ss = [
+        RB.RotationalSpringDamper3D(
+            1,
+            [0.0,0,0],
+            Int[],
+            0.0,
+        ),
+        RB.RotationalSpringDamper3D(
+            2,
+            [0.0,0,0],
+            [3],
+            force_elements_angular_stiffness,
+        )
+    ]
+    tensiles = (spring_dampers = ss, cables = Int[])
     connected = RB.connect(rbs,zeros(Int,0,0))
     tensioned = @eponymtuple(connected,)
 

@@ -101,9 +101,9 @@ function tower(;k=nothing)
     cnt_matrix = Matrix(cnt_matrix_elas')
     ncables = size(cnt_matrix,1)
     if k isa Nothing
-        cables = [RB.Cable3D(i,0.0,100.0,0.0;slack=false) for i = 1:ncables]
+        cables = [RB.DistanceSpringDamper3D(i,0.0,100.0,0.0;slack=false) for i = 1:ncables]
     else
-        cables = [RB.Cable3D(i,0.0,k[i],0.0;slack=false) for i = 1:ncables]
+        cables = [RB.DistanceSpringDamper3D(i,0.0,k[i],0.0;slack=false) for i = 1:ncables]
     end
     tensiles = (cables = cables,)
     connected = RB.connect(rbs,cnt_matrix)

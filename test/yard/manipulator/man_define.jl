@@ -180,7 +180,7 @@ function man_ndof(num_of_dof,onedir=[1.0,0.0];θ=0.0,k=0.0,c=0.0,unit="mks",rest
         original_restlens[i] = ifelse(j∈[1,0],upstringlen,lostringlen)
         ks[i] = ifelse(j∈[1,0],k,k)
     end
-    ss = [RB.Cable2D(i, original_restlens[i],ks[i],cs[i]) for i = 1:ncables]
+    ss = [RB.DistanceSpringDamper2D(i, original_restlens[i],ks[i],cs[i]) for i = 1:ncables]
 	tensiles = (cables=ss,)
 
 	matrix_cnt = zeros(Int,2(nbodies-1),nbodies)

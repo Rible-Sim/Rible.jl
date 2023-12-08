@@ -166,7 +166,6 @@ function contact_gap_and_normal(x::AbstractVector,cp::Vector{<:Plane})
     gap_first, n_first
 end
 
-
 function contact_gap_and_normal(x::AbstractVector,halvspaces::Vector{<:HalfSpace{T,N}}) where {T,N}
     nhs = length(halvspaces)
     gaps = zeros(T,nhs)

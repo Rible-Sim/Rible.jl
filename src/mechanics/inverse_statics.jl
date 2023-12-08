@@ -28,8 +28,8 @@ function build_Q̃(st)
     foreach(connected) do cc
         j = cc.id
         (;hen,egg) = cc
-        rb1 = hen.rbsig
-        rb2 = egg.rbsig
+        rb1 = hen.bodysig
+        rb2 = egg.bodysig
         C1 = rb1.cache.Cps[hen.pid]
         C2 = rb2.cache.Cps[egg.pid]
         uci1 = rb1.coords.free_idx
@@ -125,7 +125,7 @@ function build_Ǧ(tginput;factor=1.0)
     st = deepcopy(tginput)
     clear_forces!(st)
     apply_gravity!(st;factor)
-    Ǧ = assemble_force!(st)
+    Ǧ = assemble_forces!(st)
 end
 
 function make_U(st)
@@ -169,8 +169,8 @@ function make_Q̌(st,q0)
         foreach(connected) do scnt
             j = scnt.id
             (;k) = cables[j]
-            rb1 = scnt.hen.rbsig
-            rb2 = scnt.egg.rbsig
+            rb1 = scnt.hen.bodysig
+            rb2 = scnt.egg.bodysig
             rb1id = rb1.prop.id
             rb2id = rb2.prop.id
             ap1id = scnt.hen.pid
@@ -195,8 +195,8 @@ function make_Q̌(st,q0)
         Jj = zeros(eltype(q̌),num_of_dim,num_of_full_coords)
         foreach(connected) do scnt
             j = scnt.id
-            rb1 = scnt.hen.rbsig
-            rb2 = scnt.egg.rbsig
+            rb1 = scnt.hen.bodysig
+            rb2 = scnt.egg.bodysig
             rb1id = rb1.prop.id
             rb2id = rb2.prop.id
             ap1id = scnt.hen.pid
@@ -221,8 +221,8 @@ function make_Q̌(st,q0)
     #     ret = zeros(eltype(γ),nfullcoords)
     #     foreach(string2ap) do scnt
     #         j = scnt.id
-    #         rb1 = scnt.hen.rbsig
-    #         rb2 = scnt.egg.rbsig
+    #         rb1 = scnt.hen.bodysig
+    #         rb2 = scnt.egg.bodysig
     #         rb1id = rb1.prop.id
     #         rb2id = rb2.prop.id
     #         ap1id = scnt.hen.pid
@@ -492,7 +492,7 @@ function check_static_equilibrium_output_multipliers!(st,q,F=nothing;
     if gravity
         apply_gravity!(st)
     end
-    generalized_forces = assemble_force!(st)
+    generalized_forces = assemble_forces!(st)
     if !isnothing(F)
         generalized_forces .+= F[:]
     end

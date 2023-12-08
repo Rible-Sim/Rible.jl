@@ -224,7 +224,7 @@ function spine_true(n,dis,rm;
     c = 100.0
     cs = repeat(fill(c,6),n-1)
 	cables_idx = collect([j for i = 1:n-1 for j in (6*(i-1)+1):(6*(i-1)+6)])
-    cables = [RB.Cable3D(i,cablelens[i],ks[i],cs[i]) for i in cables_idx]
+    cables = [RB.DistanceSpringDamper3D(i,cablelens[i],ks[i],cs[i]) for i in cables_idx]
 	tensiles = (cables = cables,)
 
 	matrix_cnt = zeros(Int,6(n-1),n)

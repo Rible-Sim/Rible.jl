@@ -27,7 +27,7 @@ function two_tri(;k=100.0,c=0.0,ratio=0.8)
     restlens = fill(restlen1,ncables)
     ks = fill(k,ncables)
     cs = fill(c,ncables)
-    cables = [RB.Cable2D(i,restlens[i],ks[i],cs[i];slack=true) for i = 1:ncables]
+    cables = [RB.DistanceSpringDamper2D(i,restlens[i],ks[i],cs[i];slack=true) for i = 1:ncables]
     acs = [RB.ManualActuator(1,1:ncables,restlens,RB.Uncoupled())]
     tensiles = (cables = cables,)
     hub = (actuators = acs,)

@@ -72,7 +72,6 @@ function test_fvector(st,q0)
 end
 
 """
-线性化。
 $(TYPEDSIGNATURES)
 """
 function linearize(tginput,λ,u,q,q̇=zero(q))
@@ -101,7 +100,6 @@ function linearize(tginput,λ,u,q,q̇=zero(q))
     K̂[ncoords+1:nz,1:ncoords] .= c.*Aq
     M̂,Ĉ,K̂
 end
-
 
 function intrinsic_nullspace(st,q)
     (;bodies,connectivity) = st
@@ -151,11 +149,6 @@ function find_finite(ω2,Z,num_of_dof)
     finite_ω2,finite_Z
 end
 
-function build_Ǩ(st)
-    _,λ = check_static_equilibrium_output_multipliers(st)
-    build_Ǩ(st,λ)
-end
-
 function build_material_stiffness_matrix!(st::Structure,q,k)
     (;num_of_dim) = st
     (;indexed,tensioned) = st.connectivity
@@ -167,8 +160,8 @@ function build_material_stiffness_matrix!(st::Structure,q,k)
     retǨm = zeros(eltype(q),num_of_free_coords,num_of_free_coords)
     foreach(connected) do scnt
         j = scnt.id
-        rb1 = scnt.hen.rbsig
-        rb2 = scnt.egg.rbsig
+        rb1 = scnt.hen.bodysig
+        rb2 = scnt.egg.bodysig
         ap1id = scnt.hen.pid
         ap2id = scnt.egg.pid
         C1 = rb1.cache.Cps[ap1id]
@@ -200,8 +193,8 @@ function build_geometric_stiffness_matrix!(st::Structure,q,f)
     retǨg = zeros(eltype(q),num_of_free_coords,num_of_free_coords)
     foreach(connected) do scnt
         j = scnt.id
-        rb1 = scnt.hen.rbsig
-        rb2 = scnt.egg.rbsig
+        rb1 = scnt.hen.bodysig
+        rb2 = scnt.egg.bodysig
         ap1id = scnt.hen.pid
         ap2id = scnt.egg.pid
         C1 = rb1.cache.Cps[ap1id]
@@ -239,8 +232,8 @@ function make_Ǩm_Ǩg(st,q0)
         retǨg = zeros(eltype(q̌),num_of_free_coords,num_of_free_coords)
         foreach(connected) do scnt
             j = scnt.id
-            rb1 = scnt.hen.rbsig
-            rb2 = scnt.egg.rbsig
+            rb1 = scnt.hen.bodysig
+            rb2 = scnt.egg.bodysig
             rb1id = rb1.prop.id
             rb2id = rb2.prop.id
             ap1id = scnt.hen.pid
@@ -271,8 +264,8 @@ function make_Ǩm_Ǩg(st,q0)
         retǨg = zeros(eltype(q̌),num_of_free_coords,num_of_free_coords)
         foreach(connected) do scnt
             j = scnt.id
-            rb1 = scnt.hen.rbsig
-            rb2 = scnt.egg.rbsig
+            rb1 = scnt.hen.bodysig
+            rb2 = scnt.egg.bodysig
             ap1id = scnt.hen.pid
             ap2id = scnt.egg.pid
             C1 = rb1.state.cache.Cps[ap1id]
@@ -312,8 +305,8 @@ function make_S(st,q0)
         Jj = zeros(eltype(q̌),num_of_dim,num_of_full_coords)
         foreach(connected) do scnt
             j = scnt.id
-            rb1 = scnt.hen.rbsig
-            rb2 = scnt.egg.rbsig
+            rb1 = scnt.hen.bodysig
+            rb2 = scnt.egg.bodysig
             rb1id = rb1.prop.id
             rb2id = rb2.prop.id
             ap1id = scnt.hen.pid
@@ -342,8 +335,8 @@ function make_S(st,q0)
         Jj = zeros(eltype(q̌),num_of_dim,num_of_full_coords)
         foreach(connected) do scnt
             j = scnt.id
-            rb1 = scnt.hen.rbsig
-            rb2 = scnt.egg.rbsig
+            rb1 = scnt.hen.bodysig
+            rb2 = scnt.egg.bodysig
             rb1id = rb1.prop.id
             rb2id = rb2.prop.id
             ap1id = scnt.hen.pid
@@ -366,19 +359,20 @@ function make_S(st,q0)
 end
 
 # Out-of-place ∂Q̌∂q̌ (dispatch)
-function build_∂Q̌∂q̌(st)
-    build_∂Q̌∂q̌(st, st.connectivity.tensioned)
+function build_tangent_stiffness_matrix(st)
+    build_tangent_stiffness_matrix(st, st.connectivity.tensioned)
+    build_tangent_stiffness_matrix(st, st.connectivity.jointed)
 end
 
 # Out-of-place ∂Q̌∂q̌ for cables and clustered cables
-function build_∂Q̌∂q̌(st, @eponymargs(connected, clustered))
-    ∂Q̌∂q̌1 = build_∂Q̌∂q̌(st, @eponymtuple(connected))
-    ∂Q̌∂q̌2 = build_∂Q̌∂q̌(st, @eponymtuple(clustered))
+function build_tangent_stiffness_matrix(st, @eponymargs(connected, clustered))
+    ∂Q̌∂q̌1 = build_tangent_stiffness_matrix(st, @eponymtuple(connected))
+    ∂Q̌∂q̌2 = build_tangent_stiffness_matrix(st, @eponymtuple(clustered))
     return ∂Q̌∂q̌1 + ∂Q̌∂q̌2
 end
 
 # Out-of-place ∂Q̌∂q̌ for cables
-function build_∂Q̌∂q̌(st,@eponymargs(connected,))
+function build_tangent_stiffness_matrix(st,@eponymargs(connected,))
     (;cables) = st.tensiles
     (;indexed) = st.connectivity
     (;num_of_full_coords,num_of_free_coords,sys_free_idx,bodyid2sys_free_coords,bodyid2sys_full_coords) = indexed
@@ -391,8 +385,8 @@ function build_∂Q̌∂q̌(st,@eponymargs(connected,))
     foreach(connected) do cc
         cable = cables[cc.id]
         (;hen,egg) = cc
-        rb1 = hen.rbsig
-        rb2 = egg.rbsig
+        rb1 = hen.bodysig
+        rb2 = egg.bodysig
         C1 = rb1.state.cache.Cps[hen.pid]
         C2 = rb2.state.cache.Cps[egg.pid]
         free_idx1 = rb1.state.cache.free_idx
@@ -423,7 +417,7 @@ function build_∂Q̌∂q̌(st,@eponymargs(connected,))
 end
 
 # Out-of-place ∂Q̌∂q̌ for cluster cables
-function build_∂Q̌∂q̌(st,@eponymargs(clustered))
+function build_tangent_stiffness_matrix(st,@eponymargs(clustered))
     (;clustercables) = st.tensiles
     (;indexed) = st.connectivity
     (;num_of_full_coords,num_of_free_coords,sys_free_idx,bodyid2sys_free_coords,bodyid2sys_full_coords) = indexed
@@ -439,8 +433,8 @@ function build_∂Q̌∂q̌(st,@eponymargs(clustered))
         foreach(clustercable) do cc
             cable = clustercables[i].segs[cc.id]
             (;hen,egg) = cc
-            rb1 = hen.rbsig
-            rb2 = egg.rbsig
+            rb1 = hen.bodysig
+            rb2 = egg.bodysig
             C1 = rb1.state.cache.Cps[hen.pid]
             C2 = rb2.state.cache.Cps[egg.pid]
             free_idx1 = rb1.state.cache.free_idx
@@ -467,80 +461,20 @@ function build_∂Q̌∂q̌(st,@eponymargs(clustered))
     return ∂Q̌∂q̌
 end
 
-# In-place ∂Q̌∂q̌ for cables and flexible bodies
-function build_∂Q̌∂q̌!(∂Q̌∂q̌,st)
-    (;bodies,connectivity) = st
-    (;tensioned,indexed) = connectivity
-    (;cables) = st.tensiles
-    (;connected) = tensioned
-    (;num_of_full_coords,num_of_free_coords,sys_free_idx,bodyid2sys_free_coords,bodyid2sys_full_coords) = indexed
-    T = get_numbertype(st)
-    num_of_dim = get_num_of_dims(st)
-    # ∂Q̌∂q̌ = zeros(T,num_of_free_coords,num_of_free_coords)
-    D = @MMatrix zeros(T,num_of_dim,num_of_dim)
-    Im = Symmetric(SMatrix{num_of_dim,num_of_dim}(one(T)*I))
-    J̌ = zeros(T,num_of_dim,num_of_free_coords)
-    foreach(connected) do cc
-        cable = cables[cc.id]
-        (;hen,egg) = cc
-        rb1 = hen.rbsig
-        rb2 = egg.rbsig
-        C1 = rb1.cache.Cps[hen.pid]
-        C2 = rb2.cache.Cps[egg.pid]
-        free_idx1 = rb1.coords.free_idx
-        free_idx2 = rb2.coords.free_idx
-        mfree1 = bodyid2sys_free_coords[rb1.prop.id]
-        mfree2 = bodyid2sys_free_coords[rb2.prop.id]
-        (;k,c,state,slack) = cable
-        (;direction,tension,length,lengthdot) = state
-        if slack && (tension==0)
-            ∂Q̌∂q̌ .-= 0
-        else
-            D .= direction*transpose(direction)
-            density = tension/length
-            β = c*lengthdot/length + density
-            D .*= k-β
-            D .+= β.*Im
-            J̌ .= 0
-            J̌[:,mfree2] .+= C2[:,free_idx2]
-            J̌[:,mfree1] .-= C1[:,free_idx1]
-            ∂Q̌∂q̌ .-= transpose(J̌)*D*J̌
-        end
-        # ∂Q̌∂q̌_full[mfree2,mfree2] .+= transpose(C2)*D*C2
-        # ∂Q̌∂q̌_full[mfree1,mfree2] .-= transpose(C1)*D*C2
-        # ∂Q̌∂q̌_full[mfree2,mfree1] .-= transpose(C2)*D*C1
-        # ∂Q̌∂q̌_full[mfree1,mfree1] .+= transpose(C1)*D*C1
-    end
-
-    foreach(bodies) do body
-        if body isa FlexibleBody
-            (;cache) = body.state
-            (;e,funcs) = cache
-            (;ancs) = funcs
-            ∂Q∂e = ANCF.make_∂Q∂e(ancs)(e)
-            mfree = bodyid2sys_free_coords[body.prop.id]
-            free_idx = body.state.cache.free_idx
-            ∂Q̌∂q̌[mfree,mfree] .-= ∂Q∂e[free_idx,free_idx]
-        end
-    end
-
-    return ∂Q̌∂q̌
-end
-
 # Out-of-place ∂Q̌∂q̌̇ (dispatch)
-function build_∂Q̌∂q̌̇(st)
-    build_∂Q̌∂q̌̇(st, st.connectivity.tensioned)
+function build_tangent_damping_matrix(st)
+    build_tangent_damping_matrix(st, st.connectivity.tensioned)
 end
 
 # Out-of-place ∂Q̌∂q̌̇ for cables and clustered cables
-function build_∂Q̌∂q̌̇(st, @eponymargs(connected, clustered))
-    ∂Q̌∂q̌̇1 = build_∂Q̌∂q̌̇(st, @eponymtuple(connected))
-    ∂Q̌∂q̌̇2 = build_∂Q̌∂q̌̇(st, @eponymtuple(clustered))
+function build_tangent_damping_matrix(st, @eponymargs(connected, clustered))
+    ∂Q̌∂q̌̇1 = build_tangent_damping_matrix(st, @eponymtuple(connected))
+    ∂Q̌∂q̌̇2 = build_tangent_damping_matrix(st, @eponymtuple(clustered))
     return ∂Q̌∂q̌̇1 + ∂Q̌∂q̌̇2
 end
 
 # Out-of-place ∂Q̌∂q̌̇ for cables
-function build_∂Q̌∂q̌̇(st, @eponymargs(connected, ))
+function build_tangent_damping_matrix(st, @eponymargs(connected, ))
     (;cables) = st.tensiles
     (;indexed) = st.connectivity
     (;num_of_full_coords,num_of_free_coords,sys_free_idx,bodyid2sys_free_coords,bodyid2sys_full_coords) = indexed
@@ -553,8 +487,8 @@ function build_∂Q̌∂q̌̇(st, @eponymargs(connected, ))
     foreach(connected) do cc
         cable = cables[cc.id]
         (;hen,egg) = cc
-        rb1 = hen.rbsig
-        rb2 = egg.rbsig
+        rb1 = hen.bodysig
+        rb2 = egg.bodysig
         C1 = rb1.state.cache.Cps[hen.pid]
         C2 = rb2.state.cache.Cps[egg.pid]
         free_idx1 = rb1.state.cache.free_idx
@@ -583,7 +517,7 @@ function build_∂Q̌∂q̌̇(st, @eponymargs(connected, ))
 end
 
 # Out-of-place ∂Q̌∂q̌̇ for clustered cables
-function build_∂Q̌∂q̌̇(st, @eponymargs(clustered, ))
+function build_tangent_damping_matrix(st, @eponymargs(clustered, ))
     (;clustercables) = st.tensiles
     (;indexed) = st.connectivity
     (;num_of_full_coords,num_of_free_coords,sys_free_idx,bodyid2sys_free_coords,bodyid2sys_full_coords) = indexed
@@ -599,8 +533,8 @@ function build_∂Q̌∂q̌̇(st, @eponymargs(clustered, ))
         foreach(clustercable) do cc
             cable = clustercables[i].segs[cc.id]
             (;hen,egg) = cc
-            rb1 = hen.rbsig
-            rb2 = egg.rbsig
+            rb1 = hen.bodysig
+            rb2 = egg.bodysig
             C1 = rb1.state.cache.Cps[hen.pid]
             C2 = rb2.state.cache.Cps[egg.pid]
             free_idx1 = rb1.state.cache.free_idx
@@ -625,8 +559,117 @@ function build_∂Q̌∂q̌̇(st, @eponymargs(clustered, ))
     return ∂Q̌∂q̌̇
 end
 
+# In-place ∂Q̌∂q̌ for cables and flexible bodies
+function build_tangent_stiffness_matrix!(∂Q̌∂q̌,st)
+    (;bodies,connectivity) = st
+    (;tensioned,indexed,jointed) = connectivity
+    (;cables,spring_dampers) = st.tensiles
+    (;connected) = tensioned
+    (;num_of_free_coords,bodyid2sys_free_coords,bodyid2sys_full_coords) = indexed
+    T = get_numbertype(st)
+    num_of_dim = get_num_of_dims(st)
+    # ∂Q̌∂q̌ = zeros(T,num_of_free_coords,num_of_free_coords)
+    D = @MMatrix zeros(T,num_of_dim,num_of_dim)
+    Im = Symmetric(SMatrix{num_of_dim,num_of_dim}(one(T)*I))
+    J̌ = zeros(T,num_of_dim,num_of_free_coords)
+    q = get_coords(st)
+    foreach(connected) do cc
+        cable = cables[cc.id]
+        (;hen,egg) = cc
+        body_hen = hen.bodysig
+        body_egg = egg.bodysig
+        C_hen = body_hen.cache.Cps[hen.pid]
+        C_egg = body_egg.cache.Cps[egg.pid]
+        free_idx_hen = body_hen.coords.free_idx
+        free_idx_egg = body_egg.coords.free_idx
+        mfree_hen = bodyid2sys_free_coords[body_hen.prop.id]
+        mfree_egg = bodyid2sys_free_coords[body_egg.prop.id]
+        (;k,c,state,slack) = cable
+        (;direction,tension,length,lengthdot) = state
+        if slack && (tension==0)
+            ∂Q̌∂q̌ .-= 0
+        else
+            D .= direction*transpose(direction)
+            density = tension/length
+            β = c*lengthdot/length + density
+            D .*= k-β
+            D .+= β.*Im
+            J̌ .= 0
+            J̌[:,mfree_egg] .+= C_egg[:,free_idx_egg]
+            J̌[:,mfree_hen] .-= C_hen[:,free_idx_hen]
+            ∂Q̌∂q̌ .-= transpose(J̌)*D*J̌
+        end
+        # ∂Q̌∂q̌_full[mfree_egg,mfree_egg] .+= transpose(C_egg)*D*C_egg
+        # ∂Q̌∂q̌_full[mfree_hen,mfree_egg] .-= transpose(C_hen)*D*C_egg
+        # ∂Q̌∂q̌_full[mfree_egg,mfree_hen] .-= transpose(C_egg)*D*C_hen
+        # ∂Q̌∂q̌_full[mfree_hen,mfree_hen] .+= transpose(C_hen)*D*C_hen
+    end
+
+    foreach(bodies) do body
+        if body isa FlexibleBody
+            (;cache) = body.state
+            (;e,funcs) = cache
+            (;ancs) = funcs
+            ∂Q∂e = ANCF.make_∂Q∂e(ancs)(e)
+            mfree = bodyid2sys_free_coords[body.prop.id]
+            free_idx = body.state.cache.free_idx
+            ∂Q̌∂q̌[mfree,mfree] .-= ∂Q∂e[free_idx,free_idx]
+        end
+    end
+
+    foreach(jointed.joints) do joint
+        if joint isa PrototypeJoint
+            (;
+                num_of_cstr,
+                free_idx,
+                sys_free_idx,
+                hen2egg,
+                cache,
+                mask_1st,mask_2nd,mask_3rd,mask_4th
+            ) = joint
+            (;
+                relative_core
+            ) = cache
+            spring_damper = spring_dampers[joint.id]
+            (;mask) = spring_damper
+            (;hen,egg) = hen2egg
+            nmcs_hen = hen.bodysig.coords.nmcs
+            nmcs_egg = egg.bodysig.coords.nmcs
+            num_of_coords_hen = get_num_of_coords(nmcs_hen)
+            num_of_coords_egg = get_num_of_coords(nmcs_egg)
+            id_hen = hen.bodysig.prop.id
+            id_egg = egg.bodysig.prop.id
+            q_hen = @view q[bodyid2sys_full_coords[id_hen]]
+            q_egg = @view q[bodyid2sys_full_coords[id_egg]]
+            q_jointed = vcat(
+                q_hen,
+                q_egg
+            )
+            jointed2angles = make_jointed2angles(hen2egg,relative_core)
+            nq = length(q_jointed)
+            angles_jacobian = ForwardDiff.jacobian(jointed2angles,q_jointed)
+            angles_hessians = ForwardDiff.jacobian(x -> ForwardDiff.jacobian(jointed2angles, x), q_jointed)
+            # angles_hessians = FiniteDiff.finite_difference_jacobian(x -> ForwardDiff.jacobian(jointed2angles, x), q_jointed)
+            reshaped_angles_hessians = reshape(angles_hessians,3,nq,nq)
+            # @show sys_free_idx, free_idx
+            for i in mask
+                torque = spring_damper.state.torques[i]
+                angle = spring_damper.state.angles[i]
+                k = spring_damper.k
+                @show angle, torque
+                generalized_force_jacobian = torque.*reshaped_angles_hessians[i,:,:] .+ k.*angles_jacobian[i,:]*angles_jacobian[[i],:]
+                # @show generalized_force_jacobian
+                # ∂Q̌∂q̌[sys_free_idx,sys_free_idx] .-= generalized_force_jacobian[free_idx,free_idx]
+            end
+        end
+    end
+
+    return ∂Q̌∂q̌
+end
+
+
 # In-place ∂Q̌∂q̌̇ for cables
-function build_∂Q̌∂q̌̇!(∂Q̌∂q̌̇,st)
+function build_tangent_damping_matrix!(∂Q̌∂q̌̇,st)
     (;tensioned,indexed) = st.connectivity
     (;connected) = tensioned
     (;cables) = st.tensiles
@@ -640,14 +683,14 @@ function build_∂Q̌∂q̌̇!(∂Q̌∂q̌̇,st)
     foreach(connected) do cc
         cable = cables[cc.id]
         (;hen,egg) = cc
-        rb1 = hen.rbsig
-        rb2 = egg.rbsig
-        C1 = rb1.cache.Cps[hen.pid]
-        C2 = rb2.cache.Cps[egg.pid]
-        free_idx1 = rb1.coords.free_idx
-        free_idx2 = rb2.coords.free_idx
-        mfree1 = bodyid2sys_free_coords[rb1.prop.id]
-        mfree2 = bodyid2sys_free_coords[rb2.prop.id]
+        body_hen = hen.bodysig
+        body_egg = egg.bodysig
+        C_hen = body_hen.cache.Cps[hen.pid]
+        C_egg = body_egg.cache.Cps[egg.pid]
+        free_idx_hen = body_hen.coords.free_idx
+        free_idx_egg = body_egg.coords.free_idx
+        mfree_hen = bodyid2sys_free_coords[body_hen.prop.id]
+        mfree_egg = bodyid2sys_free_coords[body_egg.prop.id]
         (;k,c,state,slack) = cable
         (;direction,tension) = state
         if slack && (tension == 0)
@@ -656,15 +699,15 @@ function build_∂Q̌∂q̌̇!(∂Q̌∂q̌̇,st)
             D .= direction*transpose(direction)
             D .*= c
             J̌ .= 0
-            J̌[:,mfree2] .+= C2[:,free_idx2]
-            J̌[:,mfree1] .-= C1[:,free_idx1]
+            J̌[:,mfree_egg] .+= C_egg[:,free_idx_egg]
+            J̌[:,mfree_hen] .-= C_hen[:,free_idx_hen]
 
             ∂Q̌∂q̌̇ .-= transpose(J̌)*D*J̌
         end
-        # ∂Q̌∂q̌_full[mfree2,mfree2] .+= transpose(C2)*D*C2
-        # ∂Q̌∂q̌_full[mfree1,mfree2] .-= transpose(C1)*D*C2
-        # ∂Q̌∂q̌_full[mfree2,mfree1] .-= transpose(C2)*D*C1
-        # ∂Q̌∂q̌_full[mfree1,mfree1] .+= transpose(C1)*D*C1
+        # ∂Q̌∂q̌_full[mfree_egg,mfree_egg] .+= transpose(C_egg)*D*C_egg
+        # ∂Q̌∂q̌_full[mfree_hen,mfree_egg] .-= transpose(C_hen)*D*C_egg
+        # ∂Q̌∂q̌_full[mfree_egg,mfree_hen] .-= transpose(C_egg)*D*C_hen
+        # ∂Q̌∂q̌_full[mfree_hen,mfree_hen] .+= transpose(C_hen)*D*C_hen
     end
 end
 
@@ -706,8 +749,8 @@ function build_∂Q̌∂s̄(st)
             j += 1
             cable = clustercables[i].segs[cc.id]
             (;hen,egg) = cc
-            rb1 = hen.rbsig
-            rb2 = egg.rbsig
+            rb1 = hen.bodysig
+            rb2 = egg.bodysig
             C1 = rb1.state.cache.Cps[hen.pid]
             C2 = rb2.state.cache.Cps[egg.pid]
             free_idx1 = rb1.state.cache.free_idx
@@ -732,11 +775,16 @@ function build_∂Q̌∂s̄(st)
     return ∂Q̌∂s̄'
 end
 
+function build_Ǩ(st)
+    _,λ = check_static_equilibrium_output_multipliers(st)
+    build_Ǩ(st,λ)
+end
+
 function build_Ǩ(st,λ)
     (;num_of_free_coords) = st.connectivity.indexed
     T = get_numbertype(st)
     # Ǩ = zeros(T,num_of_free_coords,num_of_free_coords)
-    Ǩ = -build_∂Q̌∂q̌(st) .- cstr_forces_jacobian(st,λ)
+    Ǩ = -build_tangent_stiffness_matrix(st) .- cstr_forces_jacobian(st,λ)
     # Ǩ .= Ǩ
     Ǩ
 end
@@ -781,28 +829,6 @@ function undamped_eigen(st;gravity=false)
     # K̂[nq+1:nx,1:nq] .= c.*Ǎ
     #
     # eigen(K̂,M̂)
-end
-
-function undamped_eigen!(bot::Robot;gravity=false,scaling=0.01)
-    (;st,traj) = bot
-    q̌ = get_free_coords(st)
-    ω²,δq̌ = undamped_eigen(st;gravity)
-    neg_idx = findall(ω².<=0)
-    if !isempty(neg_idx)
-        @warn "Negative ω² occurs, idx $neg_idx, zeroing."
-        ω²[neg_idx] .= 0
-    end
-    ω = sqrt.(ω²)
-    resize!(traj,1)
-    nω = length(ω)
-    for i = 1:nω
-        push!(traj,deepcopy(traj[end]))
-        traj.t[end] = ω[i]
-        δq̌i = δq̌[i]
-        ratio = norm(δq̌i)/norm(q̌)
-        traj.q̌[end] .= q̌ .+ scaling.*δq̌i/ratio
-    end
-    bot
 end
 
 function old_undamped_eigen(st)
@@ -853,7 +879,6 @@ function undamped_modal_solve!(st,q0,q̇0,λ0,tf,dt)
 end
 
 """
-返回零空间。
 $(TYPEDSIGNATURES)
 """
 function find_nullspace(c)
@@ -882,68 +907,6 @@ function find_nullspace(c)
         deleteat!(P.u,ℓⁱ[end])
     end
     Array(P)
-end
-
-"""
-校核稳定性。
-$(TYPEDSIGNATURES)
-"""
-function check_stability(st::Structure;F̌=nothing,verbose=false)
-    static_equilibrium,λ = check_static_equilibrium_output_multipliers(st;F=F̌)
-    @assert static_equilibrium
-    check_stability(st,λ;verbose)
-end
-
-function check_stability(st::Structure,λ;verbose=false)
-    q = get_coords(st)
-    c = get_local_coords(st)
-    A = make_cstr_jacobian(st,q)
-    Ň(q̌,c) = nullspace(A(q̌))
-    check_stability(st,λ,Ň;verbose)
-end
-
-function check_stability(st::Structure,λ,Ň;verbose=false)
-    q̌ = get_free_coords(st)
-    c = get_local_coords(st)
-    Ǩ0 = build_Ǩ(st,λ)
-    Ň0 = Ň(q̌,c)
-    𝒦0 = transpose(Ň0)*Ǩ0*Ň0
-    eigen_result = eigen(𝒦0)
-    nn = count(x -> x < 0, eigen_result.values)
-    if nn > 1
-        @warn "Instability detected! Number of negative eigenvalues: $nn"
-        isstable = false
-    else
-        isstable = true
-    end
-    isstable, Ň0, eigen_result
-end
-
-function check_stability!(bot::Robot,Ň;
-        gravity=false,
-        scaling=0.01,
-        scalings=nothing
-    )
-    (;st,traj) = bot
-    static_equilibrium,λ = check_static_equilibrium_output_multipliers(st)
-    @assert static_equilibrium
-    q̌ = get_free_coords(st)
-    _, Ň0, er = check_stability(bot.structure,λ,Ň;verbose=true)
-    resize!(traj,1)
-    for i in 1:length(er.values)
-        push!(traj,deepcopy(traj[end]))
-        traj.t[end] = er.values[i]
-        δq̌i = Ň0*er.vectors[:,i]
-        # @show δq̌i, er.vectors[:,i]
-        if scalings isa Nothing
-            si = scaling
-        else
-            si = scalings[i]
-        end
-        ratio = norm(δq̌i) / norm(q̌) 
-        traj.q̌[end] .= q̌ .+ si.*δq̌i/ratio
-    end
-    bot
 end
 
 function make_nullspace(st::Structure,q0::AbstractVector)
@@ -980,188 +943,37 @@ function make_nullspace(st::Structure,q0::AbstractVector)
     end
 end
 
-function get_poly(bot_input;
-        Ň
-    )
-    bot = deepcopy(bot_input)
-    (;st) = bot
-    # (;num_of_dof,num_of_cstr,connectivity) = bot.structure
-    # (;cables) = st.tensiles
-    # (;num_of_full_coords,num_of_free_coords) = connectivity.indexed
-    # ncables = length(cables)
-    # nλ = num_of_cstr
-    gue = get_initial(st)
-    Φ = make_cstr_function(st,gue.q)
-    A = make_cstr_jacobian(st,gue.q)
-    Q̌ = make_Q̌(st,gue.q)
-    S = make_S(st,gue.q)
-    Ǩm_Ǩg = make_Ǩm_Ǩg(st,gue.q)
-
-    pv = get_polyvar(st)
-
-    pnq̌ = 1.0pv.q̌ .+ 0.0
-    pns = 1.0pv.s .+ 0.0
-    pnλ = 1.0pv.λ .+ 0.0
-    pnd = 1.0pv.d .+ 0.0
-    pnc = 1.0pv.c .+ 0.0
-    pnk = 1.0pv.k .+ 0.0
-    pnμ = 1.0pv.μ .+ 0.0
-    polyΦ = Φ(pnq̌,pnd,pnc)
-    polyA = A(pnq̌,pnc)
-    polyQ̌ = Q̌(pnq̌,pns,pnμ,pnk,pnc)
-    polyS = S(pnq̌,pns,pnc)
-    polyQ̌a = transpose(polyA)*pnλ
-    polyǨa = reduce(hcat,differentiate.(-polyQ̌a,Ref(pv.q̌))) |> transpose
-    polyǨm, polyǨg = Ǩm_Ǩg(pnq̌,pns,pnμ,pnk,pnc)
-    polyǨ = polyǨm .+ polyǨg .+ polyǨa
-    polyŇ = Ň(pnq̌,pnc)
-    poly𝒦 = transpose(polyŇ)*polyǨ*polyŇ
-
-    polyP = [
-        - polyQ̌ .- transpose(polyA)*pnλ ;
-        polyS;
-        polyΦ;
-        # poly𝒦*pnξ.-pnζ.*pnξ;
-        # transpose(pnξ)*pnξ-1;
-    ]
-
-    # Ǩ0 = RB.build_Ǩ(bot.structure,gue.λ)
-    # Ǩx = map(polyǨ) do z
-    # 		z(
-    # 			pv.q̌=>gue.q̌,
-    # 			pv.s=>gue.s,
-    # 			pv.λ=>gue.λ,
-    # 			pv.μ=>gue.μ,
-    # 			pv.k=>gue.k,
-    # 			pv.d=>gue.d,
-    # 			pv.c=>gue.c
-    # 		)
-    # 	end
-    # # @show Ǩ0
-    # @show Ǩ0.- Ǩx |> norm
-
-    # P0 = map(polyP) do z
-    # 	z(
-    # 		pvq̌=>q̌0,
-    # 		pvs=>s0,
-    # 		pvλ=>λ0,
-    # 		# pvξ=>ξ0,
-    # 		pvμ=>μ0,
-    # 		pvk=>k0,
-    # 	    pvd=>d0,
-    # 		pvc=>c0,
-    # 		# pv.ζ=>ζ0
-    # 	)
-    # end
-    # @show P0[                 1:num_of_free_coords] |> norm
-    # @show P0[           num_of_free_coords+1:num_of_free_coords+ncables] |> norm
-    # @show P0[   num_of_free_coords+ncables+1:num_of_free_coords+ncables+nλ] |> norm
-    # @show P0[num_of_free_coords+ncables+nλ+1:num_of_free_coords+ncables+nλ+num_of_dof]
-    # @show P0[end]
-    polyP,poly𝒦,gue,pv
+"""
+$(TYPEDSIGNATURES)
+"""
+function check_stability(st::Structure;F̌=nothing,verbose=false)
+    static_equilibrium,λ = check_static_equilibrium_output_multipliers(st;F=F̌)
+    @assert static_equilibrium
+    check_stability(st,λ;verbose)
 end
 
-function pinpoint(bot_input;
-        Ň
-    )
-	polyP, poly𝒦, gue, pv = get_poly(bot_input;Ň)
-	ň = length(pv.q̌)
-	ns = length(pv.s)
-	nλ = length(pv.λ)
-    function make_bf()
-        function inner_pp!(f,x)
-            q̌x = @view x[        1:ň]
-            sx = @view x[      ň+1:ň+ns]
-            λx = @view x[   ň+ns+1:ň+ns+nλ]
-			Px = map(polyP) do z
-                z(
-                    pv.q̌=>q̌x,
-                    pv.s=>sx,
-                    pv.λ=>λx,
-                    pv.μ=>gue.μ,
-                    pv.k=>gue.k,
-                    pv.d=>gue.d,
-                    pv.c=>gue.c,
-                )
-			end
+function check_stability(st::Structure,λ;verbose=false)
+    q = get_coords(st)
+    c = get_local_coords(st)
+    A = make_cstr_jacobian(st,q)
+    Ň(q̌,c) = nullspace(A(q̌))
+    check_stability(st,λ,Ň;verbose)
+end
 
-			f .= Px
-        end
+function check_stability(st::Structure,λ,Ň;verbose=false)
+    q̌ = get_free_coords(st)
+    c = get_local_coords(st)
+    Ǩ0 = build_Ǩ(st,λ)
+    Ň0 = Ň(q̌,c)
+    𝒦0 = transpose(Ň0)*Ǩ0*Ň0
+    eigen_result = eigen(𝒦0)
+    nn = count(x -> x < 0, eigen_result.values)
+    if nn > 1
+        @warn "Instability detected! Number of negative eigenvalues: $nn"
+        isstable = false
+    else
+        isstable = true
     end
-    f_holder = zeros(ň+ns+nλ)
-    x_initial = vcat(gue.q̌,gue.s,gue.λ)
-    pp! = make_bf()
-
-    pp = nlsolve(pp!,x_initial,ftol=1e-10,iterations=100,method=:newton)
-    # @show
-    pp!(f_holder,pp.zero)
-	# @show f_holder |> norm
-    # @show f_holder[                 1:ň+ns+nλ] |> norm
-    # @show f_holder[ň+ns+nλ+1:ň+ns+nλ+num_of_dof] |> norm
-    # @show f_holder[end]
-    # @show  pp.zero[ň+ns+nλ+1:ň+ns+nλ+num_of_dof]
-    # @show  pp.zero[end]
-    q̌ = pp.zero[        1:ň]
-    s = pp.zero[      ň+1:ň+ns]
-    λ = pp.zero[   ň+ns+1:ň+ns+nλ]
-    ini = @eponymtuple(
-			q̌,s,λ,
-			isconverged=converged(pp),
-			d=gue.d, c=gue.c, μ=gue.μ, k=gue.k
-	)
-	polyP, poly𝒦, ini, pv
+    isstable, Ň0, eigen_result
 end
-
-function path_follow(bot_input;Ň)
-	polyP, poly𝒦, ini, pv = pinpoint(bot_input;Ň)
-	variable_groups = [pv.q̌,pv.s,pv.λ]
-	parameters = [pv.d;pv.c;pv.k;pv.μ]
-	startsols = [[ini.q̌;ini.s;ini.λ]]
-	start_parameters = [ini.d;ini.c;ini.k;ini.μ]
-	target_parameters = [ini.d;ini.c;ini.k;ini.μ.+1.0]
-	Psys = System(polyP;parameters)
-	result = HomotopyContinuation.solve(
-			Psys,
-			startsols;
-			start_parameters,
-			target_parameters,
-			threading = false
-	)
-	path_results = results(result)
-	if length(path_results) != 1
-		@show failed(result)
-		error("Tracking failed.")
-	end
-	path_result1 = path_results[1]
-	sol = real(solution(path_result1))
-	q̌,s,λ = split_by_lengths(sol,length.(variable_groups))
-	@eponymtuple(q̌,s,λ)
-end
-
-function path_follow_critical(bot_input)
-	polyP, ini, pv = pinpoint_critical(bot_input)
-	variable_groups = [pv.q̌,pv.s,pv.λ,pv.ξ,[pv.ζ]]
-	parameters = [pv.d;pv.c;pv.k;pv.μ]
-	startsols = [[ini.q̌;ini.s;ini.λ;ini.ξ;ini.ζ]]
-	start_parameters = [ini.d;ini.c;ini.k;ini.μ]
-	target_parameters = [ini.d;ini.c;ini.k;ini.μ.+1.0]
-	Psys = System(polyP;parameters)
-	result = HomotopyContinuation.solve(
-			Psys,
-			startsols;
-			start_parameters,
-			target_parameters,
-			threading = false
-	)
-	path_results = results(result)
-	if length(path_results) != 1
-		@show failed(result)
-		error("Tracking failed.")
-	end
-	path_result1 = path_results[1]
-	sol = real(solution(path_result1))
-	q̌,s,λ,ξ,ζ = RB.split_by_lengths(sol,length.(variable_groups))
-	@eponymtuple(q̌,s,λ,ξ,ζ)
-end
-
 

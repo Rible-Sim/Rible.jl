@@ -162,6 +162,7 @@ function solve!(sim::Simulator,solver_cache::Zhong06_CCP_Constant_Mass_Cache;
                 ftol=1e-14,xtol=ftol,
                 verbose=false,verbose_contact=false,
                 maxiters=50,
+                max_restart=3,
                 progress=true,exception=true)
     (;prob,controller,tspan,restart,totalstep) = sim
     (;bot,env) = prob
@@ -235,7 +236,7 @@ function solve!(sim::Simulator,solver_cache::Zhong06_CCP_Constant_Mass_Cache;
         )
         restart_count = 0
         Λ_guess = 1.0
-        while restart_count < 10
+        while restart_count < max_restart
             Λₖ .= repeat([Λ_guess,0,0],na)
             x[      1:nq]          .= qₖ
             x[   nq+1:nq+nλ]       .= 0.0
@@ -329,7 +330,7 @@ function solve!(sim::Simulator,solver_cache::Zhong06_CCP_Constant_Mass_Cache;
         end
 
         if !isconverged
-            @warn "Newton max iterations $maxiters, at timestep=$timestep, normRes=$(normRes), restart_count=$(restart_count)"
+            @warn "Newton max iterations $maxiters, at timestep=$timestep, normRes=$(normRes), restart_count=$(restart_count), num_active_contacts=$(na)"
             if exception
                 @error "Not converged!"
                 break

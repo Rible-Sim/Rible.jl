@@ -91,7 +91,7 @@ function MakieCore.plot!(viz::Viz{Tuple{S}};
 end
 
 function MakieCore.plot!(viz::Viz{Tuple{Vector{S}}};
-    ) where S <: Cable
+    ) where S <: DistanceSpringDamper
     cables_ob = viz[:structure]
     point_mid_ob = lift(cables_ob) do cables_ob
         [
@@ -327,8 +327,8 @@ function get_linesegs_cables(structure;slackonly=false,noslackonly=false)
     linesegs_cables = Vector{Tuple{Point{ndim,T},Point{ndim,T}}}()
     foreach(connected) do scnt
         scable = cables[scnt.id]
-        ret = (Point(scnt.hen.rbsig.state.loci_states[scnt.hen.pid].position),
-                Point(scnt.egg.rbsig.state.loci_states[scnt.egg.pid].position))
+        ret = (Point(scnt.hen.bodysig.state.loci_states[scnt.hen.pid].position),
+                Point(scnt.egg.bodysig.state.loci_states[scnt.egg.pid].position))
         slacking = scable.state.tension <= 0
         if (slackonly && slacking) ||
            (noslackonly && !slacking) ||

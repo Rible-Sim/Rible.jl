@@ -224,7 +224,7 @@ function get_cables_len!(st::Structure,q)
 end
 
 """
-Return System Cable 刚度。
+Return System DistanceSpringDamper 刚度。
 $(TYPEDSIGNATURES)
 """
 function get_cables_stiffness(st::Structure)
@@ -232,7 +232,7 @@ function get_cables_stiffness(st::Structure)
 end
 
 """
-Return System Cable 当前Length.
+Return System DistanceSpringDamper 当前Length.
 $(TYPEDSIGNATURES)
 """
 function get_cables_len(st::Structure)
@@ -244,7 +244,7 @@ function get_cables_len_dot(st::Structure)
 end
 
 """
-Return System Cable 变形量。
+Return System DistanceSpringDamper 变形量。
 $(TYPEDSIGNATURES)
 """
 function get_cables_deform(st::Structure)
@@ -252,7 +252,7 @@ function get_cables_deform(st::Structure)
 end
 
 """
-Return System Cable Restlength。
+Return System DistanceSpringDamper Restlength。
 $(TYPEDSIGNATURES)
 """
 function get_cables_restlen(st::Structure)
@@ -260,7 +260,7 @@ function get_cables_restlen(st::Structure)
 end
 
 """
-Return System Cable Tension.
+Return System DistanceSpringDamper Tension.
 $(TYPEDSIGNATURES)
 """
 function get_cables_tension(st::Structure)
@@ -279,7 +279,7 @@ end
 
 
 """
-Return System Cable 力密度。
+Return System DistanceSpringDamper 力密度。
 $(TYPEDSIGNATURES)
 """
 function get_cables_force_density(st::Structure)
@@ -287,7 +287,7 @@ function get_cables_force_density(st::Structure)
 end
 
 """
-Return System Cable Initial Length.
+Return System DistanceSpringDamper Initial Length.
 $(TYPEDSIGNATURES)
 """
 function get_original_restlen(botinput::Robot)

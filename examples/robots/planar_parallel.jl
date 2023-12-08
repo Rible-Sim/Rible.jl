@@ -97,7 +97,7 @@ function planar_parallel()
     original_restlens = zeros(ncables)
     ks = fill(100.0,ncables)
     cs = zeros(ncables)
-    ss = [RB.Cable3D(i, original_restlens[i],ks[i],cs[i];slack=false) for i = 1:ncables]
+    ss = [RB.DistanceSpringDamper3D(i, original_restlens[i],ks[i],cs[i];slack=false) for i = 1:ncables]
     tensiles = (cables=ss,)
 
     cm = [

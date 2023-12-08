@@ -65,7 +65,7 @@ ks = zeros(ncables)
 ks[  1: m] .= ks[m+1:2m] .= k
 
 cables = [
-    RB.Cable3D(i, original_restlens[i], ks[i], c;slack=true) for i = 1:ncables
+    RB.DistanceSpringDamper3D(i, original_restlens[i], ks[i], c;slack=true) for i = 1:ncables
 ]
 
 pretty_table(

@@ -105,7 +105,7 @@ matrix_sharing = reduce(vcat, matrix_sharing_raw)
 indexedcoords = RB.index(rigdibodies, matrix_sharing)
 nstrings = 4
 ks = 1.0; restlens = 0.5
-cables = [RB.Cable2D(i, restlens, ks, 0.0) for i in 1:nstrings]
+cables = [RB.DistanceSpringDamper2D(i, restlens, ks, 0.0) for i in 1:nstrings]
 tensiles = (cables=cables,)
 acs = []
 hub = (actuators=acs,)
@@ -129,7 +129,7 @@ plot_traj!(bot)
 #         RB.update_bodies!(st,q,q̇)
 #         RB.update_tensiles!(st)
 #         # RB.apply_gravity!(st)
-#         RB.assemble_force!(st)
+#         RB.assemble_forces!(st)
 #         RB.get_force!(F,st)
 #         ## F .= 0
 #     end

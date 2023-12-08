@@ -217,7 +217,7 @@ function BuildTail()
         restlens[i] = 25
         ks[i] = 0.3
     end
-    cables = [RB.Cable2D(i, restlens[i], ks[i], 0.0) for i in 1:nstrings]
+    cables = [RB.DistanceSpringDamper2D(i, restlens[i], ks[i], 0.0) for i in 1:nstrings]
     tensiles = (cables=cables,)
 
     matrix_cnt_raw = Vector{Matrix{Int}}()
@@ -486,14 +486,14 @@ function BuildTail(type; β=1.0, μ=0.02)
         restlens[i] = 25
         ks[i] = 0.3
     end
-    cables = [RB.Cable2D(i, restlens[i], ks[i], 0.0) for i in 1:nstrings]
+    cables = [RB.DistanceSpringDamper2D(i, restlens[i], ks[i], 0.0) for i in 1:nstrings]
     @match type begin
         1 => begin
             lens = [44.71, 50, 50]
             @show pre = [lens[i]*(1-β)*0.2 for i in 1:3]
-            c_section = StructArray([RB.CableSegment(i, lens[i], 0.2, prestress=pre[i]) for i in 1:3])
-            cs1 = RB.ClusterCables(1, 2, deepcopy(c_section); μ=μ)
-            cs2 = RB.ClusterCables(2, 2, deepcopy(c_section); μ=μ)
+            c_section = StructArray([RB.DistanceSpringDamperSegment(i, lens[i], 0.2, prestress=pre[i]) for i in 1:3])
+            cs1 = RB.ClusterDistanceSpringDampers(1, 2, deepcopy(c_section); μ=μ)
+            cs2 = RB.ClusterDistanceSpringDampers(2, 2, deepcopy(c_section); μ=μ)
             tensiles = (cables=cables, clustercables=[cs1, cs2])
             s = zeros(Int, 2, nb)
             s[1, 1] = 3; s[1, 2] = 2; s[1, 4] = 2; s[1, 6] = 2
@@ -503,9 +503,9 @@ function BuildTail(type; β=1.0, μ=0.02)
         2 => begin
             lens = vcat([44.71], [50 for _ in 1:7])
             pre = [lens[i]*(1-β)*0.2 for i in 1:8]
-            c_section = StructArray([RB.CableSegment(i, lens[i], 0.2, prestress=pre[i]) for i in 1:8])
-            cs1 = RB.ClusterCables(1, 7, deepcopy(c_section); μ=μ)
-            cs2 = RB.ClusterCables(2, 7, deepcopy(c_section); μ=μ)
+            c_section = StructArray([RB.DistanceSpringDamperSegment(i, lens[i], 0.2, prestress=pre[i]) for i in 1:8])
+            cs1 = RB.ClusterDistanceSpringDampers(1, 7, deepcopy(c_section); μ=μ)
+            cs2 = RB.ClusterDistanceSpringDampers(2, 7, deepcopy(c_section); μ=μ)
             tensiles = (cables=cables, clustercables=[cs1, cs2])
             s = zeros(Int, 2, nb)
             s[1, 1] = 3; s[2, 1] = 2
@@ -519,10 +519,10 @@ function BuildTail(type; β=1.0, μ=0.02)
             lens1 = [44.71, 50]; lens2 = [50.0, 50.0]
             pre1 = [lens1[i]*(1-β)*0.2 for i in 1:2]
             pre2 = [lens2[i]*(1-β)*0.2 for i in 1:2]
-            c_section1 = StructArray([RB.CableSegment(i, lens1[i], 0.2, prestress=pre1[i]) for i in 1:2])
-            c_section2 = StructArray([RB.CableSegment(i, lens2[i], 0.2, prestress=pre2[i]) for i in 1:2])
-            cs1 = [RB.ClusterCables(i, 1, deepcopy(c_section1); μ=μ) for i in 1:2]
-            cs2 = [RB.ClusterCables(i, 1, deepcopy(c_section2); μ=μ) for i in 3:8]
+            c_section1 = StructArray([RB.DistanceSpringDamperSegment(i, lens1[i], 0.2, prestress=pre1[i]) for i in 1:2])
+            c_section2 = StructArray([RB.DistanceSpringDamperSegment(i, lens2[i], 0.2, prestress=pre2[i]) for i in 1:2])
+            cs1 = [RB.ClusterDistanceSpringDampers(i, 1, deepcopy(c_section1); μ=μ) for i in 1:2]
+            cs2 = [RB.ClusterDistanceSpringDampers(i, 1, deepcopy(c_section2); μ=μ) for i in 3:8]
             tensiles = (cables=cables, clustercables=vcat(cs1, cs2))
             s = zeros(Int, 8, nb)
             s[1, 1] = 3; s[1, 2] = 2; s[1, 4] = 2;
@@ -539,10 +539,10 @@ function BuildTail(type; β=1.0, μ=0.02)
             lens1 = [44.71, 50, 50]; lens2 = [50.0, 50.0, 50.0]
             pre1 = [lens1[i]*(1-β)*0.2 for i in 1:3]
             pre2 = [lens2[i]*(1-β)*0.2 for i in 1:3]
-            c_section1 = StructArray([RB.CableSegment(i, lens1[i], 0.2, prestress=pre1[i]) for i in 1:3])
-            c_section2 = StructArray([RB.CableSegment(i, lens2[i], 0.2, prestress=pre2[i]) for i in 1:3])
-            cs1 = [RB.ClusterCables(i, 2, deepcopy(c_section1); μ=μ) for i in 1:2]
-            cs2 = [RB.ClusterCables(i, 2, deepcopy(c_section2); μ=μ) for i in 3:6]
+            c_section1 = StructArray([RB.DistanceSpringDamperSegment(i, lens1[i], 0.2, prestress=pre1[i]) for i in 1:3])
+            c_section2 = StructArray([RB.DistanceSpringDamperSegment(i, lens2[i], 0.2, prestress=pre2[i]) for i in 1:3])
+            cs1 = [RB.ClusterDistanceSpringDampers(i, 2, deepcopy(c_section1); μ=μ) for i in 1:2]
+            cs2 = [RB.ClusterDistanceSpringDampers(i, 2, deepcopy(c_section2); μ=μ) for i in 3:6]
             tensiles = (cables=cables, clustercables=vcat(cs1, cs2))
             s = zeros(Int, 6, nb)
             s[1, 1] = 3; s[1, 2] = 2; s[1, 4] = 2; s[1, 6] = 2

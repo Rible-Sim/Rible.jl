@@ -55,7 +55,7 @@ To do this, use `include`, docs/test/benchmark; use `includet` dev;
           - [x] where to put `pres_idx`, `free_idx`, `cstr_idx`? To `NonminimalCoordinates` for now
           - [x] how to cache hessians? to get both `∂Aq̇∂q` and `cstr_forces_jacobian`
         - [ ] quaternion-based
-          - [x] differentiate position cache and velocity cache (acc cache not need for now) to_velocity_transformation is always at velocity level
+          - [x] differentiate position cache and velocity cache (acc cache not needed for now) to_transformation is always at velocity level
           - [ ] similarly `∂M⁻¹p∂q` and `∂Mq̇∂q`
           - [ ] merge mass matrices cache and `∂T∂qᵀ`
           - [ ] use `∂T∂xᵀ∂x` and  `∂T∂xᵀ∂ẋ`
@@ -64,6 +64,7 @@ To do this, use `include`, docs/test/benchmark; use `includet` dev;
             - [ ] `Zhong06` familiy all depend on position coordinates
       - [ ] flexible bodies
         - [ ] absolute nodal coords
+- [ ] remove `free_idx`/`pres_idx` and `cstr_idx` in coordinates formulations
   - [x] integrator cache, used for all timesteps
     - [x] timestep cache, contacts related, because the num of contacts no known in advance,
       - [x] use solver / contact model / for dispatch
@@ -73,6 +74,7 @@ To do this, use `include`, docs/test/benchmark; use `includet` dev;
     - [x] resitution: Inelastic, Newton, Poisson, Strange
     - [x] variants: Unclassified/Classified CCP, Mono/Two-layer,
     - [ ] Moreau-$\theta$ scheme
+      - [x] constant mass
 - [x] reduce functions fields
 - [x] preallocations for autodiff: `QCF`  cstr_forces_jacobian
 - [ ] joint cstr
@@ -81,6 +83,10 @@ To do this, use `include`, docs/test/benchmark; use `includet` dev;
   - [x] reorder basic joint numbering
   - [x] reorder normal, tangent, bitangent
   - [x] `QCF` joints constraints hessians -> cstr_forces_jacobian
+- [ ] unify cable (translational) with rotational force as spring/damper forces
+  - [ ] make use of the shared definitions between joints and spring/damper forces
+  - [ ] allow spring-damper to be defined without extrinsic joints
+  - [ ] provide high-level interfaces for joint-spring-damper
 - [x] put contacts into loci
 - [ ] local distribution law
 - [ ] try SNAKE/RATTLE scheme

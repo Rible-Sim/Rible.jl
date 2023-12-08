@@ -111,7 +111,7 @@ indexedcoords = RB.index(rbs,sharing)
 # ness = 10
 # ks = vcat(fill(k,naux),fill(k,ness))
 # cs = fill(c,ncables)
-# cables = [RB.Cable2D(i,restlens[i],ks[i],cs[i];slack) for i = 1:ncables]
+# cables = [RB.DistanceSpringDamper2D(i,restlens[i],ks[i],cs[i];slack) for i = 1:ncables]
 # acs = [RB.ManualActuator(1,collect(1:ncables),restlens[1:ncables])]
 # tensiles = (cables = cables,)
 # hub = (actuators = acs,)
@@ -137,9 +137,9 @@ connected = RB.connect(rbs,cnt_matrix)
 ncables = size(cnt_matrix,1)
 hncables = ncables
 if k isa Nothing
-    cables = [RB.Cable2D(i,0.0,1000.0,0.0;slack=false) for i = 1:ncables]
+    cables = [RB.DistanceSpringDamper2D(i,0.0,1000.0,0.0;slack=false) for i = 1:ncables]
 else
-    cables = [RB.Cable2D(i,0.0,k[i],0.0;slack=false) for i = 1:ncables]
+    cables = [RB.DistanceSpringDamper2D(i,0.0,k[i],0.0;slack=false) for i = 1:ncables]
 end
 acs = [
     RB.ManualActuator(i,[i],zeros(1))

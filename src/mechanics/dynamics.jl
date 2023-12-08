@@ -54,7 +54,7 @@ function generalized_force!(F,bot,q,q̇,t;actuate=false,gravity=true,(user_defin
     if gravity
         apply_gravity!(structure)
     end
-    F .= assemble_force!(structure)
+    F .= assemble_forces!(structure)
     user_defined_force!(F,t)
 end
 
@@ -65,8 +65,8 @@ function generalized_force_jacobain!(∂F∂q̌,∂F∂q̌̇,bot,q,q̇,t)
     clear_forces!(structure)
     lazy_update_bodies!(structure,q,q̇)
     update_tensiles!(structure)
-    build_∂Q̌∂q̌!(∂F∂q̌,structure)
-    build_∂Q̌∂q̌̇!(∂F∂q̌̇,structure)
+    build_tangent_stiffness_matrix!(∂F∂q̌,structure)
+    build_tangent_damping_matrix!(∂F∂q̌̇,structure)
 end
 
 struct ContactCache{cacheType}

@@ -155,7 +155,7 @@ function nbridge(n,m=2;θ=missing,r=missing,c=0.0,h=1.0,o2=[0,4.0,0],right=false
 	ks = fill(2000.0,ncables)
 	ks[stale_cable_idx] .= 3000.0
     cs = fill(c,ncables)
-    cables = [RB.Cable3D(i,restlens[i],ks[i],cs[i];slack=true) for i = 1:ncables]
+    cables = [RB.DistanceSpringDamper3D(i,restlens[i],ks[i],cs[i];slack=true) for i = 1:ncables]
     tensiles = (cables = cables,)
 	cnt_rows = [
 		begin
@@ -355,7 +355,7 @@ function nrailbridge(n,m=2;θ=missing,r=missing,c=0.0,h=1.0,o2=[0,4.0,0],right=f
 	ks = fill(2000.0,ncables)
 	ks[stale_cable_idx] .= 3000.0
     cs = fill(c,ncables)
-    cables = [RB.Cable3D(i,restlens[i],ks[i],cs[i];slack=true) for i = 1:ncables]
+    cables = [RB.DistanceSpringDamper3D(i,restlens[i],ks[i],cs[i];slack=true) for i = 1:ncables]
     tensiles = (cables = cables,)
 	# 绳索连接
 	cnt_rows = [

@@ -86,9 +86,9 @@ function lander(;k=nothing)
     ncables = size(cnt_matrix,1)
     hncables = ncables
     if k isa Nothing
-        cables = [RB.Cable3D(i,0.0,100.0,0.0;slack=false) for i = 1:ncables]
+        cables = [RB.DistanceSpringDamper3D(i,0.0,100.0,0.0;slack=false) for i = 1:ncables]
     else
-        cables = [RB.Cable3D(i,0.0,k[i],0.0;slack=false) for i = 1:ncables]
+        cables = [RB.DistanceSpringDamper3D(i,0.0,k[i],0.0;slack=false) for i = 1:ncables]
     end
     acs = [
         RB.ManualActuator(i,[i],zeros(1))
