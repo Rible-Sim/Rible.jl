@@ -1,5 +1,5 @@
 
-struct Zhong06_CCP_Constant_Mass_Cache{CacheType}
+struct Zhong06_CCP_Constant_Mass_Mono_Cache{CacheType}
     cache::CacheType
 end
 
@@ -11,7 +11,7 @@ function generate_cache(
         }},
         solver::DynamicsSolver{
             Zhong06,
-            <:InnerLayerContactSolver
+            <:MonolithicContactSolver
         },
         ::Val{true};
         dt,kargs...
@@ -53,11 +53,11 @@ function generate_cache(
         es_sys,
         gaps_sys
     )
-    Zhong06_CCP_Constant_Mass_Cache(cache)
+    Zhong06_CCP_Constant_Mass_Mono_Cache(cache)
 end
 
 function make_step_k(
-        solver_cache::Zhong06_CCP_Constant_Mass_Cache,
+        solver_cache::Zhong06_CCP_Constant_Mass_Mono_Cache,
         nq,nλ,na,
         qₖ₋₁,vₖ₋₁,pₖ₋₁,tₖ₋₁,
         pₖ,vₖ,
@@ -72,8 +72,8 @@ function make_step_k(
     function ns_stepk!(
             𝐫𝐞𝐬,𝐉,
             Fₘ,∂F∂q,∂F∂q̇,
-            𝐁,𝐛,𝐜ᵀ,𝐍,𝐫,
-            x,Λₖ,
+            𝐰,x,Λₖ,y,∂y∂x,
+            Λ_split,y_split,
             structure,
             contact_cache,
             timestep,iteration
@@ -102,8 +102,6 @@ function make_step_k(
 
         𝐉[n1+1:n2,   1:n1] .=  -mass_norm.*Aₖ
 
-        lu𝐉 = lu(𝐉)
-
         if na != 0
             (;
                 H,
@@ -112,9 +110,7 @@ function make_step_k(
             ) = contact_cache.cache
             Dₘ = contact_cache.cache.Dper
             Dₖ = contact_cache.cache.Dimp
-            𝐁 .= 0
-            𝐁[   1:n1,1:nΛ] .= h.*mass_norm.*transpose(D)*H
-            𝐫𝐞𝐬  .-= 𝐁*Λₖ 
+            𝐫𝐞𝐬[   1:n1]  .-= h.*mass_norm.*transpose(D)*H*Λₖ 
 
             pₖ .= Momentum_k(qₖ₋₁,pₖ₋₁,qₖ,λₘ,M,A,mass_norm,h)
             vₖ .= invM*pₖ        
@@ -124,7 +120,7 @@ function make_step_k(
             
             v́⁺ = Dₘ*vₘ .+ Dₖ*vₖ
             ∂v́⁺∂qₖ = Dₘ*∂vₘ∂qₖ .+ Dₖ*∂vₖ∂qₖ
-            𝐜ᵀ .= 0
+            ∂y∂x .= 0
             v́ₖ₋₁ = Dₖ*vₖ₋₁
             for i = 1:na
                 is = 3(i-1)
@@ -135,21 +131,26 @@ function make_step_k(
                 vₙⁱₖ₋₁ = vⁱₖ₋₁[1]
                 vₙⁱ   = vⁱ⁺[1]
                 v́ₜⁱ = vₜⁱ⁺ + restitution_coefficients[i]*min(vₙⁱₖ₋₁,0)
-                𝐛[is+1:is+3] .= [v́ₜⁱ,0,0]
+                𝐰[is+1:is+3] .= [v́ₜⁱ,0,0]
                 Dⁱₘ = @view Dₘ[is+1:is+3,:]
                 Dⁱₖ = @view Dₖ[is+1:is+3,:]
-                𝐜ᵀ[is+1     ,   1:n1] .= 1/(norm(v́⁺[is+2:is+3])+1e-14)*(v́⁺[is+2]*∂v́⁺∂qₖ[is+2,:] .+ v́⁺[is+3]*∂v́⁺∂qₖ[is+3,:])
-                𝐜ᵀ[is+1:is+3,   1:n1] .+= ∂v́⁺∂qₖ[is+1:is+3,:]
-                𝐜ᵀ[is+1:is+3,n1+1:n2] .= Dⁱₖ*∂vₖ∂λₘ
+                ∂y∂x[is+1     ,   1:n1] .= 1/(norm(v́⁺[is+2:is+3])+1e-14)*(v́⁺[is+2]*∂v́⁺∂qₖ[is+2,:] .+ v́⁺[is+3]*∂v́⁺∂qₖ[is+3,:])
+                ∂y∂x[is+1:is+3,   1:n1] .+= ∂v́⁺∂qₖ[is+1:is+3,:]
+                ∂y∂x[is+1:is+3,n1+1:n2] .= Dⁱₖ*∂vₖ∂λₘ
             end
-            if timestep == 659
-                @show v́⁺, 𝐛
+            𝐫𝐞𝐬[(n2   +1):(n2+ nΛ)] .= (h.*(v́⁺ .+ 𝐰) .- h.*y)
+            𝐫𝐞𝐬[n2+nΛ+1:n2+2nΛ]     .= reduce(vcat,Λ_split⊙y_split)
+            𝐉[      1:n1    , n2+   1:n2+ nΛ] .=  -mass_norm*h .*transpose(D)*H
+            𝐉[n2+1:n2+ nΛ,      1:n2    ]     .=  h.*∂y∂x
+            𝐉[n2+1:n2+ nΛ,    n2+nΛ+1:n2+2nΛ] .= -h.*I(nΛ)
+            𝐉[n2+nΛ+1:n2+2nΛ, n2+   1:n2+ nΛ] .=  BlockDiagonal(mat.(y_split))
+            𝐉[n2+nΛ+1:n2+2nΛ, n2+nΛ+1:n2+2nΛ] .=  BlockDiagonal(mat.(Λ_split))
+            if timestep == 289
+                @show y_split[1], Λ_split[1]
+                @show v́⁺, 𝐰, y
+                @show qr(𝐉).R |> diag
             end
-            # 𝐜ᵀinv𝐉 = 𝐜ᵀ*inv(𝐉)
-            𝐍 .= 𝐜ᵀ*(lu𝐉\𝐁)
-            𝐫 .= (v́⁺ + 𝐛) .-𝐜ᵀ*(lu𝐉\(𝐫𝐞𝐬 + 𝐁*Λₖ))
         end
-        lu𝐉
         # debug
         # @show norm(D*vₖ + 𝐛), norm(𝐫𝐞𝐬)
         # @show Λₖ, D*vₖ, 𝐛
@@ -159,7 +160,7 @@ function make_step_k(
     ns_stepk!
 end
 
-function solve!(sim::Simulator,solver_cache::Zhong06_CCP_Constant_Mass_Cache;
+function solve!(sim::Simulator,solver_cache::Zhong06_CCP_Constant_Mass_Mono_Cache;
                 dt,
                 ftol=1e-14,xtol=ftol,
                 verbose=false,verbose_contact=false,
@@ -220,14 +221,33 @@ function solve!(sim::Simulator,solver_cache::Zhong06_CCP_Constant_Mass_Cache;
         iteration_break = 0
         isconverged = false
         nΛ = 3na
-        Λₖ = zeros(T,nΛ)
-        Λʳₖ = copy(Λₖ)
-        ΔΛₖ = copy(Λₖ)
-        𝐁 = zeros(T,nx,nΛ)
-        𝐛 = zeros(T,nΛ)
-        𝐜ᵀ = zeros(T,nΛ,nx)
-        𝐍 = zeros(T,nΛ,nΛ)
-        𝐫 = zeros(T,nΛ)
+        n1 = nq
+        n2 = n1 + nλ
+        nx = n2 + 2nΛ
+        Δx = zeros(T,nx)
+        x = zero(Δx)
+        Res = zero(Δx)
+        Jac = zeros(T,nx,nx)
+        Λₖ = @view x[(n2+1):n2+nΛ]
+        y  = @view x[n2+nΛ+1:n2+2nΛ]
+        𝐰 = zeros(T,nΛ)
+        ∂y∂x = zeros(T,nΛ,n2)
+        J = Diagonal(SVector(one(T),-one(T),-one(T)))
+        𝐞_split = [SVector(one(T),zero(T),zero(T)) for i = 1:na]
+        Λ_split = split_by_lengths(Λₖ,3)
+        y_split = split_by_lengths(y,3)
+        Λp = zero(Λₖ)
+        yp = zero(y)
+        Δxp = zeros(T,nx)
+        ΔΛp = @view Δxp[(n2+1):n2+nΛ]
+        Δyp = @view Δxp[n2+nΛ+1:n2+2nΛ]
+        ΔΛp_split = split_by_lengths(ΔΛp,3)
+        Δyp_split = split_by_lengths(Δyp,3)
+        Δxc = zeros(T,nx)
+        ΔΛc = @view Δxc[(n2+1):n2+nΛ]
+        Δyc = @view Δxc[n2+nΛ+1:n2+2nΛ]
+        ΔΛc_split = split_by_lengths(ΔΛc,3)
+        Δyc_split = split_by_lengths(Δyc,3)
         get_frictional_directions_and_positions!(structure, contact_cache, qₖ₋₁, q̇ₖ₋₁, Λₖ)
         ns_stepk! = make_step_k(
             solver_cache,
@@ -241,21 +261,21 @@ function solve!(sim::Simulator,solver_cache::Zhong06_CCP_Constant_Mass_Cache;
         Λ_guess = 1.0
         while restart_count < max_restart
             Λₖ .= repeat([Λ_guess,0,0],na)
+            y .= Λₖ
             x[      1:nq]          .= qₖ
             x[   nq+1:nq+nλ]       .= 0.0
-            Λʳₖ .= Λₖ
             Nmax = 50
             for iteration = 1:maxiters
-                luJac = ns_stepk!(
+                ns_stepk!(
                     Res,Jac,
                     F,∂F∂q,∂F∂q̇,
-                    𝐁,𝐛,𝐜ᵀ,𝐍,𝐫,
-                    x,Λₖ,
+                    𝐰,x,Λₖ,y,∂y∂x,
+                    Λ_split,y_split,
                     structure,
                     contact_cache,
                     timestep,iteration
                 )
-                normRes = norm(Res)
+                normRes = norm(Res,Inf)
                 if  normRes < ftol
                     isconverged = true
                     iteration_break = iteration-1
@@ -269,8 +289,9 @@ function solve!(sim::Simulator,solver_cache::Zhong06_CCP_Constant_Mass_Cache;
                     iteration_break = iteration-1
                     isconverged = false
                 end
+                lu𝐉 = lu(Jac)
                 if na == 0
-                    Δx .= luJac\(-Res)
+                    Δx .= lu𝐉\(-Res)
                     x .+= Δx
                 else # na!=0
                     get_distribution_law!(structure,contact_cache,x[1:nq])
@@ -279,41 +300,33 @@ function solve!(sim::Simulator,solver_cache::Zhong06_CCP_Constant_Mass_Cache;
                     else
                         Nmax = 50
                     end
-                    # Λₖini = repeat([Λ_guess,0,0],na)
-                    Λₖini = deepcopy(Λₖ)
-                    Λₖini[begin+1:3:end] .= 0.0
-                    Λₖini[begin+2:3:end] .= 0.0
-                    if timestep == 659 
-                        # @show timestep, iteration
-                        # @show 𝐍
-                        @show iteration
-                        # @show qr(L).R |> diag
-                        @show :befor, size(𝐍), rank(𝐍), cond(𝐍)
+                    μ = transpose(y)*Λₖ/nΛ
+                    Δxp .= lu𝐉\(-Res)
+                    αp_Λ = find_cone_step_length(Λ_split,ΔΛp_split,J)
+                    αp_y = find_cone_step_length(y_split,Δyp_split,J)
+                    αpmax = min(αp_Λ,αp_y)
+                    # αpmax = find_cone_step_length(z_split,W_blocks,Δyp_split,ΔΛp_split,J)
+                    αp = min(one(αpmax),0.99αpmax)
+                    Λp .= Λₖ .+ αp.*ΔΛp
+                    yp .= y .+ αp.*Δyp
+                    μp = transpose(yp)*Λp/nΛ
+                    σ = (μp/μ)^3
+                    if σ == NaN || μ == 0
+                        break
                     end
-                    𝐍 .+= L
-                    yₖini = 𝐍*Λₖ + 𝐫
-                    yₖini .= abs.(yₖini)
-                    yₖini[begin+1:3:end] .= 0.0
-                    yₖini[begin+2:3:end] .= 0.0
-                    IPM!(Λₖ,na,nΛ,Λₖini,yₖini,𝐍,𝐫;ftol,Nmax)
-                    ΔΛₖ .= Λₖ - Λʳₖ
-                    minusResΛ = -Res + 𝐁*(ΔΛₖ)
-                    normRes = norm(minusResΛ)
-                    if timestep == 659
-                        @show :after, size(𝐍), rank(𝐍), cond(𝐍)
-                        @show minusResΛ
-                        @show Λₖ, Λʳₖ
-                        @show cond(Jac)
-                        # @show yₖini
-                        # display(L)
-                        # display(nullspace(L))
-                        # @show Λₖ
-                        # display(L*Λₖ)
-                    end
-                    Δx .= luJac\minusResΛ
-                    Λʳₖ .= Λₖ
-                    x .+= Δx
-                    # @show timestep, iteration, normRes, norm(Δx), norm(ΔΛₖ)
+                    τ = σ*μp
+                    𝐫𝐞𝐬_c_split = -τ.*𝐞_split.+((Δyp_split)⊙(ΔΛp_split))
+                    Res[n2+nΛ+1:n2+2nΛ] .+= reduce(vcat,𝐫𝐞𝐬_c_split)
+                    Δxc .= lu𝐉\(-Res)
+                    # η = exp(-0.1μ) + 0.9
+                    α_Λ = find_cone_step_length(Λ_split,ΔΛc_split,J)
+                    # @show Λ_split,ΔΛc_split
+                    α_y = find_cone_step_length(y_split,Δyc_split,J)
+                    αmax = min(α_Λ,α_y)
+                    α = min(1,0.99αmax)
+                    # α_record[iteration] = α
+                    x .+= α.*Δxc
+                    μ = transpose(y)*Λₖ/nΛ
                 end
             end
             if isconverged

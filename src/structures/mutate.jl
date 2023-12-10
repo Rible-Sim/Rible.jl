@@ -75,7 +75,8 @@ function make_jointed2angles(hen2egg,relative_core)
         X_hen = NCF.get_X(nmcs_hen,q_hen)
         X_egg = NCF.get_X(nmcs_egg,q_egg)
         relative_axes = X_egg*relative_core*X_hen'
-        angles = rotation2angles(relative_axes.X)
+        angles = rotation2angles(relative_axes)
+        angles = [0,0,acos(X_hen[:,2]'*X_egg[:,2]/(norm(X_hen[:,2])*norm(X_egg[:,2])))]
     end
 end
 
@@ -103,7 +104,7 @@ function update_tensiles!(st::AbstractStructure, jointed::JointedMembers)
                 relative_core
             ) = cache
             spring_damper = spring_dampers[joint.id]
-            (;mask) = spring_damper
+            (;mask,k) = spring_damper
             (;hen,egg) = hen2egg
             nmcs_hen = hen.bodysig.coords.nmcs
             nmcs_egg = egg.bodysig.coords.nmcs
@@ -119,13 +120,15 @@ function update_tensiles!(st::AbstractStructure, jointed::JointedMembers)
             )
             jointed2angles = make_jointed2angles(hen2egg,relative_core)
             angles = jointed2angles(q_jointed)
+	        torques = k.*angles
             update!(spring_damper,angles,)
             angles_jacobian = ForwardDiff.jacobian(jointed2angles,q_jointed)
             for i in mask
-                torque = spring_damper.state.torques[i]
-                angle = spring_damper.state.angles[i]
-                @show angles_jacobian[i,  4:12]
-                @show angles_jacobian[i,16:end]
+                torque = torques[i]
+                angle = angles[i]
+                # @show angle
+                # @show angles_jacobian[i,  4:12]*torque
+                # @show angles_jacobian[i,16:end]*torque
                 system.F̌[sys_free_idx] .-= angles_jacobian[i,free_idx]*torque
             end
         end

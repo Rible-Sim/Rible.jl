@@ -29,7 +29,7 @@ function generate_cache(
     (;M,M⁻¹,M̌,M̌⁻¹,Ḿ,M̄)= build_mass_matrices(structure)
     A = make_cstr_jacobian(structure)
     Φ = make_cstr_function(structure)
-    F!(F,q,q̇,t) = generalized_force!(F,bot,q,q̇,t)
+    F!(F,q,q̇,t) = generalized_force!(F,bot,q,q̇,t;gravity=false)
     Jac_F!(∂F∂q̌,∂F∂q̌̇,q,q̇,t) = generalized_force_jacobain!(∂F∂q̌,∂F∂q̌̇,bot,q,q̇,t)
     q̌0 = traj.q̌[begin]
     λ0 = traj.λ[begin]
@@ -138,7 +138,7 @@ function solve!(sim::Simulator,cache::Zhong06_Constant_Mass_Cache;
         Aᵀₖ₋₁ = transpose(A(qₖ₋₁))
         Res_stepk! = make_Res_stepk(qₖ,q̌ₖ,λₖ,qₖ₋₁,p̌ₖ₋₁,F̌,Aᵀₖ₋₁,tₖ₋₁)
         isconverged = false
-        if Jac_F! isa Missing
+        if false #Jac_F! isa Missing
             dfk = OnceDifferentiable(Res_stepk!,initial_x,initial_Res)
             Res_stepk_result = nlsolve(dfk, initial_x; ftol, iterations=maxiters, method=:newton)
             isconverged = converged(Res_stepk_result)

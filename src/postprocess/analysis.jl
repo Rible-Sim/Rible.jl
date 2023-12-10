@@ -12,9 +12,9 @@ function get_trajectory!(bot::Robot,bodyid::Int,pid::Int,step_range=:)
         (;t,q,q̇) = state 
         update_bodies!(structure,q,q̇)
         if pid == 0
-            position_traj[i] .= body.state.mass_locus_state.position
+            position_traj[i] .= body.state.mass_locus_state.frame.position
         else
-	        position_traj[i] .= body.state.loci_states[pid].position
+	        position_traj[i] .= body.state.loci_states[pid].frame.position
 		end
     end
     position_traj[step_range] |> VectorOfArray
@@ -34,9 +34,9 @@ function get_velocity!(bot::Robot,bodyid::Int,pid::Int,step_range=:)
         (;t,q,q̇) = state 
         update_bodies!(structure,q,q̇)
         if pid == 0
-            velocity_traj[i] .= body.state.mass_locus_state.velocity
+            velocity_traj[i] .= body.state.mass_locus_state.frame.velocity
         else
-	        velocity_traj[i] .= body.state.loci_states[pid].velocity
+	        velocity_traj[i] .= body.state.loci_states[pid].frame.velocity
 		end
     end
     velocity_traj[step_range] |> VectorOfArray

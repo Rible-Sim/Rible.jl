@@ -115,6 +115,69 @@ function intrinsic_nullspace(st,q)
     ret
 end
 
+function extrinsic_nullspace(st,q)
+    (;bodies,connectivity,num_of_dof) = st
+    (;indexed,jointed) = connectivity
+    (;num_of_full_coords,bodyid2sys_full_coords,sys_num_of_dof,) = indexed
+    ret = zeros(eltype(q),sys_num_of_dof,num_of_dof)
+    bodyid2sys_dof_idx = deepcopy(indexed.bodyid2sys_dof_idx)
+    nullspaces = Vector{Matrix{eltype(q)}}(undef,2)
+    foreach(jointed.joints) do joint
+        jointid = joint.id
+        if joint isa PrototypeJoint
+            nullspaces[1] = zeros(eltype(q),sys_num_of_dof,7)
+            for i in bodyid2sys_dof_idx[1]
+                nullspaces[1][i,i] = 1
+            end
+            (;hen,egg) = joint.hen2egg
+            nmcs_hen = hen.bodysig.coords.nmcs
+            nmcs_egg = egg.bodysig.coords.nmcs
+            id_hen = hen.bodysig.prop.id
+            id_egg = egg.bodysig.prop.id
+            q_hen = q[bodyid2sys_full_coords[id_hen]]
+            q_egg = q[bodyid2sys_full_coords[id_egg]]
+            c_hen = to_local_coords(nmcs_hen,hen.bodysig.prop.loci[hen.pid].position)
+            c_egg = to_local_coords(nmcs_egg,egg.bodysig.prop.loci[egg.pid].position)
+            r_hen =  to_transformation(nmcs_hen,q_hen,c_hen)*q_hen
+            r_egg =  to_transformation(nmcs_egg,q_egg,c_egg)*q_egg
+            ro_hen = to_transformation(nmcs_hen,q_hen,zero(c_hen))*q_hen
+            ro_egg = to_transformation(nmcs_egg,q_egg,zero(c_egg))*q_egg
+
+            # hen.bodysig.prop.loci[hen.trlid].axes
+            # egg.bodysig.prop.loci[egg.trlid].axes
+            # hen.bodysig.prop.loci[hen.rotid].axes
+            invX̄_hen = nmcs_hen.data.invX̄
+            invX̄_egg = nmcs_egg.data.invX̄
+            axes_rot_egg = invX̄_egg*egg.bodysig.prop.loci[egg.rotid].axes
+            axes_idx = [
+                (3,1), #normal * tangent
+                (3,2), #normal * bitangent
+                (1,2)  #tangent * bitangent
+            ]
+            id_axis_egg = 3
+            X_hen = NCF.get_X(nmcs_hen,q_hen)
+            X_egg = NCF.get_X(nmcs_egg,q_egg)
+            axis_egg = X_egg*axes_rot_egg.X
+            normal = axis_egg[:,id_axis_egg]
+            I3 = I(3)
+            O3 = zero(I3)
+            o3 = O3[:,1]
+            nullspaces[1][bodyid2sys_dof_idx[id_egg],vcat(bodyid2sys_dof_idx[id_hen],7)] = [
+                I3 skew((r_egg-ro_egg)-(r_hen-ro_hen)) (r_egg-ro_egg)×normal;
+                O3             I3                      normal
+            ]
+        else
+            if jointid == 2
+                nullspaces[2] = zeros(eltype(q),7,3)
+                nullspaces[2][3,1] = 1
+                nullspaces[2][4,2] = 1
+                nullspaces[2][7,3] = 1
+            end
+        end
+    end
+    ret .= nullspaces[1]*nullspaces[2]
+end
+
 function frequencyshift(M̂,Ĉ,K̂,α::Real)
     M̄ = M̂
     C̄ = 2α*M̂ + Ĉ
@@ -127,7 +190,6 @@ function frequencyshift(M̂,K̂,α::Real)
     K̄ = α*M̂ + K̂
     M̄,K̄
 end
-
 
 function enlarge(M̄,C̄,K̄)
     T = eltype(M̄)
@@ -631,7 +693,7 @@ function build_tangent_stiffness_matrix!(∂Q̌∂q̌,st)
                 relative_core
             ) = cache
             spring_damper = spring_dampers[joint.id]
-            (;mask) = spring_damper
+            (;mask,k) = spring_damper
             (;hen,egg) = hen2egg
             nmcs_hen = hen.bodysig.coords.nmcs
             nmcs_egg = egg.bodysig.coords.nmcs
@@ -647,16 +709,17 @@ function build_tangent_stiffness_matrix!(∂Q̌∂q̌,st)
             )
             jointed2angles = make_jointed2angles(hen2egg,relative_core)
             nq = length(q_jointed)
+            angles = jointed2angles(q_jointed)
+	        torques = k.*angles
             angles_jacobian = ForwardDiff.jacobian(jointed2angles,q_jointed)
             angles_hessians = ForwardDiff.jacobian(x -> ForwardDiff.jacobian(jointed2angles, x), q_jointed)
             # angles_hessians = FiniteDiff.finite_difference_jacobian(x -> ForwardDiff.jacobian(jointed2angles, x), q_jointed)
             reshaped_angles_hessians = reshape(angles_hessians,3,nq,nq)
             # @show sys_free_idx, free_idx
             for i in mask
-                torque = spring_damper.state.torques[i]
-                angle = spring_damper.state.angles[i]
-                k = spring_damper.k
-                @show angle, torque
+                angle = angles[i]
+                torque = torques[i]
+                # @show angle, torque
                 generalized_force_jacobian = torque.*reshaped_angles_hessians[i,:,:] .+ k.*angles_jacobian[i,:]*angles_jacobian[[i],:]
                 # @show generalized_force_jacobian
                 # ∂Q̌∂q̌[sys_free_idx,sys_free_idx] .-= generalized_force_jacobian[free_idx,free_idx]
@@ -666,7 +729,6 @@ function build_tangent_stiffness_matrix!(∂Q̌∂q̌,st)
 
     return ∂Q̌∂q̌
 end
-
 
 # In-place ∂Q̌∂q̌̇ for cables
 function build_tangent_damping_matrix!(∂Q̌∂q̌̇,st)

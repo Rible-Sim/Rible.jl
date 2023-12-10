@@ -305,13 +305,21 @@ function solve!(sim::Simulator,solver_cache::Zhong06_Frictionless_Nonconstant_Ma
                     timestep,iteration
                 )
                 condition_number = cond(Jac)
+                normRes = norm(Res)
+                if  normRes < ftol
+                    isconverged = true
+                    iteration_break = iteration-1
+                    break
+                elseif normRes > 1e10
+                    # force restart
+                    iteration_break = iteration-1
+                    isconverged = false
+                    break
+                elseif iteration == maxiters
+                    iteration_break = iteration-1
+                    isconverged = false
+                end
                 if na == 0
-                    normRes = norm(Res)
-                    if normRes < ftol
-                        isconverged = true
-                        iteration_break = iteration-1
-                        break
-                    end
                     Δx .= Jac\(-Res)
                     x .+= Δx
                 else # na!=0
@@ -335,20 +343,6 @@ function solve!(sim::Simulator,solver_cache::Zhong06_Frictionless_Nonconstant_Ma
                     τ = σ*μp
                     Res_c = -τ.*𝐞.+(Δyp.*ΔΛp)
                     Res[n2+na+1:n2+2na] .+= Res_c
-                    normRes = norm(Res)
-                    if  normRes < ftol
-                        isconverged = true
-                        iteration_break = iteration-1
-                        break
-                    elseif normRes > 1e10
-                        # force restart
-                        iteration_break = iteration-1
-                        isconverged = false
-                        break
-                    elseif iteration == maxiters
-                        iteration_break = iteration-1
-                        isconverged = false
-                    end
                     Δxc .= lu𝐉\(-Res)
                     # η = exp(-0.1μ) + 0.9
                     α_Λ = find_nonnegative_step_length(Λ_split,ΔΛc_split)

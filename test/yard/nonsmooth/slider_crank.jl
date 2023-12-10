@@ -36,9 +36,9 @@ GM.activate!(;px_per_unit=2,scalefactor = 2); plot_traj!(sc;showground=false)
 
 RB.has_constant_mass_matrix(sc)
 
-dt = 1e-4
+dt = 5e-4
 tspan = (0.0,2*683dt)
-# tspan = (0.0,1dt)
+tspan = (0.0,1.0)
 
 # No Contact Dynamics
 prob = RB.DynamicsProblem(sc,)
@@ -51,7 +51,7 @@ RB.solve!(
 
 RB.solve!(
     prob,
-    RB.DynamicsSolver(RB.Moreau(0.5));
+    RB.DynamicsSolver(RB.Moreau(1.0));
     dt,tspan,ftol=1e-12,maxiters=5,verbose=true,exception=true,progress=false,
 )
 

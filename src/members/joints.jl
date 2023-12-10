@@ -24,7 +24,7 @@ $(TYPEDSIGNATURES)
 """
 function LinearJoint(id,indexed,A,violations)
     num_of_cstr = size(A,1)
-    free_idx = collect(1:size(cst.A,2))
+    free_idx = collect(1:size(A,2))
     sys_free_idx = collect(1:indexed.num_of_free_coords)
     LinearJoint(id,num_of_cstr,free_idx,sys_free_idx,A,violations)
 end

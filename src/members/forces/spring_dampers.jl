@@ -172,8 +172,9 @@ $(TYPEDSIGNATURES)
 function potential_energy(rf::RotationalSpringDamper)
 	(;k,state,mask,slack) = rf
 	Δ⁺ = (state.angles - state.rest_angles)[mask]
-	Δ = ifelse(slack,max(0,Δ⁺),Δ⁺)
-	pe = 1/2*k*Δ^2
+	# Δ = ifelse(slack,max(0,Δ⁺),Δ⁺)
+    Δ = Δ⁺
+	pe = 1/2*k*sum(Δ.^2)
 end
 
 mutable struct LinearLaw{T}

@@ -20,20 +20,26 @@ includet("../../../examples/robots/woodpecker.jl")#jl
 
 wt = woodpecker()
 
+q = RB.get_coords(wt.structure)
+N_in = RB.intrinsic_nullspace(wt.structure,q)
+A = RB.make_cstr_jacobian(wt.structure)(q)
+N_ex = RB.extrinsic_nullspace(wt.structure,q)
+N = N_in*N_ex
+A*N
 GM.activate!(;scalefactor=1);plot_traj!(wt;showmesh=false,showground=false)
 
 # Contact Surfaces
 halfspaces = RB.StaticContactSurfaces(
     [
-        RB.HalfSpace([0,-1.0,0],[0,-0.0025,0]),
-        RB.HalfSpace([0, 1.0,0],[0, 0.0025,0])
+        RB.HalfSpace([0,-1.0,0],[0,-0.0025e3,0]),
+        RB.HalfSpace([0, 1.0,0],[0, 0.0025e3,0])
     ]
 )
 
 # Frictional Contact Dynamics
 
-dt = 1e-3
-tspan = (0.0,2.0)
+dt = 1e-4
+tspan = (0.0,1.0)
 
 prob = RB.DynamicsProblem(
     wt,
@@ -49,13 +55,24 @@ RB.solve!(
     prob,
     RB.DynamicsSolver(
         RB.Zhong06(),
+        # RB.MonolithicContactSolver(
         RB.InnerLayerContactSolver(
             RB.InteriorPointMethod()
         )
     );
-    dt,tspan,ftol=1e-14,maxiters=50,verbose=true,
+    dt,tspan,ftol=1e-10,maxiters=50,verbose=true,
     exception=true,progress=false,
+    max_restart=1
 )
+
+b1g = RB.get_trajectory!(wt,1,0)
+lines(b1g[3,:])
+
+b1vg = RB.get_velocity!(wt,1,0)
+lines(b1vg[3,:])
+
+b1v1 = RB.get_velocity!(wt,1,1)
+lines(b1v1[2,:])
 
 GM.activate!(;scalefactor=1);plot_traj!(wt;showmesh=false,showground=false)
 
@@ -63,17 +80,26 @@ GM.activate!(;scalefactor=1);plot_traj!(wt;showmesh=false,showground=false)
 RB.solve!(
     prob,
     RB.DynamicsSolver(
-        RB.Moreau(1.0),
+        RB.Moreau(0.5),
         RB.InnerLayerContactSolver(
             RB.InteriorPointMethod()
         )
     );
-    dt,tspan,ftol=1e-14,maxiters=50,verbose=true,exception=true,progress=false,
+    dt,tspan,ftol=1e-12,maxiters=50,verbose=true,
+    exception=false,progress=false,
 )
 
-GM.activate!(;px_per_unit=2,scalefactor = 2);plot_traj!(wt;showmesh=false,showground=false)
+GM.activate!(;px_per_unit=1,scalefactor = 1);plot_traj!(wt;showmesh=false,showground=false)
 
-me = RB.mechanical_energy!(wt)
+
+b1g = RB.get_trajectory!(wt,1,0)
+lines(b1g[3,:])
+
+b1v1 = RB.get_velocity!(wt,1,1)
+lines(b1v1[2,:])
+
+
+me = RB.mechanical_energy!(wt;gravity=false)
 Makie.lines(me.E)
 
 using FileIO

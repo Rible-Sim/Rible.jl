@@ -19,7 +19,7 @@ function generate_cache(
     (;prob) = simulator
     (;bot,env) = prob
     (;structure) = bot
-    F!(F,q,q̇,t) = generalized_force!(F,bot,q,q̇,t)
+    F!(F,q,q̇,t) = generalized_force!(F,bot,q,q̇,t;gravity=true)
     Jac_F!(∂F∂q̌,∂F∂q̌̇,q,q̇,t) = generalized_force_jacobain!(∂F∂q̌,∂F∂q̌̇,bot,q,q̇,t)
     
     M = Matrix(assemble_M(structure))
@@ -227,7 +227,7 @@ function solve!(sim::Simulator,solver_cache::Moreau_CCP_Constant_Mass_Cache;
             dt,mass_norm
         )
         restart_count = 0
-        Λ_guess = 0.1
+        Λ_guess = 100.0
         while restart_count < 10
             Λₖ₊₁ .= repeat([Λ_guess,0,0],na)
             x[      1:nq]          .= qₖ₊₁

@@ -206,18 +206,18 @@ function nullspace_mat(nmcs::NC3D12C,q)
     u,v,w = get_uvw(nmcs,q)
     o3 = zero(u)
     O3 = [o3 o3 o3;]
-    # ret = [
-    #     I3_Bool   O3;
-    #     O3 -skew(u);
-    #     O3 -skew(v);
-    #     O3 -skew(w);
-    # ]
     ret = [
-        I3_Bool    O3;
-        O3  o3  -w  v;
-        O3   w  o3 -u;
-        O3  -v   u o3;
+        I3_Bool   O3;
+        O3 -skew(u);
+        O3 -skew(v);
+        O3 -skew(w);
     ]
+    # ret = [
+    #     I3_Bool    O3;
+    #     O3  o3  -w  v;
+    #     O3   w  o3 -u;
+    #     O3  -v   u o3;
+    # ]
     cv\ret
 end
 

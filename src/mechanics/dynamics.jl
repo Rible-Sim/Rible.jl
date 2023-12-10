@@ -52,7 +52,7 @@ function generalized_force!(F,bot,q,q̇,t;actuate=false,gravity=true,(user_defin
     lazy_update_bodies!(structure,q,q̇)
     update_tensiles!(structure)
     if gravity
-        apply_gravity!(structure)
+        apply_gravity!(structure;factor=1000)
     end
     F .= assemble_forces!(structure)
     user_defined_force!(F,t)
@@ -356,10 +356,12 @@ function get_distribution_law!(structure,cache,q)
     (;
         D,L,H,bodyid2act_idx
     ) = cache.cache
+    (;sys_free_idx,bodyid2sys_full_coords,bodyid2sys_dof_idx) = structure.connectivity.indexed
     N_in = intrinsic_nullspace(structure,q)
-    A = make_cstr_jacobian(structure)(q)
-    N_ex = nullspace(A*N_in)
+    # A = make_cstr_jacobian(structure)(q)
+    N_ex = extrinsic_nullspace(structure,q)
     N = N_in*N_ex
+    # @show rank(N), (A*N |> norm)
     R = D*N
     L .= (I-pinv(R)'*R')*H
 end

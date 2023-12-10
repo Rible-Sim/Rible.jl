@@ -576,6 +576,9 @@ function potential_energy(st::Structure;gravity=false)
     if !isempty(st.tensiles.cables)
         V += sum(potential_energy.(st.tensiles.cables))
     end
+    if hasfield(typeof(st.tensiles),:spring_dampers)
+        V += sum(potential_energy.(st.tensiles.spring_dampers))
+    end
     V
 end
 

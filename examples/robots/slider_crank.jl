@@ -14,7 +14,7 @@ function slider_crank(;θ = 0, coordsType = RB.NCF.NC)
     ω0 = [
         150.0,
         -75.0,
-    ]
+    ]./20
     b = 0.05
     a = 0.025
     d = 0.05
@@ -221,9 +221,34 @@ function slider_crank(;θ = 0, coordsType = RB.NCF.NC)
     rigdibodies = TypeSortedCollection(rbs)
     numbered = RB.number(rigdibodies)
     indexed = RB.index(rigdibodies,)
-
-    ss = Int[]
-    tensiles = (cables = ss,)
+    force_elements_angular_stiffness = 5.0
+    ss = [
+        RB.RotationalSpringDamper3D(
+            1,
+            [0.0,0,0],
+            Int[],
+            0.0,
+        ),
+        RB.RotationalSpringDamper3D(
+            2,
+            [0.0,0,0],
+            [3],
+            force_elements_angular_stiffness,
+        ),
+        RB.RotationalSpringDamper3D(
+            3,
+            [0.0,0,0],
+            [3],
+            force_elements_angular_stiffness,
+        ),
+        RB.RotationalSpringDamper3D(
+            4,
+            [0.0,0,0],
+            [3],
+            force_elements_angular_stiffness,
+        )
+    ]
+    tensiles = (spring_dampers = ss, cables = Int[])
     connected = RB.connect(rbs,zeros(Int,0,0))
     tensioned = @eponymtuple(connected,)
 
