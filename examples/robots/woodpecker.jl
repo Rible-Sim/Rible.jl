@@ -162,9 +162,18 @@ function woodpecker(;coordsType = RB.NCF.NC)
     @show spring_velocity
     rbs = [sleeve1,link1]
     rigdibodies = TypeSortedCollection(rbs)
-    numbered = RB.number(rigdibodies)
-    indexed = RB.index(rigdibodies,)
-
+    q_sleeve1,_ = RB.body_state2coords_state(sleeve1)
+    cstr_idx = [1,2,5,6]
+    A_linearjoint = zeros(length(cstr_idx),12)
+    for (i,j) in enumerate(cstr_idx)
+        A_linearjoint[i,j] = 1
+    end
+    js = [
+        RB.RevoluteJoint(1,RB.Hen2Egg(1,RB.ID(sleeve1,3,1),RB.ID(link1,1,1))),
+        RB.LinearJoint(2,sleeve1,A_linearjoint,q_sleeve1[cstr_idx]),
+        # RB.FixedBodyConstraint(2,indexed,sleeve1)
+    ]
+    jointed = RB.join(js,)
     ss = [
         RB.RotationalSpringDamper3D(
             1,
@@ -182,20 +191,9 @@ function woodpecker(;coordsType = RB.NCF.NC)
     tensiles = (spring_dampers = ss, cables = Int[])
     connected = RB.connect(rbs,zeros(Int,0,0))
     tensioned = @eponymtuple(connected,)
-    q_sleeve1,_ = RB.body_state2coords_state(sleeve1)
-    cstr_idx = [1,2,5,6]
-    A_linearjoint = zeros(length(cstr_idx),12)
-    for (i,j) in enumerate(cstr_idx)
-        A_linearjoint[i,j] = 1
-    end
-    js = [
-        RB.RevoluteJoint(1,RB.Hen2Egg(1,RB.ID(sleeve1,3,1),RB.ID(link1,1,1))),
-        RB.LinearJoint(2,sleeve1,A_linearjoint,q_sleeve1[cstr_idx]),
-        # RB.FixedBodyConstraint(2,indexed,sleeve1)
-    ]
-    
-    jointed = RB.join(js,)
-    cnt = RB.Connectivity(numbered,indexed,tensioned,jointed)
+    indexed = RB.index(rigdibodies,)
+    numbered = RB.number(rigdibodies)
+    cnt = RB.Connectivity(jointed,tensioned,indexed,numbered)
     st = RB.Structure(rigdibodies,tensiles,cnt)
     RB.Robot(st,)
 end

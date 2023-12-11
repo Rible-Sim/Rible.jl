@@ -86,7 +86,7 @@ function make_jointed2angles(hen2egg,relative_core)
     end
 end
 
-function update_tensiles!(st::AbstractStructure, jointed::JointedMembers)
+function update_tensiles!(st::AbstractStructure, jointed::Jointed)
     (;spring_dampers) = st.tensiles
     (;indexed,numbered) = st.connectivity
     (;system) = st.state

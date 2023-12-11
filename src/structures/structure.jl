@@ -13,7 +13,7 @@ end
 State Constructor.
 $(TYPEDSIGNATURES)
 """
-function StructureState(bodies,tensiles,cnt::Connectivity{<:Any,<:Any,<:NamedTuple{(:connected, )},<:Any})
+function StructureState(bodies,tensiles,cnt::Connectivity{<:Any,<:NamedTuple{(:connected, )},<:Any,<:Any})
     (;numbered,indexed,jointed) = cnt
     (;bodyid2sys_loci_coords_idx) = numbered
     (;
