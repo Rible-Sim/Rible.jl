@@ -29,8 +29,8 @@ end
 
 
 
-function StructureState(bodies,tensiles,cnt::Connectivity{<:Any,<:Any,<:NamedTuple{(:connected, :clustered)},<:Any})
-    (;clustercables) = tensiles
+function StructureState(bodies,force_elements,cnt::Connectivity{<:Any,<:Any,<:NamedTuple{(:connected, :clustered)},<:Any})
+    (;clustercables) = force_elements
     (;indexed,jointed) = cnt
     (;num_of_full_coords,num_of_intrinsic_cstr,sys_free_idx,sys_pres_idx) = indexed
     (;bodyid2sys_intrinsic_cstr_idx,bodyid2sys_full_coords,bodyid2sys_free_coords,bodyid2sys_pres_coords) = indexed
@@ -77,7 +77,7 @@ function StructureState(bodies,tensiles,cnt::Connectivity{<:Any,<:Any,<:NamedTup
 end
 
 function update_tensiles!(st, @eponymargs(clustered,))
-    (;clustercables) = st.tensiles
+    (;clustercables) = st.force_elements
     id = 0
     foreach(clustered) do scnt
         id += 1
@@ -128,7 +128,7 @@ function distribute_s̄!(st::AbstractStructure, s̄)
     s⁺ = @view s̄[begin:2:end]
     s⁻ = @view s̄[begin+1:2:end]
     is = 0
-    for cs in st.tensiles.clustercables
+    for cs in st.force_elements.clustercables
         nsi = length(cs.sps)
         cs.sps.s⁺ .= s⁺[is+1:is+nsi]
         cs.sps.s⁻ .= s⁻[is+1:is+nsi]
@@ -138,7 +138,7 @@ function distribute_s̄!(st::AbstractStructure, s̄)
 end
 
 function get_s̄(st::AbstractStructure)
-    ns = sum([length(st.tensiles.clustercables[i].sps) for i in 1:st.nclustercables])
+    ns = sum([length(st.force_elements.clustercables[i].sps) for i in 1:st.nclustercables])
     s̄ = zeros(get_numbertype(st),2ns)
     s⁺ = @view s̄[begin:2:end]
     s⁻ = @view s̄[begin+1:2:end]
@@ -163,7 +163,7 @@ function (f::FischerBurmeister)(x,y)
 end
 
 function make_Ψ(st::AbstractStructure)
-    (;clustercables) = st.tensiles
+    (;clustercables) = st.force_elements
     nclustercables = length(clustercables)
     ns = sum([length(clustercables[i].sps) for i in 1:nclustercables])
     FB = FischerBurmeister(1e-14,10.,10.)
@@ -204,7 +204,7 @@ function make_Ψ(st::AbstractStructure)
 end
 
 function build_ζ(st::AbstractStructure)
-    (;clustercables) = st.tensiles
+    (;clustercables) = st.force_elements
     nclustercables = length(clustercables)
     ns = sum([length(clustercables[i].sps) for i in 1:nclustercables])
     ζ = Vector{Float64}(undef,2ns)
@@ -236,7 +236,7 @@ end
 
 function build_∂ζ∂q(st::AbstractStructure,q̌)
     (;num_of_dim, connectivity) = st
-    (;clustercables) = st.tensiles
+    (;clustercables) = st.force_elements
     nclustercables = length(clustercables)
     (;tensioned, indexed) = connectivity
     # (;q̌) = st.state.system
@@ -376,7 +376,7 @@ function Record_build_∂ζ∂q(st::AbstractStructure,q̌, xlsxname, sheetname)
 end
 
 function get_clusterA(st)
-    (;clustercables) = st.tensiles
+    (;clustercables) = st.force_elements
     A_list = [Matrix{Float64}(undef,1,1) for i in 1:length(clustercables)]
     for (csid, cs) in enumerate(clustercables)
         (;k) = cs.segs
@@ -396,7 +396,7 @@ function get_clusterA(st)
 end
 
 function build_∂ζ∂s̄(st)
-    (;clustercables) = st.tensiles
+    (;clustercables) = st.force_elements
     A_list = Vector{SparseMatrixCSC{Float64,Int64}}()
     clusterA = get_clusterA(st)
     for (cid,clustercable) in enumerate(clustercables)

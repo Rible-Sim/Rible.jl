@@ -733,7 +733,7 @@ function plot_slack_cables(bots,figname=nothing;at=1.23)
                 at = 2.0
             end
             bot = bots[i]
-            (;cables) = bot.st.tensiles
+            (;cables) = bot.st.force_elements
             ncables = length(cables)
             f = [get_tension!(bot,j) for j in collect(1:12)]
             t_mids = get_time_mids(bot)

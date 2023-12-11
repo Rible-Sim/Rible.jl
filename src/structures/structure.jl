@@ -13,7 +13,7 @@ end
 State Constructor.
 $(TYPEDSIGNATURES)
 """
-function StructureState(bodies,tensiles,cnt::Connectivity{<:Any,<:NamedTuple{(:connected, )},<:Any,<:Any})
+function StructureState(bodies,force_elements,cnt::Connectivity{<:Any,<:NamedTuple{(:connected, )},<:Any,<:Any})
     (;numbered,indexed,jointed) = cnt
     (;bodyid2sys_loci_coords_idx) = numbered
     (;
@@ -88,7 +88,7 @@ struct Structure{BodyType,TenType,CntType,StateType} <: AbstractStructure
     num_of_bodies::Int
     num_of_tensiles::Int
     bodies::BodyType
-    tensiles::TenType
+    force_elements::TenType
     connectivity::CntType
     state::StateType
 end
@@ -97,10 +97,10 @@ end
 Structure Constructor.
 $(TYPEDSIGNATURES)
 """
-function Structure(bodies,tensiles,cnt::Connectivity)
+function Structure(bodies,force_elements,cnt::Connectivity)
     num_of_dim = get_num_of_dims(bodies)
     num_of_bodies = length(bodies)
-    num_of_tensiles = sum(map(length,tensiles))
+    num_of_tensiles = sum(map(length,force_elements))
     (;num_of_free_coords,num_of_intrinsic_cstr) = cnt.indexed
     (;num_of_extrinsic_cstr) = cnt.jointed
     num_of_cstr = num_of_intrinsic_cstr + num_of_extrinsic_cstr
@@ -108,11 +108,11 @@ function Structure(bodies,tensiles,cnt::Connectivity)
     if num_of_dof <= 0
         @warn "Non positive degree of freedom: $num_of_dof."
     end
-    state = StructureState(bodies,tensiles,cnt)
+    state = StructureState(bodies,force_elements,cnt)
     st = Structure(
         num_of_dim,num_of_dof,num_of_cstr,
         num_of_bodies,num_of_tensiles,
-        bodies,tensiles,
+        bodies,force_elements,
         cnt,
         state
     )
@@ -122,8 +122,8 @@ function Structure(bodies,tensiles,cnt::Connectivity)
 end
 
 function Structure(bodies,cnt::Connectivity)
-    tensiles = (cables = Int[],)
-    Structure(bodies,tensiles,cnt)
+    force_elements = (cables = Int[],)
+    Structure(bodies,force_elements,cnt)
 end
 
 
@@ -532,7 +532,7 @@ function check_constraints_consistency(st;tol=1e-14)
 end
 
 function analyse_slack(st::AbstractStructure,verbose=false)
-    (;cables) = st.tensiles
+    (;cables) = st.force_elements
     slackcases = [cable.id for cable in cables if cable.slack && (cable.state.length <= cable.state.restlen)]
     if verbose && !isempty(slackcases)
         @show slackcases
@@ -576,11 +576,11 @@ function potential_energy(st::Structure;gravity=false)
     if gravity
         V += potential_energy_gravity(st)
     end
-    if !isempty(st.tensiles.cables)
-        V += sum(potential_energy.(st.tensiles.cables))
+    if !isempty(st.force_elements.cables)
+        V += sum(potential_energy.(st.force_elements.cables))
     end
-    if hasfield(typeof(st.tensiles),:spring_dampers)
-        V += sum(potential_energy.(st.tensiles.spring_dampers))
+    if hasfield(typeof(st.force_elements),:spring_dampers)
+        V += sum(potential_energy.(st.force_elements.spring_dampers))
     end
     V
 end

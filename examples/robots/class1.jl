@@ -58,7 +58,7 @@ ks = fill(k,ncables)
 cs = fill(c,ncables)
 cables = [RB.DistanceSpringDamper3D(i,restlens[i],ks[i],cs[i];slack=true) for i = 1:ncables]
 acs = [RB.ManualActuator(1,collect(1:ncables),restlens[1:ncables])]
-tensiles = (cables = cables,)
+force_elements = (cables = cables,)
 hub = (actuators = acs,)
 cnt_matrix_cables = [
     # Outer
@@ -74,6 +74,6 @@ connected = RB.connect(rbs,cnt_matrix_cables)
 #
 cnt = RB.Connectivity(numberedpoints,indexedcoords,@eponymtuple(connected,))
 
-st = RB.Structure(rbs,tensiles,cnt)
+st = RB.Structure(rbs,force_elements,cnt)
 RB.Robot(st,hub)
 end

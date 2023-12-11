@@ -1,6 +1,4 @@
-#done use the basic types of Constraints
 #todo parameterization of joints
-#note can full rotation cstr be linear?
 abstract type ExtrinsicConstraints{T} end
 
 

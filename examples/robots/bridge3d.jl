@@ -191,7 +191,7 @@ acs = [
     RB.ManualActuator(i,[i,i+hncables],zeros(2))
     for i = 1:hncables
 ]
-tensiles = (cables = cables,)
+force_elements = (cables = cables,)
 hub = (actuators = acs,)
 # 	# triplex 1
 # 	1 0 0 -1  0  0  0 0 0 0;
@@ -228,7 +228,7 @@ hub = (actuators = acs,)
 # 	]
 connected = RB.connect(rbs,cnt_matrix)
 # ss = Int[]
-# tensiles = (cables = ss,)
+# force_elements = (cables = ss,)
 # connected = RB.connect(rbs,zeros(Int,0,0))
 # #
 #
@@ -239,6 +239,6 @@ connected = RB.connect(rbs,cnt_matrix)
 #
 cnt = RB.Connectivity(numberedpoints,indexedcoords,@eponymtuple(connected,))
 
-st = RB.Structure(rbs,tensiles,cnt)
+st = RB.Structure(rbs,force_elements,cnt)
 bot = RB.Robot(st,hub)
 end

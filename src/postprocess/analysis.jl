@@ -139,7 +139,7 @@ end
 
 function get_tension!(bot::Robot,cid::Int,step_range=:)
     (; structure, traj)= bot
-    (; cables) = structure.tensiles
+    (; cables) = structure.force_elements
     T = get_numbertype(structure)
     f = Vector{T}()
     h = traj.t[2] - traj.t[1]

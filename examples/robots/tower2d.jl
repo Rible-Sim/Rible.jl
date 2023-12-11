@@ -56,7 +56,7 @@ function tower2d(;k=100.0,c=0.0,ratio=0.8,ratio1=ratio,slack=true)
     cs = fill(c,ncables)
     cables = [RB.DistanceSpringDamper2D(i,restlens[i],ks[i],cs[i];slack) for i = 1:ncables]
     acs = [RB.ManualActuator(1,collect(1:ncables),restlens[1:ncables])]
-    tensiles = (cables = cables,)
+    force_elements = (cables = cables,)
     hub = (actuators = acs,)
     cnt_matrix_cables = [
         0  0 0 0 -1  0  0  2;
@@ -84,6 +84,6 @@ function tower2d(;k=100.0,c=0.0,ratio=0.8,ratio1=ratio,slack=true)
 
     cnt = RB.Connectivity(numberedpoints,indexedcoords,@eponymtuple(connected,),jointedmembers)
     # cnt = RB.Connectivity(numberedpoints,indexedcoords,connections)
-    st = RB.Structure(rbs,tensiles,cnt)
+    st = RB.Structure(rbs,force_elements,cnt)
     bot = RB.Robot(st,hub)
 end

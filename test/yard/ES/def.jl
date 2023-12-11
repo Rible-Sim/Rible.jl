@@ -14,7 +14,7 @@ function plot_tower2d!(ax,
     end
     (;num_of_bodies) = st
     (;tensioned) = st.connectivity
-    (;cables) = st.tensiles
+    (;cables) = st.force_elements
     ncables = length(cables)
     ndim = RB.get_num_of_dims(st)
     T = RB.get_numbertype(st)

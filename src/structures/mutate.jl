@@ -19,7 +19,7 @@ function update_tensiles!(st::AbstractStructure)
 end
 
 function update_tensiles!(st::AbstractStructure, @eponymargs(connected,))
-    (;cables) = st.tensiles
+    (;cables) = st.force_elements
     foreach(connected) do scnt
         cable = cables[scnt.id]
         locus_state_hen = scnt.hen.bodysig.state.loci_states[scnt.hen.pid]
@@ -87,7 +87,7 @@ function make_jointed2angles(hen2egg,relative_core)
 end
 
 function update_tensiles!(st::AbstractStructure, jointed::Jointed)
-    (;spring_dampers) = st.tensiles
+    (;spring_dampers) = st.force_elements
     (;indexed,numbered) = st.connectivity
     (;system) = st.state
     (;bodyid2sys_free_coords,

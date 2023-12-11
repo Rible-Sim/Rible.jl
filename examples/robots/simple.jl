@@ -78,7 +78,7 @@ pretty_table(
     )
 )
 #
-tensiles = (cables = cables,)
+force_elements = (cables = cables,)
 acs = [
 RB.ManualActuator(
     i,
@@ -101,6 +101,6 @@ tensioned = @eponymtuple(connected,)
 #
 cnt = RB.Connectivity(numberedpoints, indexedcoords, tensioned)
 # #
-st = RB.Structure(rigdibodies, tensiles, cnt, )
+st = RB.Structure(rigdibodies, force_elements, cnt, )
 bot = RB.Robot(st, hub)
 end

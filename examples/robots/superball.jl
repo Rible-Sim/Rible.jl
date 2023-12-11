@@ -71,7 +71,7 @@ function superball(c=0.0;
     RB.DistanceSpringDamper3D(i, original_restlens[i], ks[i], c;slack=false) for i = 1:ncables
     ]
     #
-    tensiles = (cables = cables,)
+    force_elements = (cables = cables,)
     acs = [
     RB.ManualActuator(
         i,
@@ -119,6 +119,6 @@ function superball(c=0.0;
         )
     end
 
-    st = RB.Structure(rigdibodies, tensiles, cnt, )
+    st = RB.Structure(rigdibodies, force_elements, cnt, )
     bot = RB.Robot(st, hub)
 end

@@ -144,7 +144,7 @@ function man_nd1(k=0.0,c=0.0;ratio=0.8)
 	#
     cables = [RB.DistanceSpringDamper2D(i,original_restlens[i],ks[i],cs[i];slack=false) for i = 1:ncables]
     acs = [RB.ManualActuator(i,i,original_restlens[i]) for i = 1:ncables]
-    tensiles = (cables = cables,)
+    force_elements = (cables = cables,)
     hub = (actuators = acs,)
 
 	cnt_matrix_cables = [
@@ -157,6 +157,6 @@ function man_nd1(k=0.0,c=0.0;ratio=0.8)
 	tensioned = @eponymtuple(connected,)
 	cnt = RB.Connectivity(numberedpoints,indexedcoords,tensioned)
 
-	st = RB.Structure(rigidbodies,tensiles,cnt)
+	st = RB.Structure(rigidbodies,force_elements,cnt)
     bot = RB.Robot(st,hub)
 end

@@ -106,7 +106,7 @@ indexedcoords = RB.index(rigdibodies, matrix_sharing)
 nstrings = 4
 ks = 1.0; restlens = 0.5
 cables = [RB.DistanceSpringDamper2D(i, restlens, ks, 0.0) for i in 1:nstrings]
-tensiles = (cables=cables,)
+force_elements = (cables=cables,)
 acs = []
 hub = (actuators=acs,)
 
@@ -117,7 +117,7 @@ s[3, 3] = 2; s[3, 5] = -2
 s[4, 3] = 1; s[4, 5] = -1
 connections = (cables=RB.connect(rigdibodies, s), )
 cnt = RB.Connectivity(numberedpoints, indexedcoords, connections)
-st = RB.Structure(rigdibodies, tensiles, cnt)
+st = RB.Structure(rigdibodies, force_elements, cnt)
 bot = RB.Robot(st, hub)
 plot_traj!(bot)
 

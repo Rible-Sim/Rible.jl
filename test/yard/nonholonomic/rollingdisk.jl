@@ -36,7 +36,7 @@ function make_rollingdisk()
 	indexedcoords = RB.index(rbs,matrix_sharing)
 	#
 	ss = Int[]
-	tensiles = (cables = ss,)
+	force_elements = (cables = ss,)
 	hub = nothing
 	#
 	connections = RB.connect(rbs,zeros(Int,0,0))
@@ -44,7 +44,7 @@ function make_rollingdisk()
 	jointedmembers = RB.unjoin()
 
 	cnt = RB.Connectivity(numberedpoints,indexedcoords,connections,jointedmembers)
-	st = RB.Structure(rbs,tensiles,cnt)
+	st = RB.Structure(rbs,force_elements,cnt)
     bot = RB.Robot(st,nothing)
 end
 

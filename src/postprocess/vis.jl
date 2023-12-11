@@ -188,11 +188,11 @@ function MakieCore.plot!(viz::Viz{Tuple{S}};
         show_nodes = viz.show_nodes[]
     end
     tgob = viz[:structure]
-    (;tensiles,num_of_bodies) = tgob[]
-    ncables = length(tensiles.cables)
+    (;force_elements,num_of_bodies) = tgob[]
+    ncables = length(force_elements.cables)
     if ncables > 0 && viz.showcables[]
         cables_ob = lift(tgob) do tgob
-            tgob.tensiles.cables
+            tgob.force_elements.cables
         end
         viz!(viz,cables_ob;
             cablecolor,
@@ -321,7 +321,7 @@ end
 
 function get_linesegs_cables(structure;slackonly=false,noslackonly=false)
     (;connected) = structure.connectivity.tensioned
-    (;cables) = structure.tensiles
+    (;cables) = structure.force_elements
     ndim = get_num_of_dims(structure)
     T = get_numbertype(structure)
     linesegs_cables = Vector{Tuple{Point{ndim,T},Point{ndim,T}}}()

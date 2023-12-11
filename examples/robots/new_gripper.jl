@@ -96,7 +96,7 @@ function new_gripper(;c=0.0,x1 = 41.02, ϕ1 = 0.7652, ϕ2 = 0.0)
 	ncables = length(ks)
     cs = zeros(ncables)
     ss = [RB.DistanceSpringDamper2D(i, restlengths[i],ks[i],cs[i];slack=false) for i = 1:ncables]
-	tensiles = (cables=ss,)
+	force_elements = (cables=ss,)
 
 	# matrix_cnt = [
 	# 	1 -2  0
@@ -120,6 +120,6 @@ function new_gripper(;c=0.0,x1 = 41.02, ϕ1 = 0.7652, ϕ2 = 0.0)
 	hub = nothing
 
     cnt = RB.Connectivity(numbered,indexed,tensioned)
-    st = RB.Structure(rigdibodies,tensiles,cnt)
+    st = RB.Structure(rigdibodies,force_elements,cnt)
     bot = RB.Robot(st,hub)
 end

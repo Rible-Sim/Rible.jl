@@ -110,7 +110,7 @@ function uni(c=100.0;
     RB.DistanceSpringDamper3D(i, original_restlens[i], ks[i], c;slack=false) for i = 1:ncables
     ]
     #
-    tensiles = (cables = cables,)
+    force_elements = (cables = cables,)
     acs = [
     RB.ManualActuator(
         i,
@@ -159,6 +159,6 @@ function uni(c=100.0;
 
     cnt = RB.Connectivity(numberedpoints, indexedcoords, tensioned, jointed)
 
-    st = RB.Structure(rigdibodies, tensiles, cnt,)
+    st = RB.Structure(rigdibodies, force_elements, cnt,)
     bot = RB.Robot(st, hub)
 end

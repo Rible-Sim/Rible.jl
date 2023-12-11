@@ -200,7 +200,7 @@ acs = [
         zeros(ncables_prism)
     ),
 ]
-tensiles = (cables = cables,)
+force_elements = (cables = cables,)
 hub = (actuators = acs,)
 
 
@@ -270,6 +270,6 @@ end
 
 cnt = RB.Connectivity(numberedpoints,indexedcoords,@eponymtuple(connected,),jointedmembers)
 
-st = RB.Structure(rbs,tensiles,cnt)
+st = RB.Structure(rbs,force_elements,cnt)
 bot = RB.Robot(st,hub)
 end

@@ -248,7 +248,7 @@ function slider_crank(;θ = 0, coordsType = RB.NCF.NC)
             force_elements_angular_stiffness,
         )
     ]
-    tensiles = (spring_dampers = ss, cables = Int[])
+    force_elements = (spring_dampers = ss, cables = Int[])
     connected = RB.connect(rbs,zeros(Int,0,0))
     tensioned = @eponymtuple(connected,)
 
@@ -261,6 +261,6 @@ function slider_crank(;θ = 0, coordsType = RB.NCF.NC)
 
     jointed = RB.join(js,indexed)
     cnt = RB.Connectivity(numbered,indexed,tensioned,jointed)
-    st = RB.Structure(rigdibodies,tensiles,cnt)
+    st = RB.Structure(rigdibodies,force_elements,cnt)
     RB.Robot(st,)
 end

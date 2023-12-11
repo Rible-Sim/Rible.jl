@@ -150,7 +150,7 @@ function Tbars(;θ = 0, coordsType = RB.NCF.NC)
     ks[2] = 400.0
     cs = zeros(ncables)
     ss = [RB.DistanceSpringDamper3D(i, original_restlens[i],ks[i],cs[i];slack=false) for i = 1:ncables]
-    tensiles = (cables=ss,)
+    force_elements = (cables=ss,)
 
     cm = [
         1 -1  0  0;
@@ -174,6 +174,6 @@ function Tbars(;θ = 0, coordsType = RB.NCF.NC)
 
     jointed = RB.join(js,indexed)
     cnt = RB.Connectivity(numbered,indexed,tensioned,jointed)
-    st = RB.Structure(rigdibodies,tensiles,cnt)
+    st = RB.Structure(rigdibodies,force_elements,cnt)
     RB.Robot(st,)
 end

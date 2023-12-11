@@ -21,12 +21,12 @@ function one_bar_one_tri()
     indexedcoords = RB.index(rbs,matrix_sharing)
     # cables
     cables = Int[]
-    tensiles = (cables = cables,)
+    force_elements = (cables = cables,)
     hub = nothing
     connected = RB.connect(rbs,zeros(Int,0,0))
 
     cnt = RB.Connectivity(numberedpoints,indexedcoords,@eponymtuple(connected,))
 
-    st = RB.Structure(rbs,tensiles,cnt)
+    st = RB.Structure(rbs,force_elements,cnt)
     bot = RB.Robot(st,hub)
 end

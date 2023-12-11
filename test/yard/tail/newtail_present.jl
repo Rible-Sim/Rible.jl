@@ -129,7 +129,7 @@ for i = 1:ncables
 end
 ss = [RB.SString2D(i,0.5original_restlens[i],ks[i],0.0) for i = 1:ncables]
 
-tensiles = (cables=ss,)
+force_elements = (cables=ss,)
 acs = [RB.ManualActuation(RB.SimpleActuator(4(i-1)+j,5original_restlens[4(i-1)+j])) for i = 1:n  for j = 1:4]
 hub = (actuators=acs,)
 
@@ -146,7 +146,7 @@ for i = 1:n
     push!(string2ap,(RB.ID(2i+1,2),RB.ID(2i-1,2)))
 end
 cnt = RB.Connectivity(bodyid2q,string2ap)
-st = RB.Structure(rbs,tensiles,cnt)
+st = RB.Structure(rbs,force_elements,cnt)
 RB.update_cables_apply_forces!(st)
 function jac_singularity_check(st)
     q,_ = RB.get_coords(st)

@@ -188,12 +188,12 @@ function woodpecker(;coordsType = RB.NCF.NC)
             force_elements_angular_stiffness,
         )
     ]
-    tensiles = (spring_dampers = ss, cables = Int[])
+    force_elements = (spring_dampers = ss, cables = Int[])
     connected = RB.connect(rbs,zeros(Int,0,0))
     tensioned = @eponymtuple(connected,)
     indexed = RB.index(rigdibodies,jointed)
     numbered = RB.number(rigdibodies)
     cnt = RB.Connectivity(jointed,tensioned,indexed,numbered)
-    st = RB.Structure(rigdibodies,tensiles,cnt)
+    st = RB.Structure(rigdibodies,force_elements,cnt)
     RB.Robot(st,)
 end

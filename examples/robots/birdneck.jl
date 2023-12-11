@@ -119,7 +119,7 @@ indexedcoords = RB.index(rbs,sharing)
 # cs = fill(c,ncables)
 # cables = [RB.DistanceSpringDamper2D(i,restlens[i],ks[i],cs[i];slack) for i = 1:ncables]
 # acs = [RB.ManualActuator(1,collect(1:ncables),restlens[1:ncables])]
-# tensiles = (cables = cables,)
+# force_elements = (cables = cables,)
 # hub = (actuators = acs,)
 cnt_matrix = [
     1  -2  0  0 0  0;
@@ -152,12 +152,12 @@ acs = [
     for i = 1:hncables
 ]
 hub = (actuators = acs,)
-tensiles = (cables = cables,)
+force_elements = (cables = cables,)
 connected = RB.connect(rbs,cnt_matrix)
 
 
 cnt = RB.Connectivity(numberedpoints,indexedcoords,@eponymtuple(connected,),)
 # # cnt = RB.Connectivity(numberedpoints,indexedcoords,connections)
-st = RB.Structure(rbs,tensiles,cnt)
+st = RB.Structure(rbs,force_elements,cnt)
 RB.Robot(st,hub)
 end

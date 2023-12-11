@@ -98,7 +98,7 @@ function planar_parallel()
     ks = fill(100.0,ncables)
     cs = zeros(ncables)
     ss = [RB.DistanceSpringDamper3D(i, original_restlens[i],ks[i],cs[i];slack=false) for i = 1:ncables]
-    tensiles = (cables=ss,)
+    force_elements = (cables=ss,)
 
     cm = [
         1 -1 ;
@@ -123,6 +123,6 @@ function planar_parallel()
     # ]
     # jointed = RB.join(js,indexed)
     cnt = RB.Connectivity(numbered,indexed,tensioned,)
-    st = RB.Structure(rigdibodies,tensiles,cnt)
+    st = RB.Structure(rigdibodies,force_elements,cnt)
     RB.Robot(st,)
 end

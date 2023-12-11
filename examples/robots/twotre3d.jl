@@ -130,12 +130,12 @@ acs = [
         zeros(ncables)
     ),
 ]
-tensiles = (cables = cables,)
+force_elements = (cables = cables,)
 hub = (actuators = acs,)
 
 # jointedmembers = RB.join(csts,indexedcoords)
 cnt = RB.Connectivity(numberedpoints,indexedcoords,@eponymtuple(connected,),)
 
-st = RB.Structure(rbs,tensiles,cnt)
+st = RB.Structure(rbs,force_elements,cnt)
 RB.Robot(st,hub)
 end

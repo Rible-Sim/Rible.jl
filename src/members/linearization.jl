@@ -216,7 +216,7 @@ function build_material_stiffness_matrix!(st::Structure,q,k)
     (;indexed,tensioned) = st.connectivity
     (;num_of_full_coords,num_of_free_coords,sys_free_idx,bodyid2sys_full_coords) = indexed
     (;connected) = tensioned
-    (;cables) = st.tensiles
+    (;cables) = st.force_elements
     update!(st,q)
     Jj = zeros(eltype(q),num_of_dim,num_of_full_coords)
     retǨm = zeros(eltype(q),num_of_free_coords,num_of_free_coords)
@@ -249,7 +249,7 @@ function build_geometric_stiffness_matrix!(st::Structure,q,f)
     (;indexed,tensioned) = st.connectivity
     (;num_of_full_coords,num_of_free_coords,sys_free_idx,bodyid2sys_full_coords) = indexed
     (;connected) = tensioned
-    (;cables) = st.tensiles
+    (;cables) = st.force_elements
     update!(st,q)
     Jj = zeros(eltype(q),num_of_dim,num_of_full_coords)
     retǨg = zeros(eltype(q),num_of_free_coords,num_of_free_coords)
@@ -283,7 +283,7 @@ function make_Ǩm_Ǩg(st,q0)
     (;numbered,indexed,tensioned) = st.connectivity
     (;num_of_full_coords,num_of_free_coords,sys_pres_idx,sys_free_idx,bodyid2sys_full_coords) = indexed
     (;connected) = tensioned
-    (;cables) = st.tensiles
+    (;cables) = st.force_elements
     (;bodyid2sys_loci_idx,sys_loci2coords_idx) = numbered
     function inner_Ǩm_Ǩg(q̌,s,μ,k,c)
 		q = Vector{eltype(q̌)}(undef,num_of_full_coords)
@@ -357,7 +357,7 @@ function make_S(st,q0)
     (;sys_pres_idx,sys_free_idx,num_of_full_coords,bodyid2sys_full_coords) = indexed
     (;bodyid2sys_loci_idx,sys_loci2coords_idx) = numbered
     (;connected) = tensioned
-    (;cables) = st.tensiles
+    (;cables) = st.force_elements
     ncables = length(cables)
     function inner_S(q̌,s)
 		q = Vector{eltype(q̌)}(undef,num_of_full_coords)
@@ -435,7 +435,7 @@ end
 
 # Out-of-place ∂Q̌∂q̌ for cables
 function build_tangent_stiffness_matrix(st,@eponymargs(connected,))
-    (;cables) = st.tensiles
+    (;cables) = st.force_elements
     (;indexed) = st.connectivity
     (;num_of_full_coords,num_of_free_coords,sys_free_idx,bodyid2sys_free_coords,bodyid2sys_full_coords) = indexed
     T = get_numbertype(st)
@@ -480,7 +480,7 @@ end
 
 # Out-of-place ∂Q̌∂q̌ for cluster cables
 function build_tangent_stiffness_matrix(st,@eponymargs(clustered))
-    (;clustercables) = st.tensiles
+    (;clustercables) = st.force_elements
     (;indexed) = st.connectivity
     (;num_of_full_coords,num_of_free_coords,sys_free_idx,bodyid2sys_free_coords,bodyid2sys_full_coords) = indexed
     T = get_numbertype(st)
@@ -537,7 +537,7 @@ end
 
 # Out-of-place ∂Q̌∂q̌̇ for cables
 function build_tangent_damping_matrix(st, @eponymargs(connected, ))
-    (;cables) = st.tensiles
+    (;cables) = st.force_elements
     (;indexed) = st.connectivity
     (;num_of_full_coords,num_of_free_coords,sys_free_idx,bodyid2sys_free_coords,bodyid2sys_full_coords) = indexed
     T = get_numbertype(st)
@@ -580,7 +580,7 @@ end
 
 # Out-of-place ∂Q̌∂q̌̇ for clustered cables
 function build_tangent_damping_matrix(st, @eponymargs(clustered, ))
-    (;clustercables) = st.tensiles
+    (;clustercables) = st.force_elements
     (;indexed) = st.connectivity
     (;num_of_full_coords,num_of_free_coords,sys_free_idx,bodyid2sys_free_coords,bodyid2sys_full_coords) = indexed
     T = get_numbertype(st)
@@ -625,7 +625,7 @@ end
 function build_tangent_stiffness_matrix!(∂Q̌∂q̌,st)
     (;bodies,connectivity) = st
     (;tensioned,indexed,jointed) = connectivity
-    (;cables,spring_dampers) = st.tensiles
+    (;cables,spring_dampers) = st.force_elements
     (;connected) = tensioned
     (;
         num_of_free_coords,
@@ -742,7 +742,7 @@ end
 function build_tangent_damping_matrix!(∂Q̌∂q̌̇,st)
     (;tensioned,indexed) = st.connectivity
     (;connected) = tensioned
-    (;cables) = st.tensiles
+    (;cables) = st.force_elements
     (;num_of_full_coords,num_of_free_coords,sys_free_idx,bodyid2sys_free_coords,bodyid2sys_full_coords) = indexed
     T = get_numbertype(st)
     num_of_dim = get_num_of_dims(st)
@@ -783,7 +783,7 @@ end
 
 function build_∂Q̌∂s̄(st)
     (;connectivity) = st
-    (;cables,clustercables) = st.tensiles
+    (;cables,clustercables) = st.force_elements
     nclustercables = length(clustercables)
     (;tensioned,indexed) = connectivity
     (;num_of_full_coords,num_of_free_coords,sys_free_idx,bodyid2sys_free_coords,bodyid2sys_full_coords) = indexed

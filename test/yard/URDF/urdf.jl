@@ -515,13 +515,13 @@ function urdf_to_rigidrobot(urdf,T=Float64)
 	numbered = RB.number(rbs)
 	indexed = RB.index(rbs,)
     ss = Int[]
-	tensiles = (cables = ss,)
+	force_elements = (cables = ss,)
 	connected = RB.connect(rbs,zeros(Int,0,0))
 	tensioned = @eponymtuple(connected,)
     jointed = RB.join(TypeSortedCollection(jointcsts),indexed)
 	cnt = RB.Connectivity(numbered,indexed,tensioned,jointed)
 	# contacts = [RB.Contact(i,μ,e) for i = [5]]
-	st = RB.Structure(rbs,tensiles,cnt,)
+	st = RB.Structure(rbs,force_elements,cnt,)
     bot = RB.Robot(st)
 end
 #-- functions

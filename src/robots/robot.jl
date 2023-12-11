@@ -48,7 +48,7 @@ build_mass_matrices(bot::Robot) = build_mass_matrices(bot.structure)
 function build_Y(bot)
     (;structure, hub) = bot
     (;actuators) = hub
-    (;cables) = structure.tensiles
+    (;cables) = structure.force_elements
     ncables = length(cables)
     nact = length(actuators)
     ret = spzeros(Int,ncables,nact)

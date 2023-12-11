@@ -46,9 +46,9 @@ function make_bar(;
     matrix_sharing = zeros(Int,0,0)
     indexedcoords = RB.index(rbs,matrix_sharing)
     ss = Int[]
-    tensiles = (cables = ss,)
+    force_elements = (cables = ss,)
     connections = RB.connect(rbs,zeros(Int,0,0))
     cnt = RB.Connectivity(numberedpoints,indexedcoords,connections)
-    st = RB.Structure(rbs,tensiles,cnt,)
+    st = RB.Structure(rbs,force_elements,cnt,)
     bot = RB.Robot(st)
 end

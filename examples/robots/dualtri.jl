@@ -114,7 +114,7 @@ function dualtri(num_of_dof,;onedir=[1.0,0.0],θ=0.0,k=400.0,c=0.0,restlen=0.16)
         ks[i] = ifelse(j∈[1,0],k,k)
     end
     ss = [RB.DistanceSpringDamper2D(i, original_restlens[i],ks[i],cs[i];slack=false) for i = 1:ncables]
-    tensiles = (cables=ss,)
+    force_elements = (cables=ss,)
 
     matrix_cnt = zeros(Int,2(num_of_bodies-1),num_of_bodies)
     for i = 1:num_of_bodies-1
@@ -145,6 +145,6 @@ function dualtri(num_of_dof,;onedir=[1.0,0.0],θ=0.0,k=400.0,c=0.0,restlen=0.16)
     jointed = RB.join(pjs,indexed)
 
     cnt = RB.Connectivity(numbered,indexed,tensioned,jointed)
-    st = RB.Structure(rigdibodies,tensiles,cnt)
+    st = RB.Structure(rigdibodies,force_elements,cnt)
     RB.Robot(st,hub)
 end

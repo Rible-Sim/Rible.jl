@@ -81,7 +81,7 @@ function one_tri_one_bar(;k=nothing)
     else
         cables = [RB.DistanceSpringDamper3D(i,0.0,k[i],0.0;slack=false) for i = 1:ncables]
     end
-    tensiles = (cables = cables,)
+    force_elements = (cables = cables,)
     connected = RB.connect(rbs,cnt_matrix)
 
     cst1 = RB.PinJoint(
@@ -102,6 +102,6 @@ function one_tri_one_bar(;k=nothing)
         jointedmembers
     )
 
-    st = RB.Structure(rbs,tensiles,cnt)
+    st = RB.Structure(rbs,force_elements,cnt)
     bot = RB.Robot(st,)
 end

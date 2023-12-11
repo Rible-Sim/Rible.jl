@@ -50,7 +50,7 @@ function locate_bifurcation_point(bot_input,γ0)
     bot = deepcopy(bot_input)
     (;st) = bot
     (;num_of_dof,num_of_cstr,connectivity) = bot.st
-    (;cables) = st.tensiles
+    (;cables) = st.force_elements
     (;num_of_full_coords,num_of_free_coords) = connectivity.indexed
     ncables = length(cables)
     nλ = num_of_cstr
