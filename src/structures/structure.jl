@@ -367,7 +367,7 @@ function cstr_jacobian(structure::AbstractStructure,q,c=get_local_coords(structu
     end
     foreach(jointed.joints) do joint
         jointexcst = num_of_intrinsic_cstr.+jointid2sys_extrinsic_cstr_idx[joint.id]
-        jointed_sys_free_idx = joint.sys_free_idx
+        _, _, jointed_sys_free_idx = get_joint_idx(joint,indexed)
         ret[jointexcst,jointed_sys_free_idx] .= cstr_jacobian(joint,structure,q)
     end
     ret
@@ -478,7 +478,8 @@ end
 
 function check_constraints_consistency(st;tol=1e-14)
     (;bodies,state,connectivity) = st
-    (;joints) = connectivity.jointed
+    (;indexed,jointed) = connectivity
+    (;joints) = jointed
     q = get_coords(st)
     q̌̇ = get_free_velocs(st)
     Φ = cstr_function(st,q)
@@ -518,7 +519,8 @@ function check_constraints_consistency(st;tol=1e-14)
             end
         end
         foreach(joints) do joint
-            q̇_jointed = state.system.q̌̇[joint.sys_free_idx]
+            _, _, sys_free_idx = get_joint_idx(joint,indexed)
+            q̇_jointed = state.system.q̌̇[sys_free_idx]
             Aq̇_joint = cstr_jacobian(joint,st,q)*q̇_jointed
             norm_velocity_joint = norm(Aq̇_joint)
             if norm_velocity_joint > tol

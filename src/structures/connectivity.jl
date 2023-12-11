@@ -188,7 +188,7 @@ function unjoin()
     JointedMembers(njoints,num_of_extrinsic_cstr,joints,jointid2sys_extrinsic_cstr_idx)
 end
 
-function join(joints,indexed)
+function join(joints)
     # num_of_extrinsic_cstr = mapreduce((joint)->joint.num_of_cstr,+,joints,init=0)
     njoints = length(joints)
     jointid2sys_extrinsic_cstr_idx = Vector{Int}[]

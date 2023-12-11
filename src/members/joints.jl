@@ -10,11 +10,10 @@ get_numbertype(cst::ExtrinsicConstraints{<:AbstractArray{T}}) where T = T
 """
 $(TYPEDEF)
 """
-struct LinearJoint{T} <: ExtrinsicConstraints{T}
+struct LinearJoint{T,bodyType} <: ExtrinsicConstraints{T}
     id::Int
+    body::bodyType
     num_of_cstr::Int
-    free_idx::Vector{Int64}
-    sys_free_idx::Vector{Int64}
     A::Matrix{T}
     violations::Vector{T}
 end
@@ -22,30 +21,49 @@ end
 """
 $(TYPEDSIGNATURES)
 """
-function LinearJoint(id,indexed,A,violations)
+function LinearJoint(id,body,A,violations)
     num_of_cstr = size(A,1)
-    free_idx = collect(1:size(A,2))
-    sys_free_idx = collect(1:indexed.num_of_free_coords)
-    LinearJoint(id,num_of_cstr,free_idx,sys_free_idx,A,violations)
+    LinearJoint(id,body,num_of_cstr,A,violations)
+end
+
+function get_joint_idx(cst::LinearJoint,indexed)
+    (;bodyid2sys_free_coords) = indexed
+    (;body) = cst
+    bid = body.prop.id
+    nmcs = body.coords.nmcs
+    free_idx = body.coords.free_idx
+    ncoords = get_num_of_coords(nmcs)
+    full_idx = collect(1:ncoords)
+    free_idx = free_idx
+    sys_free_idx = bodyid2sys_free_coords[bid]
+    # full_idx, sys_full_idx
+    full_idx, free_idx, sys_free_idx
 end
 
 function cstr_function(cst::LinearJoint,structure,q,c)
-    (;A,sys_free_idx,violations) = cst
+    (;indexed) = structure.connectivity
+    full_idx, free_idx, sys_free_idx = get_joint_idx(cst,indexed)
+    (;A,violations) = cst
     A*q[sys_free_idx] .- violations
 end
 
 function cstr_jacobian(cst::LinearJoint,structure,q)
+    (;indexed) = structure.connectivity
+    full_idx, free_idx, sys_free_idx = get_joint_idx(cst,indexed)
     cst.A
 end
 
-function cstr_forces_jacobian(cst::LinearJoint,st,q,λ)
-    (;sys_free_idx) = cst
+function cstr_forces_jacobian(cst::LinearJoint,structure,q,λ)
+    (;indexed) = structure.connectivity
+    full_idx, free_idx, sys_free_idx = get_joint_idx(cst,indexed)
     n = length(sys_free_idx)
     zeros(eltype(λ),n,n)
 end
 
-function cstr_velocity_jacobian(cst::LinearJoint,st,q,q̇)
-    (;num_of_cstr,sys_free_idx) = cst
+function cstr_velocity_jacobian(cst::LinearJoint,structure,q,q̇)
+    (;indexed) = structure.connectivity
+    full_idx, free_idx, sys_free_idx = get_joint_idx(cst,indexed)
+    (;num_of_cstr,) = cst
     n = length(sys_free_idx)
     zeros(eltype(q̇),num_of_cstr,n)
 end
@@ -101,27 +119,27 @@ function get_joint_info(joint_type::Symbol)
     (joint_type == :Fixed)              && (return (ntrl = 0, nrot = 0, num_of_dof = 0, num_of_cstr = 6, mask_1st = [1,2,3], mask_2nd = Int[], mask_3rd_hen = Int[], mask_3rd_egg = Int[], mask_4th = [1,2,3])) #t1'*t2, t1'*n, t2'*n
 end
 
-FloatingSphericalJoint(id,indexed,hen2egg)  = PrototypeJoint(id,indexed,hen2egg,:FloatingSpherical)
-OrbitalSphericalJoint(id,indexed,hen2egg)   = PrototypeJoint(id,indexed,hen2egg,:OrbitalSpherical)
-PlanarSphericalJoint(id,indexed,hen2egg)    = PrototypeJoint(id,indexed,hen2egg,:PlanarSpherical)
-PrismaticSphericalJoint(id,indexed,hen2egg) = PrototypeJoint(id,indexed,hen2egg,:PrismaticSpherical)
-SphericalJoint(id,indexed,hen2egg)          = PrototypeJoint(id,indexed,hen2egg,:Spherical)
-FloatingUniversalJoint(id,indexed,hen2egg)  = PrototypeJoint(id,indexed,hen2egg,:FloatingUniversal)
-OrbitalUniversalJoint(id,indexed,hen2egg)   = PrototypeJoint(id,indexed,hen2egg,:OrbitalUniversal)
-PlanarUniversalJoint(id,indexed,hen2egg)    = PrototypeJoint(id,indexed,hen2egg,:PlanarUniversal)
-PrismaticUniversalJoint(id,indexed,hen2egg) = PrototypeJoint(id,indexed,hen2egg,:PrismaticUniversal)
-UniversalPrismaticJoint(id,indexed,hen2egg) = PrototypeJoint(id,indexed,hen2egg,:UniversalPrismatic)
-UniversalJoint(id,indexed,hen2egg)          = PrototypeJoint(id,indexed,hen2egg,:Universal)
-FloatingRevoluteJoint(id,indexed,hen2egg)   = PrototypeJoint(id,indexed,hen2egg,:FloatingRevolute)
-OrbitalRevoluteJoint(id,indexed,hen2egg)    = PrototypeJoint(id,indexed,hen2egg,:OrbitalRevolute)
-PlanarRevoluteJoint(id,indexed,hen2egg)     = PrototypeJoint(id,indexed,hen2egg,:PlanarRevolute)
-CylindricalJoint(id,indexed,hen2egg)        = PrototypeJoint(id,indexed,hen2egg,:Cylindrical)
-RevoluteJoint(id,indexed,hen2egg)           = PrototypeJoint(id,indexed,hen2egg,:Revolute)
-FloatingJoint(id,indexed,hen2egg)           = PrototypeJoint(id,indexed,hen2egg,:Floating)
-OrbitalJoint(id,indexed,hen2egg)            = PrototypeJoint(id,indexed,hen2egg,:Orbital)
-PlanarJoint(id,indexed,hen2egg)             = PrototypeJoint(id,indexed,hen2egg,:Planar)
-PrismaticJoint(id,indexed,hen2egg)          = PrototypeJoint(id,indexed,hen2egg,:Prismatic)
-FixedJoint(id,indexed,hen2egg)              = PrototypeJoint(id,indexed,hen2egg,:Fixed)
+FloatingSphericalJoint(id,hen2egg)  = PrototypeJoint(id,hen2egg,:FloatingSpherical)
+OrbitalSphericalJoint(id,hen2egg)   = PrototypeJoint(id,hen2egg,:OrbitalSpherical)
+PlanarSphericalJoint(id,hen2egg)    = PrototypeJoint(id,hen2egg,:PlanarSpherical)
+PrismaticSphericalJoint(id,hen2egg) = PrototypeJoint(id,hen2egg,:PrismaticSpherical)
+SphericalJoint(id,hen2egg)          = PrototypeJoint(id,hen2egg,:Spherical)
+FloatingUniversalJoint(id,hen2egg)  = PrototypeJoint(id,hen2egg,:FloatingUniversal)
+OrbitalUniversalJoint(id,hen2egg)   = PrototypeJoint(id,hen2egg,:OrbitalUniversal)
+PlanarUniversalJoint(id,hen2egg)    = PrototypeJoint(id,hen2egg,:PlanarUniversal)
+PrismaticUniversalJoint(id,hen2egg) = PrototypeJoint(id,hen2egg,:PrismaticUniversal)
+UniversalPrismaticJoint(id,hen2egg) = PrototypeJoint(id,hen2egg,:UniversalPrismatic)
+UniversalJoint(id,hen2egg)          = PrototypeJoint(id,hen2egg,:Universal)
+FloatingRevoluteJoint(id,hen2egg)   = PrototypeJoint(id,hen2egg,:FloatingRevolute)
+OrbitalRevoluteJoint(id,hen2egg)    = PrototypeJoint(id,hen2egg,:OrbitalRevolute)
+PlanarRevoluteJoint(id,hen2egg)     = PrototypeJoint(id,hen2egg,:PlanarRevolute)
+CylindricalJoint(id,hen2egg)        = PrototypeJoint(id,hen2egg,:Cylindrical)
+RevoluteJoint(id,hen2egg)           = PrototypeJoint(id,hen2egg,:Revolute)
+FloatingJoint(id,hen2egg)           = PrototypeJoint(id,hen2egg,:Floating)
+OrbitalJoint(id,hen2egg)            = PrototypeJoint(id,hen2egg,:Orbital)
+PlanarJoint(id,hen2egg)             = PrototypeJoint(id,hen2egg,:Planar)
+PrismaticJoint(id,hen2egg)          = PrototypeJoint(id,hen2egg,:Prismatic)
+FixedJoint(id,hen2egg)              = PrototypeJoint(id,hen2egg,:Fixed)
 
 const PinJoint = SphericalJoint
 
@@ -134,8 +152,6 @@ struct PrototypeJoint{hen2eggType,maskType,valueType,cacheType} <: ExtrinsicCons
     hen2egg::hen2eggType
     num_of_cstr::Int
     num_of_dof::Int
-    free_idx::Vector{Int}
-    sys_free_idx::Vector{Int}
     mask_1st::maskType
     mask_2nd::maskType
     mask_3rd::maskType
@@ -147,7 +163,7 @@ end
 """
 $(TYPEDSIGNATURES)
 """
-function PrototypeJoint(id,indexed,hen2egg,joint_type::Symbol) 
+function PrototypeJoint(id,hen2egg,joint_type::Symbol) 
     (;hen,egg) = hen2egg
     joint_info = get_joint_info(joint_type)
     (;  ntrl, nrot, 
@@ -158,26 +174,9 @@ function PrototypeJoint(id,indexed,hen2egg,joint_type::Symbol)
         mask_3rd_egg, 
         mask_4th, 
     ) = joint_info
-    (;bodyid2sys_free_coords,bodyid2sys_full_coords,num_of_free_coords) = indexed
     mask_3rd = vcat(mask_3rd_hen,mask_3rd_egg.+3)
     nmcs_hen = hen.bodysig.coords.nmcs
     nmcs_egg = egg.bodysig.coords.nmcs
-    free_idx_hen = hen.bodysig.coords.free_idx
-    free_idx_egg = egg.bodysig.coords.free_idx
-    ncoords_hen = NCF.get_num_of_coords(nmcs_hen)
-    ncoords_egg = NCF.get_num_of_coords(nmcs_egg)
-    free_idx = vcat(
-        free_idx_hen,
-        free_idx_egg .+ ncoords_hen
-    )
-    id_hen = hen.bodysig.prop.id
-    id_egg = egg.bodysig.prop.id
-    free_hen = bodyid2sys_free_coords[id_hen]
-    free_egg = bodyid2sys_free_coords[id_egg]
-    sys_free_idx = vcat(
-        free_hen,
-        free_egg
-    )
 
     state_hen = hen.bodysig.state
     state_egg = egg.bodysig.state
@@ -201,8 +200,6 @@ function PrototypeJoint(id,indexed,hen2egg,joint_type::Symbol)
         id,hen2egg,
         num_of_cstr,
         num_of_dof,
-        free_idx,
-        sys_free_idx,
         mask_1st,
         mask_2nd,
         mask_3rd,
@@ -210,6 +207,39 @@ function PrototypeJoint(id,indexed,hen2egg,joint_type::Symbol)
         values,
         cache
     )
+end
+
+function get_joint_idx(cst::PrototypeJoint,indexed)
+    (;bodyid2sys_free_coords,
+      bodyid2sys_full_coords,
+      num_of_free_coords,
+      num_of_full_coords,
+    ) = indexed
+    (;hen,egg) = cst.hen2egg
+    id_hen = hen.bodysig.prop.id
+    id_egg = egg.bodysig.prop.id
+    nmcs_hen = hen.bodysig.coords.nmcs
+    nmcs_egg = egg.bodysig.coords.nmcs
+    free_idx_hen = hen.bodysig.coords.free_idx
+    free_idx_egg = egg.bodysig.coords.free_idx
+    ncoords_hen = get_num_of_coords(nmcs_hen)
+    ncoords_egg = get_num_of_coords(nmcs_egg)
+    full_idx = vcat(
+        collect(1:ncoords_hen),
+        collect(1:ncoords_egg) .+ ncoords_hen
+    )
+    free_idx = vcat(
+        free_idx_hen,
+        free_idx_egg .+ ncoords_hen
+    )
+    free_hen = bodyid2sys_free_coords[id_hen]
+    free_egg = bodyid2sys_free_coords[id_egg]
+    sys_free_idx = vcat(
+        free_hen,
+        free_egg
+    )
+    # full_idx, sys_full_idx
+    full_idx, free_idx, sys_free_idx
 end
 
 function cstr_function(cst::PrototypeJoint,structure::Structure,q, c = get_local_coords(structure))
@@ -222,6 +252,7 @@ function cstr_function(cst::PrototypeJoint,structure::Structure,q, c = get_local
         cache,
         mask_1st,mask_2nd,mask_3rd,mask_4th
     ) = cst
+    # full_idx, free_idx, sys_free_idx = get_joint_idx(cst,indexed)
     (;hen,egg) = hen2egg
     id_hen = hen.bodysig.prop.id
     id_egg = egg.bodysig.prop.id
@@ -257,19 +288,18 @@ function cstr_jacobian(cst::PrototypeJoint,structure::Structure,q,c = get_local_
     (;sys_loci2coords_idx,bodyid2sys_loci_idx) = numbered
     (;
         num_of_cstr,
-        free_idx,
-        sys_free_idx,
         hen2egg,
         cache,
         mask_1st,mask_2nd,mask_3rd,mask_4th
     ) = cst
+    full_idx, free_idx, sys_free_idx = get_joint_idx(cst,indexed)
     (;hen,egg) = hen2egg
     id_hen = hen.bodysig.prop.id
     id_egg = egg.bodysig.prop.id
     nmcs_hen = hen.bodysig.coords.nmcs
     nmcs_egg = egg.bodysig.coords.nmcs
     T = eltype(q)
-    ret = zeros(T,num_of_cstr,length(sys_free_idx))
+    ret = zeros(T,num_of_cstr,length(full_idx))
     q_hen = @view q[bodyid2sys_full_coords[id_hen]]
     q_egg = @view q[bodyid2sys_full_coords[id_egg]]
     # translate
@@ -280,10 +310,9 @@ function cstr_jacobian(cst::PrototypeJoint,structure::Structure,q,c = get_local_
         egg.bodysig.prop.loci[egg.pid].position,
         cache,
         mask_1st,mask_2nd,mask_3rd,mask_4th,
-        free_idx,
         q_hen,q_egg
     )
-    ret
+    @view ret[:,free_idx]
 end
 
 function cstr_forces_jacobian(cst::PrototypeJoint,structure,q,λ)
@@ -296,10 +325,10 @@ function cstr_forces_jacobian(cst::PrototypeJoint,structure,q,λ)
     (;
         num_of_cstr,
         hen2egg,
-        free_idx,
         cache,
         mask_1st,mask_2nd,mask_3rd,mask_4th
     ) = cst
+    full_idx, free_idx, sys_free_idx = get_joint_idx(cst,indexed)
     (;hen,egg) = hen2egg
     id_hen = hen.bodysig.prop.id
     id_egg = egg.bodysig.prop.id
@@ -308,8 +337,8 @@ function cstr_forces_jacobian(cst::PrototypeJoint,structure,q,λ)
     nmcs_hen = hen.bodysig.coords.nmcs
     nmcs_egg = egg.bodysig.coords.nmcs
     T = eltype(λ)
-    num_of_free_idx = length(free_idx)
-    ret = zeros(T,num_of_free_idx,num_of_free_idx)
+    num_of_full_idx = length(full_idx)
+    ret = zeros(T,num_of_full_idx,num_of_full_idx)
     get_joint_forces_jacobian!(
         ret,
         num_of_cstr,
@@ -318,11 +347,10 @@ function cstr_forces_jacobian(cst::PrototypeJoint,structure,q,λ)
         egg.bodysig.prop.loci[egg.pid].position,
         cache,
         mask_1st,mask_2nd,mask_3rd,mask_4th,
-        free_idx,
         q_hen,q_egg,
         λ
     )
-    ret
+    @view ret[free_idx,free_idx]
 end
 
 function cstr_velocity_jacobian(cst::PrototypeJoint,structure,q,q̇)
@@ -335,10 +363,10 @@ function cstr_velocity_jacobian(cst::PrototypeJoint,structure,q,q̇)
     (;
         num_of_cstr,
         hen2egg,
-        free_idx,
         cache,
         mask_1st,mask_2nd,mask_3rd,mask_4th
     ) = cst
+    full_idx, free_idx, sys_free_idx = get_joint_idx(cst,indexed)
     (;hen,egg) = hen2egg
     id_hen = hen.bodysig.prop.id
     id_egg = egg.bodysig.prop.id
@@ -349,8 +377,8 @@ function cstr_velocity_jacobian(cst::PrototypeJoint,structure,q,q̇)
     nmcs_hen = hen.bodysig.coords.nmcs
     nmcs_egg = egg.bodysig.coords.nmcs
     T = eltype(q̇)
-    num_of_free_idx = length(free_idx)
-    ret = zeros(T,num_of_cstr,num_of_free_idx)
+    num_of_full_idx = length(full_idx)
+    ret = zeros(T,num_of_cstr,num_of_full_idx)
     get_joint_velocity_jacobian!(
         ret,
         num_of_cstr,
@@ -359,9 +387,8 @@ function cstr_velocity_jacobian(cst::PrototypeJoint,structure,q,q̇)
         egg.bodysig.prop.loci[egg.pid].position,
         cache,
         mask_1st,mask_2nd,mask_3rd,mask_4th,
-        free_idx,
         q_hen,q_egg,
         q̇_hen,q̇_egg,
     )
-    ret
+    @view ret[:,free_idx]
 end

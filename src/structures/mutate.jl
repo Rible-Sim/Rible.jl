@@ -100,8 +100,6 @@ function update_tensiles!(st::AbstractStructure, jointed::JointedMembers)
         if joint isa PrototypeJoint
             (;
                 num_of_cstr,
-                free_idx,
-                sys_free_idx,
                 hen2egg,
                 cache,
                 mask_1st,mask_2nd,mask_3rd,mask_4th
@@ -109,6 +107,7 @@ function update_tensiles!(st::AbstractStructure, jointed::JointedMembers)
             (;
                 relative_core
             ) = cache
+            _, free_idx, sys_free_idx = get_joint_idx(joint,indexed)
             spring_damper = spring_dampers[joint.id]
             (;mask,k) = spring_damper
             (;hen,egg) = hen2egg

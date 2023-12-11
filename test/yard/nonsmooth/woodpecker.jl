@@ -39,7 +39,7 @@ halfspaces = RB.StaticContactSurfaces(
 # Frictional Contact Dynamics
 
 dt = 1e-4
-tspan = (0.0,3.0)
+tspan = (0.0,1.0)
 
 prob = RB.DynamicsProblem(
     wt,

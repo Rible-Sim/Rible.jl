@@ -184,17 +184,17 @@ function woodpecker(;coordsType = RB.NCF.NC)
     tensioned = @eponymtuple(connected,)
     q_sleeve1,_ = RB.body_state2coords_state(sleeve1)
     cstr_idx = [1,2,5,6]
-    A_linearjoint = zeros(length(cstr_idx),24)
+    A_linearjoint = zeros(length(cstr_idx),12)
     for (i,j) in enumerate(cstr_idx)
         A_linearjoint[i,j] = 1
     end
     js = [
-        RB.RevoluteJoint(1,indexed,RB.Hen2Egg(1,RB.ID(sleeve1,3,1),RB.ID(link1,1,1))),
-        RB.LinearJoint(2,indexed,A_linearjoint,q_sleeve1[cstr_idx]),
+        RB.RevoluteJoint(1,RB.Hen2Egg(1,RB.ID(sleeve1,3,1),RB.ID(link1,1,1))),
+        RB.LinearJoint(2,sleeve1,A_linearjoint,q_sleeve1[cstr_idx]),
         # RB.FixedBodyConstraint(2,indexed,sleeve1)
     ]
     
-    jointed = RB.join(js,indexed)
+    jointed = RB.join(js,)
     cnt = RB.Connectivity(numbered,indexed,tensioned,jointed)
     st = RB.Structure(rigdibodies,tensiles,cnt)
     RB.Robot(st,)

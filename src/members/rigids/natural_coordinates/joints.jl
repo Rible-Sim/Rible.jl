@@ -142,7 +142,6 @@ function get_joint_jacobian!(
         loci_position_egg,
         cache,
         mask_1st,mask_2nd,mask_3rd,mask_4th,
-        free_idx,
         q_hen,q_egg
     )
     (;transformations,hessians) = cache
@@ -150,9 +149,9 @@ function get_joint_jacobian!(
     num_of_coords_hen = get_num_of_coords(nmcs_hen)
     for (icstr,hess) = enumerate(hessians)
         A = q'*hess
-        ret[icstr,:] .= A[1,free_idx]
+        ret[icstr,:] .= A[1,:]
     end
-    ret[mask_1st,:] .+= transformations[mask_1st,free_idx]
+    ret[mask_1st,:] .+= transformations[mask_1st,:]
 end
 
 function get_joint_forces_jacobian!(
@@ -163,14 +162,13 @@ function get_joint_forces_jacobian!(
         loci_position_egg,
         cache,
         mask_1st,mask_2nd,mask_3rd,mask_4th,
-        free_idx,
         q_hen,q_egg,
         λ
     )
     (;hessians) = cache
     ret .= 0.0
     for i = 1:num_of_cstr
-        ret .+= -λ[i] .* hessians[i][free_idx,free_idx]
+        ret .+= -λ[i] .* hessians[i]
     end
 end
 
@@ -182,7 +180,6 @@ function get_joint_velocity_jacobian!(
         loci_position_egg,
         cache,
         mask_1st,mask_2nd,mask_3rd,mask_4th,
-        free_idx,
         q_hen,q_egg,
         q̇_hen,q̇_egg,
     )
@@ -191,6 +188,6 @@ function get_joint_velocity_jacobian!(
         q̇_hen,q̇_egg,
     )
     for i = 1:num_of_cstr
-        ret[[i],:] .= transpose(q̇_jointed)*hessians[i][:,free_idx]
+        ret[[i],:] .= transpose(q̇_jointed)*hessians[i]
     end
 end

@@ -24,7 +24,7 @@ function cstr_forces_jacobian(st::AbstractStructure,q,λ)
     if get_num_of_dims(st) == 3
         foreach(joints) do joint
             joint_cstr_idx = num_of_intrinsic_cstr .+ jointid2sys_extrinsic_cstr_idx[joint.id]
-            jointed_sys_free_idx = joint.sys_free_idx
+            _, _, jointed_sys_free_idx = get_joint_idx(joint,indexed)
             ret[jointed_sys_free_idx,jointed_sys_free_idx] .+= cstr_forces_jacobian(joint,st,q,λ[joint_cstr_idx])
         end
     end
@@ -683,8 +683,6 @@ function build_tangent_stiffness_matrix!(∂Q̌∂q̌,st)
         if joint isa PrototypeJoint
             (;
                 num_of_cstr,
-                free_idx,
-                sys_free_idx,
                 hen2egg,
                 cache,
                 mask_1st,mask_2nd,mask_3rd,mask_4th
@@ -692,6 +690,7 @@ function build_tangent_stiffness_matrix!(∂Q̌∂q̌,st)
             (;
                 relative_core
             ) = cache
+            _, free_idx, sys_free_idx = get_joint_idx(joint,indexed)
             spring_damper = spring_dampers[joint.id]
             (;mask,k) = spring_damper
             (;hen,egg) = hen2egg
