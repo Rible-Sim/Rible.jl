@@ -13,11 +13,11 @@ using SparseMatricesCSR
 using BlockArrays
 using BlockDiagonals
 using SymmetricFormats
-using RowEchelon
 using TypeSortedCollections
-using TypedTables
+using ComponentArrays
 using Tullio
 # data structure
+using TypedTables
 using Interpolations
 using Quaternions
 using Rotations
@@ -25,6 +25,7 @@ using CoordinateTransformations
 using EponymTuples
 using Unitful
 # solvers
+using RowEchelon
 using NLsolve
 import JuMP, COSMO, Clarabel
 using Polyhedra

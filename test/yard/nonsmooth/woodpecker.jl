@@ -39,7 +39,7 @@ halfspaces = RB.StaticContactSurfaces(
 # Frictional Contact Dynamics
 
 dt = 1e-4
-tspan = (0.0,1.0)
+tspan = (0.0,3.0)
 
 prob = RB.DynamicsProblem(
     wt,
@@ -62,17 +62,23 @@ RB.solve!(
     );
     dt,tspan,ftol=1e-10,maxiters=50,verbose=true,
     exception=true,progress=false,
-    max_restart=1
+    max_restart=3
 )
 
 b1g = RB.get_trajectory!(wt,1,0)
 lines(b1g[3,:])
 
 b1vg = RB.get_velocity!(wt,1,0)
+b1vg = RB.get_mid_velocity!(wt,1,0)
 lines(b1vg[3,:])
 
-b1v1 = RB.get_velocity!(wt,1,1)
-lines(b1v1[2,:])
+b1ω = RB.get_mid_angular_velocity!(wt,1)
+b1θ = RB.get_mid_orientation!(wt,1)
+lines(b1θ[3,:],b1ω[1,:])
+
+b2ω = RB.get_mid_angular_velocity!(wt,2)
+b2θ = RB.get_mid_orientation!(wt,2)
+lines(b2θ[3,:],b2ω[1,:])
 
 GM.activate!(;scalefactor=1);plot_traj!(wt;showmesh=false,showground=false)
 
@@ -85,55 +91,68 @@ RB.solve!(
             RB.InteriorPointMethod()
         )
     );
-    dt,tspan,ftol=1e-12,maxiters=50,verbose=true,
+    dt,tspan,ftol=1e-10,maxiters=50,verbose=true,
     exception=false,progress=false,
 )
 
 GM.activate!(;px_per_unit=1,scalefactor = 1);plot_traj!(wt;showmesh=false,showground=false)
 
 
-b1g = RB.get_trajectory!(wt,1,0)
-lines(b1g[3,:])
+b1vg = RB.get_velocity!(wt,1,0)
+lines(b1vg[3,:])
 
-b1v1 = RB.get_velocity!(wt,1,1)
-lines(b1v1[2,:])
+b1ω = RB.get_mid_angular_velocity!(wt,1)
+lines(b1ω[1,:])
+
+b1θ = RB.get_mid_orientation!(wt,1)
+lines(b1θ[3,:],b1ω[1,:])
+
+b2ω = RB.get_mid_angular_velocity!(wt,2)
+lines(b2ω[1,:])
+
+b2θ = RB.get_mid_orientation!(wt,2)
+lines(b2θ[3,:],b2ω[1,:])
 
 
-me = RB.mechanical_energy!(wt;gravity=false)
-Makie.lines(me.E)
 
-using FileIO
-using GLMakie
-brain = load(assetpath("brain.stl"))
+dts = [1e-3,5e-4,2e-4,1e-4,1e-5]
+tspan = (0.0,0.08)
+wt_dts = [
+    begin
+        wt = woodpecker()
+        # Zhong06
+        RB.solve!(
+            RB.DynamicsProblem(
+                wt,
+                halfspaces,
+                RB.RestitutionFrictionCombined(
+                    RB.NewtonRestitution(),
+                    RB.CoulombFriction(),
+                )
+            ),
+            RB.DynamicsSolver(
+                RB.Zhong06(),
+                # RB.MonolithicContactSolver(
+                RB.InnerLayerContactSolver(
+                    RB.InteriorPointMethod()
+                )
+            );
+            dt,tspan,ftol=1e-11,maxiters=50,verbose=false,
+            exception=true,progress=true,
+            max_restart=3
+        ).prob.bot
+    end
+    for dt in dts
+]
 
-GLMakie.activate!(;scalefactor = 1) 
-GM.activate!(;scalefactor = 2) #bug
 
+_,err_avg = RB.get_err_avg(wt_dts;bid=2,pid=2,di=2,field=:traj)
 fig = Figure()
-ax1 = Axis3(fig[1, 1], aspect = :equal, title = "aspect = :equal")
-ax2 = Axis3(fig[1, 2], aspect = :data, title = "aspect = :data")
-for ax in [ax1, ax2]
-    mesh!(ax, brain, color = :gray80)
+ax = Axis(fig[1,1])
+plot_convergence_order!(ax,dts[begin:end-1],err_avg)
+ax2 = Axis(fig[1,2])
+for bot in wt_dts
+    b1r2 = RB.get_trajectory!(bot,2,2)
+    lines!(ax2,bot.traj.t,b1r2[2,:])
 end
-DataInspector(fig)
 fig
-
-using ForwardDiff
-
-ForwardDiff.gradient((x)->atan(x[2],x[1]),[0,1.0])
-using FiniteDiff
-FiniteDiff.finite_difference_gradient((x)->atan(x[2],x[1]),[0,1.0])
-
-R = exp(RB.skew(rand(3)))
-
-rR = rand(RotMatrix3)
-rotation2angles(vec(R))
-RotZYX(rR)
-
-function myfun(x)
-    [x[1]^2,x[2]^2,x[4]*x[2]]
-end
-x = rand(4)
-angles_jacobian = ForwardDiff.jacobian(myfun,x)
-angles_hessians = reshape(ForwardDiff.jacobian(x -> ForwardDiff.jacobian(myfun, x), x),3,4,4)
-

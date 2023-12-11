@@ -45,16 +45,64 @@ end
 function get_mid_velocity!(bot::Robot,bodyid::Int,pid::Int,step_range=:)
     (; structure, traj)= bot
 	(; t, q) = traj
-	T = get_numbertype(bot)
 	h = t[begin+1] - t[begin]
-    ṙp = Vector{T}[]
+	T = get_numbertype(bot)
+    N = get_num_of_dims(bot)
+    velocity_traj = [
+        zeros(T,N)
+        for _ in eachindex(traj)
+    ]
     bodies = get_bodies(structure)
     body = bodies[bodyid]
-    for (qₖ,qₖ₋₁) in zip(traj.q[begin+1:end], traj.q[begin:end-1])
+    for (i,(qₖ,qₖ₋₁)) in enumerate(zip(q[begin+1:end], q[begin:end-1]))
         update_bodies!(structure,(qₖ.+qₖ₋₁)./2,(qₖ.-qₖ₋₁)./h)
-        push!(ṙp,body.state.ṙps[pid])
+        if pid == 0
+            velocity_traj[i] .= body.state.mass_locus_state.frame.velocity
+        else
+	        velocity_traj[i] .= body.state.loci_states[pid].frame.velocity
+		end
     end
-    ṙp[step_range] |> VectorOfArray
+    velocity_traj[begin:end-1][step_range] |> VectorOfArray
+end
+
+function get_mid_angular_velocity!(bot::Robot,bodyid::Int,step_range=:)
+    (; structure, traj)= bot
+	(; t, q) = traj
+	h = t[begin+1] - t[begin]
+	T = get_numbertype(bot)
+    N = get_num_of_dims(bot)
+    M = 2N-3
+    angular_velocity_traj = [
+        zeros(T,M)
+        for _ in eachindex(traj)
+    ]
+    bodies = get_bodies(structure)
+    body = bodies[bodyid]
+    for (i,(qₖ,qₖ₋₁)) in enumerate(zip(q[begin+1:end], q[begin:end-1]))
+        update_bodies!(structure,(qₖ.+qₖ₋₁)./2,(qₖ.-qₖ₋₁)./h)
+        angular_velocity_traj[i] .= body.state.origin_frame.angular_velocity
+    end
+    angular_velocity_traj[begin:end-1][step_range] |> VectorOfArray
+end
+
+function get_mid_orientation!(bot::Robot,bodyid::Int,step_range=:)
+    (; structure, traj)= bot
+	(; t, q) = traj
+	h = t[begin+1] - t[begin]
+	T = get_numbertype(bot)
+    N = get_num_of_dims(bot)
+    M = 2N-3
+    angles_traj = [
+        zeros(T,M)
+        for _ in eachindex(traj)
+    ]
+    bodies = get_bodies(structure)
+    body = bodies[bodyid]
+    for (i,(qₖ,qₖ₋₁)) in enumerate(zip(q[begin+1:end], q[begin:end-1]))
+        update_bodies!(structure,(qₖ.+qₖ₋₁)./2,(qₖ.-qₖ₋₁)./h)
+        angles_traj[i] .= body.state.origin_frame.axes.X |> rotation2angles
+    end
+    angles_traj[begin:end-1][step_range] |> VectorOfArray
 end
 
 function get_orientation!(bot::Robot,bodyid::Int,step_range=:)

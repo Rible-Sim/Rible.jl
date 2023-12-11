@@ -65,7 +65,7 @@ function make_step_k(
         vₖ₊₁,
         invM,
         h,mass_norm)
-    (;F!,Jac_F!,M,A,∂Aᵀλ∂q,∂Aq̇∂q,solver) = solver_cache.cache
+    (;F!,Jac_F!,M,A,Φ,∂Aᵀλ∂q,∂Aq̇∂q,solver) = solver_cache.cache
     (;θ) = solver.integrator
 
     n1 = nq
@@ -100,12 +100,14 @@ function make_step_k(
                         (h^2) .*F
 
         𝐫𝐞𝐬[n1+1:n2] .= -mass_norm.*h.*Aₖ₊₁*vₖ₊₁
+        # 𝐫𝐞𝐬[n1+1:n2] .= -mass_norm.*Φ(qₖ₊₁)
         
         𝐉 .= 0.0
         𝐉[   1:n1,   1:n1] .=  1/θ .*M .-h^2 .*(θ .*∂F∂q .+ 1/h.*∂F∂q̇) .- mass_norm.*∂Aᵀλ∂q(qₖ₊₁,λₖ₊₁)
         𝐉[   1:n1,n1+1:n2] .= -mass_norm.*transpose(Aₖ₊₁)
 
         𝐉[n1+1:n2,   1:n1] .= -mass_norm.*(h.*∂Aq̇∂q(qₖ₊₁,vₖ₊₁) .+ 1/θ.*Aₖ₊₁)
+        # 𝐉[n1+1:n2,   1:n1] .= -mass_norm.*Aₖ₊₁
 
         lu𝐉 = lu(𝐉)
 
@@ -227,7 +229,7 @@ function solve!(sim::Simulator,solver_cache::Moreau_CCP_Constant_Mass_Cache;
             dt,mass_norm
         )
         restart_count = 0
-        Λ_guess = 100.0
+        Λ_guess = 10.0
         while restart_count < 10
             Λₖ₊₁ .= repeat([Λ_guess,0,0],na)
             x[      1:nq]          .= qₖ₊₁
@@ -246,12 +248,20 @@ function solve!(sim::Simulator,solver_cache::Moreau_CCP_Constant_Mass_Cache;
                     timestep,iteration
                 )
                 normRes = norm(Res)
+                if  normRes < ftol
+                    isconverged = true
+                    iteration_break = iteration-1
+                    break
+                elseif normRes > 1e10
+                    # force restart
+                    iteration_break = iteration-1
+                    isconverged = false
+                    break
+                elseif iteration == maxiters
+                    iteration_break = iteration-1
+                    isconverged = false
+                end
                 if na == 0
-                    if normRes < ftol
-                        isconverged = true
-                        iteration_break = iteration-1
-                        break
-                    end
                     Δx .= luJac\(-Res)
                     x .+= Δx
                 else # na!=0
@@ -286,19 +296,6 @@ function solve!(sim::Simulator,solver_cache::Moreau_CCP_Constant_Mass_Cache;
                     ΔΛₖ₊₁ .= Λₖ₊₁ - Λʳₖ₊₁
                     minusResΛ = -Res + 𝐁*(ΔΛₖ₊₁)
                     normRes = norm(minusResΛ)
-                    if  normRes < ftol
-                        isconverged = true
-                        iteration_break = iteration-1
-                        break
-                    elseif normRes > 1e10
-                        # force restart
-                        iteration_break = iteration-1
-                        isconverged = false
-                        break
-                    elseif iteration == maxiters
-                        iteration_break = iteration-1
-                        isconverged = false
-                    end
                     Δx .= luJac\minusResΛ
                     Λʳₖ₊₁ .= Λₖ₊₁
                     x .+= Δx

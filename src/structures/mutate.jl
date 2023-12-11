@@ -45,8 +45,9 @@ function rotation2angles(R::AbstractMatrix{T}) where {T}
     if R31 < 1
         if R31 > -1
             θy = asin(-R31)
-            θz = atan(R[2,1],R[1,1])
-            θx = atan(R[3,2],R[3,3])
+            cosθy = cos(θy)
+            θz = atan((R[2,1])/cosθy,(R[1,1])/cosθy)
+            θx = atan((R[3,2])/cosθy,(R[3,3])/cosθy)
         else # R31 == -1
             # Not a unique solution
             θx = zero(T)
@@ -60,6 +61,10 @@ function rotation2angles(R::AbstractMatrix{T}) where {T}
         θz = atan(-R[2,3],R[2,2])
     end
     [θz,θy,θx]
+    c1 = [1.0,0,0]×(R[:,1]/norm(R[:,1]))
+    c2 = [0,1.0,0]×(R[:,2]/norm(R[:,2]))
+    c3 = [0,0,1.0]×(R[:,3]/norm(R[:,3]))
+    asin.([0,0,c3[1]])
 end
 
 function make_jointed2angles(hen2egg,relative_core)
@@ -74,9 +79,10 @@ function make_jointed2angles(hen2egg,relative_core)
         q_egg = @view q_jointed[num_of_coords_hen+1:end]
         X_hen = NCF.get_X(nmcs_hen,q_hen)
         X_egg = NCF.get_X(nmcs_egg,q_egg)
-        relative_axes = X_egg*relative_core*X_hen'
-        angles = rotation2angles(relative_axes)
-        angles = [0,0,acos(X_hen[:,2]'*X_egg[:,2]/(norm(X_hen[:,2])*norm(X_egg[:,2])))]
+        relative_axes = X_egg*X_hen'
+        # angles = [0,0,acos(X_hen[:,2]'*X_egg[:,2]/(norm(X_hen[:,2])*norm(X_egg[:,2])))]
+        angles = rotation2angles(relative_axes) 
+        angles
     end
 end
 

@@ -551,10 +551,10 @@ end
 Return System potential energy
 $(TYPEDSIGNATURES)
 """
-function potential_energy_gravity(st::Structure)
+function potential_energy_gravity(st::Structure;factor=1000)
     V = Ref(zero(get_numbertype(st)))
     foreach(st.bodies) do body
-        V[] += potential_energy_gravity(body)
+        V[] += factor*potential_energy_gravity(body)
     end
     V[]
 end
