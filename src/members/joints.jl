@@ -26,8 +26,7 @@ function LinearJoint(id,body,A,violations)
     LinearJoint(id,body,num_of_cstr,A,violations)
 end
 
-function get_joint_idx(cst::LinearJoint,indexed)
-    (;bodyid2sys_free_coords) = indexed
+function get_joint_idx(cst::LinearJoint,bodyid2sys_free_coords)
     (;body) = cst
     bid = body.prop.id
     nmcs = body.coords.nmcs
@@ -42,27 +41,26 @@ end
 
 function cstr_function(cst::LinearJoint,structure,q,c)
     (;indexed) = structure.connectivity
-    full_idx, free_idx, sys_free_idx = get_joint_idx(cst,indexed)
+    sys_free_idx = indexed.jointid2sys_free_idx[cst.id]
     (;A,violations) = cst
     A*q[sys_free_idx] .- violations
 end
 
 function cstr_jacobian(cst::LinearJoint,structure,q)
     (;indexed) = structure.connectivity
-    full_idx, free_idx, sys_free_idx = get_joint_idx(cst,indexed)
     cst.A
 end
 
 function cstr_forces_jacobian(cst::LinearJoint,structure,q,λ)
     (;indexed) = structure.connectivity
-    full_idx, free_idx, sys_free_idx = get_joint_idx(cst,indexed)
+    sys_free_idx = indexed.jointid2sys_free_idx[cst.id]
     n = length(sys_free_idx)
     zeros(eltype(λ),n,n)
 end
 
 function cstr_velocity_jacobian(cst::LinearJoint,structure,q,q̇)
     (;indexed) = structure.connectivity
-    full_idx, free_idx, sys_free_idx = get_joint_idx(cst,indexed)
+    sys_free_idx = indexed.jointid2sys_free_idx[cst.id]
     (;num_of_cstr,) = cst
     n = length(sys_free_idx)
     zeros(eltype(q̇),num_of_cstr,n)
@@ -209,12 +207,7 @@ function PrototypeJoint(id,hen2egg,joint_type::Symbol)
     )
 end
 
-function get_joint_idx(cst::PrototypeJoint,indexed)
-    (;bodyid2sys_free_coords,
-      bodyid2sys_full_coords,
-      num_of_free_coords,
-      num_of_full_coords,
-    ) = indexed
+function get_joint_idx(cst::PrototypeJoint,bodyid2sys_free_coords)
     (;hen,egg) = cst.hen2egg
     id_hen = hen.bodysig.prop.id
     id_egg = egg.bodysig.prop.id
@@ -242,7 +235,7 @@ function get_joint_idx(cst::PrototypeJoint,indexed)
     full_idx, free_idx, sys_free_idx
 end
 
-function cstr_function(cst::PrototypeJoint,structure::Structure,q, c = get_local_coords(structure))
+function cstr_function(joint::PrototypeJoint,structure::Structure,q, c = get_local_coords(structure))
     (;indexed,numbered) = structure.connectivity
     (;bodyid2sys_full_coords) = indexed
     (;sys_loci2coords_idx,bodyid2sys_loci_idx) = numbered
@@ -251,8 +244,7 @@ function cstr_function(cst::PrototypeJoint,structure::Structure,q, c = get_local
         violations,
         cache,
         mask_1st,mask_2nd,mask_3rd,mask_4th
-    ) = cst
-    # full_idx, free_idx, sys_free_idx = get_joint_idx(cst,indexed)
+    ) = joint
     (;hen,egg) = hen2egg
     id_hen = hen.bodysig.prop.id
     id_egg = egg.bodysig.prop.id
@@ -264,7 +256,7 @@ function cstr_function(cst::PrototypeJoint,structure::Structure,q, c = get_local
     q_egg = @view q[bodyid2sys_full_coords[id_egg]]
     q = vcat(q_hen,q_egg)
     # cstr violations
-    # @show cst.id
+    # @show joint.id
     get_joint_violations!(
         ret,
         nmcs_hen, nmcs_egg,
@@ -278,12 +270,14 @@ function cstr_function(cst::PrototypeJoint,structure::Structure,q, c = get_local
     ret
 end
 
-function cstr_jacobian(cst::PrototypeJoint,structure::Structure,q,c = get_local_coords(structure))
+function cstr_jacobian(joint::PrototypeJoint,structure::Structure,q,c = get_local_coords(structure))
     (;indexed,numbered) = structure.connectivity
     (;bodyid2sys_free_coords,
       bodyid2sys_full_coords,
       num_of_free_coords,
       num_of_full_coords,
+      jointid2full_idx,
+      jointid2free_idx,
     ) = indexed
     (;sys_loci2coords_idx,bodyid2sys_loci_idx) = numbered
     (;
@@ -291,8 +285,9 @@ function cstr_jacobian(cst::PrototypeJoint,structure::Structure,q,c = get_local_
         hen2egg,
         cache,
         mask_1st,mask_2nd,mask_3rd,mask_4th
-    ) = cst
-    full_idx, free_idx, sys_free_idx = get_joint_idx(cst,indexed)
+    ) = joint
+    full_idx = jointid2full_idx[joint.id]
+    free_idx = jointid2free_idx[joint.id]
     (;hen,egg) = hen2egg
     id_hen = hen.bodysig.prop.id
     id_egg = egg.bodysig.prop.id
@@ -315,20 +310,23 @@ function cstr_jacobian(cst::PrototypeJoint,structure::Structure,q,c = get_local_
     @view ret[:,free_idx]
 end
 
-function cstr_forces_jacobian(cst::PrototypeJoint,structure,q,λ)
+function cstr_forces_jacobian(joint::PrototypeJoint,structure,q,λ)
     (;indexed,numbered) = structure.connectivity
     (;bodyid2sys_free_coords,
       bodyid2sys_full_coords,
       num_of_free_coords,
       num_of_full_coords,
+      jointid2full_idx,
+      jointid2free_idx
     ) = indexed
     (;
         num_of_cstr,
         hen2egg,
         cache,
         mask_1st,mask_2nd,mask_3rd,mask_4th
-    ) = cst
-    full_idx, free_idx, sys_free_idx = get_joint_idx(cst,indexed)
+    ) = joint
+    full_idx = jointid2full_idx[joint.id]
+    free_idx = jointid2free_idx[joint.id]
     (;hen,egg) = hen2egg
     id_hen = hen.bodysig.prop.id
     id_egg = egg.bodysig.prop.id
@@ -353,20 +351,23 @@ function cstr_forces_jacobian(cst::PrototypeJoint,structure,q,λ)
     @view ret[free_idx,free_idx]
 end
 
-function cstr_velocity_jacobian(cst::PrototypeJoint,structure,q,q̇)
+function cstr_velocity_jacobian(joint::PrototypeJoint,structure,q,q̇)
     (;indexed,numbered) = structure.connectivity
     (;bodyid2sys_free_coords,
       bodyid2sys_full_coords,
       num_of_free_coords,
       num_of_full_coords,
+      jointid2full_idx,
+      jointid2free_idx
     ) = indexed
     (;
         num_of_cstr,
         hen2egg,
         cache,
         mask_1st,mask_2nd,mask_3rd,mask_4th
-    ) = cst
-    full_idx, free_idx, sys_free_idx = get_joint_idx(cst,indexed)
+    ) = joint
+    full_idx = jointid2full_idx[joint.id]
+    free_idx = jointid2free_idx[joint.id]
     (;hen,egg) = hen2egg
     id_hen = hen.bodysig.prop.id
     id_egg = egg.bodysig.prop.id

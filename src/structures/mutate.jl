@@ -94,6 +94,9 @@ function update_tensiles!(st::AbstractStructure, jointed::Jointed)
       bodyid2sys_full_coords,
       num_of_free_coords,
       num_of_full_coords,
+      jointid2full_idx,
+      jointid2free_idx,
+      jointid2sys_free_idx
     ) = indexed
     q = get_coords(st)
     foreach(jointed.joints) do joint
@@ -107,7 +110,9 @@ function update_tensiles!(st::AbstractStructure, jointed::Jointed)
             (;
                 relative_core
             ) = cache
-            _, free_idx, sys_free_idx = get_joint_idx(joint,indexed)
+            full_idx = jointid2full_idx[joint.id]
+            free_idx = jointid2free_idx[joint.id]
+            sys_free_idx = jointid2sys_free_idx[joint.id]
             spring_damper = spring_dampers[joint.id]
             (;mask,k) = spring_damper
             (;hen,egg) = hen2egg

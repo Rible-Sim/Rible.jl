@@ -24,7 +24,7 @@ function cstr_forces_jacobian(st::AbstractStructure,q,λ)
     if get_num_of_dims(st) == 3
         foreach(joints) do joint
             joint_cstr_idx = num_of_intrinsic_cstr .+ jointid2sys_extrinsic_cstr_idx[joint.id]
-            _, _, jointed_sys_free_idx = get_joint_idx(joint,indexed)
+            jointed_sys_free_idx = indexed.jointid2sys_free_idx[joint.id]
             ret[jointed_sys_free_idx,jointed_sys_free_idx] .+= cstr_forces_jacobian(joint,st,q,λ[joint_cstr_idx])
         end
     end
@@ -53,7 +53,7 @@ function cstr_velocity_jacobian(st::AbstractStructure,q,q̇)
     if get_num_of_dims(st) == 3
         foreach(joints) do joint
             joint_cstr_idx = num_of_intrinsic_cstr .+ jointid2sys_extrinsic_cstr_idx[joint.id]
-            jointed_sys_free_idx = joint.sys_free_idx
+            jointed_sys_free_idx = indexed.jointid2sys_free_idx[joint.id]
             ret[joint_cstr_idx,jointed_sys_free_idx] .= cstr_velocity_jacobian(joint,st,q,q̇)
         end
     end
@@ -627,7 +627,14 @@ function build_tangent_stiffness_matrix!(∂Q̌∂q̌,st)
     (;tensioned,indexed,jointed) = connectivity
     (;cables,spring_dampers) = st.tensiles
     (;connected) = tensioned
-    (;num_of_free_coords,bodyid2sys_free_coords,bodyid2sys_full_coords) = indexed
+    (;
+        num_of_free_coords,
+        bodyid2sys_free_coords,
+        bodyid2sys_full_coords,
+        jointid2full_idx,
+        jointid2free_idx,
+        jointid2sys_free_idx
+    ) = indexed
     T = get_numbertype(st)
     num_of_dim = get_num_of_dims(st)
     # ∂Q̌∂q̌ = zeros(T,num_of_free_coords,num_of_free_coords)
@@ -690,7 +697,9 @@ function build_tangent_stiffness_matrix!(∂Q̌∂q̌,st)
             (;
                 relative_core
             ) = cache
-            _, free_idx, sys_free_idx = get_joint_idx(joint,indexed)
+            full_idx = jointid2full_idx[joint.id]
+            free_idx = jointid2free_idx[joint.id]
+            sys_free_idx = jointid2sys_free_idx[joint.id]
             spring_damper = spring_dampers[joint.id]
             (;mask,k) = spring_damper
             (;hen,egg) = hen2egg

@@ -96,20 +96,23 @@ function connect_and_cluster(rbs, cm_input, cm2_input)
     return (connected=ret1, clustered=ret2)
 end
 
-struct Indexed{mem2sysType,sysType}
+struct Indexed{id2idxType,idxType}
     num_of_full_coords::Int
     num_of_free_coords::Int
     num_of_pres_coords::Int
     num_of_bodies::Int
-    bodyid2sys_full_coords::mem2sysType
-    bodyid2sys_free_coords::mem2sysType
-    bodyid2sys_pres_coords::mem2sysType
-    sys_free_idx::sysType
-    sys_pres_idx::sysType
+    bodyid2sys_full_coords::id2idxType
+    bodyid2sys_free_coords::id2idxType
+    bodyid2sys_pres_coords::id2idxType
+    sys_free_idx::idxType
+    sys_pres_idx::idxType
     num_of_intrinsic_cstr::Int
-    bodyid2sys_intrinsic_cstr_idx::mem2sysType
+    bodyid2sys_intrinsic_cstr_idx::id2idxType
     sys_num_of_dof::Int
-    bodyid2sys_dof_idx::mem2sysType
+    bodyid2sys_dof_idx::id2idxType
+    jointid2full_idx::id2idxType
+    jointid2free_idx::id2idxType
+    jointid2sys_free_idx::id2idxType
 end
 
 function index_incstr(rbs)
@@ -137,7 +140,11 @@ function index_incstr(rbs)
     num_of_intrinsic_cstr,bodyid2sys_intrinsic_cstr_idx,sys_num_of_dof,bodyid2sys_dof_idx
 end
 
-function index(rbs,sharing_input=Int[;;])
+
+function index(rbs,sharing_input::AbstractMatrix=Int[;;])
+end
+
+function index(rbs,jointed::Jointed,sharing_input::AbstractMatrix=Int[;;])
     ids,num_of_bodies = check_id_sanity(rbs)
     if size(sharing_input,2) > num_of_bodies
         @warn "Cropping the sharing matrix."
@@ -204,15 +211,25 @@ function index(rbs,sharing_input=Int[;;])
         end
     end
     num_of_intrinsic_cstr,bodyid2sys_intrinsic_cstr_idx,sys_num_of_dof,bodyid2sys_dof_idx = index_incstr(rbs)
+    
+    (;njoints,joints) = jointed
+    jointid2full_idx = Vector{Vector{Int}}(undef,njoints)
+    jointid2free_idx = Vector{Vector{Int}}(undef,njoints)
+    jointid2sys_free_idx = Vector{Vector{Int}}(undef,njoints)
+    foreach(joints) do joint
+        (;id) = joint
+        jointid2full_idx[id], jointid2free_idx[id], jointid2sys_free_idx[id] = 
+        get_joint_idx(joint,bodyid2sys_free_coords)
+    end
     Indexed(
         length(sysfull),length(sys_free_idx),length(sys_pres_idx),num_of_bodies,
         bodyid2sys_full_coords,bodyid2sys_free_coords,bodyid2sys_pres_coords,
         sys_free_idx,sys_pres_idx,
         num_of_intrinsic_cstr,bodyid2sys_intrinsic_cstr_idx,
-        sys_num_of_dof,bodyid2sys_dof_idx
+        sys_num_of_dof,bodyid2sys_dof_idx,
+        jointid2full_idx,jointid2free_idx,jointid2sys_free_idx
     )
 end
-
 
 struct Numbered
     "body's loci' idx to System's loci' idx"
