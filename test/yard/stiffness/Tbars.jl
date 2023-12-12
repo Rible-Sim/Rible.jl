@@ -1,25 +1,26 @@
-figdir::String = ""
-if Sys.iswindows()
-    figdir::String = raw"C:\Users\luo22\OneDrive\Papers\FrictionalContact\CMAME"
-elseif Sys.isapple()
-    figdir::String = raw"/Users/jacob/Library/CloudStorage/OneDrive-SharedLibraries-onedrive/Papers/FrictionalContact/CMAME"
-end
-#-- end
-
 include("deps.jl")
 using AbbreviatedStackTraces #jl
 ENV["JULIA_STACKTRACE_ABBREVIATED"] = true #jl
 ENV["JULIA_STACKTRACE_MINIMAL"] = true #jl
+using Revise #jl
 import Rible as RB
+figdir::String = joinpath(pathof(RB),"../../tmp")
+if Sys.iswindows() #src
+    figdir::String = raw"C:\Users\luo22\OneDrive\Papers\FrictionalContact\CMAME" #src
+elseif Sys.isapple() #src
+    figdir::String = raw"/Users/jacob/Library/CloudStorage/OneDrive-SharedLibraries-onedrive/Papers/FrictionalContact/CMAME" #src
+end #src
 include("../../vis.jl")
 includet("../../vis.jl") #jl
 
 #-- T bars
+include("../../../examples/bodies/make_3d_bar.jl")
+includet("../../../examples/bodies/make_3d_bar.jl") #jl
 include("../../../examples/robots/Tbars.jl")
 includet("../../../examples/robots/Tbars.jl")#jl
 tbbot = Tbars(;θ=π/4)
 bot = tbbot
-@myshow bot.structure.num_of_dof
+@myshow bot.structure.connectivity.indexed.num_of_dof
 bodies = RB.get_bodies(bot)
 body1 = bodies[1]
 dt = 1e-3
@@ -111,10 +112,10 @@ bot = tbbot
 RB.check_static_equilibrium_output_multipliers(bot.structure)
 
 function nullspace_on_free(st)    
-    (;sys_free_idx,bodyid2sys_full_coords,bodyid2sys_dof_idx) = st.connectivity.indexed
+    (;sys_free_coords_idx,bodyid2sys_full_coords,bodyid2sys_dof_idx) = st.connectivity.indexed
     q = RB.get_coords(bot.structure)
     Nin = RB.intrinsic_nullspace(st,q)[
-        sys_free_idx,
+        sys_free_coords_idx,
         reduce(vcat,bodyid2sys_dof_idx[2:end])
     ]
     I3 = I(3)

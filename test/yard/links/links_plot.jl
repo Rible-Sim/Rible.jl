@@ -89,11 +89,11 @@ function update_strings!(scene,sts)
 end
 update_strings!(scene,sts)
 =======
-function update_tensiles!(scene,sts)
+function update_apparatuses!(scene,sts)
     lss = [string2linesegment(st) for st in sts]
     scene.plots[end].input_args[1][] = lss
 end
-update_tensiles!(scene,sts)
+update_apparatuses!(scene,sts)
 >>>>>>> Stashed changes
 
 function update_scene!(scene,tgsys,q,q̇)
@@ -104,7 +104,7 @@ function update_scene!(scene,tgsys,q,q̇)
 <<<<<<< Updated upstream
     update_strings!(scene,tgsys.strings)
 =======
-    update_tensiles!(scene,tgsys.cables)
+    update_apparatuses!(scene,tgsys.cables)
 >>>>>>> Stashed changes
 end
 update_scene!(scene,tgsys,state.qs[1],state.q̇s[1])

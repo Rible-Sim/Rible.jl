@@ -200,7 +200,7 @@ acs = [
         zeros(ncables_prism)
     ),
 ]
-force_elements = (cables = cables,)
+apparatuses = (cables = cables,)
 hub = (actuators = acs,)
 
 
@@ -218,41 +218,41 @@ hub = (actuators = acs,)
 if p == 3
     csts_bar2bar = [
         # one to two
-        RB.PinJoint(1,RB.Hen2Egg(1,
+        RB.PinJoint(1,RB.Hen2Egg(
                 RB.ID(bars[    1][cm[4]],1),
                 RB.ID(bars[n+1][cm[8]],1)
         )),
-        RB.PinJoint(2,RB.Hen2Egg(2,
+        RB.PinJoint(2,RB.Hen2Egg(
                 RB.ID(bars[    1][cm[5]],1),
                 RB.ID(bars[n+1][cm[7]],1)
         )),
-        RB.PinJoint(3,RB.Hen2Egg(3,
+        RB.PinJoint(3,RB.Hen2Egg(
                 RB.ID(bars[    1][cm[3]],2),
                 RB.ID(bars[n+1][cm[11]],2)
         )),
-        RB.PinJoint(4,RB.Hen2Egg(4,
+        RB.PinJoint(4,RB.Hen2Egg(
                 RB.ID(bars[    1][cm[2]],2),
                 RB.ID(bars[n+1][cm[12]],2)
         )),
         # one to three
-        RB.PinJoint(5,RB.Hen2Egg(5,
+        RB.PinJoint(5,RB.Hen2Egg(
                 RB.ID(bars[     1][cm[ 3]],1),
                 RB.ID(bars[2n+1][cm[13]],1)
         )),
-        RB.PinJoint(6,RB.Hen2Egg(6,
+        RB.PinJoint(6,RB.Hen2Egg(
                 RB.ID(bars[     1][cm[ 4]],1),
                 RB.ID(bars[2n+1][cm[18]],1)
         )),
-        RB.PinJoint(7,RB.Hen2Egg(7,
+        RB.PinJoint(7,RB.Hen2Egg(
                 RB.ID(bars[     1][cm[ 1]],2),
                 RB.ID(bars[2n+1][cm[17]],2)
         )),
-        RB.PinJoint(8,RB.Hen2Egg(8,
+        RB.PinJoint(8,RB.Hen2Egg(
                 RB.ID(bars[     1][cm[ 2]],2),
                 RB.ID(bars[2n+1][cm[16]],2)
         )),
         # two to three
-        RB.PinJoint(9,RB.Hen2Egg(9,
+        RB.PinJoint(9,RB.Hen2Egg(
                 RB.ID(bars[ n+1][cm[ 9]],1),
                 RB.ID(bars[2n+1][cm[17]],1)
         )),
@@ -270,6 +270,6 @@ end
 
 cnt = RB.Connectivity(numberedpoints,indexedcoords,@eponymtuple(connected,),jointedmembers)
 
-st = RB.Structure(rbs,force_elements,cnt)
+st = RB.Structure(rbs,apparatuses,cnt)
 bot = RB.Robot(st,hub)
 end

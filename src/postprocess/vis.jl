@@ -90,66 +90,49 @@ function MakieCore.plot!(viz::Viz{Tuple{S}};
     viz
 end
 
-function MakieCore.plot!(viz::Viz{Tuple{Vector{S}}};
-    ) where S <: DistanceSpringDamper
-    cables_ob = viz[:structure]
-    point_mid_ob = lift(cables_ob) do cables_ob
-        [
-            begin 
-                point_start = cab.state.start
-                point_stop = cab.state.stop 
-                (point_start .+ point_stop)./2 |> GB.Point
-            end
-            for cab in cables_ob
-        ]
+function MakieCore.plot!(viz::Viz{Tuple{S}};
+    ) where S <: Apparatus{false, true,<:CableJoint}
+    cable_appar_ob = viz[:structure]
+
+    seg_ob = lift(cable_appar_ob) do cab
+        point_start = cab.force.state.start |> GB.Point
+        point_stop = cab.force.state.stop |> GB.Point
+        [(point_start,point_stop)]
     end
 
-    slackseg_ob = lift(cables_ob) do cables_ob
-        [
-            begin 
-                point_start = cab.state.start |> GB.Point
-                point_stop = cab.state.stop |> GB.Point
-                (point_start,point_stop)
-            end
-            for cab in cables_ob if cab.state.length <= cab.state.restlen
-        ]
-    end
-
-    noslackseg_ob = lift(cables_ob) do cables_ob
-        [
-            begin 
-                point_start = cab.state.start |> GB.Point
-                point_stop = cab.state.stop |> GB.Point
-                (point_start,point_stop)
-            end
-            for cab in cables_ob if cab.state.length > cab.state.restlen
-        ]
-    end
-
-    ids_ob = lift(cables_ob) do cables_ob
-        [
-            "c$(cab.id)"
-            for cab in cables_ob
-        ]
-    end
     # slackonly=false,
     # noslackonly=true
+    linestyle_ob = lift(cable_appar_ob) do cab
+        if cab.force.state.length > cab.force.state.restlen
+            return :solid
+        else
+            return viz.slack_linestyle[]
+        end
+    end
+
     MakieCore.linesegments!(
-        viz, noslackseg_ob, 
+        viz, seg_ob, 
         color = viz.cablecolor[], 
         linewidth = viz.cablewidth[], 
-        linestyle = :solid
+        linestyle = linestyle_ob
     )
-    MakieCore.linesegments!(
-        viz, slackseg_ob, 
-        color = viz.cablecolor[], 
-        linewidth = viz.cablewidth[], 
-        linestyle = viz.slack_linestyle[]
-    )
+
+    point_mid_ob = lift(cable_appar_ob) do cab
+        point_start = cab.force.state.start
+        point_stop = cab.force.state.stop 
+        (point_start .+ point_stop)./2 |> GB.Point
+    end
+
+
+    id_ob = lift(cable_appar_ob) do cab
+        "c$(cab.id)"
+    end
+  
+
     # show cable labels
     if viz.show_cable_labels[]
         MakieCore.text!(viz,
-            ids_ob,
+            id_ob,
             position = point_mid_ob,
             color = viz.cablelabelcolor[],
             align = (:left, :top),
@@ -188,19 +171,35 @@ function MakieCore.plot!(viz::Viz{Tuple{S}};
         show_nodes = viz.show_nodes[]
     end
     tgob = viz[:structure]
-    (;force_elements,num_of_bodies) = tgob[]
-    ncables = length(force_elements.cables)
-    if ncables > 0 && viz.showcables[]
-        cables_ob = lift(tgob) do tgob
-            tgob.force_elements.cables
+    (;connectivity) = tgob[]
+    (;num_of_bodies,) = connectivity.indexed
+    cable_apparatuses_ob = lift(tgob) do tgob
+        filter(sort(tgob.apparatuses)) do appar
+            appar.joint isa CableJoint
         end
-        viz!(viz,cables_ob;
-            cablecolor,
-            cablewidth = viz.cablewidth[],
-            cablelabelcolor = viz.cablelabelcolor[],
-            slack_linestyle = viz.slack_linestyle[],
-            show_cable_labels,
-        )
+    end
+
+    ncables = length(cable_apparatuses_ob[])
+
+    cables_array_ob = [
+        begin
+            lift(cable_apparatuses_ob) do cable_apparatuses_ob
+                cable_apparatuses_ob[i]
+            end
+        end
+        for i = 1:ncables
+    ]
+
+    if ncables > 0 && viz.showcables[]
+        for cable_ob in cables_array_ob
+            viz!(viz,cable_ob;
+                cablecolor,
+                cablewidth = viz.cablewidth[],
+                cablelabelcolor = viz.cablelabelcolor[],
+                slack_linestyle = viz.slack_linestyle[],
+                show_cable_labels,
+            )
+        end
     end
     if num_of_bodies > 0
         bodies_ob = lift(tgob) do tgob
@@ -321,7 +320,7 @@ end
 
 function get_linesegs_cables(structure;slackonly=false,noslackonly=false)
     (;connected) = structure.connectivity.tensioned
-    (;cables) = structure.force_elements
+    (;cables) = structure.apparatuses
     ndim = get_num_of_dims(structure)
     T = get_numbertype(structure)
     linesegs_cables = Vector{Tuple{Point{ndim,T},Point{ndim,T}}}()

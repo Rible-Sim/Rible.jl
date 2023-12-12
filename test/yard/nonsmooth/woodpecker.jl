@@ -2,6 +2,7 @@ include("deps.jl")
 using AbbreviatedStackTraces #jl
 ENV["JULIA_STACKTRACE_ABBREVIATED"] = true #jl
 ENV["JULIA_STACKTRACE_MINIMAL"] = true #jl
+using Revise #jl
 import Rible as RB
 figdir::String = joinpath(pathof(RB),"../../tmp")
 if Sys.iswindows() #src

@@ -135,8 +135,8 @@ function make_new_tail(n)
         ks[i] = ifelse(j ∈ [1, 0], 100, 100.0)
     end
     cables =
-        [RB.DistanceSpringDamper2D(i, 0.5original_restlens[i], ks[i], 0.0) for i = 1:ncables]  #
-    force_elements = (cables = cables,)
+        [RB.DistanceSpringDamper2D( 0.5original_restlens[i], ks[i], 0.0) for i = 1:ncables]  #
+    apparatuses = (cables = cables,)
     acs = [
         RB.ManualActuator(1,
             [4(i-1)+j for i = 1:n for j = 1:4],
@@ -164,7 +164,7 @@ function make_new_tail(n)
     tensioned = @eponymtuple(connected,)
     cnt = RB.Connectivity(numberedpoints, indexedcoords, tensioned)
 
-    st = RB.Structure(rigdibodies, force_elements, cnt)
+    st = RB.Structure(rigdibodies, apparatuses, cnt)
     bot = RB.Robot(st, hub)
 end
 
@@ -188,7 +188,7 @@ function dynfuncs(bot)
     function F!(F,q,q̇,t)
         RB.clear_forces!(st)
         RB.update_bodies!(st,q,q̇)
-        RB.update_tensiles!(st)
+        RB.update_apparatuses!(st)
         ## RB.apply_gravity!(st)
         RB.assemble_forces!(st)
         RB.get_force!(F,st)

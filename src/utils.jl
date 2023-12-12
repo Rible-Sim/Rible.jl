@@ -175,14 +175,23 @@ $(TYPEDEF)
 $(TYPEDFIELDS)
 """
 struct Hen2Egg{henType<:ID,eggType<:ID}
-    "id"
-    id::Int
     "hen/parent/predecessor"
     hen::henType
     "egg/child/successor"
     egg::eggType
 end
 
-function Base.isless(a::Hen2Egg,b::Hen2Egg)
-    isless(a.id,b.id)
+
+function get_ids(things)
+    ids = mapreduce(get_id,vcat,things;init=Int[])
+    nb = length(ids)
+    ids,nb
+end
+
+function check_id_sanity(things)
+    ids,nb = get_ids(things)
+    @assert minimum(ids) == 1
+    @assert maximum(ids) == nb
+    @assert allunique(ids)
+    ids,nb
 end

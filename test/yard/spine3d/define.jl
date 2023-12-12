@@ -65,8 +65,8 @@ function spine3d(n;c=0.0)
     ks = repeat(vcat(fill(kH,4),fill(kR,4)),n-1)
     # c = 0.0
     cs = repeat(fill(c,8),n-1)
-    cables = [RB.DistanceSpringDamper3D(i,stringlens[i],ks[i],cs[i]) for i = 1:ncables]
-    force_elements = (cables=cables,)
+    cables = [RB.DistanceSpringDamper3D(stringlens[i],ks[i],cs[i]) for i = 1:ncables]
+    apparatuses = (cables=cables,)
     acs = [RB.ManualActuator(RB.SimpleRegistor(8(i-1)+j,stringlens[8(i-1)+j])) for i = 1:n-1  for j = 1:6]
     hub = (actuators=acs,)
 
@@ -104,6 +104,6 @@ function spine3d(n;c=0.0)
 	# display(matrix_cnt)
     connections = RB.connect(rigdibodies, matrix_cnt)
     cnt = RB.Connectivity(numberedpoints, indexedcoords, connections)
-    st = RB.Structure(rigdibodies,force_elements,cnt)
+    st = RB.Structure(rigdibodies,apparatuses,cnt)
     bot = RB.Robot(st,hub)
 end

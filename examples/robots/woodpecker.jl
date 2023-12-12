@@ -169,7 +169,7 @@ function woodpecker(;coordsType = RB.NCF.NC)
         A_linearjoint[i,j] = 1
     end
     js = [
-        RB.RevoluteJoint(1,RB.Hen2Egg(1,RB.ID(sleeve1,3,1),RB.ID(link1,1,1))),
+        RB.RevoluteJoint(1,RB.Hen2Egg(RB.ID(sleeve1,3,1),RB.ID(link1,1,1))),
         RB.LinearJoint(2,sleeve1,A_linearjoint,q_sleeve1[cstr_idx]),
         # RB.FixedBodyConstraint(2,indexed,sleeve1)
     ]
@@ -188,12 +188,12 @@ function woodpecker(;coordsType = RB.NCF.NC)
             force_elements_angular_stiffness,
         )
     ]
-    force_elements = (spring_dampers = ss, cables = Int[])
+    apparatuses = (spring_dampers = ss, cables = Int[])
     connected = RB.connect(rbs,zeros(Int,0,0))
     tensioned = @eponymtuple(connected,)
     indexed = RB.index(rigdibodies,jointed)
     numbered = RB.number(rigdibodies)
     cnt = RB.Connectivity(jointed,tensioned,indexed,numbered)
-    st = RB.Structure(rigdibodies,force_elements,cnt)
+    st = RB.Structure(rigdibodies,apparatuses,cnt)
     RB.Robot(st,)
 end

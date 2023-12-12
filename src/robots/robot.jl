@@ -48,7 +48,7 @@ build_mass_matrices(bot::Robot) = build_mass_matrices(bot.structure)
 function build_Y(bot)
     (;structure, hub) = bot
     (;actuators) = hub
-    (;cables) = structure.force_elements
+    (;cables) = structure.apparatuses
     ncables = length(cables)
     nact = length(actuators)
     ret = spzeros(Int,ncables,nact)
@@ -76,7 +76,7 @@ function reset!(bot::Robot)
     (;q, q̇) = traj
     clear_forces!(structure)
     update_bodies!(structure,q[begin],q̇[begin])
-    update_tensiles!(structure)
+    update_apparatuses!(structure)
     resize!(traj,1)
 end
 

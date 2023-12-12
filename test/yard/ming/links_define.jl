@@ -93,7 +93,7 @@ function spine(n,dis,rm,heating_law;k=1000.0,c=0.0)
 	strings_idx = collect([j for i = 1:n-1 for j in (6*(i-1)+4):(6*(i-1)+6)])
     SMA_strings = [RB.SMAString3D(i,stringlens[i],RB.LinearLaw(ks[i],0.0),cs[i]) for i in SMA_strings_idx]
     strings = [RB.SString3D(i,stringlens[i],ks[i],cs[i]) for i in strings_idx]
-	force_elements = (strings = strings, SMA_strings = SMA_strings)
+	apparatuses = (strings = strings, SMA_strings = SMA_strings)
 	acs = [RB.ManualActuation(RB.SimpleActuator(i,stringlens[i])) for i = strings_idx]
 	heaters = [RB.ManualSerialHeating(RB.SimpleActuators(i.+[6j for j=0:n-2],fill(40.0,n-1)),fill(heating_law,n-1)) for i in 1:3]
 	hub = (actuators=acs, heaters=heaters)
@@ -112,7 +112,7 @@ function spine(n,dis,rm,heating_law;k=1000.0,c=0.0)
         end
     end
     cnt = RB.Connectivity(bodyid2q,string2ap)
-    st = RB.Structure(rbs,force_elements,cnt)
+    st = RB.Structure(rbs,apparatuses,cnt)
 	RB.jac_singularity_check(st)
 	tr = RB.Robot(st,hub)
 	RB.heat!(tr,fill(40.0,length(heaters)))
@@ -224,8 +224,8 @@ function spine_true(n,dis,rm;
     c = 100.0
     cs = repeat(fill(c,6),n-1)
 	cables_idx = collect([j for i = 1:n-1 for j in (6*(i-1)+1):(6*(i-1)+6)])
-    cables = [RB.DistanceSpringDamper3D(i,cablelens[i],ks[i],cs[i]) for i in cables_idx]
-	force_elements = (cables = cables,)
+    cables = [RB.DistanceSpringDamper3D(cablelens[i],ks[i],cs[i]) for i in cables_idx]
+	apparatuses = (cables = cables,)
 
 	matrix_cnt = zeros(Int,6(n-1),n)
     for i = 1:n-1
@@ -254,6 +254,6 @@ function spine_true(n,dis,rm;
 	hub = (actuators=acs,)
 
 	cnt = RB.Connectivity(numbered,indexed,tensioned,)
-    st = RB.Structure(rbs,force_elements,cnt)
+    st = RB.Structure(rbs,apparatuses,cnt)
 	bot = RB.Robot(st,hub)
 end

@@ -243,7 +243,7 @@ for i in 4*8+1:nstrings
     ks[i] = 0.3
 end
 
-cables = [RB.DistanceSpringDamper2D(i, restlens[i], ks[i], 0.0) for i in 1:nstrings]
+cables = [RB.DistanceSpringDamper2D( restlens[i], ks[i], 0.0) for i in 1:nstrings]
 
 ncsegs = 3
 lens = [44.71, 50, 50]
@@ -252,8 +252,8 @@ c_section = StructArray([RB.DistanceSpringDamperSegment(i, lens[i], .2, prestres
 cs1 = RB.ClusterDistanceSpringDampers(1, ncsegs-1, deepcopy(c_section); μ=0.02)
 cs2 = RB.ClusterDistanceSpringDampers(2, ncsegs-1, deepcopy(c_section); μ=0.02)
 
-force_elements = (cables=cables, clustercables=[cs1, cs2])
-# force_elements = (cables=cables,)
+apparatuses = (cables=cables, clustercables=[cs1, cs2])
+# apparatuses = (cables=cables,)
 acs = []
 hub = (actuators = acs, )
 
@@ -301,8 +301,8 @@ connections = RB.connect(rigdibodies, matrix_cnt, matrix_cnt2)
 
 cnt = RB.Connectivity(numberedpoints, indexedcoords, connections)
 
-st = RB.ClusterTensegrityStructure(rigdibodies, force_elements, cnt)
-# st = RB.Structure(rigdibodies, force_elements, cnt)
+st = RB.ClusterTensegrityStructure(rigdibodies, apparatuses, cnt)
+# st = RB.Structure(rigdibodies, apparatuses, cnt)
 bot = RB.Robot(st, hub)
 # bot.traj.q̇[begin][bot.st.connectivity.indexed.bodyid2sys_full_coords[end][1:4]] .= [50,0.0,50,0.0]
 # function dynfuncs(bot)
@@ -311,7 +311,7 @@ bot = RB.Robot(st, hub)
 #         RB.clear_forces!(st)
 #         RB.update_bodies!(st,q,q̇)
 #         RB.distribute_s̄!(st,s)
-#         RB.update_tensiles!(st)
+#         RB.update_apparatuses!(st)
 #         ## RB.apply_gravity!(st)
 #         RB.assemble_forces!(st)
 #         RB.get_force!(F,st)

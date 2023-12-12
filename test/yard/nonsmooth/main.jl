@@ -780,13 +780,13 @@ function make_flexcable(;
     # display(sm)
     indexedcoords = RB.index(fbs,sm)
     ss = Int[]
-    force_elements = (cables = ss,)
+    apparatuses = (cables = ss,)
     connected = RB.connect(fbs,)
     tensioned = @eponymtuple(connected,)
     cst1 = RB.FixedIndicesConstraint(1,[1,2,3],ri)
     jointed = RB.join((cst1,),indexedcoords)
     cnt = RB.Connectivity(numberedpoints,indexedcoords,tensioned,jointed)
-    st = RB.Structure(fbs,force_elements,cnt,)
+    st = RB.Structure(fbs,apparatuses,cnt,)
     bot = RB.Robot(st)
 end
 
@@ -1874,13 +1874,13 @@ function make_cube(origin_position = [0.0,0.0,0.5],
     matrix_sharing = zeros(Int,0,0)
     indexedcoords = RB.index(rbs,matrix_sharing)
     ss = Int[]
-    force_elements = (cables = ss,)
+    apparatuses = (cables = ss,)
     hub = nothing
     #
     connected = RB.connect(rbs,zeros(Int,0,0))
     tensioned = @eponymtuple(connected)
     cnt = RB.Connectivity(numberedpoints,indexedcoords,tensioned)
-    st = RB.Structure(rbs,force_elements,cnt,)
+    st = RB.Structure(rbs,apparatuses,cnt,)
     bot = RB.Robot(st,nothing)
 end
 

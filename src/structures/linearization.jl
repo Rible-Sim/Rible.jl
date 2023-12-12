@@ -5,7 +5,7 @@ function cstr_forces_jacobian(st::AbstractStructure,q,λ)
     num_of_intrinsic_cstr,
     bodyid2sys_free_coords,
     bodyid2sys_intrinsic_cstr_idx) = indexed
-    (;njoints,num_of_extrinsic_cstr,joints,jointid2sys_extrinsic_cstr_idx) = jointed
+    (;njoints,num_of_extrinsic_cstr,joints,apparid2sys_extrinsic_cstr_idx) = jointed
     ret = zeros(eltype(λ),num_of_free_coords,num_of_free_coords)
     (;bodies,num_of_cstr) = st
     foreach(bodies) do body
@@ -23,8 +23,8 @@ function cstr_forces_jacobian(st::AbstractStructure,q,λ)
     #todo skip 2D for now
     if get_num_of_dims(st) == 3
         foreach(joints) do joint
-            joint_cstr_idx = num_of_intrinsic_cstr .+ jointid2sys_extrinsic_cstr_idx[joint.id]
-            jointed_sys_free_idx = indexed.jointid2sys_free_idx[joint.id]
+            joint_cstr_idx = num_of_intrinsic_cstr .+ apparid2sys_extrinsic_cstr_idx[joint.id]
+            jointed_sys_free_idx = indexed.apparid2sys_free_coords_idx[joint.id]
             ret[jointed_sys_free_idx,jointed_sys_free_idx] .+= cstr_forces_jacobian(joint,st,q,λ[joint_cstr_idx])
         end
     end
@@ -36,7 +36,7 @@ function cstr_velocity_jacobian(st::AbstractStructure,q,q̇)
     (;bodies,num_of_cstr) = st
     (;indexed,jointed) = st.connectivity
     (;num_of_intrinsic_cstr,bodyid2sys_free_coords,bodyid2sys_intrinsic_cstr_idx) = indexed
-    (;njoints,num_of_extrinsic_cstr,joints,jointid2sys_extrinsic_cstr_idx) = jointed
+    (;njoints,num_of_extrinsic_cstr,joints,apparid2sys_extrinsic_cstr_idx) = jointed
     ret = zeros(eltype(q̇),num_of_cstr,num_of_free_coords)
     foreach(bodies) do body
         bodyid = body.prop.id
@@ -52,8 +52,8 @@ function cstr_velocity_jacobian(st::AbstractStructure,q,q̇)
     #todo skip 2D for now
     if get_num_of_dims(st) == 3
         foreach(joints) do joint
-            joint_cstr_idx = num_of_intrinsic_cstr .+ jointid2sys_extrinsic_cstr_idx[joint.id]
-            jointed_sys_free_idx = indexed.jointid2sys_free_idx[joint.id]
+            joint_cstr_idx = num_of_intrinsic_cstr .+ apparid2sys_extrinsic_cstr_idx[joint.id]
+            jointed_sys_free_idx = indexed.apparid2sys_free_coords_idx[joint.id]
             ret[joint_cstr_idx,jointed_sys_free_idx] .= cstr_velocity_jacobian(joint,st,q,q̇)
         end
     end
@@ -104,8 +104,8 @@ end
 function intrinsic_nullspace(st,q)
     (;bodies,connectivity) = st
     (;indexed,) = connectivity
-    (;num_of_full_coords,bodyid2sys_full_coords,sys_num_of_dof,bodyid2sys_dof_idx,) = indexed
-    ret = zeros(eltype(q),num_of_full_coords,sys_num_of_dof)
+    (;num_of_full_coords,bodyid2sys_full_coords,num_of_dof_unconstrained,bodyid2sys_dof_idx,) = indexed
+    ret = zeros(eltype(q),num_of_full_coords,num_of_dof_unconstrained)
     foreach(bodies) do body
         bodyid = body.prop.id
         (;nmcs) = body.coords
@@ -118,14 +118,14 @@ end
 function extrinsic_nullspace(st,q)
     (;bodies,connectivity,num_of_dof) = st
     (;indexed,jointed) = connectivity
-    (;num_of_full_coords,bodyid2sys_full_coords,sys_num_of_dof,) = indexed
-    ret = zeros(eltype(q),sys_num_of_dof,num_of_dof)
+    (;num_of_full_coords,bodyid2sys_full_coords,num_of_dof_unconstrained,) = indexed
+    ret = zeros(eltype(q),num_of_dof_unconstrained,num_of_dof)
     bodyid2sys_dof_idx = deepcopy(indexed.bodyid2sys_dof_idx)
     nullspaces = Vector{Matrix{eltype(q)}}(undef,2)
     foreach(jointed.joints) do joint
-        jointid = joint.id
+        apparid = joint.id
         if joint isa PrototypeJoint
-            nullspaces[1] = zeros(eltype(q),sys_num_of_dof,7)
+            nullspaces[1] = zeros(eltype(q),num_of_dof_unconstrained,7)
             for i in bodyid2sys_dof_idx[1]
                 nullspaces[1][i,i] = 1
             end
@@ -167,7 +167,7 @@ function extrinsic_nullspace(st,q)
                 O3             I3                      normal
             ]
         else
-            if jointid == 2
+            if apparid == 2
                 nullspaces[2] = zeros(eltype(q),7,3)
                 nullspaces[2][3,1] = 1
                 nullspaces[2][4,2] = 1
@@ -214,9 +214,9 @@ end
 function build_material_stiffness_matrix!(st::Structure,q,k)
     (;num_of_dim) = st
     (;indexed,tensioned) = st.connectivity
-    (;num_of_full_coords,num_of_free_coords,sys_free_idx,bodyid2sys_full_coords) = indexed
+    (;num_of_full_coords,num_of_free_coords,sys_free_coords_idx,bodyid2sys_full_coords) = indexed
     (;connected) = tensioned
-    (;cables) = st.force_elements
+    (;cables) = st.apparatuses
     update!(st,q)
     Jj = zeros(eltype(q),num_of_dim,num_of_full_coords)
     retǨm = zeros(eltype(q),num_of_free_coords,num_of_free_coords)
@@ -238,7 +238,7 @@ function build_material_stiffness_matrix!(st::Structure,q,k)
         Jj[:,mfull2] .+= C2
         Jj[:,mfull1] .-= C1
         Uj = transpose(Jj)*Jj
-        Ūjq = Uj[sys_free_idx,:]*q
+        Ūjq = Uj[sys_free_coords_idx,:]*q
         retǨm .+= k[j]*s^2*(Ūjq*transpose(Ūjq))
     end
     retǨm
@@ -247,9 +247,9 @@ end
 function build_geometric_stiffness_matrix!(st::Structure,q,f)
     (;num_of_dim) = st
     (;indexed,tensioned) = st.connectivity
-    (;num_of_full_coords,num_of_free_coords,sys_free_idx,bodyid2sys_full_coords) = indexed
+    (;num_of_full_coords,num_of_free_coords,sys_free_coords_idx,bodyid2sys_full_coords) = indexed
     (;connected) = tensioned
-    (;cables) = st.force_elements
+    (;cables) = st.apparatuses
     update!(st,q)
     Jj = zeros(eltype(q),num_of_dim,num_of_full_coords)
     retǨg = zeros(eltype(q),num_of_free_coords,num_of_free_coords)
@@ -271,8 +271,8 @@ function build_geometric_stiffness_matrix!(st::Structure,q,f)
         Jj[:,mfull2] .+= C2
         Jj[:,mfull1] .-= C1
         Uj = transpose(Jj)*Jj
-        Ǔj = @view Uj[sys_free_idx,sys_free_idx]
-        Ūjq = Uj[sys_free_idx,:]*q
+        Ǔj = @view Uj[sys_free_coords_idx,sys_free_coords_idx]
+        Ūjq = Uj[sys_free_coords_idx,:]*q
         retǨg .+= f[j]/length*(Ǔj-s^2*Ūjq*transpose(Ūjq))
     end
     retǨg
@@ -281,14 +281,14 @@ end
 function make_Ǩm_Ǩg(st,q0)
     (;num_of_dim) = st
     (;numbered,indexed,tensioned) = st.connectivity
-    (;num_of_full_coords,num_of_free_coords,sys_pres_idx,sys_free_idx,bodyid2sys_full_coords) = indexed
+    (;num_of_full_coords,num_of_free_coords,sys_pres_coords_idx,sys_free_coords_idx,bodyid2sys_full_coords) = indexed
     (;connected) = tensioned
-    (;cables) = st.force_elements
+    (;cables) = st.apparatuses
     (;bodyid2sys_loci_idx,sys_loci2coords_idx) = numbered
     function inner_Ǩm_Ǩg(q̌,s,μ,k,c)
 		q = Vector{eltype(q̌)}(undef,num_of_full_coords)
-		q[sys_pres_idx] .= q0[sys_pres_idx]
-		q[sys_free_idx] .= q̌
+		q[sys_pres_coords_idx] .= q0[sys_pres_coords_idx]
+		q[sys_free_coords_idx] .= q̌
         Jj = zeros(eltype(q̌),num_of_dim,num_of_full_coords)
         retǨm = zeros(eltype(q̌),num_of_free_coords,num_of_free_coords)
         retǨg = zeros(eltype(q̌),num_of_free_coords,num_of_free_coords)
@@ -310,8 +310,8 @@ function make_Ǩm_Ǩg(st,q0)
             Jj[:,mfull2] .+= C2
             Jj[:,mfull1] .-= C1
             Uj = transpose(Jj)*Jj
-            Ǔj = @view Uj[sys_free_idx,sys_free_idx]
-            Ūjq = Uj[sys_free_idx,:]*q
+            Ǔj = @view Uj[sys_free_coords_idx,sys_free_coords_idx]
+            Ūjq = Uj[sys_free_coords_idx,:]*q
             retǨm .+= k[j]*s[j]^2*(Ūjq*transpose(Ūjq))
             retǨg .+= k[j]*(1-μ[j]*s[j])*(Ǔj-s[j]^2*Ūjq*transpose(Ūjq))
         end
@@ -319,8 +319,8 @@ function make_Ǩm_Ǩg(st,q0)
     end
     function inner_Ǩm_Ǩg(q̌)
 		q = Vector{eltype(q̌)}(undef,num_of_full_coords)
-		q[sys_pres_idx] .= q0[sys_pres_idx]
-		q[sys_free_idx] .= q̌
+		q[sys_pres_coords_idx] .= q0[sys_pres_coords_idx]
+		q[sys_free_coords_idx] .= q̌
         Jj = zeros(eltype(q̌),num_of_dim,num_of_full_coords)
         retǨm = zeros(eltype(q̌),num_of_free_coords,num_of_free_coords)
         retǨg = zeros(eltype(q̌),num_of_free_coords,num_of_free_coords)
@@ -342,8 +342,8 @@ function make_Ǩm_Ǩg(st,q0)
             Jj[:,mfull2] .+= C2
             Jj[:,mfull1] .-= C1
             Uj = transpose(Jj)*Jj
-            Ǔj = @view Uj[sys_free_idx,sys_free_idx]
-            Ūjq = Uj[sys_free_idx,:]*q
+            Ǔj = @view Uj[sys_free_coords_idx,sys_free_coords_idx]
+            Ūjq = Uj[sys_free_coords_idx,:]*q
             retǨm .+= k*s^2*(Ūjq*transpose(Ūjq))
             retǨg .+= tension/length*(Ǔj-s^2*Ūjq*transpose(Ūjq))
         end
@@ -354,15 +354,15 @@ end
 function make_S(st,q0)
     (;num_of_dim) = st
     (;numbered,indexed,tensioned) = st.connectivity
-    (;sys_pres_idx,sys_free_idx,num_of_full_coords,bodyid2sys_full_coords) = indexed
+    (;sys_pres_coords_idx,sys_free_coords_idx,num_of_full_coords,bodyid2sys_full_coords) = indexed
     (;bodyid2sys_loci_idx,sys_loci2coords_idx) = numbered
     (;connected) = tensioned
-    (;cables) = st.force_elements
+    (;cables) = st.apparatuses
     ncables = length(cables)
     function inner_S(q̌,s)
 		q = Vector{eltype(q̌)}(undef,num_of_full_coords)
-		q[sys_pres_idx] .= q0[sys_pres_idx]
-		q[sys_free_idx] .= q̌
+		q[sys_pres_coords_idx] .= q0[sys_pres_coords_idx]
+		q[sys_free_coords_idx] .= q̌
         ret = zeros(eltype(q̌),ncables)
         Jj = zeros(eltype(q̌),num_of_dim,num_of_full_coords)
         foreach(connected) do scnt
@@ -391,8 +391,8 @@ function make_S(st,q0)
     end
     function inner_S(q̌,s,c)
         q = Vector{eltype(q̌)}(undef,num_of_full_coords)
-        q[sys_pres_idx] .= q0[sys_pres_idx]
-        q[sys_free_idx] .= q̌
+        q[sys_pres_coords_idx] .= q0[sys_pres_coords_idx]
+        q[sys_free_coords_idx] .= q̌
         ret = zeros(eltype(q̌),ncables)
         Jj = zeros(eltype(q̌),num_of_dim,num_of_full_coords)
         foreach(connected) do scnt
@@ -435,9 +435,9 @@ end
 
 # Out-of-place ∂Q̌∂q̌ for cables
 function build_tangent_stiffness_matrix(st,@eponymargs(connected,))
-    (;cables) = st.force_elements
+    (;cables) = st.apparatuses
     (;indexed) = st.connectivity
-    (;num_of_full_coords,num_of_free_coords,sys_free_idx,bodyid2sys_free_coords,bodyid2sys_full_coords) = indexed
+    (;num_of_full_coords,num_of_free_coords,sys_free_coords_idx,bodyid2sys_free_coords,bodyid2sys_full_coords) = indexed
     T = get_numbertype(st)
     num_of_dim = get_num_of_dims(st)
     ∂Q̌∂q̌ = zeros(T,num_of_free_coords,num_of_free_coords)
@@ -480,9 +480,9 @@ end
 
 # Out-of-place ∂Q̌∂q̌ for cluster cables
 function build_tangent_stiffness_matrix(st,@eponymargs(clustered))
-    (;clustercables) = st.force_elements
+    (;clustercables) = st.apparatuses
     (;indexed) = st.connectivity
-    (;num_of_full_coords,num_of_free_coords,sys_free_idx,bodyid2sys_free_coords,bodyid2sys_full_coords) = indexed
+    (;num_of_full_coords,num_of_free_coords,sys_free_coords_idx,bodyid2sys_free_coords,bodyid2sys_full_coords) = indexed
     T = get_numbertype(st)
     num_of_dim = get_num_of_dims(st)
     ∂Q̌∂q̌ = zeros(T,num_of_free_coords,num_of_free_coords)
@@ -537,9 +537,9 @@ end
 
 # Out-of-place ∂Q̌∂q̌̇ for cables
 function build_tangent_damping_matrix(st, @eponymargs(connected, ))
-    (;cables) = st.force_elements
+    (;cables) = st.apparatuses
     (;indexed) = st.connectivity
-    (;num_of_full_coords,num_of_free_coords,sys_free_idx,bodyid2sys_free_coords,bodyid2sys_full_coords) = indexed
+    (;num_of_full_coords,num_of_free_coords,sys_free_coords_idx,bodyid2sys_free_coords,bodyid2sys_full_coords) = indexed
     T = get_numbertype(st)
     num_of_dim = get_num_of_dims(st)
     ∂Q̌∂q̌̇ = zeros(T,num_of_free_coords,num_of_free_coords)
@@ -580,9 +580,9 @@ end
 
 # Out-of-place ∂Q̌∂q̌̇ for clustered cables
 function build_tangent_damping_matrix(st, @eponymargs(clustered, ))
-    (;clustercables) = st.force_elements
+    (;clustercables) = st.apparatuses
     (;indexed) = st.connectivity
-    (;num_of_full_coords,num_of_free_coords,sys_free_idx,bodyid2sys_free_coords,bodyid2sys_full_coords) = indexed
+    (;num_of_full_coords,num_of_free_coords,sys_free_coords_idx,bodyid2sys_free_coords,bodyid2sys_full_coords) = indexed
     T = get_numbertype(st)
     num_of_dim = get_num_of_dims(st)
     ∂Q̌∂q̌̇ = zeros(T,num_of_free_coords,num_of_free_coords)
@@ -623,17 +623,15 @@ end
 
 # In-place ∂Q̌∂q̌ for cables and flexible bodies
 function build_tangent_stiffness_matrix!(∂Q̌∂q̌,st)
-    (;bodies,connectivity) = st
-    (;tensioned,indexed,jointed) = connectivity
-    (;cables,spring_dampers) = st.force_elements
-    (;connected) = tensioned
+    (;bodies,apparatuses,connectivity) = st
+    (;indexed,numbered) = connectivity
     (;
         num_of_free_coords,
         bodyid2sys_free_coords,
         bodyid2sys_full_coords,
-        jointid2full_idx,
-        jointid2free_idx,
-        jointid2sys_free_idx
+        apparid2full_idx,
+        apparid2free_idx,
+        apparid2sys_free_coords_idx
     ) = indexed
     T = get_numbertype(st)
     num_of_dim = get_num_of_dims(st)
@@ -642,37 +640,6 @@ function build_tangent_stiffness_matrix!(∂Q̌∂q̌,st)
     Im = Symmetric(SMatrix{num_of_dim,num_of_dim}(one(T)*I))
     J̌ = zeros(T,num_of_dim,num_of_free_coords)
     q = get_coords(st)
-    foreach(connected) do cc
-        cable = cables[cc.id]
-        (;hen,egg) = cc
-        body_hen = hen.bodysig
-        body_egg = egg.bodysig
-        C_hen = body_hen.cache.Cps[hen.pid]
-        C_egg = body_egg.cache.Cps[egg.pid]
-        free_idx_hen = body_hen.coords.free_idx
-        free_idx_egg = body_egg.coords.free_idx
-        mfree_hen = bodyid2sys_free_coords[body_hen.prop.id]
-        mfree_egg = bodyid2sys_free_coords[body_egg.prop.id]
-        (;k,c,state,slack) = cable
-        (;direction,tension,length,lengthdot) = state
-        if slack && (tension==0)
-            ∂Q̌∂q̌ .-= 0
-        else
-            D .= direction*transpose(direction)
-            density = tension/length
-            β = c*lengthdot/length + density
-            D .*= k-β
-            D .+= β.*Im
-            J̌ .= 0
-            J̌[:,mfree_egg] .+= C_egg[:,free_idx_egg]
-            J̌[:,mfree_hen] .-= C_hen[:,free_idx_hen]
-            ∂Q̌∂q̌ .-= transpose(J̌)*D*J̌
-        end
-        # ∂Q̌∂q̌_full[mfree_egg,mfree_egg] .+= transpose(C_egg)*D*C_egg
-        # ∂Q̌∂q̌_full[mfree_hen,mfree_egg] .-= transpose(C_hen)*D*C_egg
-        # ∂Q̌∂q̌_full[mfree_egg,mfree_hen] .-= transpose(C_egg)*D*C_hen
-        # ∂Q̌∂q̌_full[mfree_hen,mfree_hen] .+= transpose(C_hen)*D*C_hen
-    end
 
     foreach(bodies) do body
         if body isa FlexibleBody
@@ -686,22 +653,50 @@ function build_tangent_stiffness_matrix!(∂Q̌∂q̌,st)
         end
     end
 
-    foreach(jointed.joints) do joint
-        if joint isa PrototypeJoint
+    foreach(apparatuses) do appar
+        if appar.joint isa CableJoint
+            (;hen,egg) = appar.joint.hen2egg
+            body_hen = hen.bodysig
+            body_egg = egg.bodysig
+            C_hen = body_hen.cache.Cps[hen.pid]
+            C_egg = body_egg.cache.Cps[egg.pid]
+            free_idx_hen = body_hen.coords.free_idx
+            free_idx_egg = body_egg.coords.free_idx
+            mfree_hen = bodyid2sys_free_coords[body_hen.prop.id]
+            mfree_egg = bodyid2sys_free_coords[body_egg.prop.id]
+            (;k,c,state,slack) = appar.force
+            (;direction,tension,length,lengthdot) = state
+            if slack && (tension==0)
+                ∂Q̌∂q̌ .-= 0
+            else
+                D .= direction*transpose(direction)
+                density = tension/length
+                β = c*lengthdot/length + density
+                D .*= k-β
+                D .+= β.*Im
+                J̌ .= 0
+                J̌[:,mfree_egg] .+= C_egg[:,free_idx_egg]
+                J̌[:,mfree_hen] .-= C_hen[:,free_idx_hen]
+                ∂Q̌∂q̌ .-= transpose(J̌)*D*J̌
+            end
+            # ∂Q̌∂q̌_full[mfree_egg,mfree_egg] .+= transpose(C_egg)*D*C_egg
+            # ∂Q̌∂q̌_full[mfree_hen,mfree_egg] .-= transpose(C_hen)*D*C_egg
+            # ∂Q̌∂q̌_full[mfree_egg,mfree_hen] .-= transpose(C_egg)*D*C_hen
+            # ∂Q̌∂q̌_full[mfree_hen,mfree_hen] .+= transpose(C_hen)*D*C_hen
+        elseif appar.has_force isa Val{true}
             (;
                 num_of_cstr,
                 hen2egg,
                 cache,
                 mask_1st,mask_2nd,mask_3rd,mask_4th
-            ) = joint
+            ) = appar.joint
             (;
                 relative_core
             ) = cache
-            full_idx = jointid2full_idx[joint.id]
-            free_idx = jointid2free_idx[joint.id]
-            sys_free_idx = jointid2sys_free_idx[joint.id]
-            spring_damper = spring_dampers[joint.id]
-            (;mask,k) = spring_damper
+            full_idx = apparid2full_idx[appar.id]
+            free_idx = apparid2free_idx[appar.id]
+            sys_free_coords_idx = apparid2sys_free_coords_idx[appar.id]
+            (;mask,k) = appar.force
             (;hen,egg) = hen2egg
             nmcs_hen = hen.bodysig.coords.nmcs
             nmcs_egg = egg.bodysig.coords.nmcs
@@ -723,14 +718,14 @@ function build_tangent_stiffness_matrix!(∂Q̌∂q̌,st)
             angles_hessians = ForwardDiff.jacobian(x -> ForwardDiff.jacobian(jointed2angles, x), q_jointed)
             # angles_hessians = FiniteDiff.finite_difference_jacobian(x -> ForwardDiff.jacobian(jointed2angles, x), q_jointed)
             reshaped_angles_hessians = reshape(angles_hessians,3,nq,nq)
-            # @show sys_free_idx, free_idx
+            # @show sys_free_coords_idx, free_idx
             for i in mask
                 angle = angles[i]
                 torque = torques[i]
                 # @show angle, torque
                 generalized_force_jacobian = torque.*reshaped_angles_hessians[i,:,:] .+ k.*angles_jacobian[i,:]*angles_jacobian[[i],:]
                 # @show generalized_force_jacobian
-                # ∂Q̌∂q̌[sys_free_idx,sys_free_idx] .-= generalized_force_jacobian[free_idx,free_idx]
+                ∂Q̌∂q̌[sys_free_coords_idx,sys_free_coords_idx] .-= generalized_force_jacobian[free_idx,free_idx]
             end
         end
     end
@@ -740,53 +735,54 @@ end
 
 # In-place ∂Q̌∂q̌̇ for cables
 function build_tangent_damping_matrix!(∂Q̌∂q̌̇,st)
-    (;tensioned,indexed) = st.connectivity
-    (;connected) = tensioned
-    (;cables) = st.force_elements
-    (;num_of_full_coords,num_of_free_coords,sys_free_idx,bodyid2sys_free_coords,bodyid2sys_full_coords) = indexed
+    (;apparatuses,connectivity) = st
+    (;numbered,indexed) = connectivity
+    (;num_of_full_coords,num_of_free_coords,sys_free_coords_idx,bodyid2sys_free_coords,bodyid2sys_full_coords) = indexed
     T = get_numbertype(st)
     num_of_dim = get_num_of_dims(st)
     # ∂Q̌∂q̌̇ = zeros(T,num_of_free_coords,num_of_free_coords)
     D = @MMatrix zeros(T,num_of_dim,num_of_dim)
     Im = Symmetric(SMatrix{num_of_dim,num_of_dim}(one(T)*I))
     J̌ = zeros(T,num_of_dim,num_of_free_coords)
-    foreach(connected) do cc
-        cable = cables[cc.id]
-        (;hen,egg) = cc
-        body_hen = hen.bodysig
-        body_egg = egg.bodysig
-        C_hen = body_hen.cache.Cps[hen.pid]
-        C_egg = body_egg.cache.Cps[egg.pid]
-        free_idx_hen = body_hen.coords.free_idx
-        free_idx_egg = body_egg.coords.free_idx
-        mfree_hen = bodyid2sys_free_coords[body_hen.prop.id]
-        mfree_egg = bodyid2sys_free_coords[body_egg.prop.id]
-        (;k,c,state,slack) = cable
-        (;direction,tension) = state
-        if slack && (tension == 0)
-            ∂Q̌∂q̌̇ .-= 0
-        else
-            D .= direction*transpose(direction)
-            D .*= c
-            J̌ .= 0
-            J̌[:,mfree_egg] .+= C_egg[:,free_idx_egg]
-            J̌[:,mfree_hen] .-= C_hen[:,free_idx_hen]
+    foreach(apparatuses) do appar
+        if appar.joint isa CableJoint
+            spring_damper = appar.force
+            (;hen,egg) = appar.joint.hen2egg
+            body_hen = hen.bodysig
+            body_egg = egg.bodysig
+            C_hen = body_hen.cache.Cps[hen.pid]
+            C_egg = body_egg.cache.Cps[egg.pid]
+            free_idx_hen = body_hen.coords.free_idx
+            free_idx_egg = body_egg.coords.free_idx
+            mfree_hen = bodyid2sys_free_coords[body_hen.prop.id]
+            mfree_egg = bodyid2sys_free_coords[body_egg.prop.id]
+            (;k,c,state,slack) = spring_damper
+            (;direction,tension) = state
+            if slack && (tension == 0)
+                ∂Q̌∂q̌̇ .-= 0
+            else
+                D .= direction*transpose(direction)
+                D .*= c
+                J̌ .= 0
+                J̌[:,mfree_egg] .+= C_egg[:,free_idx_egg]
+                J̌[:,mfree_hen] .-= C_hen[:,free_idx_hen]
 
-            ∂Q̌∂q̌̇ .-= transpose(J̌)*D*J̌
+                ∂Q̌∂q̌̇ .-= transpose(J̌)*D*J̌
+            end
+            # ∂Q̌∂q̌_full[mfree_egg,mfree_egg] .+= transpose(C_egg)*D*C_egg
+            # ∂Q̌∂q̌_full[mfree_hen,mfree_egg] .-= transpose(C_hen)*D*C_egg
+            # ∂Q̌∂q̌_full[mfree_egg,mfree_hen] .-= transpose(C_egg)*D*C_hen
+            # ∂Q̌∂q̌_full[mfree_hen,mfree_hen] .+= transpose(C_hen)*D*C_hen
         end
-        # ∂Q̌∂q̌_full[mfree_egg,mfree_egg] .+= transpose(C_egg)*D*C_egg
-        # ∂Q̌∂q̌_full[mfree_hen,mfree_egg] .-= transpose(C_hen)*D*C_egg
-        # ∂Q̌∂q̌_full[mfree_egg,mfree_hen] .-= transpose(C_egg)*D*C_hen
-        # ∂Q̌∂q̌_full[mfree_hen,mfree_hen] .+= transpose(C_hen)*D*C_hen
     end
 end
 
 function build_∂Q̌∂s̄(st)
     (;connectivity) = st
-    (;cables,clustercables) = st.force_elements
+    (;cables,clustercables) = st.apparatuses
     nclustercables = length(clustercables)
     (;tensioned,indexed) = connectivity
-    (;num_of_full_coords,num_of_free_coords,sys_free_idx,bodyid2sys_free_coords,bodyid2sys_full_coords) = indexed
+    (;num_of_full_coords,num_of_free_coords,sys_free_coords_idx,bodyid2sys_free_coords,bodyid2sys_full_coords) = indexed
     ns = sum([length(clustercables[i].sps) for i in 1:nclustercables])
     T = get_numbertype(st)
     num_of_dim = get_num_of_dims(st)
@@ -981,12 +977,12 @@ end
 
 function make_nullspace(st::Structure,q0::AbstractVector)
 	(;bodies,connectivity) = st
-    (;num_of_free_coords,num_of_full_coords,sys_pres_idx,sys_free_idx,bodyid2sys_free_coords,bodyid2sys_intrinsic_cstr_idx,num_of_intrinsic_cstr) = connectivity.indexed
+    (;num_of_free_coords,num_of_full_coords,sys_pres_coords_idx,sys_free_coords_idx,bodyid2sys_free_coords,bodyid2sys_intrinsic_cstr_idx,num_of_intrinsic_cstr) = connectivity.indexed
     function inner_nullspace(q̌)
         T = eltype(q̌)
 		q = Vector{T}(undef,num_of_full_coords)
-		q[sys_pres_idx] .= q0[sys_pres_idx]
-		q[sys_free_idx] .= q̌
+		q[sys_pres_coords_idx] .= q0[sys_pres_coords_idx]
+		q[sys_free_coords_idx] .= q̌
         ret = zeros(T,num_of_free_coords,num_of_free_coords-num_of_intrinsic_cstr)
         foreach(bodies) do body
             bodyid = body.prop.id

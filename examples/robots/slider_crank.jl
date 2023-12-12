@@ -248,19 +248,19 @@ function slider_crank(;θ = 0, coordsType = RB.NCF.NC)
             force_elements_angular_stiffness,
         )
     ]
-    force_elements = (spring_dampers = ss, cables = Int[])
+    apparatuses = (spring_dampers = ss, cables = Int[])
     connected = RB.connect(rbs,zeros(Int,0,0))
     tensioned = @eponymtuple(connected,)
 
     j1 = RB.FixedBodyConstraint(1,indexed,base)
-    j2 = RB.RevoluteJoint(2,indexed,RB.Hen2Egg(2,RB.ID(base ,1,1),RB.ID(link1,1,1)))
-    j3 = RB.RevoluteJoint(3,indexed,RB.Hen2Egg(3,RB.ID(link1,2,2),RB.ID(link2,1,1)))
-    j4 = RB.RevoluteJoint(4,indexed,RB.Hen2Egg(4,RB.ID(link2,2,2),RB.ID(slider1,5,5)))
+    j2 = RB.RevoluteJoint(2,indexed,RB.Hen2Egg(RB.ID(base ,1,1),RB.ID(link1,1,1)))
+    j3 = RB.RevoluteJoint(3,indexed,RB.Hen2Egg(RB.ID(link1,2,2),RB.ID(link2,1,1)))
+    j4 = RB.RevoluteJoint(4,indexed,RB.Hen2Egg(RB.ID(link2,2,2),RB.ID(slider1,5,5)))
 
     js = [j1,j2,j3,j4]
 
     jointed = RB.join(js,indexed)
     cnt = RB.Connectivity(numbered,indexed,tensioned,jointed)
-    st = RB.Structure(rigdibodies,force_elements,cnt)
+    st = RB.Structure(rigdibodies,apparatuses,cnt)
     RB.Robot(st,)
 end

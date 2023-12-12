@@ -206,7 +206,7 @@ cable_length = 0.1Unitful.m
 κ = (mat_cable.modulus_elas)*π*(diameter/2)^2/cable_length
 # @show κ
 @show uconvert(Unitful.N/Unitful.m,κ),ustrip(Unitful.N/Unitful.m,κ)
-cables_prism = [RB.DistanceSpringDamper3D(i,0.0,   ustrip(Unitful.N/Unitful.m,κ),0.0;slack=true) for i = 1:ncables_prism]
+cables_prism = [RB.DistanceSpringDamper3D(0.0,   ustrip(Unitful.N/Unitful.m,κ),0.0;slack=true) for i = 1:ncables_prism]
 cables = cables_prism
 acs = [
     RB.ManualActuator(
@@ -215,7 +215,7 @@ acs = [
         zeros(ncables_prism)
     ),
 ]
-force_elements = (cables = cables,)
+apparatuses = (cables = cables,)
 hub = (actuators = acs,)
 
 
@@ -261,6 +261,6 @@ jointedmembers = RB.join(csts,indexedcoords)
 
 cnt = RB.Connectivity(numberedpoints,indexedcoords,@eponymtuple(connected,),jointedmembers)
 
-st = RB.Structure(rbs,force_elements,cnt)
+st = RB.Structure(rbs,apparatuses,cnt)
 bot = RB.Robot(st,hub)
 end

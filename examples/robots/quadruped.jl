@@ -121,10 +121,10 @@ function quad(c=100.0;
     end
     end
     cables = [
-    RB.DistanceSpringDamper3D(i, original_restlens[i], ks[i], c) for i = 1:ncables
+    RB.DistanceSpringDamper3D( original_restlens[i], ks[i], c) for i = 1:ncables
     ]
     #
-    force_elements = (cables = cables,)
+    apparatuses = (cables = cables,)
     acs = [
     RB.ManualActuator(
         i,
@@ -157,6 +157,6 @@ function quad(c=100.0;
     #
     cnt = RB.Connectivity(numberedpoints, indexedcoords, tensioned)
     # #
-    st = RB.Structure(rigdibodies, force_elements, cnt,)
+    st = RB.Structure(rigdibodies, apparatuses, cnt,)
     bot = RB.Robot(st, hub)
 end

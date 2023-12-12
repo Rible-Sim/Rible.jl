@@ -44,7 +44,7 @@ function forward_system(st,mode=PrimalMode();F̌=reshape(build_Ǧ(st),:,1))
     (;num_of_cstr) = st
     (;num_of_free_coords) = st.connectivity.indexed
     (;nc) = st.connectivity.numbered
-    ns = st.force_elements.cables |> length
+    ns = st.apparatuses.cables |> length
     nλ = num_of_cstr
     @polyvar q̌[1:num_of_free_coords]
     @polyvar s[1:ns]
@@ -259,8 +259,8 @@ end
 
 function recover(state::NamedTuple,st::AbstractStructure)
     q = get_coords(st)
-    (;sys_free_idx) = st.connectivity.indexed
-    q[sys_free_idx] = state.q̌
+    (;sys_free_coords_idx) = st.connectivity.indexed
+    q[sys_free_coords_idx] = state.q̌
     merge((q=q,),state)
 end
 
@@ -345,7 +345,7 @@ function get_poly(bot_input;
 bot = deepcopy(bot_input)
 (;st) = bot
 # (;num_of_dof,num_of_cstr,connectivity) = bot.structure
-# (;cables) = st.force_elements
+# (;cables) = st.apparatuses
 # (;num_of_full_coords,num_of_free_coords) = connectivity.indexed
 # ncables = length(cables)
 # nλ = num_of_cstr

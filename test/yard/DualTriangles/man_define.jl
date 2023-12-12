@@ -175,8 +175,8 @@ function man_ndof(num_of_dof,onedir=[0.0,-1.0];θ=0.0,k=0.0,c=0.0,unit="mks",res
 
     # ks[1:2] .= 1e10
     # ks[end-1:end] .= 1e-8
-    ss = [RB.DistanceSpringDamper2D(i, original_restlens[i],ks[i],cs[i]) for i = 1:nstrings]
-    force_elements = (cables=ss,)
+    ss = [RB.DistanceSpringDamper2D( original_restlens[i],ks[i],cs[i]) for i = 1:nstrings]
+    apparatuses = (cables=ss,)
 
     matrix_cnt = zeros(Int,2(nbodies-1),nbodies)
     for i = 1:nbodies-1
@@ -213,7 +213,7 @@ function man_ndof(num_of_dof,onedir=[0.0,-1.0];θ=0.0,k=0.0,c=0.0,unit="mks",res
     jointed = RB.join(pinjoints,indexed)
 
     cnt = RB.Connectivity(numbered,indexed,tensioned,jointed)
-    st = RB.Structure(rigdibodies,force_elements,cnt)
+    st = RB.Structure(rigdibodies,apparatuses,cnt)
     bot = RB.Robot(st,hub)
 end
 
@@ -502,8 +502,8 @@ function man_ndof_2022(num_of_dof,onedir=[1.0,0.0];θ=0.0,k=1250.0,c=0.0,unit="m
         end
     end
 
-    ss = [RB.DistanceSpringDamper2D(i, original_restlens[i],ks[i],cs[i]) for i = 1:nstrings]
-    force_elements = (cables=ss,)
+    ss = [RB.DistanceSpringDamper2D( original_restlens[i],ks[i],cs[i]) for i = 1:nstrings]
+    apparatuses = (cables=ss,)
 
     matrix_cnt = zeros(Int,2(nbodies-1),nbodies)
 
@@ -536,7 +536,7 @@ function man_ndof_2022(num_of_dof,onedir=[1.0,0.0];θ=0.0,k=1250.0,c=0.0,unit="m
     hub = (actuators=acs,)
 
     cnt = RB.Connectivity(numbered,indexed,tensioned)
-    st = RB.Structure(rigdibodies,force_elements,cnt)
+    st = RB.Structure(rigdibodies,apparatuses,cnt)
     bot = RB.Robot(st,hub)
 end
 

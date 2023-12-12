@@ -113,8 +113,8 @@ function dualtri(num_of_dof,;onedir=[1.0,0.0],θ=0.0,k=400.0,c=0.0,restlen=0.16)
         original_restlens[i] = ifelse(j∈[1,0],upstringlen,lostringlen)
         ks[i] = ifelse(j∈[1,0],k,k)
     end
-    ss = [RB.DistanceSpringDamper2D(i, original_restlens[i],ks[i],cs[i];slack=false) for i = 1:ncables]
-    force_elements = (cables=ss,)
+    ss = [RB.DistanceSpringDamper2D( original_restlens[i],ks[i],cs[i];slack=false) for i = 1:ncables]
+    apparatuses = (cables=ss,)
 
     matrix_cnt = zeros(Int,2(num_of_bodies-1),num_of_bodies)
     for i = 1:num_of_bodies-1
@@ -139,12 +139,12 @@ function dualtri(num_of_dof,;onedir=[1.0,0.0],θ=0.0,k=400.0,c=0.0,restlen=0.16)
                            ganged_act(i,2i,2(i-1)+1,original_restlens)) for i = 1:num_of_bodies-1]
     hub = (actuators=acs,)
     pjs = [
-        RB.PinJoint(i,RB.Hen2Egg(i,RB.ID(rbs[i],2,1),RB.ID(rbs[i+1],1)))
+        RB.PinJoint(i,RB.Hen2Egg(RB.ID(rbs[i],2,1),RB.ID(rbs[i+1],1)))
         for i = 1:num_of_bodies-1
     ]
     jointed = RB.join(pjs,indexed)
 
     cnt = RB.Connectivity(numbered,indexed,tensioned,jointed)
-    st = RB.Structure(rigdibodies,force_elements,cnt)
+    st = RB.Structure(rigdibodies,apparatuses,cnt)
     RB.Robot(st,hub)
 end

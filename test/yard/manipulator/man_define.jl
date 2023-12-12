@@ -180,8 +180,8 @@ function man_ndof(num_of_dof,onedir=[1.0,0.0];θ=0.0,k=0.0,c=0.0,unit="mks",rest
         original_restlens[i] = ifelse(j∈[1,0],upstringlen,lostringlen)
         ks[i] = ifelse(j∈[1,0],k,k)
     end
-    ss = [RB.DistanceSpringDamper2D(i, original_restlens[i],ks[i],cs[i]) for i = 1:ncables]
-	force_elements = (cables=ss,)
+    ss = [RB.DistanceSpringDamper2D( original_restlens[i],ks[i],cs[i]) for i = 1:ncables]
+	apparatuses = (cables=ss,)
 
 	matrix_cnt = zeros(Int,2(nbodies-1),nbodies)
     for i = 1:nbodies-1
@@ -212,7 +212,7 @@ function man_ndof(num_of_dof,onedir=[1.0,0.0];θ=0.0,k=0.0,c=0.0,unit="mks",rest
 	hub = (actuators=acs,)
 
     cnt = RB.Connectivity(numbered,indexed,tensioned)
-    st = RB.Structure(rigdibodies,force_elements,cnt)
+    st = RB.Structure(rigdibodies,apparatuses,cnt)
     bot = RB.Robot(st,hub)
 end
 

@@ -121,7 +121,7 @@ ncables = size(connecting,1)
 κ0 = 72e9*π*(3e-3)^2/1.0
 @show κ0
 
-cables = [RB.DistanceSpringDamper3D(i,0.8*2h,1e3,0.0;slack=true) for i = 1:ncables]
+cables = [RB.DistanceSpringDamper3D(0.8*2h,1e3,0.0;slack=true) for i = 1:ncables]
 
 acs = [
     RB.ManualActuator(
@@ -130,12 +130,12 @@ acs = [
         zeros(ncables)
     ),
 ]
-force_elements = (cables = cables,)
+apparatuses = (cables = cables,)
 hub = (actuators = acs,)
 
 # jointedmembers = RB.join(csts,indexedcoords)
 cnt = RB.Connectivity(numberedpoints,indexedcoords,@eponymtuple(connected,),)
 
-st = RB.Structure(rbs,force_elements,cnt)
+st = RB.Structure(rbs,apparatuses,cnt)
 RB.Robot(st,hub)
 end

@@ -86,27 +86,27 @@ function lander(;k=nothing)
     ncables = size(cnt_matrix,1)
     hncables = ncables
     if k isa Nothing
-        cables = [RB.DistanceSpringDamper3D(i,0.0,100.0,0.0;slack=false) for i = 1:ncables]
+        cables = [RB.DistanceSpringDamper3D(0.0,100.0,0.0;slack=false) for i = 1:ncables]
     else
-        cables = [RB.DistanceSpringDamper3D(i,0.0,k[i],0.0;slack=false) for i = 1:ncables]
+        cables = [RB.DistanceSpringDamper3D(0.0,k[i],0.0;slack=false) for i = 1:ncables]
     end
     acs = [
         RB.ManualActuator(i,[i],zeros(1))
         for i = 1:hncables
     ]
     hub = (actuators = acs,)
-    force_elements = (cables = cables,)
+    apparatuses = (cables = cables,)
     connected = RB.connect(rbs,cnt_matrix)
     # #
     #
-    # cst1 = RB.PinJoint(RB.Hen2Egg(1,RB.ID(rb1_to_3[1],2),RB.ID(rb4,1)))
-    # cst2 = RB.PinJoint(RB.Hen2Egg(2,RB.ID(rb1_to_3[2],2),RB.ID(rb4,2)))
-    # cst3 = RB.PinJoint(RB.Hen2Egg(3,RB.ID(rb1_to_3[3],2),RB.ID(rb4,3)))
+    # cst1 = RB.PinJoint(RB.Hen2Egg(RB.ID(rb1_to_3[1],2),RB.ID(rb4,1)))
+    # cst2 = RB.PinJoint(RB.Hen2Egg(RB.ID(rb1_to_3[2],2),RB.ID(rb4,2)))
+    # cst3 = RB.PinJoint(RB.Hen2Egg(RB.ID(rb1_to_3[3],2),RB.ID(rb4,3)))
     # jointedmembers = RB.join((cst1,cst2,cst3),indexedcoords)
     #
 
     cnt = RB.Connectivity(numberedpoints,indexedcoords,@eponymtuple(connected,))
 
-    st = RB.Structure(rbs,force_elements,cnt)
+    st = RB.Structure(rbs,apparatuses,cnt)
     bot = RB.Robot(st,hub)
 end

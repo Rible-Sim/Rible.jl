@@ -29,7 +29,7 @@ function ManualActuator(actid,ids::AbstractVector,values::AbstractVector,coupler
 end
 
 function actuate!(st,act::AbstractActuator{<:Uncoupled},μ::AbstractVector)
-    (;cables) = st.force_elements
+    (;cables) = st.apparatuses
     (;reg) = act
     (;ids, values) = reg
     for (id, original_restlen) in zip(ids,values)
@@ -39,7 +39,7 @@ function actuate!(st,act::AbstractActuator{<:Uncoupled},μ::AbstractVector)
 end
 
 function actuate!(st,act::AbstractActuator{<:Serial},μ::Number)
-    (;cables) = st.force_elements
+    (;cables) = st.apparatuses
     (;reg) = act
     (;ids, values) = reg
     for (id, original_restlen) in zip(ids,values)
@@ -117,7 +117,7 @@ end
 # end
 #
 # function heat!(ctrller::ManualHeater,st,u;inc=false,abs=true)
-#     (;SMA_cables) = st.force_elements
+#     (;SMA_cables) = st.apparatuses
 #     (;id_string, original_value, heating_law) = ctrller.act
 #     s = select_by_id(SMA_cables,id_string)
 #     if abs
@@ -133,7 +133,7 @@ end
 # end
 #
 # @inline function heat!(ctrller::ManualSerialHeater,st::Structure,u;inc=false)
-#     heat!(ctrller,st.force_elements.SMA_cables,u;inc)
+#     heat!(ctrller,st.apparatuses.SMA_cables,u;inc)
 # end
 #
 # function heat!(ctrller::ManualSerialHeater,
@@ -160,7 +160,7 @@ end
 # end
 
 function set_restlen!(st,u)
-    for (i,s) in enumerate(st.force_elements.cables)
+    for (i,s) in enumerate(st.apparatuses.cables)
         s.state.restlen = u[i]
     end
 end

@@ -49,7 +49,7 @@ function dynfuncs(bot)
         RB.clear_forces!(st)
         RB.update_bodies!(st,q,q̇)
         RB.distribute_s̄!(st,s)
-        RB.update_tensiles!(st)
+        RB.update_apparatuses!(st)
         ## RB.apply_gravity!(st)
         RB.assemble_forces!(st)
         RB.get_force!(F,st)
@@ -68,7 +68,7 @@ function dynfuncs(bot)
     #             return 0
     #         end
     #     end
-    #     st.force_elements.clustercables[1].segs[1].state.restlen += inner(t)
+    #     st.apparatuses.clustercables[1].segs[1].state.restlen += inner(t)
     # end
     Jac_F! = true
     @eponymtuple(F!, Jac_F!)
@@ -88,7 +88,7 @@ function actuate!(st, t; dt=1e-2)
             return 0
         end
     end
-    st.force_elements.clustercables[1].segs[1].state.restlen += inner(t)
+    st.apparatuses.clustercables[1].segs[1].state.restlen += inner(t)
 end
 
 RB.solve!(prob,RB.FBZhong06(),

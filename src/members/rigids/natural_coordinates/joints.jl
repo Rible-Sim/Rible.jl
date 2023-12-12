@@ -80,11 +80,11 @@ function build_joint_cache(
                 kron(vcat(0,axis_zero,0,axis_egg),I3_Bool)'*
                 select_uvw_egg |> sparse
         end
-        relative_core = axes_rot_egg.X*axes_rot_hen.X'
     else
         # rotational joint not to be used for bars
         axes_rot_hen = axes_rot_egg
     end
+    relative_core = axes_rot_egg.X*axes_rot_hen.X'
 
     halves = vcat(
         half_1st[mask_1st],

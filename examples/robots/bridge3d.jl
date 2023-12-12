@@ -183,15 +183,15 @@ diameter = 1e-2
 κ = (mat_cable.modulus_elas |> ustrip)*1e9*π*(diameter/2)^2/10
 @show κ
 if k isa Nothing
-    cables = [RB.DistanceSpringDamper3D(i,0.0,κ,0.0;slack=false) for i = 1:ncables]
+    cables = [RB.DistanceSpringDamper3D(0.0,κ,0.0;slack=false) for i = 1:ncables]
 else
-    cables = [RB.DistanceSpringDamper3D(i,0.0,k[i],0.0;slack=false) for i = 1:ncables]
+    cables = [RB.DistanceSpringDamper3D(0.0,k[i],0.0;slack=false) for i = 1:ncables]
 end
 acs = [
     RB.ManualActuator(i,[i,i+hncables],zeros(2))
     for i = 1:hncables
 ]
-force_elements = (cables = cables,)
+apparatuses = (cables = cables,)
 hub = (actuators = acs,)
 # 	# triplex 1
 # 	1 0 0 -1  0  0  0 0 0 0;
@@ -228,17 +228,17 @@ hub = (actuators = acs,)
 # 	]
 connected = RB.connect(rbs,cnt_matrix)
 # ss = Int[]
-# force_elements = (cables = ss,)
+# apparatuses = (cables = ss,)
 # connected = RB.connect(rbs,zeros(Int,0,0))
 # #
 #
-# cst1 = RB.PinJoint(RB.Hen2Egg(1,RB.ID(rb1_to_3[1],2),RB.ID(rb4,1)))
-# cst2 = RB.PinJoint(RB.Hen2Egg(2,RB.ID(rb1_to_3[2],2),RB.ID(rb4,2)))
-# cst3 = RB.PinJoint(RB.Hen2Egg(3,RB.ID(rb1_to_3[3],2),RB.ID(rb4,3)))
+# cst1 = RB.PinJoint(RB.Hen2Egg(RB.ID(rb1_to_3[1],2),RB.ID(rb4,1)))
+# cst2 = RB.PinJoint(RB.Hen2Egg(RB.ID(rb1_to_3[2],2),RB.ID(rb4,2)))
+# cst3 = RB.PinJoint(RB.Hen2Egg(RB.ID(rb1_to_3[3],2),RB.ID(rb4,3)))
 # jointedmembers = RB.join((cst1,cst2,cst3),indexedcoords)
 #
 cnt = RB.Connectivity(numberedpoints,indexedcoords,@eponymtuple(connected,))
 
-st = RB.Structure(rbs,force_elements,cnt)
+st = RB.Structure(rbs,apparatuses,cnt)
 bot = RB.Robot(st,hub)
 end

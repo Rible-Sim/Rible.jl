@@ -54,9 +54,9 @@ function tower2d(;k=100.0,c=0.0,ratio=0.8,ratio1=ratio,slack=true)
     ness = 10
     ks = vcat(fill(k,naux),fill(k,ness))
     cs = fill(c,ncables)
-    cables = [RB.DistanceSpringDamper2D(i,restlens[i],ks[i],cs[i];slack) for i = 1:ncables]
+    cables = [RB.DistanceSpringDamper2D(restlens[i],ks[i],cs[i];slack) for i = 1:ncables]
     acs = [RB.ManualActuator(1,collect(1:ncables),restlens[1:ncables])]
-    force_elements = (cables = cables,)
+    apparatuses = (cables = cables,)
     hub = (actuators = acs,)
     cnt_matrix_cables = [
         0  0 0 0 -1  0  0  2;
@@ -75,15 +75,15 @@ function tower2d(;k=100.0,c=0.0,ratio=0.8,ratio1=ratio,slack=true)
     connected = RB.connect(rbs,cnt_matrix_cables)
     #
 
-    cst1 = RB.PinJoint(RB.Hen2Egg(1,RB.ID(rb2,2),RB.ID(rb3,2)))
-    cst2 = RB.PinJoint(RB.Hen2Egg(2,RB.ID(rb3,3),RB.ID(rb4,1)))
-    cst3 = RB.PinJoint(RB.Hen2Egg(3,RB.ID(rb4,2),RB.ID(rb5,3)))
-    cst4 = RB.PinJoint(RB.Hen2Egg(4,RB.ID(rb5,3),RB.ID(rb6,1)))
+    cst1 = RB.PinJoint(RB.Hen2Egg(RB.ID(rb2,2),RB.ID(rb3,2)))
+    cst2 = RB.PinJoint(RB.Hen2Egg(RB.ID(rb3,3),RB.ID(rb4,1)))
+    cst3 = RB.PinJoint(RB.Hen2Egg(RB.ID(rb4,2),RB.ID(rb5,3)))
+    cst4 = RB.PinJoint(RB.Hen2Egg(RB.ID(rb5,3),RB.ID(rb6,1)))
     jointedmembers = RB.join((cst1,cst2,cst3,cst4),indexedcoords)
     # jointedmembers = RB.join((cst1,cst2,cst3),indexedcoords)
 
     cnt = RB.Connectivity(numberedpoints,indexedcoords,@eponymtuple(connected,),jointedmembers)
     # cnt = RB.Connectivity(numberedpoints,indexedcoords,connections)
-    st = RB.Structure(rbs,force_elements,cnt)
+    st = RB.Structure(rbs,apparatuses,cnt)
     bot = RB.Robot(st,hub)
 end

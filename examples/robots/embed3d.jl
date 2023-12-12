@@ -220,9 +220,9 @@ cable_length = 0.1Unitful.m
 κ = (mat_cable.modulus_elas)*π*(diameter/2)^2/cable_length
 # @show κ
 @show uconvert(Unitful.N/Unitful.m,κ),ustrip(Unitful.N/Unitful.m,κ)
-cables_prism = [RB.DistanceSpringDamper3D(i,0.0,   ustrip(Unitful.N/Unitful.m,κ),0.0;slack=true) for i = 1:ncables_prism]
+cables_prism = [RB.DistanceSpringDamper3D(0.0,   ustrip(Unitful.N/Unitful.m,κ),0.0;slack=true) for i = 1:ncables_prism]
 cables_outer = [
-    RB.DistanceSpringDamper3D(i,[0.95,0.85,0.75][((i-ncables_prism) % 3)+1]*0.2,ustrip(Unitful.N/Unitful.m,κ),0.0;slack=true) 
+    RB.DistanceSpringDamper3D([0.95,0.85,0.75][((i-ncables_prism) % 3)+1]*0.2,ustrip(Unitful.N/Unitful.m,κ),0.0;slack=true) 
     for i = ncables_prism+1:ncables
 ]
 @show 2h
@@ -242,11 +242,11 @@ acs = [
         zeros(ncables_outer)
     ),
 ]
-force_elements = (cables = cables,)
+apparatuses = (cables = cables,)
 hub = (actuators = acs,)
 
 csts = [
-    RB.PinJoint(i+m*(j-1),RB.Hen2Egg(i,RB.ID(bars[j][m+cm[i]],2),RB.ID(plates[j+1],cm[i-1])))
+    RB.PinJoint(i+m*(j-1),RB.Hen2Egg(RB.ID(bars[j][m+cm[i]],2),RB.ID(plates[j+1],cm[i-1])))
      for j = 1:n for i = 1:m
 ]
 
@@ -254,6 +254,6 @@ jointedmembers = RB.join(csts,indexedcoords)
 
 cnt = RB.Connectivity(numberedpoints,indexedcoords,@eponymtuple(connected,),jointedmembers)
 
-st = RB.Structure(rbs,force_elements,cnt)
+st = RB.Structure(rbs,apparatuses,cnt)
 bot = RB.Robot(st,hub)
 end

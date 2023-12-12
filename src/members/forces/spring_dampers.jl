@@ -36,7 +36,6 @@ end
 $(TYPEDEF)
 """
 struct DistanceSpringDamper{N,T}
-    id::Int
     k::T
     c::T
 	slack::Bool
@@ -46,19 +45,19 @@ end
 """
 $(TYPEDSIGNATURES)
 """
-function DistanceSpringDamper2D(id,restlen::T,k::T,c=zero(k);slack=true) where T
+function DistanceSpringDamper2D(restlen::T,k::T,c=zero(k);slack=true) where T
     direction = MVector{2}(one(T),zero(T))
     state = DistanceSpringDamperState(restlen,direction)
-    DistanceSpringDamper(id,k,c,slack,state)
+    DistanceSpringDamper(k,c,slack,state)
 end
 
 """
 $(TYPEDSIGNATURES)
 """
-function DistanceSpringDamper3D(id,restlen::T,k::T,c=zero(k);slack=true) where T
+function DistanceSpringDamper3D(restlen::T,k::T,c=zero(k);slack=true) where T
     direction = MVector{3}(one(T),zero(T),zero(T))
     state = DistanceSpringDamperState(restlen,direction)
-    DistanceSpringDamper(id,k,c,slack,state)
+    DistanceSpringDamper(k,c,slack,state)
 end
 
 """
@@ -142,17 +141,17 @@ end
 """
 $(TYPEDSIGNATURES)
 """
-function RotationalSpringDamper2D(id,rest_angles::AbstractVector{T},mask,k::T,c=zero(k);slack=true) where T
+function RotationalSpringDamper2D(rest_angles::AbstractVector{T},mask,k::T,c=zero(k);slack=true) where T
     state = RotationalSpringDamperState(MVector{1}(rest_angles))
-    RotationalSpringDamper(id,k,c,slack,mask,state)
+    RotationalSpringDamper(k,c,slack,mask,state)
 end
 
 """
 $(TYPEDSIGNATURES)
 """
-function RotationalSpringDamper3D(id,rest_angles::AbstractVector{T},mask,k::T,c=zero(k);slack=true) where T
+function RotationalSpringDamper3D(rest_angles::AbstractVector{T},mask,k::T,c=zero(k);slack=true) where T
     state = RotationalSpringDamperState(MVector{3}(rest_angles))
-    RotationalSpringDamper(id,k,c,slack,mask,state)
+    RotationalSpringDamper(k,c,slack,mask,state)
 end
 
 """
@@ -211,10 +210,10 @@ struct SMADistanceSpringDamper{N,T,F}
     state::SMADistanceSpringDamperState{N,T}
 end
 
-function SMADistanceSpringDamper3D(id,restlen::T,law::LawT,c::T,original_temp::T=0.0) where {LawT,T}
+function SMADistanceSpringDamper3D(restlen::T,law::LawT,c::T,original_temp::T=0.0) where {LawT,T}
     direction = MVector{3}(one(T),zero(T),zero(T))
     state = SMADistanceSpringDamperState(original_temp,restlen,direction)
-    SMADistanceSpringDamper(id,law,c,state)
+    SMADistanceSpringDamper(law,c,state)
 end
 
 mutable struct SlidingPoint{T}
@@ -235,10 +234,10 @@ struct DistanceSpringDamperSegment{N,T}
     state::DistanceSpringDamperState{N,T}
 end
 
-function DistanceSpringDamperSegment(id, original_restlen, k; c=zero(k), prestress=zero(k))
+function DistanceSpringDamperSegment( original_restlen, k; c=zero(k), prestress=zero(k))
     direction = MVector{2}(one(k), zero(k))
     state = DistanceSpringDamperState(original_restlen, direction)
-    DistanceSpringDamperSegment(id, k, c, prestress, original_restlen, state)
+    DistanceSpringDamperSegment( k, c, prestress, original_restlen, state)
 end
 
 function calculate_α(μ,θ)
@@ -260,9 +259,9 @@ struct ClusterDistanceSpringDampers{spsType,segsType}
     segs::segsType
 end
 
-function ClusterDistanceSpringDampers(id, nsp, segs;μ=0.0)
+function ClusterDistanceSpringDampers( nsp, segs;μ=0.0)
     sps = StructArray([SlidingPoint(μ) for i = 1:nsp])
-    ClusterDistanceSpringDampers(id, sps, segs)
+    ClusterDistanceSpringDampers( sps, segs)
 end
 
 function s2s̄(s::Number)

@@ -9,32 +9,6 @@ function clear_forces!(bodies::TypeSortedCollection)
     foreach(clear_forces!,bodies)
 end
 
-"""
-Update DistanceSpringDamper Tension 
-$(TYPEDSIGNATURES)
-"""
-function update_tensiles!(st::AbstractStructure)
-    update_tensiles!(st::AbstractStructure, st.connectivity.tensioned)
-    update_tensiles!(st::AbstractStructure, st.connectivity.jointed)
-end
-
-function update_tensiles!(st::AbstractStructure, @eponymargs(connected,))
-    (;cables) = st.force_elements
-    foreach(connected) do scnt
-        cable = cables[scnt.id]
-        locus_state_hen = scnt.hen.bodysig.state.loci_states[scnt.hen.pid]
-        locus_state_egg = scnt.egg.bodysig.state.loci_states[scnt.egg.pid]
-        p_hen = locus_state_hen.frame.position
-        ṗ_hen = locus_state_hen.frame.velocity
-        f_hen = locus_state_hen.force
-        p_egg = locus_state_egg.frame.position
-        ṗ_egg = locus_state_egg.frame.velocity
-        f_egg = locus_state_egg.force
-        update!(cable,p_hen,p_egg,ṗ_hen,ṗ_egg)
-        f_hen .+= cable.state.force
-        f_egg .-= cable.state.force
-    end
-end
 
 function rotation2angles(R::AbstractVector{T}) where {T}
     rotation2angles(reshape(R,3,:))
@@ -86,62 +60,85 @@ function make_jointed2angles(hen2egg,relative_core)
     end
 end
 
-function update_tensiles!(st::AbstractStructure, jointed::Jointed)
-    (;spring_dampers) = st.force_elements
+
+"""
+Update DistanceSpringDamper Tension 
+$(TYPEDSIGNATURES)
+"""
+function update_apparatuses!(st::AbstractStructure)
+    (;apparatuses) = st
+    foreach(apparatuses) do appar
+        update_apparatus!(st, appar)
+    end
+end
+
+function update_apparatus!(st::AbstractStructure, appar::Apparatus{true,false})
+    #no force, no update
+end
+
+function update_apparatus!(st::AbstractStructure, appar::Apparatus{false,true,<:CableJoint})
+    (;id,joint,force) = appar
+    (;hen,egg) = joint.hen2egg
+    locus_state_hen = hen.bodysig.state.loci_states[hen.pid]
+    locus_state_egg = egg.bodysig.state.loci_states[egg.pid]
+    p_hen = locus_state_hen.frame.position
+    ṗ_hen = locus_state_hen.frame.velocity
+    f_hen = locus_state_hen.force
+    p_egg = locus_state_egg.frame.position
+    ṗ_egg = locus_state_egg.frame.velocity
+    f_egg = locus_state_egg.force
+    update!(force,p_hen,p_egg,ṗ_hen,ṗ_egg)
+    f_hen .+= force.state.force
+    f_egg .-= force.state.force
+end
+
+function update_apparatuses!(st::AbstractStructure, appar::Apparatus{true,true,<:PrototypeJoint})
     (;indexed,numbered) = st.connectivity
     (;system) = st.state
     (;bodyid2sys_free_coords,
       bodyid2sys_full_coords,
       num_of_free_coords,
       num_of_full_coords,
-      jointid2full_idx,
-      jointid2free_idx,
-      jointid2sys_free_idx
+      apparid2full_idx,
+      apparid2free_idx,
+      apparid2sys_free_coords_idx
     ) = indexed
+    (;
+        num_of_cstr,
+        hen2egg,
+        cache,
+        mask_1st,mask_2nd,mask_3rd,mask_4th
+    ) = appar.joint
+    (;
+        relative_core
+    ) = cache
+    full_idx = apparid2full_idx[appar.id]
+    free_idx = apparid2free_idx[appar.id]
+    sys_free_coords_idx = apparid2sys_free_coords_idx[appar.id]
+    spring_damper = spring_dampers[appar.id]
+    (;mask,k) = spring_damper
+    (;hen,egg) = hen2egg
+    id_hen = hen.bodysig.prop.id
+    id_egg = egg.bodysig.prop.id
     q = get_coords(st)
-    foreach(jointed.joints) do joint
-        if joint isa PrototypeJoint
-            (;
-                num_of_cstr,
-                hen2egg,
-                cache,
-                mask_1st,mask_2nd,mask_3rd,mask_4th
-            ) = joint
-            (;
-                relative_core
-            ) = cache
-            full_idx = jointid2full_idx[joint.id]
-            free_idx = jointid2free_idx[joint.id]
-            sys_free_idx = jointid2sys_free_idx[joint.id]
-            spring_damper = spring_dampers[joint.id]
-            (;mask,k) = spring_damper
-            (;hen,egg) = hen2egg
-            nmcs_hen = hen.bodysig.coords.nmcs
-            nmcs_egg = egg.bodysig.coords.nmcs
-            num_of_coords_hen = get_num_of_coords(nmcs_hen)
-            num_of_coords_egg = get_num_of_coords(nmcs_egg)
-            id_hen = hen.bodysig.prop.id
-            id_egg = egg.bodysig.prop.id
-            q_hen = @view q[bodyid2sys_full_coords[id_hen]]
-            q_egg = @view q[bodyid2sys_full_coords[id_egg]]
-            q_jointed = vcat(
-                q_hen,
-                q_egg
-            )
-            jointed2angles = make_jointed2angles(hen2egg,relative_core)
-            angles = jointed2angles(q_jointed)
-	        torques = k.*angles
-            update!(spring_damper,angles,)
-            angles_jacobian = ForwardDiff.jacobian(jointed2angles,q_jointed)
-            for i in mask
-                torque = torques[i]
-                angle = angles[i]
-                # @show angle
-                # @show angles_jacobian[i,  4:12]*torque
-                # @show angles_jacobian[i,16:end]*torque
-                system.F̌[sys_free_idx] .-= angles_jacobian[i,free_idx]*torque
-            end
-        end
+    q_hen = @view q[bodyid2sys_full_coords[id_hen]]
+    q_egg = @view q[bodyid2sys_full_coords[id_egg]]
+    q_jointed = vcat(
+        q_hen,
+        q_egg
+    )
+    jointed2angles = make_jointed2angles(hen2egg,relative_core)
+    angles = jointed2angles(q_jointed)
+    torques = k.*angles
+    update!(spring_damper,angles,)
+    angles_jacobian = ForwardDiff.jacobian(jointed2angles,q_jointed)
+    for i in mask
+        torque = torques[i]
+        angle = angles[i]
+        # @show angle
+        # @show angles_jacobian[i,  4:12]*torque
+        # @show angles_jacobian[i,16:end]*torque
+        system.F̌[sys_free_coords_idx] .-= angles_jacobian[i,free_idx]*torque
     end
 end
 

@@ -340,7 +340,7 @@ function plot_traj!(bot::RB.Robot;
                     # @show RB.mechanical_energy(structure)
                     #
                     this_time[] = traj.t[this_step]
-                    RB.analyse_slack(structure,true)
+                    # RB.analyse_slack(structure,true)
                     tgob[] = structure
                     if auto
                         if AxisType <: LScene

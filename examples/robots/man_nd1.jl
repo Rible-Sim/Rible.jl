@@ -142,9 +142,9 @@ function man_nd1(k=0.0,c=0.0;ratio=0.8)
     # original_restlens = [lostringlen;upstringlen;upstringlen;lostringlen]
     # @show  original_restlens
 	#
-    cables = [RB.DistanceSpringDamper2D(i,original_restlens[i],ks[i],cs[i];slack=false) for i = 1:ncables]
+    cables = [RB.DistanceSpringDamper2D(original_restlens[i],ks[i],cs[i];slack=false) for i = 1:ncables]
     acs = [RB.ManualActuator(i,i,original_restlens[i]) for i = 1:ncables]
-    force_elements = (cables = cables,)
+    apparatuses = (cables = cables,)
     hub = (actuators = acs,)
 
 	cnt_matrix_cables = [
@@ -157,6 +157,6 @@ function man_nd1(k=0.0,c=0.0;ratio=0.8)
 	tensioned = @eponymtuple(connected,)
 	cnt = RB.Connectivity(numberedpoints,indexedcoords,tensioned)
 
-	st = RB.Structure(rigidbodies,force_elements,cnt)
+	st = RB.Structure(rigidbodies,apparatuses,cnt)
     bot = RB.Robot(st,hub)
 end

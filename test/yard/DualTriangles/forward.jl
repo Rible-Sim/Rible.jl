@@ -150,8 +150,8 @@ function cable_angle(bot_input,seq)
     θs = Vector{Float64}()
     for q in seq.q
         RB.update_bodies!(st,q)
-        RB.update_tensiles!(st)
-        sdir = st.force_elements.cables[2].state.direction
+        RB.update_apparatuses!(st)
+        sdir = st.apparatuses.cables[2].state.direction
         θ = atan(sdir[2],sdir[1])
         push!(θs,θ)
     end
@@ -585,7 +585,7 @@ compare_loop([12])
 includet("../dyn.jl")
 
 mandyn = man_ndof_2022(2)
-mandyn.st.force_elements.cables
+mandyn.st.apparatuses.cables
 
 _ = RB.check_static_equilibrium_output_multipliers(mandyn.st)
 

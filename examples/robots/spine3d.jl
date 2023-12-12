@@ -74,8 +74,8 @@ kR = 400e1
 ks = repeat(vcat(fill(kH,4),fill(kR,4)),n-1)
 # c = 0.0
 cs = repeat(fill(c,8),n-1)
-cables = [RB.DistanceSpringDamper3D(i,cablelens[i],ks[i],cs[i]) for i = 1:ncables]
-force_elements = (cables=cables,)	
+cables = [RB.DistanceSpringDamper3D(cablelens[i],ks[i],cs[i]) for i = 1:ncables]
+apparatuses = (cables=cables,)	
 acs = [RB.ManualActuator(1,collect(1:ncables),cablelens[1:ncables])]
 hub = (actuators=acs,)
 
@@ -106,6 +106,6 @@ matrix_cnt = reduce(vcat, matrix_cnt_raw)
 connected = RB.connect(rigdibodies, matrix_cnt)
 tensioned = @eponymtuple(connected,)
 cnt = RB.Connectivity(numberedpoints, indexedcoords, tensioned)
-st = RB.Structure(rigdibodies,force_elements,cnt)
+st = RB.Structure(rigdibodies,apparatuses,cnt)
 bot = RB.Robot(st,hub)
 end

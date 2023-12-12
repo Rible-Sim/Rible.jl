@@ -129,9 +129,9 @@ pretty_table(
         ]
     )
 )
-cables = [RB.DistanceSpringDamper3D(i,restlens[i],ks[i],cs[i];slack=true) for i = 1:ncables]
+cables = [RB.DistanceSpringDamper3D(restlens[i],ks[i],cs[i];slack=true) for i = 1:ncables]
 acs = [RB.ManualActuator(1,collect(1:ncables),restlens[1:ncables])]
-force_elements = (cables = cables,)
+apparatuses = (cables = cables,)
 hub = (actuators = acs,)
 cnt_matrix_cables = [
     # triplex 1
@@ -170,13 +170,13 @@ cnt_matrix_cables = [
 connected = RB.connect(rbs,cnt_matrix_cables[begin:end,begin:end-1])
 #
 #
-# cst1 = RB.PinJoint(RB.Hen2Egg(1,RB.ID(rb1_to_3[1],2),RB.ID(rb4,1)))
-# cst2 = RB.PinJoint(RB.Hen2Egg(2,RB.ID(rb1_to_3[2],2),RB.ID(rb4,2)))
-# cst3 = RB.PinJoint(RB.Hen2Egg(3,RB.ID(rb1_to_3[3],2),RB.ID(rb4,3)))
+# cst1 = RB.PinJoint(RB.Hen2Egg(RB.ID(rb1_to_3[1],2),RB.ID(rb4,1)))
+# cst2 = RB.PinJoint(RB.Hen2Egg(RB.ID(rb1_to_3[2],2),RB.ID(rb4,2)))
+# cst3 = RB.PinJoint(RB.Hen2Egg(RB.ID(rb1_to_3[3],2),RB.ID(rb4,3)))
 # jointedmembers = RB.join((cst1,cst2,cst3),indexedcoords)
 #
 cnt = RB.Connectivity(numberedpoints,indexedcoords,@eponymtuple(connected,))
 
-st = RB.Structure(rbs,force_elements,cnt)
+st = RB.Structure(rbs,apparatuses,cnt)
 bot = RB.Robot(st,hub)
 end

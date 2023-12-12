@@ -56,8 +56,8 @@ function make_spine(n,θ=0.0)
     k = 840.0 #N/m
     c = 100.0
     original_restlens = repeat([0.15, 0.11, 0.11, 0.15]./2,n-1)
-    ss = [RB.DistanceSpringDamper2D(i,original_restlens[i],k,c) for i = 1:ncables]
-    force_elements = (cables = ss,)
+    ss = [RB.DistanceSpringDamper2D(original_restlens[i],k,c) for i = 1:ncables]
+    apparatuses = (cables = ss,)
     hub = nothing
 	
 
@@ -74,6 +74,6 @@ function make_spine(n,θ=0.0)
 
     cnt = RB.Connectivity(numbered,indexed,tensioned)
 	# rbs
-    st = RB.Structure(rigdibodies,force_elements,cnt)
+    st = RB.Structure(rigdibodies,apparatuses,cnt)
     bot = RB.Robot(st,hub)
 end

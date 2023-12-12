@@ -1,4 +1,4 @@
-includet("../bodies/make_3d_bar.jl")
+# includet("../bodies/make_3d_bar.jl")
 function Tbars(;θ = 0, coordsType = RB.NCF.NC)
     SVo3 = SVector{3}([0.0,0.0,0.0])
     a = 1.0
@@ -131,17 +131,14 @@ function Tbars(;θ = 0, coordsType = RB.NCF.NC)
     )
     rbs = [base,slider1,slider2,bar]
     rigdibodies = TypeSortedCollection(rbs)
-    numbered = RB.number(rigdibodies)
-    # sm = [
-    #     0 1 0 1;
-    #     0 2 0 2;
-    #     0 3 0 3;
-    #     0 0 1 4;
-    #     0 0 2 5;
-    #     0 0 3 6;
-    # ]
-    # indexed = RB.index(rigdibodies,sm)
-    indexed = RB.index(rigdibodies,)
+
+    j1 = RB.PrismaticJoint(1,RB.Hen2Egg(RB.ID(base,5,1),RB.ID(slider1,1,1)))
+    j2 = RB.PrismaticJoint(2,RB.Hen2Egg(RB.ID(base,5,2),RB.ID(slider2,1,1)))
+
+    j3 = RB.PinJoint(3,RB.Hen2Egg(RB.ID(bar,1,1),RB.ID(slider1,2,1)))
+    j4 = RB.PinJoint(4,RB.Hen2Egg(RB.ID(bar,2,1),RB.ID(slider2,2,1)))
+
+    js = [j1,j2,j3,j4]
 
     ncables = 4
     original_restlens = zeros(ncables)
@@ -149,8 +146,7 @@ function Tbars(;θ = 0, coordsType = RB.NCF.NC)
     ks = fill(100.0,ncables)
     ks[2] = 400.0
     cs = zeros(ncables)
-    ss = [RB.DistanceSpringDamper3D(i, original_restlens[i],ks[i],cs[i];slack=false) for i = 1:ncables]
-    force_elements = (cables=ss,)
+    spring_dampers = [RB.DistanceSpringDamper3D(original_restlens[i],ks[i],cs[i];slack=false) for i = 1:ncables]
 
     cm = [
         1 -1  0  0;
@@ -161,19 +157,21 @@ function Tbars(;θ = 0, coordsType = RB.NCF.NC)
         7 -1  0  0;
     ]
 
-    connected = RB.connect(rigdibodies, cm)
-    tensioned = @eponymtuple(connected,)
+    cables = RB.connect(rigdibodies, spring_dampers, cm, 4)
 
-    j1 = RB.PrismaticJoint(1,RB.Hen2Egg(1,RB.ID(base,5,1),RB.ID(slider1,1,1)))
-    j2 = RB.PrismaticJoint(2,RB.Hen2Egg(2,RB.ID(base,5,2),RB.ID(slider2,1,1)))
-
-    j3 = RB.PinJoint(3,RB.Hen2Egg(3,RB.ID(bar,1,1),RB.ID(slider1,2,1)))
-    j4 = RB.PinJoint(4,RB.Hen2Egg(4,RB.ID(bar,2,1),RB.ID(slider2,2,1)))
-
-    js = [j1,j2,j3,j4]
-
-    jointed = RB.join(js,indexed)
-    cnt = RB.Connectivity(numbered,indexed,tensioned,jointed)
-    st = RB.Structure(rigdibodies,force_elements,cnt)
+    apparatuses = TypeSortedCollection(
+        vcat(js,cables)
+    )
+    
+    # sm = [
+    #     0 1 0 1;
+    #     0 2 0 2;
+    #     0 3 0 3;
+    #     0 0 1 4;
+    #     0 0 2 5;
+    #     0 0 3 6;
+    # ]
+    # indexed = RB.index(rigdibodies,sm)
+    st = RB.Structure(rigdibodies,apparatuses,)
     RB.Robot(st,)
 end

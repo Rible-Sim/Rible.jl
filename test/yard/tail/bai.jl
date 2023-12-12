@@ -197,8 +197,8 @@ function make_bai(meshes,质心,质量,惯量)
         ks[i] = 1000.0
     end
     cables =
-        [RB.DistanceSpringDamper2D(i, original_restlens[i], ks[i], 0.0;slack=true) for i = 1:ncables]  #
-    force_elements = (cables = cables,)
+        [RB.DistanceSpringDamper2D( original_restlens[i], ks[i], 0.0;slack=true) for i = 1:ncables]  #
+    apparatuses = (cables = cables,)
     acs = [
         RB.ManualActuator(1,
             [1:2(nb-1)],
@@ -222,7 +222,7 @@ function make_bai(meshes,质心,质量,惯量)
     tensioned = @eponymtuple(connected,)
     cnt = RB.Connectivity(numberedpoints, indexedcoords, tensioned)
 
-    st = RB.Structure(rigdibodies, force_elements, cnt)
+    st = RB.Structure(rigdibodies, apparatuses, cnt)
     bot = RB.Robot(st, hub)
 end
 

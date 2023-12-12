@@ -25,7 +25,7 @@ function initialize_GDR(st,F::Nothing;gravity=true)
         # Q = Q̃*Γ(x)
         clear_forces!(st)
         update_bodies!(st,x)
-        update_tensiles!(st)
+        update_apparatuses!(st)
         if gravity
             apply_gravity!(st)
         end

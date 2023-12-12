@@ -454,14 +454,7 @@ function concentrated_force!(F,state::AbstractBodyState,cache::AbstractBodyCache
     end
 end
 
-
-# kinematic joint cstr
-
-function get_bodies_ids(bodies)
-    ids = mapreduce((body)->body.prop.id,vcat,bodies;init=Int[])
-    nb = length(ids)
-    ids,nb
-end
+get_id(body::AbstractBody) = body.prop.id
 
 """
 Return 约束方程编号。

@@ -57,13 +57,13 @@ function make_rod()
 	matrix_sharing = zeros(Int,0,0)
 	indexedcoords = RB.index(rbs,matrix_sharing)
     ss = Int[]
-	force_elements = (cables = ss,)
+	apparatuses = (cables = ss,)
 	hub = nothing
 	connections = RB.connect(rbs,zeros(Int,0,0))
 	jointedmembers = RB.unjoin()
 	contacts = [RB.ID(1,i) for i = 1:2]
 	cnt = RB.Connectivity(numberedpoints,indexedcoords,connections,jointedmembers,contacts)
-	st = RB.Structure(rbs,force_elements,cnt)
+	st = RB.Structure(rbs,apparatuses,cnt)
     bot = RB.Robot(st,nothing)
 end
 
@@ -100,13 +100,13 @@ function make_bar()
 	matrix_sharing = zeros(Int,0,0)
 	indexedcoords = RB.index(rbs,matrix_sharing)
     ss = Int[]
-	force_elements = (cables = ss,)
+	apparatuses = (cables = ss,)
 	hub = nothing
 	connections = RB.connect(rbs,zeros(Int,0,0))
 	jointedmembers = RB.unjoin()
 	contacts = [RB.ID(1,i) for i = 1:2]
 	cnt = RB.Connectivity(numberedpoints,indexedcoords,connections,jointedmembers,contacts)
-	st = RB.Structure(rbs,force_elements,cnt)
+	st = RB.Structure(rbs,apparatuses,cnt)
     bot = RB.Robot(st,nothing)
 end
 

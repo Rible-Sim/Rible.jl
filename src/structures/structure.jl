@@ -13,30 +13,28 @@ end
 State Constructor.
 $(TYPEDSIGNATURES)
 """
-function StructureState(bodies,force_elements,cnt::Connectivity{<:Any,<:NamedTuple{(:connected, )},<:Any,<:Any})
-    (;numbered,indexed,jointed) = cnt
+function StructureState(bodies,apparatuses,cnt::Connectivity)
+    (;numbered,indexed) = cnt
     (;bodyid2sys_loci_coords_idx) = numbered
     (;
+        num_of_bodies,
         num_of_full_coords,
         num_of_free_coords,
         num_of_intrinsic_cstr,
-        sys_free_idx,
-        sys_pres_idx
-    ) = indexed
-    (;
+        num_of_extrinsic_cstr,
+        num_of_cstr,
+        sys_free_coords_idx,
+        sys_pres_coords_idx,
         bodyid2sys_intrinsic_cstr_idx,
         bodyid2sys_full_coords,
         bodyid2sys_free_coords,
     ) = indexed
-    (;num_of_extrinsic_cstr) = jointed
-    num_of_cstr = num_of_intrinsic_cstr + num_of_extrinsic_cstr
-    nb = length(bodies)
-    pres_idx_by_mem = Vector{Vector{Int}}(undef,nb)
-    free_idx_by_mem = Vector{Vector{Int}}(undef,nb)
+    pres_idx_by_body = Vector{Vector{Int}}(undef,num_of_bodies)
+    free_idx_by_body = Vector{Vector{Int}}(undef,num_of_bodies)
     foreach(bodies) do body
         bodyid = body.prop.id
-        pres_idx_by_mem[bodyid] = body.coords.pres_idx
-        free_idx_by_mem[bodyid] = body.coords.free_idx
+        pres_idx_by_body[bodyid] = body.coords.pres_idx
+        free_idx_by_body[bodyid] = body.coords.free_idx
     end
     T = get_numbertype(bodies)
     t = zero(T)
@@ -48,7 +46,7 @@ function StructureState(bodies,force_elements,cnt::Connectivity{<:Any,<:NamedTup
     c = get_local_coords(bodies,numbered)
     p = zero(q)
     p̌ = Vector{T}(undef,num_of_free_coords)
-    system = NonminimalCoordinatesState(t,q,q̇,q̈,F,p,p̌,λ,sys_free_idx,sys_pres_idx,c)
+    system = NonminimalCoordinatesState(t,q,q̇,q̈,F,p,p̌,λ,sys_free_coords_idx,sys_pres_coords_idx,c)
     members = [
         begin
             qmem = @view q[bodyid2sys_full_coords[bodyid]]
@@ -62,12 +60,12 @@ function StructureState(bodies,force_elements,cnt::Connectivity{<:Any,<:NamedTup
             NonminimalCoordinatesState(
                 t,
                 qmem,q̇mem,q̈mem,Fmem,pmem,p̌mem,λmem,
-                free_idx_by_mem[bodyid],
-                pres_idx_by_mem[bodyid],
+                free_idx_by_body[bodyid],
+                pres_idx_by_body[bodyid],
                 cmem
             )
         end
-        for bodyid = 1:nb
+        for bodyid = 1:num_of_bodies
     ]
     foreach(bodies) do body
         q, q̇ = body_state2coords_state(body)
@@ -83,12 +81,8 @@ $(TYPEDEF)
 """
 struct Structure{BodyType,TenType,CntType,StateType} <: AbstractStructure
     num_of_dim::Int
-    num_of_dof::Int
-    num_of_cstr::Int
-    num_of_bodies::Int
-    num_of_tensiles::Int
     bodies::BodyType
-    force_elements::TenType
+    apparatuses::TenType
     connectivity::CntType
     state::StateType
 end
@@ -97,22 +91,13 @@ end
 Structure Constructor.
 $(TYPEDSIGNATURES)
 """
-function Structure(bodies,force_elements,cnt::Connectivity)
+function Structure(bodies,apparatuses,cnt = Connectivity(index(bodies,apparatuses),number(bodies,apparatuses),))
     num_of_dim = get_num_of_dims(bodies)
-    num_of_bodies = length(bodies)
-    num_of_tensiles = sum(map(length,force_elements))
-    (;num_of_free_coords,num_of_intrinsic_cstr) = cnt.indexed
-    (;num_of_extrinsic_cstr) = cnt.jointed
-    num_of_cstr = num_of_intrinsic_cstr + num_of_extrinsic_cstr
-    num_of_dof = num_of_free_coords - num_of_cstr
-    if num_of_dof <= 0
-        @warn "Non positive degree of freedom: $num_of_dof."
-    end
-    state = StructureState(bodies,force_elements,cnt)
+    state = StructureState(bodies,apparatuses,cnt)
     st = Structure(
-        num_of_dim,num_of_dof,num_of_cstr,
-        num_of_bodies,num_of_tensiles,
-        bodies,force_elements,
+        num_of_dim,
+        bodies,
+        apparatuses,
         cnt,
         state
     )
@@ -122,8 +107,8 @@ function Structure(bodies,force_elements,cnt::Connectivity)
 end
 
 function Structure(bodies,cnt::Connectivity)
-    force_elements = (cables = Int[],)
-    Structure(bodies,force_elements,cnt)
+    apparatuses = (cables = Int[],)
+    Structure(bodies,apparatuses,cnt)
 end
 
 
@@ -131,7 +116,7 @@ function update!(st::AbstractStructure; gravity=false)
     clear_forces!(st)
     stretch_rigids!(st)
     update_bodies!(st)
-    update_tensiles!(st)
+    update_apparatuses!(st)
     if gravity
         apply_gravity!(st)
     end
@@ -141,7 +126,7 @@ end
 function lazy_update!(st::AbstractStructure; gravity=false)
     clear_forces!(st)
     lazy_update_bodies!(st)
-    update_tensiles!(st)
+    update_apparatuses!(st)
     if gravity
         apply_gravity!(st)
     end
@@ -287,33 +272,33 @@ Return System mass matrices
 $(TYPEDSIGNATURES)
 """
 function build_mass_matrices(structure::Structure,)
-    (;sys_free_idx,sys_pres_idx) = structure.connectivity.indexed
+    (;sys_free_coords_idx,sys_pres_coords_idx) = structure.connectivity.indexed
     M = assemble_M(structure,) |> sparse |> Symmetric
     M⁻¹ = M |> Matrix |> inv |> sparse |> Symmetric
-    M̌   = M[sys_free_idx,sys_free_idx] |> sparse |> Symmetric
+    M̌   = M[sys_free_coords_idx,sys_free_coords_idx] |> sparse |> Symmetric
     M̌⁻¹ = M̌ |> Matrix |> inv |> sparse |> Symmetric
-    Ḿ = M[sys_free_idx,:]            |> sparse
-    M̄ = M[sys_free_idx,sys_pres_idx] |> sparse
+    Ḿ = M[sys_free_coords_idx,:]            |> sparse
+    M̄ = M[sys_free_coords_idx,sys_pres_coords_idx] |> sparse
     @eponymtuple(M,M⁻¹,M̌,M̌⁻¹,Ḿ,M̄)
 end
 
 function cstr_function(structure::AbstractStructure,q,c=get_local_coords(structure))
-    (;bodies,num_of_cstr,connectivity) = structure
-    (;numbered,indexed,jointed) = connectivity
-    (;
+    (;bodies,apparatuses,connectivity) = structure
+    (;numbered,indexed,) = connectivity
+    (;  
+        num_of_cstr,
         num_of_free_coords,
         num_of_full_coords,
-        sys_pres_idx,
-        sys_free_idx,
+        sys_pres_coords_idx,
+        sys_free_coords_idx,
         bodyid2sys_full_coords,
         bodyid2sys_pres_coords,
         bodyid2sys_free_coords,
         num_of_intrinsic_cstr,
-        bodyid2sys_intrinsic_cstr_idx
+        bodyid2sys_intrinsic_cstr_idx,
+        apparid2sys_extrinsic_cstr_idx
     ) = indexed
-    (;
-        jointid2sys_extrinsic_cstr_idx
-    ) = jointed
+    
     ret = Vector{eltype(q)}(undef,num_of_cstr)
     foreach(bodies) do body
         bodyid = body.prop.id
@@ -326,34 +311,35 @@ function cstr_function(structure::AbstractStructure,q,c=get_local_coords(structu
             )
         end
     end
-    foreach(jointed.joints) do joint
-        jointexcst = num_of_intrinsic_cstr.+jointid2sys_extrinsic_cstr_idx[joint.id]
-        ret[jointexcst] .= cstr_function(joint,structure,
-            q,
-            c
-        )
+    foreach(apparatuses) do appar
+        if appar.has_joint isa Val{true}
+            jointexcst = num_of_intrinsic_cstr.+apparid2sys_extrinsic_cstr_idx[appar.id]
+            ret[jointexcst] .= cstr_function(appar,structure,
+                q,
+                c
+            )
+        end
     end
     ret
 end
 
 function cstr_jacobian(structure::AbstractStructure,q,c=get_local_coords(structure))
-    (;bodies,num_of_cstr,connectivity) = structure
-    (;indexed,jointed) = connectivity
+    (;bodies,apparatuses,connectivity) = structure
+    (;indexed,numbered) = connectivity
     (;
+        num_of_cstr,
         num_of_free_coords,
         num_of_full_coords,
-        sys_pres_idx,
-        sys_free_idx,
+        sys_pres_coords_idx,
+        sys_free_coords_idx,
         bodyid2sys_full_coords,
         bodyid2sys_pres_coords,
         bodyid2sys_free_coords,
         num_of_intrinsic_cstr,
         bodyid2sys_intrinsic_cstr_idx,
-        jointid2sys_free_idx
+        apparid2sys_free_coords_idx,
+        apparid2sys_extrinsic_cstr_idx
     ) = indexed
-    (;
-        jointid2sys_extrinsic_cstr_idx
-    ) = jointed
     ret = zeros(eltype(q),num_of_cstr,num_of_free_coords)
     foreach(bodies) do body
         bodyid = body.prop.id
@@ -366,10 +352,13 @@ function cstr_jacobian(structure::AbstractStructure,q,c=get_local_coords(structu
             )
         end
     end
-    foreach(jointed.joints) do joint
-        jointexcst = num_of_intrinsic_cstr.+jointid2sys_extrinsic_cstr_idx[joint.id]
-        jointed_sys_free_idx = jointid2sys_free_idx[joint.id]
-        ret[jointexcst,jointed_sys_free_idx] .= cstr_jacobian(joint,structure,q)
+    foreach(apparatuses) do appar
+        if appar.has_joint isa Val{true}
+            (;id,joint) = appar
+            jointexcst = num_of_intrinsic_cstr.+apparid2sys_extrinsic_cstr_idx[id]
+            jointed_sys_free_idx = apparid2sys_free_coords_idx[id]
+            ret[jointexcst,jointed_sys_free_idx] .= cstr_jacobian(appar,structure,q)
+        end
     end
     ret
 end
@@ -382,13 +371,13 @@ function make_cstr_function(structure::AbstractStructure,q0::AbstractVector)
     (;indexed,) = connectivity
     (;
         num_of_full_coords,
-        sys_pres_idx,
-        sys_free_idx,
+        sys_pres_coords_idx,
+        sys_free_coords_idx,
     ) = indexed
     function inner_cstr_function(q̌,d=get_d(structure),c=get_local_coords(structure))
         q = Vector{eltype(q̌)}(undef,num_of_full_coords)
-        q[sys_pres_idx] .= q0[sys_pres_idx]
-        q[sys_free_idx] .= q̌
+        q[sys_pres_coords_idx] .= q0[sys_pres_coords_idx]
+        q[sys_free_coords_idx] .= q̌
         cstr_function(q,d,c)
     end
 end
@@ -398,13 +387,13 @@ function make_cstr_jacobian(structure::AbstractStructure,q0::AbstractVector)
     (;indexed,) = connectivity
     (;
         num_of_full_coords,
-        sys_pres_idx,
-        sys_free_idx,
+        sys_pres_coords_idx,
+        sys_free_coords_idx,
     ) = indexed
     function inner_cstr_jacobian(q̌,c=get_local_coords(structure))
         q = Vector{eltype(q̌)}(undef,num_of_full_coords)
-        q[sys_pres_idx] .= q0[sys_pres_idx]
-        q[sys_free_idx] .= q̌
+        q[sys_pres_coords_idx] .= q0[sys_pres_coords_idx]
+        q[sys_free_coords_idx] .= q̌
         cstr_jacobian(structure,q,c)
     end
     inner_cstr_jacobian
@@ -478,9 +467,8 @@ function check_jacobian_singularity(st)
 end
 
 function check_constraints_consistency(st;tol=1e-14)
-    (;bodies,state,connectivity) = st
-    (;indexed,jointed) = connectivity
-    (;joints) = jointed
+    (;bodies,apparatuses,state,connectivity) = st
+    (;indexed,numbered) = connectivity
     q = get_coords(st)
     q̌̇ = get_free_velocs(st)
     Φ = cstr_function(st,q)
@@ -497,11 +485,11 @@ function check_constraints_consistency(st;tol=1e-14)
                 @warn "The $(bodyid)th body's position-level constraints are inconsistent: norm_position_body=$(norm_position_body)"
             end
         end
-        foreach(joints) do joint
-            Φ_joint = cstr_jacobian(joint,st,q)
+        foreach(apparatuses) do appar
+            Φ_joint = cstr_jacobian(appar,st,q)
             norm_position_joint = norm(Φ_joint)
             if norm_position_joint > tol
-                @warn "The $(joint.id)th body's position-level constraints are inconsistent: norm_position_joint=$(norm_position_joint)"
+                @warn "The $(appar.id)th apparatus's position-level constraints are inconsistent: norm_position_joint=$(norm_position_joint)"
             end
         end
     end
@@ -519,20 +507,20 @@ function check_constraints_consistency(st;tol=1e-14)
                 @warn "The $(bodyid)th body's velcoity-level constraints are inconsistent: norm_velocity_body=$(norm_velocity_body)"
             end
         end
-        foreach(joints) do joint
-            sys_free_idx = indexed.jointid2sys_free_idx[joint.id]
-            q̇_jointed = state.system.q̌̇[sys_free_idx]
-            Aq̇_joint = cstr_jacobian(joint,st,q)*q̇_jointed
+        foreach(apparatuses) do appar
+            sys_free_coords_idx = indexed.apparid2sys_free_coords_idx[appar.id]
+            q̇_jointed = state.system.q̌̇[sys_free_coords_idx]
+            Aq̇_joint = cstr_jacobian(appar,st,q)*q̇_jointed
             norm_velocity_joint = norm(Aq̇_joint)
             if norm_velocity_joint > tol
-                @warn "The $(joint.id)th joint's velcoity-level constraints are inconsistent: Aq̇_joint=$(Aq̇_joint)"
+                @warn "The $(appar.id)th apparatus's velcoity-level constraints are inconsistent: Aq̇_joint=$(Aq̇_joint)"
             end
         end
     end
 end
 
 function analyse_slack(st::AbstractStructure,verbose=false)
-    (;cables) = st.force_elements
+    (;cables) = st.apparatuses
     slackcases = [cable.id for cable in cables if cable.slack && (cable.state.length <= cable.state.restlen)]
     if verbose && !isempty(slackcases)
         @show slackcases
@@ -576,11 +564,11 @@ function potential_energy(st::Structure;gravity=false)
     if gravity
         V += potential_energy_gravity(st)
     end
-    if !isempty(st.force_elements.cables)
-        V += sum(potential_energy.(st.force_elements.cables))
+    if !isempty(st.apparatuses.cables)
+        V += sum(potential_energy.(st.apparatuses.cables))
     end
-    if hasfield(typeof(st.force_elements),:spring_dampers)
-        V += sum(potential_energy.(st.force_elements.spring_dampers))
+    if hasfield(typeof(st.apparatuses),:spring_dampers)
+        V += sum(potential_energy.(st.apparatuses.spring_dampers))
     end
     V
 end

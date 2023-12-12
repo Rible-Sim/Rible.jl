@@ -16,7 +16,7 @@ function one_bar(k=0.0,c=0.0;ratio=0.8)
     indexedcoords = RB.index(rbs,matrix_sharing)
     #
     ss = Int[]
-    force_elements = (cables = ss,)
+    apparatuses = (cables = ss,)
     hub = nothing
     #
     connections = RB.connect(rbs,zeros(Int,0,0))
@@ -25,6 +25,6 @@ function one_bar(k=0.0,c=0.0;ratio=0.8)
 
     cnt = RB.Connectivity(numberedpoints,indexedcoords,connections,jointedmembers)
 
-    st = RB.Structure(rbs,force_elements,cnt)
+    st = RB.Structure(rbs,apparatuses,cnt)
     bot = RB.Robot(st,hub)
 end

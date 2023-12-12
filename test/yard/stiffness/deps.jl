@@ -16,12 +16,12 @@ using StructArrays
 using SymmetricFormats
 # data
 using DataStructures
+# using CubicSplines
+# import FLOWMath
 using CoordinateTransformations
 using Rotations
 using Unitful
 using EponymTuples
-# using CubicSplines
-# import FLOWMath
 # visualize/plot
 using Makie
 import GLMakie as GM
@@ -45,7 +45,7 @@ using TexTables
 using PrettyTables
 using Printf
 auto_display(false)
-# solve
+# solver
 import DifferentialEquations as DE
 using NLsolve
 using Arpack
@@ -57,6 +57,3 @@ lib = CDDLib.Library()
 # code
 using BenchmarkTools
 using Cthulhu
-using AbbreviatedStackTraces
-ENV["JULIA_STACKTRACE_ABBREVIATED"] = true
-ENV["JULIA_STACKTRACE_MINIMAL"] = true

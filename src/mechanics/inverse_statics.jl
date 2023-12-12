@@ -19,7 +19,7 @@ end
 function build_Q̃(st)
     (;tensioned,indexed) = st.connectivity
     (;connected) = tensioned
-    (;cables) = st.force_elements
+    (;cables) = st.apparatuses
     ncables = length(cables)
     (;num_of_free_coords,bodyid2sys_free_coords) = indexed
     T = get_numbertype(st)
@@ -66,7 +66,7 @@ end
 function build_L̂(st)
     (;connectivity,num_of_dim) = st
     (;connected) = connectivity.tensioned
-    (;cables) = st.force_elements
+    (;cables) = st.apparatuses
     ncables = length(cables)
     T = get_numbertype(st)
     L̂ = spzeros(T, ncables*num_of_dim, ncables)
@@ -82,7 +82,7 @@ end
 function build_K̂(st)
     (;connectivity,num_of_dim) = st
     (;connected) = connectivity.tensioned
-    (;cables) = st.force_elements
+    (;cables) = st.apparatuses
     ncables = length(cables)
     T = get_numbertype(st)
     K̂ = spzeros(T, ncables*num_of_dim, ncables)
@@ -98,7 +98,7 @@ end
 function build_L(st)
     (;connectivity,num_of_dim) = st
     (;connected) = connectivity.tensioned
-    (;cables) = st.force_elements
+    (;cables) = st.apparatuses
     ncables = length(cables)
     T = get_numbertype(st)
     L = spzeros(T, ncables*num_of_dim, ncables)
@@ -131,7 +131,7 @@ end
 function make_U(st)
     (;num_of_dim) = st
     (;num_of_full_coords) = st.connectivity.indexed
-    (;cables) = st.force_elements
+    (;cables) = st.apparatuses
     ncables = length(cables)
     function inner_U(s,u)
         ret = zeros(eltype(s),ncables*num_of_dim,num_of_full_coords)
@@ -156,14 +156,14 @@ end
 function make_Q̌(st,q0)
     (;num_of_dim) = st
     (;numbered,indexed,tensioned) = st.connectivity
-    (;num_of_full_coords,num_of_free_coords,sys_pres_idx,sys_free_idx,bodyid2sys_full_coords) = indexed
+    (;num_of_full_coords,num_of_free_coords,sys_pres_coords_idx,sys_free_coords_idx,bodyid2sys_full_coords) = indexed
     (;connected) = tensioned
-    (;cables) = st.force_elements
+    (;cables) = st.apparatuses
     (;bodyid2sys_loci_idx,sys_loci2coords_idx) = numbered
     function inner_Q̌(q̌,s,u)
 		q = Vector{eltype(q̌)}(undef,num_of_full_coords)
-		q[sys_pres_idx] .= q0[sys_pres_idx]
-		q[sys_free_idx] .= q̌
+		q[sys_pres_coords_idx] .= q0[sys_pres_coords_idx]
+		q[sys_free_coords_idx] .= q̌
         ret = zeros(eltype(q̌),num_of_free_coords)
         Jj = zeros(eltype(q̌),num_of_dim,num_of_full_coords)
         foreach(connected) do scnt
@@ -182,15 +182,15 @@ function make_Q̌(st,q0)
             Jj .= 0
             Jj[:,mfull2] .+= C2
             Jj[:,mfull1] .-= C1
-            Ūj = @view (transpose(Jj)*Jj)[sys_free_idx,:]
+            Ūj = @view (transpose(Jj)*Jj)[sys_free_coords_idx,:]
             ret .+= k*(u[j]*s[j]-1)*Ūj*q
         end
         ret
     end
     function inner_Q̌(q̌,s,μ,k,c)
 		q = Vector{eltype(q̌)}(undef,num_of_full_coords)
-		q[sys_pres_idx] .= q0[sys_pres_idx]
-		q[sys_free_idx] .= q̌
+		q[sys_pres_coords_idx] .= q0[sys_pres_coords_idx]
+		q[sys_free_coords_idx] .= q̌
         ret = zeros(eltype(q̌),num_of_free_coords)
         Jj = zeros(eltype(q̌),num_of_dim,num_of_full_coords)
         foreach(connected) do scnt
@@ -212,7 +212,7 @@ function make_Q̌(st,q0)
             Jj .= 0
             Jj[:,mfull2] .+= C2
             Jj[:,mfull1] .-= C1
-            Ūj = @view (transpose(Jj)*Jj)[sys_free_idx,:]
+            Ūj = @view (transpose(Jj)*Jj)[sys_free_coords_idx,:]
             ret .+= k[j]*(μ[j]*s[j]-1)*Ūj*q
         end
         ret
@@ -270,7 +270,7 @@ function build_inverse_statics_core(tginput,tgref::Structure,Fˣ=nothing;gravity
     st = deepcopy(tginput)
     clear_forces!(st)
     update_bodies!(st,q)
-    update_tensiles!(st)
+    update_apparatuses!(st)
     if gravity
         Ǧ = build_Ǧ(st)
     else
@@ -487,7 +487,7 @@ function check_static_equilibrium_output_multipliers!(st,q,F=nothing;
     )
     clear_forces!(st)
     update_bodies!(st)
-    update_tensiles!(st)
+    update_apparatuses!(st)
     # check_restlen(st,get_cables_restlen(st))
     if gravity
         apply_gravity!(st)
@@ -539,7 +539,7 @@ function inverse_for_restlength(tginput,tgref::Structure,Fˣ=nothing;
         fmin=0.0,
     )
     B,F̃ = build_inverse_statics_for_restlength(tginput,tgref,Fˣ;gravity,scale)
-    nμ = tgref.force_elements.cables |> length
+    nμ = tgref.apparatuses.cables |> length
     κ = get_cables_stiffness(tginput)
     ℓ = get_cables_len(tgref)
     h = -ℓ.*κ
@@ -634,7 +634,7 @@ function optimize_for_stiffness_and_restlen(
 
     f0,Z = get_solution_set(B,F̃)
     @show size(Z)
-    ncables = bot.structure.force_elements.cables |> length
+    ncables = bot.structure.apparatuses.cables |> length
     Y = build_Y(bot)
     l0 = get_cables_len(bot.structure)
 

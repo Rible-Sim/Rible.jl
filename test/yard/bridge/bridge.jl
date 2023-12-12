@@ -155,8 +155,8 @@ function nbridge(n,m=2;θ=missing,r=missing,c=0.0,h=1.0,o2=[0,4.0,0],right=false
 	ks = fill(2000.0,ncables)
 	ks[stale_cable_idx] .= 3000.0
     cs = fill(c,ncables)
-    cables = [RB.DistanceSpringDamper3D(i,restlens[i],ks[i],cs[i];slack=true) for i = 1:ncables]
-    force_elements = (cables = cables,)
+    cables = [RB.DistanceSpringDamper3D(restlens[i],ks[i],cs[i];slack=true) for i = 1:ncables]
+    apparatuses = (cables = cables,)
 	cnt_rows = [
 		begin
 			cnt_row = zeros(Int,5,nb)
@@ -185,7 +185,7 @@ function nbridge(n,m=2;θ=missing,r=missing,c=0.0,h=1.0,o2=[0,4.0,0],right=false
 	connected = RB.connect(rigidbodies,cnt_cables)
 	tensioned = @eponymtuple(connected,)
     cnt = RB.Connectivity(numbered,indexed,tensioned)
-    st = RB.Structure(rigidbodies,force_elements,cnt)
+    st = RB.Structure(rigidbodies,apparatuses,cnt)
 
 	actuators_active =
 		RB.ManualActuator(
@@ -355,8 +355,8 @@ function nrailbridge(n,m=2;θ=missing,r=missing,c=0.0,h=1.0,o2=[0,4.0,0],right=f
 	ks = fill(2000.0,ncables)
 	ks[stale_cable_idx] .= 3000.0
     cs = fill(c,ncables)
-    cables = [RB.DistanceSpringDamper3D(i,restlens[i],ks[i],cs[i];slack=true) for i = 1:ncables]
-    force_elements = (cables = cables,)
+    cables = [RB.DistanceSpringDamper3D(restlens[i],ks[i],cs[i];slack=true) for i = 1:ncables]
+    apparatuses = (cables = cables,)
 	# 绳索连接
 	cnt_rows = [
 		begin
@@ -409,7 +409,7 @@ function nrailbridge(n,m=2;θ=missing,r=missing,c=0.0,h=1.0,o2=[0,4.0,0],right=f
     cnt = RB.Connectivity(numbered,indexed,tensioned,jointed)
 
 	# 张拉整体结构
-    st = RB.Structure(rigidbodies,force_elements,cnt)
+    st = RB.Structure(rigidbodies,apparatuses,cnt)
 
 	# 作动器
 	actuators_active =

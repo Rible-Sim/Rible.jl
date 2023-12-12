@@ -391,7 +391,7 @@ function parse_joints_links!(
         ci = collect(1:12),
         Φi = Int[]
     )
-    jointid = 0
+    apparid = 0
     transformsdict = Dict([base_link => id_trans])
     bodiesdict = Dict{String,Any}([base_link => rb_base])
     jointcsts = []
@@ -440,7 +440,7 @@ function parse_joints_links!(
                                 1
                             )
                             push!(bodiesdict, child => rb_child)
-                            jointid += 1
+                            apparid += 1
                             if joint.type == "fixed"
                                 @warn "fixed joint: $(joint.name)"
                                 push!(bodiesdict[parent].prop.loci,joint.origin.xyz)
@@ -450,7 +450,7 @@ function parse_joints_links!(
                                 push!(bodiesdict[parent].prop.axes,fixedaxis)
                                 push!(bodiesdict[parent].state.as,bodiesdict[parent].state.R*fixedaxis)
                                 fixedjoint = RB.FixedJoint(
-                                    jointid,
+                                    apparid,
                                     RB.End2End(
                                         ijoint,
                                         RB.ID(bodiesdict[parent],
@@ -467,7 +467,7 @@ function parse_joints_links!(
                                 push!(bodiesdict[parent].prop.axes,joint.mobility.axis)
                                 push!(bodiesdict[parent].state.as,bodiesdict[parent].state.R*joint.mobility.axis)
                                 revjoint = RB.RevoluteJoint(
-                                    jointid,
+                                    apparid,
                                     RB.End2End(
                                         ijoint,
                                         RB.ID(bodiesdict[parent],
@@ -484,7 +484,7 @@ function parse_joints_links!(
                                 push!(bodiesdict[parent].prop.axes,joint.mobility.axis)
                                 push!(bodiesdict[parent].state.as,bodiesdict[parent].state.R*joint.mobility.axis)
                                 prmjoint = RB.PrismaticJoint(
-                                    jointid,
+                                    apparid,
                                     RB.End2End(
                                         ijoint,
                                         RB.ID(bodiesdict[parent],
@@ -515,13 +515,13 @@ function urdf_to_rigidrobot(urdf,T=Float64)
 	numbered = RB.number(rbs)
 	indexed = RB.index(rbs,)
     ss = Int[]
-	force_elements = (cables = ss,)
+	apparatuses = (cables = ss,)
 	connected = RB.connect(rbs,zeros(Int,0,0))
 	tensioned = @eponymtuple(connected,)
     jointed = RB.join(TypeSortedCollection(jointcsts),indexed)
 	cnt = RB.Connectivity(numbered,indexed,tensioned,jointed)
 	# contacts = [RB.Contact(i,μ,e) for i = [5]]
-	st = RB.Structure(rbs,force_elements,cnt,)
+	st = RB.Structure(rbs,apparatuses,cnt,)
     bot = RB.Robot(st)
 end
 #-- functions
@@ -585,7 +585,7 @@ function dynfuncs(bot)
     function F!(F,q,q̇,t)
         RB.clear_forces!(st)
         RB.update_rigids!(st,q,q̇)
-        # RB.update_tensiles!(st)
+        # RB.update_apparatuses!(st)
         RB.apply_gravity!(st)
         F .= RB.generate_forces!(st)
     end
@@ -594,7 +594,7 @@ function dynfuncs(bot)
         ∂F∂q̌̇ .= 0
         RB.clear_forces!(st)
         RB.update_rigids!(st,q,q̇)
-        # RB.update_tensiles!(st)
+        # RB.update_apparatuses!(st)
         # RB.build_tangent_stiffness_matrix!(∂F∂q̌,st)
         # RB.build_tangent_stiffness_matriẋ!(∂F∂q̌̇,st)
     end

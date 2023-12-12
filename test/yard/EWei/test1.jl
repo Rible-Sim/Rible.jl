@@ -105,8 +105,8 @@ matrix_sharing = reduce(vcat, matrix_sharing_raw)
 indexedcoords = RB.index(rigdibodies, matrix_sharing)
 nstrings = 4
 ks = 1.0; restlens = 0.5
-cables = [RB.DistanceSpringDamper2D(i, restlens, ks, 0.0) for i in 1:nstrings]
-force_elements = (cables=cables,)
+cables = [RB.DistanceSpringDamper2D( restlens, ks, 0.0) for i in 1:nstrings]
+apparatuses = (cables=cables,)
 acs = []
 hub = (actuators=acs,)
 
@@ -117,7 +117,7 @@ s[3, 3] = 2; s[3, 5] = -2
 s[4, 3] = 1; s[4, 5] = -1
 connections = (cables=RB.connect(rigdibodies, s), )
 cnt = RB.Connectivity(numberedpoints, indexedcoords, connections)
-st = RB.Structure(rigdibodies, force_elements, cnt)
+st = RB.Structure(rigdibodies, apparatuses, cnt)
 bot = RB.Robot(st, hub)
 plot_traj!(bot)
 
@@ -127,7 +127,7 @@ plot_traj!(bot)
 #     function F!(F,q,q̇,t)
 #         RB.clear_forces!(st)
 #         RB.update_bodies!(st,q,q̇)
-#         RB.update_tensiles!(st)
+#         RB.update_apparatuses!(st)
 #         # RB.apply_gravity!(st)
 #         RB.assemble_forces!(st)
 #         RB.get_force!(F,st)

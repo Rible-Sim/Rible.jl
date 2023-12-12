@@ -116,7 +116,7 @@ function cartesian_frame2coords(nmcs::NC,origin_frame)
     (;r̄i,X̄) = nmcs.data
     ri = position + axes*r̄i
     ṙi = velocity + angular_velocity×(ri-position)
-    X = (axes*X̄).X
+    X = (axes.X*X̄)
     Ẋ = reduce(hcat,Ref(angular_velocity) .× eachcol(X))
     qstd = vcat(ri,vec(X))
     q̇std = vcat(ṙi,vec(Ẋ))

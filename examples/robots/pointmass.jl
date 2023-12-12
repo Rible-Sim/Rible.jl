@@ -35,10 +35,10 @@ function new_pointmass(;
     matrix_sharing = zeros(Int,0,0)
     indexedcoords = RB.index(rbs,matrix_sharing)
     ss = Int[]
-    force_elements = (cables = ss,)
+    apparatuses = (cables = ss,)
     connected = RB.connect(rbs,zeros(Int,0,0))
     tensioned = @eponymtuple(connected,)
     cnt = RB.Connectivity(numberedpoints,indexedcoords,tensioned)
-    st = RB.Structure(rbs,force_elements,cnt,)
+    st = RB.Structure(rbs,apparatuses,cnt,)
     bot = RB.Robot(st)
 end

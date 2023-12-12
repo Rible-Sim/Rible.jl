@@ -97,8 +97,8 @@ function planar_parallel()
     original_restlens = zeros(ncables)
     ks = fill(100.0,ncables)
     cs = zeros(ncables)
-    ss = [RB.DistanceSpringDamper3D(i, original_restlens[i],ks[i],cs[i];slack=false) for i = 1:ncables]
-    force_elements = (cables=ss,)
+    ss = [RB.DistanceSpringDamper3D( original_restlens[i],ks[i],cs[i];slack=false) for i = 1:ncables]
+    apparatuses = (cables=ss,)
 
     cm = [
         1 -1 ;
@@ -115,14 +115,14 @@ function planar_parallel()
     connected = RB.connect(rigdibodies, cm)
     tensioned = @eponymtuple(connected,)
 
-    # j1 = RB.PrismaticJoint(1,RB.Hen2Egg(1,RB.ID(base,5,1),RB.ID(slider1,1,1)))
-    # j2 = RB.PrismaticJoint(2,RB.Hen2Egg(2,RB.ID(base,5,2),RB.ID(slider2,1,1)))
+    # j1 = RB.PrismaticJoint(1,RB.Hen2Egg(RB.ID(base,5,1),RB.ID(slider1,1,1)))
+    # j2 = RB.PrismaticJoint(2,RB.Hen2Egg(RB.ID(base,5,2),RB.ID(slider2,1,1)))
 
     # js = [
     #     j1,j2
     # ]
     # jointed = RB.join(js,indexed)
     cnt = RB.Connectivity(numbered,indexed,tensioned,)
-    st = RB.Structure(rigdibodies,force_elements,cnt)
+    st = RB.Structure(rigdibodies,apparatuses,cnt)
     RB.Robot(st,)
 end

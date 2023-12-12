@@ -101,11 +101,11 @@ function tower(;k=nothing)
     cnt_matrix = Matrix(cnt_matrix_elas')
     ncables = size(cnt_matrix,1)
     if k isa Nothing
-        cables = [RB.DistanceSpringDamper3D(i,0.0,100.0,0.0;slack=false) for i = 1:ncables]
+        cables = [RB.DistanceSpringDamper3D(0.0,100.0,0.0;slack=false) for i = 1:ncables]
     else
-        cables = [RB.DistanceSpringDamper3D(i,0.0,k[i],0.0;slack=false) for i = 1:ncables]
+        cables = [RB.DistanceSpringDamper3D(0.0,k[i],0.0;slack=false) for i = 1:ncables]
     end
-    force_elements = (cables = cables,)
+    apparatuses = (cables = cables,)
     connected = RB.connect(rbs,cnt_matrix)
 
     cst1 = RB.PinJoint(
@@ -135,6 +135,6 @@ function tower(;k=nothing)
             jointedmembers
         )
 
-    st = RB.Structure(rbs,force_elements,cnt)
+    st = RB.Structure(rbs,apparatuses,cnt)
     bot = RB.Robot(st,)
 end

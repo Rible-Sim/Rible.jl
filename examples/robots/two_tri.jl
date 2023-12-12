@@ -27,9 +27,9 @@ function two_tri(;k=100.0,c=0.0,ratio=0.8)
     restlens = fill(restlen1,ncables)
     ks = fill(k,ncables)
     cs = fill(c,ncables)
-    cables = [RB.DistanceSpringDamper2D(i,restlens[i],ks[i],cs[i];slack=true) for i = 1:ncables]
+    cables = [RB.DistanceSpringDamper2D(restlens[i],ks[i],cs[i];slack=true) for i = 1:ncables]
     acs = [RB.ManualActuator(1,1:ncables,restlens,RB.Uncoupled())]
-    force_elements = (cables = cables,)
+    apparatuses = (cables = cables,)
     hub = (actuators = acs,)
     cnt_matrix_cables = [
         3 -2 ;
@@ -70,6 +70,6 @@ function two_tri(;k=100.0,c=0.0,ratio=0.8)
         # jointedmembers
     )
 
-    st = RB.Structure(rbs,force_elements,cnt)
+    st = RB.Structure(rbs,apparatuses,cnt)
     bot = RB.Robot(st,hub)
 end

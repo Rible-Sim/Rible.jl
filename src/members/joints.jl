@@ -1,15 +1,10 @@
 #todo parameterization of joints
-abstract type ExtrinsicConstraints{T} end
-
-
-get_numbertype(cst::ExtrinsicConstraints{<:AbstractArray{T}}) where T = T
-
+abstract type AbstractJoint end
 
 """
 $(TYPEDEF)
 """
-struct LinearJoint{T,bodyType} <: ExtrinsicConstraints{T}
-    id::Int
+struct LinearJoint{T,bodyType} <: AbstractJoint
     body::bodyType
     num_of_cstr::Int
     A::Matrix{T}
@@ -32,36 +27,9 @@ function get_joint_idx(cst::LinearJoint,bodyid2sys_free_coords)
     ncoords = get_num_of_coords(nmcs)
     full_idx = collect(1:ncoords)
     free_idx = free_idx
-    sys_free_idx = bodyid2sys_free_coords[bid]
+    sys_free_coords_idx = bodyid2sys_free_coords[bid]
     # full_idx, sys_full_idx
-    full_idx, free_idx, sys_free_idx
-end
-
-function cstr_function(cst::LinearJoint,structure,q,c)
-    (;indexed) = structure.connectivity
-    sys_free_idx = indexed.jointid2sys_free_idx[cst.id]
-    (;A,violations) = cst
-    A*q[sys_free_idx] .- violations
-end
-
-function cstr_jacobian(cst::LinearJoint,structure,q)
-    (;indexed) = structure.connectivity
-    cst.A
-end
-
-function cstr_forces_jacobian(cst::LinearJoint,structure,q,λ)
-    (;indexed) = structure.connectivity
-    sys_free_idx = indexed.jointid2sys_free_idx[cst.id]
-    n = length(sys_free_idx)
-    zeros(eltype(λ),n,n)
-end
-
-function cstr_velocity_jacobian(cst::LinearJoint,structure,q,q̇)
-    (;indexed) = structure.connectivity
-    sys_free_idx = indexed.jointid2sys_free_idx[cst.id]
-    (;num_of_cstr,) = cst
-    n = length(sys_free_idx)
-    zeros(eltype(q̇),num_of_cstr,n)
+    full_idx, free_idx, sys_free_coords_idx
 end
 
 function FixedBodyConstraint(id::Int,indexed,body::AbstractBody)
@@ -139,12 +107,10 @@ FixedJoint(id,hen2egg)              = PrototypeJoint(id,hen2egg,:Fixed)
 
 const PinJoint = SphericalJoint
 
-
 """
 $(TYPEDEF)
 """
-struct PrototypeJoint{hen2eggType,maskType,valueType,cacheType} <: ExtrinsicConstraints{valueType}
-    id::Int
+struct PrototypeJoint{hen2eggType,maskType,valueType,cacheType} <: AbstractJoint
     hen2egg::hen2eggType
     num_of_cstr::Int
     num_of_dof::Int
@@ -192,8 +158,8 @@ function PrototypeJoint(id,hen2egg,joint_type::Symbol)
     )
     # @show mask_1st,mask_2nd,mask_3rd,mask_4th
     # @show values
-    PrototypeJoint(
-        id,hen2egg,
+    joint = PrototypeJoint(
+        hen2egg,
         num_of_cstr,
         num_of_dof,
         mask_1st,
@@ -203,9 +169,26 @@ function PrototypeJoint(id,hen2egg,joint_type::Symbol)
         values,
         cache
     )
+    force = nothing
+    Apparatus(
+        id,
+        Val(true),
+        Val(false),
+        joint,
+        force,
+    )
 end
 
-function get_joint_idx(cst::PrototypeJoint,bodyid2sys_free_coords)
+"""
+$(TYPEDEF)
+"""
+struct CableJoint{hen2eggType} <: AbstractJoint
+    hen2egg::hen2eggType
+    num_of_cstr::Int
+end
+
+
+function get_joint_idx(cst::Union{PrototypeJoint,CableJoint},bodyid2sys_free_coords)
     (;hen,egg) = cst.hen2egg
     id_hen = hen.bodysig.prop.id
     id_egg = egg.bodysig.prop.id
@@ -225,169 +208,10 @@ function get_joint_idx(cst::PrototypeJoint,bodyid2sys_free_coords)
     )
     free_hen = bodyid2sys_free_coords[id_hen]
     free_egg = bodyid2sys_free_coords[id_egg]
-    sys_free_idx = vcat(
+    sys_free_coords_idx = vcat(
         free_hen,
         free_egg
     )
     # full_idx, sys_full_idx
-    full_idx, free_idx, sys_free_idx
-end
-
-function cstr_function(joint::PrototypeJoint,structure::Structure,q, c = get_local_coords(structure))
-    (;indexed,numbered) = structure.connectivity
-    (;bodyid2sys_full_coords) = indexed
-    (;sys_loci2coords_idx,bodyid2sys_loci_idx) = numbered
-    (;
-        num_of_cstr,hen2egg,
-        violations,
-        cache,
-        mask_1st,mask_2nd,mask_3rd,mask_4th
-    ) = joint
-    (;hen,egg) = hen2egg
-    id_hen = hen.bodysig.prop.id
-    id_egg = egg.bodysig.prop.id
-    nmcs_hen = hen.bodysig.coords.nmcs
-    nmcs_egg = egg.bodysig.coords.nmcs
-    T = eltype(q)
-    ret = zeros(T,num_of_cstr)
-    q_hen = @view q[bodyid2sys_full_coords[id_hen]]
-    q_egg = @view q[bodyid2sys_full_coords[id_egg]]
-    q = vcat(q_hen,q_egg)
-    # cstr violations
-    # @show joint.id
-    get_joint_violations!(
-        ret,
-        nmcs_hen, nmcs_egg,
-        hen.bodysig.prop.loci[hen.pid].position,
-        egg.bodysig.prop.loci[egg.pid].position,
-        cache,
-        mask_1st,mask_2nd,mask_3rd,mask_4th,
-        q_hen,q_egg,
-        violations
-    )
-    ret
-end
-
-function cstr_jacobian(joint::PrototypeJoint,structure::Structure,q,c = get_local_coords(structure))
-    (;indexed,numbered) = structure.connectivity
-    (;bodyid2sys_free_coords,
-      bodyid2sys_full_coords,
-      num_of_free_coords,
-      num_of_full_coords,
-      jointid2full_idx,
-      jointid2free_idx,
-    ) = indexed
-    (;sys_loci2coords_idx,bodyid2sys_loci_idx) = numbered
-    (;
-        num_of_cstr,
-        hen2egg,
-        cache,
-        mask_1st,mask_2nd,mask_3rd,mask_4th
-    ) = joint
-    full_idx = jointid2full_idx[joint.id]
-    free_idx = jointid2free_idx[joint.id]
-    (;hen,egg) = hen2egg
-    id_hen = hen.bodysig.prop.id
-    id_egg = egg.bodysig.prop.id
-    nmcs_hen = hen.bodysig.coords.nmcs
-    nmcs_egg = egg.bodysig.coords.nmcs
-    T = eltype(q)
-    ret = zeros(T,num_of_cstr,length(full_idx))
-    q_hen = @view q[bodyid2sys_full_coords[id_hen]]
-    q_egg = @view q[bodyid2sys_full_coords[id_egg]]
-    # translate
-    get_joint_jacobian!(
-        ret,
-        nmcs_hen, nmcs_egg,
-        hen.bodysig.prop.loci[hen.pid].position,
-        egg.bodysig.prop.loci[egg.pid].position,
-        cache,
-        mask_1st,mask_2nd,mask_3rd,mask_4th,
-        q_hen,q_egg
-    )
-    @view ret[:,free_idx]
-end
-
-function cstr_forces_jacobian(joint::PrototypeJoint,structure,q,λ)
-    (;indexed,numbered) = structure.connectivity
-    (;bodyid2sys_free_coords,
-      bodyid2sys_full_coords,
-      num_of_free_coords,
-      num_of_full_coords,
-      jointid2full_idx,
-      jointid2free_idx
-    ) = indexed
-    (;
-        num_of_cstr,
-        hen2egg,
-        cache,
-        mask_1st,mask_2nd,mask_3rd,mask_4th
-    ) = joint
-    full_idx = jointid2full_idx[joint.id]
-    free_idx = jointid2free_idx[joint.id]
-    (;hen,egg) = hen2egg
-    id_hen = hen.bodysig.prop.id
-    id_egg = egg.bodysig.prop.id
-    q_hen = @view q[bodyid2sys_full_coords[id_hen]]
-    q_egg = @view q[bodyid2sys_full_coords[id_egg]]
-    nmcs_hen = hen.bodysig.coords.nmcs
-    nmcs_egg = egg.bodysig.coords.nmcs
-    T = eltype(λ)
-    num_of_full_idx = length(full_idx)
-    ret = zeros(T,num_of_full_idx,num_of_full_idx)
-    get_joint_forces_jacobian!(
-        ret,
-        num_of_cstr,
-        nmcs_hen, nmcs_egg,
-        hen.bodysig.prop.loci[hen.pid].position,
-        egg.bodysig.prop.loci[egg.pid].position,
-        cache,
-        mask_1st,mask_2nd,mask_3rd,mask_4th,
-        q_hen,q_egg,
-        λ
-    )
-    @view ret[free_idx,free_idx]
-end
-
-function cstr_velocity_jacobian(joint::PrototypeJoint,structure,q,q̇)
-    (;indexed,numbered) = structure.connectivity
-    (;bodyid2sys_free_coords,
-      bodyid2sys_full_coords,
-      num_of_free_coords,
-      num_of_full_coords,
-      jointid2full_idx,
-      jointid2free_idx
-    ) = indexed
-    (;
-        num_of_cstr,
-        hen2egg,
-        cache,
-        mask_1st,mask_2nd,mask_3rd,mask_4th
-    ) = joint
-    full_idx = jointid2full_idx[joint.id]
-    free_idx = jointid2free_idx[joint.id]
-    (;hen,egg) = hen2egg
-    id_hen = hen.bodysig.prop.id
-    id_egg = egg.bodysig.prop.id
-    q_hen = @view q[bodyid2sys_full_coords[id_hen]]
-    q_egg = @view q[bodyid2sys_full_coords[id_egg]]
-    q̇_hen = @view q̇[bodyid2sys_full_coords[id_hen]]
-    q̇_egg = @view q̇[bodyid2sys_full_coords[id_egg]]
-    nmcs_hen = hen.bodysig.coords.nmcs
-    nmcs_egg = egg.bodysig.coords.nmcs
-    T = eltype(q̇)
-    num_of_full_idx = length(full_idx)
-    ret = zeros(T,num_of_cstr,num_of_full_idx)
-    get_joint_velocity_jacobian!(
-        ret,
-        num_of_cstr,
-        nmcs_hen, nmcs_egg,
-        hen.bodysig.prop.loci[hen.pid].position,
-        egg.bodysig.prop.loci[egg.pid].position,
-        cache,
-        mask_1st,mask_2nd,mask_3rd,mask_4th,
-        q_hen,q_egg,
-        q̇_hen,q̇_egg,
-    )
-    @view ret[:,free_idx]
+    full_idx, free_idx, sys_free_coords_idx
 end

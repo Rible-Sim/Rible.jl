@@ -37,7 +37,6 @@ using TexTables
 # IO
 using FileIO
 # code
-using Revise
 using Cthulhu
 using JET
 using BenchmarkTools

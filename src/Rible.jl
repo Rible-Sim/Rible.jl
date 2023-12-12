@@ -109,15 +109,17 @@ include("members/flexibles/flexible_body.jl")
 
 include("members/forces/spring_dampers.jl")
 
+include("members/joints.jl")
+
 include("structures/connectivity.jl")
 
 include("structures/structure.jl")
 
-include("members/joints.jl")
-
-include("members/linearization.jl")
+include("structures/constraints.jl")
 
 include("structures/mutate.jl")
+
+include("structures/linearization.jl")
 
 include("robots/robot.jl")
 

@@ -50,7 +50,7 @@ function generalized_force!(F,bot,q,q̇,t;actuate=false,gravity=true,(user_defin
     (;structure) = bot
     clear_forces!(structure)
     lazy_update_bodies!(structure,q,q̇)
-    update_tensiles!(structure)
+    update_apparatuses!(structure)
     if gravity
         apply_gravity!(structure;factor=1000)
     end
@@ -64,7 +64,7 @@ function generalized_force_jacobain!(∂F∂q̌,∂F∂q̌̇,bot,q,q̇,t)
     ∂F∂q̌̇ .= 0
     clear_forces!(structure)
     lazy_update_bodies!(structure,q,q̇)
-    update_tensiles!(structure)
+    update_apparatuses!(structure)
     build_tangent_stiffness_matrix!(∂F∂q̌,structure)
     build_tangent_damping_matrix!(∂F∂q̌̇,structure)
 end
@@ -356,7 +356,7 @@ function get_distribution_law!(structure,cache,q)
     (;
         D,L,H,bodyid2act_idx
     ) = cache.cache
-    (;sys_free_idx,bodyid2sys_full_coords,bodyid2sys_dof_idx) = structure.connectivity.indexed
+    (;sys_free_coords_idx,bodyid2sys_full_coords,bodyid2sys_dof_idx) = structure.connectivity.indexed
     N_in = intrinsic_nullspace(structure,q)
     # A = make_cstr_jacobian(structure)(q)
     N_ex = extrinsic_nullspace(structure,q)

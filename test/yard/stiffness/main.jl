@@ -50,10 +50,10 @@ end
 #--- superball
 # for use with Class-1 and the 1st rigid fixed
 function build_nullspace_on_free(st)
-    (;sys_free_idx,bodyid2sys_dof_idx) = st.connectivity.indexed
+    (;sys_free_coords_idx,bodyid2sys_dof_idx) = st.connectivity.indexed
     q = RB.get_coords(bot.structure)
     Nin = RB.make_intrinsic_nullspace(st,q)[
-        sys_free_idx,
+        sys_free_coords_idx,
         reduce(vcat,bodyid2sys_dof_idx[2:end])
     ]
 end
@@ -436,10 +436,10 @@ f = RB.get_cables_tension(bot)
 
 # for use with Class-1 and the 1st rigid fixed
 function build_nullspace_on_free(st)
-    (;sys_free_idx,bodyid2sys_full_coords,bodyid2sys_dof_idx) = st.connectivity.indexed
+    (;sys_free_coords_idx,bodyid2sys_full_coords,bodyid2sys_dof_idx) = st.connectivity.indexed
     q = RB.get_coords(bot.structure)
     Nin = RB.make_intrinsic_nullspace(st,q)[
-        sys_free_idx,
+        sys_free_coords_idx,
         reduce(vcat,bodyid2sys_dof_idx[begin:end-1])
     ]
     Nex = zeros(eltype(q),30,12)
@@ -930,11 +930,11 @@ bot.structure.num_of_dof
 RB.check_static_equilibrium_output_multipliers(bot.structure)
 
 function make_nullspace_on_free(st)    
-    (;sys_free_idx,bodyid2sys_dof_idx) = st.connectivity.indexed
+    (;sys_free_coords_idx,bodyid2sys_dof_idx) = st.connectivity.indexed
     q = RB.get_coords(bot.structure)
     Nin = RB.make_intrinsic_nullspace(st,q)
     Nin[
-        sys_free_idx,
+        sys_free_coords_idx,
         reduce(vcat,bodyid2sys_dof_idx[2:end])
     ][:,end]
     # I2 = RB.NCF.I2_Bool
@@ -1385,10 +1385,10 @@ bot = towerbot
 plot_traj!(bot;showground=false)
 
 function build_nullspace_on_free(st)
-    (;sys_free_idx,bodyid2sys_full_coords,bodyid2sys_dof_idx) = st.connectivity.indexed
+    (;sys_free_coords_idx,bodyid2sys_full_coords,bodyid2sys_dof_idx) = st.connectivity.indexed
     q = RB.get_coords(bot.structure)
     Nin = RB.make_intrinsic_nullspace(st,q)[
-        sys_free_idx,
+        sys_free_coords_idx,
         reduce(vcat,bodyid2sys_dof_idx[begin+1:end])
     ]    
     Nex = zeros(eltype(q),11,5)

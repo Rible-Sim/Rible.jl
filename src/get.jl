@@ -29,8 +29,8 @@ function get_initial(st::Structure)
 end
 
 function get_polyvar(st::Structure)
-    (;num_of_cstr,connectivity,force_elements) = st
-    (;cables) = force_elements
+    (;num_of_cstr,connectivity,apparatuses) = st
+    (;cables) = apparatuses
     (;indexed,numbered,) = connectivity
     (;nc) = numbered
     (;num_of_intrinsic_cstr) = indexed
@@ -228,7 +228,7 @@ Return System DistanceSpringDamper 刚度。
 $(TYPEDSIGNATURES)
 """
 function get_cables_stiffness(st::Structure)
-    [s.k for s in st.force_elements.cables]
+    [s.k for s in st.apparatuses.cables]
 end
 
 """
@@ -236,11 +236,11 @@ Return System DistanceSpringDamper 当前Length.
 $(TYPEDSIGNATURES)
 """
 function get_cables_len(st::Structure)
-    [s.state.length for s in st.force_elements.cables]
+    [s.state.length for s in st.apparatuses.cables]
 end
 
 function get_cables_len_dot(st::Structure)
-    [s.state.lengthdot for s in st.force_elements.cables]
+    [s.state.lengthdot for s in st.apparatuses.cables]
 end
 
 """
@@ -248,7 +248,7 @@ Return System DistanceSpringDamper 变形量。
 $(TYPEDSIGNATURES)
 """
 function get_cables_deform(st::Structure)
-    [s.state.length - s.state.restlen for s in st.force_elements.cables]
+    [s.state.length - s.state.restlen for s in st.apparatuses.cables]
 end
 
 """
@@ -256,7 +256,7 @@ Return System DistanceSpringDamper Restlength。
 $(TYPEDSIGNATURES)
 """
 function get_cables_restlen(st::Structure)
-    [s.state.restlen for s in st.force_elements.cables]
+    [s.state.restlen for s in st.apparatuses.cables]
 end
 
 """
@@ -264,7 +264,7 @@ Return System DistanceSpringDamper Tension.
 $(TYPEDSIGNATURES)
 """
 function get_cables_tension(st::Structure)
-    [s.state.tension for s in st.force_elements.cables]
+    [s.state.tension for s in st.apparatuses.cables]
 end
 
 """
@@ -272,7 +272,7 @@ Set cables' tension
 $(TYPEDSIGNATURES)
 """
 function set_cables_tension!(st::Structure,fs)
-    for (s,f) in zip(st.force_elements.cables,fs)
+    for (s,f) in zip(st.apparatuses.cables,fs)
         s.state.tension = f
     end
 end
@@ -283,7 +283,7 @@ Return System DistanceSpringDamper 力密度。
 $(TYPEDSIGNATURES)
 """
 function get_cables_force_density(st::Structure)
-    [s.state.tension/s.state.length for s in st.force_elements.cables]
+    [s.state.tension/s.state.length for s in st.apparatuses.cables]
 end
 
 """
@@ -306,5 +306,5 @@ function force_densities_to_restlen(st::Structure,γs)
         c = s.c
         u = l-(γ*l-c*l̇)/k
     end
-        for (γ,s) in zip(γs,st.force_elements.cables)]
+        for (γ,s) in zip(γs,st.apparatuses.cables)]
 end
