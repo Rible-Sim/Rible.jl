@@ -64,8 +64,8 @@ deck = new_deck(
 # 			ijkl=1)
 
 rbs = TypeSortedCollection(vcat(lbars,rbars,[deck]))
-numberedpoints = RB.number(rbs)
-indexedcoords = RB.index(rbs)
+numbered = RB.number(rbs)
+indexed = RB.index(rbs)
 # # #
 cnt_matrix_elas = ElasticArray{Int}(undef, 2n+1, 0)
 # left
@@ -235,9 +235,9 @@ connected = RB.connect(rbs,cnt_matrix)
 # cst1 = RB.PinJoint(RB.Hen2Egg(RB.ID(rb1_to_3[1],2),RB.ID(rb4,1)))
 # cst2 = RB.PinJoint(RB.Hen2Egg(RB.ID(rb1_to_3[2],2),RB.ID(rb4,2)))
 # cst3 = RB.PinJoint(RB.Hen2Egg(RB.ID(rb1_to_3[3],2),RB.ID(rb4,3)))
-# jointedmembers = RB.join((cst1,cst2,cst3),indexedcoords)
+# jointedmembers = RB.join((cst1,cst2,cst3),indexed)
 #
-cnt = RB.Connectivity(numberedpoints,indexedcoords,@eponymtuple(connected,))
+cnt = RB.Connectivity(numbered,indexed,@eponymtuple(connected,))
 
 st = RB.Structure(rbs,apparatuses,cnt)
 bot = RB.Robot(st,hub)

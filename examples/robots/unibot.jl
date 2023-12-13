@@ -93,8 +93,8 @@ function uni(c=100.0;
         rb2
     ]
     rigdibodies = TypeSortedCollection(rbs)
-    numberedpoints = RB.number(rigdibodies)
-    indexedcoords = RB.index(rigdibodies)
+    numbered = RB.number(rigdibodies)
+    indexed = RB.index(rigdibodies)
     #
     ncables = 6
 
@@ -155,9 +155,9 @@ function uni(c=100.0;
         )
     )
 
-    jointed = RB.join([uj],indexedcoords)
+    jointed = RB.join([uj],indexed)
 
-    cnt = RB.Connectivity(numberedpoints, indexedcoords, tensioned, jointed)
+    cnt = RB.Connectivity(numbered, indexed, tensioned, jointed)
 
     st = RB.Structure(rigdibodies, apparatuses, cnt,)
     bot = RB.Robot(st, hub)

@@ -68,7 +68,7 @@ rb9  = make_3d_tri( 9,nodess[5],ro_by_rbid[5],R_by_rbid[5],rirjrkrl_by_rbid[5][1
 rb10 = make_3d_tri(10,nodess[6],ro_by_rbid[6],R_by_rbid[6],rirjrkrl_by_rbid[6][1:ijkl]...)
 
 rbs = TypeSortedCollection(vcat(rb1_to_3,rb4_to_6,[rb7,rb8,rb9,]))
-numberedpoints = RB.number(rbs)
+numbered = RB.number(rbs)
 matrix_sharing = [
     4 0 0 0 1 0 0 0 0 0;
     5 0 0 0 2 0 0 0 0 0;
@@ -95,8 +95,8 @@ matrix_sharing = [
     0 0 0 0 0 0 0 2 2 0;
     0 0 0 0 0 0 0 3 3 0;
 ]
-indexedcoords = RB.index(rbs,matrix_sharing[begin:end,begin:end-1])
-# indexedcoords = RB.index(rbs)
+indexed = RB.index(rbs,matrix_sharing[begin:end,begin:end-1])
+# indexed = RB.index(rbs)
 # #
 ndcables = 9
 nocables = 6
@@ -173,9 +173,9 @@ connected = RB.connect(rbs,cnt_matrix_cables[begin:end,begin:end-1])
 # cst1 = RB.PinJoint(RB.Hen2Egg(RB.ID(rb1_to_3[1],2),RB.ID(rb4,1)))
 # cst2 = RB.PinJoint(RB.Hen2Egg(RB.ID(rb1_to_3[2],2),RB.ID(rb4,2)))
 # cst3 = RB.PinJoint(RB.Hen2Egg(RB.ID(rb1_to_3[3],2),RB.ID(rb4,3)))
-# jointedmembers = RB.join((cst1,cst2,cst3),indexedcoords)
+# jointedmembers = RB.join((cst1,cst2,cst3),indexed)
 #
-cnt = RB.Connectivity(numberedpoints,indexedcoords,@eponymtuple(connected,))
+cnt = RB.Connectivity(numbered,indexed,@eponymtuple(connected,))
 
 st = RB.Structure(rbs,apparatuses,cnt)
 bot = RB.Robot(st,hub)

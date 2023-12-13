@@ -210,7 +210,7 @@ end
 rbs = [rigidbody(i, rds[i], r̄s[i]) for i in 1:nb]
 # rigidbody(1, rds[1], r̄s[1])
 rigdibodies = TypeSortedCollection(rbs)
-numberedpoints = RB.number(rigdibodies)
+numbered = RB.number(rigdibodies)
 matrix_sharing_raw = Vector{Matrix{Int}}()
 for i in 1:nb-1
     s = zeros(2, nb)
@@ -230,7 +230,7 @@ for i in 1:nb-1
 end
 matrix_sharing = reduce(vcat, matrix_sharing_raw)
 # display(matrix_sharing)
-indexedcoords = RB.index(rigdibodies, matrix_sharing)
+indexed = RB.index(rigdibodies, matrix_sharing)
 nstrings = 8 * 4 + 8 * 2
 ks = zeros(nstrings); restlens = zeros(nstrings)
 for i in 1:4*8
@@ -299,7 +299,7 @@ matrix_cnt2 = s
 connections = RB.connect(rigdibodies, matrix_cnt, matrix_cnt2)
 # connections = (cables=RB.connect(rigdibodies, matrix_cnt),)
 
-cnt = RB.Connectivity(numberedpoints, indexedcoords, connections)
+cnt = RB.Connectivity(numbered, indexed, connections)
 
 st = RB.ClusterTensegrityStructure(rigdibodies, apparatuses, cnt)
 # st = RB.Structure(rigdibodies, apparatuses, cnt)

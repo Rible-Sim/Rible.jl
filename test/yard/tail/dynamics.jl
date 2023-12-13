@@ -109,7 +109,7 @@ function make_new_tail(n)
         rigidbody(i, O) for i = 1:nb
     ]
     rigdibodies = TypeSortedCollection(rbs)
-    numberedpoints = RB.number(rigdibodies)
+    numbered = RB.number(rigdibodies)
     matrix_sharing_raw = Vector{Matrix{Int}}()
     for i = 1:2n
         s = zeros(2, nb)
@@ -124,7 +124,7 @@ function make_new_tail(n)
     end
     matrix_sharing = reduce(vcat, matrix_sharing_raw)
     display(matrix_sharing)
-    indexedcoords = RB.index(rigdibodies, matrix_sharing)
+    indexed = RB.index(rigdibodies, matrix_sharing)
 
     ncables = 4n
     original_restlens = zeros(ncables)
@@ -162,7 +162,7 @@ function make_new_tail(n)
     display(matrix_cnt)
     connected = RB.connect(rigdibodies, matrix_cnt)
     tensioned = @eponymtuple(connected,)
-    cnt = RB.Connectivity(numberedpoints, indexedcoords, tensioned)
+    cnt = RB.Connectivity(numbered, indexed, tensioned)
 
     st = RB.Structure(rigdibodies, apparatuses, cnt)
     bot = RB.Robot(st, hub)

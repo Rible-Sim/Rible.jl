@@ -26,7 +26,7 @@ function tower2d(;k=100.0,c=0.0,ratio=0.8,ratio1=ratio,slack=true)
     rb8 = build_2d_ground(8)
     rbs = TypeSortedCollection((rb1,rb2,rb3,rb4,rb5,rb6,rb7,rb8))
     # rbs = TypeSortedCollection((rb1,rb2,rb3,rb4,rb5,rb6,rb7))
-    numberedpoints = RB.number(rbs)
+    numbered = RB.number(rbs)
     matrix_sharing = [
         3 0 1 0 0 0 0;
         4 0 2 0 0 0 0;
@@ -35,7 +35,7 @@ function tower2d(;k=100.0,c=0.0,ratio=0.8,ratio1=ratio,slack=true)
         0 0 0 0 0 3 5;
         0 0 0 0 0 4 6;
     ]
-    indexedcoords = RB.index(rbs,matrix_sharing)
+    indexed = RB.index(rbs,matrix_sharing)
     #
     restlen4 = ratio1*0.1*√5
     restlen1 = ratio*0.1*√2
@@ -79,11 +79,11 @@ function tower2d(;k=100.0,c=0.0,ratio=0.8,ratio1=ratio,slack=true)
     cst2 = RB.PinJoint(RB.Hen2Egg(RB.ID(rb3,3),RB.ID(rb4,1)))
     cst3 = RB.PinJoint(RB.Hen2Egg(RB.ID(rb4,2),RB.ID(rb5,3)))
     cst4 = RB.PinJoint(RB.Hen2Egg(RB.ID(rb5,3),RB.ID(rb6,1)))
-    jointedmembers = RB.join((cst1,cst2,cst3,cst4),indexedcoords)
-    # jointedmembers = RB.join((cst1,cst2,cst3),indexedcoords)
+    jointedmembers = RB.join((cst1,cst2,cst3,cst4),indexed)
+    # jointedmembers = RB.join((cst1,cst2,cst3),indexed)
 
-    cnt = RB.Connectivity(numberedpoints,indexedcoords,@eponymtuple(connected,),jointedmembers)
-    # cnt = RB.Connectivity(numberedpoints,indexedcoords,connections)
+    cnt = RB.Connectivity(numbered,indexed,@eponymtuple(connected,),jointedmembers)
+    # cnt = RB.Connectivity(numbered,indexed,connections)
     st = RB.Structure(rbs,apparatuses,cnt)
     bot = RB.Robot(st,hub)
 end

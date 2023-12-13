@@ -7,7 +7,7 @@ pt2px(x, ppi = 300*u"px"/1u"inch") = ustrip(u"px",x*u"pt"*ppi)
 px2pt(x, ppi = 300*u"px"/1u"inch") = ustrip(u"pt",x*u"px"/ppi)
 
 fontsize::Float64 = 8 #|> pt2px
-markersize::Float64 = 0.5#fontsize
+markersize::Float64 = 2.0#fontsize
 linewidth::Float64 = 0.5 #|> pt2px
 tw::Float64 = 455.24411 #|> pt2px
 mks_cyc::Base.Iterators.Cycle{Vector{String}} = Iterators.cycle(["o","v","^","s","P","X","d","<",">","h"])
@@ -83,9 +83,12 @@ theme_pub = Makie.Attributes(;
         xminorgridwidth=0.2,yminorgridwidth=0.2,zminorgridwidth=0.2,
         xtickwidth = 0.2, ytickwidth = 0.2,ztickwidth=0.2,
         xminortickwidth = 0.2, yminortickwidth = 0.2, zminortickwidth=0.2,
-        xlabeloffset = 2*8,
-        ylabeloffset = 2*8,
-        zlabeloffset = 4*8,
+        xlabeloffset = 2fontsize,
+        ylabeloffset = 2fontsize,
+        zlabeloffset = 3fontsize,
+        xticklabelpad = 0.5fontsize, 
+        yticklabelpad = 0.5fontsize, 
+        zticklabelpad = 0.5fontsize, 
     ),
     Label = (
         # fontsize = fontsize,
@@ -106,6 +109,36 @@ theme_pub = Makie.Attributes(;
     Poly = (
         color = :slategrey,
         transparency = false,
+    ),
+    Legend = (
+        # alignmode, 
+        # backgroundcolor, bgcolor, 
+        # framecolor, framevisible, 
+        framewidth = 0.2, 
+        # gridshalign, gridsvalign, 
+        groupgap = 0, 
+        # halign, height, 
+        # label, labelcolor, labelfont, labelhalign, labelvalign, labeljustification, 
+        labelsize = 0.8fontsize, 
+        # linecolor, linepoints, linestyle, 
+        # linewidth = 0.2, 
+        # margin, 
+        # marker, markercolor, markerpoints, markerstrokecolor, 
+        # markersize = 1,
+        # markerstrokewidth = fontsize, 
+        # nbanks, orientation, 
+        padding = (0.2fontsize, 0.2fontsize, 0, 0), 
+        # patchcolor, 
+        patchlabelgap = 0, 
+        patchsize = (fontsize, fontsize), 
+        # patchstrokecolor, patchstrokewidth, 
+        # polycolor, polypoints,  polystrokecolor, 
+        polystrokewidth = 1, 
+        # rowgap, 
+        colgap = 0.2fontsize, 
+        # tellheight, tellwidth, 
+        # titlecolor, titlefont, titlegap, titlehalign, titleposition, titlesize, titlevalign, titlevisible, 
+        # valign, width
     )
 )
 

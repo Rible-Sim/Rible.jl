@@ -1,3 +1,21 @@
+
+function nullspace_mat(::QC,x::AbstractVector{T}) where{T}
+    q = @view x[4:7]
+    O43 = @SMatrix zeros(T,4,3)
+    O33 = @SMatrix zeros(T,3,3)
+    hcat(
+        vcat(
+            SMatrix{3,3,T}(I(3)),
+            O43
+        ),
+        vcat(
+            O33,
+            Lᵀmat(q)
+        )
+    )
+
+end
+
 function get_deform(::QC{T}) where T
     one(T)
 end

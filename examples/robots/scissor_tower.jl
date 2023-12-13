@@ -81,7 +81,7 @@ tri2 = build_2d_tri(6,bps[11],bps[10],bps[9];
 # rb8 = build_2d_ground(8)
 # rbs = TypeSortedCollection((rb1,rb2,rb3,rb4,rb5,rb6,rb7,rb8))
 rbs = TypeSortedCollection((bar1,bar2,bar3,bar4,tri1,tri2))
-numberedpoints = RB.number(rbs)
+numbered = RB.number(rbs)
 sharing = [
     3 0 0 1 0 0;
     4 0 0 2 0 0;
@@ -92,7 +92,7 @@ sharing = [
     0 0 3 0 3 0;
     0 0 4 0 4 0;
 ]
-indexedcoords = RB.index(rbs,sharing)
+indexed = RB.index(rbs,sharing)
 # #
 # restlen4 = ratio1*0.1*√5
 # restlen1 = ratio*0.1*√2
@@ -131,8 +131,8 @@ connected = RB.connect(rbs,cnt_matrix)
 # cst2 = RB.PinJoint(RB.Hen2Egg(RB.ID(rb3,3),RB.ID(rb4,1)))
 # cst3 = RB.PinJoint(RB.Hen2Egg(RB.ID(rb4,2),RB.ID(rb5,3)))
 # cst4 = RB.PinJoint(RB.Hen2Egg(RB.ID(rb5,3),RB.ID(rb6,1)))
-# jointedmembers = RB.join((cst1,cst2,cst3,cst4),indexedcoords)
-# # jointedmembers = RB.join((cst1,cst2,cst3),indexedcoords)
+# jointedmembers = RB.join((cst1,cst2,cst3,cst4),indexed)
+# # jointedmembers = RB.join((cst1,cst2,cst3),indexed)
 
 ncables = size(cnt_matrix,1)
 hncables = ncables
@@ -150,8 +150,8 @@ apparatuses = (cables = cables,)
 connected = RB.connect(rbs,cnt_matrix)
 
 
-cnt = RB.Connectivity(numberedpoints,indexedcoords,@eponymtuple(connected,),)
-# # cnt = RB.Connectivity(numberedpoints,indexedcoords,connections)
+cnt = RB.Connectivity(numbered,indexed,@eponymtuple(connected,),)
+# # cnt = RB.Connectivity(numbered,indexed,connections)
 st = RB.Structure(rbs,apparatuses,cnt)
 RB.Robot(st,hub)
 end

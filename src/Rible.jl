@@ -51,6 +51,7 @@ import MakieCore
 using Observables
 import GeometryBasics as GB
 import ColorTypes as CT
+import Meshing
 const lift = map
 # docs
 using DocStringExtensions

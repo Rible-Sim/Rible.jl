@@ -58,7 +58,7 @@ function MakieCore.plot!(viz::Viz{Tuple{S}};
         end
     end
     if viz.show_nodes[]
-        MakieCore.scatter!(viz,nodes_ob;color=viz.pointcolor[])
+        MakieCore.scatter!(viz,nodes_ob; color=viz.pointcolor[])
         if viz.show_node_labels[]
             MakieCore.text!(viz,
                 ["r$(id[])p$pid" for (pid,rp) in enumerate(nodes_ob[])],
@@ -279,9 +279,17 @@ function get_groundmesh(f::Function,rect)
 end
 
 function get_groundmesh(plane::Plane,rect)
-    GeometryBasics.Mesh(rect, MarchingCubes()) do v
+    GB.Mesh(rect, Meshing.MarchingCubes()) do v
         signed_distance(v,plane)
-    end |> make_patch(;color = :snow)
+    end  |> make_patch(;color = :snow)
+end
+
+function get_groundmesh(static_env::StaticContactSurfaces,rect)
+    map(static_env.surfaces) do surface
+        GB.Mesh(rect, Meshing.MarchingCubes()) do v
+            signed_distance(v,surface)
+        end 
+    end |> GB.merge |> make_patch(;color = :snow)
 end
 
 function hidex(ax)

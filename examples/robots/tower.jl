@@ -67,8 +67,8 @@ function tower(;k=nothing)
     # # #
     nb = 3
     rbs = TypeSortedCollection([base,bar,top])
-    numberedpoints = RB.number(rbs)
-    indexedcoords = RB.index(rbs,)
+    numbered = RB.number(rbs)
+    indexed = RB.index(rbs,)
     
     # 
     cnt_matrix_elas = ElasticArray{Int}(undef, nb, 0)
@@ -126,11 +126,11 @@ function tower(;k=nothing)
         )
     )
 
-    jointedmembers = RB.join((cst1,cst2,),indexedcoords)
+    jointedmembers = RB.join((cst1,cst2,),indexed)
 
     cnt = RB.Connectivity(
-            numberedpoints,
-            indexedcoords,
+            numbered,
+            indexed,
             @eponymtuple(connected,),
             jointedmembers
         )

@@ -181,17 +181,22 @@ struct Hen2Egg{henType<:ID,eggType<:ID}
     egg::eggType
 end
 
+function get_id(thing)
+    1
+end
 
 function get_ids(things)
-    ids = mapreduce(get_id,vcat,things;init=Int[])
+    ids = mapreduce(get_id,vcat,things; init=Int[])
     nb = length(ids)
     ids,nb
 end
 
 function check_id_sanity(things)
     ids,nb = get_ids(things)
-    @assert minimum(ids) == 1
-    @assert maximum(ids) == nb
-    @assert allunique(ids)
+    if nb > 0 
+        @assert minimum(ids) == 1
+        @assert maximum(ids) == nb
+        @assert allunique(ids)
+    end
     ids,nb
 end

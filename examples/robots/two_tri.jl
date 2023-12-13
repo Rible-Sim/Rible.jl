@@ -15,12 +15,12 @@ function two_tri(;k=100.0,c=0.0,ratio=0.8)
     )
 
     rbs = TypeSortedCollection((rb1,rb2))
-    numberedpoints = RB.number(rbs)
+    numbered = RB.number(rbs)
     matrix_sharing = [
         1 1;
         2 2;
     ]
-    indexedcoords = RB.index(rbs,matrix_sharing)
+    indexed = RB.index(rbs,matrix_sharing)
     #
     ncables = 4
     restlen1 = 0.05
@@ -61,11 +61,11 @@ function two_tri(;k=100.0,c=0.0,ratio=0.8)
     #     end
     # )
 
-    # jointedmembers = RB.join((cst1,),indexedcoords)
+    # jointedmembers = RB.join((cst1,),indexed)
 
     cnt = RB.Connectivity(
-        numberedpoints,
-        indexedcoords,
+        numbered,
+        indexed,
         @eponymtuple(connected,),
         # jointedmembers
     )

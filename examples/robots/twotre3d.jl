@@ -77,9 +77,9 @@ plates = [
 ]
 nb =  length(plates)
 rbs = plates |> TypeSortedCollection
-numberedpoints = RB.number(rbs)
-# indexedcoords = RB.index(rbs,sharing)
-indexedcoords = RB.index(rbs,)
+numbered = RB.number(rbs)
+# indexed = RB.index(rbs,sharing)
+indexed = RB.index(rbs,)
 
 connecting_elas = ElasticArray{Int}(undef, nb, 0)
 # outer
@@ -133,8 +133,8 @@ acs = [
 apparatuses = (cables = cables,)
 hub = (actuators = acs,)
 
-# jointedmembers = RB.join(csts,indexedcoords)
-cnt = RB.Connectivity(numberedpoints,indexedcoords,@eponymtuple(connected,),)
+# jointedmembers = RB.join(csts,indexed)
+cnt = RB.Connectivity(numbered,indexed,@eponymtuple(connected,),)
 
 st = RB.Structure(rbs,apparatuses,cnt)
 RB.Robot(st,hub)

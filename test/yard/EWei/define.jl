@@ -188,7 +188,7 @@ function BuildTail()
 
     rbs = [rigidbody(i, rds[i], r̄s[i]) for i in 1:nb]
     rigdibodies = TypeSortedCollection(rbs)
-    numberedpoints = RB.number(rigdibodies)
+    numbered = RB.number(rigdibodies)
     matrix_sharing_raw = Vector{Matrix{Int}}()
     for i in 1:nb-1
         s = zeros(2, nb)
@@ -205,7 +205,7 @@ function BuildTail()
         push!(matrix_sharing_raw, s)
     end
     matrix_sharing = reduce(vcat, matrix_sharing_raw)
-    indexedcoords = RB.index(rigdibodies, matrix_sharing)
+    indexed = RB.index(rigdibodies, matrix_sharing)
     nstrings = 8 * 4 + 8 * 2
     ks = zeros(nstrings); restlens = zeros(nstrings)
     for i in 1:4*8
@@ -247,7 +247,7 @@ function BuildTail()
     end
     matrix_cnt = reduce(vcat, matrix_cnt_raw)
     tensiled = (connected=RB.connect(rigdibodies, matrix_cnt),)
-    cnt = RB.Connectivity(numberedpoints, indexedcoords, tensiled)
+    cnt = RB.Connectivity(numbered, indexed, tensiled)
     st = RB.Structure(rigdibodies, apparatuses, cnt)
     bot = RB.Robot(st,)
 end
@@ -457,7 +457,7 @@ function BuildTail(type; β=1.0, μ=0.02)
 
     rbs = [rigidbody(i, rds[i], r̄s[i]) for i in 1:nb]
     rigdibodies = TypeSortedCollection(rbs)
-    numberedpoints = RB.number(rigdibodies)
+    numbered = RB.number(rigdibodies)
     matrix_sharing_raw = Vector{Matrix{Int}}()
     for i in 1:nb-1
         s = zeros(2, nb)
@@ -474,7 +474,7 @@ function BuildTail(type; β=1.0, μ=0.02)
         push!(matrix_sharing_raw, s)
     end
     matrix_sharing = reduce(vcat, matrix_sharing_raw)
-    indexedcoords = RB.index(rigdibodies, matrix_sharing)
+    indexed = RB.index(rigdibodies, matrix_sharing)
     nstrings = 8 * 4 + 8 * 2
     ks = zeros(nstrings); restlens = zeros(nstrings)
     for i in 1:4*8
@@ -586,7 +586,7 @@ function BuildTail(type; β=1.0, μ=0.02)
     end
     matrix_cnt = reduce(vcat, matrix_cnt_raw)
     cc = RB.connect_and_cluster(rigdibodies, matrix_cnt, matrix_cnt2)
-    cnt = RB.Connectivity(numberedpoints, indexedcoords, cc)
+    cnt = RB.Connectivity(numbered, indexed, cc)
     st = RB.Structure(rigdibodies, apparatuses, cnt)
     bot = RB.Robot(st,)
 end

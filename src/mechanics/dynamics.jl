@@ -52,7 +52,7 @@ function generalized_force!(F,bot,q,q̇,t;actuate=false,gravity=true,(user_defin
     lazy_update_bodies!(structure,q,q̇)
     update_apparatuses!(structure)
     if gravity
-        apply_gravity!(structure;factor=1000)
+        apply_gravity!(structure;factor=1)
     end
     F .= assemble_forces!(structure)
     user_defined_force!(F,t)
@@ -112,7 +112,9 @@ function activate_frictional_contacts!(structure,contact_env,solver_cache,q;chec
         persistent_bits,
     ) = solver_cache.cache
 
-    (;bodyid2sys_loci_idx) = structure.connectivity.numbered
+    (;indexed,numbered) = structure.connectivity
+    (;bodyid2sys_loci_idx) = numbered
+    (;num_of_bodies) = indexed
     (;surfaces) = contact_env
     T = eltype(q)
     nq = length(q)
@@ -157,7 +159,7 @@ function activate_frictional_contacts!(structure,contact_env,solver_cache,q;chec
     bodyid2act_idx = deepcopy(bodyid2sys_loci_idx)
     act_start = 0
     persistent_idx = Int[]
-    for bid = 1:structure.num_of_bodies
+    for bid = 1:num_of_bodies
         bodyid2act_idx[bid] .= 0
         contacts_bits_body = findall(contacts_bits[bodyid2sys_loci_idx[bid]])
         nactive_body = length(contacts_bits_body)
@@ -187,8 +189,9 @@ function activate_contacts!(structure,contact_env,solver_cache,q;checkpersist=tr
         contacts_bits,
         persistent_bits,
     ) = solver_cache.cache
-
-    (;bodyid2sys_loci_idx) = structure.connectivity.numbered
+    (;indexed,numbered) = structure.connectivity
+    (;bodyid2sys_loci_idx) = numbered
+    (;num_of_bodies) = indexed
     (;surfaces) = contact_env
     T = eltype(q)
     nq = length(q)
@@ -233,7 +236,7 @@ function activate_contacts!(structure,contact_env,solver_cache,q;checkpersist=tr
     bodyid2act_idx = deepcopy(bodyid2sys_loci_idx)
     act_start = 0
     persistent_idx = Int[]
-    for bid = 1:structure.num_of_bodies
+    for bid = 1:num_of_bodies
         bodyid2act_idx[bid] .= 0
         contacts_bits_body = findall(contacts_bits[bodyid2sys_loci_idx[bid]])
         nactive_body = length(contacts_bits_body)
@@ -358,8 +361,9 @@ function get_distribution_law!(structure,cache,q)
     ) = cache.cache
     (;sys_free_coords_idx,bodyid2sys_full_coords,bodyid2sys_dof_idx) = structure.connectivity.indexed
     N_in = intrinsic_nullspace(structure,q)
-    # A = make_cstr_jacobian(structure)(q)
-    N_ex = extrinsic_nullspace(structure,q)
+    # N_ex = extrinsic_nullspace(structure,q)
+    A = make_cstr_jacobian(structure)(q)
+    N_ex = nullspace(A*N_in)
     N = N_in*N_ex
     # @show rank(N), (A*N |> norm)
     R = D*N

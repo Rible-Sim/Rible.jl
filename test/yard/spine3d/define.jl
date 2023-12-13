@@ -53,8 +53,8 @@ function spine3d(n;c=0.0)
     end
     rbs = [rigidbody(i,props[i],aps,rs[i],Rs[i],ṙs[i],ωs[i]) for i = 1:n]
 	rigdibodies = TypeSortedCollection(rbs)
-    numberedpoints = RB.number(rigdibodies)
-	indexedcoords = RB.index(rigdibodies)
+    numbered = RB.number(rigdibodies)
+	indexed = RB.index(rigdibodies)
 
     ncables = 8*(n-1)
     stringlenH = 0.6h
@@ -103,7 +103,7 @@ function spine3d(n;c=0.0)
     matrix_cnt = reduce(vcat, matrix_cnt_raw)
 	# display(matrix_cnt)
     connections = RB.connect(rigdibodies, matrix_cnt)
-    cnt = RB.Connectivity(numberedpoints, indexedcoords, connections)
+    cnt = RB.Connectivity(numbered, indexed, connections)
     st = RB.Structure(rigdibodies,apparatuses,cnt)
     bot = RB.Robot(st,hub)
 end

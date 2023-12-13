@@ -189,6 +189,10 @@ function nullspace_mat(nmcs::NC2D6C,q)
     cv\ret
 end
 
+function nullspace_mat(nmcs::NC3D3C,q)
+    ret = SMatrix{3,3}(IMatrix(3))
+end
+
 function nullspace_mat(nmcs::NC3D6C,q)
     cv = nmcs.conversion_to_std
     u,v,w = get_uvw(nmcs,q)

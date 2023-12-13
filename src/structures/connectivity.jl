@@ -203,8 +203,26 @@ function index(bodies,apparatuses,sharing_input::AbstractMatrix=Int[;;])
     # num_of_extrinsic_cstr = mapreduce((apparatus)->apparatus.num_of_cstr,+,apparatuses,init=0)
     apparid2sys_extrinsic_cstr_idx = Vector{Int}[]
     nexcst_by_joint = zeros(Int,num_of_apparatuses)
-    foreach(apparatuses) do apparatus
-        nexcst_by_joint[apparatus.id] = apparatus.joint.num_of_cstr
+    num_of_joint_apparatuses = 0
+    num_of_force_apparatuses = 0
+    apparid2full_idx = Vector{Vector{Int}}(undef,num_of_apparatuses)
+    apparid2free_idx = Vector{Vector{Int}}(undef,num_of_apparatuses)
+    apparid2sys_free_coords_idx = Vector{Vector{Int}}(undef,num_of_apparatuses)
+    apparid2sys_extrinsic_cstr_idx = Vector{Int}[]
+    ilast = 0
+    if num_of_apparatuses > 0
+        foreach(apparatuses) do apparatus
+            nexcst_by_joint[apparatus.id] = apparatus.joint.num_of_cstr
+            (;id,joint) = apparatus
+            apparid2full_idx[id], apparid2free_idx[id], apparid2sys_free_coords_idx[id] = 
+            get_joint_idx(joint,bodyid2sys_free_coords)
+            if apparatus.has_joint isa Val{true}
+                num_of_joint_apparatuses += 1
+            end
+            if apparatus.has_force isa Val{true}
+                num_of_force_apparatuses += 1
+            end
+        end
     end
     num_of_extrinsic_cstr = sum(nexcst_by_joint)
     num_of_cstr = num_of_intrinsic_cstr + num_of_extrinsic_cstr
@@ -212,28 +230,10 @@ function index(bodies,apparatuses,sharing_input::AbstractMatrix=Int[;;])
     if num_of_dof <= 0
         @warn "Non positive degree of freedom: $num_of_dof."
     end
-    apparid2sys_extrinsic_cstr_idx = Vector{Int}[]
-    ilast = 0
     for apparid = 1:num_of_apparatuses
         nexcst = nexcst_by_joint[apparid]
         push!(apparid2sys_extrinsic_cstr_idx,collect(ilast+1:ilast+nexcst))
         ilast += nexcst
-    end
-    num_of_joint_apparatuses = 0
-    num_of_force_apparatuses = 0
-    apparid2full_idx = Vector{Vector{Int}}(undef,num_of_apparatuses)
-    apparid2free_idx = Vector{Vector{Int}}(undef,num_of_apparatuses)
-    apparid2sys_free_coords_idx = Vector{Vector{Int}}(undef,num_of_apparatuses)
-    foreach(apparatuses) do apparatus
-        (;id,joint) = apparatus
-        apparid2full_idx[id], apparid2free_idx[id], apparid2sys_free_coords_idx[id] = 
-        get_joint_idx(joint,bodyid2sys_free_coords)
-        if apparatus.has_joint isa Val{true}
-            num_of_joint_apparatuses += 1
-        end
-        if apparatus.has_force isa Val{true}
-            num_of_force_apparatuses += 1
-        end
     end
 
     Indexed(

@@ -335,11 +335,11 @@ function update_state!(state::RigidBodyState,
         origin_frame,
         mass_locus_state,
     ) = state
+    (;axes) = origin_frame
     (;nmcs) = coords
     lazy_update_state!(state,coords,cache,prop,q,q̇)
     origin_frame.angular_velocity = axes*find_local_angular_velocity(nmcs,q,q̇)
 end
-
 
 """
     stretch_loci!(

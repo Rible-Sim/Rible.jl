@@ -42,13 +42,13 @@ function make_bar(;
     cyl_bar_mesh = cyl_bar_simple |> simple2mesh
     rb1 = RB.RigidBody(prop,state,cyl_bar_mesh)
     rbs = TypeSortedCollection((rb1,))
-    numberedpoints = RB.number(rbs)
+    numbered = RB.number(rbs)
     matrix_sharing = zeros(Int,0,0)
-    indexedcoords = RB.index(rbs,matrix_sharing)
+    indexed = RB.index(rbs,matrix_sharing)
     ss = Int[]
     apparatuses = (cables = ss,)
     connections = RB.connect(rbs,zeros(Int,0,0))
-    cnt = RB.Connectivity(numberedpoints,indexedcoords,connections)
+    cnt = RB.Connectivity(numbered,indexed,connections)
     st = RB.Structure(rbs,apparatuses,cnt,)
     bot = RB.Robot(st)
 end

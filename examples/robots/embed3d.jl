@@ -97,7 +97,7 @@ plates = [
 ]
 nb = sum(length.(bars)) + length(plates)
 rbs = vcat(reduce(vcat,bars),plates) |> TypeSortedCollection
-numberedpoints = RB.number(rbs)
+numbered = RB.number(rbs)
 sharing_elas = ElasticArray{Int}(undef, nb, 0)
 cm = CircularArray(collect(1:m))
 for j = 1:n
@@ -124,8 +124,8 @@ for j = 2:n
 end
 sharing = Matrix(sharing_elas')
 # display(sharing)
-indexedcoords = RB.index(rbs,sharing)
-# indexedcoords = RB.index(rbs,)
+indexed = RB.index(rbs,sharing)
+# indexed = RB.index(rbs,)
 
 connecting_elas = ElasticArray{Int}(undef, nb, 0)
 for j = 1:n
@@ -250,9 +250,9 @@ csts = [
      for j = 1:n for i = 1:m
 ]
 
-jointedmembers = RB.join(csts,indexedcoords)
+jointedmembers = RB.join(csts,indexed)
 
-cnt = RB.Connectivity(numberedpoints,indexedcoords,@eponymtuple(connected,),jointedmembers)
+cnt = RB.Connectivity(numbered,indexed,@eponymtuple(connected,),jointedmembers)
 
 st = RB.Structure(rbs,apparatuses,cnt)
 bot = RB.Robot(st,hub)

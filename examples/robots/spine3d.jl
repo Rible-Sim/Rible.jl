@@ -62,8 +62,8 @@ function rigidbody(i,prop,loci,r,R,ṙ,ω)
 end
 rbs = [rigidbody(i,props[i],loci,rs[i],Rs[i],ṙs[i],ωs[i]) for i = 1:n]
 rigdibodies = TypeSortedCollection(rbs)
-numberedpoints = RB.number(rigdibodies)
-indexedcoords = RB.index(rigdibodies)
+numbered = RB.number(rigdibodies)
+indexed = RB.index(rigdibodies)
 
 ncables = 8*(n-1)
 cablelenH = 0.6h
@@ -105,7 +105,7 @@ matrix_cnt = reduce(vcat, matrix_cnt_raw)
 # display(matrix_cnt)
 connected = RB.connect(rigdibodies, matrix_cnt)
 tensioned = @eponymtuple(connected,)
-cnt = RB.Connectivity(numberedpoints, indexedcoords, tensioned)
+cnt = RB.Connectivity(numbered, indexed, tensioned)
 st = RB.Structure(rigdibodies,apparatuses,cnt)
 bot = RB.Robot(st,hub)
 end

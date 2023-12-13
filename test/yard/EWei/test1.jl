@@ -88,7 +88,7 @@ rg = [[0.0, 0.0], [0.5, 0.0],
 
 rbs = [rigidbody(i, rij[i], apss[i], rg[i]) for i in 1:5]
 rigdibodies = TypeSortedCollection(rbs)
-numberedpoints = RB.number(rigdibodies)
+numbered = RB.number(rigdibodies)
 matrix_sharing_raw = Vector{Matrix{Int}}()
 for i in 1:4
     s = zeros(2, 5)
@@ -102,7 +102,7 @@ for i in 1:4
     push!(matrix_sharing_raw, s)
 end
 matrix_sharing = reduce(vcat, matrix_sharing_raw)
-indexedcoords = RB.index(rigdibodies, matrix_sharing)
+indexed = RB.index(rigdibodies, matrix_sharing)
 nstrings = 4
 ks = 1.0; restlens = 0.5
 cables = [RB.DistanceSpringDamper2D( restlens, ks, 0.0) for i in 1:nstrings]
@@ -116,7 +116,7 @@ s[2, 1] = 1; s[2, 3] = -1
 s[3, 3] = 2; s[3, 5] = -2
 s[4, 3] = 1; s[4, 5] = -1
 connections = (cables=RB.connect(rigdibodies, s), )
-cnt = RB.Connectivity(numberedpoints, indexedcoords, connections)
+cnt = RB.Connectivity(numbered, indexed, connections)
 st = RB.Structure(rigdibodies, apparatuses, cnt)
 bot = RB.Robot(st, hub)
 plot_traj!(bot)

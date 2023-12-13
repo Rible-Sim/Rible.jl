@@ -47,8 +47,8 @@ function superball(c=0.0;
     for i = 1:6
     ]
     rigdibodies = TypeSortedCollection(rbs)
-    numberedpoints = RB.number(rigdibodies)
-    indexedcoords = RB.index(rigdibodies)
+    numbered = RB.number(rigdibodies)
+    indexed = RB.index(rigdibodies)
     #
     ncables = 24
 
@@ -102,7 +102,7 @@ function superball(c=0.0;
     #
 
     if isempty(addconst)
-    cnt = RB.Connectivity(numberedpoints, indexedcoords, tensioned)
+    cnt = RB.Connectivity(numbered, indexed, tensioned)
     else
     cst1 = RB.LinearJoint(
         1,
@@ -110,10 +110,10 @@ function superball(c=0.0;
         [0.0],
         addconst
     )
-    jointed = RB.join([cst1],indexedcoords)
+    jointed = RB.join([cst1],indexed)
     cnt = RB.Connectivity(
-        numberedpoints, 
-        indexedcoords, 
+        numbered, 
+        indexed, 
         tensioned,
         jointed
         )

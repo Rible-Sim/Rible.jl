@@ -79,7 +79,7 @@ function make_step_k(
         pₖ,vₖ,
         structure,
         contact_cache,
-        h,scaling,
+        h,mass_norm,
     )
     (;
         F!,Jac_F!,
@@ -121,13 +121,13 @@ function make_step_k(
         𝐫𝐞𝐬[   1:n1] .= h.*Mₘ*vₘ .- 
                         h.*pₖ₋₁ .-
                         (h^2)/2 .*Fₘ .-
-                        scaling.*transpose(Aₖ₋₁)*λₘ 
-        𝐫𝐞𝐬[n1+1:n2] .= scaling.*Φ(qₖ)
+                        mass_norm.*transpose(Aₖ₋₁)*λₘ 
+        𝐫𝐞𝐬[n1+1:n2] .= mass_norm.*Φ(qₖ)
         
         𝐉 .= 0.0
         𝐉[   1:n1,   1:n1] .=  Mₘ .+ 1/2 .*∂Mₘhq̇ₘ∂qₘ .-h^2/2 .*(1/2 .*∂Fₘ∂qₘ .+ 1/h.*∂Fₘ∂q̇ₘ)
-        𝐉[   1:n1,n1+1:n2] .= -scaling.*transpose(Aₖ₋₁)
-        𝐉[n1+1:n2,   1:n1] .=  scaling.*Aₖ
+        𝐉[   1:n1,n1+1:n2] .= -mass_norm.*transpose(Aₖ₋₁)
+        𝐉[n1+1:n2,   1:n1] .=  mass_norm.*Aₖ
         
         if na != 0
             (;
@@ -135,26 +135,26 @@ function make_step_k(
                 restitution_coefficients,
                 persistent_idx
             ) = contact_cache.cache
-            𝐫𝐞𝐬[   1:n1] .-= scaling*h .*transpose(Dₖ₋₁)*H*Λₘ 
+            𝐫𝐞𝐬[   1:n1] .-= mass_norm*h .*transpose(Dₖ₋₁)*H*Λₘ 
             # get_directions_and_positions!(Dₖ,Dper, Dimp, ∂Dₖvₖ∂qₖ, ∂DᵀₖHΛₘ∂qₖ,ŕₖ,qₖ, vₖ, H*Λₘ,bodyid2act_idx)
             get_frictional_directions_and_positions!(structure, contact_cache, qₖ, vₖ, H*Λₘ)
             Dₖ = contact_cache.cache.D
             ŕₖ = contact_cache.cache.ŕ
             ∂Dₖvₖ∂qₖ = contact_cache.cache.∂Dq̇∂q
             ∂DᵀₖHΛₘ∂qₖ = contact_cache.cache.∂DᵀΛ∂q
-            pₖ .= Momentum_k(qₖ₋₁,pₖ₋₁,qₖ,λₘ,Mₘ,A,Λₘ,Dₖ₋₁,Dₖ,H,scaling,h)
+            pₖ .= Momentum_k(qₖ₋₁,pₖ₋₁,qₖ,λₘ,Mₘ,A,Λₘ,Dₖ₋₁,Dₖ,H,mass_norm,h)
             M⁻¹_and_Jac_M⁻¹!(M⁻¹ₖ,∂M⁻¹ₖpₖ∂qₖ,qₖ,pₖ)
             vₖ .= M⁻¹ₖ*pₖ
             ∂Aᵀₖλₘ∂qₖ = ∂Aᵀλ∂q(qₖ,λₘ)
             ∂pₖ∂qₖ = 2/h.*Mₘ + 
                      1/h.*∂Mₘhq̇ₘ∂qₘ .+
-                     scaling/h.*∂Aᵀₖλₘ∂qₖ .+ 
-                     scaling.*∂DᵀₖHΛₘ∂qₖ
-            ∂pₖ∂λₘ = scaling/h.*transpose(Aₖ-Aₖ₋₁)
+                     mass_norm/h.*∂Aᵀₖλₘ∂qₖ .+ 
+                     mass_norm.*∂DᵀₖHΛₘ∂qₖ
+            ∂pₖ∂λₘ = mass_norm/h.*transpose(Aₖ-Aₖ₋₁)
             ∂vₖ∂qₖ = M⁻¹ₖ*∂pₖ∂qₖ .+ ∂M⁻¹ₖpₖ∂qₖ
             ∂vₖ∂λₘ = M⁻¹ₖ*∂pₖ∂λₘ
             𝐁 .= 0
-            𝐁[  1:n1,   1:nΛ] .= scaling.*h .*transpose(Dₖ₋₁)*H
+            𝐁[  1:n1,   1:nΛ] .= mass_norm.*h .*transpose(Dₖ₋₁)*H
             v́ₖ = Dₖ*vₖ
             ∂v́ₖ∂qₖ = Dₖ*∂vₖ∂qₖ .+ ∂Dₖvₖ∂qₖ 
             ∂v́ₘ∂qₖ = Dₖ./h 
@@ -234,8 +234,7 @@ function solve!(sim::Simulator,solver_cache::Zhong06_CCP_Nonconstant_Mass_Cache;
     Res = zero(Δx)
     Jac = zeros(T,nx,nx)
     mr = norm(Mₘ,Inf)
-    scaling = mr
-    @show mr
+    mass_norm = mr
     iteration = 0
     prog = Progress(totalstep; dt=1.0, enabled=progress)
     for timestep = 1:totalstep
@@ -284,10 +283,10 @@ function solve!(sim::Simulator,solver_cache::Zhong06_CCP_Nonconstant_Mass_Cache;
             pₖ,q̇ₖ,
             structure,
             contact_cache,
-            dt,scaling,
+            dt,mass_norm,
         )
         restart_count = 0
-        Λ_guess = 0.1
+        Λ_guess = 1.0
         while restart_count < 10
             Λₘ .= repeat([Λ_guess,0,0],na)
             x[      1:nq]          .= qₖ
@@ -303,14 +302,22 @@ function solve!(sim::Simulator,solver_cache::Zhong06_CCP_Nonconstant_Mass_Cache;
                     Dₖ₋₁,ŕₖ₋₁,
                     timestep,iteration
                 )
+                normRes = norm(Res)
+                if  normRes < ftol
+                    isconverged = true
+                    iteration_break = iteration-1
+                    break
+                elseif normRes > 1e10
+                    # force restart
+                    iteration_break = iteration-1
+                    isconverged = false
+                    break
+                elseif iteration == maxiters
+                    iteration_break = iteration-1
+                    isconverged = false
+                end
                 if na == 0
-                    normRes = norm(Res)
-                    if normRes < ftol
-                        isconverged = true
-                        iteration_break = iteration-1
-                        break
-                    end
-                    Δx .= -Jac\Res
+                    Δx .= Jac\(-Res)
                     x .+= Δx
                 else # na!=0
                     # @show timestep,iteration,normRes,Λₘ
@@ -326,23 +333,10 @@ function solve!(sim::Simulator,solver_cache::Zhong06_CCP_Nonconstant_Mass_Cache;
                     yini .= abs.(yini)
                     yini[begin+1:3:end] .= 0.0
                     yini[begin+2:3:end] .= 0.0
-                    IPM!(Λₘ,na,nΛ,Λₘini,yini,𝐍,𝐫;ftol=1e-14,Nmax)
+                    IPM!(Λₘ,na,nΛ,Λₘini,yini,𝐍,𝐫;ftol,Nmax)
                     ΔΛₖ .= Λₘ - Λʳₖ
                     minusResΛ = -Res + 𝐁*(ΔΛₖ)
                     normRes = norm(minusResΛ)
-                    if  normRes < ftol
-                        isconverged = true
-                        iteration_break = iteration-1
-                        break
-                    elseif normRes > 1e10
-                        # force restart
-                        iteration_break = iteration-1
-                        isconverged = false
-                        break
-                    elseif iteration == maxiters
-                        iteration_break = iteration-1
-                        isconverged = false
-                    end
                     Δx .= Jac\minusResΛ
                     Λʳₖ .= Λₘ
                     x .+= Δx
@@ -363,11 +357,11 @@ function solve!(sim::Simulator,solver_cache::Zhong06_CCP_Nonconstant_Mass_Cache;
         # get_directions_and_positions!(Dₖ, Dper, Dimp, ∂Dq̇∂q, ∂DᵀΛ∂q, ŕₖ, qₖ, q̇ₖ, Λₘ, bodyid2act_idx)
         get_frictional_directions_and_positions!(structure, contact_cache, qₖ, q̇ₖ, Λₘ,)
         Dₖ = contact_cache.cache.D
-        pₖ .= Momentum_k(qₖ₋₁,pₖ₋₁,qₖ,λₘ,Mₘ,A,Λₘ,Dₖ₋₁,Dₖ,H,scaling,dt)
+        pₖ .= Momentum_k(qₖ₋₁,pₖ₋₁,qₖ,λₘ,Mₘ,A,Λₘ,Dₖ₋₁,Dₖ,H,mass_norm,dt)
         M⁻¹!(M⁻¹ₖ,qₖ)
         q̇ₖ .= M⁻¹ₖ*pₖ
         if na != 0
-            update_contacts!(cₖ[contacts_bits],cₖ₋₁[contacts_bits],Dₖ*q̇ₖ,Λₘ./(scaling*dt))
+            update_contacts!(cₖ[contacts_bits],cₖ₋₁[contacts_bits],Dₖ*q̇ₖ,Λₘ./(mass_norm*dt))
         end
         if !isconverged
             @warn "Newton max iterations $maxiters, at timestep=$timestep, normRes=$(normRes)"

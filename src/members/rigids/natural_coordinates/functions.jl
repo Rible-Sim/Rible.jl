@@ -36,7 +36,7 @@ get_X(q::AbstractVector,nmcs::NC) = get_X(nmcs,q)
 function find_rotation(nmcs::NC,q::AbstractVector)
     num_of_dim = get_num_of_dims(nmcs)
     if (nmcs isa NC2D2C) || (nmcs isa NC3D3C)
-        R = SMatrix{num_of_dim,num_of_dim}(I(num_of_dim))
+        R = SMatrix{num_of_dim,num_of_dim,eltype(q)}(I(num_of_dim))
     elseif nmcs isa NC2D4C
         (;r̄i,X̄) = nmcs.data
         ū,v̄ = get_uv(nmcs,vcat(r̄i,vec(X̄)))
@@ -109,6 +109,7 @@ $(TYPEDSIGNATURES)
 """
 function cartesian_frame2coords(nmcs::Union{NC2D2C,NC3D3C},origin_frame)
     (;position,velocity) = origin_frame
+    position, velocity
 end
 
 function cartesian_frame2coords(nmcs::NC,origin_frame)

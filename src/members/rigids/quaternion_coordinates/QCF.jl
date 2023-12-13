@@ -14,6 +14,7 @@ import ..Rible: get_num_of_dof, get_num_of_local_dims
 import ..Rible: to_local_coords, to_transformation
 
 import ..Rible: get_deform
+import ..Rible: nullspace_mat
 import ..Rible: cstr_function
 import ..Rible: cstr_jacobian
 import ..Rible: cstr_forces_jacobian

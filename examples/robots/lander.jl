@@ -47,8 +47,8 @@ function lander(;k=nothing)
     sharing = Matrix(sharing_elas')
     display(sharing)
     rbs = TypeSortedCollection(vcat(legs,[base]))
-    numberedpoints = RB.number(rbs)
-    indexedcoords = RB.index(rbs,sharing)
+    numbered = RB.number(rbs)
+    indexed = RB.index(rbs,sharing)
     
     # 
     cnt_matrix_elas = ElasticArray{Int}(undef, nb, 0)
@@ -102,10 +102,10 @@ function lander(;k=nothing)
     # cst1 = RB.PinJoint(RB.Hen2Egg(RB.ID(rb1_to_3[1],2),RB.ID(rb4,1)))
     # cst2 = RB.PinJoint(RB.Hen2Egg(RB.ID(rb1_to_3[2],2),RB.ID(rb4,2)))
     # cst3 = RB.PinJoint(RB.Hen2Egg(RB.ID(rb1_to_3[3],2),RB.ID(rb4,3)))
-    # jointedmembers = RB.join((cst1,cst2,cst3),indexedcoords)
+    # jointedmembers = RB.join((cst1,cst2,cst3),indexed)
     #
 
-    cnt = RB.Connectivity(numberedpoints,indexedcoords,@eponymtuple(connected,))
+    cnt = RB.Connectivity(numbered,indexed,@eponymtuple(connected,))
 
     st = RB.Structure(rbs,apparatuses,cnt)
     bot = RB.Robot(st,hub)

@@ -564,11 +564,10 @@ function potential_energy(st::Structure;gravity=false)
     if gravity
         V += potential_energy_gravity(st)
     end
-    if !isempty(st.apparatuses.cables)
-        V += sum(potential_energy.(st.apparatuses.cables))
-    end
-    if hasfield(typeof(st.apparatuses),:spring_dampers)
-        V += sum(potential_energy.(st.apparatuses.spring_dampers))
+    foreach(st.apparatuses) do appar
+        if appar.has_force isa Val{true}
+            V[] += potential_energy(appar.force)
+        end
     end
     V
 end

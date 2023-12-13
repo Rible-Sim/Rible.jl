@@ -1,13 +1,17 @@
 
 function cstr_forces_jacobian(st::AbstractStructure,q,λ)
-    (;numbered,indexed,jointed) = st.connectivity
-    (;num_of_free_coords,
-    num_of_intrinsic_cstr,
-    bodyid2sys_free_coords,
-    bodyid2sys_intrinsic_cstr_idx) = indexed
-    (;njoints,num_of_extrinsic_cstr,joints,apparid2sys_extrinsic_cstr_idx) = jointed
+    (;bodies,apparatuses) = st
+    (;numbered,indexed,) = st.connectivity
+    (;
+        num_of_free_coords,
+        num_of_intrinsic_cstr,
+        bodyid2sys_free_coords,
+        bodyid2sys_intrinsic_cstr_idx,
+        num_of_cstr,
+        num_of_extrinsic_cstr,
+        apparid2sys_extrinsic_cstr_idx
+    ) = indexed
     ret = zeros(eltype(λ),num_of_free_coords,num_of_free_coords)
-    (;bodies,num_of_cstr) = st
     foreach(bodies) do body
         bodyid = body.prop.id
         memfree = bodyid2sys_free_coords[bodyid]
@@ -22,10 +26,12 @@ function cstr_forces_jacobian(st::AbstractStructure,q,λ)
     end
     #todo skip 2D for now
     if get_num_of_dims(st) == 3
-        foreach(joints) do joint
-            joint_cstr_idx = num_of_intrinsic_cstr .+ apparid2sys_extrinsic_cstr_idx[joint.id]
-            jointed_sys_free_idx = indexed.apparid2sys_free_coords_idx[joint.id]
-            ret[jointed_sys_free_idx,jointed_sys_free_idx] .+= cstr_forces_jacobian(joint,st,q,λ[joint_cstr_idx])
+        foreach(apparatuses) do appar
+            if appar.has_joint isa Val{true}
+                joint_cstr_idx = num_of_intrinsic_cstr .+ apparid2sys_extrinsic_cstr_idx[appar.id]
+                jointed_sys_free_idx = indexed.apparid2sys_free_coords_idx[appar.id]
+                ret[jointed_sys_free_idx,jointed_sys_free_idx] .+= cstr_forces_jacobian(appar,st,q,λ[joint_cstr_idx])
+            end
         end
     end
     ret

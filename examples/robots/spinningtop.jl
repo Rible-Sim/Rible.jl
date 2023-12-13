@@ -71,15 +71,11 @@ function make_top(origin_position = [0.0,0.0,0.0],
     state = RB.RigidBodyState(prop,origin_position,R,origin_velocity,ω)
     coords = RB.NonminimalCoordinates(nmcs,pres_idx)
     rb1 = RB.RigidBody(prop,state,coords,topmesh)
-    rbs = TypeSortedCollection((rb1,))
-    numberedpoints = RB.number(rbs)
-    matrix_sharing = zeros(Int,0,0)
-    indexedcoords = RB.index(rbs,matrix_sharing)
-    ss = Int[]
-    apparatuses = (cables = ss,)
-    connected = RB.connect(rbs,zeros(Int,0,0))
-    tensioned = @eponymtuple(connected,)
-    cnt = RB.Connectivity(numberedpoints,indexedcoords,tensioned)
-    st = RB.Structure(rbs,apparatuses,cnt,)
+    bodies = TypeSortedCollection([rb1,])
+    apparatuses = Int[]
+    indexed = RB.index(bodies,apparatuses)
+    numbered = RB.number(bodies,apparatuses)
+    cnt = RB.Connectivity(indexed,numbered,)
+    st = RB.Structure(bodies,apparatuses,cnt,)
     bot = RB.Robot(st)
 end

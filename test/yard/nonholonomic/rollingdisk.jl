@@ -31,9 +31,9 @@ function make_rollingdisk()
     state = RB.RigidBodyState(prop,nmcs,ro,α,ṙo,ω)
     rb1 = RB.RigidBody(prop,state)
 	rbs = TypeSortedCollection((rb1,))
-	numberedpoints = RB.number(rbs)
+	numbered = RB.number(rbs)
 	matrix_sharing = zeros(Int,0,0)
-	indexedcoords = RB.index(rbs,matrix_sharing)
+	indexed = RB.index(rbs,matrix_sharing)
 	#
 	ss = Int[]
 	apparatuses = (cables = ss,)
@@ -43,7 +43,7 @@ function make_rollingdisk()
 
 	jointedmembers = RB.unjoin()
 
-	cnt = RB.Connectivity(numberedpoints,indexedcoords,connections,jointedmembers)
+	cnt = RB.Connectivity(numbered,indexed,connections,jointedmembers)
 	st = RB.Structure(rbs,apparatuses,cnt)
     bot = RB.Robot(st,nothing)
 end

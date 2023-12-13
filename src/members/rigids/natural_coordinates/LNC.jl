@@ -319,16 +319,8 @@ function NC3D1P(ri::AbstractVector{T}) where T
     nv = 0
     ndim = 3
     nld = 0
-    NC(
-        np,
-        nv,
-        LNCData(
-            SVector{ndim}(r̄i),
-            SMatrix{ndim,nld,T}()
-        ),
-        get_conversion_to_std(ndim,np,nv),
-        get_conversion_to_X(ndim,nld,np,nv)
-    )
+    X̄ = @SMatrix zeros(T,3,0)
+    NC(np,nv,ndim,nld,r̄i,X̄)
 end
 
 """

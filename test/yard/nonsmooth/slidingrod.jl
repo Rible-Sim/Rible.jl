@@ -53,16 +53,16 @@ function make_rod()
     state = RB.RigidBodyState(prop,nmcs,ro,Ro,ṙo,ωo)
     rb1 = RB.RigidBody(prop,state)
 	rbs = TypeSortedCollection((rb1,))
-	numberedpoints = RB.number(rbs)
+	numbered = RB.number(rbs)
 	matrix_sharing = zeros(Int,0,0)
-	indexedcoords = RB.index(rbs,matrix_sharing)
+	indexed = RB.index(rbs,matrix_sharing)
     ss = Int[]
 	apparatuses = (cables = ss,)
 	hub = nothing
 	connections = RB.connect(rbs,zeros(Int,0,0))
 	jointedmembers = RB.unjoin()
 	contacts = [RB.ID(1,i) for i = 1:2]
-	cnt = RB.Connectivity(numberedpoints,indexedcoords,connections,jointedmembers,contacts)
+	cnt = RB.Connectivity(numbered,indexed,connections,jointedmembers,contacts)
 	st = RB.Structure(rbs,apparatuses,cnt)
     bot = RB.Robot(st,nothing)
 end
@@ -96,16 +96,16 @@ function make_bar()
     state = RB.RigidBodyState(prop,nmcs,ro,Ro,ṙo,ωo)
     rb1 = RB.RigidBody(prop,state)
 	rbs = TypeSortedCollection((rb1,))
-	numberedpoints = RB.number(rbs)
+	numbered = RB.number(rbs)
 	matrix_sharing = zeros(Int,0,0)
-	indexedcoords = RB.index(rbs,matrix_sharing)
+	indexed = RB.index(rbs,matrix_sharing)
     ss = Int[]
 	apparatuses = (cables = ss,)
 	hub = nothing
 	connections = RB.connect(rbs,zeros(Int,0,0))
 	jointedmembers = RB.unjoin()
 	contacts = [RB.ID(1,i) for i = 1:2]
-	cnt = RB.Connectivity(numberedpoints,indexedcoords,connections,jointedmembers,contacts)
+	cnt = RB.Connectivity(numbered,indexed,connections,jointedmembers,contacts)
 	st = RB.Structure(rbs,apparatuses,cnt)
     bot = RB.Robot(st,nothing)
 end

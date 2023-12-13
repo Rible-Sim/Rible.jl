@@ -45,11 +45,11 @@ rb1 = make_3d_tri(1,loci,ro_by_rbid[1],R_by_rbid[1],rirjrkrl_by_rbid[1][1];
 rb2 = make_3d_tri(2,loci,ro_by_rbid[2],R_by_rbid[2],rirjrkrl_by_rbid[2][1:ijkl]...)
 
 rbs = TypeSortedCollection([rb1,rb2])
-numberedpoints = RB.number(rbs)
+numbered = RB.number(rbs)
 # matrix_sharing = [
 # ]
-# indexedcoords = RB.index(rbs,matrix_sharing)
-indexedcoords = RB.index(rbs)
+# indexed = RB.index(rbs,matrix_sharing)
+indexed = RB.index(rbs)
 # #
 ncables = 6
 restlen = 0.01
@@ -72,7 +72,7 @@ cnt_matrix_cables = [
 ]
 connected = RB.connect(rbs,cnt_matrix_cables)
 #
-cnt = RB.Connectivity(numberedpoints,indexedcoords,@eponymtuple(connected,))
+cnt = RB.Connectivity(numbered,indexed,@eponymtuple(connected,))
 
 st = RB.Structure(rbs,apparatuses,cnt)
 RB.Robot(st,hub)

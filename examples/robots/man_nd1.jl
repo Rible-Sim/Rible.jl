@@ -117,14 +117,14 @@ function man_nd1(k=0.0,c=0.0;ratio=0.8)
 	α2 = 0.0
 	rb3 = make_rb3(rJ,α2)
     rigidbodies = TypeSortedCollection([rb1,rb2,rb3])
-	numberedpoints = RB.number(rigidbodies)
+	numbered = RB.number(rigidbodies)
 	matrix_sharing = [
 		1 1 0;
 		2 2 0;
 		0 3 1;
 		0 4 2;
 	]
-	indexedcoords = RB.index(rigidbodies,matrix_sharing)
+	indexed = RB.index(rigidbodies,matrix_sharing)
 	#
 
     ncables = 4
@@ -155,7 +155,7 @@ function man_nd1(k=0.0,c=0.0;ratio=0.8)
 	]
 	connected = RB.connect(rigidbodies,cnt_matrix_cables)
 	tensioned = @eponymtuple(connected,)
-	cnt = RB.Connectivity(numberedpoints,indexedcoords,tensioned)
+	cnt = RB.Connectivity(numbered,indexed,tensioned)
 
 	st = RB.Structure(rigidbodies,apparatuses,cnt)
     bot = RB.Robot(st,hub)

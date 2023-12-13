@@ -104,8 +104,8 @@ function quad(c=100.0;
     ]
     )
     rigdibodies = TypeSortedCollection(rbs)
-    numberedpoints = RB.number(rigdibodies)
-    indexedcoords = RB.index(rigdibodies)
+    numbered = RB.number(rigdibodies)
+    indexed = RB.index(rigdibodies)
     #
     ncables = 4*6
     original_restlens = zeros(ncables)
@@ -155,7 +155,7 @@ function quad(c=100.0;
     connected = RB.connect(rigdibodies, matrix_cnt)
     tensioned = @eponymtuple(connected,)
     #
-    cnt = RB.Connectivity(numberedpoints, indexedcoords, tensioned)
+    cnt = RB.Connectivity(numbered, indexed, tensioned)
     # #
     st = RB.Structure(rigdibodies, apparatuses, cnt,)
     bot = RB.Robot(st, hub)

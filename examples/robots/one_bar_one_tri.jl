@@ -13,19 +13,19 @@ function one_bar_one_tri()
     α2 =  0.0
     rb2 = build_2d_tri(2,bps[2];α=α2)
     rbs = TypeSortedCollection([rb1,rb2])
-    numberedpoints = RB.number(rbs)
+    numbered = RB.number(rbs)
     matrix_sharing = [
         3 1;
         4 2;
     ]
-    indexedcoords = RB.index(rbs,matrix_sharing)
+    indexed = RB.index(rbs,matrix_sharing)
     # cables
     cables = Int[]
     apparatuses = (cables = cables,)
     hub = nothing
     connected = RB.connect(rbs,zeros(Int,0,0))
 
-    cnt = RB.Connectivity(numberedpoints,indexedcoords,@eponymtuple(connected,))
+    cnt = RB.Connectivity(numbered,indexed,@eponymtuple(connected,))
 
     st = RB.Structure(rbs,apparatuses,cnt)
     bot = RB.Robot(st,hub)

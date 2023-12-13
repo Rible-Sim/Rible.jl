@@ -5,7 +5,7 @@ function new_pointmass(;
         μ = 0.3,
         e = 0.9
     )
-    contactable = false
+    contactable = true
     visible = true
     Ia = SMatrix{3,3}(Matrix(m*I,3,3))
     mass_locus  = SVector{3}([ 0.0, 0.0, 0.0])
@@ -30,15 +30,11 @@ function new_pointmass(;
     coords = RB.NonminimalCoordinates(nmcs,ci,cstr_idx)
     rb1 = RB.RigidBody(prop,state,coords)
 
-    rbs = TypeSortedCollection((rb1,))
-    numberedpoints = RB.number(rbs)
-    matrix_sharing = zeros(Int,0,0)
-    indexedcoords = RB.index(rbs,matrix_sharing)
-    ss = Int[]
-    apparatuses = (cables = ss,)
-    connected = RB.connect(rbs,zeros(Int,0,0))
-    tensioned = @eponymtuple(connected,)
-    cnt = RB.Connectivity(numberedpoints,indexedcoords,tensioned)
+    rbs = TypeSortedCollection([rb1,])
+    apparatuses = Int[]
+    indexed = RB.index(rbs,apparatuses)
+    numbered = RB.number(rbs,apparatuses)
+    cnt = RB.Connectivity(indexed,numbered,)
     st = RB.Structure(rbs,apparatuses,cnt,)
     bot = RB.Robot(st)
 end

@@ -19,22 +19,7 @@ cd(@__DIR__)
 #     return str
 # end
 
-# Literate it:
-# Literate.markdown(
-#     "src/stexamples.jl", 
-#     "src/";
-#     name = "stexamples", 
-#     preprocess = replace_includes,
-#     documenter = true,
-# )
 
-Literate.markdown(
-    "../yard/demos/nonsmooth/pointmass.jl", 
-    "src/";
-    name="pointmass",
-    # execute = true,
-    documenter = true,
-)
 # 1. generate demo files
 # demopage, postprocess_cb, demo_assets = makedemos("../yard/realdemos"; # this is the relative path to docs/
 #     root = @__DIR__,
