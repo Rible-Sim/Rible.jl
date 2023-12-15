@@ -81,7 +81,7 @@ function get_local_coords(body::RigidBody,r̄p)
 end
 
 function get_local_coords(body::FlexibleBody,r̄p)
-    body.state.cache.funcs.x(r̄p)
+    body.cache.funcs.x(r̄p)
 end
 
 function set_C!(st::Structure,c)
@@ -153,10 +153,10 @@ get_num_of_coords(body::AbstractRigidBody) = get_num_of_coords(body.coords.nmcs)
 get_num_of_dof(body::AbstractRigidBody) = get_num_of_dof(body.coords.nmcs)
 get_num_of_local_dims(body::AbstractRigidBody) = get_num_of_local_dims(body.coords.nmcs)
 
-get_num_of_intrinsic_cstr(body::AbstractFlexibleBody) = get_num_of_cstr(body.coords.ancs)
-get_num_of_coords(body::AbstractFlexibleBody) = get_num_of_coords(body.coords.ancs)
-get_num_of_dof(body::AbstractFlexibleBody) = get_num_of_dof(body.coords.ancs)
-get_num_of_local_dims(body::AbstractFlexibleBody) = get_num_of_local_dims(body.coords.ancs)
+get_num_of_intrinsic_cstr(body::AbstractFlexibleBody) = get_num_of_cstr(body.coords.nmcs)
+get_num_of_coords(body::AbstractFlexibleBody) = get_num_of_coords(body.coords.nmcs)
+get_num_of_dof(body::AbstractFlexibleBody) = get_num_of_dof(body.coords.nmcs)
+get_num_of_local_dims(body::AbstractFlexibleBody) = get_num_of_local_dims(body.coords.nmcs)
 
 
 has_constant_mass_matrix(bot::Robot) = has_constant_mass_matrix(bot.structure)

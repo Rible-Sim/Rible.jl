@@ -16,28 +16,25 @@ function build_Ci(body)
     ])
 end
 
-function build_Q̃(st)
-    (;tensioned,indexed) = st.connectivity
-    (;connected) = tensioned
-    (;cables) = st.apparatuses
-    ncables = length(cables)
-    (;num_of_free_coords,bodyid2sys_free_coords) = indexed
-    T = get_numbertype(st)
-    num_of_dim = get_num_of_dims(st)
-    Q̃ = zeros(T,num_of_free_coords,num_of_dim*ncables)
-    foreach(connected) do cc
-        j = cc.id
-        (;hen,egg) = cc
-        rb1 = hen.bodysig
-        rb2 = egg.bodysig
-        C1 = rb1.cache.Cps[hen.pid]
-        C2 = rb2.cache.Cps[egg.pid]
-        uci1 = rb1.coords.free_idx
-        uci2 = rb2.coords.free_idx
-        m2sf1 = bodyid2sys_free_coords[rb1.prop.id]
-        m2sf2 = bodyid2sys_free_coords[rb2.prop.id]
-        Q̃[m2sf2,(j-1)*num_of_dim+1:j*num_of_dim] .-= transpose(C2)[uci2,:]
-        Q̃[m2sf1,(j-1)*num_of_dim+1:j*num_of_dim] .+= transpose(C1)[uci1,:]
+function build_Q̃(structure)
+    (;indexed) = structure.connectivity
+    (;num_of_free_coords,bodyid2sys_free_coords,num_of_force_apparatuses) = indexed
+    T = get_numbertype(structure)
+    num_of_dim = get_num_of_dims(structure)
+    Q̃ = zeros(T,num_of_free_coords,num_of_dim*num_of_force_apparatuses)
+    foreach(structure.apparatuses) do appar
+        j = appar.id
+        if appar.has_force isa Val{true}
+            (;hen,egg) = appar.joint
+            C1 = hen.bodysig.cache.Cps[hen.pid]
+            C2 = egg.bodysig.cache.Cps[egg.pid]
+            uci1 = hen.bodysig.coords.free_idx
+            uci2 = egg.bodysig.coords.free_idx
+            m2sf1 = bodyid2sys_free_coords[hen.bodysig.prop.id]
+            m2sf2 = bodyid2sys_free_coords[egg.bodysig.prop.id]
+            Q̃[m2sf2,(j-1)*num_of_dim+1:j*num_of_dim] .-= transpose(C2)[uci2,:]
+            Q̃[m2sf1,(j-1)*num_of_dim+1:j*num_of_dim] .+= transpose(C1)[uci1,:]
+        end
     end
     Q̃
 end

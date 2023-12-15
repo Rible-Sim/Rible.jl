@@ -17,31 +17,31 @@ function make_drift_damper(c=0.95,d=20)
     γ(θ) = c + θ/d
 end
 
-function initialize_GDR(st,F::Nothing;gravity=true)
-    Q̃ = build_Q̃(st)
-    Γ = build_Γ(st)
+function initialize_GDR(structure,F::Nothing;gravity=true)
+    Q̃ = build_Q̃(structure)
+    Γ = build_Γ(structure)
     # 𝛚(x) =
     function 𝛚(x)
         # Q = Q̃*Γ(x)
-        clear_forces!(st)
-        update_bodies!(st,x)
-        update_apparatuses!(st)
+        clear_forces!(structure)
+        update_bodies!(structure,x)
+        update_apparatuses!(structure)
         if gravity
-            apply_gravity!(st)
+            apply_gravity!(structure)
         end
-        F = assemble_forces!(st)
+        F = assemble_forces!(structure)
         # @show abs.(F-Q) |> maximum
         -F
     end
-    𝐛 = make_cstr_function(st)
-    𝐉 = make_cstr_jacobian(st)
-    x0 = st.state.system.q
-    x̌0 = st.state.system.q̌
+    𝐛 = make_cstr_function(structure)
+    𝐉 = make_cstr_jacobian(structure)
+    x0 = structure.state.system.q
+    x̌0 = structure.state.system.q̌
     x0,x̌0,𝛚,𝐛,𝐉
 end
 
-function initialize_GDR(st,F)
-    x0,x̌0,𝛚_,𝐛,𝐉 = initialize_GDR(st,nothing)
+function initialize_GDR(structure,F)
+    x0,x̌0,𝛚_,𝐛,𝐉 = initialize_GDR(structure,nothing)
     𝛚(x) = - 𝛚_(x) - F
     x0,x̌0,𝛚,𝐛,𝐉
 end
@@ -100,8 +100,8 @@ function GDR!(
         verbose=false,
     )
     reset!(bot)
-    (;st,traj) = bot
-    x,x̌,𝛚,𝐛,𝐉 = initialize_GDR(st,F;gravity)
+    (;structure,traj) = bot
+    x,x̌,𝛚,𝐛,𝐉 = initialize_GDR(structure,F;gravity)
     # 𝛄 = make_viscous_damper()
     𝛄 = make_kinetic_damper()
     # 𝛄 = make_drift_damper()

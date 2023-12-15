@@ -231,7 +231,7 @@ function assemble_forces!(st::Structure)
         centrifugal_force!(F,state,cache)
         mass_center_force!(F,state,cache)
         concentrated_force!(F,state,cache)
-        # strain!(F,state)
+        strain!(F,state,cache)
     end
     system.F̌
 end

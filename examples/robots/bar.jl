@@ -30,8 +30,8 @@ function make_bar(;
 
     prop = RB.RigidBodyProperty(1,contactable,m,Ī,mass_locus,loci;visible)
 
-    nmcs = RB.NCF.NC3D2P(ri,rj,origin_position,R,origin_velocity,ω)
-    state = RB.RigidBodyState(prop,nmcs,origin_position,R,origin_velocity,ω)
+    nmcs = RB.NCF.NC3D2P(ri,rj,origin_position,R)
+    state = RB.RigidBodyState(prop,origin_position,R,origin_velocity,ω)
 
     p1 = Meshes.Point(loci[1])
     p2 = Meshes.Point(loci[2])

@@ -54,6 +54,6 @@ nmcs = RB.NCF.NC1P3V(ri,ro,R)
 # cf = RB.NCF.CoordinateFunctions(nmcs,q0,ci,free_idx)
 # @show typeof(nmcs)
 boxmesh = Meshes.boundary(box) |> simple2mesh
-state = RB.RigidBodyState(prop,nmcs,ro,R,ṙo,ω,ci,cstr_idx)
+state = RB.RigidBodyState(prop,ro,R,ṙo,ω,ci,cstr_idx)
 RB.RigidBody(prop,state,boxmesh)
 end

@@ -1,6 +1,6 @@
 
-struct Zhong06_CCP_Constant_Mass_Cache{CacheType}
-    cache::CacheType
+struct Zhong06_CCP_Constant_Mass_Cache{cacheType}
+    cache::cacheType
 end
 
 function generate_cache(
@@ -19,7 +19,12 @@ function generate_cache(
     (;prob) = simulator
     (;bot,env) = prob
     (;structure) = bot
-    F!(F,q,q̇,t) = generalized_force!(F,bot,q,q̇,t;gravity=true)
+    options = merge(
+        (gravity=true,factor=1,checkpersist=true), #default
+        prob.options,
+        solver.options,
+    )
+    F!(F,q,q̇,t) = generalized_force!(F,bot,q,q̇,t;gravity=options.gravity)
     Jac_F!(∂F∂q̌,∂F∂q̌̇,q,q̇,t) = generalized_force_jacobain!(∂F∂q̌,∂F∂q̌̇,bot,q,q̇,t)
     
     M = Matrix(assemble_M(structure))
@@ -51,7 +56,8 @@ function generate_cache(
         persistent_bits,
         μs_sys,
         es_sys,
-        gaps_sys
+        gaps_sys,
+        options,
     )
     Zhong06_CCP_Constant_Mass_Cache(cache)
 end
@@ -166,7 +172,7 @@ function solve!(sim::Simulator,solver_cache::Zhong06_CCP_Constant_Mass_Cache;
     (;prob,controller,tspan,restart,totalstep) = sim
     (;bot,env) = prob
     (;structure,traj,contacts_traj) = bot
-    (;M,A,contacts_bits) = solver_cache.cache
+    (;M,A,contacts_bits,options) = solver_cache.cache
     q0 = traj.q[begin]
     λ0 = traj.λ[begin]
     q̇0 = traj.q̇[begin]
@@ -209,7 +215,7 @@ function solve!(sim::Simulator,solver_cache::Zhong06_CCP_Constant_Mass_Cache;
         qˣ = qₖ₋₁ .+ dt./2 .*q̇ₖ₋₁
         qₖ .= qₖ₋₁ .+ dt .*q̇ₖ₋₁
         q̇ₖ .= q̇ₖ₋₁
-        contact_cache = activate_frictional_contacts!(structure,env,solver_cache,qˣ;checkpersist=true)
+        contact_cache = activate_frictional_contacts!(structure,env,solver_cache,qˣ;checkpersist=options.checkpersist)
         (;na) = contact_cache.cache
         (;L) = contact_cache.cache
         isconverged = false
@@ -253,20 +259,12 @@ function solve!(sim::Simulator,solver_cache::Zhong06_CCP_Constant_Mass_Cache;
                     timestep,iteration
                 )
                 normRes = norm(Res)
-                if  normRes < ftol
-                    isconverged = true
-                    iteration_break = iteration-1
-                    break
-                elseif normRes > 1e10
-                    # force restart
-                    iteration_break = iteration-1
-                    isconverged = false
-                    break
-                elseif iteration == maxiters
-                    iteration_break = iteration-1
-                    isconverged = false
-                end
                 if na == 0
+                    if  normRes < ftol
+                        isconverged = true
+                        iteration_break = iteration-1
+                        break
+                    end
                     Δx .= luJac\(-Res)
                     x .+= Δx
                 else # na!=0
@@ -287,15 +285,28 @@ function solve!(sim::Simulator,solver_cache::Zhong06_CCP_Constant_Mass_Cache;
                         # @show qr(L).R |> diag
                         @show :befor, size(𝐍), rank(𝐍), cond(𝐍)
                     end
-                    𝐍 .+= L
+                    # 𝐍 .+= L
                     yₖini = 𝐍*Λₖ + 𝐫
                     yₖini .= abs.(yₖini)
                     yₖini[begin+1:3:end] .= 0.0
                     yₖini[begin+2:3:end] .= 0.0
-                    IPM!(Λₖ,na,nΛ,Λₖini,yₖini,𝐍,𝐫;ftol,Nmax)
+                    IPM!(Λₖ,na,nΛ,Λₖini,yₖini,𝐍,𝐫;ftol=1e-14,Nmax)
                     ΔΛₖ .= Λₖ - Λʳₖ
                     minusResΛ = -Res + 𝐁*(ΔΛₖ)
                     normRes = norm(minusResΛ)
+                    if  normRes < ftol
+                        isconverged = true
+                        iteration_break = iteration-1
+                        break
+                    elseif normRes > 1e10
+                        # force restart
+                        iteration_break = iteration-1
+                        isconverged = false
+                        break
+                    elseif iteration == maxiters
+                        iteration_break = iteration-1
+                        isconverged = false
+                    end
                     if false
                         @show :after, size(𝐍), rank(𝐍), cond(𝐍)
                         @show minusResΛ

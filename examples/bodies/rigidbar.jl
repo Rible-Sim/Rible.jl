@@ -16,7 +16,7 @@ function rigidbar(i,
     u = rj - ri
     u̇ = ṙj - ṙi
     u /= norm(u)
-    v,w = Meshes.householderbasis(u)
+    v,w = RB.HouseholderOrthogonalization(u)
     R = SMatrix{3,3}(hcat(u,v,w))
     # if isodd(pos)
     b = norm(rj-ri)
@@ -74,7 +74,7 @@ function rigidbar(i,
             rot = RotY(π/2),
         )
     else
-        barmesh = endpoints2mesh(r̄p1,r̄p2;radius = norm(r̄p2-r̄p1)/40)
+        barmesh = RB.endpoints2mesh(r̄p1,r̄p2;radius = norm(r̄p2-r̄p1)/40)
     end
     body = RB.RigidBody(prop, state, coords, barmesh)
 end

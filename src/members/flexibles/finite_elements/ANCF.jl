@@ -9,10 +9,7 @@ using QuadGK
 
 import ..Rible: get_num_of_cstr, get_num_of_coords
 import ..Rible: get_num_of_dof, get_num_of_local_dims
-
-export get_num_of_cstr, get_num_of_coords
-export get_num_of_dof, get_num_of_local_dims
-
+import ..Rible: nullspace_mat
 
 """
 Absolute Nodal Coordinates abstract type。
@@ -84,6 +81,10 @@ $(TYPEDSIGNATURES)
 """
 get_num_of_dof(ancs::ANC) =  get_num_of_coords(ancs) - get_num_of_cstr(ancs)
 
+function nullspace_mat(ancs::ANC,e)
+    nc = get_num_of_coords(ancs)
+    I(nc)
+end
 
 """
 坐标数目为12的 three-dimensional Absolute Nodal Coordinates类，使用1个基本点、3个基本向量。
@@ -375,7 +376,7 @@ struct CoordinateFunctions{ancsType,xT<:Function,ST<:Function}
     S::ST
 end
 
-function CoordinateFunctions(ancs,free_idx_mask,cstr_idx)
+function CoordinateFunctions(ancs)
     _x = make_x(ancs)
     _S = make_S(ancs)
     CoordinateFunctions(ancs,_x,_S)
@@ -386,7 +387,7 @@ end
 Return 未约束的Absolute Nodal Coordinates编号。
 $(TYPEDSIGNATURES)
 """
-function get_unconstrained_idx(ancs::ANC,pres_idx)
+function get_free_idx(ancs::ANC,pres_idx)
     deleteat!(collect(1:get_num_of_coords(ancs)),pres_idx)
 end
 

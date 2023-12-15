@@ -68,37 +68,47 @@ struct Moreau{T} <: AbstractIntegrator
     θ::T
 end
 
-struct DynamicsSolver{integratorType,contact_solverType,tendon_solverType} <: AbstractSolver 
+struct DynamicsSolver{integratorType,contact_solverType,apparatus_solverType,optionsType} <: AbstractSolver 
     integrator::integratorType
     contact_solver::contact_solverType
-    tendon_solver::tendon_solverType
+    apparatus_solver::apparatus_solverType
+    options::optionsType
 end
 
-function DynamicsSolver(integrator::AbstractIntegrator)
-    DynamicsSolver(integrator,nothing,nothing)
+function DynamicsSolver(integrator::AbstractIntegrator,options::NamedTuple)
+    DynamicsSolver(integrator,nothing,nothing,options)
 end
 
-function DynamicsSolver(integrator::AbstractIntegrator,contact_solver::AbstractContactSolver)
-    DynamicsSolver(integrator,contact_solver,nothing)
+function DynamicsSolver(integrator::AbstractIntegrator;options...)
+    DynamicsSolver(integrator,nothing,nothing,values(options))
 end
 
-struct DynamicsProblem{RobotType,envType,contact_modelType,tendon_modelType}
+function DynamicsSolver(integrator::AbstractIntegrator,contact_solver::AbstractContactSolver,options::NamedTuple)
+    DynamicsSolver(integrator,contact_solver,nothing,options)
+end
+
+function DynamicsSolver(integrator::AbstractIntegrator,contact_solver::AbstractContactSolver;options...)
+    DynamicsSolver(integrator,contact_solver,nothing,values(options))
+end
+
+struct DynamicsProblem{RobotType,envType,contact_modelType,apparatus_modelType,optionsType}
     bot::RobotType
     env::envType
     contact_model::contact_modelType
-    tendon_model::tendon_modelType
+    apparatus_model::apparatus_modelType
+    options::optionsType
 end
 
-function DynamicsProblem(bot::Robot)
-    DynamicsProblem(bot::Robot,EmptySpace(),Contactless(),NoTendon())
+function DynamicsProblem(bot::Robot;options...)
+    DynamicsProblem(bot::Robot,EmptySpace(),Contactless(),NoTendon(),values(options))
 end
 
-function DynamicsProblem(bot::Robot,contact_model::AbstractContactModel)
-    DynamicsProblem(bot::Robot,EmptySpace(),contact_model,NoTendon())
+function DynamicsProblem(bot::Robot,contact_model::AbstractContactModel;options...)
+    DynamicsProblem(bot::Robot,EmptySpace(),contact_model,NoTendon(),values(options))
 end
 
-function DynamicsProblem(bot::Robot,env::AbstractContactEnvironment,contact_model::AbstractContactModel)
-    DynamicsProblem(bot::Robot,env,contact_model,NoTendon())
+function DynamicsProblem(bot::Robot,env::AbstractContactEnvironment,contact_model::AbstractContactModel;options...)
+    DynamicsProblem(bot::Robot,env,contact_model,NoTendon(),values(options))
 end
 
 

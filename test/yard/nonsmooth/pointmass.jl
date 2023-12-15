@@ -70,7 +70,7 @@ RB.solve!(
 # visualize
 GM.activate!(;scalefactor); with_theme(theme_pub;
         size = (0.8tw,0.2tw),
-        figure_padding = (0,fontsize,0,-2fontsize),
+        figure_padding = (0,fontsize,0,0),
         Axis3 = (
             azimuth = 4.575530633326986,
             elevation = 0.13269908169872408
@@ -150,7 +150,7 @@ GM.activate!(;scalefactor); with_theme(theme_pub;
     Label(gd2[1,2,TopLeft()], 
         rich("($(alphabet[3]))",font=:bold)
     )
-    colgap!(fig.layout,1,-2fontsize)
+    colgap!(fig.layout,1,0)
     savefig(fig,"pointmass_bouncing")
     fig
 end
@@ -211,7 +211,7 @@ scatterlines(vl1)  #src
 # visualize
 GM.activate!(;scalefactor); with_theme(theme_pub;
         size = (1tw,0.2tw),
-        figure_padding = (0,fontsize,0,-2fontsize),
+        figure_padding = (0,fontsize,0,0),
         Axis3 = (
             azimuth = 4.575530633326984,
             elevation = 0.16269908169872405,

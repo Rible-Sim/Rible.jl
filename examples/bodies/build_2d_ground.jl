@@ -30,6 +30,6 @@ function build_2d_ground(id)
     ci = collect(1:nq)
     free_idx = Int[]
     cstr_idx = Int[]
-    state = RB.RigidBodyState(prop,nmcs,ro,α,ṙo,ω,ci,cstr_idx)
+    state = RB.RigidBodyState(prop,ro,α,ṙo,ω,ci,cstr_idx)
     body = RB.RigidBody(prop,state)
 end

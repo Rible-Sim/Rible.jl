@@ -40,22 +40,11 @@ function FlexibleBodyProperty(
     )
 end
 
-struct FlexibleBodyCoordinatesCache{fT,MT,JT,VT,eT,ArrayT,N,M}
-    pres_idx::Vector{Int}
-    free_idx::Vector{Int}
-    pres_idx_mask::SVector{N,Bool}
-    free_idx_mask::SVector{N,Bool}
-	cstr_idx::SVector{M,Bool}
-    num_of_cstr::Int
+struct FlexibleBodyCoordinatesCache{fT,eT,inertia_cacheType,ArrayT}
     funcs::fT
     e::eT
     ė::eT
-    M::MT
-	M⁻¹::MT
-	∂Mė∂e::JT
-	∂M⁻¹p∂e::JT
-	Ṁė::VT
-    ∂T∂eᵀ::VT
+    inertia_cache::inertia_cacheType
     So::ArrayT
     Sg::ArrayT
     Sps::Vector{ArrayT}
@@ -63,14 +52,7 @@ end
 
 function get_cstr_idx(ancs::ANCF.ANC)
 	num_of_cstr = ANCF.get_num_of_cstr(ancs)
-	@SVector ones(Bool,num_of_cstr)
-end
-
-function get_idx_mask(ancs::ANCF.ANC,pres_idx)
-    ne = ANCF.get_num_of_coords(ancs)
-    pres_idx_mask = SVector{ne}(i in pres_idx for i = 1:ne)
-    free_idx_mask = .!pres_idx_mask
-    free_idx_mask, pres_idx_mask
+	collect(1:num_of_cstr)
 end
 
 function BodyCache(
@@ -83,11 +65,7 @@ function BodyCache(
     ) where {N,T}
     (;mass,loci) = prop
     num_of_loci = length(loci)
-    num_of_cstr = sum(cstr_idx)
-    free_idx_mask, pres_idx_mask = get_idx_mask(ancs,pres_idx)
-    pres_idx = findall(pres_idx_mask)
-    free_idx = findall(free_idx_mask)
-    cf = ANCF.CoordinateFunctions(ancs,free_idx_mask,cstr_idx)
+    cf = ANCF.CoordinateFunctions(ancs,)
     M = ANCF.build_M(ancs)
     M⁻¹ = inv(M)
     ∂Mq̇∂q = zero(M)
@@ -98,24 +76,25 @@ function BodyCache(
     So = S(x(zeros(N)))
     Sg = ANCF.build_Sg(ancs,mass)
     Sps = [typeof(So)(S(x(loci[i].position))) for i in 1:num_of_loci]
+    inertia_cache = InertiaCache(
+        M,
+        M⁻¹,
+        ∂Mq̇∂q,
+        ∂M⁻¹p∂q,
+        Ṁq̇,
+        ∂T∂qᵀ,
+    )
     FlexibleBodyCoordinatesCache(
-        pres_idx,
-        free_idx,
-        pres_idx_mask,
-        free_idx_mask,
-        cstr_idx,num_of_cstr,
         cf,e,ė,
-        M,M⁻¹,
-        ∂Mq̇∂q,∂M⁻¹p∂q,Ṁq̇,
-        ∂T∂qᵀ,So,Sg,Sps)
+        inertia_cache,
+        So,Sg,Sps
+    )
 end
 
-struct FlexibleBodyState{N,M,T,cacheType} <: AbstractFlexibleBodyState{N,T}
+struct FlexibleBodyState{N,M,T} <: AbstractFlexibleBodyState{N,T}
     mass_locus_state::LocusState{N,M,T}
 	"Positions of anchor points"
     loci_states::Vector{LocusState{N,M,T}}
-	"Cache"
-    cache::cacheType
 end
 
 function FlexibleBodyState(prop::FlexibleBodyProperty{N,T},
@@ -136,100 +115,133 @@ function FlexibleBodyState(prop::FlexibleBodyProperty{N,T},
     )
     (;Sg,Sps) = cache
     mass_locus_state = LocusState(
-        MVector{N}(Sg*e),
-        MVector{N}(Sg*ė),
+        SVector{N}(Sg*e),
+        SVector{N}(Sg*ė),
     )
     loci_states = [
         LocusState(
-            MVector{N}(Sps[i]*e),
-            MVector{N}(Sps[i]*ė)
+            SVector{N}(Sps[i]*e),
+            SVector{N}(Sps[i]*ė)
         )
         for i in 1:num_of_loci
     ]
-    FlexibleBodyState(
+    coords = NonminimalCoordinates(
+        ancs,pres_idx,cstr_idx
+    )
+    state = FlexibleBodyState(
         mass_locus_state,
         loci_states,
-        cache,
     )
+    state, coords, cache
 end
 
-struct FlexibleBody{N,M,T,cacheType,meshType} <: AbstractFlexibleBody{N,T}
+struct FlexibleBody{N,M,T,coordsType,cacheType,meshType} <: AbstractFlexibleBody{N,T}
 	"Properties of a flexible body"
     prop::FlexibleBodyProperty{N,T}
 	"State of a flexible body"
-    state::FlexibleBodyState{N,M,T,cacheType}
+    state::FlexibleBodyState{N,M,T}
+    "Coordinates Info"
+    coords::NonminimalCoordinates{coordsType}
+    "Cache"
+    cache::cacheType
     "Mesh"
     mesh::meshType
 end
 
-function FlexibleBody(prop,state)
-    FlexibleBody(prop,state,nothing)
+function FlexibleBody(prop,state,coords,cache)
+    FlexibleBody(prop,state,coords,cache,nothing)
 end
 
 
 function body_state2coords_state(fb::FlexibleBody)
-    (;e,ė) = fb.state.cache
+    (;e,ė) = fb.cache
     e,ė
+end
+
+function lazy_update_state!(
+        state::FlexibleBodyState,
+        coords::NonminimalCoordinates{<:ANCF.ANC},
+        cache::FlexibleBodyCoordinatesCache,
+        prop::FlexibleBodyProperty,q,q̇)
+    update_state!(state,coords,cache,prop,q,q̇)
 end
 
 function update_state!(
         state::FlexibleBodyState,
-        cache::FlexibleBodyCoordinatesCache{<:ANCF.CoordinateFunctions},
-        prop::AbstractBodyProperty,q,q̇)
-    (;cache,mass_locus_state) = state
+        coords::NonminimalCoordinates{<:ANCF.ANC},
+        cache::FlexibleBodyCoordinatesCache,
+        prop::FlexibleBodyProperty,q,q̇)
+    (;mass_locus_state) = state
     (;e, ė, Sg) = cache
     e .= q
     ė .= q̇
-    mul!(mass_locus_state.position, Sg, q)
-    mul!(mass_locus_state.velocity, Sg, q̇)
+    mass_locus_state.frame.position = Sg*q
+    mass_locus_state.frame.velocity = Sg*q̇
 end
+
+function update_inertia_cache!(
+        cache::FlexibleBodyCoordinatesCache,
+        coords::NonminimalCoordinates{<:ANCF.ANC},
+        prop::FlexibleBodyProperty,
+        q,q̇
+    )
+    # constant mass matrix, no need to update
+end
+
 
 function stretch_loci!(
-    cache::FlexibleBodyCoordinatesCache,
-	prop::AbstractBodyProperty,c)
+        coords::NonminimalCoordinates{<:ANCF.ANC},
+        cache,
+        prop::FlexibleBodyProperty,c
+    )
+    # to be implemented
 end
 
+
 function update_transformations!(
+    coords::NonminimalCoordinates{<:ANCF.ANC},
     cache::FlexibleBodyCoordinatesCache,
     state::FlexibleBodyState,
-    prop::AbstractBodyProperty,q)
+    prop::FlexibleBodyProperty,q)
+    # to be implemented
 end
 
 function update_loci_states!(
         state::FlexibleBodyState,
-        cache::FlexibleBodyCoordinatesCache{<:ANCF.CoordinateFunctions},
-        prop::AbstractBodyProperty,e,ė)
+        coords::NonminimalCoordinates{<:ANCF.ANC},
+        cache::FlexibleBodyCoordinatesCache,
+        prop::FlexibleBodyProperty,e,ė)
     (;loci_states) = state
     (;Sps) = cache
     for (i,locus_state) in enumerate(loci_states)
-        mul!(locus_state.position, Sps[i], e)
-        mul!(locus_state.velocity, Sps[i], ė)
+        locus_state.frame.position = Sps[i]*e
+        locus_state.frame.velocity = Sps[i]*ė
     end
 end
 
-function centrifugal_force!(F,state::AbstractFlexibleBodyState)
-	(;cache,mass_locus_state,loci_states) = state
-	(;Sps,Sg,e,∂T∂eᵀ) = cache
-	F .+= ∂T∂eᵀ
+function centrifugal_force!(F,state::AbstractFlexibleBodyState,cache)
+	(;mass_locus_state,loci_states) = state
+    (;∂T∂qᵀ) = cache.inertia_cache
+	F .+= ∂T∂qᵀ
 end
 
-function mass_center_force!(F,state::AbstractFlexibleBodyState)
-	(;cache,mass_locus_state,loci_states) = state
-	(;Sps,Sg,e,∂T∂eᵀ) = cache
+function mass_center_force!(F,state::AbstractFlexibleBodyState,cache)
+	(;mass_locus_state,loci_states) = state
+	(;Sps,Sg,e,) = cache
 	mul!(F,transpose(Sg),mass_locus_state.force,1,1)
 end
 
-function concentrated_force!(F,state::AbstractFlexibleBodyState)
-	(;cache,mass_locus_state,loci_states) = state
-	(;Sps,Sg,e,∂T∂eᵀ) = cache
+function concentrated_force!(F,state::AbstractFlexibleBodyState,cache)
+	(;mass_locus_state,loci_states) = state
+	(;Sps,Sg,e,) = cache
 	for (pid,locus_state) in enumerate(loci_states)
 		mul!(F,transpose(Sps[pid]),locus_state.force,1,1)
 	end    
 end
 
-function strain!(F,state::AbstractFlexibleBodyState)
-	(;cache,mass_locus_state,loci_states) = state
-	(;Sps,Sg,e,∂T∂eᵀ) = cache
+function strain!(F,state::AbstractFlexibleBodyState,cache)
+	(;mass_locus_state,loci_states) = state
+	(;Sps,Sg,e,) = cache
     Q = ANCF.make_Q(cache.funcs.ancs)
 	F .-= Q(e)
 	F
@@ -243,7 +255,7 @@ function potential_energy_gravity(fb::AbstractFlexibleBody)
 	(;mass) = fb.prop
     (;mass_locus_state) = fb.state
     gravity_acceleration = get_gravity(fb)
-    -transpose(mass_locus_state.position)*gravity_acceleration*mass
+    -transpose(mass_locus_state.frame.position)*gravity_acceleration*mass
 end
 
 """
@@ -251,17 +263,17 @@ Return the potential energy for strain of a flexible body
 $(TYPEDSIGNATURES)
 """
 function potential_energy_strain(fb::AbstractFlexibleBody)
-    (;cache) = fb.state
-    (;funcs,e) = cache
-    (;ancs) = funcs
+    (;coords,cache) = fb
+    (;e) = cache
+    ancs = coords.nmcs
     ANCF.make_V(ancs)(e)
 end
 
 function subdivide(fb::FlexibleBody,nx=1,ny=1,nz=1)
-    (;prop,state) = fb
-    (;cache) = state
-    (;pres_idx,funcs,e,ė) = cache
-    (;ancs) = funcs
+    (;prop,state,coords,cache) = fb
+    (;e,ė) = cache
+    (;nmcs,pres_idx) = coords
+    ancs = nmcs
     (;radius,E,L,ρ) = ancs
     xrange = range(0,L,nx+1) |> collect
     _S = ANCF.make_S(ancs)
@@ -314,8 +326,8 @@ function subdivide(fb::FlexibleBody,nx=1,ny=1,nz=1)
             end
             # @show sub_pres_idx
             # cache = BodyCache(prop,ancs,𝐞)
-            state = FlexibleBodyState(prop,subancs,esegs[i],ėsegs[i];pres_idx=sub_pres_idx)
-            fb = FlexibleBody(prop,state)
+            state, coords, cache = FlexibleBodyState(prop,subancs,esegs[i],ėsegs[i];pres_idx=sub_pres_idx)
+            fb = FlexibleBody(prop,state, coords, cache)
         end
         for i = 1:nx
     ]

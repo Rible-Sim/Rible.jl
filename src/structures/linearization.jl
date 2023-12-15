@@ -39,10 +39,10 @@ end
 
 function cstr_velocity_jacobian(st::AbstractStructure,q,q̇)
     (;num_of_free_coords) = st.connectivity.indexed
-    (;bodies,num_of_cstr) = st
-    (;indexed,jointed) = st.connectivity
-    (;num_of_intrinsic_cstr,bodyid2sys_free_coords,bodyid2sys_intrinsic_cstr_idx) = indexed
-    (;njoints,num_of_extrinsic_cstr,joints,apparid2sys_extrinsic_cstr_idx) = jointed
+    (;bodies,apparatuses) = st
+    (;indexed,) = st.connectivity
+    (;num_of_cstr,num_of_extrinsic_cstr,apparid2sys_extrinsic_cstr_idx,
+    num_of_intrinsic_cstr,bodyid2sys_free_coords,bodyid2sys_intrinsic_cstr_idx) = indexed
     ret = zeros(eltype(q̇),num_of_cstr,num_of_free_coords)
     foreach(bodies) do body
         bodyid = body.prop.id
@@ -57,10 +57,12 @@ function cstr_velocity_jacobian(st::AbstractStructure,q,q̇)
     end
     #todo skip 2D for now
     if get_num_of_dims(st) == 3
-        foreach(joints) do joint
-            joint_cstr_idx = num_of_intrinsic_cstr .+ apparid2sys_extrinsic_cstr_idx[joint.id]
-            jointed_sys_free_idx = indexed.apparid2sys_free_coords_idx[joint.id]
-            ret[joint_cstr_idx,jointed_sys_free_idx] .= cstr_velocity_jacobian(joint,st,q,q̇)
+        foreach(apparatuses) do appar
+            if appar.has_joint isa Val{true}
+                joint_cstr_idx = num_of_intrinsic_cstr .+ apparid2sys_extrinsic_cstr_idx[appar.id]
+                jointed_sys_free_idx = indexed.apparid2sys_free_coords_idx[appar.id]
+                ret[joint_cstr_idx,jointed_sys_free_idx] .= cstr_velocity_jacobian(appar,st,q,q̇)
+            end
         end
     end
     ret
@@ -649,12 +651,12 @@ function build_tangent_stiffness_matrix!(∂Q̌∂q̌,st)
 
     foreach(bodies) do body
         if body isa FlexibleBody
-            (;cache) = body.state
-            (;e,funcs) = cache
-            (;ancs) = funcs
+            (;coords,cache) = body
+            (;e,) = cache
+            ancs = coords.nmcs
             ∂Q∂e = ANCF.make_∂Q∂e(ancs)(e)
             mfree = bodyid2sys_free_coords[body.prop.id]
-            free_idx = body.state.cache.free_idx
+            (;free_idx) = body.coords
             ∂Q̌∂q̌[mfree,mfree] .-= ∂Q∂e[free_idx,free_idx]
         end
     end

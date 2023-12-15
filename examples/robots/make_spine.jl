@@ -40,7 +40,7 @@ function make_spine(n,θ=0.0)
         ω = 0.0
         ṙo = @SVector zeros(2)
         nmcs,_ = RB.NCF.NC1P2V(ri,ro,θ)
-        state = RB.RigidBodyState(prop,nmcs,ro,θ,ṙo,ω, ci, cstr_idx)
+        state = RB.RigidBodyState(prop,ro,θ,ṙo,ω, ci, cstr_idx)
         RB.RigidBody(prop,state)
     end
 

@@ -32,8 +32,8 @@ prop = RB.RigidBodyProperty(
     friction_coefficients,restitution_coefficients,
     )
 ri = copy(origin_position)
-nmcs = RB.NCF.NC1P3V(ri,origin_position,R,origin_velocity,ω)
-state = RB.RigidBodyState(prop,nmcs,origin_position,R,origin_velocity,ω)
+nmcs = RB.NCF.NC1P3V(ri,origin_position,R)
+state = RB.RigidBodyState(prop,origin_position,R,origin_velocity,ω)
 rb1 = RB.RigidBody(prop,state,cube_mesh)
 rbs = TypeSortedCollection((rb1,))
 numbered = RB.number(rbs)

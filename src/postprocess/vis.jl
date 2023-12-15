@@ -19,8 +19,8 @@ MakieCore.@recipe(Viz, structure) do scene
         cablelabelcolor=:darkgreen,
         rigidlabelcolor=:darkblue,
         refcolor=:lightgrey,
-        cablewidth=2,
-        meshcolor=nothing,
+        cablewidth=0.6,
+        meshcolor=:slategrey,
         fontsize = 12,
     )
 end
@@ -376,10 +376,9 @@ function spbasis(n)
 end
 
 function build_mesh(fb::FlexibleBody,nsegs=100;color=:slategrey)
-    (;state) = fb
-    (;cache) = state
-    (;funcs,e) = cache
-    (;ancs) = funcs
+    (;state,coords,cache) = fb
+    (;e) = cache
+    ancs = coords.nmcs
     (;L,radius) = ancs
     T = typeof(L)
     V = T <: AbstractFloat ? T : Float64
@@ -440,7 +439,7 @@ function simple2mesh(sp,color=:slategrey)
     points  = GB.Point.(coords)
     faces  = GB.TriangleFace{UInt64}.(tris)
     nls = GB.normals(points,faces)
-    parsedcolor = parse(Makie.ColorTypes.RGB{Float32},color)
+    parsedcolor = parse(CT.RGB{Float32},color)
     colors = fill(parsedcolor,length(points))
     GB.Mesh(GB.meta(points,normals=nls,color=colors),faces)
 end

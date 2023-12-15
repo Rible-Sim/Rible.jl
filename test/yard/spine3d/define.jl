@@ -48,7 +48,7 @@ function spine3d(n;c=0.0)
         # nmcs = RB.NCF.NC3P1V(ri,rk,rl,r,R,ṙ,ω)
         # nmcs = RB.NCF.NC2P2V(rk,rl,r,R,ṙ,ω)
         nmcs = RB.NCF.NC1P3V(r,r,R,ṙ,ω)
-        state = RB.RigidBodyState(prop,nmcs,r,R,ṙ,ω,ci,cstr_idx)
+        state = RB.RigidBodyState(prop,r,R,ṙ,ω,ci,cstr_idx)
         body = RB.RigidBody(prop,state)
     end
     rbs = [rigidbody(i,props[i],aps,rs[i],Rs[i],ṙs[i],ωs[i]) for i = 1:n]

@@ -10,45 +10,45 @@ function superball(c=0.0;
         l = 1.7/2,
         d = l/2,
         k = 4000.0,
-        visible = true,
-        addconst = Float64[],
+        constrained = true,
         loadmesh = true,
     )
+
     p = Ref(R) .* SVector{3}.(
-    [
-        [ 0,  d,  l], [ 0,  d, -l],
-        [ 0, -d, -l], [ 0, -d,  l],
-        [ d,  l,  0], [ d, -l,  0],
-        [-d, -l,  0], [-d,  l,  0],
-        [ l,  0,  d], [-l,  0,  d],
-        [-l,  0, -d], [ l,  0, -d],
-    ]
+        [
+            [ 0,  d,  l], [ 0,  d, -l],
+            [ 0, -d, -l], [ 0, -d,  l],
+            [ d,  l,  0], [ d, -l,  0],
+            [-d, -l,  0], [-d,  l,  0],
+            [ l,  0,  d], [-l,  0,  d],
+            [-l,  0, -d], [ l,  0, -d],
+        ]
     ).+Ref(origin_position)
     # p |> display
     ṗ = [
-    origin_velocity + ω×(r-origin_position)
-    for r in p
+        origin_velocity + ω×(r-origin_position)
+        for r in p
     ]
+
     rbs = [
-    rigidbar(i,
-        p[2i-1],
-        p[2i  ];
-        ṙi=ṗ[2i-1],
-        ṙj=ṗ[2i  ], 
-        m = 5.0,
-        μ,
-        e,
-        visible = ifelse(i==1 && visible,true,false),
-        ci = ifelse(i==1 && visible,collect(1:6),Int[]),
-        cstr_idx = ifelse(i==1 && visible,Int[],[1]),
-        loadmesh,
-        isbody =false,
+        rigidbar(
+            i,
+            p[2i-1],
+            p[2i  ];
+            ṙi=ṗ[2i-1],
+            ṙj=ṗ[2i  ], 
+            m = 5.0,
+            μ,
+            e,
+            visible = ifelse(i==1 && constrained,true,false),
+            ci = ifelse(i==1 && constrained,collect(1:6),Int[]),
+            cstr_idx = ifelse(i==1 && constrained,Int[],[1]),
+            loadmesh,
+            isbody =false,
         )
-    for i = 1:6
+        for i = 1:6
     ]
     rigdibodies = TypeSortedCollection(rbs)
-    numbered = RB.number(rigdibodies)
-    indexed = RB.index(rigdibodies)
     #
     ncables = 24
 
@@ -59,66 +59,54 @@ function superball(c=0.0;
     ks .= k
 
     pretty_table(
-    SortedDict(
+        SortedDict(
+            [
+                ("stiffness", k),
+                ("bar length", 2l),
+                ("bar distance", d)
+            ]
+        )
+    )
+
+
+    spring_dampers = [
+        RB.DistanceSpringDamper3D( original_restlens[i], ks[i], c;slack=false) for i = 1:ncables
+    ]
+    #
+    # #
+    nb = CircularArray(
         [
-            ("stiffness", k),
-            ("bar length", 2l),
-            ("bar distance", d)
+            [1,2],
+            [3,4],
+            [5,6]
         ]
     )
-    )
-    cables = [
-    RB.DistanceSpringDamper3D( original_restlens[i], ks[i], c;slack=false) for i = 1:ncables
-    ]
-    #
-    apparatuses = (cables = cables,)
-    acs = [
-    RB.ManualActuator(
-        i,
-        collect(1:6), [original_restlens[6*(i-1)+j] for j = 1:6],
-    ) for i = [1]
-    ]
-    hub = (actuators = acs,)
-    # #
-    nb = CircularArray([
-    [1,2],
-    [3,4],
-    [5,6]
-    ])
     matrix_cnt = zeros(Int,ncables,6)
     for lev = 1:3
-    matrix_cnt[8(lev-1)+1, [nb[lev][1],nb[lev+1][1]]] = [1, -1]
-    matrix_cnt[8(lev-1)+2, [nb[lev][1],nb[lev+1][1]]] = [2, -1]
-    matrix_cnt[8(lev-1)+3, [nb[lev][1],nb[lev+1][2]]] = [1, -2]
-    matrix_cnt[8(lev-1)+4, [nb[lev][1],nb[lev+1][2]]] = [2, -2]
-    matrix_cnt[8(lev-1)+5, [nb[lev][2],nb[lev+1][2]]] = [1, -1]
-    matrix_cnt[8(lev-1)+6, [nb[lev][2],nb[lev+1][2]]] = [2, -1]
-    matrix_cnt[8(lev-1)+7, [nb[lev][2],nb[lev+1][1]]] = [1, -2]
-    matrix_cnt[8(lev-1)+8, [nb[lev][2],nb[lev+1][1]]] = [2, -2]
+        matrix_cnt[8(lev-1)+1, [nb[lev][1],nb[lev+1][1]]] = [1, -1]
+        matrix_cnt[8(lev-1)+2, [nb[lev][1],nb[lev+1][1]]] = [2, -1]
+        matrix_cnt[8(lev-1)+3, [nb[lev][1],nb[lev+1][2]]] = [1, -2]
+        matrix_cnt[8(lev-1)+4, [nb[lev][1],nb[lev+1][2]]] = [2, -2]
+        matrix_cnt[8(lev-1)+5, [nb[lev][2],nb[lev+1][2]]] = [1, -1]
+        matrix_cnt[8(lev-1)+6, [nb[lev][2],nb[lev+1][2]]] = [2, -1]
+        matrix_cnt[8(lev-1)+7, [nb[lev][2],nb[lev+1][1]]] = [1, -2]
+        matrix_cnt[8(lev-1)+8, [nb[lev][2],nb[lev+1][1]]] = [2, -2]
     end
     # display(matrix_cnt)
-    connected = RB.connect(rigdibodies, matrix_cnt)
-    tensioned = @eponymtuple(connected,)
+    cables = RB.connect(rigdibodies, spring_dampers, matrix_cnt, 0)
+
+    apparatuses = TypeSortedCollection(
+        cables
+    )
     #
 
-    if isempty(addconst)
-    cnt = RB.Connectivity(numbered, indexed, tensioned)
-    else
-    cst1 = RB.LinearJoint(
-        1,
-        1,
-        [0.0],
-        addconst
-    )
-    jointed = RB.join([cst1],indexed)
+    indexed = RB.index(rigdibodies, apparatuses)
+    numbered = RB.number(rigdibodies, apparatuses)
     cnt = RB.Connectivity(
         numbered, 
-        indexed, 
-        tensioned,
-        jointed
-        )
-    end
+        indexed,
+    )
 
     st = RB.Structure(rigdibodies, apparatuses, cnt, )
-    bot = RB.Robot(st, hub)
+    bot = RB.Robot(st,)
 end

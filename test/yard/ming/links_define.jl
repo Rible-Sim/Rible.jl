@@ -74,7 +74,7 @@ function spine(n,dis,rm,heating_law;k=1000.0,c=0.0)
 		else
 			pres_idx = Int[]
 		end
-        state = RB.RigidBodyState(prop,nmcs,ro,R,ṙo,ω,q,q̇,pres_idx)
+        state = RB.RigidBodyState(prop,ro,R,ṙo,ω,q,q̇,pres_idx)
         body = RB.RigidBody(prop,state)
     end
     rbs = [rigidbody(i,props[i],aps,rs[i],Rs[i],ṙs[i],ωs[i]) for i = 1:n]
@@ -205,7 +205,7 @@ function spine_true(n,dis,rm;
 			ci = Int[]
 			cstr_idx = collect(1:6)
 		end
-        state = RB.RigidBodyState(prop,nmcs,ro,R,ṙo,ω,ci,cstr_idx)
+        state = RB.RigidBodyState(prop,ro,R,ṙo,ω,ci,cstr_idx)
         body = RB.RigidBody(prop,state)
     end
     rbs = [rigidbody(i,props[i],aps,rs[i],Rs[i],ṙs[i],ωs[i]) for i = 1:n]

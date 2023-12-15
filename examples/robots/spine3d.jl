@@ -52,7 +52,7 @@ function rigidbody(i,prop,loci,r,R,ṙ,ω)
     # nmcs = RB.NCF.NC3P1V(ri,rk,rl,r,R,ṙ,ω)
     # nmcs = RB.NCF.NC2P2V(rk,rl,r,R,ṙ,ω)
     nmcs = RB.NCF.NC1P3V(r,r,R,ṙ,ω)
-    state = RB.RigidBodyState(prop,nmcs,r,R,ṙ,ω,ci,cstr_idx)
+    state = RB.RigidBodyState(prop,r,R,ṙ,ω,ci,cstr_idx)
     radius = norm(loci[1]-loci[5])/25
     vertmesh = merge([
         endpoints2mesh(loci[i],loci[5];radius)

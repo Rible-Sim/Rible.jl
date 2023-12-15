@@ -26,6 +26,6 @@ function build_2d_bar(id,ri,rj;α = 0.0, ci = Int[])
     ro = ri
     ṙo = zero(ro)
     nmcs = RB.NCF.NC2D2P(ri,rj,ro,α)
-    state = RB.RigidBodyState(prop,nmcs,ro,α,ṙo,ω,ci)
+    state = RB.RigidBodyState(prop,ro,α,ṙo,ω,ci)
     body = RB.RigidBody(prop,state)
 end

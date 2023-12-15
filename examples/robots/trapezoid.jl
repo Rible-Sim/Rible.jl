@@ -46,7 +46,7 @@ prop = RB.RigidBodyProperty(id,contactable,m,Īg,
 # ṙo = [0.0,0.0001]
 ṙo = zero(ro)
 nmcs = RB.NCF.NC1P2V(ri,ro,α)
-state = RB.RigidBodyState(prop,nmcs,ro,α,ṙo,ω,ci,cstr_idx)
+state = RB.RigidBodyState(prop,ro,α,ṙo,ω,ci,cstr_idx)
 body = RB.RigidBody(prop,state)
 
 end

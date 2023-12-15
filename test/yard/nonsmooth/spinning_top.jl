@@ -18,6 +18,15 @@ scalefactor = 2 #nb
 include(joinpath(pathof(RB),"../../examples/robots/spinningtop.jl"))
 includet(joinpath(pathof(RB),"../../examples/robots/spinningtop.jl"))
 
+
+# solver
+solver = RB.DynamicsSolver(
+    RB.Zhong06(),
+    RB.InnerLayerContactSolver(
+        RB.InteriorPointMethod()
+    ),
+)
+
 # ## First scenario
 # Contact Surfaces
 planes = RB.StaticContactSurfaces(
@@ -28,7 +37,7 @@ planes = RB.StaticContactSurfaces(
 
 # Initial conditions
 origin_position = [0,0,0.5]
-R = RotX(π/24)
+R = RotX(0.0)
 origin_velocity = [1.0,0.0,0.0]
 Ω = [0.0,0.0,200.0]
 # parameters
@@ -38,77 +47,27 @@ e = 0.5
 tspan = (0.0,1.8)
 h = 1e-4
 
-topq = make_top(origin_position,R,origin_velocity,Ω;μ,e,loadmesh=true)
-
+## top = make_top(origin_position,R,origin_velocity,Ω;μ,e,loadmesh=true) #src
+top = make_top(origin_position,R,origin_velocity,Ω,RB.NCF.NC;μ,e,loadmesh=true);
 RB.solve!(
     RB.DynamicsProblem(
-        topq,
+        top,
         planes,
         RB.RestitutionFrictionCombined(
             RB.NewtonRestitution(),
             RB.CoulombFriction(),
         )
     ),
-    RB.DynamicsSolver(
-        RB.Zhong06(),
-        RB.InnerLayerContactSolver(
-            RB.InteriorPointMethod()
-        )
-    );
-    tspan,
-    dt=h,
-    ftol=1e-12,
-    maxiters=50,exception=true,verbose_contact=true
-)
-
-me = RB.mechanical_energy!(topq)
-lines(me.E)
-v5 = RB.get_velocity!(topq,1,5) 
-lines(v5[3,:])
-GM.activate!(;scalefactor)
-plot_traj!(
-    topq;
-    showinfo=false,
-    # rigidcolor=:white,
-    showwire=true,
-    showarrows=false,
-)
-
-topn = make_top(origin_position,R,origin_velocity,Ω,RB.NCF.NC;μ,e,loadmesh=true)
-RB.solve!(
-    RB.DynamicsProblem(
-        topn,
-        planes,
-        RB.RestitutionFrictionCombined(
-            RB.NewtonRestitution(),
-            RB.CoulombFriction(),
-        )
-    ),
-    RB.DynamicsSolver(
-        RB.Zhong06(),
-        RB.InnerLayerContactSolver(
-            RB.InteriorPointMethod()
-        )
-    );
+    solver;
     tspan,
     dt=h,
     ftol=1e-14,
     maxiters=50,exception=false,verbose_contact=false
-)
+);
 
-v5 = RB.get_velocity!(topn,1,5)
-lines(v5[3,:])
-plot_traj!(
-    topn;
-    showinfo=false,
-    # rigidcolor=:white,
-    showwire=false,
-    showarrows=false,
-    # figsize=(0.6tw,0.6tw)
-)
-
-GM.activate!(;scalefactor);with_theme(theme_pub;
+GM.activate!(;scalefactor=4);with_theme(theme_pub;
         size = (1.0tw,0.3tw),
+        figure_padding = (-3fontsize,fontsize,0,0),
         Axis3 = (
             azimuth = 5.1155306333269825,
             elevation = 0.1426990816987241,
@@ -118,7 +77,7 @@ GM.activate!(;scalefactor);with_theme(theme_pub;
             transparency = true,
         )
     ) do
-    bot = topn
+    bot = top
     (;t) = bot.traj
     rp5 = RB.get_trajectory!(bot,1,5)
     vp5 = RB.get_velocity!(bot,1,5)
@@ -138,7 +97,6 @@ GM.activate!(;scalefactor);with_theme(theme_pub;
         fig = gd1,
         doslide = false,
         showinfo=false,
-        # rigidcolor=:white,
         showwire=false,
         showpoints=false,
         showlabels=false,
@@ -191,8 +149,8 @@ GM.activate!(;scalefactor);with_theme(theme_pub;
     Label(
         fig[1,1,TopLeft()],
         rich("($(alphabet[1]))",font=:bold),
-        justification = :right,
-        padding = (0,-5fontsize,0,0)
+        padding = (0,-fontsize,0,0),
+        halign = :right,
         
     )
     Label(
@@ -207,30 +165,16 @@ GM.activate!(;scalefactor);with_theme(theme_pub;
         gd2[1,2,TopLeft()],
         rich("($(alphabet[4]))",font=:bold)
     )
-    colsize!(fig.layout,2,Fixed(0.50tw))
-    colgap!(fig.layout,1.5fontsize)
+    colsize!(fig.layout,2,Relative(0.55))
+    colgap!(fig.layout,-fontsize)
     rowgap!(gd2,0)
-    colgap!(gd2,1.5fontsize)
-    # savefig(fig,"spinningtop_drop")
+    colgap!(gd2,0.5fontsize)
+    savefig(fig,"spinningtop_drop")
     fig
 end
 
-topq_longtime = deepcopy(topq)
-RB.set_new_initial!(topq_longtime,topq.traj.q[end],topq.traj.q̇[end])
-RB.solve!(
-    RB.DynamicsProblem(topq_longtime,top_contact_dynfuncs),
-    RB.ZhongQCCP();
-    tspan = (0.0,50.0),
-    dt=2e-3,
-    ftol=1e-14,
-    maxiters=100,exception=false,verbose=false
-)
-me = RB.mechanical_energy!(topq_longtime)
-lines(me.E)
-rp5 = RB.get_trajectory!(topq_longtime,1,5)
-lines(topq_longtime.traj.t,-rp5[3,:].-(-rp5[3,1]))
-
-topn_longtimes = [
+# long time simulations, compare checkpersist or not.
+top_longtimes = [
     begin
         h = 2*0.01897941
         θ = π/18
@@ -240,50 +184,54 @@ topn_longtimes = [
         Ω = [0.0,0.0,200.0]
         bot = make_top(origin_position,R,origin_velocity,Ω,RB.NCF.NC;μ,e,loadmesh=true)
         RB.solve!(
-            RB.DynamicsProblem(bot,(x)->top_contact_dynfuncs(x;checkpersist=check)),
-            RB.ZhongCCP();
+            RB.DynamicsProblem(
+                bot,
+                planes,
+                RB.RestitutionFrictionCombined(
+                    RB.NewtonRestitution(),
+                    RB.CoulombFriction(),
+                )
+            ),
+            RB.DynamicsSolver(
+                RB.Zhong06(),
+                RB.InnerLayerContactSolver(
+                    RB.InteriorPointMethod()
+                );
+                checkpersist
+            );
             tspan = (0.0,500.0),
             dt=2e-3,
             ftol=1e-14,
             maxiters=100,exception=false,verbose=false
-        )
+        ).prob.bot
     end
-    for check in [true,false]
+    for checkpersist in [true,false]
 ]
 
-plot_traj!(
-    topn_longtimes[1];
-    showinfo=false,
-    # rigidcolor=:white,
-    showwire=false,
-    showarrows=false,
-    # figsize=(0.6tw,0.6tw)
-)
+GM.activate!(;scalefactor=1);plot_traj!(top_longtimes[2];showinfo=false,showwire=false,showarrows=false,) #src
 
-plotsave_contact_persistent(topn_longtimes[1])
-true_me = RB.mechanical_energy!(topn_longtimes[1])
-lines(true_me.E)
-false_me = RB.mechanical_energy!(topn_longtimes[2])
-lines!(false_me.E)
-true_rp5 = RB.get_trajectory!(topn_longtimes[1],1,5)
-lines(true_rp5)
-false_rp5 = RB.get_trajectory!(topn_longtimes[2],1,5)
-lines!(false_rp5)
-plot_traj!(topn_longtimes[1])
-# vp5 = RB.get_velocity!(topn,1,5)
-with_theme(theme_pub;
+true_me = RB.mechanical_energy!(top_longtimes[1])
+# lines(true_me.E) #src
+false_me = RB.mechanical_energy!(top_longtimes[2])
+# lines!(false_me.E) #src
+true_rp5 = RB.get_trajectory!(top_longtimes[1],1,5)
+# lines(true_rp5) #src
+false_rp5 = RB.get_trajectory!(top_longtimes[2],1,5)
+# lines!(false_rp5) #src
+# plot_traj!(top_longtimes[1]) #src
+
+GM.activate!(;scalefactor=4);with_theme(theme_pub;
         size = (1tw,0.25tw),
         figure_padding = (0,fontsize,0,fontsize/2)
     ) do
-    bot = topn_longtimes[1]
-    # bot = topq_longtime
+    bot = top_longtimes[1]
     (;t) = bot.traj
     fig = Figure()
     ax1 = Axis(fig[1,1];xlabel=tlabel, ylabel="Rel. Err.")
     ax2 = Axis(fig[1,2];xlabel=tlabel, ylabel="Abs. Err. (m)")
     ax3 = Axis(fig[1,3];xlabel="x (m)", ylabel="y (m)", aspect=DataAspect())
     skipstep = 2000
-    startstep = time2step(1.5,t)
+    startstep = RB.time2step(1.5,t)
     @myshow length(t[startstep:skipstep:end])
     mo=5
     scaling = 10.0^(-mo)
@@ -326,33 +274,48 @@ with_theme(theme_pub;
     Label(fig[1,1,TopLeft()], rich("($(alphabet[1]))",font=:bold))
     Label(fig[1,2,TopLeft()], rich("($(alphabet[2]))",font=:bold))
     Label(fig[1,3,TopLeft()], rich("($(alphabet[3]))",font=:bold))
+    colgap!(fig.layout,0.5fontsize)
     savefig(fig,"spinningtop_longtime")
     fig    
 end
 
-# sliding
+# sliding simulation
 
 R = RotX(π/18)
 origin_position = [0,0,0.037]
 Ω = [0,0,50.0]
 dts = [1e-3,1e-2]
-checks = [true,false]
 tops_e0 = [
     begin   
-        topbot = make_top(origin_position,R,origin_velocity,Ω,RB.NCF.NC; μ = 0.01, e = 0.0,loadmesh=true)
+        bot = make_top(origin_position,R,origin_velocity,Ω,RB.NCF.NC; μ = 0.01, e = 0.0,loadmesh=true)
         RB.solve!(
-            RB.DynamicsProblem(topbot,(x)->top_contact_dynfuncs(x;checkpersist=check)),
-            RB.ZhongCCP();
+            RB.DynamicsProblem(
+                bot,
+                planes,
+                RB.RestitutionFrictionCombined(
+                    RB.NewtonRestitution(),
+                    RB.CoulombFriction(),
+                )
+            ),
+            RB.DynamicsSolver(
+                RB.Zhong06(),
+                RB.InnerLayerContactSolver(
+                    RB.InteriorPointMethod()
+                );
+                checkpersist
+            );
             tspan=(0.0,2.0),
             dt,ftol=1e-14,maxiters=50,exception=false,#verbose_contact=false
-        )
+        ).prob.bot
     end
-    for dt in dts, check in checks
+    for dt in dts, checkpersist in [true,false]
 ]
 
-plot_traj!(tops_e0[1])
-vp5 = RB.get_velocity!(tops_e0[1],1,5)
+plot_traj!(tops_e0[1]) #src
+vp5 = RB.get_velocity!(tops_e0[1],1,5) #src
 
+
+# Compare
 GM.activate!();with_theme(theme_pub;
         size = (1.0tw,0.45tw),
         figure_padding = (0,1fontsize,0,0),
@@ -389,7 +352,6 @@ GM.activate!();with_theme(theme_pub;
         fig = gd1,
         doslide = false,
         showinfo=true,
-        # rigidcolor=:white,
         showwire=false,
         showpoints=false,
         showlabels=false,
@@ -401,7 +363,7 @@ GM.activate!();with_theme(theme_pub;
         ylims = (-0.1,0.2),
         zlims = (-1e-6,0.1),
         sup! = (ax,tgob,sgi) -> begin
-            hidey(ax)
+            RB.hidey(ax)
             ax.xlabeloffset = 0.0
             ax.zlabeloffset = 2fontsize
             for (istep,step) in enumerate(steps)
@@ -409,7 +371,7 @@ GM.activate!();with_theme(theme_pub;
                 suptg.state.system.q .= bot.traj.q[step]
                 RB.update!(suptg)
                 (;r,g,b) = cg[istep]
-                viz!(ax,Observable(suptg);
+                RB.viz!(ax,Observable(suptg);
                     showlabels=false,
                     showarrows=false,
                     showpoints=false,
@@ -425,7 +387,6 @@ GM.activate!();with_theme(theme_pub;
         ylabel = L"y~(\mathrm{m})",
         tellwidth = false,
     )
-    # ax2.xlabelpadding = -fontsize
     lines!(ax2,rp5[1:2,:],label="tip")
     lines!(ax2,rp1[1:2,:],label="edge")
     ylims!(ax2,-0.05,0.05)
@@ -441,7 +402,6 @@ GM.activate!();with_theme(theme_pub;
     contacts_traj_voa = VectorOfArray(bot.contacts_traj)[:,stepstart:end]
     c1s = contacts_traj_voa[end,:]
     idx_per = findall((x)->RB.doespersist(x;Λtol=0),c1s) #∩ idx_sli
-    # @show idx_per
     α_per = map(c1s[idx_per]) do c
         RB.get_contact_angle(c;Λtol=0)
     end
@@ -454,7 +414,6 @@ GM.activate!();with_theme(theme_pub;
     lines!(ax4,t,me.T, label="T")
     lines!(ax4,t,me.V, label="V")
     Legend(gd3[1,3],ax4,orientation=:vertical,tellwidth=false,tellheight=false)
-    # axislegend(ax4,position=:rt)
     xlims!(as3,0,2.0)
     xlims!(ax4,0,2.0)
     Label(
@@ -477,18 +436,15 @@ GM.activate!();with_theme(theme_pub;
         gd3[1,1,TopLeft()],
         rich("($(alphabet[4]))",font=:bold)
     )
-    # colsize!(fig.layout,1,Fixed(0.40tw))
     colgap!(fig.layout,1,3fontsize)
     rowgap!(gd1,0)
     rowgap!(fig.layout,0)
     rowsize!(fig.layout,2,Fixed(0.11tw))
-    # rowsize!(gd1,2,Fixed(0.05tw))
-    # rowgap!(gd1,0)
-    # rowsize!(gd3,2,0.1tw)
     savefig(fig,"spinningtop_sliding")
     fig
 end
 
+# Compare
 with_theme(theme_pub;
         size = (0.95tw, 0.18tw),
         figure_padding = (0,fontsize/2,0,0)
@@ -522,7 +478,6 @@ with_theme(theme_pub;
         rp5 = RB.get_trajectory!(bot,1,5)
         lines!(ax2,t,((-rp5[3,begin:end]).-(-rp5[3,begin]))./scaling;label)
     end
-    # hidex(ax1)
     Legend(fig[1,3],ax2)
     Label(
         fig[1,1,TopLeft()],
@@ -538,32 +493,39 @@ with_theme(theme_pub;
     fig
 end
 
-plotsave_contact_persistent(tops_e0[1],cid=5,tol=0)
+plotsave_contact_persistent(tops_e0[1],cid=5,tol=0) #src
 #dt
 
+# convergence analysis
 dts = [1e-2,5e-3,3e-3,2e-3,1e-3,5e-4,3e-4,2e-4,1e-4,1e-5]
 tops_dt = [
- begin
-    top = deepcopy(tops_e0[1])
-     RB.solve!(RB.DynamicsProblem(top,top_contact_dynfuncs),
-             RB.ZhongCCP();
-             tspan=(0.0,0.1),dt,ftol=1e-14,maxiters=50,exception=true)
- end
- for dt in dts
-]
+    begin
+        bot = deepcopy(tops_e0[1])
+        RB.solve!(
+                RB.DynamicsProblem(
+                bot,
+                planes,
+                RB.RestitutionFrictionCombined(
+                    RB.NewtonRestitution(),
+                    RB.CoulombFriction(),
+                )
+            ),
+            RB.DynamicsSolver(
+                RB.Zhong06(),
+                RB.InnerLayerContactSolver(
+                    RB.InteriorPointMethod()
+                );
+            );
+            tspan=(0.0,0.1),dt,ftol=1e-14,maxiters=50,exception=true
+        ).prob.bot
+    end
+    for dt in dts
+];
 
-me = RB.mechanical_energy!(bot)
-lines(me.E)
-fig = Figure()
-ax = Axis3(fig[1,1])
-for top in tops_dt
-    lines!(ax,RB.get_trajectory!(top,1,1),label="$(top.traj.t[2])")
-end
-Legend(fig[1,2],ax)
-fig
-_,traj_err_avg = get_err_avg(tops_dt;bid=1,pid=1,di=1,field=:traj)
-_,vel_err_avg = get_err_avg(tops_dt;bid=1,pid=1,di=1,field=:vel)
-GM.activate!();with_theme(theme_pub;
+
+_,traj_err_avg = RB.get_err_avg(tops_dt;bid=1,pid=1,di=1,field=:traj)
+_,vel_err_avg = RB.get_err_avg(tops_dt;bid=1,pid=1,di=1,field=:vel)
+GM.activate!(;scalefactor=4);with_theme(theme_pub;
         size = (0.7tw,0.2tw),
         figure_padding = (0,fontsize/2,0,0)
     ) do 
@@ -578,7 +540,8 @@ GM.activate!();with_theme(theme_pub;
     Legend(fig[1,3],ax2)
     Label(fig[1,1,TopLeft()],"($(alphabet[1]))",font=:bold)
     Label(fig[1,2,TopLeft()],"($(alphabet[2]))",font=:bold)
-    # savefig(fig,"spinningtop_order")
+    colgap!(fig.layout,1fontsize)
+    savefig(fig,"spinningtop_order")
     fig
 end
 

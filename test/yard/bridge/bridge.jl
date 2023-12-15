@@ -34,7 +34,7 @@ function make_strut(id,ri,rj;ci = Int[])
 	ṙo = zero(ro)
 	ω = zero(ro)
 	nmcs = RB.NCF.NC3D2P(ri,rj,ro,R)
-	state = RB.RigidBodyState(prop,nmcs,ro,R,ṙo,ω,ci)
+	state = RB.RigidBodyState(prop,ro,R,ṙo,ω,ci)
 	strutmesh = endpoints2mesh(r̄p1,r̄p2)
 	body = RB.RigidBody(prop,state,strutmesh)
 end

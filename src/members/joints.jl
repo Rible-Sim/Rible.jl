@@ -59,6 +59,25 @@ function FixedBodyConstraint(id::Int,indexed,body::AbstractBody)
     )
 end
 
+function FixedIndicesConstraint(id::Int,body,idx,violations)
+    num_of_cstr = length(idx)
+    num_of_coords = get_num_of_coords(body)
+    T = get_numbertype(body)
+    A = zeros(T,num_of_cstr,num_of_coords)
+    for (i,j) in enumerate(idx)
+        A[i,j] = 1
+    end
+    joint = LinearJoint(body,num_of_cstr,A,violations)
+    force = nothing
+    Apparatus(
+        id,
+        Val(true),
+        Val(false),
+        joint,
+        force,
+    )
+end
+
 function get_joint_info(joint_type::Symbol)
     (joint_type == :FloatingSpherical)  && (return (ntrl = 3, nrot = 3, num_of_dof = 6, num_of_cstr = 0, mask_1st = Int[]  , mask_2nd = Int[], mask_3rd_hen = Int[], mask_3rd_egg = Int[], mask_4th = Int[]  ))
     (joint_type == :OrbitalSpherical)   && (return (ntrl = 2, nrot = 3, num_of_dof = 5, num_of_cstr = 1, mask_1st = Int[]  , mask_2nd = [1]  , mask_3rd_hen = Int[], mask_3rd_egg = Int[], mask_4th = Int[]  ))

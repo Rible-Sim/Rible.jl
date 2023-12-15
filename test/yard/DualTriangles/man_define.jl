@@ -133,7 +133,7 @@ function man_ndof(num_of_dof,onedir=[0.0,-1.0];θ=0.0,k=0.0,c=0.0,unit="mks",res
             ci = Int[]
             cstr_idx = collect(1:3)
         end
-        state = RB.RigidBodyState(prop,nmcs,ro,α,ṙo,ω,ci,cstr_idx)
+        state = RB.RigidBodyState(prop,ro,α,ṙo,ω,ci,cstr_idx)
 
         body = RB.RigidBody(prop,state)
     end
@@ -439,7 +439,7 @@ function man_ndof_2022(num_of_dof,onedir=[1.0,0.0];θ=0.0,k=1250.0,c=0.0,unit="m
 
         nmcs = RB.NCF.NC2P1V(ri,rj,ro,α)
 
-        state = RB.RigidBodyState(prop,nmcs,ro,α,ṙo,ω,ci,cstr_idx)
+        state = RB.RigidBodyState(prop,ro,α,ṙo,ω,ci,cstr_idx)
 
         body = RB.RigidBody(prop,state)
 

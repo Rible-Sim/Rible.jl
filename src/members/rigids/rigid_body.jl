@@ -254,6 +254,7 @@ function update_inertia_cache!(
         prop::RigidBodyProperty,
         q,q̇
     )
+    # constant mass matrix, no need to update
 end
 
 function update_inertia_cache!(
@@ -434,25 +435,26 @@ function update_loci_states!(state::RigidBodyState,
     end
 end
 
-function centrifugal_force!(F,state::AbstractBodyState,cache::AbstractBodyCache)
+function centrifugal_force!(F,state::RigidBodyState,cache::RigidBodyCache)
     (;mass_locus_state,loci_states) = state
     (;Cps,Cg,inertia_cache) = cache
     F .+= inertia_cache.∂T∂qᵀ
 end
 
-function mass_center_force!(F,state::AbstractBodyState,cache::AbstractBodyCache)
+function mass_center_force!(F,state::RigidBodyState,cache::RigidBodyCache)
     (;mass_locus_state,loci_states) = state
     (;Cps,Cg,inertia_cache) = cache
     mul!(F,transpose(Cg),mass_locus_state.force,1,1)
 end
 
-function concentrated_force!(F,state::AbstractBodyState,cache::AbstractBodyCache)
+function concentrated_force!(F,state::RigidBodyState,cache::RigidBodyCache)
     (;mass_locus_state,loci_states) = state
     (;Cps,Cg,inertia_cache) = cache
     for (pid,locus_state) in enumerate(loci_states)
         mul!(F,transpose(Cps[pid]),locus_state.force,1,1)
     end
 end
+
 
 get_id(body::AbstractBody) = body.prop.id
 
@@ -515,6 +517,16 @@ Clear Rigid Body Forces and torques。
 $(TYPEDSIGNATURES)
 """
 function clear_forces!(body::AbstractRigidBody)
+    (;mass_locus_state,loci_states,) = body.state
+    mass_locus_state.force .= 0
+    mass_locus_state.torque .= 0
+    foreach(loci_states) do locus_state
+        locus_state.force .= 0
+        locus_state.torque .= 0
+    end
+end
+
+function reset!(body::AbstractRigidBody)
     (;mass_locus_state,loci_states,) = body.state
     mass_locus_state.force .= 0
     mass_locus_state.torque .= 0

@@ -24,6 +24,7 @@ using Rotations
 using CoordinateTransformations
 using EponymTuples
 using Unitful
+import IterTools
 # solvers
 using RowEchelon
 using NLsolve
@@ -52,6 +53,7 @@ using Observables
 import GeometryBasics as GB
 import ColorTypes as CT
 import Meshing
+import Meshes
 const lift = map
 # docs
 using DocStringExtensions

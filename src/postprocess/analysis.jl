@@ -249,11 +249,11 @@ function isactive(contact)
 end
 function isimpact(contact;Λtol=1e-8) # rule out false active
 	cs = contact.state
-	cs.active && !cs.persistent && norm(cs.Λ) > Λtol
+	cs.active && !cs.persistent && norm(cs.force) > Λtol
 end
 function doespersist(contact;Λtol=1e-8) # rule out false active
 	cs = contact.state
-	cs.active && cs.persistent && norm(cs.Λ) > Λtol
+	cs.active && cs.persistent && norm(cs.force) > Λtol
 end
 function issliding(contact;vtol=1e-8)
 	cs = contact.state
@@ -262,7 +262,9 @@ end
 
 function get_contact_angle(contact;Λtol=1e-7,vtol=Λtol)
 	(;id,μ,e,state) = contact
-	(;active,persistent,v,Λ) = state
+	(;active,persistent) = state
+    Λ = state.force
+    v = state.relative_velocity
 	if active
 		vₙ = v[1]
 		Λₙ = Λ[1]

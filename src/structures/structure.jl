@@ -542,7 +542,7 @@ end
 Return System potential energy
 $(TYPEDSIGNATURES)
 """
-function potential_energy_gravity(st::Structure;factor=1000)
+function potential_energy_gravity(st::Structure;factor=1)
     V = Ref(zero(get_numbertype(st)))
     foreach(st.bodies) do body
         V[] += factor*potential_energy_gravity(body)
@@ -559,17 +559,17 @@ function potential_energy_strain(st::Structure)
 end
 
 function potential_energy(st::Structure;gravity=false)
-    V = zero(get_numbertype(st))
-    V += potential_energy_strain(st)
+    V = Ref(zero(get_numbertype(st)))
+    V[] += potential_energy_strain(st)
     if gravity
-        V += potential_energy_gravity(st)
+        V[] += potential_energy_gravity(st)
     end
     foreach(st.apparatuses) do appar
         if appar.has_force isa Val{true}
             V[] += potential_energy(appar.force)
         end
     end
-    V
+    V[]
 end
 
 """

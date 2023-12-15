@@ -1,27 +1,27 @@
 
-function cstr_function(cst::LinearJoint,structure,q,c)
+function cstr_function(appar::Apparatus{true,false,<:LinearJoint},structure,q,c)
     (;indexed) = structure.connectivity
-    sys_free_coords_idx = indexed.apparid2sys_free_coords_idx[cst.id]
-    (;A,violations) = cst
+    sys_free_coords_idx = indexed.apparid2sys_free_coords_idx[appar.id]
+    (;A,violations) = appar.joint
     A*q[sys_free_coords_idx] .- violations
 end
 
-function cstr_jacobian(cst::LinearJoint,structure,q)
+function cstr_jacobian(appar::Apparatus{true,false,<:LinearJoint},structure,q)
     (;indexed) = structure.connectivity
-    cst.A
+    appar.joint.A
 end
 
-function cstr_forces_jacobian(cst::LinearJoint,structure,q,λ)
+function cstr_forces_jacobian(appar::Apparatus{true,false,<:LinearJoint},structure,q,λ)
     (;indexed) = structure.connectivity
-    sys_free_coords_idx = indexed.apparid2sys_free_coords_idx[cst.id]
+    sys_free_coords_idx = indexed.apparid2sys_free_coords_idx[appar.id]
     n = length(sys_free_coords_idx)
     zeros(eltype(λ),n,n)
 end
 
-function cstr_velocity_jacobian(cst::LinearJoint,structure,q,q̇)
+function cstr_velocity_jacobian(appar::Apparatus{true,false,<:LinearJoint},structure,q,q̇)
     (;indexed) = structure.connectivity
-    sys_free_coords_idx = indexed.apparid2sys_free_coords_idx[cst.id]
-    (;num_of_cstr,) = cst
+    sys_free_coords_idx = indexed.apparid2sys_free_coords_idx[appar.id]
+    (;num_of_cstr,) = appar.joint
     n = length(sys_free_coords_idx)
     zeros(eltype(q̇),num_of_cstr,n)
 end

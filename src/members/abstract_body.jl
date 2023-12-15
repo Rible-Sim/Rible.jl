@@ -20,7 +20,7 @@ update_transformations!(body::AbstractBody,q) = update_transformations!(body.coo
 function body_state2coords_state(body::AbstractBody)
     body_state2coords_state(body.state,body.coords)
 end
-
+function strain!(F,state::AbstractBodyState,cache::AbstractBodyCache) end
 """
 Nonminimal Coordinates State Type.
 $(TYPEDEF)

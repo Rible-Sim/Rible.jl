@@ -310,7 +310,7 @@ function link_to_rigidbody(i,link::RB.URDF.Link,
         ri = ro
         nmcs, _ = RB.NCF.NC1P3V(ri,ro,R,ṙo,ω)
     end
-    state = RB.RigidBodyState(prop,nmcs,ro,R,ṙo,ω,ci,Φi)
+    state = RB.RigidBodyState(prop,ro,R,ṙo,ω,ci,Φi)
     
     rigidmesh = nothing
     if visual !== nothing
