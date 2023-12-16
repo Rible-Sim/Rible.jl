@@ -229,7 +229,7 @@ function solve!(sim::Simulator,solver_cache::Moreau_CCP_Constant_Mass_Cache;
             dt,mass_norm
         )
         restart_count = 0
-        Λ_guess = 10.0
+        Λ_guess = 1.0
         while restart_count < 10
             Λₖ₊₁ .= repeat([Λ_guess,0,0],na)
             x[      1:nq]          .= qₖ₊₁
@@ -248,20 +248,12 @@ function solve!(sim::Simulator,solver_cache::Moreau_CCP_Constant_Mass_Cache;
                     timestep,iteration
                 )
                 normRes = norm(Res)
-                if  normRes < ftol
-                    isconverged = true
-                    iteration_break = iteration-1
-                    break
-                elseif normRes > 1e10
-                    # force restart
-                    iteration_break = iteration-1
-                    isconverged = false
-                    break
-                elseif iteration == maxiters
-                    iteration_break = iteration-1
-                    isconverged = false
-                end
                 if na == 0
+                    if  normRes < ftol
+                        isconverged = true
+                        iteration_break = iteration-1
+                        break
+                    end
                     Δx .= luJac\(-Res)
                     x .+= Δx
                 else # na!=0
@@ -283,7 +275,7 @@ function solve!(sim::Simulator,solver_cache::Moreau_CCP_Constant_Mass_Cache;
                         # @show qr(L).R |> diag
                         # @show :befor, size(𝐍), rank(𝐍), cond(𝐍)
                     end
-                    𝐍 .+= L
+                    # 𝐍 .+= L
                     yₖ₊₁ini = 𝐍*Λₖ₊₁ + 𝐫
                     if false 
                         # @show :after, size(𝐍), rank(𝐍), cond(𝐍)
@@ -296,6 +288,19 @@ function solve!(sim::Simulator,solver_cache::Moreau_CCP_Constant_Mass_Cache;
                     ΔΛₖ₊₁ .= Λₖ₊₁ - Λʳₖ₊₁
                     minusResΛ = -Res + 𝐁*(ΔΛₖ₊₁)
                     normRes = norm(minusResΛ)
+                    if  normRes < ftol
+                        isconverged = true
+                        iteration_break = iteration-1
+                        break
+                    elseif normRes > 1e10
+                        # force restart
+                        iteration_break = iteration-1
+                        isconverged = false
+                        break
+                    elseif iteration == maxiters
+                        iteration_break = iteration-1
+                        isconverged = false
+                    end
                     Δx .= luJac\minusResΛ
                     Λʳₖ₊₁ .= Λₖ₊₁
                     x .+= Δx

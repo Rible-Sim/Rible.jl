@@ -61,7 +61,7 @@ meteor_hammer_DR.traj.q̇[end][end-8:end] .= meteor_hammer.traj.q̇[end][end-8:e
 RB.set_new_initial!(meteor_hammer,meteor_hammer_DR.traj.q[end],meteor_hammer_DR.traj.q̇[end])
 
 
-with_theme(theme_pub;
+GM.activate!(;scalefactor=1);with_theme(theme_pub;
         Poly= (
             transparency = true,
         ) 
@@ -258,7 +258,7 @@ inclined_plane_env = RB.StaticContactSurfaces(
     ]
 )
 
-GM.activate!();with_theme(theme_pub;
+GM.activate!(;scalefactor=1);with_theme(theme_pub;
         Poly= (
             transparency = true,
         ) 
@@ -296,7 +296,7 @@ pnvp2 = [plane_normal'*v for v in vp2 ]
 lines(pnvp2)
 plotsave_contact_persistent(meteor_hammer,tol=0) #src
 
-with_theme(theme_pub;
+GM.activate!(;scalefactor=4);with_theme(theme_pub;
         size = (0.95tw,0.5tw),
         figure_padding = (0,fontsize,0,0),
         Axis3=(
@@ -340,7 +340,7 @@ with_theme(theme_pub;
                 (;r,g,b) = cg[i]
                 RB.viz!(ax,tgvis;meshcolor=Makie.RGBA(r,g,b,alphas[i]))
             end
-            lines!(ax,rp2[:,begin:4001],color=:blue)
+            lines!(ax,rp2[:,begin:4001],color=:red)
             handlemesh = load(joinpath(RB.assetpath(),"把柄.STL")) |> RB.make_patch(;
                 scale = 1/400,
                 trans = [ 0.0, 0.0, 1.55],

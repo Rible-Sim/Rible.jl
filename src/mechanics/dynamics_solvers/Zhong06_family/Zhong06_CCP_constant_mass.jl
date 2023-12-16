@@ -241,7 +241,7 @@ function solve!(sim::Simulator,solver_cache::Zhong06_CCP_Constant_Mass_Cache;
             dt,mass_norm
         )
         restart_count = 0
-        Λ_guess = 1.0
+        Λ_guess = 0.1
         while restart_count < max_restart
             Λₖ .= repeat([Λ_guess,0,0],na)
             x[      1:nq]          .= qₖ
@@ -285,12 +285,12 @@ function solve!(sim::Simulator,solver_cache::Zhong06_CCP_Constant_Mass_Cache;
                         # @show qr(L).R |> diag
                         @show :befor, size(𝐍), rank(𝐍), cond(𝐍)
                     end
-                    # 𝐍 .+= L
+                    𝐍 .+= L
                     yₖini = 𝐍*Λₖ + 𝐫
                     yₖini .= abs.(yₖini)
                     yₖini[begin+1:3:end] .= 0.0
                     yₖini[begin+2:3:end] .= 0.0
-                    IPM!(Λₖ,na,nΛ,Λₖini,yₖini,𝐍,𝐫;ftol=1e-14,Nmax)
+                    IPM!(Λₖ,na,nΛ,Λₖini,yₖini,𝐍,𝐫;ftol,Nmax)
                     ΔΛₖ .= Λₖ - Λʳₖ
                     minusResΛ = -Res + 𝐁*(ΔΛₖ)
                     normRes = norm(minusResΛ)
