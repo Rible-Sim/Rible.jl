@@ -11,3 +11,4 @@ result/
 *.csv
 .DS_Store
 *.pdf
+/notebooks/.ipynb_checkpoints

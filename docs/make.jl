@@ -2,26 +2,9 @@ using Documenter, DocStringExtensions, Literate, DemoCards
 using Rible
 
 cd(@__DIR__)
-# function replace_includes(str)
-
-#     included = [
-#         "1Dfield_temporalprediction.jl",
-#         "2Dfield_crossprediction.jl", 
-#         "2Dfield_temporalprediction.jl"
-#     ]
-
-#     path = dirname(dirname(pathof(Rible)))*"/examples/"
-
-#     for ex in included
-#         content = read(path*ex, String)
-#         str = replace(str, "include(\"$(ex)\")" => content)
-#     end
-#     return str
-# end
-
 
 # 1. generate demo files
-# demopage, postprocess_cb, demo_assets = makedemos("../yard/realdemos"; # this is the relative path to docs/
+# demopage, postprocess_cb, demo_assets = makedemos(""; # this is the relative path to docs/
 #     root = @__DIR__,
 #     src = "src",
 #     build = "build",
@@ -42,8 +25,7 @@ makedocs(
     clean = true, #whether to do clean build
     doctest = true,
     modules = [Rible],
-    # repo = Documenter.Remotes.GitHub("jacobleft/Rible.jl"),# concrete Remotes.Remote object
-    repo = Documenter.Remotes.GitLab("robotgroup/Rible.jl"),# concrete Remotes.Remote object
+    repo = Documenter.Remotes.GitHub("Rible-Sim/Rible.jl"),# concrete Remotes.Remote object
     # remotes = [
     #     path => remote,
     # ],
@@ -52,11 +34,11 @@ makedocs(
     pages = [
         "index.md",
         "setup.md",
-        "Modeling" => [
-            "naturalcoordinates.md",
-            "rigidbody.md",
-            # "cable.md",
-        ],
+        ## "Modeling" => [
+        ##     "naturalcoordinates.md",
+        ##     "rigidbody.md",
+        ##     # "cable.md",
+        ## ],
         # "tensegrity.md",
         # "control.md",
         # "Linearization" => [
@@ -65,12 +47,12 @@ makedocs(
         # "Statics" => [
         #     "inverse_statics.md"
         # ],
-        "Demos" => [
-            "pointmass.md",
-        ],
-        "Dynamics" => [
-            "solvers.md"
-        ],
+        ## "Demos" => [
+        ##     "pointmass.md",
+        ## ],
+        ## "Dynamics" => [
+        ##     "solvers.md"
+        ## ],
         # "Examples" => [
         #     # "tail.md"
         # ]
@@ -89,7 +71,7 @@ makedocs(
         # :parse_error, 
         # :setup_block
     ),
-    workdir = joinpath(@__DIR__, "../yard"), # the working directory where @example and @repl code blocks are executed. 
+    ## workdir = joinpath(@__DIR__, ""), # the working directory where @example and @repl code blocks are executed. 
     format = Documenter.HTML(
         # mathengine = MathJax3(
         #     Dict(
