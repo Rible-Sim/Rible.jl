@@ -14,7 +14,7 @@ end #src
 include(joinpath(pathof(RB),"../../test/vis.jl"))
 includet(joinpath(pathof(RB),"../../test/vis.jl")) #jl
 tw::Float64 = 455.24411 #src
-scalefactor = 4 #nb
+scalefactor = 2 #nb
 include(joinpath(pathof(RB),"../../examples/robots/pointmass.jl"));
 includet(joinpath(pathof(RB),"../../examples/robots/pointmass.jl")) #jl
 #-- deps end
@@ -211,7 +211,7 @@ scatterlines(vl1)  #src
 # visualize
 GM.activate!(;scalefactor); with_theme(theme_pub;
         size = (1tw,0.2tw),
-        figure_padding = (0,fontsize,0,0),
+        figure_padding = (fontsize,fontsize,0,0),
         Axis3 = (
             azimuth = 4.575530633326984,
             elevation = 0.16269908169872405,
@@ -300,9 +300,40 @@ GM.activate!(;scalefactor); with_theme(theme_pub;
     )
     @show extrema(dp1), extrema(vl1)
     colsize!(fig.layout,2,Relative(0.7))
-    colgap!(fig.layout,1,-3fontsize)
-    colgap!(gd2,1,0.5fontsize)
+    colgap!(fig.layout,1,-fontsize)
     savefig(fig,"pointmass_sliding")
     DataInspector(fig)
     fig
 end
+
+# convergence analysis
+dts = [1e-1,5e-2,2e-2,1e-2,5e-3,2e-3,1e-3,1e-5]
+pm_dts = [
+    RB.solve!(
+        RB.DynamicsProblem(
+            deepcopy(pm),
+            inclined_plane,
+            RB.RestitutionFrictionCombined(
+                RB.NewtonRestitution(),
+                RB.CoulombFriction(),
+            )
+        ),
+        RB.DynamicsSolver(
+            solver,
+            RB.InnerLayerContactSolver(
+                RB.InteriorPointMethod()
+            );
+            checkpersist=false
+        );
+        tspan,dt,ftol=1e-14,maxiters=50,exception=true
+    ).prob.bot
+    for dt in dts, solver in (RB.Zhong06(), RB.Moreau(0.5))
+]
+pm_dts[end,1] = pm_dts[end,2]
+fig = Figure()
+ax = Axis(fig[1,1])
+_,err_avg = RB.get_err_avg(pm_dts[:,1];bid=1,pid=1,di=3)
+plot_convergence_order!(ax,dts[begin:end-1],err_avg)
+_,err_avg = RB.get_err_avg(pm_dts[:,2];bid=1,pid=1,di=3)
+plot_convergence_order!(ax,dts[begin:end-1],err_avg)
+fig

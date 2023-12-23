@@ -90,7 +90,7 @@ function plotsave_velocity_restitution(bots,showlegend,
         for (botid,bot) in enumerate(bots)
             ax1 = Axis(grids[botid,1][1,1], xlabel = tlabel, ylabel = L"v~(\mathrm{m/s})")
             ṙp2_mid = get_mid_velocity!(bot,1,2)
-            t_mids = get_time_mids(bot)
+            t_mids = get_mid_times(bot)
             lines!(ax1,t_mids,ṙp2_mid[3,:], label="v́ₙ")
             lines!(ax1,t_mids,ṙp2_mid[1,:], label="v́ₜ" )
             if botid == 4 && showlegend
@@ -189,7 +189,7 @@ function plotsave_point_traj_vel(bots,figname=nothing)
             ṙp2 = get_mid_velocity!(bot,1,2)
             ṙpx = ṙp2[1,:]
             ṙpy = ṙp2[2,:]
-            t_mids = get_time_mids(bot)
+            t_mids = get_mid_times(bot)
             θ_mids = atan.(ṙpy,ṙpx)
             ṙpxy = map(ṙp2.u) do ṙ
                 norm(ṙ[1:2])

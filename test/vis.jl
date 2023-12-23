@@ -401,20 +401,20 @@ function plot_traj!(bot::RB.Robot;
     fig
 end
 
-function savefig(fig,figname=nothing;)
+function savefig(fig,figname=nothing;backend=GM)
     if !isa(figname,Nothing)
         if isdefined(Main,:figdir)
             figpath = joinpath(figdir,figname)
         else
             figpath = figname
         end
-        if Makie.current_backend() == CM
+        if backend == CM
             @info "Saving to $figpath.pdf"
-            CM.save(figpath*".pdf",fig;pt_per_unit=1)
+            save(figpath*".pdf",fig;backend,pt_per_unit=1)
         else
             px_per_unit = ustrip(u"inch",tw*u"pt")*600/tw # 300dpi
             @info "Saving to $figpath.png"
-            GM.save(figpath*".png",fig;px_per_unit)
+            save(figpath*".png",fig;backend,px_per_unit)
         end
     end
     fig
@@ -530,22 +530,22 @@ function plot_self_stress_states(
     end
 end
 
-function plot_convergence_order!(ax,dts,err_avg;show_orders=true)
+function plot_convergence_order!(ax,dts,err_avg;
+    show_orders=true,
+    orders = [1,2],
+    marker=:rect,
+    color=:red,
+    label="NMSI"
+)
 
-    scatterlines!(ax,
-        dts,
-        err_avg;
-        marker=:rect,
-        color=:red,
-        label="NMSI"
-    )
-    
+    scatterlines!(ax,dts,err_avg;marker,color,label)
 
     if show_orders
-        o2 = err_avg[1] .*(dts./dts[1]).^2
-        lines!(ax,dts,o2,label=L"\mathcal{O}(h^2)")
-        o1 = err_avg[1] .*(dts./dts[1])
-        lines!(ax,dts,o1,label=L"\mathcal{O}(h)")
+        for order = orders
+            o = err_avg[1] .*(dts./dts[1]).^order
+            label = ifelse(order==1,L"\mathcal{O}(h)",latexstring("\\mathcal{O}(h^$order)"))
+            lines!(ax,dts,o;label)
+        end
     end
 
     ax.xlabel = L"h~(\mathrm{s})"

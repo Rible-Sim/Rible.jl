@@ -24,12 +24,18 @@ function generate_cache(
         ::Val{true};
         dt,kargs...
     )
-    (;bot) = simulator.prob
+    (;prob) = simulator
+    (;bot) = prob
     (;traj,structure) = bot
+    options = merge(
+        (gravity=true,factor=1,checkpersist=true), #default
+        prob.options,
+        solver.options,
+    )
     (;M,M⁻¹,M̌,M̌⁻¹,Ḿ,M̄)= build_mass_matrices(structure)
     A = make_cstr_jacobian(structure)
     Φ = make_cstr_function(structure)
-    F!(F,q,q̇,t) = generalized_force!(F,bot,q,q̇,t;gravity=false)
+    F!(F,q,q̇,t) = generalized_force!(F,bot,q,q̇,t;gravity=options.gravity)
     Jac_F!(∂F∂q̌,∂F∂q̌̇,q,q̇,t) = generalized_force_jacobain!(∂F∂q̌,∂F∂q̌̇,bot,q,q̇,t)
     q̌0 = traj.q̌[begin]
     λ0 = traj.λ[begin]
@@ -53,7 +59,8 @@ function generate_cache(
             nq̌,nλ,nx,
             initial_x,
             initial_Res,
-            initial_Jac
+            initial_Jac,
+            options
         )
     )
 end

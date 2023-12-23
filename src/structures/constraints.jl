@@ -1,24 +1,51 @@
 
-function cstr_function(appar::Apparatus{true,false,<:LinearJoint},structure,q,c)
+function cstr_function(appar::Apparatus{<:CableJoint},structure,q,c)
+    T = get_numbertype(structure)
+    zeros(T,0)
+end
+
+function cstr_jacobian(appar::Apparatus{<:CableJoint},structure,q)
+    (;apparid2sys_free_coords_idx) = structure.connectivity.indexed
+    jointed_sys_free_idx = apparid2sys_free_coords_idx[appar.id]
+    T = get_numbertype(structure)
+    zeros(T,0,length(jointed_sys_free_idx))
+end
+
+function cstr_forces_jacobian(appar::Apparatus{<:CableJoint},structure,q,λ)
+    (;apparid2sys_free_coords_idx) = structure.connectivity.indexed
+    jointed_sys_free_idx = apparid2sys_free_coords_idx[appar.id]
+    T = get_numbertype(structure)
+    zeros(T,length(jointed_sys_free_idx),length(jointed_sys_free_idx))
+
+end
+
+function cstr_velocity_jacobian(appar::Apparatus{<:CableJoint},structure,q,q̇)
+    (;apparid2sys_free_coords_idx) = structure.connectivity.indexed
+    jointed_sys_free_idx = apparid2sys_free_coords_idx[appar.id]
+    T = get_numbertype(structure)
+    zeros(T,0,length(jointed_sys_free_idx))
+end
+
+function cstr_function(appar::Apparatus{<:LinearJoint},structure,q,c)
     (;indexed) = structure.connectivity
     sys_free_coords_idx = indexed.apparid2sys_free_coords_idx[appar.id]
     (;A,violations) = appar.joint
     A*q[sys_free_coords_idx] .- violations
 end
 
-function cstr_jacobian(appar::Apparatus{true,false,<:LinearJoint},structure,q)
+function cstr_jacobian(appar::Apparatus{<:LinearJoint},structure,q)
     (;indexed) = structure.connectivity
     appar.joint.A
 end
 
-function cstr_forces_jacobian(appar::Apparatus{true,false,<:LinearJoint},structure,q,λ)
+function cstr_forces_jacobian(appar::Apparatus{<:LinearJoint},structure,q,λ)
     (;indexed) = structure.connectivity
     sys_free_coords_idx = indexed.apparid2sys_free_coords_idx[appar.id]
     n = length(sys_free_coords_idx)
     zeros(eltype(λ),n,n)
 end
 
-function cstr_velocity_jacobian(appar::Apparatus{true,false,<:LinearJoint},structure,q,q̇)
+function cstr_velocity_jacobian(appar::Apparatus{<:LinearJoint},structure,q,q̇)
     (;indexed) = structure.connectivity
     sys_free_coords_idx = indexed.apparid2sys_free_coords_idx[appar.id]
     (;num_of_cstr,) = appar.joint
@@ -26,7 +53,7 @@ function cstr_velocity_jacobian(appar::Apparatus{true,false,<:LinearJoint},struc
     zeros(eltype(q̇),num_of_cstr,n)
 end
 
-function cstr_function(appar::Apparatus{true,has_force,<:PrototypeJoint},structure::Structure,q, c = get_local_coords(structure)) where {has_force}
+function cstr_function(appar::Apparatus{<:PrototypeJoint},structure::Structure,q, c = get_local_coords(structure))
     (;indexed,numbered) = structure.connectivity
     (;bodyid2sys_full_coords) = indexed
     (;sys_loci2coords_idx,bodyid2sys_loci_idx) = numbered
@@ -61,7 +88,7 @@ function cstr_function(appar::Apparatus{true,has_force,<:PrototypeJoint},structu
     ret
 end
 
-function cstr_jacobian(appar::Apparatus{true,has_force,<:PrototypeJoint},structure::Structure,q,c = get_local_coords(structure)) where {has_force}
+function cstr_jacobian(appar::Apparatus{<:PrototypeJoint},structure::Structure,q,c = get_local_coords(structure))
     (;indexed,numbered) = structure.connectivity
     (;bodyid2sys_free_coords,
       bodyid2sys_full_coords,
@@ -101,7 +128,7 @@ function cstr_jacobian(appar::Apparatus{true,has_force,<:PrototypeJoint},structu
     @view ret[:,free_idx]
 end
 
-function cstr_forces_jacobian(appar::Apparatus{true,has_force,<:PrototypeJoint},structure,q,λ) where {has_force}
+function cstr_forces_jacobian(appar::Apparatus{<:PrototypeJoint},structure,q,λ)
     (;indexed,numbered) = structure.connectivity
     (;bodyid2sys_free_coords,
       bodyid2sys_full_coords,
@@ -142,7 +169,7 @@ function cstr_forces_jacobian(appar::Apparatus{true,has_force,<:PrototypeJoint},
     @view ret[free_idx,free_idx]
 end
 
-function cstr_velocity_jacobian(appar::Apparatus{true,has_force,<:PrototypeJoint},structure,q,q̇) where {has_force}
+function cstr_velocity_jacobian(appar::Apparatus{<:PrototypeJoint},structure,q,q̇)
     (;indexed,numbered) = structure.connectivity
     (;bodyid2sys_free_coords,
       bodyid2sys_full_coords,

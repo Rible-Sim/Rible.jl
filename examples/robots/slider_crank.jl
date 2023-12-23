@@ -14,7 +14,7 @@ function slider_crank(;θ = 0, coordsType = RB.NCF.NC)
     ω0 = [
         150.0,
         -75.0,
-    ]./20
+    ]./100
     b = 0.05
     a = 0.025
     d = 0.05
@@ -219,48 +219,17 @@ function slider_crank(;θ = 0, coordsType = RB.NCF.NC)
     slider1 = make_slider(4;ro = p3)
     rbs = [base,link1,link2,slider1,]
     rigdibodies = TypeSortedCollection(rbs)
-    numbered = RB.number(rigdibodies)
-    indexed = RB.index(rigdibodies,)
-    force_elements_angular_stiffness = 5.0
-    ss = [
-        RB.RotationalSpringDamper3D(
-            1,
-            [0.0,0,0],
-            Int[],
-            0.0,
-        ),
-        RB.RotationalSpringDamper3D(
-            2,
-            [0.0,0,0],
-            [3],
-            force_elements_angular_stiffness,
-        ),
-        RB.RotationalSpringDamper3D(
-            3,
-            [0.0,0,0],
-            [3],
-            force_elements_angular_stiffness,
-        ),
-        RB.RotationalSpringDamper3D(
-            4,
-            [0.0,0,0],
-            [3],
-            force_elements_angular_stiffness,
-        )
-    ]
-    apparatuses = (spring_dampers = ss, cables = Int[])
-    connected = RB.connect(rbs,zeros(Int,0,0))
-    tensioned = @eponymtuple(connected,)
 
-    j1 = RB.FixedBodyConstraint(1,indexed,base)
-    j2 = RB.RevoluteJoint(2,indexed,RB.Hen2Egg(RB.ID(base ,1,1),RB.ID(link1,1,1)))
-    j3 = RB.RevoluteJoint(3,indexed,RB.Hen2Egg(RB.ID(link1,2,2),RB.ID(link2,1,1)))
-    j4 = RB.RevoluteJoint(4,indexed,RB.Hen2Egg(RB.ID(link2,2,2),RB.ID(slider1,5,5)))
+    j1 = RB.FixedBodyConstraint(1,base)
+    j2 = RB.RevoluteJoint(2,RB.Hen2Egg(RB.ID(base ,1,1),RB.ID(link1,1,1)))
+    j3 = RB.RevoluteJoint(3,RB.Hen2Egg(RB.ID(link1,2,2),RB.ID(link2,1,1)))
+    j4 = RB.RevoluteJoint(4,RB.Hen2Egg(RB.ID(link2,2,2),RB.ID(slider1,5,5)))
 
-    js = [j1,j2,j3,j4]
+    apparatuses = TypeSortedCollection([j1,j2,j3,j4])
 
-    jointed = RB.join(js,indexed)
-    cnt = RB.Connectivity(numbered,indexed,tensioned,jointed)
+    numbered = RB.number(rigdibodies,apparatuses)
+    indexed = RB.index(rigdibodies,apparatuses)
+    cnt = RB.Connectivity(numbered,indexed)
     st = RB.Structure(rigdibodies,apparatuses,cnt)
     RB.Robot(st,)
 end

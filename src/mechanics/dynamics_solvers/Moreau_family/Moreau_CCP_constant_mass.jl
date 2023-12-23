@@ -100,14 +100,12 @@ function make_step_k(
                         (h^2) .*F
 
         𝐫𝐞𝐬[n1+1:n2] .= -mass_norm.*h.*Aₖ₊₁*vₖ₊₁
-        # 𝐫𝐞𝐬[n1+1:n2] .= -mass_norm.*Φ(qₖ₊₁)
         
         𝐉 .= 0.0
         𝐉[   1:n1,   1:n1] .=  1/θ .*M .-h^2 .*(θ .*∂F∂q .+ 1/h.*∂F∂q̇) .- mass_norm.*∂Aᵀλ∂q(qₖ₊₁,λₖ₊₁)
         𝐉[   1:n1,n1+1:n2] .= -mass_norm.*transpose(Aₖ₊₁)
 
         𝐉[n1+1:n2,   1:n1] .= -mass_norm.*(h.*∂Aq̇∂q(qₖ₊₁,vₖ₊₁) .+ 1/θ.*Aₖ₊₁)
-        # 𝐉[n1+1:n2,   1:n1] .= -mass_norm.*Aₖ₊₁
 
         lu𝐉 = lu(𝐉)
 
@@ -137,7 +135,7 @@ function make_step_k(
                 𝐛[is+1:is+3] .= [v́ₜⁱ,0,0]
                 𝐜ᵀ[is+1     ,   1:n1] .= 1/(norm(v́⁺[is+2:is+3])+1e-14)*(v́⁺[is+2]*∂v́⁺∂qₖ₊₁[is+2,:] .+ v́⁺[is+3]*∂v́⁺∂qₖ₊₁[is+3,:])
                 𝐜ᵀ[is+1:is+3,   1:n1] .+= ∂v́⁺∂qₖ₊₁[is+1:is+3,:]
-                𝐜ᵀ[is+1:is+3,n1+1:n2] .= 0.0 #Dⁱₖ₊₁*∂vₖ₊₁∂λₘ
+                𝐜ᵀ[is+1:is+3,n1+1:n2] .= 0.0
             end
             # 𝐜ᵀinv𝐉 = 𝐜ᵀ*inv(𝐉)
             𝐍 .= 𝐜ᵀ*(lu𝐉\𝐁)
@@ -157,7 +155,7 @@ function solve!(sim::Simulator,solver_cache::Moreau_CCP_Constant_Mass_Cache;
                 dt,
                 ftol=1e-14,xtol=ftol,
                 verbose=false,verbose_contact=false,
-                maxiters=50,
+                maxiters=50,max_restart=1,
                 progress=true,exception=true)
     (;prob,controller,tspan,restart,totalstep) = sim
     (;bot,env) = prob
@@ -205,7 +203,7 @@ function solve!(sim::Simulator,solver_cache::Moreau_CCP_Constant_Mass_Cache;
         qₖ₊₁ .= qₖ .+ dt .*q̇ₖ₊₁
         q̇ₖ₊₁ .= q̇ₖ
         contact_cache = activate_frictional_contacts!(structure,env,solver_cache,qˣ;checkpersist=false)
-        (;na) = contact_cache.cache
+        (;na,L) = contact_cache.cache
         isconverged = false
         normRes = typemax(T)
         iteration_break = 0
@@ -230,14 +228,13 @@ function solve!(sim::Simulator,solver_cache::Moreau_CCP_Constant_Mass_Cache;
         )
         restart_count = 0
         Λ_guess = 1.0
-        while restart_count < 10
+        while restart_count < max_restart
             Λₖ₊₁ .= repeat([Λ_guess,0,0],na)
             x[      1:nq]          .= qₖ₊₁
             x[   nq+1:nq+nλ]       .= 0.0
             Λʳₖ₊₁ .= Λₖ₊₁
             Nmax = 50
             for iteration = 1:maxiters
-                # @show iteration,D,ηs,restitution_coefficients,gaps
                 luJac = ns_stepk!(
                     Res,Jac,
                     F,∂F∂q,∂F∂q̇,
@@ -258,13 +255,6 @@ function solve!(sim::Simulator,solver_cache::Moreau_CCP_Constant_Mass_Cache;
                     x .+= Δx
                 else # na!=0
                     get_distribution_law!(structure,contact_cache,x[1:nq])
-                    (;L) = contact_cache.cache
-                    if iteration < 2
-                        Nmax = 50
-                    else
-                        Nmax = 50
-                    end
-                    # Λₖini = repeat([Λ_guess,0,0],na)
                     Λₖ₊₁ini = deepcopy(Λₖ₊₁)
                     Λₖ₊₁ini[begin+1:3:end] .= 0.0
                     Λₖ₊₁ini[begin+2:3:end] .= 0.0
@@ -275,7 +265,7 @@ function solve!(sim::Simulator,solver_cache::Moreau_CCP_Constant_Mass_Cache;
                         # @show qr(L).R |> diag
                         # @show :befor, size(𝐍), rank(𝐍), cond(𝐍)
                     end
-                    # 𝐍 .+= L
+                    𝐍 .+= L
                     yₖ₊₁ini = 𝐍*Λₖ₊₁ + 𝐫
                     if false 
                         # @show :after, size(𝐍), rank(𝐍), cond(𝐍)
@@ -304,15 +294,13 @@ function solve!(sim::Simulator,solver_cache::Moreau_CCP_Constant_Mass_Cache;
                     Δx .= luJac\minusResΛ
                     Λʳₖ₊₁ .= Λₖ₊₁
                     x .+= Δx
-                    # @show timestep, iteration, normRes, norm(Δx), norm(ΔΛₖ)
                 end
             end
             if isconverged
                 break
             end
             restart_count += 1
-            Λ_guess /= 10
-            # @warn "restarting step: $timestep, count: $restart_count, Λ_guess = $Λ_guess"
+            Λ_guess =  max(Λ_guess/10,maximum(abs.(Λₖ₊₁[begin:3:end])))
         end
         qₖ₊₁ .= x[      1:nq]
         λₖ₊₁ .= x[   nq+1:nq+nλ]

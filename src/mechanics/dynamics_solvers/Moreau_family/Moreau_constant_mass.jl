@@ -98,7 +98,6 @@ function solve!(sim::Simulator,cache::Moreau_Constant_Mass_Cache;
                                h^2*F̌ .+
                                mass_norm.*transpose(Aₖ₊₁)*λₖ₊₁
             Res[nq̌+1:nq̌+nλ] .= mass_norm.*h.*Aₖ₊₁*vₖ₊₁
-            # Res[nq̌+1:nq̌+nλ] .= mass_norm.*Φ(qₖ₊₁)
 
         end
     end
@@ -114,7 +113,6 @@ function solve!(sim::Simulator,cache::Moreau_Constant_Mass_Cache;
         Jac[   1:nq̌ ,   1:nq̌ ] .=  1/θ .*M̌.-(h^2) .*(θ .*∂F∂q̌.+1/h.*∂F∂q̌̇) .+ mass_norm.*∂Aᵀλ∂q(qₖ₊₁,λₖ₊₁)
         Jac[   1:nq̌ ,nq̌+1:end] .=  mass_norm.*transpose(Aₖ₊₁)
         Jac[nq̌+1:end,   1:nq̌ ] .=  mass_norm.*(h.*∂Aq̇∂q(qₖ₊₁,vₖ₊₁) .+ 1/θ.*Aₖ₊₁)
-        # Jac[nq̌+1:end,   1:nq̌ ] .=  mass_norm.*Aₖ₊₁
         Jac[nq̌+1:end,nq̌+1:end] .=  0.0
     end
 

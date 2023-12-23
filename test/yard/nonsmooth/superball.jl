@@ -15,11 +15,10 @@ include(joinpath(pathof(RB),"../../test/vis.jl"))
 includet(joinpath(pathof(RB),"../../test/vis.jl")) #jl
 tw::Float64 = 455.24411 #src
 scalefactor = 4
-scalefactor = 2 #src
 include(joinpath(pathof(RB),"../../examples/bodies/rigidbar.jl"))
-includet(joinpath(pathof(RB),"../../examples/bodies/rigidbar.jl"))
+includet(joinpath(pathof(RB),"../../examples/bodies/rigidbar.jl")) #jl
 include(joinpath(pathof(RB),"../../examples/robots/superball.jl"))
-includet(joinpath(pathof(RB),"../../examples/robots/superball.jl"))
+includet(joinpath(pathof(RB),"../../examples/robots/superball.jl")) #jl
 
 # Parameters
 l = 1.7/2
@@ -40,7 +39,7 @@ solver =  RB.DynamicsSolver(
     ),
 )
 
-# First Scenario (rolling)
+# ## First Scenario (rolling)
 ballbot = superball(
     0.0;
     origin_velocity = SVector(7.0,2.0,-7.0),
@@ -68,7 +67,7 @@ h = 1e-2
     tspan,dt=h,ftol=1e-12,maxiters=200,exception=false
 );
 
-GM.activate!(); with_theme(theme_pub;
+GM.activate!(;scalefactor); with_theme(theme_pub;
         figure_padding = (0,0,0,-fontsize),
         size = (1.0tw,0.40tw),
         Axis3 = (
@@ -190,7 +189,7 @@ GM.activate!(); with_theme(theme_pub;
     fig
 end
 
-# Second Scenario
+# ## Second Scenario
 ballbot = superball(
     0.0;
     origin_velocity = SVector(2.0,1.0,0),
@@ -214,7 +213,7 @@ prob = RB.DynamicsProblem(
         RB.CoulombFriction(),
     )
 )
-@time RB.solve!(prob,solver;tspan,dt=h,ftol=1e-14,maxiters=100,exception=false)
+@time RB.solve!(prob,solver;tspan,dt=h,ftol=1e-14,exception=false)
 
 GM.activate!(); plot_traj!(ballbot; #src
     xlims = [-1,10], #src
@@ -223,44 +222,12 @@ GM.activate!(); plot_traj!(ballbot; #src
 ) #src
 GM.activate!(); plotsave_contactpoints(ballbot) #src
 
-me = RB.mechanical_energy!(ballbot)#src
+me = RB.mechanical_energy!(ballbot);
 me.E |> lines#src
 #-- end testing#src
 
-step_start = RB.time2step(1.6,ballbot.traj.t) #src
-step_stop = RB.time2step(2.5,ballbot.traj.t) #src
-r2p1 = RB.get_trajectory!(ballbot,2,1) #src
-r1p2 = RB.get_trajectory!(ballbot,1,2) #src
-r6p2 = RB.get_trajectory!(ballbot,6,2) #src
-lines(r2p1) #src
-lines(r1p2) #src
-lines(r6p2) #src
-
-# convergence analysis
-dts = [1e-2,3e-3,1e-3,3e-4,1e-4,1e-5];
-superballs_dt = [
-    begin
-        ballbot_dt = deepcopy(ballbot)
-        prob = RB.DynamicsProblem(
-            ballbot_dt,flatplane,
-            RB.RestitutionFrictionCombined(
-                RB.NewtonRestitution(),
-                RB.CoulombFriction(),
-            )
-        )
-        RB.solve!(prob,
-            solver;
-            tspan=(0.0,0.1),dt,ftol=1e-14,
-            maxiters=500,exception=false
-        ).prob.bot
-    end
-    for dt in dts
-];
-
-_,err_avg = RB.get_err_avg(superballs_dt;bid=2,pid=1,di=1);
-
 GM.activate!(;scalefactor); with_theme(theme_pub;
-        size = (1.0tw,0.45tw),
+        size = (0.8tw,0.30tw),
         figure_padding = (-2fontsize,0.5fontsize,0,0),
         Axis3 = (
             azimuth = 4.825530633326982,
@@ -268,10 +235,9 @@ GM.activate!(;scalefactor); with_theme(theme_pub;
         )
     ) do
     fig = Figure()
-    gd2 = fig[1,2] = GridLayout()
-    gd3 = fig[2,2] = GridLayout()
-    gd1 = fig[:,1] = GridLayout()
-    steps = 1:100:501    
+    gd1 = fig[1,1] = GridLayout()
+    gd2 = fig[1,2] = GridLayout(;tellheight=false)
+    steps = 1:100:501 
     nstep = length(steps)
     alphas = fill(0.15,nstep)
     alphas[1:3] = [1,0.2,0.2]
@@ -286,7 +252,7 @@ GM.activate!(;scalefactor); with_theme(theme_pub;
         fig = gd1,
         xlims = [-1,6],
         ylims = [-1,3],
-        zlims = [-1e-3,2.4],
+        zlims = [-1e-3,1.55],
         doslide = false,
         showinfo = true,
         showpoints = false,
@@ -308,16 +274,13 @@ GM.activate!(;scalefactor); with_theme(theme_pub;
             end
             lines!(ax,r2p1)
         end
-        # figname = "ballbot"
     )
-    ax2 = Axis(gd2[1,1],xlabel=tlabel,ylabel = "Energy (J)")
-    lines!(ax2,me.E,label="E")
-    lines!(ax2,me.T,label="T")
-    lines!(ax2,me.V,label="V")
+    ax2 = Axis(gd2[1,1];tellheight=false,xlabel=tlabel,ylabel = "Energy (J)")
+    lines!(ax2,ballbot.traj.t,me.E,label="E")
+    lines!(ax2,ballbot.traj.t,me.T,label="T")
+    lines!(ax2,ballbot.traj.t,me.V,label="V")
+    xlims!(ax2,extrema(ballbot.traj.t)...)
     Legend(gd2[1,2],ax2,)
-    ax3 = Axis(gd3[1,1],ylabel="Traj. Err.")
-    plot_convergence_order!(ax3,dts[begin:end-1],err_avg;show_orders=true)
-    Legend(gd3[1,2],ax3)
     Label(
         gd1[1,1,TopLeft()],"($(alphabet[1]))",font=:bold,
         padding = (2.5fontsize,0,0,0)
@@ -325,14 +288,85 @@ GM.activate!(;scalefactor); with_theme(theme_pub;
     Label(
         gd2[1,1,TopLeft()],"($(alphabet[2]))",font=:bold
     )
-    Label(
-        gd3[1,1,TopLeft()],"($(alphabet[3]))",font=:bold
-    )
-    colsize!(fig.layout,1,0.55tw)
-    colgap!(fig.layout,1fontsize)
-    colgap!(gd2,fontsize)
-    colgap!(gd3,fontsize)
+    colsize!(fig.layout,1,0.45tw)
+    rowsize!(gd2,1,0.15tw)
     rowgap!(fig.layout,0)
     savefig(fig,"ballbot_sliding")
+    fig
+end
+
+step_start = RB.time2step(1.6,ballbot.traj.t) #src
+step_stop = RB.time2step(2.5,ballbot.traj.t) #src
+r2p1 = RB.get_trajectory!(ballbot,2,1) #src
+r1p2 = RB.get_trajectory!(ballbot,1,2) #src
+r6p2 = RB.get_trajectory!(ballbot,6,2) #src
+lines(r2p1) #src
+lines(r1p2) #src
+lines(r6p2) #src
+
+# convergence analysis
+dts = vcat([10^(-s) for s in range(2,3.3;length=7)],5e-6)
+stats_superballs_dt = [
+    begin
+        ballbot_dt = deepcopy(ballbot)
+        prob = RB.DynamicsProblem(
+            ballbot_dt,flatplane,
+            RB.RestitutionFrictionCombined(
+                RB.NewtonRestitution(),
+                RB.CoulombFriction(),
+            )
+        )
+        @timed RB.solve!(prob,
+            RB.DynamicsSolver(
+                solver,
+                RB.InnerLayerContactSolver(
+                    RB.InteriorPointMethod()
+                ),
+            );
+            tspan=(0.0,0.1),dt,ftol=1e-14,
+            maxiters=500,exception=false
+        ).prob.bot
+    end
+    for dt in dts, solver in (RB.Zhong06(),RB.Moreau(0.5))
+];
+
+superballs_dt = map((x)->x.value,stats_superballs_dt);
+
+GM.activate!(;scalefactor); with_theme(theme_pub;
+        size = (1tw,0.2tw)
+    ) do
+    fig = Figure()
+    ax1 = Axis(fig[1,1], ylabel="Traj. Err. (m)")
+    ax2 = Axis(fig[1,2], ylabel="Vel. Err. (m)")
+    ax3 = Axis(fig[1,3], xlabel="Traj. Err. (m)", ylabel="Walltime (s)")
+    _,traj_nmsi = RB.get_err_avg(vcat(superballs_dt[begin:end-1,1],superballs_dt[end,2]);bid=2,pid=1,di=1)
+    _,traj_moreau = RB.get_err_avg(superballs_dt[:,2];bid=2,pid=1,di=1)
+    _,vel_nmsi = RB.get_err_avg(vcat(superballs_dt[begin:end-1,1],superballs_dt[end,2]);bid=2,pid=1,di=1,field=:midvel)
+    _,vel_moreau = RB.get_err_avg(superballs_dt[:,2];bid=2,pid=1,di=1,field=:midvel)
+    plot_convergence_order!(ax1,dts[begin:end-1],traj_nmsi;orders=[2])
+    plot_convergence_order!(ax1,dts[begin:end-1],traj_moreau;label="Moreau",color=:blue,marker=:utriangle,orders=[1])
+    plot_convergence_order!(ax2,dts[begin:end-1],vel_nmsi;orders=[2])
+    plot_convergence_order!(ax2,dts[begin:end-1],vel_moreau;label="Moreau",color=:blue,marker=:utriangle,orders=[1])
+    
+    nmsi_time = map((x)->x.time-x.gctime,stats_superballs_dt[begin:end-1,1])
+    moreau_time = map((x)->x.time-x.gctime,stats_superballs_dt[begin:end-1,2])
+    scatterlines!(ax3,traj_moreau,moreau_time;marker=:utriangle,color=:blue,)
+    scatterlines!(ax3,traj_nmsi,nmsi_time;marker=:rect,color=:red)
+    ax3.xscale = Makie.log10
+    ax3.xminorticksvisible = true 
+    ax3.xminorgridvisible = true 
+    ax3.xminorticks = IntervalsBetween(8)
+    ax3.yscale = Makie.log10
+    ax3.yminorticksvisible = true 
+    ax3.yminorgridvisible = true 
+    ax3.yminorticks = IntervalsBetween(4)
+
+    Legend(fig[1,4],ax1)
+
+    Label(fig[1,1,TopLeft()],"($(alphabet[1]))",font=:bold)
+    Label(fig[1,2,TopLeft()],"($(alphabet[2]))",font=:bold)
+    Label(fig[1,3,TopLeft()],"($(alphabet[3]))",font=:bold)
+    colgap!(fig.layout,fontsize)
+    savefig(fig,"ballbot_sliding_convergence";backend=CM)
     fig
 end

@@ -91,7 +91,7 @@ function MakieCore.plot!(viz::Viz{Tuple{S}};
 end
 
 function MakieCore.plot!(viz::Viz{Tuple{S}};
-    ) where S <: Apparatus{false, true,<:CableJoint}
+    ) where S <: Apparatus{<:CableJoint}
     cable_appar_ob = viz[:structure]
 
     seg_ob = lift(cable_appar_ob) do cab
@@ -228,7 +228,6 @@ function MakieCore.plot!(viz::Viz{Tuple{S}};
     end
     viz
 end
-
 
 function build_mesh(body::AbstractRigidBody;update=true,color=nothing)
     (;mesh) = body
@@ -451,15 +450,23 @@ function get_err_avg(bots;bid=1,pid=1,di=1,field=:traj)
         get! = get_trajectory!
     elseif field == :vel
         get! = get_velocity!
+    elseif field == :midvel
+        get! = get_mid_velocity!
+    elseif field == :ang
+        get!(bot,bid,pid) = get_orientation!(bot,bid)
     end
     lastbot_traj = get!(lastbot,bid,pid)
-    lastbot_t = lastbot.traj.t
-    lastbot_dt = lastbot_t[begin+1]-lastbot_t[begin]
+    if field == :midvel
+        lastbot_t = get_mid_times(lastbot)
+    else
+        lastbot_t = lastbot.traj.t
+    end
+    lastbot_dt = lastbot.traj.t[begin+1]-lastbot.traj.t[begin]
     lastbot_traj_itp = begin 
         itp = interpolate(lastbot_traj[di,:], BSpline(Linear()))
         scale(
             itp,
-            lastbot_t[begin]:lastbot_dt:lastbot_t[end]
+            range(lastbot_t[begin],lastbot_t[end];step=lastbot_dt)
         )
     end
     dts = [
@@ -468,7 +475,11 @@ function get_err_avg(bots;bid=1,pid=1,di=1,field=:traj)
     ]
     err_avg = [
         begin
-            (;t) = bot.traj
+            if field == :midvel
+                t = get_mid_times(bot)
+            else
+                (;t) = bot.traj
+            end
             bot_traj_di = get!(
                 bots[i],bid,pid
             )[di,begin:end-1]

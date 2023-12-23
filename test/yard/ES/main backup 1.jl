@@ -736,7 +736,7 @@ function plot_slack_cables(bots,figname=nothing;at=1.23)
             (;cables) = bot.st.apparatuses
             ncables = length(cables)
             f = [get_tension!(bot,j) for j in collect(1:12)]
-            t_mids = get_time_mids(bot)
+            t_mids = get_mid_times(bot)
             step_at = findfirst((x)->x>=at, t_mids)
             noslack = [findall((x)->x>0,fj[1:step_at]) for (j,fj) in enumerate(f)]
             slack   = [findall((x)->x<=0,fj[1:step_at]) for (j,fj) in enumerate(f)]

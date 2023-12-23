@@ -24,7 +24,7 @@ function build_Q̃(structure)
     Q̃ = zeros(T,num_of_free_coords,num_of_dim*num_of_force_apparatuses)
     foreach(structure.apparatuses) do appar
         j = appar.id
-        if appar.has_force isa Val{true}
+        if appar.joint isa CableJoint
             (;hen,egg) = appar.joint
             C1 = hen.bodysig.cache.Cps[hen.pid]
             C2 = egg.bodysig.cache.Cps[egg.pid]

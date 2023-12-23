@@ -15,26 +15,6 @@ function rotation2angles(R::AbstractVector{T}) where {T}
 end
 
 function rotation2angles(R::AbstractMatrix{T}) where {T}
-    R31 = R[3,1]
-    if R31 < 1
-        if R31 > -1
-            θy = asin(-R31)
-            cosθy = cos(θy)
-            θz = atan((R[2,1])/cosθy,(R[1,1])/cosθy)
-            θx = atan((R[3,2])/cosθy,(R[3,3])/cosθy)
-        else # R31 == -1
-            # Not a unique solution
-            θx = zero(T)
-            θy = T(π/2)
-            θz =  -atan(-R[2,3],R[2,2])
-        end
-    else # R31 == 1
-        # Not a unique solution
-        θx = zero(T)
-        θy = -π/2
-        θz = atan(-R[2,3],R[2,2])
-    end
-    [θz,θy,θx]
     c1 = [1.0,0,0]×(R[:,1]/norm(R[:,1]))
     c2 = [0,1.0,0]×(R[:,2]/norm(R[:,2]))
     c3 = [0,0,1.0]×(R[:,3]/norm(R[:,3]))
@@ -54,7 +34,6 @@ function make_jointed2angles(hen2egg,relative_core)
         X_hen = NCF.get_X(nmcs_hen,q_hen)
         X_egg = NCF.get_X(nmcs_egg,q_egg)
         relative_axes = X_egg*X_hen'
-        # angles = [0,0,acos(X_hen[:,2]'*X_egg[:,2]/(norm(X_hen[:,2])*norm(X_egg[:,2])))]
         angles = rotation2angles(relative_axes) 
         angles
     end
@@ -72,11 +51,11 @@ function update_apparatuses!(st::AbstractStructure)
     end
 end
 
-function update_apparatus!(st::AbstractStructure, appar::Apparatus{true,false})
-    #no force, no update
+function update_apparatus!(st::AbstractStructure, appar::Apparatus)
+    #default no update
 end
 
-function update_apparatus!(st::AbstractStructure, appar::Apparatus{false,true,<:CableJoint})
+function update_apparatus!(st::AbstractStructure, appar::Apparatus{<:CableJoint})
     (;id,joint,force) = appar
     (;hen,egg) = joint.hen2egg
     locus_state_hen = hen.bodysig.state.loci_states[hen.pid]
@@ -92,7 +71,7 @@ function update_apparatus!(st::AbstractStructure, appar::Apparatus{false,true,<:
     f_egg .-= force.state.force
 end
 
-function update_apparatuses!(st::AbstractStructure, appar::Apparatus{true,true,<:PrototypeJoint})
+function update_apparatus!(st::AbstractStructure, appar::Apparatus{<:PrototypeJoint,<:RotationalSpringDamper})
     (;indexed,numbered) = st.connectivity
     (;system) = st.state
     (;bodyid2sys_free_coords,
@@ -115,7 +94,7 @@ function update_apparatuses!(st::AbstractStructure, appar::Apparatus{true,true,<
     full_idx = apparid2full_idx[appar.id]
     free_idx = apparid2free_idx[appar.id]
     sys_free_coords_idx = apparid2sys_free_coords_idx[appar.id]
-    spring_damper = spring_dampers[appar.id]
+    spring_damper = appar.force
     (;mask,k) = spring_damper
     (;hen,egg) = hen2egg
     id_hen = hen.bodysig.prop.id
@@ -134,10 +113,6 @@ function update_apparatuses!(st::AbstractStructure, appar::Apparatus{true,true,<
     angles_jacobian = ForwardDiff.jacobian(jointed2angles,q_jointed)
     for i in mask
         torque = torques[i]
-        angle = angles[i]
-        # @show angle
-        # @show angles_jacobian[i,  4:12]*torque
-        # @show angles_jacobian[i,16:end]*torque
         system.F̌[sys_free_coords_idx] .-= angles_jacobian[i,free_idx]*torque
     end
 end

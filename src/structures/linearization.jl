@@ -27,11 +27,9 @@ function cstr_forces_jacobian(st::AbstractStructure,q,λ)
     #todo skip 2D for now
     if get_num_of_dims(st) == 3
         foreach(apparatuses) do appar
-            if appar.has_joint isa Val{true}
-                joint_cstr_idx = num_of_intrinsic_cstr .+ apparid2sys_extrinsic_cstr_idx[appar.id]
-                jointed_sys_free_idx = indexed.apparid2sys_free_coords_idx[appar.id]
-                ret[jointed_sys_free_idx,jointed_sys_free_idx] .+= cstr_forces_jacobian(appar,st,q,λ[joint_cstr_idx])
-            end
+            joint_cstr_idx = num_of_intrinsic_cstr .+ apparid2sys_extrinsic_cstr_idx[appar.id]
+            jointed_sys_free_idx = indexed.apparid2sys_free_coords_idx[appar.id]
+            ret[jointed_sys_free_idx,jointed_sys_free_idx] .+= cstr_forces_jacobian(appar,st,q,λ[joint_cstr_idx])
         end
     end
     ret
@@ -58,11 +56,9 @@ function cstr_velocity_jacobian(st::AbstractStructure,q,q̇)
     #todo skip 2D for now
     if get_num_of_dims(st) == 3
         foreach(apparatuses) do appar
-            if appar.has_joint isa Val{true}
-                joint_cstr_idx = num_of_intrinsic_cstr .+ apparid2sys_extrinsic_cstr_idx[appar.id]
-                jointed_sys_free_idx = indexed.apparid2sys_free_coords_idx[appar.id]
-                ret[joint_cstr_idx,jointed_sys_free_idx] .= cstr_velocity_jacobian(appar,st,q,q̇)
-            end
+            joint_cstr_idx = num_of_intrinsic_cstr .+ apparid2sys_extrinsic_cstr_idx[appar.id]
+            jointed_sys_free_idx = indexed.apparid2sys_free_coords_idx[appar.id]
+            ret[joint_cstr_idx,jointed_sys_free_idx] .= cstr_velocity_jacobian(appar,st,q,q̇)
         end
     end
     ret
@@ -673,13 +669,15 @@ function build_tangent_stiffness_matrix!(∂Q̌∂q̌,st)
             mfree_hen = bodyid2sys_free_coords[body_hen.prop.id]
             mfree_egg = bodyid2sys_free_coords[body_egg.prop.id]
             (;k,c,state,slack) = appar.force
-            (;direction,tension,length,lengthdot) = state
+            (;direction,tension) = state
+            l = state.length
+            l̇ = state.lengthdot
             if slack && (tension==0)
                 ∂Q̌∂q̌ .-= 0
             else
                 D .= direction*transpose(direction)
-                density = tension/length
-                β = c*lengthdot/length + density
+                density = tension/l
+                β = c*l̇/l + density
                 D .*= k-β
                 D .+= β.*Im
                 J̌ .= 0
@@ -691,7 +689,7 @@ function build_tangent_stiffness_matrix!(∂Q̌∂q̌,st)
             # ∂Q̌∂q̌_full[mfree_hen,mfree_egg] .-= transpose(C_hen)*D*C_egg
             # ∂Q̌∂q̌_full[mfree_egg,mfree_hen] .-= transpose(C_egg)*D*C_hen
             # ∂Q̌∂q̌_full[mfree_hen,mfree_hen] .+= transpose(C_hen)*D*C_hen
-        elseif appar.has_force isa Val{true}
+        elseif appar.force isa RotationalSpringDamper
             (;
                 num_of_cstr,
                 hen2egg,
@@ -730,7 +728,6 @@ function build_tangent_stiffness_matrix!(∂Q̌∂q̌,st)
             for i in mask
                 angle = angles[i]
                 torque = torques[i]
-                # @show angle, torque
                 generalized_force_jacobian = torque.*reshaped_angles_hessians[i,:,:] .+ k.*angles_jacobian[i,:]*angles_jacobian[[i],:]
                 # @show generalized_force_jacobian
                 ∂Q̌∂q̌[sys_free_coords_idx,sys_free_coords_idx] .-= generalized_force_jacobian[free_idx,free_idx]

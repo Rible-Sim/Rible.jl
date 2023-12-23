@@ -14,9 +14,9 @@ end #src
 include(joinpath(pathof(RB),"../../test/vis.jl"))
 includet(joinpath(pathof(RB),"../../test/vis.jl")) #jl
 tw::Float64 = 455.24411 #src
-scalefactor = 2 #nb
+scalefactor = 4 #nb
 include(joinpath(pathof(RB),"../../examples/robots/spinningtop.jl"))
-includet(joinpath(pathof(RB),"../../examples/robots/spinningtop.jl"))
+includet(joinpath(pathof(RB),"../../examples/robots/spinningtop.jl")) #jl
 
 
 # solver
@@ -244,7 +244,6 @@ GM.activate!(;scalefactor=4);with_theme(theme_pub;
         t[startstep:skipstep:end],
         (false_me.E[startstep:skipstep:end].-false_me.E[startstep])./false_me.E[startstep]./scaling
     )
-    # ylims!(ax1,-1e-4,1e-4)
     xlims!(ax1,extrema(t)...)
     @myshow true_rp5[3,startstep]
     mo=5
@@ -280,7 +279,6 @@ GM.activate!(;scalefactor=4);with_theme(theme_pub;
 end
 
 # sliding simulation
-
 R = RotX(π/18)
 origin_position = [0,0,0.037]
 Ω = [0,0,50.0]
@@ -316,7 +314,7 @@ vp5 = RB.get_velocity!(tops_e0[1],1,5) #src
 
 
 # Compare
-GM.activate!();with_theme(theme_pub;
+GM.activate!(;scalefactor);with_theme(theme_pub;
         size = (1.0tw,0.45tw),
         figure_padding = (0,1fontsize,0,0),
         Axis3 = (
@@ -445,7 +443,7 @@ GM.activate!();with_theme(theme_pub;
 end
 
 # Compare
-with_theme(theme_pub;
+GM.activate!(;scalefactor);with_theme(theme_pub;
         size = (0.95tw, 0.18tw),
         figure_padding = (0,fontsize/2,0,0)
     ) do
@@ -497,11 +495,11 @@ plotsave_contact_persistent(tops_e0[1],cid=5,tol=0) #src
 #dt
 
 # convergence analysis
-dts = [1e-2,5e-3,3e-3,2e-3,1e-3,5e-4,3e-4,2e-4,1e-4,1e-5]
-tops_dt = [
+dts = vcat([5*10^(-s) for s in range(3,4;length=7)], 1e-6)
+stats_tops_dt = [
     begin
         bot = deepcopy(tops_e0[1])
-        RB.solve!(
+        @timed RB.solve!(
                 RB.DynamicsProblem(
                 bot,
                 planes,
@@ -511,7 +509,7 @@ tops_dt = [
                 )
             ),
             RB.DynamicsSolver(
-                RB.Zhong06(),
+                solver,
                 RB.InnerLayerContactSolver(
                     RB.InteriorPointMethod()
                 );
@@ -519,32 +517,46 @@ tops_dt = [
             tspan=(0.0,0.1),dt,ftol=1e-14,maxiters=50,exception=true
         ).prob.bot
     end
-    for dt in dts
+    for dt in dts, solver in (RB.Zhong06(), RB.Moreau(0.5))
 ];
-
-
-_,traj_err_avg = RB.get_err_avg(tops_dt;bid=1,pid=1,di=1,field=:traj)
-_,vel_err_avg = RB.get_err_avg(tops_dt;bid=1,pid=1,di=1,field=:vel)
-GM.activate!(;scalefactor=4);with_theme(theme_pub;
-        size = (0.7tw,0.2tw),
+tops_dt = map((x)->x.value,stats_tops_dt)
+GM.activate!(;scalefactor);with_theme(theme_pub;
+        size = (1tw,0.2tw),
         figure_padding = (0,fontsize/2,0,0)
     ) do 
     fig = Figure()
-    ax1 = Axis(fig[1,1]; ylabel = "Traj. Err.")
-    ax2 = Axis(fig[1,2]; ylabel = "Vel. Err.")
-    plot_convergence_order!(ax1,dts[begin:end-1],traj_err_avg;show_orders=true)
-    plot_convergence_order!(ax2,dts[begin:end-1],vel_err_avg;show_orders=true)
-    # ax1.xticks = [1e-4,1e-3,1e-2]
-    xlims!(ax1,5e-5,2e-2)
-    xlims!(ax2,5e-5,2e-2)
-    Legend(fig[1,3],ax2)
+    ax1 = Axis(fig[1,1]; ylabel = "Traj. Err. (m)")
+    ax2 = Axis(fig[1,2]; ylabel = "Vel. Err. (m)")
+    ax3 = Axis(fig[1,3]; xlabel = "Traj. Err. (m)", ylabel = "Walltime (s)")
+    _,traj_nmsi = RB.get_err_avg(vcat(tops_dt[begin:end-1,1],tops_dt[end,2]);bid=1,pid=1,di=1,field=:traj)
+    _,vel_nmsi = RB.get_err_avg(vcat(tops_dt[begin:end-1,1],tops_dt[end,2]);bid=1,pid=1,di=1,field=:vel)
+    plot_convergence_order!(ax1,dts[begin:end-1],traj_nmsi;orders=[2])
+    plot_convergence_order!(ax2,dts[begin:end-1],vel_nmsi;orders=[2])
+    _,traj_moreau = RB.get_err_avg(tops_dt[:,2];bid=1,pid=1,di=1,field=:traj)
+    _,vel_moreau = RB.get_err_avg(tops_dt[:,2];bid=1,pid=1,di=1,field=:vel)
+    plot_convergence_order!(ax1,dts[begin:end-1],traj_moreau;label="Moreau",marker=:utriangle,color=:blue,orders=[1])
+    plot_convergence_order!(ax2,dts[begin:end-1],vel_moreau;label="Moreau",marker=:utriangle,color=:blue,orders=[1])
+    nmsi_time = map((x)->x.time-x.gctime,stats_tops_dt[begin:end-1,1])
+    moreau_time = map((x)->x.time-x.gctime,stats_tops_dt[begin:end-1,2])
+    scatterlines!(ax3,traj_moreau,moreau_time;marker=:utriangle,color=:blue,)
+    scatterlines!(ax3,traj_nmsi,nmsi_time;marker=:rect,color=:red)
+    ax3.xscale = Makie.log10
+    ax3.xminorticksvisible = true 
+    ax3.xminorgridvisible = true 
+    ax3.xminorticks = IntervalsBetween(8)
+    ax3.yscale = Makie.log10
+    ax3.yminorticksvisible = true 
+    ax3.yminorgridvisible = true 
+    ax3.yminorticks = IntervalsBetween(4)
+    Legend(fig[1,4],ax2)
     Label(fig[1,1,TopLeft()],"($(alphabet[1]))",font=:bold)
     Label(fig[1,2,TopLeft()],"($(alphabet[2]))",font=:bold)
+    Label(fig[1,3,TopLeft()],"($(alphabet[3]))",font=:bold)
     colgap!(fig.layout,1fontsize)
-    savefig(fig,"spinningtop_order")
+    colsize!(fig.layout,3,Relative(0.24))
+    savefig(fig,"spinningtop_order";backend=CM)
     fig
 end
-
 
 
 

@@ -216,8 +216,7 @@ function solve!(sim::Simulator,solver_cache::Zhong06_CCP_Constant_Mass_Cache;
         qₖ .= qₖ₋₁ .+ dt .*q̇ₖ₋₁
         q̇ₖ .= q̇ₖ₋₁
         contact_cache = activate_frictional_contacts!(structure,env,solver_cache,qˣ;checkpersist=options.checkpersist)
-        (;na) = contact_cache.cache
-        (;L) = contact_cache.cache
+        (;na,L) = contact_cache.cache
         isconverged = false
         normRes = typemax(T)
         iteration_break = 0
@@ -241,7 +240,7 @@ function solve!(sim::Simulator,solver_cache::Zhong06_CCP_Constant_Mass_Cache;
             dt,mass_norm
         )
         restart_count = 0
-        Λ_guess = 0.1
+        Λ_guess = 1.0
         while restart_count < max_restart
             Λₖ .= repeat([Λ_guess,0,0],na)
             x[      1:nq]          .= qₖ
@@ -258,8 +257,8 @@ function solve!(sim::Simulator,solver_cache::Zhong06_CCP_Constant_Mass_Cache;
                     contact_cache,
                     timestep,iteration
                 )
-                normRes = norm(Res)
                 if na == 0
+                    normRes = norm(Res)
                     if  normRes < ftol
                         isconverged = true
                         iteration_break = iteration-1
@@ -269,12 +268,6 @@ function solve!(sim::Simulator,solver_cache::Zhong06_CCP_Constant_Mass_Cache;
                     x .+= Δx
                 else # na!=0
                     get_distribution_law!(structure,contact_cache,x[1:nq])
-                    if iteration < 2
-                        Nmax = 50
-                    else
-                        Nmax = 50
-                    end
-                    # Λₖini = repeat([Λ_guess,0,0],na)
                     Λₖini = deepcopy(Λₖ)
                     Λₖini[begin+1:3:end] .= 0.0
                     Λₖini[begin+2:3:end] .= 0.0
@@ -315,21 +308,21 @@ function solve!(sim::Simulator,solver_cache::Zhong06_CCP_Constant_Mass_Cache;
                         # @show yₖini
                         # display(L)
                         # display(nullspace(L))
-                        # @show Λₖ
+                        @show Λₖ
                         # display(L*Λₖ)
                     end
                     Δx .= luJac\minusResΛ
                     Λʳₖ .= Λₖ
                     x .+= Δx
-                    # @show timestep, iteration, normRes, norm(Δx), norm(ΔΛₖ)
                 end
             end
             if isconverged
                 break
             end
             restart_count += 1
-            Λ_guess /= 10
-            # @warn "restarting step: $timestep, count: $restart_count, Λ_guess = $Λ_guess"
+            if na > 0
+                Λ_guess =  max(Λ_guess/10,10maximum(abs.(Λₖ[begin:3:end])))
+            end
         end
         qₖ .= x[      1:nq]
         λₘ .= x[   nq+1:nq+nλ]

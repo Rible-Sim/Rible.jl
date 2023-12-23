@@ -312,13 +312,11 @@ function cstr_function(structure::AbstractStructure,q,c=get_local_coords(structu
         end
     end
     foreach(apparatuses) do appar
-        if appar.has_joint isa Val{true}
-            jointexcst = num_of_intrinsic_cstr.+apparid2sys_extrinsic_cstr_idx[appar.id]
-            ret[jointexcst] .= cstr_function(appar,structure,
-                q,
-                c
-            )
-        end
+        jointexcst = num_of_intrinsic_cstr.+apparid2sys_extrinsic_cstr_idx[appar.id]
+        ret[jointexcst] .= cstr_function(appar,structure,
+            q,
+            c
+        )
     end
     ret
 end
@@ -353,12 +351,10 @@ function cstr_jacobian(structure::AbstractStructure,q,c=get_local_coords(structu
         end
     end
     foreach(apparatuses) do appar
-        if appar.has_joint isa Val{true}
-            (;id,joint) = appar
-            jointexcst = num_of_intrinsic_cstr.+apparid2sys_extrinsic_cstr_idx[id]
-            jointed_sys_free_idx = apparid2sys_free_coords_idx[id]
-            ret[jointexcst,jointed_sys_free_idx] .= cstr_jacobian(appar,structure,q)
-        end
+        (;id,) = appar
+        jointexcst = num_of_intrinsic_cstr.+apparid2sys_extrinsic_cstr_idx[id]
+        jointed_sys_free_idx = apparid2sys_free_coords_idx[id]
+        ret[jointexcst,jointed_sys_free_idx] .= cstr_jacobian(appar,structure,q)
     end
     ret
 end
@@ -565,7 +561,7 @@ function potential_energy(st::Structure;gravity=false)
         V[] += potential_energy_gravity(st)
     end
     foreach(st.apparatuses) do appar
-        if appar.has_force isa Val{true}
+        if !(appar.force isa Nothing)
             V[] += potential_energy(appar.force)
         end
     end

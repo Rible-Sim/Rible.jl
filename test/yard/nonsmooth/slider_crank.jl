@@ -1,4 +1,6 @@
-include("deps.jl")
+using Revise #jl
+import Rible as RB
+include(joinpath(pathof(RB),"../../test/yard/nonsmooth/deps.jl"))
 using AbbreviatedStackTraces #jl
 ENV["JULIA_STACKTRACE_ABBREVIATED"] = true #jl
 ENV["JULIA_STACKTRACE_MINIMAL"] = true #jl
@@ -9,14 +11,15 @@ if Sys.iswindows() #src
 elseif Sys.isapple() #src
     figdir::String = raw"/Users/jacob/Library/CloudStorage/OneDrive-SharedLibraries-onedrive/Papers/IMSD 2024/LaTex_Abstract" #src
 end #src
-include("../../vis.jl")
-includet("../../vis.jl") #jl
+include(joinpath(pathof(RB),"../../test/vis.jl"))
+includet(joinpath(pathof(RB),"../../test/vis.jl")) #jl
 
 tw = 455.8843 #pt |> pt2px
+scalefactor = 4
 
 #--  slider crank 
-include("../../../examples/robots/slider_crank.jl")
-includet("../../../examples/robots/slider_crank.jl")#jl
+include(joinpath(pathof(RB),"../../examples/robots/slider_crank.jl"))
+includet(joinpath(pathof(RB),"../../examples/robots/slider_crank.jl"))#jl
 
 # natural coordinates
 sc = slider_crank(;coordsType=RB.NCF.NC)
@@ -32,13 +35,85 @@ planes = RB.StaticContactSurfaces(
     ]
 )
 
-GM.activate!(;px_per_unit=2,scalefactor = 2); plot_traj!(sc;showground=false)
+GM.activate!(;scalefactor); plot_traj!(sc;showground=false)
 
 RB.has_constant_mass_matrix(sc)
 
 dt = 5e-4
 tspan = (0.0,2*683dt)
 tspan = (0.0,1.0)
+
+# No Contact Dynamics
+sc = slider_crank(;coordsType=RB.NCF.NC)
+
+prob = RB.DynamicsProblem(sc,)
+RB.solve!(
+    prob,
+    RB.DynamicsSolver(
+        RB.Zhong06()
+        # RB.Moreau(0.5)
+    );
+    dt,tspan,ftol=1e-12,maxiters=50,verbose=true,exception=true,progress=false,
+)
+GM.activate!(;scalefactor=1); plot_traj!(sc;showground=false)
+
+RB.solve!(
+    prob,
+    RB.DynamicsSolver(RB.Moreau(0.5));
+    dt,tspan,ftol=1e-12,maxiters=3,verbose=true,exception=true,progress=false,
+)
+
+
+dts = [
+    1e-3,5e-4,2e-4,1e-4,1e-5
+]
+
+sc_dts = [
+    RB.solve!(
+        RB.DynamicsProblem(
+            slider_crank(;coordsType=RB.NCF.NC),
+        ),
+        RB.DynamicsSolver(solver);
+        dt,
+        tspan=(0.0,0.1),
+        ftol=1e-14,maxiters=50,verbose=false,exception=true,progress=true,
+    ).prob.bot
+    for dt in dts, solver in (RB.Zhong06(), RB.Moreau(1.0)) 
+]
+
+fig = Figure() #src
+ax = Axis(fig[1,1]) #src
+for bot in sc_dts[begin+1:end,1] #src
+    b1r2 = RB.get_mid_velocity!(bot,4,2) #src
+    lines!(ax,RB.get_mid_times(bot),b1r2[2,:]) #src
+end #src
+for bot in sc_dts[begin+1:end,2] #src
+    b1r2 = RB.get_mid_velocity!(bot,4,2) #src
+    lines!(ax,RB.get_mid_times(bot),b1r2[2,:]) #src
+end #src
+fig #src
+
+
+GM.activate!(;scalefactor); with_theme(theme_pub;
+        size = (0.9tw,0.2tw)
+    ) do
+    fig = Figure()
+    ax1 = Axis(fig[1,1],ylabel = "Abs. Err. (rad)")
+    ax2 = Axis(fig[1,2],ylabel = "Abs. Err. (rad/s)")
+    _,err_avg_moreau_traj = RB.get_err_avg(vcat(sc_dts[begin:end-1,2],sc_dts[end,1]);bid=4,pid=2,di=2,field=:traj)
+    plot_convergence_order!(ax1,dts[begin:end-1],err_avg_moreau_traj;show_orders=false,marker=:utriangle,color=:blue,label="Moreau")
+    _,err_avg_nmsi_traj = RB.get_err_avg(sc_dts[:,1];bid=4,pid=2,di=2,field=:traj)
+    plot_convergence_order!(ax1,dts[begin:end-1],err_avg_nmsi_traj,label="NMSI")
+    _,err_avg_moreau_vel = RB.get_err_avg(vcat(sc_dts[begin:end-1,2],sc_dts[end,1]);bid=4,pid=2,di=3,field=:midvel)
+    plot_convergence_order!(ax2,dts[begin:end-1],err_avg_moreau_vel;show_orders=false,marker=:utriangle,color=:blue,label="Moreau")
+    _,err_avg_nmsi_vel = RB.get_err_avg(sc_dts[:,1];bid=4,pid=2,di=3,field=:midvel)
+    plot_convergence_order!(ax2,dts[begin:end-1],err_avg_nmsi_vel,label="NMSI")
+    # axislegend(ax2,position=:rb)
+    Label(fig[1,1,TopLeft()],"($(alphabet[1]))",font=:bold)
+    Label(fig[1,2,TopLeft()],"($(alphabet[2]))",font=:bold)
+    # savefig(fig,"sc_convergence";backend=CM)
+    fig
+end
 
 # No Contact Dynamics
 prob = RB.DynamicsProblem(sc,)
@@ -49,13 +124,7 @@ RB.solve!(
     dt,tspan,ftol=1e-12,maxiters=50,verbose=true,exception=true,progress=false,
 )
 
-RB.solve!(
-    prob,
-    RB.DynamicsSolver(RB.Moreau(1.0));
-    dt,tspan,ftol=1e-12,maxiters=5,verbose=true,exception=true,progress=false,
-)
-
-GM.activate!(;px_per_unit=1,scalefactor = 1);plot_traj!(sc;showground=false)
+GM.activate!(;scalefactor = 1);plot_traj!(sc;showground=false)
 
 me = RB.mechanical_energy!(sc)
 lines(me.E)

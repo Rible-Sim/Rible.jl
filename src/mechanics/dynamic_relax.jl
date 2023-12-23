@@ -98,13 +98,19 @@ function GDR!(
         N=10,
         ξ=1e-7,
         verbose=false,
+        damper=Val(:kinetic),
+        c=0.95,d=20
     )
     reset!(bot)
     (;structure,traj) = bot
     x,x̌,𝛚,𝐛,𝐉 = initialize_GDR(structure,F;gravity)
-    # 𝛄 = make_viscous_damper()
-    𝛄 = make_kinetic_damper()
-    # 𝛄 = make_drift_damper()
+    if damper isa Val{:kinetic}
+        𝛄 = make_kinetic_damper()
+    elseif damper isa Val{:viscous}
+        𝛄 = make_viscous_damper(c)
+    elseif damper isa Val{:drift}
+        𝛄 = make_drift_damper(c,d)
+    end
     t = zero(β)
     r = one.(x̌)
     q = β.*r

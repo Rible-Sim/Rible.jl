@@ -32,9 +32,7 @@ function get_joint_idx(cst::LinearJoint,bodyid2sys_free_coords)
     full_idx, free_idx, sys_free_coords_idx
 end
 
-function FixedBodyConstraint(id::Int,indexed,body::AbstractBody)
-    (;bodyid2sys_free_coords,num_of_free_coords) = indexed
-    bodyid = body.prop.id
+function FixedBodyConstraint(id::Int,body::AbstractBody)
     nmcs = body.coords.nmcs
     state = body.state
     q,_ = cartesian_frame2coords(
@@ -42,21 +40,8 @@ function FixedBodyConstraint(id::Int,indexed,body::AbstractBody)
         state.origin_frame
     )
     independent_free_idx = find_independent_free_idx(nmcs,q)
-    jointed_sys_free_idx = bodyid2sys_free_coords[bodyid][independent_free_idx]
     violations = q[independent_free_idx]
-    num_of_cstr = num_of_free_idx = length(jointed_sys_free_idx)
-    A = zeros(eltype(q),num_of_cstr,num_of_free_idx)
-    for i = 1:num_of_cstr
-        A[i,i] = 1
-    end
-    LinearJoint(
-        id,
-        num_of_cstr,
-        independent_free_idx,
-        jointed_sys_free_idx,
-        A,
-        violations
-    )
+    FixedIndicesConstraint(id,body,independent_free_idx,violations)
 end
 
 function FixedIndicesConstraint(id::Int,body,idx,violations)
@@ -71,8 +56,6 @@ function FixedIndicesConstraint(id::Int,body,idx,violations)
     force = nothing
     Apparatus(
         id,
-        Val(true),
-        Val(false),
         joint,
         force,
     )
@@ -102,27 +85,27 @@ function get_joint_info(joint_type::Symbol)
     (joint_type == :Fixed)              && (return (ntrl = 0, nrot = 0, num_of_dof = 0, num_of_cstr = 6, mask_1st = [1,2,3], mask_2nd = Int[], mask_3rd_hen = Int[], mask_3rd_egg = Int[], mask_4th = [1,2,3])) #t1'*t2, t1'*n, t2'*n
 end
 
-FloatingSphericalJoint(id,hen2egg)  = PrototypeJoint(id,hen2egg,:FloatingSpherical)
-OrbitalSphericalJoint(id,hen2egg)   = PrototypeJoint(id,hen2egg,:OrbitalSpherical)
-PlanarSphericalJoint(id,hen2egg)    = PrototypeJoint(id,hen2egg,:PlanarSpherical)
-PrismaticSphericalJoint(id,hen2egg) = PrototypeJoint(id,hen2egg,:PrismaticSpherical)
-SphericalJoint(id,hen2egg)          = PrototypeJoint(id,hen2egg,:Spherical)
-FloatingUniversalJoint(id,hen2egg)  = PrototypeJoint(id,hen2egg,:FloatingUniversal)
-OrbitalUniversalJoint(id,hen2egg)   = PrototypeJoint(id,hen2egg,:OrbitalUniversal)
-PlanarUniversalJoint(id,hen2egg)    = PrototypeJoint(id,hen2egg,:PlanarUniversal)
-PrismaticUniversalJoint(id,hen2egg) = PrototypeJoint(id,hen2egg,:PrismaticUniversal)
-UniversalPrismaticJoint(id,hen2egg) = PrototypeJoint(id,hen2egg,:UniversalPrismatic)
-UniversalJoint(id,hen2egg)          = PrototypeJoint(id,hen2egg,:Universal)
-FloatingRevoluteJoint(id,hen2egg)   = PrototypeJoint(id,hen2egg,:FloatingRevolute)
-OrbitalRevoluteJoint(id,hen2egg)    = PrototypeJoint(id,hen2egg,:OrbitalRevolute)
-PlanarRevoluteJoint(id,hen2egg)     = PrototypeJoint(id,hen2egg,:PlanarRevolute)
-CylindricalJoint(id,hen2egg)        = PrototypeJoint(id,hen2egg,:Cylindrical)
-RevoluteJoint(id,hen2egg)           = PrototypeJoint(id,hen2egg,:Revolute)
-FloatingJoint(id,hen2egg)           = PrototypeJoint(id,hen2egg,:Floating)
-OrbitalJoint(id,hen2egg)            = PrototypeJoint(id,hen2egg,:Orbital)
-PlanarJoint(id,hen2egg)             = PrototypeJoint(id,hen2egg,:Planar)
-PrismaticJoint(id,hen2egg)          = PrototypeJoint(id,hen2egg,:Prismatic)
-FixedJoint(id,hen2egg)              = PrototypeJoint(id,hen2egg,:Fixed)
+FloatingSphericalJoint(id,hen2egg,force=nothing)  = PrototypeJoint(id,hen2egg,force,:FloatingSpherical)
+OrbitalSphericalJoint(id,hen2egg,force=nothing)   = PrototypeJoint(id,hen2egg,force,:OrbitalSpherical)
+PlanarSphericalJoint(id,hen2egg,force=nothing)    = PrototypeJoint(id,hen2egg,force,:PlanarSpherical)
+PrismaticSphericalJoint(id,hen2egg,force=nothing) = PrototypeJoint(id,hen2egg,force,:PrismaticSpherical)
+SphericalJoint(id,hen2egg,force=nothing)          = PrototypeJoint(id,hen2egg,force,:Spherical)
+FloatingUniversalJoint(id,hen2egg,force=nothing)  = PrototypeJoint(id,hen2egg,force,:FloatingUniversal)
+OrbitalUniversalJoint(id,hen2egg,force=nothing)   = PrototypeJoint(id,hen2egg,force,:OrbitalUniversal)
+PlanarUniversalJoint(id,hen2egg,force=nothing)    = PrototypeJoint(id,hen2egg,force,:PlanarUniversal)
+PrismaticUniversalJoint(id,hen2egg,force=nothing) = PrototypeJoint(id,hen2egg,force,:PrismaticUniversal)
+UniversalPrismaticJoint(id,hen2egg,force=nothing) = PrototypeJoint(id,hen2egg,force,:UniversalPrismatic)
+UniversalJoint(id,hen2egg,force=nothing)          = PrototypeJoint(id,hen2egg,force,:Universal)
+FloatingRevoluteJoint(id,hen2egg,force=nothing)   = PrototypeJoint(id,hen2egg,force,:FloatingRevolute)
+OrbitalRevoluteJoint(id,hen2egg,force=nothing)    = PrototypeJoint(id,hen2egg,force,:OrbitalRevolute)
+PlanarRevoluteJoint(id,hen2egg,force=nothing)     = PrototypeJoint(id,hen2egg,force,:PlanarRevolute)
+CylindricalJoint(id,hen2egg,force=nothing)        = PrototypeJoint(id,hen2egg,force,:Cylindrical)
+RevoluteJoint(id,hen2egg,force=nothing)           = PrototypeJoint(id,hen2egg,force,:Revolute)
+FloatingJoint(id,hen2egg,force=nothing)           = PrototypeJoint(id,hen2egg,force,:Floating)
+OrbitalJoint(id,hen2egg,force=nothing)            = PrototypeJoint(id,hen2egg,force,:Orbital)
+PlanarJoint(id,hen2egg,force=nothing)             = PrototypeJoint(id,hen2egg,force,:Planar)
+PrismaticJoint(id,hen2egg,force=nothing)          = PrototypeJoint(id,hen2egg,force,:Prismatic)
+FixedJoint(id,hen2egg,force=nothing)              = PrototypeJoint(id,hen2egg,force,:Fixed)
 
 const PinJoint = SphericalJoint
 
@@ -144,7 +127,7 @@ end
 """
 $(TYPEDSIGNATURES)
 """
-function PrototypeJoint(id,hen2egg,joint_type::Symbol) 
+function PrototypeJoint(id,hen2egg,force,joint_type::Symbol) 
     (;hen,egg) = hen2egg
     joint_info = get_joint_info(joint_type)
     (;  ntrl, nrot, 
@@ -188,11 +171,8 @@ function PrototypeJoint(id,hen2egg,joint_type::Symbol)
         values,
         cache
     )
-    force = nothing
     Apparatus(
         id,
-        Val(true),
-        Val(false),
         joint,
         force,
     )

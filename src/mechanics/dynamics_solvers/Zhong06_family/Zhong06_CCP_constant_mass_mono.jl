@@ -145,11 +145,6 @@ function make_step_k(
             𝐉[n2+1:n2+ nΛ,    n2+nΛ+1:n2+2nΛ] .= -h.*I(nΛ)
             𝐉[n2+nΛ+1:n2+2nΛ, n2+   1:n2+ nΛ] .=  BlockDiagonal(mat.(y_split))
             𝐉[n2+nΛ+1:n2+2nΛ, n2+nΛ+1:n2+2nΛ] .=  BlockDiagonal(mat.(Λ_split))
-            if timestep == 289
-                @show y_split[1], Λ_split[1]
-                @show v́⁺, 𝐰, y
-                @show qr(𝐉).R |> diag
-            end
         end
         # debug
         # @show norm(D*vₖ + 𝐛), norm(𝐫𝐞𝐬)
@@ -264,7 +259,6 @@ function solve!(sim::Simulator,solver_cache::Zhong06_CCP_Constant_Mass_Mono_Cach
             y .= Λₖ
             x[      1:nq]          .= qₖ
             x[   nq+1:nq+nλ]       .= 0.0
-            Nmax = 50
             for iteration = 1:maxiters
                 ns_stepk!(
                     Res,Jac,
@@ -275,37 +269,23 @@ function solve!(sim::Simulator,solver_cache::Zhong06_CCP_Constant_Mass_Mono_Cach
                     contact_cache,
                     timestep,iteration
                 )
-                normRes = norm(Res,Inf)
-                if  normRes < ftol
-                    isconverged = true
-                    iteration_break = iteration-1
-                    break
-                elseif normRes > 1e10
-                    # force restart
-                    iteration_break = iteration-1
-                    isconverged = false
-                    break
-                elseif iteration == maxiters
-                    iteration_break = iteration-1
-                    isconverged = false
-                end
                 lu𝐉 = lu(Jac)
                 if na == 0
+                    normRes = norm(Res)
+                    if  normRes < ftol
+                        isconverged = true
+                        iteration_break = iteration-1
+                        break
+                    end
                     Δx .= lu𝐉\(-Res)
                     x .+= Δx
                 else # na!=0
                     get_distribution_law!(structure,contact_cache,x[1:nq])
-                    if iteration < 2
-                        Nmax = 50
-                    else
-                        Nmax = 50
-                    end
                     μ = transpose(y)*Λₖ/nΛ
                     Δxp .= lu𝐉\(-Res)
                     αp_Λ = find_cone_step_length(Λ_split,ΔΛp_split,J)
                     αp_y = find_cone_step_length(y_split,Δyp_split,J)
                     αpmax = min(αp_Λ,αp_y)
-                    # αpmax = find_cone_step_length(z_split,W_blocks,Δyp_split,ΔΛp_split,J)
                     αp = min(one(αpmax),0.99αpmax)
                     Λp .= Λₖ .+ αp.*ΔΛp
                     yp .= y .+ αp.*Δyp
@@ -317,16 +297,29 @@ function solve!(sim::Simulator,solver_cache::Zhong06_CCP_Constant_Mass_Mono_Cach
                     τ = σ*μp
                     𝐫𝐞𝐬_c_split = -τ.*𝐞_split.+((Δyp_split)⊙(ΔΛp_split))
                     Res[n2+nΛ+1:n2+2nΛ] .+= reduce(vcat,𝐫𝐞𝐬_c_split)
+                    normRes = norm(Res)
+                    if  normRes < ftol
+                        isconverged = true
+                        iteration_break = iteration-1
+                        break
+                    elseif normRes > 1e10
+                        # force restart
+                        iteration_break = iteration-1
+                        isconverged = false
+                        break
+                    elseif iteration == maxiters
+                        iteration_break = iteration-1
+                        isconverged = false
+                    end
                     Δxc .= lu𝐉\(-Res)
-                    # η = exp(-0.1μ) + 0.9
                     α_Λ = find_cone_step_length(Λ_split,ΔΛc_split,J)
-                    # @show Λ_split,ΔΛc_split
                     α_y = find_cone_step_length(y_split,Δyc_split,J)
                     αmax = min(α_Λ,α_y)
                     α = min(1,0.99αmax)
                     # α_record[iteration] = α
                     x .+= α.*Δxc
                     μ = transpose(y)*Λₖ/nΛ
+                    @show Λₖ
                 end
             end
             if isconverged

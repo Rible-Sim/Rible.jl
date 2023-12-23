@@ -10,3 +10,4 @@ result/
 *.agx
 *.csv
 .DS_Store
+*.pdf

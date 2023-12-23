@@ -1,7 +1,5 @@
-struct Apparatus{bool_joint,bool_force,jointType,forceType}
+struct Apparatus{jointType,forceType}
     id::Int
-    has_joint::Val{bool_joint}
-    has_force::Val{bool_force}
     joint::jointType
     force::forceType
 end
@@ -40,8 +38,6 @@ function connect(bodies, spring_dampers, cm_input=Int[;;], istart = 0)
         force = spring_dampers[j]
         cable = Apparatus(
             istart+j,
-            Val(false),
-            Val(true),
             joint,
             force
         )
@@ -216,10 +212,10 @@ function index(bodies,apparatuses,sharing_input::AbstractMatrix=Int[;;])
             (;id,joint) = apparatus
             apparid2full_idx[id], apparid2free_idx[id], apparid2sys_free_coords_idx[id] = 
             get_joint_idx(joint,bodyid2sys_free_coords)
-            if apparatus.has_joint isa Val{true}
+            if !(apparatus.joint isa Nothing)
                 num_of_joint_apparatuses += 1
             end
-            if apparatus.has_force isa Val{true}
+            if !(apparatus.force isa Nothing)
                 num_of_force_apparatuses += 1
             end
         end

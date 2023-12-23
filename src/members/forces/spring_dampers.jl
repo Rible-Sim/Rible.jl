@@ -130,7 +130,6 @@ end
 $(TYPEDEF)
 """
 struct RotationalSpringDamper{N,T}
-    id::Int
     k::T
     c::T
 	slack::Bool

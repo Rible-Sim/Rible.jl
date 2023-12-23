@@ -15,12 +15,15 @@ includet(joinpath(pathof(RB),"../../test/vis.jl")) #jl
 tw::Float64 = 455.24411 #src
 scalefactor = 4
 
-include(joinpath(pathof(RB),"../../examples/bodies/hammer.jl"))
-includet(joinpath(pathof(RB),"../../examples/bodies/hammer.jl"))
-include(joinpath(pathof(RB),"../../examples/bodies/cable_ancf.jl"))
-includet(joinpath(pathof(RB),"../../examples/bodies/cable_ancf.jl"))
-include(joinpath(pathof(RB),"../../examples/robots/meteor_hammer.jl"))
-includet(joinpath(pathof(RB),"../../examples/robots/meteor_hammer.jl"))
+include( joinpath(pathof(RB),"../../examples/bodies/hammer.jl"))
+includet(joinpath(pathof(RB),"../../examples/bodies/hammer.jl")) #jl
+include( joinpath(pathof(RB),"../../examples/bodies/cable_ancf.jl"))
+includet(joinpath(pathof(RB),"../../examples/bodies/cable_ancf.jl")) #jl
+include( joinpath(pathof(RB),"../../examples/robots/meteor_hammer.jl"))
+includet(joinpath(pathof(RB),"../../examples/robots/meteor_hammer.jl")) #jl
+
+
+# ## Second Scenario
 
 # set up the inclined plane
 R = RotXY(deg2rad(0),deg2rad(-0))
@@ -44,7 +47,7 @@ meteor_hammer_DR = make_meteor_hammer(;
         rjx = [ 0.0,-1.0, 0.0],
         L=1.2,nx=5,doDR=true
 )
-RB.GDR!(meteor_hammer_DR;β=2e-4,maxiters=2e5,verbose=false);
+RB.GDR!(meteor_hammer_DR;β=1e-3,maxiters=2e5,damper=Val(:drift),c=0.9,d=10,verbose=false);
 
 # set the initial conditions
 meteor_hammer = make_meteor_hammer(;
@@ -60,20 +63,19 @@ meteor_hammer_DR.traj.q[end][end-8:end] .= meteor_hammer.traj.q[end][end-8:end]
 meteor_hammer_DR.traj.q̇[end][end-8:end] .= meteor_hammer.traj.q̇[end][end-8:end]
 RB.set_new_initial!(meteor_hammer,meteor_hammer_DR.traj.q[end],meteor_hammer_DR.traj.q̇[end])
 
-
-GM.activate!(;scalefactor=1);with_theme(theme_pub;
-        Poly= (
-            transparency = true,
-        ) 
-    ) do 
-    plot_traj!(
-        meteor_hammer;
-        ground=inclined_plane,
-        xlims=(-1.2,1.0),
-        ylims=(-0.5,0.5),
-        zlims=(-0.4,1.8),
-    )
-end
+GM.activate!(;scalefactor=1);with_theme(theme_pub; #src
+        Poly= ( #src
+            transparency = true, #src
+        )  #src
+    ) do  #src
+    plot_traj!( #src
+        meteor_hammer; #src
+        ground=inclined_plane, #src
+        xlims=(-1.2,1.0), #src
+        ylims=(-0.5,0.5), #src
+        zlims=(-0.4,1.8), #src
+    ) #src
+end #src
 
 # sliding and avg err 
 tspan = (0.0,1.5)
@@ -98,44 +100,15 @@ RB.solve!(
 )
 
 plotsave_contactpoints(meteor_hammer,) #src
-
 rp2 = RB.get_trajectory!(meteor_hammer,6,10)#src
 lines(rp2[2,:])#src
 
-me = RB.mechanical_energy!(meteor_hammer)#src
+me = RB.mechanical_energy!(meteor_hammer)
 lines((me.E.-me.E[begin])./me.E[begin])#src
 
-# Convergence analysis
-# dts = [1e-1,3e-2,1e-2,3e-3,1e-3,1e-4] #src
-dts = [1e-2,5e-3,2e-3,0.99e-3,5e-4,2e-4,2e-5]
-meteor_hammers_dt = [
-    begin
-        meteor_hammer_dt = deepcopy(meteor_hammer)
-        RB.solve!(
-            RB.DynamicsProblem(
-                meteor_hammer_dt,
-                inclined_plane_env,
-                RB.RestitutionFrictionCombined(
-                    RB.NewtonRestitution(),
-                    RB.CoulombFriction(),
-                )
-            ),
-            RB.DynamicsSolver(
-                RB.Zhong06(),
-                RB.InnerLayerContactSolver(
-                    RB.InteriorPointMethod()
-                ),
-            );
-            tspan=(0.0,0.12),dt,ftol=1e-14,maxiters=50,exception=false
-        ).prob.bot
-    end
-    for dt in dts
-]
-
-_, err_avg = RB.get_err_avg(meteor_hammers_dt;bid=6,pid=10,di=1)
 GM.activate!(;scalefactor);with_theme(theme_pub;
-        size = (0.9tw,0.45tw),
-        figure_padding = (fontsize,fontsize,0,0),
+        size = (0.8tw,0.36tw),
+        figure_padding = (fontsize,1.5fontsize,0,0),
         Axis3=(
             azimuth = 7.595530633326987,
             elevation = 0.14269908169872403
@@ -143,14 +116,12 @@ GM.activate!(;scalefactor);with_theme(theme_pub;
     ) do
     bot = meteor_hammer
     (;t) = bot.traj
-    bots = meteor_hammers_dt
     rp1 = RB.get_trajectory!(bot,6,1)
     rp12 = RB.get_trajectory!(bot,6,12)
     rp10 = RB.get_trajectory!(bot,6,10)
     fig = Figure()
-    gd2 = fig[1,2] = GridLayout()
-    gd3 = fig[2,2] = GridLayout()
-    gd1 = fig[:,1] = GridLayout()
+    gd1 = fig[1,1] = GridLayout()
+    gd2 = fig[1,2] = GridLayout(;tellheight=false)
     steps = 1:1000:length(bot.traj)
     laststep = last(steps)
     cg = cgrad(:winter, length(steps), categorical = true, rev = true)
@@ -199,37 +170,93 @@ GM.activate!(;scalefactor);with_theme(theme_pub;
     ax2 = Axis(gd2[1,1],
         xlabel = tlabel,
         ylabel = "Energy (J)",
-        # aspect = DataAspect()
     )
     lines!(ax2,t,me.E,label="E")
     lines!(ax2,t,me.T,label="T")
     lines!(ax2,t,me.V,label="V")
-    # axislegend(ax2)
+    xlims!(ax2,extrema(t)...)
     Legend(gd2[1,2],ax2)
-    ax3 = Axis(gd3[1,1])
-    plot_convergence_order!(ax3,dts[begin:end-1],err_avg;show_orders=true)
-    Legend(gd3[1,2],ax3)
     colsize!(fig.layout,1,0.45tw)
     rowgap!(fig.layout,0)
     Label(
-        gd1[1,1,TopLeft()],"($(alphabet[1]))",font = :bold,
-        padding = (0,0,0,0),
-        justification = :right,
-        lineheight = 1.0,
-        halign = :center,
-        valign = :bottom,        
+        gd1[1,1,TopLeft()],"($(alphabet[1]))",font = :bold,    
     )
     Label(
         gd2[1,1,TopLeft()],"($(alphabet[2]))",font = :bold
     )
-    Label(
-        gd3[1,1,TopLeft()],"($(alphabet[3]))",font = :bold
-    )
+    colsize!(fig.layout,2,Relative(0.36))
+    rowsize!(gd2,1,0.15tw)
+    colgap!(fig.layout,-fontsize)
     savefig(fig,"meteor_sliding")
     fig
 end
 
-# First Scenario
+# Convergence analysis
+dts = vcat([4*10^(-s) for s in range(4,5;length=7)],2e-7)
+stats_meteor_hammers_dt = [
+    begin
+        meteor_hammer_dt = deepcopy(meteor_hammer)
+        @timed RB.solve!(
+            RB.DynamicsProblem(
+                meteor_hammer_dt,
+                inclined_plane_env,
+                RB.RestitutionFrictionCombined(
+                    RB.NewtonRestitution(),
+                    RB.CoulombFriction(),
+                )
+            ),
+            RB.DynamicsSolver(
+                solver,
+                RB.InnerLayerContactSolver(
+                    RB.InteriorPointMethod()
+                ),
+            );
+            tspan=(0.0,0.01),dt,ftol=1e-14,max_restart=3
+        ).prob.bot
+    end
+    for dt in dts, solver = (
+        RB.Zhong06(),
+        RB.Moreau(0.5),
+    )
+]
+meteor_hammers_dt = map((x)->x.value,stats_meteor_hammers_dt);
+
+GM.activate!(;scalefactor);with_theme(theme_pub;
+        size = (1tw,0.2tw),
+    ) do
+    fig = Figure()
+    ax1 = Axis(fig[1,1];ylabel="Traj. Err. (m)")
+    ax2 = Axis(fig[1,2];ylabel="Vel. Err. (m)")
+    ax3 = Axis(fig[1,3];xlabel="Traj. Err. (m)", ylabel="Walltime (s)")
+    _, traj_nmsi = RB.get_err_avg(vcat(meteor_hammers_dt[begin:end-1,1],meteor_hammers_dt[end,2]);bid=6,pid=10,di=1)
+    _, vel_nmsi = RB.get_err_avg(vcat(meteor_hammers_dt[begin:end-1,1],meteor_hammers_dt[end,2]);bid=6,pid=10,di=1,field=:midvel)
+    _, traj_moreau = RB.get_err_avg(meteor_hammers_dt[:,2];bid=6,pid=10,di=1)
+    _, vel_moreau = RB.get_err_avg(meteor_hammers_dt[:,2];bid=6,pid=10,di=1,field=:midvel)
+    plot_convergence_order!(ax1,dts[begin:end-1],traj_nmsi;orders=[2])
+    plot_convergence_order!(ax1,dts[begin:end-1],traj_moreau;label="Moreau",marker=:utriangle,color=:blue,orders=[1])
+    plot_convergence_order!(ax2,dts[begin:end-1],vel_nmsi;orders=[2])
+    plot_convergence_order!(ax2,dts[begin:end-1],vel_moreau;label="Moreau",marker=:utriangle,color=:blue,orders=[1])
+    moreau_time = map((x)->x.time-x.gctime,stats_meteor_hammers_dt[begin:end-1,2])
+    nmsi_time = map((x)->x.time-x.gctime,stats_meteor_hammers_dt[begin:end-1,1])
+    scatterlines!(ax3,traj_moreau,moreau_time;marker=:utriangle,color=:blue,)
+    scatterlines!(ax3,traj_nmsi,nmsi_time;marker=:rect,color=:red)
+    ax3.xscale = Makie.log10
+    ax3.xminorticksvisible = true 
+    ax3.xminorgridvisible = true 
+    ax3.xminorticks = IntervalsBetween(8)
+    ax3.yscale = Makie.log10
+    ax3.yminorticksvisible = true 
+    ax3.yminorgridvisible = true 
+    ax3.yminorticks = IntervalsBetween(4)
+    Legend(fig[1,4],ax1)
+    Label(fig[1,1,TopLeft()],"($(alphabet[1]))",font = :bold)
+    Label(fig[1,2,TopLeft()],"($(alphabet[2]))",font = :bold)
+    Label(fig[1,3,TopLeft()],"($(alphabet[3]))",font = :bold)
+    savefig(fig,"meteor_hammer_convergence";backend=CM)
+    fig
+end
+
+# ## First Scenario
 meteor_hammer_DR = make_meteor_hammer(;
         ri  = [ 0.0, 0.0, 1.5],
         rix = [ 0.0, 0.0,-1.0],
@@ -237,7 +264,7 @@ meteor_hammer_DR = make_meteor_hammer(;
         rjx = [ 0.0,-1.0, 0.0],
         L=1.2,nx=5,doDR=true
 )
-RB.GDR!(meteor_hammer_DR;β=2e-4,maxiters=2e5,verbose=false);
+RB.GDR!(meteor_hammer_DR;β=1e-3,maxiters=2e5,damper=Val(:drift),c=0.9,d=10,verbose=false);
 meteor_hammer = make_meteor_hammer(;
     ri  = [ 0.0, 0.0, 1.5],
     rix = [ 0.0, 0.0,-1.0],
@@ -258,15 +285,15 @@ inclined_plane_env = RB.StaticContactSurfaces(
     ]
 )
 
-GM.activate!(;scalefactor=1);with_theme(theme_pub;
-        Poly= (
-            transparency = true,
-        ) 
-    ) do 
-    plot_traj!(meteor_hammer;
-    ground=inclined_plane
-    )
-end
+GM.activate!(;scalefactor=1);with_theme(theme_pub; #src
+        Poly= ( #src
+            transparency = true, #src
+        )  #src
+    ) do  #src
+    plot_traj!(meteor_hammer; #src
+    ground=inclined_plane #src
+    ) #src
+end #src
 
 h = 2e-4
 tspan = (0.0,1.5)
@@ -292,11 +319,11 @@ me = RB.mechanical_energy!(meteor_hammer)
 lines(meteor_hammer.traj.t,(me.E.-me.E[begin])./me.E[begin])
 rp2 = RB.get_trajectory!(meteor_hammer,6,2)
 vp2 = RB.get_velocity!(meteor_hammer,6,2)
-pnvp2 = [plane_normal'*v for v in vp2 ]
-lines(pnvp2)
+pnvp2 = [plane_normal'*v for v in vp2 ];
+lines(pnvp2) #src
 plotsave_contact_persistent(meteor_hammer,tol=0) #src
 
-GM.activate!(;scalefactor=4);with_theme(theme_pub;
+GM.activate!(;scalefactor);with_theme(theme_pub;
         size = (0.95tw,0.5tw),
         figure_padding = (0,fontsize,0,0),
         Axis3=(
@@ -353,7 +380,7 @@ GM.activate!(;scalefactor=4);with_theme(theme_pub;
         xlabel = tlabel,
         ylabel = L"\acute{v}_n~(\mathrm{m/s})",
     )
-    impact_time = 2995*h
+    impact_time = 2991*h
     step_before_impact = RB.time2step(impact_time,t)
     @myshow step_before_impact
     vminus, vplus = pnvp2[step_before_impact:step_before_impact+1]

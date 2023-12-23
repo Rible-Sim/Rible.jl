@@ -107,32 +107,43 @@ end
 
 function get_orientation!(bot::Robot,bodyid::Int,step_range=:)
     (; structure, traj)= bot
+	(; t, q) = traj
 	T = get_numbertype(bot)
-    R = VectorOfArray(Vector{Matrix{T}}())
+    N = get_num_of_dims(bot)
+    M = 2N-3
+    angles_traj = [
+        zeros(T,M)
+        for _ in eachindex(traj)
+    ]
     bodies = get_bodies(structure)
     body = bodies[bodyid]
-    for (q,q̇) in zip(traj.q, traj.q̇)
-        update_bodies!(structure,q,q̇)
-        update_orientations!(structure)
-        push!(R,body.state.R)
+    for (i,qₖ) in enumerate(q)
+        update_bodies!(structure,qₖ)
+        angles_traj[i] .= body.state.origin_frame.axes.X |> rotation2angles
     end
-    R[step_range] |> VectorOfArray
+    angles_traj[step_range] |> VectorOfArray
 end
 
 function get_angular_velocity!(bot::Robot,bodyid::Int,step_range=:)
     (; structure, traj)= bot
+	(; t, q, q̇) = traj
 	T = get_numbertype(bot)
-    ω = Vector{T}[]
+    N = get_num_of_dims(bot)
+    M = 2N-3
+    angular_velocity_traj = [
+        zeros(T,M)
+        for _ in eachindex(traj)
+    ]
     bodies = get_bodies(structure)
     body = bodies[bodyid]
-    for (q,q̇) in zip(traj.q, traj.q̇)
-        update_bodies!(structure,q,q̇)
-        push!(ω,body.state.ω)
+    for (i,(qₖ,q̇ₖ)) in enumerate(zip(q, q̇))
+        update_bodies!(structure,qₖ,q̇ₖ)
+        angular_velocity_traj[i] .= body.state.origin_frame.angular_velocity
     end
-    ω[step_range] |> VectorOfArray
+    angular_velocity_traj[step_range] |> VectorOfArray
 end
 
-function get_time_mids(bot::Robot)
+function get_mid_times(bot::Robot)
     (;t) = bot.traj
     (t[begin+1:end] .+ t[begin:end-1])./2
 end
@@ -163,7 +174,7 @@ function analyse_energy(tr_input;actuation=false,gravity=false,elasticity=false,
     epes = 0.0
     gpes = 0.0
 
-    restitution_coefficients = kes
+    es = kes
     if elasticity
         if actuation
             as = get_actuation_traj(tr)
@@ -172,16 +183,16 @@ function analyse_energy(tr_input;actuation=false,gravity=false,elasticity=false,
             epes = factor.*[elastic_potential_energy(structure,q) for q in traj.qs]
         end
 
-        restitution_coefficients += epes
+        es += epes
     end
     if gravity
         gpes = factor.*[gravity_potential_energy(structure,q) for q in traj.qs]
-        restitution_coefficients += gpes
+        es += gpes
     end
-    es1 = restitution_coefficients[1]
-    es_err = abs.((restitution_coefficients.-es1)./es1)
+    es1 = es[1]
+    es_err = abs.((es.-es1)./es1)
 
-    kes,epes,gpes,restitution_coefficients,es_err
+    kes,epes,gpes,es,es_err
 end
 
 function string_potential(tgstruct,sol)
