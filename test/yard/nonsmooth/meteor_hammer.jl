@@ -211,7 +211,7 @@ stats_meteor_hammers_dt = [
                     RB.InteriorPointMethod()
                 ),
             );
-            tspan=(0.0,0.01),dt,ftol=1e-14,max_restart=3
+            tspan=(0.0,0.01),dt,ftol=ifelse(dt==2e-7,1e-14,1e-12),max_restart=3
         ).prob.bot
     end
     for dt in dts, solver = (
@@ -253,6 +253,103 @@ GM.activate!(;scalefactor);with_theme(theme_pub;
     Label(fig[1,2,TopLeft()],"($(alphabet[2]))",font = :bold)
     Label(fig[1,3,TopLeft()],"($(alphabet[3]))",font = :bold)
     savefig(fig,"meteor_hammer_convergence";backend=CM)
+    fig
+end
+
+# ## Only Cable
+
+cable = make_meteor_hammer(;
+    ri  = [ 0.0, 0.0, 1.5],
+    rix = [ 0.0, 0.0,-1.0],
+    rj  = [-0.6*√3, 0.0, 1.2],
+    rjx = [ 0.0,-1.0, 0.0],
+    e = 0.0,
+    μ=0.1,L=1.2,nx=5,R=RotY(-π/2),
+    ω=-200n,
+    only_cable=true
+)
+# set the initial conditions
+RB.set_new_initial!(cable,meteor_hammer_DR.traj.q[end][begin:end-9],meteor_hammer_DR.traj.q̇[end][begin:end-9]);
+
+tspan = (0.0,1.5)
+h = 2e-4
+
+RB.solve!(
+    RB.DynamicsProblem(
+        cable,
+        inclined_plane_env,
+        RB.RestitutionFrictionCombined(
+            RB.NewtonRestitution(),
+            RB.CoulombFriction(),
+        )
+    ),
+    RB.DynamicsSolver(
+        RB.Zhong06(),
+        RB.InnerLayerContactSolver(
+            RB.InteriorPointMethod()
+        ),
+    );
+    tspan,dt=h,ftol=1e-12,maxiters=50,exception=false,verbose=false
+)
+
+GM.activate!(;scalefactor);with_theme(theme_pub;
+        size = (0.6tw,0.36tw),
+        figure_padding = (fontsize,1.5fontsize,0,0),
+        Axis3=(
+            azimuth = 7.595530633326987,
+            elevation = 0.14269908169872403
+        )
+    ) do
+    bot = cable
+    (;t) = bot.traj
+    rp1 = RB.get_trajectory!(bot,5,2)
+    fig = Figure()
+    gd1 = fig[1,1] = GridLayout()
+    steps = 1:1000:length(bot.traj)
+    laststep = last(steps)
+    cg = cgrad(:winter, length(steps), categorical = true, rev = true)
+    nstep = length(steps)
+    alphas = fill(0.2,nstep)
+    alphas[1:3] = [1, 0.2, 0.2]
+    alphas[end] = 1
+    plot_traj!(
+        bot;
+        AxisType=Axis3,
+        fig = gd1,
+        showtitle=false,
+        showpoints=false,
+        showlabels=false,
+        showarrows=false,
+        showcables=false,
+        showwire=false,
+        showmesh=false,
+        xlims=(-1.2,1.0),
+        ylims=(-0.3,0.8),
+        zlims=(-0.0,1.8),
+        doslide=false,
+        showinfo=false,
+        ground=inclined_plane,
+        sup! = (ax,_,_) -> begin
+            for (i,step) in enumerate(steps)
+                RB.goto_step!(bot,step)
+                tgvis = deepcopy(bot.structure)
+                (;r,g,b) = cg[i]
+                RB.viz!(ax,tgvis;
+                    meshcolor=Makie.RGBAf(r,g,b,alphas[i])
+                )
+            end
+            lines!(ax,rp1[begin:laststep],color=:red)
+            handlemesh = load(joinpath(RB.assetpath(),"把柄.STL")) |> RB.make_patch(;
+                scale = 1/400,
+                trans = [ 0.0, 0.0, 1.55],
+                rot = RotY(-π/2)
+            )
+            RB.hidey(ax)
+            mesh!(ax,handlemesh)
+        end
+    )
+    colgap!(fig.layout,-fontsize)
+    savefig(fig,"cable_contacting")
     fig
 end
 

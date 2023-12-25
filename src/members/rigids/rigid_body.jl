@@ -40,7 +40,7 @@ function RigidBodyProperty(
             ones(T,size(inertia_input,1)) |> SVector{size(inertia_input,1)}
             for i = 1:length(positions)
         ],
-        friction_coefficients=zeros(T,length(positions)),
+        friction_coefficients=0.5ones(T,length(positions)),
         restitution_coefficients=zeros(T,length(positions));
         visible = true,
         type = :generic

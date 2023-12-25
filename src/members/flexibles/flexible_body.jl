@@ -3,6 +3,10 @@ abstract type AbstractFlexibleBodyProperty{N,T} <: AbstractBodyProperty{N,T} end
 abstract type AbstractFlexibleBodyState{N,T} <: AbstractBodyState{N,T} end
 
 struct FlexibleBodyProperty{N,T} <: AbstractFlexibleBodyProperty{N,T}
+    "Is able to make contact with?"
+    contactable::Bool
+    "Is visible?"
+    visible::Bool
     id::Int
     type::Symbol
     mass::T
@@ -13,8 +17,10 @@ end
 function FlexibleBodyProperty(
         id,type,mass::T,
         mass_center_position::SVector{N,T},positions,
-        friction_coefficients=zeros(T,length(positions)),
+        friction_coefficients=0.5ones(T,length(positions)),
         restitution_coefficients=zeros(T,length(positions));
+        contactable=false,
+        visible=true,
     ) where {N,T}
     VecType = SVector{N}
     mass_locus = Locus(
@@ -33,6 +39,8 @@ function FlexibleBodyProperty(
         )
     ]
     FlexibleBodyProperty(
+        contactable,
+        visible,
         id,type,
         mass,
         mass_locus,
@@ -270,7 +278,8 @@ function potential_energy_strain(fb::AbstractFlexibleBody)
 end
 
 function subdivide(fb::FlexibleBody,nx=1,ny=1,nz=1)
-    (;prop,state,coords,cache) = fb
+    (;state,coords,cache) = fb
+    (;visible,contactable) = fb.prop
     (;e,ė) = cache
     (;nmcs,pres_idx) = coords
     ancs = nmcs
@@ -315,7 +324,9 @@ function subdivide(fb::FlexibleBody,nx=1,ny=1,nz=1)
                 mass,
                 mass_locus,
                 # length(loci),
-                loci
+                loci;
+                visible,
+                contactable
             )
             if i == 1
                 sub_pres_idx = filter((j)->j in 1:6, pres_idx)

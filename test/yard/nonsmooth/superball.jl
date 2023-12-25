@@ -323,7 +323,7 @@ stats_superballs_dt = [
                     RB.InteriorPointMethod()
                 ),
             );
-            tspan=(0.0,0.1),dt,ftol=1e-14,
+            tspan=(0.0,0.1),dt,ftol=ifelse(dt==5e-6,1e-14,1e-12),
             maxiters=500,exception=false
         ).prob.bot
     end
@@ -353,9 +353,10 @@ GM.activate!(;scalefactor); with_theme(theme_pub;
     scatterlines!(ax3,traj_moreau,moreau_time;marker=:utriangle,color=:blue,)
     scatterlines!(ax3,traj_nmsi,nmsi_time;marker=:rect,color=:red)
     ax3.xscale = Makie.log10
+    xlims!(ax3,1e-7,1e-3)
     ax3.xminorticksvisible = true 
     ax3.xminorgridvisible = true 
-    ax3.xminorticks = IntervalsBetween(8)
+    ax3.xminorticks = IntervalsBetween(4)
     ax3.yscale = Makie.log10
     ax3.yminorticksvisible = true 
     ax3.yminorgridvisible = true 

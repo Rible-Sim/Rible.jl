@@ -28,20 +28,20 @@ using GLMakie
 # )
 
 
-## Literate.notebook(
-##     joinpath(@__DIR__,"meteor_hammer.jl"), 
-##     joinpath(@__DIR__,"../../../notebooks/");
-##     name="meteor_hammer",
-##     execute = true,
-##     # documenter = false,
-## )
-
-
 Literate.notebook(
-    joinpath(@__DIR__,"superball.jl"), 
+    joinpath(@__DIR__,"meteor_hammer.jl"), 
     joinpath(@__DIR__,"../../../notebooks/");
-    name="superball",
+    name="meteor_hammer",
     execute = true,
     # documenter = false,
 )
+
+
+## Literate.notebook(
+##     joinpath(@__DIR__,"superball.jl"), 
+##     joinpath(@__DIR__,"../../../notebooks/");
+##     name="superball",
+##     execute = true,
+##     # documenter = false,
+## )
 GLMakie.closeall()

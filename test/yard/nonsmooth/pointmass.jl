@@ -205,7 +205,6 @@ rp1 = RB.get_trajectory!(pm,1,1)
 ṙp1 = RB.get_velocity!(pm,1,1)
 dp1 = rp1.u .|> norm
 vl1 = [u ⋅ normalize(origin_velocity) for u in ṙp1];
-## overshoot! not anymore?! #src
 scatterlines(vl1)  #src
 
 # visualize
@@ -330,10 +329,16 @@ pm_dts = [
     for dt in dts, solver in (RB.Zhong06(), RB.Moreau(0.5))
 ]
 pm_dts[end,1] = pm_dts[end,2]
-fig = Figure()
-ax = Axis(fig[1,1])
-_,err_avg = RB.get_err_avg(pm_dts[:,1];bid=1,pid=1,di=3)
-plot_convergence_order!(ax,dts[begin:end-1],err_avg)
-_,err_avg = RB.get_err_avg(pm_dts[:,2];bid=1,pid=1,di=3)
-plot_convergence_order!(ax,dts[begin:end-1],err_avg)
-fig
+GM.activate!(;scalefactor); with_theme(theme_pub;
+        size = (0.4tw,0.2tw)
+    ) do
+    fig = Figure()
+    ax = Axis(fig[1,1],ylabel = "Abs. Err.")
+    _,err_nmsi = RB.get_err_avg(pm_dts[:,1];bid=1,pid=1,di=3)
+    plot_convergence_order!(ax,dts[begin:end-1],err_nmsi;orders=[2],label="NMSI")
+    _,err_moreau = RB.get_err_avg(pm_dts[:,2];bid=1,pid=1,di=3)
+    plot_convergence_order!(ax,dts[begin:end-1],err_moreau;orders=[1],marker=:utriangle,color=:blue,label="Moreau")
+    Legend(fig[1,2],ax,)
+    savefig(fig,"pointmass_convergence";backend=CM)
+    fig
+end
