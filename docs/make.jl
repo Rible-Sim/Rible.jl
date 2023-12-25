@@ -32,14 +32,13 @@ makedocs(
     highlightsig = true,
     sitename = "Rible.jl",
     pages = [
-        "index.md",
-        "setup.md",
+        ## "index.md",
+        ## "setup.md",
         ## "Modeling" => [
         ##     "naturalcoordinates.md",
         ##     "rigidbody.md",
         ##     # "cable.md",
         ## ],
-        # "tensegrity.md",
         # "control.md",
         # "Linearization" => [
         #     "linearization.md"
@@ -53,9 +52,6 @@ makedocs(
         ## "Dynamics" => [
         ##     "solvers.md"
         ## ],
-        # "Examples" => [
-        #     # "tail.md"
-        # ]
     ],
     pagesonly = true,
     draft = false,
