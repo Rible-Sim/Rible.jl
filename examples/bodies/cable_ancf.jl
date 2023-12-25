@@ -1,4 +1,4 @@
-function cable_ancf(pres_idx, 𝐞, L = 1.0) 
+function cable_ancf(pres_idx, 𝐞, L = 1.0;contactable=false) 
     radius = 2.0e-3
     # ancs = RB.ANCF.ANC3DRURU(8.96e3;E=110e6,L,radius)
     # mat_cable = filter(
@@ -26,7 +26,8 @@ function cable_ancf(pres_idx, 𝐞, L = 1.0)
         mass,
         mass_locus,
         # length(loci),
-        loci
+        loci;
+        contactable
     )
     # cache = RB.BodyCache(prop,ancs,𝐞)
     state, coords, cache = RB.FlexibleBodyState(prop,ancs,𝐞;pres_idx)

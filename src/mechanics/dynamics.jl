@@ -126,24 +126,22 @@ function activate_frictional_contacts!(structure,contact_env,solver_cache,q;chec
         (;loci_states) = state
         contacts_bits[bodyid2sys_loci_idx[bid]] .= false
         persistent_bits[bodyid2sys_loci_idx[bid]] .= false
-        if body isa AbstractRigidBody
-            if body.prop.contactable
-                for pid in eachindex(loci_states)
-                    locus_state = loci_states[pid]
-                    (;frame,contact_state) = locus_state
-                    gap, normal = contact_gap_and_normal(frame.position,surfaces)
-                    if !checkpersist
-                        contact_state.active = false
+        if body.prop.contactable
+            for pid in eachindex(loci_states)
+                locus_state = loci_states[pid]
+                (;frame,contact_state) = locus_state
+                gap, normal = contact_gap_and_normal(frame.position,surfaces)
+                if !checkpersist
+                    contact_state.active = false
+                end
+                activate!(contact_state,gap)
+                if contact_state.active
+                    contacts_bits[bodyid2sys_loci_idx[bid][pid]] = true
+                    contact_state.axes = spatial_axes(normal)
+                    if contact_state.persistent
+                        persistent_bits[bodyid2sys_loci_idx[bid][pid]] = true
                     end
-                    activate!(contact_state,gap)
-                    if contact_state.active
-                        contacts_bits[bodyid2sys_loci_idx[bid][pid]] = true
-                        contact_state.axes = spatial_axes(normal)
-                        if contact_state.persistent
-                            persistent_bits[bodyid2sys_loci_idx[bid][pid]] = true
-                        end
-                        na += 1
-                    end
+                    na += 1
                 end
             end
         end
@@ -203,24 +201,22 @@ function activate_contacts!(structure,contact_env,solver_cache,q;checkpersist=tr
         (;loci_states) = state
         contacts_bits[bodyid2sys_loci_idx[bid]] .= false
         persistent_bits[bodyid2sys_loci_idx[bid]] .= false
-        if body isa AbstractRigidBody
-            if body.prop.contactable
-                for pid in eachindex(loci_states)
-                    locus_state = loci_states[pid]
-                    (;frame,contact_state) = locus_state
-                    gap, normal = contact_gap_and_normal(frame.position,surfaces)
-                    if !checkpersist
-                        contact_state.active = false
+        if body.prop.contactable
+            for pid in eachindex(loci_states)
+                locus_state = loci_states[pid]
+                (;frame,contact_state) = locus_state
+                gap, normal = contact_gap_and_normal(frame.position,surfaces)
+                if !checkpersist
+                    contact_state.active = false
+                end
+                activate!(contact_state,gap)
+                if contact_state.active
+                    contacts_bits[bodyid2sys_loci_idx[bid][pid]] = true
+                    contact_state.axes = spatial_axes(normal)
+                    if contact_state.persistent
+                        persistent_bits[bodyid2sys_loci_idx[bid][pid]] = true
                     end
-                    activate!(contact_state,gap)
-                    if contact_state.active
-                        contacts_bits[bodyid2sys_loci_idx[bid][pid]] = true
-                        contact_state.axes = spatial_axes(normal)
-                        if contact_state.persistent
-                            persistent_bits[bodyid2sys_loci_idx[bid][pid]] = true
-                        end
-                        na += 1
-                    end
+                    na += 1
                 end
             end
         end
@@ -278,13 +274,18 @@ function get_frictional_directions_and_positions!(structure,cache, q, q̇, Λ, )
     ∂DᵀΛ∂q .= 0
     foreach(structure.bodies) do body
         (;prop,state,coords,cache) = body
+        if body isa AbstractRigidBody
+            Cps = cache.Cps
+        elseif body isa AbstractFlexibleBody
+            Cps = cache.Sps
+        end
         bid = prop.id
         (;loci_states) = state
         for (pid,locus_state) in enumerate(loci_states)
             (;frame,contact_state) = locus_state
             if contact_state.active
                 (;normal,tangent,bitangent) = contact_state.axes
-                C = cache.Cps[pid]
+                C = Cps[pid]
                 CT = C*build_T(structure,bid)
                 dm = hcat(normal,tangent,bitangent) |> transpose
                 ci = bodyid2act_idx[bid][pid]
