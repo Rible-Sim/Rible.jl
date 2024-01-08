@@ -31,6 +31,7 @@ halfspaces = RB.StaticContactSurfaces(
 wt = woodpecker() 
 wt = woodpecker(;case=3,frictional_coefﬁcient = 0.35) #src
 dt = 1e-4
+tspan = (0.0,3637dt)
 tspan = (0.0,2.0)
 prob = RB.DynamicsProblem(
     wt,
@@ -47,18 +48,20 @@ RB.solve!(
     RB.DynamicsSolver(
         RB.Zhong06(),
         RB.InnerLayerContactSolver(
+        ## RB.MonolithicContactSolver(
             RB.InteriorPointMethod()
         )
     );
-    dt,tspan,ftol=1e-10,maxiters=50,verbose=false,
+    dt,tspan,ftol=1e-11,maxiters=20,verbose_contact=false,
     exception=false,progress=false,
-    max_restart=3
+    max_restart=1
 )
 
+GM.activate!(;scalefactor=1);plot_traj!(wt;showmesh=false,showground=false) #src
 b1vg = RB.get_mid_velocity!(wt,1,0) #src
 lines(b1vg[3,:]) #src
 
-GM.activate!(;scalefactor);with_theme(theme_pub;
+GM.activate!(;scalefactor=1);with_theme(theme_pub;
         size = (1tw,0.24tw),
         figure_padding = (0,fontsize,0,0)
     ) do 
@@ -76,7 +79,7 @@ GM.activate!(;scalefactor);with_theme(theme_pub;
 
     period = 0.13054830287206265
     @show f = 1/period
-    stiction_times = collect(0.05:period:2.0)
+    stiction_times = collect(0.05:period:1.0)
     stiction_steps = RB.time2step.(stiction_times,Ref(wt.traj.t))
     falling_distances = b1g[3,stiction_steps]
     @show length(falling_distances) - 1
@@ -101,7 +104,7 @@ GM.activate!(;scalefactor);with_theme(theme_pub;
     Label(fig[1,4,TopLeft()],"($(alphabet[4]))",font=:bold)
     colsize!(fig.layout,2,Relative(0.2))
     colgap!(fig.layout,0.5fontsize)
-    savefig(fig,"limit_cycles";backend=CM)
+    ## savefig(fig,"limit_cycles";backend=CM)
     fig
 end
 

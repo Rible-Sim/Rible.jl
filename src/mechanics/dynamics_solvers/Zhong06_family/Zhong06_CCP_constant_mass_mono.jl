@@ -103,15 +103,16 @@ function make_step_k(
         𝐉[n1+1:n2,   1:n1] .=  -mass_norm.*Aₖ
 
         if na != 0
+            get_distribution_law!(structure,contact_cache,qₖ)
             (;
                 H,
                 restitution_coefficients,
                 D,
+                L,
             ) = contact_cache.cache
             Dₘ = contact_cache.cache.Dper
             Dₖ = contact_cache.cache.Dimp
-            𝐫𝐞𝐬[   1:n1]  .-= h.*mass_norm.*transpose(D)*H*Λₖ 
-
+            𝐫𝐞𝐬[   1:n1]  .-= h.*mass_norm.*transpose(D)*H*(I)*Λₖ 
             pₖ .= Momentum_k(qₖ₋₁,pₖ₋₁,qₖ,λₘ,M,A,mass_norm,h)
             vₖ .= invM*pₖ        
             ∂vₘ∂qₖ = 1/h*I
@@ -140,7 +141,7 @@ function make_step_k(
             end
             𝐫𝐞𝐬[(n2   +1):(n2+ nΛ)] .= (h.*(v́⁺ .+ 𝐰) .- h.*y)
             𝐫𝐞𝐬[n2+nΛ+1:n2+2nΛ]     .= reduce(vcat,Λ_split⊙y_split)
-            𝐉[      1:n1    , n2+   1:n2+ nΛ] .=  -mass_norm*h .*transpose(D)*H
+            𝐉[      1:n1    , n2+   1:n2+ nΛ] .=  -mass_norm*h .*transpose(D)*H*(I)
             𝐉[n2+1:n2+ nΛ,      1:n2    ]     .=  h.*∂y∂x
             𝐉[n2+1:n2+ nΛ,    n2+nΛ+1:n2+2nΛ] .= -h.*I(nΛ)
             𝐉[n2+nΛ+1:n2+2nΛ, n2+   1:n2+ nΛ] .=  BlockDiagonal(mat.(y_split))
@@ -280,7 +281,6 @@ function solve!(sim::Simulator,solver_cache::Zhong06_CCP_Constant_Mass_Mono_Cach
                     Δx .= lu𝐉\(-Res)
                     x .+= Δx
                 else # na!=0
-                    get_distribution_law!(structure,contact_cache,x[1:nq])
                     μ = transpose(y)*Λₖ/nΛ
                     Δxp .= lu𝐉\(-Res)
                     αp_Λ = find_cone_step_length(Λ_split,ΔΛp_split,J)
@@ -319,7 +319,9 @@ function solve!(sim::Simulator,solver_cache::Zhong06_CCP_Constant_Mass_Mono_Cach
                     # α_record[iteration] = α
                     x .+= α.*Δxc
                     μ = transpose(y)*Λₖ/nΛ
-                    @show Λₖ
+                    if timestep == 763
+                        @show Λₖ, normRes, μ, cond(Jac),L
+                    end
                 end
             end
             if isconverged

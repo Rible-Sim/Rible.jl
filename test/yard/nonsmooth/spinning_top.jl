@@ -67,10 +67,11 @@ RB.solve!(
 
 GM.activate!(;scalefactor=4);with_theme(theme_pub;
         size = (1.0tw,0.3tw),
-        figure_padding = (-3fontsize,fontsize,0,0),
+        figure_padding = (-2.5fontsize,fontsize,0,0),
         Axis3 = (
             azimuth = 5.1155306333269825,
             elevation = 0.1426990816987241,
+            zlabeloffset = 1.5fontsize
         ),
         Poly = (
             cycle = [:patchcolor=>:color],
@@ -149,7 +150,7 @@ GM.activate!(;scalefactor=4);with_theme(theme_pub;
     Label(
         fig[1,1,TopLeft()],
         rich("($(alphabet[1]))",font=:bold),
-        padding = (0,-fontsize,0,0),
+        padding = (0,-2.5fontsize,0,0),
         halign = :right,
         
     )
@@ -166,7 +167,7 @@ GM.activate!(;scalefactor=4);with_theme(theme_pub;
         rich("($(alphabet[4]))",font=:bold)
     )
     colsize!(fig.layout,2,Relative(0.55))
-    colgap!(fig.layout,-fontsize)
+    colgap!(fig.layout,0)
     rowgap!(gd2,0)
     colgap!(gd2,0.5fontsize)
     savefig(fig,"spinningtop_drop")

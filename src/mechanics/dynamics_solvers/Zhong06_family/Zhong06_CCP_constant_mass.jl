@@ -82,7 +82,7 @@ function make_step_k(
             x,Λₖ,
             structure,
             contact_cache,
-            timestep,iteration
+            timestep,iteration,α=1
         )
         # @show timestep, iteration, na
         qₖ = @view x[   1:n1]
@@ -148,9 +148,15 @@ function make_step_k(
                 𝐜ᵀ[is+1:is+3,   1:n1] .+= ∂v́⁺∂qₖ[is+1:is+3,:]
                 𝐜ᵀ[is+1:is+3,n1+1:n2] .= Dⁱₖ*∂vₖ∂λₘ
             end
+            if timestep == 3092
+                    ## @show v́⁺, (v́⁺+𝐛), α
+                    ## @show 𝐜ᵀ
+                    ## @show vₙⁱₖ₋₁, restitution_coefficients
+                    ## @show restitution_coefficients[i]*min(vₙⁱₖ₋₁,0)
+            end
             # 𝐜ᵀinv𝐉 = 𝐜ᵀ*inv(𝐉)
-            𝐍 .= 𝐜ᵀ*(lu𝐉\𝐁)
-            𝐫 .= (v́⁺ + 𝐛) .-𝐜ᵀ*(lu𝐉\(𝐫𝐞𝐬 + 𝐁*Λₖ))
+            𝐍 .= α.*𝐜ᵀ*(lu𝐉\𝐁)
+            𝐫 .= (v́⁺ + 𝐛) .-𝐜ᵀ*(lu𝐉\(𝐫𝐞𝐬 + α.*𝐁*Λₖ))
         end
         lu𝐉
         # debug
@@ -191,8 +197,15 @@ function solve!(sim::Simulator,solver_cache::Zhong06_CCP_Constant_Mass_Cache;
     x = zero(Δx)
     Res = zero(Δx)
     Jac = zeros(T,nx,nx)
+    Res0 = zero(Δx)
+    Jac0 = zeros(T,nx,nx)
+    Res_α0 = zero(Δx)
+    Jac_α0 = zeros(T,nx,nx)
+    Res_α1 = zero(Δx)
+    Jac_α1 = zeros(T,nx,nx)
     mr = norm(M,Inf)
     mass_norm = mr
+    α0 = 1.0
 
     iteration = 0
     prog = Progress(totalstep; dt=1.0, enabled=progress)
@@ -240,7 +253,7 @@ function solve!(sim::Simulator,solver_cache::Zhong06_CCP_Constant_Mass_Cache;
             dt,mass_norm
         )
         restart_count = 0
-        Λ_guess = 1.0
+        Λ_guess = 0.1
         while restart_count < max_restart
             Λₖ .= repeat([Λ_guess,0,0],na)
             x[      1:nq]          .= qₖ
@@ -248,11 +261,19 @@ function solve!(sim::Simulator,solver_cache::Zhong06_CCP_Constant_Mass_Cache;
             Λʳₖ .= Λₖ
             Nmax = 50
             for iteration = 1:maxiters
+                if timestep == 3092
+                    ## @show L
+                    # @show timestep, iteration
+                    ## @show 𝐍
+                    @show iteration
+                    # @show qr(L).R |> diag
+                    ## @show :befor, size(𝐍), rank(𝐍), cond(𝐍)
+                end
                 luJac = ns_stepk!(
                     Res,Jac,
                     F,∂F∂q,∂F∂q̇,
                     𝐁,𝐛,𝐜ᵀ,𝐍,𝐫,
-                    x,Λₖ,
+                    x,Λʳₖ,
                     structure,
                     contact_cache,
                     timestep,iteration
@@ -268,25 +289,151 @@ function solve!(sim::Simulator,solver_cache::Zhong06_CCP_Constant_Mass_Cache;
                     x .+= Δx
                 else # na!=0
                     get_distribution_law!(structure,contact_cache,x[1:nq])
-                    Λₖini = deepcopy(Λₖ)
+                    yₖini = 𝐍*Λʳₖ + 𝐫
+                    Λₖini = deepcopy(Λʳₖ)
                     Λₖini[begin+1:3:end] .= 0.0
                     Λₖini[begin+2:3:end] .= 0.0
-                    if false
-                        # @show timestep, iteration
-                        # @show 𝐍
-                        @show iteration
-                        # @show qr(L).R |> diag
-                        @show :befor, size(𝐍), rank(𝐍), cond(𝐍)
-                    end
                     𝐍 .+= L
-                    yₖini = 𝐍*Λₖ + 𝐫
                     yₖini .= abs.(yₖini)
                     yₖini[begin+1:3:end] .= 0.0
                     yₖini[begin+2:3:end] .= 0.0
                     IPM!(Λₖ,na,nΛ,Λₖini,yₖini,𝐍,𝐫;ftol,Nmax)
-                    ΔΛₖ .= Λₖ - Λʳₖ
+                    ΔΛₖ .= (Λₖ - Λʳₖ)
                     minusResΛ = -Res + 𝐁*(ΔΛₖ)
-                    normRes = norm(minusResΛ)
+                    Δx .= luJac\minusResΛ
+                    if timestep == 3092
+                        ## @show :after, size(𝐍), rank(𝐍), cond(𝐍)
+                        ## @show minusResΛ
+                        @show Λₖ, Λʳₖ,ΔΛₖ
+                        ## @show cond(Jac)
+                        # @show yₖini
+                        # display(L)
+                        # display(nullspace(L))
+                        # display(L*Λₖ)
+                    end
+                    ns_stepk!(
+                        Res0,Jac0,
+                        F,∂F∂q,∂F∂q̇,
+                        𝐁,𝐛,𝐜ᵀ,𝐍,𝐫,
+                        x,Λʳₖ,
+                        structure,
+                        contact_cache,
+                        timestep,iteration
+                    )
+                    sd = 1/norm(Res0)^2*I
+                    ϕ0 = (transpose(Res0)*sd*Res0)/2
+                    dϕ0 = transpose(Res0)*sd*(-Res0)
+                    c1 = 0.45
+                    α0 = 1.0
+                    skipscale = false
+                    for line_search_step = 1:1
+                        if timestep == 3092
+                            @show iteration, line_search_step, norm(Res0)
+                        end
+                        ns_stepk!(
+                            Res_α0,Jac_α0,
+                            F,∂F∂q,∂F∂q̇,
+                            𝐁,𝐛,𝐜ᵀ,𝐍,𝐫,
+                            x.+α0.*Δx,Λʳₖ.+α0.*ΔΛₖ,
+                            structure,
+                            contact_cache,
+                            timestep,iteration
+                        )
+                        ϕα0 = (transpose(Res_α0)*sd*Res_α0)/2
+                        ## dϕα0 = transpose(Res_α0)*sd*hcat(Jac_α0,-𝐁)*vcat(Δx,ΔΛₖ)
+                        if timestep == 3092
+                            @show α0, norm(Res_α0), ϕ0, ϕα0, dϕ0
+                        end
+                        if ϕα0 <= ϕ0 + c1*α0*dϕ0
+                            if line_search_step > 1
+                                α0 = clamp(α0,0.3,0.9)
+                            end
+                            Res .= Res_α0
+                            if timestep == 3092
+                                @show "break at α0"
+                            end
+                            break
+                        else
+                            α1 = - (dϕ0*α0^2)/(2(ϕα0-ϕ0-dϕ0*α0))
+                            ns_stepk!(
+                                Res_α1,Jac_α1,
+                                F,∂F∂q,∂F∂q̇,
+                                𝐁,𝐛,𝐜ᵀ,𝐍,𝐫,
+                                x.+α1.*Δx,Λʳₖ.+α1.*ΔΛₖ,
+                                structure,
+                                contact_cache,
+                                timestep,iteration
+                            )
+                            ϕα1 = (transpose(Res_α1)*sd*Res_α1)/2
+                            ## dϕα1 = transpose(Res_α1)*sd*hcat(Jac_α1,-𝐁)*vcat(Δx,ΔΛₖ)
+                            if timestep == 3092
+                                @show α1, norm(Res_α1), ϕα1
+                            end
+                            ## α0 = α1
+                            ## Res .= Res_α1
+                            ## break
+                            if ϕα1 <= ϕ0 + c1*α1*dϕ0
+                                if timestep == 3092
+                                    @show "Should break at α1"
+                                end
+                                ## α1 = clamp(α1,0.1,0.9)
+                                ## α0 = α1
+                                ## Res .= Res_α1
+                                ## skipscale = true
+                                ## break
+                            end
+                            divisor = α0^2*α1^2*(α1-α0)
+                            a,b = [
+                                 α0^2 -α1^2;
+                                -α0^3  α1^3;
+                            ]*[
+                                ϕα1 - ϕ0 - dϕ0*α1;
+                                ϕα0 - ϕ0 - dϕ0*α0
+                            ]./divisor
+                            α2 = (-b + sqrt(max(b^2-3a*dϕ0,0)))/3a
+                            if line_search_step == 1
+                                ## @show α2
+                                ## α2 = clamp(α2,0.3,0.9)
+                            end
+                            α0 = α2
+                        end
+                    end
+                    α0 = clamp(α0,0.2,1.0)
+                    ## @show α0
+                    ns_stepk!(
+                        Res,Jac,
+                        F,∂F∂q,∂F∂q̇,
+                        𝐁,𝐛,𝐜ᵀ,𝐍,𝐫,
+                        x,Λʳₖ,
+                        structure,
+                        contact_cache,
+                        timestep,iteration,1/α0
+                    )
+                    yₖini = 𝐍*Λʳₖ + 𝐫
+                    Λₖini = deepcopy(Λʳₖ)
+                    Λₖini[begin+1:3:end] .= 0.0
+                    Λₖini[begin+2:3:end] .= 0.0
+                    𝐍 .+= L
+                    yₖini .= abs.(yₖini)
+                    yₖini[begin+1:3:end] .= 0.0
+                    yₖini[begin+2:3:end] .= 0.0
+                    IPM!(Λₖ,na,nΛ,Λₖini,yₖini,𝐍,𝐫;ftol,Nmax)
+                    ΔΛₖ .= (Λₖ - Λʳₖ)
+                    minusResΛ = -Res + 𝐁*(1/α0 .* ΔΛₖ)
+                    Δx .= (luJac\minusResΛ)
+                    normRes = norm(Res)
+                    if timestep == 3092
+                        ## @show :after, size(𝐍), rank(𝐍), cond(𝐍)
+                        ## @show minusResΛ
+                        @show Λₖ, Λʳₖ,ΔΛₖ
+                        @show (𝐍*Λₖ + 𝐫)
+                        @show (𝐍*Λₖ + 𝐫) ⋅ Λₖ
+                        ## @show cond(Jac)
+                        # @show yₖini
+                        # display(L)
+                        # display(nullspace(L))
+                        # display(L*Λₖ)
+                    end
                     if  normRes < ftol
                         isconverged = true
                         iteration_break = iteration-1
@@ -300,18 +447,7 @@ function solve!(sim::Simulator,solver_cache::Zhong06_CCP_Constant_Mass_Cache;
                         iteration_break = iteration-1
                         isconverged = false
                     end
-                    if false
-                        @show :after, size(𝐍), rank(𝐍), cond(𝐍)
-                        @show minusResΛ
-                        @show Λₖ, Λʳₖ
-                        @show cond(Jac)
-                        # @show yₖini
-                        # display(L)
-                        # display(nullspace(L))
-                        @show Λₖ
-                        # display(L*Λₖ)
-                    end
-                    Δx .= luJac\minusResΛ
+                    Λₖ .= Λʳₖ .+ ΔΛₖ
                     Λʳₖ .= Λₖ
                     x .+= Δx
                 end
@@ -321,7 +457,7 @@ function solve!(sim::Simulator,solver_cache::Zhong06_CCP_Constant_Mass_Cache;
             end
             restart_count += 1
             if na > 0
-                Λ_guess =  max(Λ_guess/10,10maximum(abs.(Λₖ[begin:3:end])))
+                Λ_guess =  max(Λ_guess/10,maximum(abs.(Λₖ[begin:3:end])))
             end
         end
         qₖ .= x[      1:nq]
@@ -335,7 +471,7 @@ function solve!(sim::Simulator,solver_cache::Zhong06_CCP_Constant_Mass_Cache;
         end
 
         if !isconverged
-            @warn "Newton max iterations $maxiters, at timestep=$timestep, normRes=$(normRes), restart_count=$(restart_count), num_active_contacts=$(na)"
+            @warn "Newton max iterations $maxiters, at timestep=$timestep, normRes=$(normRes), restart_count=$(restart_count), num_active_contacts=$(na), α0=$(α0)"
             if exception
                 @error "Not converged!"
                 break

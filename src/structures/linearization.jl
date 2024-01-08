@@ -718,19 +718,19 @@ function build_tangent_stiffness_matrix!(∂Q̌∂q̌,st)
             )
             jointed2angles = make_jointed2angles(hen2egg,relative_core)
             nq = length(q_jointed)
-            angles = jointed2angles(q_jointed)
-	        torques = k.*angles
-            angles_jacobian = ForwardDiff.jacobian(jointed2angles,q_jointed)
-            angles_hessians = ForwardDiff.jacobian(x -> ForwardDiff.jacobian(jointed2angles, x), q_jointed)
+            ## angles = jointed2angles(q_jointed)
+	        ## torques = k.*angles
+            ## angles_jacobian = ForwardDiff.jacobian(jointed2angles,q_jointed)
+            ## angles_hessians = ForwardDiff.jacobian(x -> ForwardDiff.jacobian(jointed2angles, x), q_jointed)
             # angles_hessians = FiniteDiff.finite_difference_jacobian(x -> ForwardDiff.jacobian(jointed2angles, x), q_jointed)
-            reshaped_angles_hessians = reshape(angles_hessians,3,nq,nq)
+            ## reshaped_angles_hessians = reshape(angles_hessians,3,nq,nq)
             # @show sys_free_coords_idx, free_idx
             for i in mask
-                angle = angles[i]
-                torque = torques[i]
-                generalized_force_jacobian = torque.*reshaped_angles_hessians[i,:,:] .+ k.*angles_jacobian[i,:]*angles_jacobian[[i],:]
+                ## angle = angles[i]
+                ## torque = torques[i]
+                ## generalized_force_jacobian = torque.*reshaped_angles_hessians[i,:,:] .+ k.*angles_jacobian[i,:]*angles_jacobian[[i],:]
                 # @show generalized_force_jacobian
-                ∂Q̌∂q̌[sys_free_coords_idx,sys_free_coords_idx] .-= generalized_force_jacobian[free_idx,free_idx]
+                ## ∂Q̌∂q̌[sys_free_coords_idx,sys_free_coords_idx] .-= generalized_force_jacobian[free_idx,free_idx]
             end
         end
     end

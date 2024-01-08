@@ -18,7 +18,7 @@ function rotation2angles(R::AbstractMatrix{T}) where {T}
     c1 = [1.0,0,0]×(R[:,1]/norm(R[:,1]))
     c2 = [0,1.0,0]×(R[:,2]/norm(R[:,2]))
     c3 = [0,0,1.0]×(R[:,3]/norm(R[:,3]))
-    asin.([0,0,c3[1]])
+    asin.( [0,0,c3[1]])   
 end
 
 function make_jointed2angles(hen2egg,relative_core)
@@ -108,9 +108,12 @@ function update_apparatus!(st::AbstractStructure, appar::Apparatus{<:PrototypeJo
     )
     jointed2angles = make_jointed2angles(hen2egg,relative_core)
     angles = jointed2angles(q_jointed)
+    ## @show asin.(angles) .|> rad2deg
     torques = k.*angles
     update!(spring_damper,angles,)
     angles_jacobian = ForwardDiff.jacobian(jointed2angles,q_jointed)
+    ## @show q_jointed
+    ## @show angles_jacobian
     for i in mask
         torque = torques[i]
         system.F̌[sys_free_coords_idx] .-= angles_jacobian[i,free_idx]*torque
