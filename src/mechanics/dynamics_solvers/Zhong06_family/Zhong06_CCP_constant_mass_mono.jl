@@ -108,11 +108,11 @@ function make_step_k(
                 H,
                 restitution_coefficients,
                 D,
-                L,
+                L,Lv
             ) = contact_cache.cache
             Dₘ = contact_cache.cache.Dper
             Dₖ = contact_cache.cache.Dimp
-            𝐫𝐞𝐬[   1:n1]  .-= h.*mass_norm.*transpose(D)*H*(I)*Λₖ 
+            𝐫𝐞𝐬[   1:n1]  .-= h.*mass_norm.*transpose(D)*H*(I+L)*Λₖ 
             pₖ .= Momentum_k(qₖ₋₁,pₖ₋₁,qₖ,λₘ,M,A,mass_norm,h)
             vₖ .= invM*pₖ        
             ∂vₘ∂qₖ = 1/h*I
@@ -125,6 +125,14 @@ function make_step_k(
             v́ₖ₋₁ = Dₖ*vₖ₋₁
             for i = 1:na
                 is = 3(i-1)
+                Dⁱₘ = @view Dₘ[is+1:is+3,:]
+                Dⁱₖ = @view Dₖ[is+1:is+3,:]
+                ∂y∂x[is+1:is+3,   1:n1] .= ∂v́⁺∂qₖ[is+1:is+3,:]
+                ∂y∂x[is+1:is+3,n1+1:n2] .= Dⁱₖ*∂vₖ∂λₘ
+            end
+            ∂y∂x .= (I+Lv)*∂y∂x
+            for i = 1:na
+                is = 3(i-1)
                 vⁱₖ₋₁ = @view v́ₖ₋₁[is+1:is+3]
                 vⁱ⁺   = @view v́⁺[is+1:is+3]
                 vₜⁱₖ₋₁ = norm(vⁱₖ₋₁[2:3])
@@ -133,19 +141,18 @@ function make_step_k(
                 vₙⁱ   = vⁱ⁺[1]
                 v́ₜⁱ = vₜⁱ⁺ + restitution_coefficients[i]*min(vₙⁱₖ₋₁,0)
                 𝐰[is+1:is+3] .= [v́ₜⁱ,0,0]
-                Dⁱₘ = @view Dₘ[is+1:is+3,:]
-                Dⁱₖ = @view Dₖ[is+1:is+3,:]
-                ∂y∂x[is+1     ,   1:n1] .= 1/(norm(v́⁺[is+2:is+3])+1e-14)*(v́⁺[is+2]*∂v́⁺∂qₖ[is+2,:] .+ v́⁺[is+3]*∂v́⁺∂qₖ[is+3,:])
-                ∂y∂x[is+1:is+3,   1:n1] .+= ∂v́⁺∂qₖ[is+1:is+3,:]
-                ∂y∂x[is+1:is+3,n1+1:n2] .= Dⁱₖ*∂vₖ∂λₘ
+                ∂y∂x[is+1     ,   1:n1] .+= 1/(norm(v́⁺[is+2:is+3])+1e-14)*(v́⁺[is+2]*∂v́⁺∂qₖ[is+2,:] .+ v́⁺[is+3]*∂v́⁺∂qₖ[is+3,:])
             end
-            𝐫𝐞𝐬[(n2   +1):(n2+ nΛ)] .= (h.*(v́⁺ .+ 𝐰) .- h.*y)
+            𝐫𝐞𝐬[(n2   +1):(n2+ nΛ)] .= (h.*((I+Lv)*v́⁺ .+ 𝐰) .- h.*y)
             𝐫𝐞𝐬[n2+nΛ+1:n2+2nΛ]     .= reduce(vcat,Λ_split⊙y_split)
-            𝐉[      1:n1    , n2+   1:n2+ nΛ] .=  -mass_norm*h .*transpose(D)*H*(I)
+            𝐉[      1:n1    , n2+   1:n2+ nΛ] .=  -mass_norm*h .*transpose(D)*H*(I+L)
             𝐉[n2+1:n2+ nΛ,      1:n2    ]     .=  h.*∂y∂x
             𝐉[n2+1:n2+ nΛ,    n2+nΛ+1:n2+2nΛ] .= -h.*I(nΛ)
             𝐉[n2+nΛ+1:n2+2nΛ, n2+   1:n2+ nΛ] .=  BlockDiagonal(mat.(y_split))
             𝐉[n2+nΛ+1:n2+2nΛ, n2+nΛ+1:n2+2nΛ] .=  BlockDiagonal(mat.(Λ_split))
+            if timestep == 850
+                @show 𝐉[n2+nΛ+1:n2+2nΛ,:]
+            end
         end
         # debug
         # @show norm(D*vₖ + 𝐛), norm(𝐫𝐞𝐬)
@@ -211,7 +218,7 @@ function solve!(sim::Simulator,solver_cache::Zhong06_CCP_Constant_Mass_Mono_Cach
         q̇ₖ .= q̇ₖ₋₁
         contact_cache = activate_frictional_contacts!(structure,env,solver_cache,qˣ;checkpersist=true)
         (;na) = contact_cache.cache
-        (;L) = contact_cache.cache
+        (;L,Lv) = contact_cache.cache
         isconverged = false
         normRes = typemax(T)
         iteration_break = 0
@@ -254,7 +261,7 @@ function solve!(sim::Simulator,solver_cache::Zhong06_CCP_Constant_Mass_Mono_Cach
             dt,mass_norm
         )
         restart_count = 0
-        Λ_guess = 1.0
+        Λ_guess = 0.1
         while restart_count < max_restart
             Λₖ .= repeat([Λ_guess,0,0],na)
             y .= Λₖ
@@ -319,8 +326,9 @@ function solve!(sim::Simulator,solver_cache::Zhong06_CCP_Constant_Mass_Mono_Cach
                     # α_record[iteration] = α
                     x .+= α.*Δxc
                     μ = transpose(y)*Λₖ/nΛ
-                    if timestep == 763
-                        @show Λₖ, normRes, μ, cond(Jac),L
+                    if timestep == 850
+                        @show Λₖ, normRes, μ, cond(Jac)
+                        @show  qr(Jac).R |> diag
                     end
                 end
             end

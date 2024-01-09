@@ -31,8 +31,8 @@ halfspaces = RB.StaticContactSurfaces(
 wt = woodpecker() 
 wt = woodpecker(;case=3,frictional_coefﬁcient = 0.35) #src
 dt = 1e-4
-tspan = (0.0,3637dt)
-tspan = (0.0,2.0)
+tspan = (0.0,700dt)
+tspan = (0.0,1.0)
 prob = RB.DynamicsProblem(
     wt,
     halfspaces,
@@ -52,7 +52,7 @@ RB.solve!(
             RB.InteriorPointMethod()
         )
     );
-    dt,tspan,ftol=1e-11,maxiters=20,verbose_contact=false,
+    dt,tspan,ftol=1e-10,maxiters=20,verbose_contact=false,
     exception=false,progress=false,
     max_restart=1
 )

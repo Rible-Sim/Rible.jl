@@ -168,6 +168,7 @@ function activate_frictional_contacts!(structure,contact_env,solver_cache,q;chec
         act_start += nactive_body
     end
     L = zeros(T,3na,3na)
+    Lv = deepcopy(L)
     D = zeros(T,3na,nq)
     Dper = zero(D)
     Dimp = zero(D)
@@ -175,7 +176,7 @@ function activate_frictional_contacts!(structure,contact_env,solver_cache,q;chec
     ∂DᵀΛ∂q = zeros(T,nq,nq)
     ŕ = Vector{T}(undef,3na)
     cache = @eponymtuple(
-        na, bodyid2act_idx, persistent_idx, contacts_bits, H, restitution_coefficients, D, Dper, Dimp, ∂Dq̇∂q, ∂DᵀΛ∂q, ŕ, L
+        na, bodyid2act_idx, persistent_idx, contacts_bits, H, restitution_coefficients, D, Dper, Dimp, ∂Dq̇∂q, ∂DᵀΛ∂q, ŕ, L, Lv
     )
     ContactCache(cache)
 end
@@ -251,6 +252,7 @@ function activate_contacts!(structure,contact_env,solver_cache,q;checkpersist=tr
         for mem in bodyid2act_idx
     ]
     L = BlockDiagonal(Ls)
+    Lv = deepcopy(L)
     D = zeros(T,na,nq)
     Dper = zero(D)
     Dimp = zero(D)
@@ -258,7 +260,7 @@ function activate_contacts!(structure,contact_env,solver_cache,q;checkpersist=tr
     ∂DᵀΛ∂q = zeros(T,nq,nq)
     ŕ = Vector{T}(undef,na)
     cache = @eponymtuple(
-        na, bodyid2act_idx, persistent_idx, contacts_bits, H, restitution_coefficients, D, Dper, Dimp, ∂Dq̇∂q, ∂DᵀΛ∂q, ŕ, L
+        na, bodyid2act_idx, persistent_idx, contacts_bits, H, restitution_coefficients, D, Dper, Dimp, ∂Dq̇∂q, ∂DᵀΛ∂q, ŕ, L, Lv
     )
     ContactCache(cache)
 end
@@ -358,7 +360,7 @@ end
 
 function get_distribution_law!(structure,cache,q)
     (;
-        D,L,H,bodyid2act_idx
+        D,L,Lv,H,bodyid2act_idx
     ) = cache.cache
     (;sys_free_coords_idx,bodyid2sys_full_coords,bodyid2sys_dof_idx) = structure.connectivity.indexed
     N_in = intrinsic_nullspace(structure,q)
@@ -369,6 +371,7 @@ function get_distribution_law!(structure,cache,q)
     # @show rank(N), (A*N |> norm)
     R = D*N
     L .= (I-pinv(R)'*R')*H
+    Lv .= (I-R*R')
 end
 
 function make_pres_actor(μ0,μ1,start,stop)
