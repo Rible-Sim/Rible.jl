@@ -52,12 +52,12 @@ function build_Y(bot)
     ncables = length(cables)
     nact = length(actuators)
     ret = spzeros(Int,ncables,nact)
-    foreach(actuators) do act
-        (;id,coupler,reg) = act
+    foreach(actuators) do actuator
+        (;id,coupler,reg) = actuator
         if coupler isa Serial
-            ret[act.reg.ids,id] .= 1
+            ret[actuator.reg.ids,id] .= 1
         elseif coupler isa Ganged
-            is1,is2 = act.reg.ids
+            is1,is2 = actuator.reg.ids
             ret[is1,id] =  1
             ret[is2,id] = -1
         else

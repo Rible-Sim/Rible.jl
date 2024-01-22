@@ -33,73 +33,44 @@ function Coalition(structure::AbstractStructure,gauges,actuators)
 
     num_of_errors = length(sys_errors_idx)
 
-    sys_full_actions_idx = Int[]
-    sys_pres_actions_idx = Int[]
-    sys_free_actions_idx = Int[]
-    actid2sys_full_actions = Vector{Int}[]
-    actid2sys_pres_actions = Vector{Int}[]
-    actid2sys_free_actions = Vector{Int}[]
+    sys_actions_idx = Int[]
+    actid2sys_actions = Vector{Int}[]
     ntotal_by_act = zeros(Int,num_of_actuators)
     pres_idx_by_act = Vector{Vector{Int}}(undef,num_of_actuators)
     free_idx_by_act = Vector{Vector{Int}}(undef,num_of_actuators)
-    foreach(actuators) do act
-        actid = act.id
-        ntotal_by_act[actid] = get_num_of_actions(act)
+    foreach(actuators) do actuator
+        actid = actuator.id
+        ntotal_by_act[actid] = get_num_of_actions(actuator)
         pres_idx_by_act[actid] = Int[]
         free_idx_by_act[actid] = collect(1:ntotal_by_act[actid])
     end
     for actid = 1:num_of_actuators
         ntotal = ntotal_by_act[actid]
-        pres = pres_idx_by_act[actid]
-        free = free_idx_by_act[actid]
-        push!(actid2sys_full_actions,fill(-1,ntotal))
-        push!(actid2sys_pres_actions,Int[])
-        push!(actid2sys_free_actions,Int[])
+        push!(actid2sys_actions,fill(-1,ntotal))
         unshareds = collect(1:ntotal)
         nusi = length(unshareds)
-        actid2sys_full_actions[actid][unshareds] = collect(length(sys_full_actions_idx)+1:length(sys_full_actions_idx)+nusi)
-        append!(sys_full_actions_idx,actid2sys_full_actions[actid][unshareds])
-        for i in unshareds
-            if i in pres
-                # pres
-                push!(sys_pres_actions_idx,actid2sys_full_actions[actid][i])
-            else
-                # free
-                push!(sys_free_actions_idx,actid2sys_full_actions[actid][i])
-            end
-        end
-        for i in free
-            free_idx = findfirst((x)->x==actid2sys_full_actions[actid][i],sys_free_actions_idx)
-            push!(actid2sys_free_actions[actid],free_idx)
-        end
-        for i in pres
-            pres_idx = findfirst((x)->x==actid2sys_full_actions[actid][i],sys_pres_actions_idx)
-            push!(actid2sys_pres_actions[actid],pres_idx)
-        end
+        actid2sys_actions[actid][unshareds] = collect(length(sys_actions_idx)+1:length(sys_actions_idx)+nusi)
+        append!(sys_actions_idx,actid2sys_actions[actid][unshareds])
     end
 
-    num_of_free_actions = length(sys_free_actions_idx)
-    num_of_pres_actions = length(sys_pres_actions_idx)
-    num_of_full_actions = length(sys_full_actions_idx)
+    num_of_actions = length(sys_actions_idx)
 
     Coalition(
         @eponymtuple(
             num_of_actuators, num_of_gauges,
             num_of_error_gauges, num_of_capta_gauges,
             num_of_errors,gaugeid2error_idx,
-            num_of_full_actions, num_of_free_actions, num_of_pres_actions,
-            sys_free_actions_idx, sys_pres_actions_idx,
-            actid2sys_full_actions, actid2sys_free_actions, actid2sys_pres_actions,
+            num_of_actions, actid2sys_actions, 
         )
     )
 end
 
-struct Hub{gaugesType,actuatorsType,coalitionType,stateType}
+struct ControlHub{gaugesType,actuatorsType,coalitionType,stateType}
     gauges::gaugesType
     actuators::actuatorsType
     coalition::coalitionType
     state::stateType
-    function Hub(structure::AbstractStructure,gauges,actuators,coalition::Coalition)
+    function ControlHub(structure::AbstractStructure,gauges,actuators,coalition::Coalition)
         e = get_errors(structure,gauges,coalition)
         u = get_actions(structure,actuators,coalition)
         state = ComponentArray(
@@ -126,12 +97,12 @@ function get_errors(structure,gauges,coalition)
 end
 
 function get_actions(structure,actuators,coalition)
-    (;num_of_actuators,actid2sys_full_actions) = coalition.nt
+    (;num_of_actions,actid2sys_actions) = coalition.nt
     T = get_numbertype(structure)
-    u = zeros(T,num_of_actuators)
-    foreach(actuators) do act
-        act_idx = actid2sys_full_actions[act.id]
-        u[act_idx] .= get_actions(structure,act)
+    u = zeros(T,num_of_actions)
+    foreach(actuators) do actuator
+        act_idx = actid2sys_actions[actuator.id]
+        u[act_idx] .= get_actions(structure,actuator)
     end
 end
 

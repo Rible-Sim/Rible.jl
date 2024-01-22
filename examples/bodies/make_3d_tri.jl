@@ -84,7 +84,7 @@ pretty_table(
 if loadmesh
     trimesh = load(
         RB.assetpath("球铰/零件1.stl")
-    ) |> make_patch(;
+    ) |> RB.make_patch(;
     scale = 1/200, 
     color = :tomato1,
     trans = [0,0,-0.39]
@@ -99,7 +99,7 @@ else
                 [2,3],[3,4],[4,2]
             ]
         ]
-    ) |> make_patch(;color = :darkslategrey)
+    ) |> RB.make_patch(;color = :darkslategrey)
     #     platemesh = endpoints2mesh(
     #         SVector(0.0,0.0,-height/2),
     #         SVector(0.0,0.0, height/2);

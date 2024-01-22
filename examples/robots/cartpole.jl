@@ -242,7 +242,7 @@ function cart_pole(;
         (t)->[0,1.0,0]
     )
     actuators = TypeSortedCollection([force_actuator,])
-    hub = RB.Hub(
+    hub = RB.ControlHub(
         structure,
         gauges,
         actuators,

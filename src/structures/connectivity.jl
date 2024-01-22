@@ -10,13 +10,13 @@ end
 
 get_id(appar::Apparatus) = appar.id
 
-function connect(bodies, spring_dampers, cm_input=Int[;;], istart = 0)
+function connect(bodies, spring_dampers; connecting_matrix=Int[;;], istart = 0)
     _,nb = check_id_sanity(bodies)
-    if size(cm_input,2) > nb
+    if size(connecting_matrix,2) > nb
         @warn "Cropping the connecting matrix."
-        cm = cm_input[:,1:nb]
+        cm = connecting_matrix[:,1:nb]
     else
-        cm = cm_input[:,:]
+        cm = connecting_matrix[:,:]
     end
     rbs_sorted = sort(bodies)
     ret = []
@@ -69,8 +69,8 @@ function cluster(bodies, cm2_input)
     ret2 = TypeSortedCollection(ret_raw)
 end
 
-function connect_and_cluster(bodies, cm_input, cm2_input)
-    ret1 = connect(bodies, cm_input)
+function connect_and_cluster(bodies, connecting_matrix, cm2_input)
+    ret1 = connect(bodies, connecting_matrix)
     ret2 = cluster(bodies, cm2_input)
     return (connected=ret1, clustered=ret2)
 end
@@ -126,14 +126,14 @@ function index_incstr(bodies)
     num_of_intrinsic_cstr,bodyid2sys_intrinsic_cstr_idx,num_of_dof_unconstrained,bodyid2sys_dof_idx
 end
 
-function index(bodies,apparatuses,sharing_input::AbstractMatrix=Int[;;])
+function index(bodies,apparatuses=Int[];sharing_matrix::AbstractMatrix=Int[;;])
     bodies_ids,num_of_bodies = check_id_sanity(bodies)
     apparatuses_ids,num_of_apparatuses = check_id_sanity(apparatuses)
-    if size(sharing_input,2) > num_of_bodies
+    if size(sharing_matrix,2) > num_of_bodies
         @warn "Cropping the sharing matrix."
-        sharing = sharing_input[:,1:num_of_bodies]
+        sharing = sharing_matrix[:,1:num_of_bodies]
     else
-        sharing = sharing_input[:,:]
+        sharing = sharing_matrix[:,:]
     end
     sys_full_coords_idx = Int[]
     sys_pres_coords_idx = Int[]
@@ -196,7 +196,6 @@ function index(bodies,apparatuses,sharing_input::AbstractMatrix=Int[;;])
     num_of_pres_coords = length(sys_pres_coords_idx)
     num_of_full_coords = length(sys_full_coords_idx)
     # num_of_extrinsic_cstr = mapreduce((apparatus)->apparatus.num_of_cstr,+,apparatuses,init=0)
-    apparid2sys_extrinsic_cstr_idx = Vector{Int}[]
     nexcst_by_joint = zeros(Int,num_of_apparatuses)
     num_of_joint_apparatuses = 0
     num_of_force_apparatuses = 0
@@ -269,7 +268,7 @@ struct Numbered
     nc::Int
 end
 
-function number(bodies,apparatuses)
+function number(bodies,apparatuses=nothing)
     _,nb = check_id_sanity(bodies)
     nnodes_by_body = zeros(Int,nb)
     nld_by_body = zeros(Int,nb)

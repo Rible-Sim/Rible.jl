@@ -352,9 +352,12 @@ function cstr_jacobian(structure::AbstractStructure,q,c=get_local_coords(structu
     end
     foreach(apparatuses) do appar
         (;id,) = appar
-        jointexcst = num_of_intrinsic_cstr.+apparid2sys_extrinsic_cstr_idx[id]
-        jointed_sys_free_idx = apparid2sys_free_coords_idx[id]
-        ret[jointexcst,jointed_sys_free_idx] .= cstr_jacobian(appar,structure,q)
+        ext = apparid2sys_extrinsic_cstr_idx[id]
+        if !isempty(ext)
+            jointexcst = num_of_intrinsic_cstr.+apparid2sys_extrinsic_cstr_idx[id]
+            jointed_sys_free_idx = apparid2sys_free_coords_idx[id]
+            ret[jointexcst,jointed_sys_free_idx] .= cstr_jacobian(appar,structure,q)
+        end
     end
     ret
 end

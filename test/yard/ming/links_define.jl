@@ -125,8 +125,8 @@ function build_Y(tgstruct)
     (;nstrings,strings,actuators) = tgstruct
     nact = length(actuators)
     ret = spzeros(Int,nstrings,nact)
-    for (i,act) in enumerate(actuators)
-        s1 = act.strings[1]
+    for (i,actuator) in enumerate(actuators)
+        s1 = actuator.strings[1]
         is1 = findfirst((x)->x==s1,strings)
         ret[is1,i] = 1
     end

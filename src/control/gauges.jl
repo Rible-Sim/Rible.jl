@@ -5,24 +5,24 @@ struct VelocityCapta <: AbstractCapta end
 struct PosVelCapta <: AbstractCapta end
 struct AngleCapta <: AbstractCapta end
 
-function measure(structure::Structure,sig::Signifier,capta::PositionCapta)
-    (;sig,) = gauge
-    body = sig.body
-    (;pid) = sig
+function measure(structure::Structure,signifier::Signifier,capta::PositionCapta)
+    (;signifier,) = gauge
+    body = signifier.body
+    (;pid) = signifier
     (;prop,state,cache) = body
     state.loci_states[pid].frame.position
 end
 
-function measure(structure::Structure,sig::Signifier,capta::VelocityCapta)
-    body = sig.body
-    (;pid) = sig
+function measure(structure::Structure,signifier::Signifier,capta::VelocityCapta)
+    body = signifier.body
+    (;pid) = signifier
     (;prop,state,cache) = body
     state.loci_states[pid].frame.velocity
 end
 
-function measure(structure::Structure,sig::Signifier,capta::PosVelCapta)
-    body = sig.body
-    (;pid) = sig
+function measure(structure::Structure,signifier::Signifier,capta::PosVelCapta)
+    body = signifier.body
+    (;pid) = signifier
     (;prop,state,cache) = body
     vcat(
         state.loci_states[pid].frame.position,
@@ -30,9 +30,9 @@ function measure(structure::Structure,sig::Signifier,capta::PosVelCapta)
     )
 end
 
-function measure_jacobian(structure::Structure,sig::Signifier,capta::PositionCapta)
-    body = sig.body
-    (;pid) = sig
+function measure_jacobian(structure::Structure,signifier::Signifier,capta::PositionCapta)
+    body = signifier.body
+    (;pid) = signifier
     (;prop,state,cache,coords) = body
     (;nmcs) = coords
     q = structure.state.members[body.prop.id].q
@@ -42,9 +42,9 @@ function measure_jacobian(structure::Structure,sig::Signifier,capta::PositionCap
     C,zero(C)
 end
 
-function measure_jacobian(structure::Structure,sig::Signifier,capta::VelocityCapta)
-    body = sig.body
-    (;pid) = sig
+function measure_jacobian(structure::Structure,signifier::Signifier,capta::VelocityCapta)
+    body = signifier.body
+    (;pid) = signifier
     (;prop,state,cache,coords) = body
     (;nmcs) = coords
     q = structure.state.members[body.prop.id].q
@@ -57,9 +57,9 @@ function measure_jacobian(structure::Structure,sig::Signifier,capta::VelocityCap
     
 end
 
-function measure_jacobian(structure::Structure,sig::Signifier,capta::PosVelCapta)
-    body = sig.body
-    (;pid) = sig
+function measure_jacobian(structure::Structure,signifier::Signifier,capta::PosVelCapta)
+    body = signifier.body
+    (;pid) = signifier
     (;prop,state,cache,coords) = body
     (;nmcs) = coords
     q = structure.state.members[body.prop.id].q
@@ -78,8 +78,8 @@ function measure_jacobian(structure::Structure,sig::Signifier,capta::PosVelCapta
     )
 end
 
-function measure(structure::Structure,sig::Signifier,capta::AngleCapta)
-    appar = sig.body
+function measure(structure::Structure,signifier::Signifier,capta::AngleCapta)
+    appar = signifier.body
     (;
         hen2egg,
         cache,
@@ -98,11 +98,11 @@ function measure(structure::Structure,sig::Signifier,capta::AngleCapta)
     )
     jointed2angles = make_jointed2angles(hen2egg,relative_core)
     angles = jointed2angles(q_jointed)
-    angles[sig.pid]
+    angles[signifier.pid]
 end
 
-function measure_jacobian(structure::Structure,sig::Signifier,capta::AngleCapta)
-    appar = sig.body
+function measure_jacobian(structure::Structure,signifier::Signifier,capta::AngleCapta)
+    appar = signifier.body
     (;
         hen2egg,
         cache,
@@ -121,27 +121,27 @@ function measure_jacobian(structure::Structure,sig::Signifier,capta::AngleCapta)
     )
     jointed2angles = make_jointed2angles(hen2egg,relative_core)
     angles_jacobian = ForwardDiff.jacobian(jointed2angles,q_jointed)
-    angles_jacobian[sig.pid,:]
+    angles_jacobian[signifier.pid,:]
 end
 
 abstract type AbstractGauge end
 
 struct CaptaGauge{sigType,captaType} <: AbstractGauge
     id::Int
-    sig::sigType
+    signifier::sigType
     capta::captaType
 end
 
-measure(structure::Structure,gauge::CaptaGauge) = measure(structure,gauge.sig,gauge.capta)
+measure(structure::Structure,gauge::CaptaGauge) = measure(structure,gauge.signifier,gauge.capta)
 
 struct ErrorGauge{sigType,captaType,referenceType} <: AbstractGauge
     id::Int
-    sig::sigType
+    signifier::sigType
     capta::captaType
     reference::referenceType
 end
 
-get_numbertype(gauge::AbstractGauge) = get_numbertype(gauge.sig.body)
+get_numbertype(gauge::AbstractGauge) = get_numbertype(gauge.signifier.body)
 get_num_of_errors(::CaptaGauge) = 0
 get_num_of_errors(::ErrorGauge) = 1
 
@@ -155,15 +155,13 @@ function Base.isless(a::ErrorGauge,b::ErrorGauge)
     isless(a.id,b.id)
 end
 
-get_id(ref_err::ErrorGauge) = ref_err.id
-
 struct ErrorCost{ref_errorsType}
     ref_errors::ref_errorsType
 end
 
 function measure(structure::Structure,ref_err::ErrorGauge)
-    (;sig,capta,reference) = ref_err
-    1/2*sum((measure(structure,sig,capta).-reference).^2)
+    (;signifier,capta,reference) = ref_err
+    1/2*sum((measure(structure,signifier,capta).-reference).^2)
 end
 
 function measure_jacobian!(∂ϕ∂qᵀ,∂ϕ∂q̇ᵀ,structure::Structure,ref_err::ErrorGauge)

@@ -21,14 +21,14 @@ function make_3d_plate(
 visible = ci != Int[]
 mat = filter(
     row -> row.name == "Teak", 
-    material_properties
+    RB.material_properties
 )[1]
 density = mat.density |> ustrip
 if meshvisible
     if loadmesh
         platemesh = load("柚木板3.STL") |> make_patch(;rot=RotZ(π/4))
     else
-        platemesh = endpoints2mesh(
+        platemesh = RB.endpoints2mesh(
             SVector(0.0,0.0,-height/2),
             SVector(0.0,0.0,height/2);
             radius,n1=m,n2=2)

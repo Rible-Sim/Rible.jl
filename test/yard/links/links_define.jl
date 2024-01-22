@@ -117,8 +117,8 @@ function build_Y(tr)
 	actuators = hub.actuators
     nact = length(actuators)
     ret = spzeros(Int,nstrings,nact)
-    for (i,act) in enumerate(actuators)
-        ret[act.reg.id_string,i] = 1
+    for (i,actuator) in enumerate(actuators)
+        ret[actuator.reg.id_string,i] = 1
     end
     ret
 end

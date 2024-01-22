@@ -182,7 +182,7 @@ struct Hen2Egg{henType<:Signifier,eggType<:Signifier}
 end
 
 function get_id(thing)
-    1
+    0
 end
 
 function get_ids(things)
@@ -192,11 +192,11 @@ function get_ids(things)
 end
 
 function check_id_sanity(things)
-    ids,nb = get_ids(things)
-    if nb > 0 
-        @assert minimum(ids) == 1
-        @assert maximum(ids) == nb
+    ids,num_of_things = get_ids(things)
+    if num_of_things > 0 
+        @assert minimum(ids) == 1 "minimum(ids) = $(minimum(ids))"
+        @assert maximum(ids) == num_of_things "maximum(ids) = $(maximum(ids)), num_of_things = $num_of_things"
         @assert allunique(ids)
     end
-    ids,nb
+    ids,num_of_things
 end

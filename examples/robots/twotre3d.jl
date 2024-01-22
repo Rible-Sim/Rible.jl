@@ -76,10 +76,7 @@ plates = [
     for j = 1:n+1
 ]
 nb =  length(plates)
-rbs = plates |> TypeSortedCollection
-numbered = RB.number(rbs)
-# indexed = RB.index(rbs,sharing)
-indexed = RB.index(rbs,)
+bodies = plates |> TypeSortedCollection
 
 connecting_elas = ElasticArray{Int}(undef, nb, 0)
 # outer
@@ -112,30 +109,50 @@ else
     row[2] = -(4)
     append!(connecting_elas,row)
 end
-connecting = Matrix(connecting_elas')
-display(connecting)
-connected = RB.connect(rbs,connecting)
-
-ncables = size(connecting,1)
+connecting_matrix = Matrix(connecting_elas')
+display(connecting_matrix)
+ncables = size(connecting_matrix,1)
 # @assert ncables == ncables_prism + ncables
 κ0 = 72e9*π*(3e-3)^2/1.0
 @show κ0
 
-cables = [RB.DistanceSpringDamper3D(0.8*2h,1e3,0.0;slack=true) for i = 1:ncables]
-
-acs = [
-    RB.ManualActuator(
-        2,
-        collect(1:ncables),
-        zeros(ncables)
-    ),
+    
+spring_dampers = [
+    RB.DistanceSpringDamper3D(0.8*2h,1e3,0.0;slack=true) 
+    for i = 1:ncables
 ]
-apparatuses = (cables = cables,)
-hub = (actuators = acs,)
+cable_joints = RB.connect(bodies,spring_dampers;connecting_matrix)
+apparatuses = TypeSortedCollection(
+    cable_joints
+)
 
-# jointedmembers = RB.join(csts,indexed)
-cnt = RB.Connectivity(numbered,indexed,@eponymtuple(connected,),)
+numbered = RB.number(bodies, apparatuses)
+# indexed = RB.index(bodies,sharing)
+indexed = RB.index(bodies, apparatuses)
 
-st = RB.Structure(rbs,apparatuses,cnt)
+cnt = RB.Connectivity(numbered,indexed,)
+
+actuators = TypeSortedCollection(
+    [
+        RB.RegisterActuator(
+            i,
+            cable_joints[i],
+            RB.ManualOperator(),
+            (values=zeros(ncables), matrix=I(ncables))
+        )
+        for i = 1:ncables
+    ]
+)
+
+@show ncables
+st = RB.Structure(bodies,apparatuses,cnt)
+gauges = Int[]
+hub = RB.ControlHub(
+    st,
+    gauges,
+    actuators,
+    RB.Coalition(st,gauges,actuators)
+)
+
 RB.Robot(st,hub)
 end
