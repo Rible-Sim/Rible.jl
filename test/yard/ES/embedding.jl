@@ -1,4 +1,3 @@
-#note -- preamble
 using Revise #jl
 import Rible as RB
 include(joinpath(pathof(RB),"../../test/yard/tensegrity.jl"))
