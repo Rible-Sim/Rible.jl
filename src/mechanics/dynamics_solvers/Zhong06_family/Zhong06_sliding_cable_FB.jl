@@ -127,11 +127,6 @@ function solve!(simulator::Simulator,cache::FBZhong06Cache;
         end
     end
 
-    @inline @inbounds function Momentum_k!(p̌ᵏ,p̌ᵏ⁻¹,qᵏ,qᵏ⁻¹,λᵏ,M,A,Aᵀ,h)
-        p̌ᵏ .= -p̌ᵏ⁻¹.+2/h.*Ḿ*(qᵏ.-qᵏ⁻¹) .-
-            1/h.*scaling.*(transpose(A(qᵏ))-Aᵀ)*λᵏ
-    end
-
     total_iterations = 0
     prog = Progress(totalstep; dt=1.0, enabled=progress)
     for timestep = 1:totalstep

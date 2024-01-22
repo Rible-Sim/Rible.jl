@@ -43,10 +43,7 @@ material_properties = Table(
     ]
 )
 
-function generalized_force!(F,bot,q,q̇,t;actuate=false,gravity=true,(user_defined_force!)=(F,t)->nothing)
-    if actuate
-        actuate!(bot,[t])
-    end
+function generalized_force!(F,bot,q,q̇,u,t;gravity=true,(user_defined_force!)=(F,t)->nothing)
     (;structure) = bot
     clear_forces!(structure)
     lazy_update_bodies!(structure,q,q̇)
@@ -54,8 +51,13 @@ function generalized_force!(F,bot,q,q̇,t;actuate=false,gravity=true,(user_defin
     if gravity
         apply_gravity!(structure;factor=1)
     end
+    actuate!(bot,u,t)
     F .= assemble_forces!(structure)
     user_defined_force!(F,t)
+end
+
+function generalized_force!(F,bot,q,q̇,t;gravity=true,(user_defined_force!)=(F,t)->nothing)
+    generalized_force!(F,bot,q,q̇,nothing,t;gravity,user_defined_force!)
 end
 
 function generalized_force_jacobain!(∂F∂q̌,∂F∂q̌̇,bot,q,q̇,t)
@@ -67,6 +69,15 @@ function generalized_force_jacobain!(∂F∂q̌,∂F∂q̌̇,bot,q,q̇,t)
     update_apparatuses!(structure)
     build_tangent_stiffness_matrix!(∂F∂q̌,structure)
     build_tangent_damping_matrix!(∂F∂q̌̇,structure)
+end
+
+function generalized_force_jacobain!(∂F∂u,bot,u,t)
+    (;structure) = bot
+    ∂F∂u .= 0
+    clear_forces!(structure)
+    lazy_update_bodies!(structure,q,q̇)
+    update_apparatuses!(structure)
+    build_tangent_stiffness_matrix!(∂F∂u,structure)
 end
 
 struct ContactCache{cacheType}
@@ -297,11 +308,11 @@ function get_frictional_directions_and_positions!(structure,cache, q, q̇, Λ, )
                 if coords.nmcs isa QCF.QC
                     Tbody = build_T(structure,bid)
                     locus = prop.loci[pid]
-                    ∂Cq̇∂q = QCF.∂Cẋ∂x(Tbody*q,Tbody*q̇,locus.position)*Tbody
+                    ∂Cq̇∂q = QCF.to_velocity_jacobian(coords.nmcs,Tbody*q,Tbody*q̇,locus.position)*Tbody
                     ∂Dq̇∂q[epi,:] = dm*∂Cq̇∂q
                     Λi = @view Λ[epi]
                     fi = dm'*Λi
-                    ∂Cᵀfi∂q = QCF.∂Cᵀf∂x(Tbody*q,fi,locus.position)
+                    ∂Cᵀfi∂q = QCF.to_force_jacobian(Tbody*q,fi,locus.position)
                     ∂DᵀΛ∂q .+= transpose(Tbody)*∂Cᵀfi∂q*Tbody
                 end
                 if contact_state.persistent
@@ -342,10 +353,10 @@ function get_directions_and_positions!(structure,cache, q, q̇, Λ, )
                 if coords.nmcs isa QCF.QC
                     Tbody = build_T(structure,bid)
                     locus = prop.loci[pid]
-                    ∂Cq̇∂q = QCF.∂Cẋ∂x(Tbody*q,Tbody*q̇,locus.position)*Tbody
+                    ∂Cq̇∂q = QCF.to_velocity_jacobian(coords.nmcs,Tbody*q,Tbody*q̇,locus.position)*Tbody
                     ∂Dq̇∂q[epi,:] = dm*∂Cq̇∂q
                     fi = Λ[epi]*normal
-                    ∂Cᵀfi∂q = QCF.∂Cᵀf∂x(Tbody*q,fi,locus.position)
+                    ∂Cᵀfi∂q = QCF.to_force_jacobian(Tbody*q,fi,locus.position)
                     ∂DᵀΛ∂q .+= transpose(Tbody)*∂Cᵀfi∂q*Tbody
                 end
                 if contact_state.persistent
@@ -372,29 +383,4 @@ function get_distribution_law!(structure,cache,q)
     R = D*N
     L .= (I-pinv(R)'*R')*H
     Lv .= (I-R*R')
-end
-
-function make_pres_actor(μ0,μ1,start,stop)
-    nμ = length(μ0)
-
-    function itp(t)
-        scaled_itps = extrapolate(
-            Interpolations.scale(
-                interpolate(
-                    hcat(μ0,μ1),
-                    (NoInterp(),BSpline(Linear()))
-                    # (NoInterp(),BSpline(Quadratic(Flat(OnGrid()))))
-                ),
-                1:nμ, start:stop-start:stop
-            ),
-            (Throw(),Flat())
-        )
-        [scaled_itps(j,t) for j in 1:nμ]
-    end
-
-    PrescribedActuator(
-        1,
-        ManualActuator(1,collect(1:nμ),zeros(nμ),Uncoupled()),
-        itp
-    )
 end

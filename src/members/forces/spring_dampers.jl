@@ -253,7 +253,7 @@ function SlidingPoint(μ)
 end
 
 struct ClusterDistanceSpringDampers{spsType,segsType}
-    ID::Int
+    Signifier::Int
     sps::spsType
     segs::segsType
 end

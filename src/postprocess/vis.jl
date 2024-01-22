@@ -333,8 +333,8 @@ function get_linesegs_cables(structure;slackonly=false,noslackonly=false)
     linesegs_cables = Vector{Tuple{Point{ndim,T},Point{ndim,T}}}()
     foreach(connected) do scnt
         scable = cables[scnt.id]
-        ret = (Point(scnt.hen.bodysig.state.loci_states[scnt.hen.pid].position),
-                Point(scnt.egg.bodysig.state.loci_states[scnt.egg.pid].position))
+        ret = (Point(scnt.hen.body.state.loci_states[scnt.hen.pid].position),
+                Point(scnt.egg.body.state.loci_states[scnt.egg.pid].position))
         slacking = scable.state.tension <= 0
         if (slackonly && slacking) ||
            (noslackonly && !slacking) ||

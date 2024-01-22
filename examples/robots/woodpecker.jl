@@ -175,7 +175,7 @@ function woodpecker(;
     end
     j1 = RB.RevoluteJoint(
         1,
-        RB.Hen2Egg(RB.ID(sleeve1,spring_loci_id,1),RB.ID(link1,1,1)),
+        RB.Hen2Egg(RB.Signifier(sleeve1,spring_loci_id,1),RB.Signifier(link1,1,1)),
         RB.RotationalSpringDamper3D(
             [0.0,0,0],
             [3],

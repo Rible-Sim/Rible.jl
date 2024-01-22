@@ -23,8 +23,8 @@ end
 
 function make_jointed2angles(hen2egg,relative_core)
     (;hen,egg) = hen2egg
-    nmcs_hen = hen.bodysig.coords.nmcs
-    nmcs_egg = egg.bodysig.coords.nmcs
+    nmcs_hen = hen.body.coords.nmcs
+    nmcs_egg = egg.body.coords.nmcs
     num_of_coords_hen = get_num_of_coords(nmcs_hen)
     num_of_coords_egg = get_num_of_coords(nmcs_egg)
     num_of_jointed_coords = num_of_coords_hen + num_of_coords_egg
@@ -38,7 +38,6 @@ function make_jointed2angles(hen2egg,relative_core)
         angles
     end
 end
-
 
 """
 Update DistanceSpringDamper Tension 
@@ -58,8 +57,8 @@ end
 function update_apparatus!(st::AbstractStructure, appar::Apparatus{<:CableJoint})
     (;id,joint,force) = appar
     (;hen,egg) = joint.hen2egg
-    locus_state_hen = hen.bodysig.state.loci_states[hen.pid]
-    locus_state_egg = egg.bodysig.state.loci_states[egg.pid]
+    locus_state_hen = hen.body.state.loci_states[hen.pid]
+    locus_state_egg = egg.body.state.loci_states[egg.pid]
     p_hen = locus_state_hen.frame.position
     ṗ_hen = locus_state_hen.frame.velocity
     f_hen = locus_state_hen.force
@@ -97,8 +96,8 @@ function update_apparatus!(st::AbstractStructure, appar::Apparatus{<:PrototypeJo
     spring_damper = appar.force
     (;mask,k) = spring_damper
     (;hen,egg) = hen2egg
-    id_hen = hen.bodysig.prop.id
-    id_egg = egg.bodysig.prop.id
+    id_hen = hen.body.prop.id
+    id_egg = egg.body.prop.id
     q = get_coords(st)
     q_hen = @view q[bodyid2sys_full_coords[id_hen]]
     q_egg = @view q[bodyid2sys_full_coords[id_egg]]

@@ -6,7 +6,7 @@
 
 # Example documentation deployment
 
-image: julia:1.9
+image: julia:1.10
 
 variables:
   CACHE_DIR: "$CI_PROJECT_DIR/julia_pkg"
@@ -52,7 +52,7 @@ build:
 
 # Name a test and select an appropriate image.
 # images comes from Docker hub
-test:1.9:
+test:1.10:
   <<: *test_definition
 
 pages:

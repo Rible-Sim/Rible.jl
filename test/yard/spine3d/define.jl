@@ -71,17 +71,17 @@ function spine3d(n;c=0.0)
     hub = (actuators=acs,)
 
 
-    string2ap = Vector{Tuple{RB.ID,RB.ID}}()
+    string2ap = Vector{Tuple{RB.Signifier,RB.Signifier}}()
 	asslist = [(j=j,k=k) for j = 3:4 for k = 1:2]
     string2ap = reduce(vcat,
         [
         vcat(
             [
-            (id=8(i-1)+j,hen=RB.ID(rbs[i],j),egg=RB.ID(rbs[i+1],j))
+            (id=8(i-1)+j,hen=RB.Signifier(rbs[i],j),egg=RB.Signifier(rbs[i+1],j))
             for j = 1:4
             ],
             [
-            (id=8(i-1)+4+a,hen=RB.ID(rbs[i],jk.j),egg=RB.ID(rbs[i+1],jk.k))
+            (id=8(i-1)+4+a,hen=RB.Signifier(rbs[i],jk.j),egg=RB.Signifier(rbs[i+1],jk.k))
             for (a,jk) in enumerate(asslist)
             ]
         )

@@ -209,8 +209,8 @@ hub = (actuators = acs,)
 #         i+m*(j-1),
 #         RB.Hen2Egg(
 #             i+m*(j-1),
-#             RB.ID(bars[j][cm[i+1]],1,1),
-#             RB.ID(bars[j][cm[i]]  ,2,1)
+#             RB.Signifier(bars[j][cm[i+1]],1,1),
+#             RB.Signifier(bars[j][cm[i]]  ,2,1)
 #         )
 #     )
 #     for j = 1:d for i = 1:m
@@ -219,46 +219,46 @@ if p == 3
     csts_bar2bar = [
         # one to two
         RB.PinJoint(1,RB.Hen2Egg(
-                RB.ID(bars[    1][cm[4]],1),
-                RB.ID(bars[n+1][cm[8]],1)
+                RB.Signifier(bars[    1][cm[4]],1),
+                RB.Signifier(bars[n+1][cm[8]],1)
         )),
         RB.PinJoint(2,RB.Hen2Egg(
-                RB.ID(bars[    1][cm[5]],1),
-                RB.ID(bars[n+1][cm[7]],1)
+                RB.Signifier(bars[    1][cm[5]],1),
+                RB.Signifier(bars[n+1][cm[7]],1)
         )),
         RB.PinJoint(3,RB.Hen2Egg(
-                RB.ID(bars[    1][cm[3]],2),
-                RB.ID(bars[n+1][cm[11]],2)
+                RB.Signifier(bars[    1][cm[3]],2),
+                RB.Signifier(bars[n+1][cm[11]],2)
         )),
         RB.PinJoint(4,RB.Hen2Egg(
-                RB.ID(bars[    1][cm[2]],2),
-                RB.ID(bars[n+1][cm[12]],2)
+                RB.Signifier(bars[    1][cm[2]],2),
+                RB.Signifier(bars[n+1][cm[12]],2)
         )),
         # one to three
         RB.PinJoint(5,RB.Hen2Egg(
-                RB.ID(bars[     1][cm[ 3]],1),
-                RB.ID(bars[2n+1][cm[13]],1)
+                RB.Signifier(bars[     1][cm[ 3]],1),
+                RB.Signifier(bars[2n+1][cm[13]],1)
         )),
         RB.PinJoint(6,RB.Hen2Egg(
-                RB.ID(bars[     1][cm[ 4]],1),
-                RB.ID(bars[2n+1][cm[18]],1)
+                RB.Signifier(bars[     1][cm[ 4]],1),
+                RB.Signifier(bars[2n+1][cm[18]],1)
         )),
         RB.PinJoint(7,RB.Hen2Egg(
-                RB.ID(bars[     1][cm[ 1]],2),
-                RB.ID(bars[2n+1][cm[17]],2)
+                RB.Signifier(bars[     1][cm[ 1]],2),
+                RB.Signifier(bars[2n+1][cm[17]],2)
         )),
         RB.PinJoint(8,RB.Hen2Egg(
-                RB.ID(bars[     1][cm[ 2]],2),
-                RB.ID(bars[2n+1][cm[16]],2)
+                RB.Signifier(bars[     1][cm[ 2]],2),
+                RB.Signifier(bars[2n+1][cm[16]],2)
         )),
         # two to three
         RB.PinJoint(9,RB.Hen2Egg(
-                RB.ID(bars[ n+1][cm[ 9]],1),
-                RB.ID(bars[2n+1][cm[17]],1)
+                RB.Signifier(bars[ n+1][cm[ 9]],1),
+                RB.Signifier(bars[2n+1][cm[17]],1)
         )),
         RB.PinJoint(10,RB.Hen2Egg(10,
-                RB.ID(bars[ n+1][cm[ 7]],2),
-                RB.ID(bars[2n+1][cm[15]],2)
+                RB.Signifier(bars[ n+1][cm[ 7]],2),
+                RB.Signifier(bars[2n+1][cm[15]],2)
         )),
     ]
     csts = csts_bar2bar

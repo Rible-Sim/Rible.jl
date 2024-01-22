@@ -139,8 +139,8 @@ function plot_compose_tower3d(bot0,bot1;
     # foreach(bot0.st.connectivity.tensioned) do scnt
     # 	push!(bot0_rcs_by_cables,
     # 		(
-    # 			scnt.hen.bodysig.state.loci_states[scnt.hen.pid].+
-    # 			scnt.egg.bodysig.state.loci_states[scnt.egg.pid]
+    # 			scnt.hen.body.state.loci_states[scnt.hen.pid].+
+    # 			scnt.egg.body.state.loci_states[scnt.egg.pid]
     # 		)./2
     # 	)
     # end

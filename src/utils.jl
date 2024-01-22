@@ -144,14 +144,14 @@ end
 
 
 """
-ID
+Signifier
 $(TYPEDEF)
 ---
 $(TYPEDFIELDS)
 """
-struct ID{sigType,pidType,aidType}
+struct Signifier{bodyType,pidType,aidType}
     "Signifier of body"
-    bodysig::sigType
+    body::bodyType
     "Index of the anchor point"
     pid::pidType
     "Index of the translational axis"
@@ -160,12 +160,12 @@ struct ID{sigType,pidType,aidType}
     rotid::aidType
 end
 
-function ID(bodysig,pid,trlid)
-    ID(bodysig,pid,trlid,trlid)
+function Signifier(body,pid,trlid)
+    Signifier(body,pid,trlid,trlid)
 end
 
-function ID(bodysig,pid)
-    ID(bodysig,pid,1,1)
+function Signifier(body,pid)
+    Signifier(body,pid,1,1)
 end
 
 """
@@ -174,7 +174,7 @@ $(TYPEDEF)
 ---
 $(TYPEDFIELDS)
 """
-struct Hen2Egg{henType<:ID,eggType<:ID}
+struct Hen2Egg{henType<:Signifier,eggType<:Signifier}
     "hen/parent/predecessor"
     hen::henType
     "egg/child/successor"

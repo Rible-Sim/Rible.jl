@@ -43,11 +43,11 @@ qcs = RB.QCF.QC(1.0,rand(3,3))
 c = @SVector rand(3)
 ṙo = @SVector rand(3)
 ẋ = vcat(ṙo,q̇)
-RB.QCF.to_transformation(qcs,x,c)
+RB.QCF.to_position_jacobian(qcs,x,c)
 
-∂Cẋ∂x_ref = ForwardDiff.jacobian((x) -> RB.QCF.to_transformation(qcs,x,c)*ẋ,x)
-∂Cẋ∂x = RB.QCF.∂Cẋ∂x(x,ẋ,c)
-∂Cẋ∂x - ∂Cẋ∂x_ref
+∂Cẋ∂x_ref = ForwardDiff.jacobian((x) -> RB.QCF.to_position_jacobian(qcs,x,c)*ẋ,x)
+to_velocity_jacobian = RB.QCF.to_velocity_jacobian(x,ẋ,c)
+to_velocity_jacobian - ∂Cẋ∂x_ref
 
 ∂²Rη∂qᵀ∂q_ref = ForwardDiff.jacobian((q) -> RB.QCF.∂Rη∂q(q,c),q)
 RB.QCF.∂²Rη∂qᵀ∂q(c)

@@ -109,14 +109,14 @@ function man(n,θ=0.0)
     string2p_raw = [
         [zeros(Int,2),zeros(Int,2)] for i = 1:length(ss)
     ]
-    string2p = Vector{Tuple{R2.ID,R2.ID}}()
+    string2p = Vector{Tuple{R2.Signifier,R2.Signifier}}()
     for i = 1:length(rbs)-1
         # string2p_raw[2i-1][1] .= [i  ,1]
         # string2p_raw[2i-1][2] .= [i+1,3]
         # string2p_raw[2i][1]   .= [i  ,3]
         # string2p_raw[2i][2]   .= [i+1,2]
-        push!(string2p,(R2.ID(i,1),R2.ID(i+1,3)))
-        push!(string2p,(R2.ID(i,3),R2.ID(i+1,2)))
+        push!(string2p,(R2.Signifier(i,1),R2.Signifier(i+1,3)))
+        push!(string2p,(R2.Signifier(i,3),R2.Signifier(i+1,2)))
     end
     cnt = R2.Connectivity(bodyid2q,string2p)
     R2.Structure(rbs,ss,acs,cnt)

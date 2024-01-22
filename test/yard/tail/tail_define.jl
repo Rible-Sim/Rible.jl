@@ -99,12 +99,12 @@ function make_tail(n)
     ]
     bodyid2q_raw = [[2pid[1]-1,2pid[1],2pid[2]-1,2pid[2]] for pid in rb2p]
     bodyid2q = RB.filter_bodyid2q(bodyid2q_raw,rbs)
-    string2ap = Vector{Tuple{RB.ID,RB.ID}}()
+    string2ap = Vector{Tuple{RB.Signifier,RB.Signifier}}()
     for i = 1:n
-        push!(string2ap,(RB.ID(2i+1,1),RB.ID(2i-1,1)))
-        push!(string2ap,(RB.ID(2i+1,1),RB.ID(2i  ,1)))
-        push!(string2ap,(RB.ID(2i+1,2),RB.ID(2i  ,1)))
-        push!(string2ap,(RB.ID(2i+1,2),RB.ID(2i-1,2)))
+        push!(string2ap,(RB.Signifier(2i+1,1),RB.Signifier(2i-1,1)))
+        push!(string2ap,(RB.Signifier(2i+1,1),RB.Signifier(2i  ,1)))
+        push!(string2ap,(RB.Signifier(2i+1,2),RB.Signifier(2i  ,1)))
+        push!(string2ap,(RB.Signifier(2i+1,2),RB.Signifier(2i-1,2)))
     end
     cnt = RB.Connectivity(bodyid2q,string2ap)
     st = RB.Structure(rbs,apparatuses,cnt)
@@ -269,12 +269,12 @@ function make_curve_tail(n)
     ]
     bodyid2q_raw = [[2pid[1]-1,2pid[1],2pid[2]-1,2pid[2]] for pid in rb2p]
     bodyid2q = RB.filter_bodyid2q(bodyid2q_raw,rbs)
-    string2ap = Vector{Tuple{RB.ID,RB.ID}}()
+    string2ap = Vector{Tuple{RB.Signifier,RB.Signifier}}()
     for i = 1:n
-        push!(string2ap,(RB.ID(2i+1,1),RB.ID(2i-1,1)))
-        push!(string2ap,(RB.ID(2i+1,1),RB.ID(2i  ,1)))
-        push!(string2ap,(RB.ID(2i+1,2),RB.ID(2i  ,1)))
-        push!(string2ap,(RB.ID(2i+1,2),RB.ID(2i-1,2)))
+        push!(string2ap,(RB.Signifier(2i+1,1),RB.Signifier(2i-1,1)))
+        push!(string2ap,(RB.Signifier(2i+1,1),RB.Signifier(2i  ,1)))
+        push!(string2ap,(RB.Signifier(2i+1,2),RB.Signifier(2i  ,1)))
+        push!(string2ap,(RB.Signifier(2i+1,2),RB.Signifier(2i-1,2)))
     end
     cnt = RB.Connectivity(bodyid2q,string2ap)
     st = RB.Structure(rbs,ss,acs,cnt)

@@ -41,7 +41,6 @@ function build_joint_cache(
         vio_3rd[mask_3rd],
         vio_4th[mask_4th];
     )
-    # @show r_egg, r_hen
     cache = @eponymtuple(
         quat_trl_rel_hen, quat_trl_rel_egg, quat_rot_rel_hen, quat_rot_rel_egg,
         rot_quat,
@@ -138,8 +137,8 @@ function make_cstr_jacobian(
         # @show quat_trl_hen
         # @show quat_trl_egg
         # @show quat_rot_egg
-        C_hen = to_transformation(nmcs_hen,inner_q_hen,c_hen)
-        C_egg = to_transformation(nmcs_egg,inner_q_egg,c_egg)
+        C_hen = to_position_jacobian(nmcs_hen,inner_q_hen,c_hen)
+        C_egg = to_position_jacobian(nmcs_egg,inner_q_egg,c_egg)
         J = [-C_hen C_egg;] 
         r_hen = to_position(nmcs_hen,inner_q_hen,c_hen)
         r_egg = to_position(nmcs_egg,inner_q_egg,c_egg)
@@ -180,13 +179,11 @@ end
 
 function get_joint_jacobian!(
         ret,
-        nmcs_hen::QC, 
-        nmcs_egg::QC,
+        nmcs_hen::QC, nmcs_egg::QC,
         loci_position_hen,
         loci_position_egg,
         cache,
         mask_1st,mask_2nd,mask_3rd,mask_4th,
-        free_idx,
         q_hen,q_egg
     )
     q_jointed = vcat(
@@ -200,7 +197,7 @@ function get_joint_jacobian!(
         cache,
         mask_1st,mask_2nd,mask_3rd,mask_4th,
     )(q_jointed)
-    ret .= A[:,free_idx]
+    ret .= A
 end
 
 
@@ -212,7 +209,6 @@ function get_joint_forces_jacobian!(
         loci_position_egg,
         cache,
         mask_1st,mask_2nd,mask_3rd,mask_4th,
-        free_idx,
         q_hen,q_egg,
         λ
     )
@@ -231,7 +227,7 @@ function get_joint_forces_jacobian!(
     q_jointed = vcat(
         q_hen,q_egg,
     )
-    ret .= ForwardDiff.jacobian(cstr_forces, q_jointed)[free_idx,free_idx]
+    ret .= ForwardDiff.jacobian(cstr_forces, q_jointed)
 end
 
 function get_joint_velocity_jacobian!(
@@ -242,7 +238,6 @@ function get_joint_velocity_jacobian!(
         loci_position_egg,
         cache,
         mask_1st,mask_2nd,mask_3rd,mask_4th,
-        free_idx,
         q_hen,q_egg,
         q̇_hen,q̇_egg,
     )
@@ -263,5 +258,5 @@ function get_joint_velocity_jacobian!(
     function cstr_forces(q)
         A(q)*q̇
     end
-    ret .= ForwardDiff.jacobian(cstr_forces, q_jointed)[free_idx,free_idx]
+    ret .= ForwardDiff.jacobian(cstr_forces, q_jointed)
 end

@@ -45,8 +45,8 @@ function two_tri(;k=100.0,c=0.0,ratio=0.8)
     #     1,
     #     RB.Hen2Egg(
     #         1,
-    #         RB.ID(rb1,1),
-    #         RB.ID(rb2,1)
+    #         RB.Signifier(rb1,1),
+    #         RB.Signifier(rb2,1)
     #     )
     # )
 

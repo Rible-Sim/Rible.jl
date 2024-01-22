@@ -132,11 +132,11 @@ function Tbars(;θ = 0, coordsType = RB.NCF.NC)
     rbs = [base,slider1,slider2,bar]
     rigdibodies = TypeSortedCollection(rbs)
 
-    j1 = RB.PrismaticJoint(1,RB.Hen2Egg(RB.ID(base,5,1),RB.ID(slider1,1,1)))
-    j2 = RB.PrismaticJoint(2,RB.Hen2Egg(RB.ID(base,5,2),RB.ID(slider2,1,1)))
+    j1 = RB.PrismaticJoint(1,RB.Hen2Egg(RB.Signifier(base,5,1),RB.Signifier(slider1,1,1)))
+    j2 = RB.PrismaticJoint(2,RB.Hen2Egg(RB.Signifier(base,5,2),RB.Signifier(slider2,1,1)))
 
-    j3 = RB.PinJoint(3,RB.Hen2Egg(RB.ID(bar,1,1),RB.ID(slider1,2,1)))
-    j4 = RB.PinJoint(4,RB.Hen2Egg(RB.ID(bar,2,1),RB.ID(slider2,2,1)))
+    j3 = RB.PinJoint(3,RB.Hen2Egg(RB.Signifier(bar,1,1),RB.Signifier(slider1,2,1)))
+    j4 = RB.PinJoint(4,RB.Hen2Egg(RB.Signifier(bar,2,1),RB.Signifier(slider2,2,1)))
 
     js = [j1,j2,j3,j4]
 

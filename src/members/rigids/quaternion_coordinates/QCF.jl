@@ -11,7 +11,7 @@ using PreallocationTools
 import ..Rible: HouseholderOrthogonalization, skew
 import ..Rible: get_num_of_cstr, get_num_of_coords
 import ..Rible: get_num_of_dof, get_num_of_local_dims
-import ..Rible: to_local_coords, to_transformation
+import ..Rible: to_local_coords, to_position_jacobian, to_velocity_jacobian
 
 import ..Rible: get_deform
 import ..Rible: nullspace_mat

@@ -161,7 +161,7 @@ function BodyCache(prop::RigidBodyProperty{N,T},
     Ṁq̇ = @MVector zeros(T,size(M,2))
     ∂T∂qᵀ = @MVector zeros(T,size(M,2))
     c(x) = NCF.to_local_coords(nmcs,x)
-    C(c) = NCF.to_transformation(nmcs,q,c)
+    C(c) = NCF.to_position_jacobian(nmcs,q,c)
     Co = C(c(zero(mass_center)))
     Cg = C(c(mass_center))
     Cps = [typeof(Cg)(C(c(loci[i].position))) for i in 1:num_of_loci]
@@ -362,7 +362,7 @@ function stretch_loci!(
     # to be reimplemented
     # nlocaldim = get_num_of_local_dims(nmcs)
     # for pid in eachindex(loci)
-    #     Cps[pid] = NCF.to_transformation(nmcs,q,c[nlocaldim*(pid-1)+1:nlocaldim*pid])
+    #     Cps[pid] = NCF.to_position_jacobian(nmcs,q,c[nlocaldim*(pid-1)+1:nlocaldim*pid])
     # end
 end
 
@@ -396,9 +396,9 @@ function update_transformations!(
     (;nmcs) = coords
     (;Cg,Cps) = cache
     for (Cp,lo) in zip(Cps,loci)
-        Cp .= to_transformation(nmcs,q,lo.position)
+        Cp .= to_position_jacobian(nmcs,q,lo.position)
     end 
-    Cg .= to_transformation(nmcs,q,mass_locus.position)
+    Cg .= to_position_jacobian(nmcs,q,mass_locus.position)
 end
 
 

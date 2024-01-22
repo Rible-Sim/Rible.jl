@@ -134,25 +134,25 @@ function extrinsic_nullspace(st,q)
                 nullspaces[1][i,i] = 1
             end
             (;hen,egg) = joint.hen2egg
-            nmcs_hen = hen.bodysig.coords.nmcs
-            nmcs_egg = egg.bodysig.coords.nmcs
-            id_hen = hen.bodysig.prop.id
-            id_egg = egg.bodysig.prop.id
+            nmcs_hen = hen.body.coords.nmcs
+            nmcs_egg = egg.body.coords.nmcs
+            id_hen = hen.body.prop.id
+            id_egg = egg.body.prop.id
             q_hen = q[bodyid2sys_full_coords[id_hen]]
             q_egg = q[bodyid2sys_full_coords[id_egg]]
-            c_hen = to_local_coords(nmcs_hen,hen.bodysig.prop.loci[hen.pid].position)
-            c_egg = to_local_coords(nmcs_egg,egg.bodysig.prop.loci[egg.pid].position)
-            r_hen =  to_transformation(nmcs_hen,q_hen,c_hen)*q_hen
-            r_egg =  to_transformation(nmcs_egg,q_egg,c_egg)*q_egg
-            ro_hen = to_transformation(nmcs_hen,q_hen,zero(c_hen))*q_hen
-            ro_egg = to_transformation(nmcs_egg,q_egg,zero(c_egg))*q_egg
+            c_hen = to_local_coords(nmcs_hen,hen.body.prop.loci[hen.pid].position)
+            c_egg = to_local_coords(nmcs_egg,egg.body.prop.loci[egg.pid].position)
+            r_hen =  to_position_jacobian(nmcs_hen,q_hen,c_hen)*q_hen
+            r_egg =  to_position_jacobian(nmcs_egg,q_egg,c_egg)*q_egg
+            ro_hen = to_position_jacobian(nmcs_hen,q_hen,zero(c_hen))*q_hen
+            ro_egg = to_position_jacobian(nmcs_egg,q_egg,zero(c_egg))*q_egg
 
-            # hen.bodysig.prop.loci[hen.trlid].axes
-            # egg.bodysig.prop.loci[egg.trlid].axes
-            # hen.bodysig.prop.loci[hen.rotid].axes
+            # hen.body.prop.loci[hen.trlid].axes
+            # egg.body.prop.loci[egg.trlid].axes
+            # hen.body.prop.loci[hen.rotid].axes
             invX̄_hen = nmcs_hen.data.invX̄
             invX̄_egg = nmcs_egg.data.invX̄
-            axes_rot_egg = invX̄_egg*egg.bodysig.prop.loci[egg.rotid].axes
+            axes_rot_egg = invX̄_egg*egg.body.prop.loci[egg.rotid].axes
             axes_idx = [
                 (3,1), #normal * tangent
                 (3,2), #normal * bitangent
@@ -226,8 +226,8 @@ function build_material_stiffness_matrix!(st::Structure,q,k)
     retǨm = zeros(eltype(q),num_of_free_coords,num_of_free_coords)
     foreach(connected) do scnt
         j = scnt.id
-        rb1 = scnt.hen.bodysig
-        rb2 = scnt.egg.bodysig
+        rb1 = scnt.hen.body
+        rb2 = scnt.egg.body
         ap1id = scnt.hen.pid
         ap2id = scnt.egg.pid
         C1 = rb1.cache.Cps[ap1id]
@@ -259,8 +259,8 @@ function build_geometric_stiffness_matrix!(st::Structure,q,f)
     retǨg = zeros(eltype(q),num_of_free_coords,num_of_free_coords)
     foreach(connected) do scnt
         j = scnt.id
-        rb1 = scnt.hen.bodysig
-        rb2 = scnt.egg.bodysig
+        rb1 = scnt.hen.body
+        rb2 = scnt.egg.body
         ap1id = scnt.hen.pid
         ap2id = scnt.egg.pid
         C1 = rb1.cache.Cps[ap1id]
@@ -298,8 +298,8 @@ function make_Ǩm_Ǩg(st,q0)
         retǨg = zeros(eltype(q̌),num_of_free_coords,num_of_free_coords)
         foreach(connected) do scnt
             j = scnt.id
-            rb1 = scnt.hen.bodysig
-            rb2 = scnt.egg.bodysig
+            rb1 = scnt.hen.body
+            rb2 = scnt.egg.body
             rb1id = rb1.prop.id
             rb2id = rb2.prop.id
             ap1id = scnt.hen.pid
@@ -330,8 +330,8 @@ function make_Ǩm_Ǩg(st,q0)
         retǨg = zeros(eltype(q̌),num_of_free_coords,num_of_free_coords)
         foreach(connected) do scnt
             j = scnt.id
-            rb1 = scnt.hen.bodysig
-            rb2 = scnt.egg.bodysig
+            rb1 = scnt.hen.body
+            rb2 = scnt.egg.body
             ap1id = scnt.hen.pid
             ap2id = scnt.egg.pid
             C1 = rb1.state.cache.Cps[ap1id]
@@ -371,8 +371,8 @@ function make_S(st,q0)
         Jj = zeros(eltype(q̌),num_of_dim,num_of_full_coords)
         foreach(connected) do scnt
             j = scnt.id
-            rb1 = scnt.hen.bodysig
-            rb2 = scnt.egg.bodysig
+            rb1 = scnt.hen.body
+            rb2 = scnt.egg.body
             rb1id = rb1.prop.id
             rb2id = rb2.prop.id
             ap1id = scnt.hen.pid
@@ -401,8 +401,8 @@ function make_S(st,q0)
         Jj = zeros(eltype(q̌),num_of_dim,num_of_full_coords)
         foreach(connected) do scnt
             j = scnt.id
-            rb1 = scnt.hen.bodysig
-            rb2 = scnt.egg.bodysig
+            rb1 = scnt.hen.body
+            rb2 = scnt.egg.body
             rb1id = rb1.prop.id
             rb2id = rb2.prop.id
             ap1id = scnt.hen.pid
@@ -451,8 +451,8 @@ function build_tangent_stiffness_matrix(st,@eponymargs(connected,))
     foreach(connected) do cc
         cable = cables[cc.id]
         (;hen,egg) = cc
-        rb1 = hen.bodysig
-        rb2 = egg.bodysig
+        rb1 = hen.body
+        rb2 = egg.body
         C1 = rb1.state.cache.Cps[hen.pid]
         C2 = rb2.state.cache.Cps[egg.pid]
         free_idx1 = rb1.state.cache.free_idx
@@ -499,8 +499,8 @@ function build_tangent_stiffness_matrix(st,@eponymargs(clustered))
         foreach(clustercable) do cc
             cable = clustercables[i].segs[cc.id]
             (;hen,egg) = cc
-            rb1 = hen.bodysig
-            rb2 = egg.bodysig
+            rb1 = hen.body
+            rb2 = egg.body
             C1 = rb1.state.cache.Cps[hen.pid]
             C2 = rb2.state.cache.Cps[egg.pid]
             free_idx1 = rb1.state.cache.free_idx
@@ -553,8 +553,8 @@ function build_tangent_damping_matrix(st, @eponymargs(connected, ))
     foreach(connected) do cc
         cable = cables[cc.id]
         (;hen,egg) = cc
-        rb1 = hen.bodysig
-        rb2 = egg.bodysig
+        rb1 = hen.body
+        rb2 = egg.body
         C1 = rb1.state.cache.Cps[hen.pid]
         C2 = rb2.state.cache.Cps[egg.pid]
         free_idx1 = rb1.state.cache.free_idx
@@ -599,8 +599,8 @@ function build_tangent_damping_matrix(st, @eponymargs(clustered, ))
         foreach(clustercable) do cc
             cable = clustercables[i].segs[cc.id]
             (;hen,egg) = cc
-            rb1 = hen.bodysig
-            rb2 = egg.bodysig
+            rb1 = hen.body
+            rb2 = egg.body
             C1 = rb1.state.cache.Cps[hen.pid]
             C2 = rb2.state.cache.Cps[egg.pid]
             free_idx1 = rb1.state.cache.free_idx
@@ -660,8 +660,8 @@ function build_tangent_stiffness_matrix!(∂Q̌∂q̌,st)
     foreach(apparatuses) do appar
         if appar.joint isa CableJoint
             (;hen,egg) = appar.joint.hen2egg
-            body_hen = hen.bodysig
-            body_egg = egg.bodysig
+            body_hen = hen.body
+            body_egg = egg.body
             C_hen = body_hen.cache.Cps[hen.pid]
             C_egg = body_egg.cache.Cps[egg.pid]
             free_idx_hen = body_hen.coords.free_idx
@@ -704,12 +704,12 @@ function build_tangent_stiffness_matrix!(∂Q̌∂q̌,st)
             sys_free_coords_idx = apparid2sys_free_coords_idx[appar.id]
             (;mask,k) = appar.force
             (;hen,egg) = hen2egg
-            nmcs_hen = hen.bodysig.coords.nmcs
-            nmcs_egg = egg.bodysig.coords.nmcs
+            nmcs_hen = hen.body.coords.nmcs
+            nmcs_egg = egg.body.coords.nmcs
             num_of_coords_hen = get_num_of_coords(nmcs_hen)
             num_of_coords_egg = get_num_of_coords(nmcs_egg)
-            id_hen = hen.bodysig.prop.id
-            id_egg = egg.bodysig.prop.id
+            id_hen = hen.body.prop.id
+            id_egg = egg.body.prop.id
             q_hen = @view q[bodyid2sys_full_coords[id_hen]]
             q_egg = @view q[bodyid2sys_full_coords[id_egg]]
             q_jointed = vcat(
@@ -753,8 +753,8 @@ function build_tangent_damping_matrix!(∂Q̌∂q̌̇,st)
         if appar.joint isa CableJoint
             spring_damper = appar.force
             (;hen,egg) = appar.joint.hen2egg
-            body_hen = hen.bodysig
-            body_egg = egg.bodysig
+            body_hen = hen.body
+            body_egg = egg.body
             C_hen = body_hen.cache.Cps[hen.pid]
             C_egg = body_egg.cache.Cps[egg.pid]
             free_idx_hen = body_hen.coords.free_idx
@@ -820,8 +820,8 @@ function build_∂Q̌∂s̄(st)
             j += 1
             cable = clustercables[i].segs[cc.id]
             (;hen,egg) = cc
-            rb1 = hen.bodysig
-            rb2 = egg.bodysig
+            rb1 = hen.body
+            rb2 = egg.body
             C1 = rb1.state.cache.Cps[hen.pid]
             C2 = rb2.state.cache.Cps[egg.pid]
             free_idx1 = rb1.state.cache.free_idx

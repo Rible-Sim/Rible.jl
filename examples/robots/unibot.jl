@@ -134,24 +134,24 @@ function uni(c=100.0;
     # uj = RB.PinJoint(1,
     #     RB.Hen2Egg(
     #         1,
-    #         RB.ID(rb2,4,4),
-    #         RB.ID(rb1,3,3),
+    #         RB.Signifier(rb2,4,4),
+    #         RB.Signifier(rb1,3,3),
     #     )
     # )
 
     # uj = RB.UniversalJoint(1,
     #     RB.Hen2Egg(
     #         1,
-    #         RB.ID(rb2,4,4),
-    #         RB.ID(rb1,3,3),
+    #         RB.Signifier(rb2,4,4),
+    #         RB.Signifier(rb1,3,3),
     #     )
     # )
 
     uj = RB.UniversalPrismaticJoint(1,
         RB.Hen2Egg(
             1,
-            RB.ID(rb2,4,4),
-            RB.ID(rb1,3,3),
+            RB.Signifier(rb2,4,4),
+            RB.Signifier(rb1,3,3),
         )
     )
 

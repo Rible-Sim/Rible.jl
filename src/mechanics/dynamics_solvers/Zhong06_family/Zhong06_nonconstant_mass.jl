@@ -57,7 +57,7 @@ function solve!(simulator::Simulator,solvercache::Zhong06_Nonconstant_Mass_Cache
     initial_x = vcat(q0,λ0)
     initial_Res = zero(initial_x)
     mr = norm(Mₘ,Inf)
-    scaling = mr
+    mass_norm = mr
 
     function make_Res_stepk(qᵏ,λₘ,qᵏ⁻¹,pᵏ⁻¹,Mₘ,Fₘ,Aᵀ,tᵏ⁻¹)
         @inline @inbounds function inner_Res_stepk!(Res,x)
@@ -72,8 +72,8 @@ function solve!(simulator::Simulator,solvercache::Zhong06_Nonconstant_Mass_Cache
             Res[   1:nq   ] .= Mₘ*(qᵏ.-qᵏ⁻¹) .-
                                h.*pᵏ⁻¹ .-
                                (h^2)/2 .*Fₘ .+
-                               scaling.*Aᵀ*λₘ
-            Res[nq+1:nq+nλ] .= scaling.*Φ(qᵏ)
+                               mass_norm.*Aᵀ*λₘ
+            Res[nq+1:nq+nλ] .= mass_norm.*Φ(qᵏ)
         end
     end
 
@@ -87,15 +87,10 @@ function solve!(simulator::Simulator,solvercache::Zhong06_Nonconstant_Mass_Cache
             M_and_Jac_M!(Mₘ,∂Mₘhq̇ₘ∂qₘ,qₘ,h.*q̇ₘ)
             Jac_F!(∂F∂q,∂F∂q̇,qₘ,q̇ₘ,tₘ)
             Jac[   1:nq ,   1:nq ] .=  Mₘ .+ 1/2 .*∂Mₘhq̇ₘ∂qₘ.-(h^2)/2 .*(1/2 .*∂F∂q.+1/h.*∂F∂q̇)
-            Jac[   1:nq ,nq+1:end] .=  scaling.*Aᵀ
-            Jac[nq+1:end,   1:nq ] .=  scaling.*A(qᵏ)
+            Jac[   1:nq ,nq+1:end] .=  mass_norm.*Aᵀ
+            Jac[nq+1:end,   1:nq ] .=  mass_norm.*A(qᵏ)
             Jac[nq+1:end,nq+1:end] .=  0.0
         end
-    end
-
-    @inline @inbounds function Momentum_k!(pᵏ,pᵏ⁻¹,qᵏ,qᵏ⁻¹,λᵏ,Mₘ,A,Aᵀ,h)
-        pᵏ .= -pᵏ⁻¹.+2/h.*Mₘ*(qᵏ.-qᵏ⁻¹) .-
-            1/h.*scaling.*(transpose(A(qᵏ))-Aᵀ)*λᵏ
     end
 
     total_iterations = 0
@@ -147,7 +142,7 @@ function solve!(simulator::Simulator,solvercache::Zhong06_Nonconstant_Mass_Cache
         qᵏ .= xᵏ[   1:nq   ]
         λᵏ .= xᵏ[nq+1:nq+nλ]     
         M!(Mₘ,(qᵏ.+qᵏ⁻¹)./2)
-        Momentum_k!(pᵏ,pᵏ⁻¹,qᵏ,qᵏ⁻¹,λᵏ,Mₘ,A,Aᵀ,dt)           
+        Momentum_k!(pᵏ,pᵏ⁻¹,qᵏ,qᵏ⁻¹,λᵏ,Mₘ,A,Aᵀ,mass_norm,dt)           
         M⁻¹!(M⁻¹ₖ,qᵏ)
         q̇ᵏ .= M⁻¹ₖ*pᵏ
         #---------Step k finisher-----------

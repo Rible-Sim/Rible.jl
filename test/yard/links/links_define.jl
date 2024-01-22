@@ -95,13 +95,13 @@ function links(n,di,rm;k=3e1,c=0.0)
 	# bodyid2q = RB.filter_bodyid2q(bodyid2q_raw,rbs)
 	bodyid2q = bodyid2q_raw
 
-    string2ap = Vector{Tuple{RB.ID,RB.ID}}()
+    string2ap = Vector{Tuple{RB.Signifier,RB.Signifier}}()
     for i = 1:n-1
         for j = 2:4
-            push!(string2ap,(RB.ID(i,j),RB.ID(i+1,j)))
+            push!(string2ap,(RB.Signifier(i,j),RB.Signifier(i+1,j)))
         end
         for j = 2:4
-            push!(string2ap,(RB.ID(i,j),RB.ID(i+1,1)))
+            push!(string2ap,(RB.Signifier(i,j),RB.Signifier(i+1,1)))
         end
     end
     cnt = RB.Connectivity(bodyid2q,string2ap)

@@ -2,8 +2,8 @@ function get_cables(st)
     (;connected) = st.connectivity
     ret = Vector{Pair{Point2{Float64},Point2{Float64}}}(undef,st.ncables)
     map!(ret,connected) do scnt
-        Point(scnt.hen.bodysig.state.loci_states[scnt.hen.pid]) =>
-        Point(scnt.egg.bodysig.state.loci_states[scnt.egg.pid])
+        Point(scnt.hen.body.state.loci_states[scnt.hen.pid]) =>
+        Point(scnt.egg.body.state.loci_states[scnt.egg.pid])
     end
     ret
 end

@@ -453,10 +453,10 @@ function parse_joints_links!(
                                     apparid,
                                     RB.End2End(
                                         ijoint,
-                                        RB.ID(bodiesdict[parent],
+                                        RB.Signifier(bodiesdict[parent],
                                         length(bodiesdict[parent].prop.loci),
                                         length(bodiesdict[parent].prop.axes)),
-                                        RB.ID(bodiesdict[child],1),
+                                        RB.Signifier(bodiesdict[child],1),
                                     )
                                 )
                                 push!(jointcsts,fixedjoint)
@@ -470,10 +470,10 @@ function parse_joints_links!(
                                     apparid,
                                     RB.End2End(
                                         ijoint,
-                                        RB.ID(bodiesdict[parent],
+                                        RB.Signifier(bodiesdict[parent],
                                         length(bodiesdict[parent].prop.loci),
                                         length(bodiesdict[parent].prop.axes)),
-                                        RB.ID(bodiesdict[child],1),
+                                        RB.Signifier(bodiesdict[child],1),
                                     )
                                 )
                                 push!(jointcsts,revjoint)
@@ -487,10 +487,10 @@ function parse_joints_links!(
                                     apparid,
                                     RB.End2End(
                                         ijoint,
-                                        RB.ID(bodiesdict[parent],
+                                        RB.Signifier(bodiesdict[parent],
                                         length(bodiesdict[parent].prop.loci),
                                         length(bodiesdict[parent].prop.axes)),
-                                        RB.ID(bodiesdict[child],1),
+                                        RB.Signifier(bodiesdict[child],1),
                                     )
                                 )
                                 push!(jointcsts,prmjoint)

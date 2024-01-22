@@ -265,7 +265,7 @@ function dualtri(num_of_dof,onedir=[1.0,0.0];θ=0.0,k=400.0,c=0.0,restlen=0.16)
 						   ganged_act(i,2i,2(i-1)+1,original_restlens)) for i = 1:nbodies-1]
 	hub = (actuators=acs,)
 	pjs = [
-		RB.PinJoint(RB.Hen2Egg(RB.ID(rbs[i],2),RB.ID(rbs[i+1],1)))
+		RB.PinJoint(RB.Hen2Egg(RB.Signifier(rbs[i],2),RB.Signifier(rbs[i+1],1)))
 		for i = 1:nbodies-1
 	]
 	jointed = RB.join(pjs,indexed)

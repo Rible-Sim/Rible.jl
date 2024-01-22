@@ -26,12 +26,12 @@ function build_Q̃(structure)
         j = appar.id
         if appar.joint isa CableJoint
             (;hen,egg) = appar.joint
-            C1 = hen.bodysig.cache.Cps[hen.pid]
-            C2 = egg.bodysig.cache.Cps[egg.pid]
-            uci1 = hen.bodysig.coords.free_idx
-            uci2 = egg.bodysig.coords.free_idx
-            m2sf1 = bodyid2sys_free_coords[hen.bodysig.prop.id]
-            m2sf2 = bodyid2sys_free_coords[egg.bodysig.prop.id]
+            C1 = hen.body.cache.Cps[hen.pid]
+            C2 = egg.body.cache.Cps[egg.pid]
+            uci1 = hen.body.coords.free_idx
+            uci2 = egg.body.coords.free_idx
+            m2sf1 = bodyid2sys_free_coords[hen.body.prop.id]
+            m2sf2 = bodyid2sys_free_coords[egg.body.prop.id]
             Q̃[m2sf2,(j-1)*num_of_dim+1:j*num_of_dim] .-= transpose(C2)[uci2,:]
             Q̃[m2sf1,(j-1)*num_of_dim+1:j*num_of_dim] .+= transpose(C1)[uci1,:]
         end
@@ -166,8 +166,8 @@ function make_Q̌(st,q0)
         foreach(connected) do scnt
             j = scnt.id
             (;k) = cables[j]
-            rb1 = scnt.hen.bodysig
-            rb2 = scnt.egg.bodysig
+            rb1 = scnt.hen.body
+            rb2 = scnt.egg.body
             rb1id = rb1.prop.id
             rb2id = rb2.prop.id
             ap1id = scnt.hen.pid
@@ -192,8 +192,8 @@ function make_Q̌(st,q0)
         Jj = zeros(eltype(q̌),num_of_dim,num_of_full_coords)
         foreach(connected) do scnt
             j = scnt.id
-            rb1 = scnt.hen.bodysig
-            rb2 = scnt.egg.bodysig
+            rb1 = scnt.hen.body
+            rb2 = scnt.egg.body
             rb1id = rb1.prop.id
             rb2id = rb2.prop.id
             ap1id = scnt.hen.pid
@@ -218,8 +218,8 @@ function make_Q̌(st,q0)
     #     ret = zeros(eltype(γ),nfullcoords)
     #     foreach(string2ap) do scnt
     #         j = scnt.id
-    #         rb1 = scnt.hen.bodysig
-    #         rb2 = scnt.egg.bodysig
+    #         rb1 = scnt.hen.body
+    #         rb2 = scnt.egg.body
     #         rb1id = rb1.prop.id
     #         rb2id = rb2.prop.id
     #         ap1id = scnt.hen.pid

@@ -4,22 +4,7 @@ struct Zhong06_Constant_Mass_Cache{solT,cacheType}
 end
 
 function generate_cache(
-        simulator::Simulator{<:DynamicsProblem},
-        solver::DynamicsSolver{Zhong06};
-        dt,kargs...
-    ) 
-
-    generate_cache(
-        simulator,
-        solver,
-        has_constant_mass_matrix(simulator.prob.bot);
-        dt,kargs...
-    )
-
-end
-
-function generate_cache(
-        simulator::Simulator{<:DynamicsProblem},
+        simulator::Simulator{<:AbstractDynamicsProblem},
         solver::DynamicsSolver{Zhong06,Nothing},
         ::Val{true};
         dt,kargs...
@@ -85,7 +70,7 @@ function solve!(sim::Simulator,cache::Zhong06_Constant_Mass_Cache;
         initial_Jac
     ) = cache.cache
     mr = norm(Ḿ,Inf)
-    scaling = mr
+    mass_norm = mr
     h = dt
     function make_Res_stepk(qₖ,q̌ₖ,λₖ,qₖ₋₁,p̌ₖ₋₁,F̌,Aᵀₖ₋₁,tₖ₋₁)
         @inline @inbounds function inner_Res_stepk!(Res,x)
@@ -95,8 +80,8 @@ function solve!(sim::Simulator,cache::Zhong06_Constant_Mass_Cache;
             Res[   1:nq̌   ] .= Ḿ*(qₖ.-qₖ₋₁) .-
                                h.*p̌ₖ₋₁ .-
                                (h^2)/2 .*F̌ .+
-                               scaling.*Aᵀₖ₋₁*λₖ
-            Res[nq̌+1:nq̌+nλ] .= scaling.*Φ(qₖ)
+                               mass_norm.*Aᵀₖ₋₁*λₖ
+            Res[nq̌+1:nq̌+nλ] .= mass_norm.*Φ(qₖ)
         end
     end
 
@@ -105,15 +90,10 @@ function solve!(sim::Simulator,cache::Zhong06_Constant_Mass_Cache;
             q̌ₖ .= x[1:nq̌]
             Jac_F!(∂F∂q̌,∂F∂q̌̇,(qₖ.+qₖ₋₁)./2,(qₖ.-qₖ₋₁)./h,tₖ₋₁+h/2)
             Jac[   1:nq̌ ,   1:nq̌ ] .=  M̌.-(h^2)/2 .*(1/2 .*∂F∂q̌.+1/h.*∂F∂q̌̇)
-            Jac[   1:nq̌ ,nq̌+1:end] .=  scaling.*Aᵀₖ₋₁
-            Jac[nq̌+1:end,   1:nq̌ ] .=  scaling.*A(qₖ)
+            Jac[   1:nq̌ ,nq̌+1:end] .=  mass_norm.*Aᵀₖ₋₁
+            Jac[nq̌+1:end,   1:nq̌ ] .=  mass_norm.*A(qₖ)
             Jac[nq̌+1:end,nq̌+1:end] .=  0.0
         end
-    end
-
-    @inline @inbounds function Momentum_k!(p̌ₖ,p̌ₖ₋₁,qₖ,qₖ₋₁,λₖ,Ḿ,A,Aᵀₖ₋₁,h)
-        p̌ₖ .= -p̌ₖ₋₁.+2/h.*Ḿ*(qₖ.-qₖ₋₁) .-
-            1/h.*scaling.*(transpose(A(qₖ))-Aᵀₖ₋₁)*λₖ
     end
 
     iteration_break = 0
@@ -198,7 +178,7 @@ function solve!(sim::Simulator,cache::Zhong06_Constant_Mass_Cache;
         end
         q̌ₖ .= xₖ[   1:nq̌   ]
         λₖ .= xₖ[nq̌+1:nq̌+nλ]
-        Momentum_k!(p̌ₖ,p̌ₖ₋₁,qₖ,qₖ₋₁,λₖ,Ḿ,A,Aᵀₖ₋₁,h)
+        Momentum_k!(p̌ₖ,p̌ₖ₋₁,qₖ,qₖ₋₁,λₖ,Ḿ,A,Aᵀₖ₋₁,mass_norm,h)
         q̌̇ₖ .= M̌⁻¹*(p̌ₖ.-M̄*q̃̇ₖ )
         #---------Step k finisher-----------
         #---------Step k finisher-----------

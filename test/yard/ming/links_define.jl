@@ -102,13 +102,13 @@ function spine(n,dis,rm,heating_law;k=1000.0,c=0.0)
 	# bodyid2q = RB.filter_bodyid2q(bodyid2q_raw,rbs)
 	bodyid2q = bodyid2q_raw
 
-    string2ap = Vector{Tuple{RB.ID,RB.ID}}()
+    string2ap = Vector{Tuple{RB.Signifier,RB.Signifier}}()
     for i = 1:n-1
         for j = 4:6
-            push!(string2ap,(RB.ID(i,j),RB.ID(i+1,j+3)))
+            push!(string2ap,(RB.Signifier(i,j),RB.Signifier(i+1,j+3)))
         end
         for j = 1:3
-            push!(string2ap,(RB.ID(i,j),RB.ID(i+1,j+9)))
+            push!(string2ap,(RB.Signifier(i,j),RB.Signifier(i+1,j+9)))
         end
     end
     cnt = RB.Connectivity(bodyid2q,string2ap)
@@ -230,18 +230,18 @@ function spine_true(n,dis,rm;
 	matrix_cnt = zeros(Int,6(n-1),n)
     for i = 1:n-1
         # for j = 4:6
-        #     push!(string2ap,(RB.ID(i,j),RB.ID(i+1,j+3)))
+        #     push!(string2ap,(RB.Signifier(i,j),RB.Signifier(i+1,j+3)))
         # end
         # for j = 1:3
-        #     push!(string2ap,(RB.ID(i,j),RB.ID(i+1,j+9)))
+        #     push!(string2ap,(RB.Signifier(i,j),RB.Signifier(i+1,j+9)))
         # end
         for j = 2:4
 			matrix_cnt[6(i-1)+j-1,i:i+1] = [j,-j]
-            # push!(string2ap,(RB.ID(i,j),RB.ID(i+1,j)))
+            # push!(string2ap,(RB.Signifier(i,j),RB.Signifier(i+1,j)))
 		end
 		for j = 2:4
 			matrix_cnt[6(i-1)+j+2,i:i+1] = [1,-j]
-            # push!(string2ap,(RB.ID(i,1),RB.ID(i+1,j)))
+            # push!(string2ap,(RB.Signifier(i,1),RB.Signifier(i+1,j)))
         end
     end
 	connected = RB.connect(rigdibodies, matrix_cnt)

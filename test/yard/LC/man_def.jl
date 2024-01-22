@@ -89,13 +89,13 @@ function man_nd(n;θ=0.0,k=0.0,c=0.0)
     string2ap_raw = [
         [zeros(Int,2),zeros(Int,2)] for i = 1:length(ss)
     ]
-    string2ap = Vector{Tuple{RB.ID,RB.ID}}()
+    string2ap = Vector{Tuple{RB.Signifier,RB.Signifier}}()
     for i = 1:n-1
         j = 2i - 1
-        push!(string2ap,(RB.ID(j,3),RB.ID(j+2,1)))
-        push!(string2ap,(RB.ID(j,2),RB.ID(j+2,3)))
-        push!(string2ap,(RB.ID(j,4),RB.ID(j+2,1)))
-        push!(string2ap,(RB.ID(j,2),RB.ID(j+2,4)))
+        push!(string2ap,(RB.Signifier(j,3),RB.Signifier(j+2,1)))
+        push!(string2ap,(RB.Signifier(j,2),RB.Signifier(j+2,3)))
+        push!(string2ap,(RB.Signifier(j,4),RB.Signifier(j+2,1)))
+        push!(string2ap,(RB.Signifier(j,2),RB.Signifier(j+2,4)))
     end
     cnt = RB.Connectivity(bodyid2q,string2ap)
     st = RB.Structure(rbs,ss,acs,cnt)

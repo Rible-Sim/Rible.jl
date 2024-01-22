@@ -64,10 +64,10 @@ function cstr_function(appar::Apparatus{<:PrototypeJoint},structure::Structure,q
         mask_1st,mask_2nd,mask_3rd,mask_4th
     ) = appar.joint
     (;hen,egg) = hen2egg
-    id_hen = hen.bodysig.prop.id
-    id_egg = egg.bodysig.prop.id
-    nmcs_hen = hen.bodysig.coords.nmcs
-    nmcs_egg = egg.bodysig.coords.nmcs
+    id_hen = hen.body.prop.id
+    id_egg = egg.body.prop.id
+    nmcs_hen = hen.body.coords.nmcs
+    nmcs_egg = egg.body.coords.nmcs
     T = eltype(q)
     ret = zeros(T,num_of_cstr)
     q_hen = @view q[bodyid2sys_full_coords[id_hen]]
@@ -78,8 +78,8 @@ function cstr_function(appar::Apparatus{<:PrototypeJoint},structure::Structure,q
     get_joint_violations!(
         ret,
         nmcs_hen, nmcs_egg,
-        hen.bodysig.prop.loci[hen.pid].position,
-        egg.bodysig.prop.loci[egg.pid].position,
+        hen.body.prop.loci[hen.pid].position,
+        egg.body.prop.loci[egg.pid].position,
         cache,
         mask_1st,mask_2nd,mask_3rd,mask_4th,
         q_hen,q_egg,
@@ -107,10 +107,10 @@ function cstr_jacobian(appar::Apparatus{<:PrototypeJoint},structure::Structure,q
     full_idx = apparid2full_idx[appar.id]
     free_idx = apparid2free_idx[appar.id]
     (;hen,egg) = hen2egg
-    id_hen = hen.bodysig.prop.id
-    id_egg = egg.bodysig.prop.id
-    nmcs_hen = hen.bodysig.coords.nmcs
-    nmcs_egg = egg.bodysig.coords.nmcs
+    id_hen = hen.body.prop.id
+    id_egg = egg.body.prop.id
+    nmcs_hen = hen.body.coords.nmcs
+    nmcs_egg = egg.body.coords.nmcs
     T = eltype(q)
     ret = zeros(T,num_of_cstr,length(full_idx))
     q_hen = @view q[bodyid2sys_full_coords[id_hen]]
@@ -119,8 +119,8 @@ function cstr_jacobian(appar::Apparatus{<:PrototypeJoint},structure::Structure,q
     get_joint_jacobian!(
         ret,
         nmcs_hen, nmcs_egg,
-        hen.bodysig.prop.loci[hen.pid].position,
-        egg.bodysig.prop.loci[egg.pid].position,
+        hen.body.prop.loci[hen.pid].position,
+        egg.body.prop.loci[egg.pid].position,
         cache,
         mask_1st,mask_2nd,mask_3rd,mask_4th,
         q_hen,q_egg
@@ -146,12 +146,12 @@ function cstr_forces_jacobian(appar::Apparatus{<:PrototypeJoint},structure,q,λ)
     full_idx = apparid2full_idx[appar.id]
     free_idx = apparid2free_idx[appar.id]
     (;hen,egg) = hen2egg
-    id_hen = hen.bodysig.prop.id
-    id_egg = egg.bodysig.prop.id
+    id_hen = hen.body.prop.id
+    id_egg = egg.body.prop.id
     q_hen = @view q[bodyid2sys_full_coords[id_hen]]
     q_egg = @view q[bodyid2sys_full_coords[id_egg]]
-    nmcs_hen = hen.bodysig.coords.nmcs
-    nmcs_egg = egg.bodysig.coords.nmcs
+    nmcs_hen = hen.body.coords.nmcs
+    nmcs_egg = egg.body.coords.nmcs
     T = eltype(λ)
     num_of_full_idx = length(full_idx)
     ret = zeros(T,num_of_full_idx,num_of_full_idx)
@@ -159,8 +159,8 @@ function cstr_forces_jacobian(appar::Apparatus{<:PrototypeJoint},structure,q,λ)
         ret,
         num_of_cstr,
         nmcs_hen, nmcs_egg,
-        hen.bodysig.prop.loci[hen.pid].position,
-        egg.bodysig.prop.loci[egg.pid].position,
+        hen.body.prop.loci[hen.pid].position,
+        egg.body.prop.loci[egg.pid].position,
         cache,
         mask_1st,mask_2nd,mask_3rd,mask_4th,
         q_hen,q_egg,
@@ -187,14 +187,14 @@ function cstr_velocity_jacobian(appar::Apparatus{<:PrototypeJoint},structure,q,q
     full_idx = apparid2full_idx[appar.id]
     free_idx = apparid2free_idx[appar.id]
     (;hen,egg) = hen2egg
-    id_hen = hen.bodysig.prop.id
-    id_egg = egg.bodysig.prop.id
+    id_hen = hen.body.prop.id
+    id_egg = egg.body.prop.id
     q_hen = @view q[bodyid2sys_full_coords[id_hen]]
     q_egg = @view q[bodyid2sys_full_coords[id_egg]]
     q̇_hen = @view q̇[bodyid2sys_full_coords[id_hen]]
     q̇_egg = @view q̇[bodyid2sys_full_coords[id_egg]]
-    nmcs_hen = hen.bodysig.coords.nmcs
-    nmcs_egg = egg.bodysig.coords.nmcs
+    nmcs_hen = hen.body.coords.nmcs
+    nmcs_egg = egg.body.coords.nmcs
     T = eltype(q̇)
     num_of_full_idx = length(full_idx)
     ret = zeros(T,num_of_cstr,num_of_full_idx)
@@ -202,8 +202,8 @@ function cstr_velocity_jacobian(appar::Apparatus{<:PrototypeJoint},structure,q,q
         ret,
         num_of_cstr,
         nmcs_hen, nmcs_egg,
-        hen.bodysig.prop.loci[hen.pid].position,
-        egg.bodysig.prop.loci[egg.pid].position,
+        hen.body.prop.loci[hen.pid].position,
+        egg.body.prop.loci[egg.pid].position,
         cache,
         mask_1st,mask_2nd,mask_3rd,mask_4th,
         q_hen,q_egg,

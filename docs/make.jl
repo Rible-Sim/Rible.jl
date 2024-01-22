@@ -53,24 +53,29 @@ makedocs(
         "index.md",
         "setup.md",
         "Modeling" => [
-            "naturalcoordinates.md",
-            "rigidbody.md",
+            "Rigd Bodies" => [
+                "naturalcoordinates.md",
+                "Quaternion_new.md"
+            ],
+            "Flexible Bodies",
+            "Apparatuses",
+            "Structure"
             # "cable.md",
         ],
         # "tensegrity.md",
         # "control.md",
-        # "Linearization" => [
-        #     "linearization.md"
-        # ],
-        # "Statics" => [
-        #     "inverse_statics.md"
-        # ],
-        "Demos" => [
-            "pointmass.md",
+        "Linearization" => [
+            "linearization.md"
+        ],
+        "Statics" => [
+            "inverse_statics.md"
         ],
         "Dynamics" => [
             "solvers.md"
         ],
+        ## "Demos" => [
+        ##     "pointmass.md",
+        ## ],
         # "Examples" => [
         #     # "tail.md"
         # ]

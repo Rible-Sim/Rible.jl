@@ -86,8 +86,8 @@ function update_apparatuses!(st, @eponymargs(clustered,))
         for (segid, seg) in enumerate(clustercable.segs)
             (;state, k, c, original_restlen, prestress) = seg
             (;restlen) = state
-            state1 = scnt[segid].hen.bodysig.state
-            state2 = scnt[segid].egg.bodysig.state
+            state1 = scnt[segid].hen.body.state
+            state2 = scnt[segid].egg.body.state
             pid1 = scnt[segid].hen.pid
             pid2 = scnt[segid].egg.pid
             p1 = state1.loci_states[pid1]
@@ -253,8 +253,8 @@ function build_∂ζ∂q(st::AbstractStructure,q̌)
             j += 1
             cable = clustercables[i].segs[cc.id]
             (;hen,egg) = cc
-            rb1 = hen.bodysig
-            rb2 = egg.bodysig
+            rb1 = hen.body
+            rb2 = egg.body
             C1 = rb1.state.cache.Cps[hen.pid]
             C2 = rb2.state.cache.Cps[egg.pid]
             uci1 = rb1.state.cache.free_idx
@@ -313,8 +313,8 @@ function Record_build_∂ζ∂q(st::AbstractStructure,q̌, xlsxname, sheetname)
             j += 1
             cable = st.clustercables[i].segs[cc.id]
             (;hen,egg) = cc
-            rb1 = hen.bodysig
-            rb2 = egg.bodysig
+            rb1 = hen.body
+            rb2 = egg.body
             C1 = rb1.state.cache.Cps[hen.pid]
             C2 = rb2.state.cache.Cps[egg.pid]
             uci1 = rb1.state.cache.free_idx

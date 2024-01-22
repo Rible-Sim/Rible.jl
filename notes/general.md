@@ -26,6 +26,93 @@ aim for parametric optimization
 excessive data: 
 more than necessary, but not redundant
 
+# Solver
+
+LearningProblem(
+  - Cost function (path and terminal)
+)
+
+Learner
+
+return "Policy with optimal parameters and/or conditions"
+
+OptimDynamicsProblem(
+  - Cost function (path and terminal)
+)
+
+OptimDynamicsSolver
+
+return "optimal parameters and/or conditions and cost"
+
+
+DynamicsSensitivityProblem(
+  - Dynamics models
+  - Cost function (path and terminal)
+)
+
+DynamicsSensitivitySolver
+    - solve forward dynamics (dispatch on DynamicsSolver)
+    - and gradient
+
+AdjointDynamicsSensitivitySolver
+    - solve forward dynamics (dispatch on DynamicsSolver)
+    - solve adjoint dynamics (dispatch on AdjointDynamicsSolver)
+  
+return "gradients of cost w.r.t parameters and/or conditions"
+
+Assume that the forward pass is already solved (except backsolve?)
+
+AdjointDynamicsProblem(
+  - Dynamics models
+  - Cost function (path and terminal)
+)
+
+AdjointDynamicsSolver 
+
+- Continuous adjoint dynamics solver (not depending on DynamicsSolver)
+    - derive adjoint dynamics models (dispatch on models)
+    - reuse solver history, optionally interpolate
+    - backsolve use reversible solver checkpoint?
+    - another solver for discretized adjoint dynamics
+
+- Discrete adjoint dynamics solver (depending on DynamicsSolver)
+      - reuse solver history, optionally interpolate
+      - solve straightforwardly
+
+return "trajectory of adjoint variables"
+
+Control Hub
+
+Gauge
+
+- direct field of body, apparatus, etc.
+Otherwise, requiring vectorizing bodies and apparatuses.
+
+- allow customizing system output, depending on structure state and/or aux coordinates.
+
+ReferenceError
+Mean Error (ME)
+Mean Squared Error (MSE)
+Mean Absolute Error (MAE)
+linear quadratic 
+
+Actuator
+  passive apparatus not requiring an actuator
+  active apparatus require an actuator
+  manual distinction
+  
+Cost 
+
+path cost is integral cost!
+terminal cost is proportional cost!
+what is derivative cost? also part of terminal but not really
+
+
+Observer/Estimator
+
+that provides an estimate of the internal state of a given real system, from measurements of the input and output of the real system.
+
+
 # Docs
 run `make.jl` in the `yard` environment, where developmental/experimental codes reside.
 
@@ -97,7 +184,6 @@ To do this, use `include`, docs/test/benchmark; use `includet` dev;
   - [ ] value/reward will always depends on position variables: final state or intermediate states
   - [ ] uppon convergence, an additional Newton iteration is performed to compute all the derivatives/gradients/jacobians/adjoint and cached
   - [ ] cache differentials, w.r.t action(forces/torques), structual parameters (stiffness/geometry), joints(location, axes), initial conditions, 
-
 # Show case
 - [ ] pecking wood bird examples
 - [ ] 走钢丝

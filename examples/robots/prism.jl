@@ -229,8 +229,8 @@ csts_bar2bar = [
             i+m*(j-1),
             RB.Hen2Egg(
                 i+m*(j-1),
-                RB.ID(hen,1,1),
-                RB.ID(egg,2,1)
+                RB.Signifier(hen,1,1),
+                RB.Signifier(egg,2,1)
             )
         )
     end
@@ -243,8 +243,8 @@ if hasplate
             m*d+i,
             RB.Hen2Egg(
                 m*d+i,
-                RB.ID(plate,i,1),
-                RB.ID(bars[1][cm[i]],1,1),
+                RB.Signifier(plate,i,1),
+                RB.Signifier(bars[1][cm[i]],1,1),
             )
         )
         for i = 1:m

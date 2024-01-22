@@ -125,25 +125,24 @@ $(TYPEDSIGNATURES)
 """
 get_num_of_dims(bot::Robot) = get_num_of_dims(bot.structure)
 get_num_of_dims(st::AbstractStructure) = get_num_of_dims(st.bodies)
-get_num_of_dims(bodies::AbstractVector{<:AbstractBody}) = get_num_of_dims(eltype(bodies))
-get_num_of_dims(bodies::TypeSortedCollection) = get_num_of_dims(eltype(bodies.data[1]))
-get_num_of_dims(body::AbstractBody) = get_num_of_dims(typeof(body))
-get_num_of_dims(::Type{<:AbstractBody{N,T}}) where {N,T} = N
-get_num_of_dims(::AbstractBodyProperty{N}) where {N} = N
+get_num_of_dims(bodies::AbstractVector) = get_num_of_dims(bodies[begin])
+get_num_of_dims(bodies::TypeSortedCollection) = get_num_of_dims(bodies.data[1])
+get_num_of_dims(body::BodyType) where {BodyType<:AbstractBody{N,T}} where {N,T} = N
 
 get_numbertype(bot::Robot) = get_numbertype(bot.structure)
 get_numbertype(st::AbstractStructure) = get_numbertype(st.bodies)
-get_numbertype(bodies::AbstractVector{<:AbstractBody}) = get_numbertype(eltype(bodies))
-get_numbertype(bodies::TypeSortedCollection) = get_numbertype(eltype(bodies.data[1]))
-get_numbertype(body::AbstractBody) = get_numbertype(typeof(body))
-get_numbertype(::Type{<:AbstractBody{N,T}}) where {N,T} = T
-get_numbertype(::AbstractBodyProperty{N,T}) where {N,T} = T
+get_numbertype(bodies::AbstractVector) = get_numbertype(bodies[begin])
+get_numbertype(bodies::TypeSortedCollection) = get_numbertype(bodies.data[1])
+get_numbertype(body::BodyType) where {BodyType<:AbstractBody{N,T}} where {N,T} = T
 
 """
-Return System 约束数量。
+Return the system's number of constraints.
 $(TYPEDSIGNATURES)
 """
-get_num_of_cstr(st::Structure) = st.num_of_cstr
+get_num_of_cstr(st::Structure) = st.connectivity.indexed.num_of_cstr
+
+get_num_of_free_coords(st::Structure) = st.connectivity.indexed.num_of_free_coords
+
 
 function get_num_of_cstr(rbs::TypeSortedCollection)
     num_of_intrinsic_cstr = mapreduce(get_num_of_intrinsic_cstr,+,rbs,init=0)
@@ -224,7 +223,7 @@ function get_cables_len!(st::Structure,q)
 end
 
 """
-Return System DistanceSpringDamper 刚度。
+Return System DistanceSpringDamper stiffness coefficients
 $(TYPEDSIGNATURES)
 """
 function get_cables_stiffness(st::Structure)
@@ -232,7 +231,7 @@ function get_cables_stiffness(st::Structure)
 end
 
 """
-Return System DistanceSpringDamper 当前Length.
+Return System DistanceSpringDamper current Length.
 $(TYPEDSIGNATURES)
 """
 function get_cables_len(st::Structure)
@@ -244,7 +243,7 @@ function get_cables_len_dot(st::Structure)
 end
 
 """
-Return System DistanceSpringDamper 变形量。
+Return System DistanceSpringDamper deformation。
 $(TYPEDSIGNATURES)
 """
 function get_cables_deform(st::Structure)
@@ -279,7 +278,7 @@ end
 
 
 """
-Return System DistanceSpringDamper 力密度。
+Return System DistanceSpringDamper force density。
 $(TYPEDSIGNATURES)
 """
 function get_cables_force_density(st::Structure)

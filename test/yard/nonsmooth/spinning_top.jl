@@ -1,7 +1,7 @@
 #-- deps
 using Revise #jl
 import Rible as RB
-include(joinpath(pathof(RB),"../../test/yard/nonsmooth/deps.jl"))
+include(joinpath(pathof(RB),"../../test/yard/nonsmooth.jl"))
 using AbbreviatedStackTraces #jl
 ENV["JULIA_STACKTRACE_ABBREVIATED"] = true #jl
 ENV["JULIA_STACKTRACE_MINIMAL"] = true #jl

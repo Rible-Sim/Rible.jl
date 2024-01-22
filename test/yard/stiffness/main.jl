@@ -578,8 +578,8 @@ GM.activate!();with_theme(theme_pub;
                 mapreduce(
                     (scnt)->
                     [(
-                        scnt.hen.bodysig.state.loci_states[scnt.hen.pid].position.+
-                        scnt.egg.bodysig.state.loci_states[scnt.egg.pid].position
+                        scnt.hen.body.state.loci_states[scnt.hen.pid].position.+
+                        scnt.egg.body.state.loci_states[scnt.egg.pid].position
                     )./2],
                     vcat,
                     tensioned.connected
@@ -1069,8 +1069,8 @@ GM.activate!();with_theme(theme_pub;
                 mapreduce(
                     (scnt)->
                     [(
-                        scnt.hen.bodysig.state.loci_states[scnt.hen.pid].position.+
-                        scnt.egg.bodysig.state.loci_states[scnt.egg.pid].position
+                        scnt.hen.body.state.loci_states[scnt.hen.pid].position.+
+                        scnt.egg.body.state.loci_states[scnt.egg.pid].position
                     )./2],
                     vcat,
                     tensioned.connected
@@ -1522,8 +1522,8 @@ GM.activate!();with_theme(theme_pub;
                 mapreduce(
                     (scnt)->
                     [(
-                        scnt.hen.bodysig.state.loci_states[scnt.hen.pid].+
-                        scnt.egg.bodysig.state.loci_states[scnt.egg.pid]
+                        scnt.hen.body.state.loci_states[scnt.hen.pid].+
+                        scnt.egg.body.state.loci_states[scnt.egg.pid]
                     )./2],
                     vcat,
                     tensioned.connected
@@ -1862,8 +1862,8 @@ GM.activate!();with_theme(theme_pub;
                 mapreduce(
                     (scnt)->
                     [(
-                        scnt.hen.bodysig.state.loci_states[scnt.hen.pid].+
-                        scnt.egg.bodysig.state.loci_states[scnt.egg.pid]
+                        scnt.hen.body.state.loci_states[scnt.hen.pid].+
+                        scnt.egg.body.state.loci_states[scnt.egg.pid]
                     )./2],
                     vcat,
                     tensioned.connected

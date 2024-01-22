@@ -112,8 +112,8 @@ function tower(;k=nothing)
         1,
         RB.Hen2Egg(
             1,
-            RB.ID(base,1),
-            RB.ID(bar,1),
+            RB.Signifier(base,1),
+            RB.Signifier(bar,1),
         )
     )
     
@@ -121,8 +121,8 @@ function tower(;k=nothing)
         2,
         RB.Hen2Egg(
             2,
-            RB.ID(bar,2),
-            RB.ID(top,1)
+            RB.Signifier(bar,2),
+            RB.Signifier(top,1)
         )
     )
 

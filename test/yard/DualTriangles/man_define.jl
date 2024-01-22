@@ -204,7 +204,7 @@ function man_ndof(num_of_dof,onedir=[0.0,-1.0];θ=0.0,k=0.0,c=0.0,unit="mks",res
     pinjoints = [
         RB.PinJoint(
             RB.Hen2Egg(
-                i-1,RB.ID(rbs[i-1],2),RB.ID(rbs[i],1)
+                i-1,RB.Signifier(rbs[i-1],2),RB.Signifier(rbs[i],1)
             )
         )
         for i in 2:nbodies
@@ -509,13 +509,13 @@ function man_ndof_2022(num_of_dof,onedir=[1.0,0.0];θ=0.0,k=1250.0,c=0.0,unit="m
 
     for i = 1:length(rbs)-1
         if edi == 1
-            # push!(string2ap,(RB.ID(i,7),RB.ID(i+1,6)))
-            # push!(string2ap,(RB.ID(i,8),RB.ID(i+1,5)))
+            # push!(string2ap,(RB.Signifier(i,7),RB.Signifier(i+1,6)))
+            # push!(string2ap,(RB.Signifier(i,8),RB.Signifier(i+1,5)))
             matrix_cnt[2(i-1)+1,i:i+1] = [7,-6]
             matrix_cnt[2(i-1)+2,i:i+1] = [8,-5]
         else
-            # push!(string2ap,(RB.ID(i,5),RB.ID(i+1,7)))
-            # push!(string2ap,(RB.ID(i,6),RB.ID(i+1,8)))
+            # push!(string2ap,(RB.Signifier(i,5),RB.Signifier(i+1,7)))
+            # push!(string2ap,(RB.Signifier(i,6),RB.Signifier(i+1,8)))
             matrix_cnt[2(i-1)+1,i:i+1] = [5,-7]
             matrix_cnt[2(i-1)+2,i:i+1] = [6,-8]
         end

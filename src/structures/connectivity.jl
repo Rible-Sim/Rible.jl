@@ -32,7 +32,7 @@ function connect(bodies, spring_dampers, cm_input=Int[;;], istart = 0)
         pid1,pid2 = Int64.(abs.(row[[rbid1,rbid2]]))
         j += 1
         joint = CableJoint(
-            Hen2Egg(ID(rbs_sorted[rbid1],pid1),ID(rbs_sorted[rbid2],pid2)),
+            Hen2Egg(Signifier(rbs_sorted[rbid1],pid1),Signifier(rbs_sorted[rbid2],pid2)),
             0,
         )
         force = spring_dampers[j]
@@ -62,7 +62,7 @@ function cluster(bodies, cm2_input)
             is += 1
             rbid1 = rbids[i]; rbid2 = rbids[i+1]
             pid1 = Int64(row[rbids[i]]); pid2 = Int64(row[rbids[i+1]])
-            push!(iret,Hen2Egg(is,ID(rbs_sorted[rbid1],pid1),ID(rbs_sorted[rbid2],pid2)))
+            push!(iret,Hen2Egg(is,Signifier(rbs_sorted[rbid1],pid1),Signifier(rbs_sorted[rbid2],pid2)))
         end
         push!(ret_raw, iret)
     end
@@ -135,7 +135,7 @@ function index(bodies,apparatuses,sharing_input::AbstractMatrix=Int[;;])
     else
         sharing = sharing_input[:,:]
     end
-    sysfull = Int[]
+    sys_full_coords_idx = Int[]
     sys_pres_coords_idx = Int[]
     sys_free_coords_idx = Int[]
     bodyid2sys_full_coords = Vector{Int}[]
@@ -154,8 +154,6 @@ function index(bodies,apparatuses,sharing_input::AbstractMatrix=Int[;;])
         ntotal = ntotal_by_body[bodyid]
         pres = pres_idx_by_body[bodyid]
         free = free_idx_by_body[bodyid]
-        num_of_pres_coords = length(pres)
-        num_of_free_coords = ntotal - num_of_pres_coords
         push!(bodyid2sys_full_coords,fill(-1,ntotal))
         push!(bodyid2sys_pres_coords,Int[])
         push!(bodyid2sys_free_coords,Int[])
@@ -173,8 +171,8 @@ function index(bodies,apparatuses,sharing_input::AbstractMatrix=Int[;;])
         end
         deleteat!(unshareds,shared_idx)
         nusi = length(unshareds)
-        bodyid2sys_full_coords[bodyid][unshareds] = collect(length(sysfull)+1:length(sysfull)+nusi)
-        append!(sysfull,bodyid2sys_full_coords[bodyid][unshareds])
+        bodyid2sys_full_coords[bodyid][unshareds] = collect(length(sys_full_coords_idx)+1:length(sys_full_coords_idx)+nusi)
+        append!(sys_full_coords_idx,bodyid2sys_full_coords[bodyid][unshareds])
         for i in unshareds
             if i in pres
                 # pres
@@ -196,6 +194,7 @@ function index(bodies,apparatuses,sharing_input::AbstractMatrix=Int[;;])
     num_of_intrinsic_cstr,bodyid2sys_intrinsic_cstr_idx,num_of_dof_unconstrained,bodyid2sys_dof_idx = index_incstr(bodies)
     num_of_free_coords = length(sys_free_coords_idx)
     num_of_pres_coords = length(sys_pres_coords_idx)
+    num_of_full_coords = length(sys_full_coords_idx)
     # num_of_extrinsic_cstr = mapreduce((apparatus)->apparatus.num_of_cstr,+,apparatuses,init=0)
     apparid2sys_extrinsic_cstr_idx = Vector{Int}[]
     nexcst_by_joint = zeros(Int,num_of_apparatuses)
@@ -237,7 +236,7 @@ function index(bodies,apparatuses,sharing_input::AbstractMatrix=Int[;;])
         num_of_apparatuses,
         num_of_joint_apparatuses,
         num_of_force_apparatuses,
-        length(sysfull),
+        num_of_full_coords,
         num_of_free_coords,
         num_of_pres_coords,
         num_of_intrinsic_cstr,
@@ -280,7 +279,7 @@ function number(bodies,apparatuses)
         nld_by_body[i] = get_num_of_local_dims(body)
     end
     bodyid2sys_loci_idx = Vector{Int}[]
-    num2ID = Vector{ID{Int,Int}}()
+    num2ID = Vector{Signifier{Int,Int}}()
     sys_loci2coords_idx = Vector{Int}[]
     is = 1
     js = 0
@@ -288,7 +287,7 @@ function number(bodies,apparatuses)
         push!(bodyid2sys_loci_idx,Int[])
         nld = nld_by_body[bodyid]
         for pid in 1:nnodes_by_body[bodyid]
-            push!(num2ID,ID(bodyid,pid))
+            push!(num2ID,Signifier(bodyid,pid))
             push!(bodyid2sys_loci_idx[bodyid],is)
             is += 1
             push!(sys_loci2coords_idx,collect(1:nld).+js)

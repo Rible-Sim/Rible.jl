@@ -133,10 +133,10 @@ cnt_matrix = [
 connected = RB.connect(rbs,cnt_matrix)
 # #
 
-# cst1 = RB.PinJoint(RB.Hen2Egg(RB.ID(rb2,2),RB.ID(rb3,2)))
-# cst2 = RB.PinJoint(RB.Hen2Egg(RB.ID(rb3,3),RB.ID(rb4,1)))
-# cst3 = RB.PinJoint(RB.Hen2Egg(RB.ID(rb4,2),RB.ID(rb5,3)))
-# cst4 = RB.PinJoint(RB.Hen2Egg(RB.ID(rb5,3),RB.ID(rb6,1)))
+# cst1 = RB.PinJoint(RB.Hen2Egg(RB.Signifier(rb2,2),RB.Signifier(rb3,2)))
+# cst2 = RB.PinJoint(RB.Hen2Egg(RB.Signifier(rb3,3),RB.Signifier(rb4,1)))
+# cst3 = RB.PinJoint(RB.Hen2Egg(RB.Signifier(rb4,2),RB.Signifier(rb5,3)))
+# cst4 = RB.PinJoint(RB.Hen2Egg(RB.Signifier(rb5,3),RB.Signifier(rb6,1)))
 # jointedmembers = RB.join((cst1,cst2,cst3,cst4),indexed)
 # # jointedmembers = RB.join((cst1,cst2,cst3),indexed)
 

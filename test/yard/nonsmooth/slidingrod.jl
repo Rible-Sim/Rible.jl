@@ -61,7 +61,7 @@ function make_rod()
 	hub = nothing
 	connections = RB.connect(rbs,zeros(Int,0,0))
 	jointedmembers = RB.unjoin()
-	contacts = [RB.ID(1,i) for i = 1:2]
+	contacts = [RB.Signifier(1,i) for i = 1:2]
 	cnt = RB.Connectivity(numbered,indexed,connections,jointedmembers,contacts)
 	st = RB.Structure(rbs,apparatuses,cnt)
     bot = RB.Robot(st,nothing)
@@ -104,7 +104,7 @@ function make_bar()
 	hub = nothing
 	connections = RB.connect(rbs,zeros(Int,0,0))
 	jointedmembers = RB.unjoin()
-	contacts = [RB.ID(1,i) for i = 1:2]
+	contacts = [RB.Signifier(1,i) for i = 1:2]
 	cnt = RB.Connectivity(numbered,indexed,connections,jointedmembers,contacts)
 	st = RB.Structure(rbs,apparatuses,cnt)
     bot = RB.Robot(st,nothing)

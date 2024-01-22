@@ -1,7 +1,5 @@
-module PIDController
-export PID,update!,tune!,reset!
-using Parameters
-mutable struct PID{T,limitType}
+
+mutable struct PID{T,limitType} <: Controller
     Kp::T
     Ki::T
     Kd::T
@@ -20,6 +18,7 @@ mutable struct PID{T,limitType}
     lastTime::T
     currentTime::T
 end
+
 function PID(Kp,Ki,Kd;setpoint,dt,initialInput=zero(Kp))
     @assert typeof(Kp)==typeof(Ki)==typeof(Kd)==typeof(setpoint)
     T = typeof(Kp)
@@ -35,13 +34,15 @@ function PID(Kp,Ki,Kd;setpoint,dt,initialInput=zero(Kp))
     lastOutput = zero(T)
     lastTime = -dt
     currentTime = zero(T)
-    PID(Kp,Ki,Kd,setpoint,
-                dt,output_limits,
-                input,output,
-                pTerm,iTerm,dTerm,
-                lastErr,lastInput,lastOutput,
-                lastTime,
-                currentTime)
+    PID(
+        Kp,Ki,Kd,setpoint,
+        dt,output_limits,
+        input,output,
+        pTerm,iTerm,dTerm,
+        lastErr,lastInput,lastOutput,
+        lastTime,
+        currentTime
+    )
 end
 
 function (pid::PID)(arg...)
@@ -60,6 +61,7 @@ function reset!(pid::PID)
     pid.lastTime = -pid.dt
     pid.currentTime = 0.0
 end
+
 # function update!(pid,input,t)
 #     pid.input = input
 #     pid.currentTime = t
@@ -77,7 +79,7 @@ function update!(pid,input,t)
         return pid.lastOutput
     end
 end
-#
+
 # function update!(pid,input;dt)
 #     @assert dt > 0.0
 #     pid.input = input
@@ -114,9 +116,10 @@ function update!(pid)
     pid.lastTime = pid.currentTime
     return pid.output
 end
+
 # function update!(pid,::Val{:OnMeasurement})
-#     (;Kp,Ki,Kd,setpoint) = pid
-#     (;input,dt,output_limits) = pid
+#     @unpack Kp,Ki,Kd,setpoint = pid
+#     @unpack input,dt,output_limits = pid
 #     # How long since we last calculated
 #     @assert dt > 0.0
 #     # Compute all the working error variables
@@ -149,5 +152,4 @@ function tune!(pid::PID;p=pid.Kp,i=pid.Ki,d=pid.Kd)
     pid.Kp = p
     pid.Ki = i
     pid.Kd = d
-end
 end

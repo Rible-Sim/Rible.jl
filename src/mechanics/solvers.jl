@@ -22,6 +22,7 @@ struct NoTendon <: AbstractTendonModel end
 struct SlidingTendon <: AbstractTendonModel end
 
 abstract type AbstractSolver end
+abstract type AbstractDynamicsSolver <: AbstractSolver end
 
 abstract type AbstractComplementaritySolver <: AbstractSolver end
 struct InteriorPointMethod <: AbstractComplementaritySolver end
@@ -68,7 +69,7 @@ struct Moreau{T} <: AbstractIntegrator
     θ::T
 end
 
-struct DynamicsSolver{integratorType,contact_solverType,apparatus_solverType,optionsType} <: AbstractSolver 
+struct DynamicsSolver{integratorType,contact_solverType,apparatus_solverType,optionsType} <: AbstractDynamicsSolver 
     integrator::integratorType
     contact_solver::contact_solverType
     apparatus_solver::apparatus_solverType
@@ -91,7 +92,15 @@ function DynamicsSolver(integrator::AbstractIntegrator,contact_solver::AbstractC
     DynamicsSolver(integrator,contact_solver,nothing,values(options))
 end
 
-struct DynamicsProblem{RobotType,envType,contact_modelType,apparatus_modelType,optionsType}
+struct DiscreteAdjointDynamicsSolver{integratorType,contact_solverType,apparatus_solverType,optionsType} <: AbstractDynamicsSolver 
+    forward_solver::DynamicsSolver{integratorType,contact_solverType,apparatus_solverType,optionsType}
+end
+
+abstract type AbstractMechanicsProblem end
+
+abstract type AbstractDynamicsProblem <: AbstractMechanicsProblem end
+
+struct DynamicsProblem{RobotType,envType,contact_modelType,apparatus_modelType,optionsType} <: AbstractDynamicsProblem
     bot::RobotType
     env::envType
     contact_model::contact_modelType
@@ -111,6 +120,43 @@ function DynamicsProblem(bot::Robot,env::AbstractContactEnvironment,contact_mode
     DynamicsProblem(bot::Robot,env,contact_model,NoTendon(),values(options))
 end
 
+struct DynamicsSensitivityProblem{RobotType,envType,contact_modelType,apparatus_modelType,optionsType} <: AbstractDynamicsProblem
+    bot::RobotType
+    env::envType
+    contact_model::contact_modelType
+    apparatus_model::apparatus_modelType
+    options::optionsType
+end
+
+function DynamicsSensitivityProblem(bot::Robot;options...)
+    DynamicsSensitivityProblem(bot::Robot,EmptySpace(),Contactless(),NoTendon(),values(options))
+end
+
+function DynamicsSensitivityProblem(bot::Robot,contact_model::AbstractContactModel;options...)
+    DynamicsSensitivityProblem(bot::Robot,EmptySpace(),contact_model,NoTendon(),values(options))
+end
+
+function DynamicsSensitivityProblem(bot::Robot,env::AbstractContactEnvironment,contact_model::AbstractContactModel;options...)
+    DynamicsSensitivityProblem(bot::Robot,env,contact_model,NoTendon(),values(options))
+end
+
+struct AdjointDynamicsSensitivitySolver{forward_solverType,adjoint_solverType} <: AbstractDynamicsSolver
+    forward_solver::forward_solverType
+    adjoint_solver::adjoint_solverType
+end
+
+struct AdjointDynamicsProblem{RobotType,envType,contact_modelType,apparatus_modelType,optionsType,costType} <: AbstractDynamicsProblem
+    bot::RobotType
+    env::envType
+    contact_model::contact_modelType
+    apparatus_model::apparatus_modelType
+    cost::costType
+    options::optionsType
+end
+
+function AdjointDynamicsProblem(bot::Robot,cost;options...)
+    AdjointDynamicsProblem(bot::Robot,EmptySpace(),Contactless(),NoTendon(),cost,values(options))
+end
 
 struct SolverHistory{dataType}
     data::dataType
@@ -122,7 +168,7 @@ function SolverHistory(data::NamedTuple,n)
     )
 end
 
-function SolverHistory(bot::Robot,solver::DynamicsSolver,n)
+function SolverHistory(bot::Robot,solver::AbstractDynamicsSolver,n)
     T = get_numbertype(bot)
     ini_record = (
         residual=zero(T),
@@ -135,7 +181,6 @@ function SolverHistory(bot::Robot,solver::DynamicsSolver,n)
         n
     )
 end
-
 
 function SolverHistory(
         bot::Robot,
@@ -158,7 +203,6 @@ function SolverHistory(
     )
 end
 
-
 function SolverHistory(
         bot::Robot,
         solver::DynamicsSolver{IntorType,<:MonolithicContactSolver},
@@ -179,7 +223,6 @@ function SolverHistory(
     )
 end
 
-
 function record!(sh::SolverHistory,data,k)
     sh.data[k] = data
 end
@@ -194,7 +237,7 @@ struct Simulator{ProbType,CtrlType,T,dataType}
     solver_history::SolverHistory{dataType}
 end
 
-function Simulator(prob::DynamicsProblem,solver::DynamicsSolver,
+function Simulator(prob::AbstractDynamicsProblem,solver::AbstractDynamicsSolver,
         controller = (prescribe! = nothing, actuate! = nothing);
         tspan,dt,restart=true,karg...
     )
@@ -272,20 +315,35 @@ function prepare_traj!(traj,contacts_traj;tspan,dt,restart=true)
     totalstep
 end
 
-function solve!(prob::DynamicsProblem,solver::DynamicsSolver,
+function solve!(prob::AbstractDynamicsProblem,solver::AbstractDynamicsSolver,
                 controller = (prescribe! = nothing, actuate! = nothing);
                 tspan,dt,restart=true,karg...)
     simulator = Simulator(prob,solver,controller;tspan,dt,restart)
-    solve!(simulator,solver;dt,karg...)
-    simulator
+    solvercache = solve!(simulator,solver;dt,karg...)
+    simulator, solvercache
 end
 
-function solve!(simulator::Simulator,solver::DynamicsSolver;karg...)
+function solve!(simulator::Simulator,solver::AbstractDynamicsSolver;karg...)
     solvercache = generate_cache(simulator,solver;karg...)
     solve!(simulator,solvercache;karg...)
     # retrieve!(simulator,solvercache)
-    # simulator,solvercache
+    solvercache
     # simulator.prob.bot
+end
+
+function generate_cache(
+        simulator::Simulator,
+        solver::AbstractDynamicsSolver;
+        dt,kargs...
+    ) 
+
+    generate_cache(
+        simulator,
+        solver,
+        has_constant_mass_matrix(simulator.prob.bot);
+        dt,kargs...
+    )
+
 end
 
 
@@ -307,6 +365,11 @@ include("dynamics_solvers/Zhong06_family/Zhong06_frictionless_nonconstant_mass.j
 include("dynamics_solvers/Zhong06_family/Zhong06_frictionless_nonconstant_mass_mono.jl")
 include("dynamics_solvers/Zhong06_family/Zhong06_sliding_cable_FB.jl")
 # include("dynamics_solvers/Zhong06_family/Zhong06_nonholonomic_nonsmooth.jl")
+
+
+include("dynamics_solvers/Zhong06_family/Adjoint_Zhong06_nonconstant_mass.jl")
+include("dynamics_solvers/Zhong06_family/Adjoint_Zhong06_constant_mass.jl")
+
 
 include("dynamics_solvers/Alpha_family/Alpha.jl")
 include("dynamics_solvers/Alpha_family/AlphaCCP.jl")

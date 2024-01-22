@@ -246,7 +246,7 @@ apparatuses = (cables = cables,)
 hub = (actuators = acs,)
 
 csts = [
-    RB.PinJoint(i+m*(j-1),RB.Hen2Egg(RB.ID(bars[j][m+cm[i]],2),RB.ID(plates[j+1],cm[i-1])))
+    RB.PinJoint(i+m*(j-1),RB.Hen2Egg(RB.Signifier(bars[j][m+cm[i]],2),RB.Signifier(plates[j+1],cm[i-1])))
      for j = 1:n for i = 1:m
 ]
 

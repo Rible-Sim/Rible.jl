@@ -82,7 +82,8 @@ function cstr_velocity_jacobian end
 function make_cstr_function end
 function make_cstr_jacobian end
 function to_local_coords end
-function to_transformation end
+function to_position_jacobian end
+function to_velocity_jacobian end
 function cartesian_frame2coords end
 function find_rotation end
 function find_angular_velocity end
@@ -126,8 +127,6 @@ include("structures/linearization.jl")
 
 include("robots/robot.jl")
 
-include("control/control.jl")
-
 include("./get.jl")
 
 include("mechanics/linearized_mechanics.jl")
@@ -145,6 +144,8 @@ include("mechanics/stiffness.jl")
 include("mechanics/solvers.jl")
 
 include("mechanics/dynamics.jl")
+
+include("control/control.jl")
 
 include("postprocess/analysis.jl")
 
