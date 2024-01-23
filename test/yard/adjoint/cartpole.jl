@@ -4,7 +4,7 @@ include(joinpath(pathof(RB),"../../test/yard/nonsmooth.jl"))
 using AbbreviatedStackTraces #jl
 ENV["JULIA_STACKTRACE_ABBREVIATED"] = true #jl
 ENV["JULIA_STACKTRACE_MINIMAL"] = true #jl
-import Rible as RB
+
 figdir::String = joinpath(pathof(RB),"../../tmp")
 if Sys.iswindows() #src
     figdir::String = raw"C:\Users\luo22\OneDrive\Papers\IMSD 2025\LaTex_Abstract" #src
@@ -45,23 +45,20 @@ RB.solve!(
 plot_traj!(cp_sim;showmesh=false,showground=false)
 
 # gauges terminal
-m1 = RB.measure(cp_terminal,cp_terminal.hub.gauges.data[1][1])
+m1 = RB.measure(cp_terminal.structure,cp_terminal.hub.gauges.data[1][1])
 ## m2 = RB.measure(cp_terminal,cp_terminal.hub.gauges.data[2][1])
 
-RB.measure_jacobian(cp_terminal,cp_terminal.hub.gauges.data[1][1])
-## RB.measure_jacobian(cp_terminal,cp_terminal.hub.gauges.data[2][1])
-
 # gauges
-m1 = RB.measure(cp_sim,cp_sim.hub.gauges.data[1][1])
+m1 = RB.measure(cp_sim.structure,cp_sim.hub.gauges.data[1][1])
 ## m2 = RB.measure(cp_sim,cp_sim.hub.gauges.data[2][1])
 
-RB.measure_jacobian(cp_sim,cp_sim.hub.gauges.data[1][1])
+# cost in errors
+RB.cost!(cp_sim,)
+
+RB.error_jacobian(cp_sim)
 ## RB.measure_jacobian(cp_sim,cp_sim.hub.gauges.data[2][1])
 
-# cost in errors
-RB.cost(cp_sim,)
-
-RB.cost_jacobian(cp_sim,)
+RB.cost_jacobian!(cp_sim,)
 
 # cost in actuators
 RB.generalized_force(cp_sim,cp_sim.hub.actuators.data[1][1])

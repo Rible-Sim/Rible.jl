@@ -239,6 +239,7 @@ function cart_pole(;
     force_actuator = RB.ExternalForceActuator(
         1,
         RB.Signifier(cart,5,5),
+        RB.TimeOperator(),
         (t)->[0,1.0,0]
     )
     actuators = TypeSortedCollection([force_actuator,])

@@ -122,7 +122,7 @@ function build_Ǧ(tginput;factor=1.0)
     st = deepcopy(tginput)
     clear_forces!(st)
     apply_gravity!(st;factor)
-    Ǧ = assemble_forces!(st)
+    assemble_forces!(Ǧ,st)
 end
 
 function make_U(st)
@@ -489,7 +489,7 @@ function check_static_equilibrium_output_multipliers!(st,q,F=nothing;
     if gravity
         apply_gravity!(st)
     end
-    generalized_forces = assemble_forces!(st)
+    assemble_forces!(generalized_forces,st)
     if !isnothing(F)
         generalized_forces .+= F[:]
     end

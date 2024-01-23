@@ -70,7 +70,7 @@ end
 #     update!(pid)
 # end
 
-function update!(pid,input,t)
+function update!(pid::PID,input,t)
     if t - pid.lastTime >= pid.dt
         pid.input = input
         pid.currentTime = t
@@ -88,13 +88,13 @@ end
 #     update!(pid)
 # end
 
-function update!(pid,input)
+function update!(pid::PID,input)
     pid.input = input
     pid.currentTime = pid.lastTime + pid.dt
     update!(pid)
 end
 
-function update!(pid)
+function update!(pid::PID)
     (;Kp,Ki,Kd,setpoint) = pid
     (;input,dt,output_limits) = pid
     # Compute all the working error variables

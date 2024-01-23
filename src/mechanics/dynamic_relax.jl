@@ -29,7 +29,7 @@ function initialize_GDR(structure,F::Nothing;gravity=true)
         if gravity
             apply_gravity!(structure)
         end
-        F = assemble_forces!(structure)
+        assemble_forces!(F,structure)
         # @show abs.(F-Q) |> maximum
         -F
     end

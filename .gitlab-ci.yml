@@ -26,7 +26,7 @@ build:
       - docker
   stage: build
   script:
-    - apt-get update -qq && apt-get install -y git xorg-dev mesa-utils xvfb libgl1 freeglut3-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev libxext-dev # needed by Documenter
+    - apt-get update -qq && apt-get install -y git xorg-dev mesa-utils xvfb libgl1 freeglut3-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev libxext-dev
     - DISPLAY=:0 xvfb-run -s '-screen 0 1024x768x24' julia --project=test/ -e 'using Pkg; Pkg.develop(PackageSpec(path=pwd())); Pkg.instantiate(); Pkg.precompile()'
 
 # Below is the template to run your tests in Julia
@@ -43,7 +43,8 @@ build:
   script:
     # Let's run the tests. Substitute `coverage = false` below, if you do not
     # want coverage results.
-    - julia -e 'using Pkg; Pkg.build(); Pkg.test()'
+    - apt-get update -qq && apt-get install -y git xorg-dev mesa-utils xvfb libgl1 freeglut3-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev libxext-dev
+    - DISPLAY=:0 xvfb-run -s '-screen 0 1024x768x24' julia -e 'using Pkg; Pkg.build(); Pkg.test()'
     # Comment out below if you do not want coverage results.
     # - julia -e 'using Pkg; Pkg.add("Coverage");
     #   import Rible; cd(joinpath(dirname(pathof(Rible)), ".."));
@@ -61,7 +62,7 @@ pages:
       - docker
   stage: deploy
   script:
-    - apt-get update -qq && apt-get install -y git xorg-dev mesa-utils xvfb libgl1 freeglut3-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev libxext-dev # needed by Documenter
+    - apt-get update -qq && apt-get install -y git xorg-dev mesa-utils xvfb libgl1 freeglut3-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev libxext-dev
     - DISPLAY=:0 xvfb-run -s '-screen 0 1024x768x24' julia --project=test/ -e 'using Pkg; Pkg.develop(PackageSpec(path=pwd())); Pkg.instantiate(); Pkg.precompile()'
     - JULIA_DEBUG=Literate DISPLAY=:0 xvfb-run -s '-screen 0 1024x768x24' julia --project=test/ --color=yes docs/make.jl
     - mv docs/build public  # move to the directory picked up by Gitlab pages

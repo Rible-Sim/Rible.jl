@@ -111,7 +111,6 @@ function Structure(bodies,cnt::Connectivity)
     Structure(bodies,apparatuses,cnt)
 end
 
-
 function update!(st::AbstractStructure; gravity=false)
     clear_forces!(st)
     stretch_rigids!(st)
@@ -133,11 +132,13 @@ function lazy_update!(st::AbstractStructure; gravity=false)
     assemble_forces!(st)
 end
 
-function update!(st::Structure,q::AbstractVector,q̇::AbstractVector=zero(q))
+function update!(st::Structure,q::AbstractVector,q̇::AbstractVector=zero(q),t::Number=st.state.system.t)
+    st.state.system.t = t
     st.state.system.q .= q
     st.state.system.q̇ .= q̇
     update!(st)
 end
+
 
 function assemble_M!(M,st::AbstractStructure)
     (;num_of_full_coords,bodyid2sys_full_coords) = st.connectivity.indexed

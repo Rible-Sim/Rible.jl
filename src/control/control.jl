@@ -75,7 +75,6 @@ struct ControlHub{gaugesType,actuatorsType,coalitionType,stateType}
         u = get_actions(structure,actuators,coalition)
         state = ComponentArray(
             @eponymtuple(
-                t = 0.0,
                 e,
                 u,
             )
@@ -83,16 +82,6 @@ struct ControlHub{gaugesType,actuatorsType,coalitionType,stateType}
         new{typeof(gauges),typeof(actuators),typeof(coalition),typeof(state)}(
             gauges,actuators,coalition,state
         )
-    end
-end
-
-function get_errors(structure,gauges,coalition)
-    (;num_of_errors, gaugeid2error_idx) = coalition.nt
-    T = get_numbertype(structure)
-    e = zeros(T,num_of_errors)
-    foreach(gauges) do gauge
-        err_idx = gaugeid2error_idx[gauge.id]
-        e[err_idx] .= measure(structure,gauge)
     end
 end
 
@@ -104,40 +93,80 @@ function get_actions(structure,actuators,coalition)
         act_idx = actid2sys_actions[actuator.id]
         u[act_idx] .= get_actions(structure,actuator)
     end
+    u
 end
 
-function cost!(bot::Robot,q::AbstractVector,q̇::AbstractArray,t)
+function get_actions!(bot,structure,actuators,coalition)
+    (;num_of_actions,actid2sys_actions) = coalition.nt
+    T = get_numbertype(structure)
+    u = zeros(T,num_of_actions)
+    foreach(actuators) do actuator
+        act_idx = actid2sys_actions[actuator.id]
+        u[act_idx] .= get_actions(structure,actuator)
+    end
+    u
+end
+
+function actuate!(bot::Robot,q::AbstractVector,q̇::AbstractVector,u::AbstractVector,t)
+    (;structure,hub) = bot
+    (;actuators) = hub
+    foreach(actuators) do actuator
+        execute!(structure,actuator)
+    end
+    update!(structure,q,q̇,t)
+end
+
+function actuate!(bot::Robot,t::Number=bot.structure.state.system.t)
+    (;structure,hub) = bot
+    bot.structure.state.system.t = t
+    (;actuators) = hub
+    foreach(actuators) do actuator
+        execute!(structure,actuator)
+    end
+end
+
+# For now, the cost is simply the sum of errors
+#todo weighted sum
+#todo user-defined cost
+function cost!(bot::Robot,q::AbstractVector,q̇::AbstractVector,u::AbstractVector,t)
     ## (;q,p,λ) = x
-    (;hub) = bot
+    (;structure,hub) = bot
     (;gauges) = hub
     T = get_numbertype(bot)
-    update!(bot.structure,q,q̇)
+    actuate!(bot,q,q̇,u,t)
     ϕ = zero(T)
     foreach(gauges) do gauge
-        ϕ += measure(bot,gauge)
+        ϕ += measure(structure,gauge)
     end
     ϕ
 end
 
-function cost_jacobian!(∂ϕ∂qᵀ,∂ϕ∂q̇ᵀ,bot::Robot,q::AbstractArray,q̇::AbstractArray,t)
-    (;structure,hub) = bot
-    (;gauges) = hub
-    update!(bot.structure,q)
-    T = get_numbertype(bot)
-    nq = get_num_of_free_coords(structure)
-    nλ = get_num_of_cstr(structure)
-    nx = 2nq+nλ
-    ## nu = get_num_of_actions(bot)
-    ## ∂ϕ∂uᵀ = zeros(T,nu)
-    foreach(gauges) do gauge
-        measure_jacobian!(∂ϕ∂qᵀ,∂ϕ∂q̇ᵀ,bot,gauge)
-    end
-    vcat(
-        ∂ϕ∂qᵀ, 
-        ## ∂ϕ∂uᵀ
-    )
+function cost!(bot::Robot,)
+    ## (;q,p,λ) = x
+    (;q,q̇,t) = bot.structure.state.system
+    (;u) = bot.hub.state
+    cost!(bot,q,q̇,u,t)
 end
 
+function cost_jacobian!(∂ϕ∂qᵀ,∂ϕ∂q̇ᵀ,∂ϕ∂uᵀ,bot::Robot,q::AbstractVector,q̇::AbstractVector,u::AbstractVector,t)
+    (;structure,hub) = bot
+    (;coalition) = hub
+    actuate!(bot,q,q̇,u,t)
+    (;num_of_errors, gaugeid2error_idx, num_of_actions, actid2sys_actions) = coalition.nt
+    ∂e∂q, ∂e∂q̇ = error_jacobian(bot,)
+    ∂ϕ∂qᵀ .= transpose(sum(∂e∂q,dims=1))
+    ∂ϕ∂q̇ᵀ .= transpose(sum(∂e∂q̇, dims=1))
+end
+
+function cost_jacobian!(bot::Robot)
+    (;q,q̇,t) = bot.structure.state.system
+    (;u) = bot.hub.state
+    T = get_numbertype(bot)
+    ∂ϕ∂qᵀ = zeros(T,length(q))
+    ∂ϕ∂q̇ᵀ = zeros(T,length(q̇))
+    ∂ϕ∂uᵀ = zeros(T,length(u))
+    cost_jacobian!(∂ϕ∂qᵀ,∂ϕ∂q̇ᵀ,∂ϕ∂uᵀ,bot,q,q̇,u,t)
+end
 
 function set_restlen!(structure,u)
     for (i,s) in enumerate(structure.apparatuses.apparatuses)
@@ -168,10 +197,4 @@ function make_pres_actor(μ0,μ1,start,stop)
         ManualActuator(1,collect(1:nμ),zeros(nμ),Uncoupled()),
         itp
     )
-end
-
-get_actions(bot::Robot) = get_actions(bot.structure,bot.hub.actuators,bot.hub.coalition)
-
-function get_actions(bot::Robot,q,q̇,t)
-    u
 end

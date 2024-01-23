@@ -33,18 +33,18 @@ function generate_cache(
     ∂F∂q̌ = zeros(T,nq̌,nq̌)
     ∂F∂q̌̇ = zeros(T,nq̌,nq̌)
     nx = nq̌ + nλ
-    initial_x = vcat(q̌0,λ0)
-    initial_Res = zero(initial_x)
-    initial_Jac = initial_Res*transpose(initial_Res)
+    xₖ = vcat(q̌0,λ0)
+    Res = zero(xₖ)
+    Jac = Res*transpose(Res)
     Zhong06_Constant_Mass_Cache(solver,
         @eponymtuple(
             F!,Jac_F!,
             Ḿ,M̌,M̄,M̌⁻¹,A,Φ,
             ∂F∂q̌,∂F∂q̌̇,
             nq̌,nλ,nx,
-            initial_x,
-            initial_Res,
-            initial_Jac,
+            xₖ,
+            Res,
+            Jac,
             options
         )
     )
@@ -65,9 +65,9 @@ function solve!(sim::Simulator,cache::Zhong06_Constant_Mass_Cache;
         Ḿ,M̌,M̄,M̌⁻¹,A,Φ,
         ∂F∂q̌,∂F∂q̌̇,
         nq̌,nλ,nx,
-        initial_x,
-        initial_Res,
-        initial_Jac
+        xₖ,
+        Res,
+        Jac
     ) = cache.cache
     mr = norm(Ḿ,Inf)
     mass_norm = mr
@@ -76,7 +76,10 @@ function solve!(sim::Simulator,cache::Zhong06_Constant_Mass_Cache;
         @inline @inbounds function inner_Res_stepk!(Res,x)
             q̌ₖ .= x[   1:nq̌   ]
             λₖ .= x[nq̌+1:nq̌+nλ]
-            F!(F̌,(qₖ.+qₖ₋₁)./2,(qₖ.-qₖ₋₁)./h,tₖ₋₁+h/2)
+            qₘ = (qₖ.+qₖ₋₁)./2
+            q̇ₘ = (qₖ.-qₖ₋₁)./h
+            tₘ = tₖ₋₁+h/2
+            F!(F̌,qₘ, q̇ₘ, tₘ)
             Res[   1:nq̌   ] .= Ḿ*(qₖ.-qₖ₋₁) .-
                                h.*p̌ₖ₋₁ .-
                                (h^2)/2 .*F̌ .+
@@ -85,15 +88,16 @@ function solve!(sim::Simulator,cache::Zhong06_Constant_Mass_Cache;
         end
     end
 
-    function make_Jac_stepk(qₖ,q̌ₖ,qₖ₋₁,∂F∂q̌,∂F∂q̌̇,Aᵀₖ₋₁,tₖ₋₁)
-        @inline @inbounds function inner_Jac_stepk!(Jac,x)
-            q̌ₖ .= x[1:nq̌]
-            Jac_F!(∂F∂q̌,∂F∂q̌̇,(qₖ.+qₖ₋₁)./2,(qₖ.-qₖ₋₁)./h,tₖ₋₁+h/2)
-            Jac[   1:nq̌ ,   1:nq̌ ] .=  M̌.-(h^2)/2 .*(1/2 .*∂F∂q̌.+1/h.*∂F∂q̌̇)
-            Jac[   1:nq̌ ,nq̌+1:end] .=  mass_norm.*Aᵀₖ₋₁
-            Jac[nq̌+1:end,   1:nq̌ ] .=  mass_norm.*A(qₖ)
-            Jac[nq̌+1:end,nq̌+1:end] .=  0.0
-        end
+    function Jac_stepk!(Jac,x,qₖ,q̌ₖ,qₖ₋₁,∂F∂q̌,∂F∂q̌̇,Aᵀₖ₋₁,tₖ₋₁)
+        q̌ₖ .= x[1:nq̌]
+        qₘ = (qₖ.+qₖ₋₁)./2
+        q̇ₘ = (qₖ.-qₖ₋₁)./h
+        tₘ = tₖ₋₁+h/2
+        Jac_F!(∂F∂q̌,∂F∂q̌̇,qₘ,q̇ₘ,tₘ)
+        Jac[   1:nq̌ ,   1:nq̌ ] .=  M̌.-(h^2)/2 .*(1/2 .*∂F∂q̌.+1/h.*∂F∂q̌̇)
+        Jac[   1:nq̌ ,nq̌+1:end] .=  mass_norm.*Aᵀₖ₋₁
+        Jac[nq̌+1:end,   1:nq̌ ] .=  mass_norm.*A(qₖ)
+        Jac[nq̌+1:end,nq̌+1:end] .=  0.0
     end
 
     iteration_break = 0
@@ -120,25 +124,24 @@ function solve!(sim::Simulator,cache::Zhong06_Constant_Mass_Cache;
         λₖ = traj.λ[timestep+1]
         p̌ₖ = traj.p̌[timestep+1]
         F̌ = traj.F̌[timestep+1]
-        initial_x[   1:nq̌]    .= q̌ₖ₋₁ .+ h.*q̌̇ₖ₋₁
-        initial_x[nq̌+1:nq̌+nλ] .= 0
+        xₖ[   1:nq̌]    .= q̌ₖ₋₁ .+ h.*q̌̇ₖ₋₁
+        xₖ[nq̌+1:nq̌+nλ] .= 0
         Aᵀₖ₋₁ = transpose(A(qₖ₋₁))
         Res_stepk! = make_Res_stepk(qₖ,q̌ₖ,λₖ,qₖ₋₁,p̌ₖ₋₁,F̌,Aᵀₖ₋₁,tₖ₋₁)
         isconverged = false
         if false #Jac_F! isa Missing
-            dfk = OnceDifferentiable(Res_stepk!,initial_x,initial_Res)
-            Res_stepk_result = nlsolve(dfk, initial_x; ftol, iterations=maxiters, method=:newton)
+            dfk = OnceDifferentiable(Res_stepk!,xₖ,Res)
+            Res_stepk_result = nlsolve(dfk, xₖ; ftol, iterations=maxiters, method=:newton)
             isconverged = converged(Res_stepk_result)
             iteration_break = Res_stepk_result.iterations
             Res_stepk_result.iterations
-            xₖ = Res_stepk_result.zero
+            xₖ .= Res_stepk_result.zero
         else
-            Jac_stepk! = make_Jac_stepk(qₖ,q̌ₖ,qₖ₋₁,∂F∂q̌,∂F∂q̌̇,Aᵀₖ₋₁,tₖ₋₁)
             # if timestep == 10
             #     Jac_ref = zeros(nq̌+nλ,nq̌+nλ)
-            #     FiniteDiff.finite_difference_jacobian!(Jac_ref,Res_stepk!,initial_x)
+            #     FiniteDiff.finite_difference_jacobian!(Jac_ref,Res_stepk!,xₖ)
             #     Jac_my = zeros(nq̌+nλ,nq̌+nλ)
-            #     Jac_stepk!(Jac_my,initial_x)
+            #     Jac_stepk!(Jac_my,xₖ)
             #     diff_Jac = Jac_my .- Jac_ref
             #     diff_Jac[abs.(diff_Jac).<1e-5] .= 0.0
             #     diff_rowidx = findall((x)-> x>1e-5,norm.(eachrow(diff_Jac)))
@@ -152,20 +155,19 @@ function solve!(sim::Simulator,cache::Zhong06_Constant_Mass_Cache;
             # @show maximum(abs.(diff_Jac))for iteration = 1:maxiters
             # @show iteration,D,ηs,restitution_coefficients,gaps
             for iteration = 1:maxiters
-                Res_stepk!(initial_Res,initial_x)
-                # @show initial_Res
-                normRes = norm(initial_Res)
+                Res_stepk!(Res,xₖ)
+                # @show Res
+                normRes = norm(Res)
                 if normRes < ftol
                     isconverged = true
                     iteration_break = iteration-1
                     break
                 end                
-                # FiniteDiff.finite_difference_jacobian!(initial_Jac,Res_stepk!,initial_x,Val{:central})
-                Jac_stepk!(initial_Jac,initial_x)
-                initial_x .+= initial_Jac\(-initial_Res)
+                # FiniteDiff.finite_difference_jacobian!(Jac,Res_stepk!,xₖ,Val{:central})
+                Jac_stepk!(Jac,xₖ,qₖ,q̌ₖ,qₖ₋₁,∂F∂q̌,∂F∂q̌̇,Aᵀₖ₋₁,tₖ₋₁)
+                xₖ .+= Jac\(-Res)
             end
-            xₖ = initial_x
-            # dfk = OnceDifferentiable(Res_stepk!,Jac_stepk!,initial_x,initial_Res)
+            # dfk = OnceDifferentiable(Res_stepk!,Jac_stepk!,xₖ,Res)
         end
         
         if !isconverged

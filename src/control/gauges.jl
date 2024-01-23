@@ -164,10 +164,43 @@ function measure(structure::Structure,ref_err::ErrorGauge)
     1/2*sum((measure(structure,signifier,capta).-reference).^2)
 end
 
-function measure_jacobian!(∂ϕ∂qᵀ,∂ϕ∂q̇ᵀ,structure::Structure,ref_err::ErrorGauge)
-    (;gauge,reference) = ref_err
-    m = measure(structure,gauge)
-    Jq,Jq̇ = measure_jacobian(structure,gauge)
-    ∂ϕ∂qᵀ .+= transpose(transpose(m)*Jq)
-    ∂ϕ∂q̇ᵀ .+= transpose(transpose(m)*Jq̇)
+function measure_jacobian!(∂e∂q,∂e∂q̇,structure::Structure,ref_err::ErrorGauge)
+    (;signifier,capta,reference) = ref_err
+    m = measure(structure,signifier,capta)
+    Jq,Jq̇ = measure_jacobian(structure,signifier,capta)
+    ∂e∂q .+= transpose(m)*Jq
+    ∂e∂q̇ .+= transpose(m)*Jq̇
+end
+
+
+function get_errors(structure,gauges,coalition)
+    (;num_of_errors, gaugeid2error_idx) = coalition.nt
+    T = get_numbertype(structure)
+    e = zeros(T,num_of_errors)
+    foreach(gauges) do gauge
+        err_idx = gaugeid2error_idx[gauge.id]
+        e[err_idx] .= measure(structure,gauge)
+    end
+    e
+end
+
+function errors_jacobian!(∂e∂q,∂e∂q̇,bot::Robot,)
+    (;structure,hub) = bot
+    (;gauges,coalition) = hub
+    (;num_of_errors, gaugeid2error_idx,) = coalition.nt
+    foreach(gauges) do gauge
+        err_idx = gaugeid2error_idx[gauge.id]
+        measure_jacobian!(∂e∂q[err_idx,:],∂e∂q̇[err_idx,:],structure,gauge)
+    end
+end
+
+function error_jacobian(bot::Robot,)
+    (;structure,hub) = bot
+    (;num_of_free_coords) = structure.connectivity.indexed
+    (;num_of_errors, gaugeid2error_idx,) = hub.coalition.nt
+    T = get_numbertype(structure)
+    ∂e∂q = zeros(T,num_of_errors,num_of_free_coords)
+    ∂e∂q̇ = zeros(T,num_of_errors,num_of_free_coords)
+    errors_jacobian!(∂e∂q,∂e∂q̇,bot)
+    ∂e∂q, ∂e∂q̇
 end

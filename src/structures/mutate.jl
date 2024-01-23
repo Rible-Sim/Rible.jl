@@ -199,6 +199,13 @@ end
 """
 $(TYPEDSIGNATURES)
 """
+function assemble_forces!(generliazed_force,st::Structure)
+    generliazed_force .= assemble_forces!(st::Structure)
+end
+
+"""
+$(TYPEDSIGNATURES)
+"""
 function assemble_forces!(st::Structure)
     (;bodies,state) = st
     (;system,members) = state

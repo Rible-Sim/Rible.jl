@@ -43,7 +43,7 @@ material_properties = Table(
     ]
 )
 
-function generalized_force!(F,bot,q,q̇,u,t;gravity=true,(user_defined_force!)=(F,t)->nothing)
+function generalized_force!(F,bot,q,q̇,t;gravity=true,(user_defined_force!)=(F,t)->nothing)
     (;structure) = bot
     clear_forces!(structure)
     lazy_update_bodies!(structure,q,q̇)
@@ -51,13 +51,9 @@ function generalized_force!(F,bot,q,q̇,u,t;gravity=true,(user_defined_force!)=(
     if gravity
         apply_gravity!(structure;factor=1)
     end
-    actuate!(bot,u,t)
-    F .= assemble_forces!(structure)
+    actuate!(bot,t)
+    assemble_forces!(F,structure)
     user_defined_force!(F,t)
-end
-
-function generalized_force!(F,bot,q,q̇,t;gravity=true,(user_defined_force!)=(F,t)->nothing)
-    generalized_force!(F,bot,q,q̇,nothing,t;gravity,user_defined_force!)
 end
 
 function generalized_force_jacobain!(∂F∂q̌,∂F∂q̌̇,bot,q,q̇,t)
