@@ -32,6 +32,7 @@ mutable struct NonminimalCoordinatesState{T,qT,qviewT,pT}
     q̈::qT
     F::qT
     λ::qT
+    s::qT
     q̌::qviewT
     q̌̇::qviewT
     q̌̈::qviewT
@@ -46,7 +47,7 @@ mutable struct NonminimalCoordinatesState{T,qT,qviewT,pT}
     Nonminimal Coordinates State Constructor.
     $(TYPEDSIGNATURES)
     """
-    function NonminimalCoordinatesState(t,q,q̇,q̈,F,p,p̌,λ,free_idx,pres_idx,c)
+    function NonminimalCoordinatesState(t,q,q̇,q̈,F,p,p̌,λ,s,free_idx,pres_idx,c)
         q̌ = @view q[free_idx]
         q̌̇ = @view q̇[free_idx]
         q̌̈ = @view q̈[free_idx]
@@ -54,7 +55,7 @@ mutable struct NonminimalCoordinatesState{T,qT,qviewT,pT}
         q̃̇ = @view q̇[pres_idx]
         q̃̈ = @view q̈[pres_idx]
         F̌ = @view F[free_idx]
-        new{typeof(t),typeof(q),typeof(q̌),typeof(p)}(t,q,q̇,q̈,F,λ,q̌,q̌̇,q̌̈,q̃,q̃̇,q̃̈,F̌,p,p̌,c)
+        new{typeof(t),typeof(q),typeof(q̌),typeof(p)}(t,q,q̇,q̈,F,λ,s,q̌,q̌̇,q̌̈,q̃,q̃̇,q̃̈,F̌,p,p̌,c)
     end
 end
 

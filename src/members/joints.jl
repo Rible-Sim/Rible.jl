@@ -19,17 +19,20 @@ function LinearJoint(id,body,A,violations)
     LinearJoint(id,body,num_of_cstr,A,violations)
 end
 
-function get_joint_idx(cst::LinearJoint,bodyid2sys_free_coords)
-    (;body) = cst
-    bid = body.prop.id
+function get_joint_idx(joint::LinearJoint)
+    (;body) = joint
     nmcs = body.coords.nmcs
     free_idx = body.coords.free_idx
     ncoords = get_num_of_coords(nmcs)
     full_idx = collect(1:ncoords)
     free_idx = free_idx
-    sys_free_coords_idx = bodyid2sys_free_coords[bid]
-    # full_idx, sys_full_idx
-    full_idx, free_idx, sys_free_coords_idx
+    full_idx, free_idx
+end
+
+function get_appar_idx(appar::Apparatus{<:LinearJoint},bodyid2sys_free_coords)
+    (;body) = appar.joint
+    bid = body.prop.id
+    bodyid2sys_free_coords[bid]
 end
 
 function FixedBodyConstraint(id::Int,body::AbstractBody)
@@ -195,10 +198,8 @@ struct CableJoint{hen2eggType} <: AbstractJoint
 end
 
 
-function get_joint_idx(cst::Union{PrototypeJoint,CableJoint},bodyid2sys_free_coords)
-    (;hen,egg) = cst.hen2egg
-    id_hen = hen.body.prop.id
-    id_egg = egg.body.prop.id
+function get_joint_idx(joint::Union{PrototypeJoint,CableJoint})
+    (;hen,egg) = joint.hen2egg
     nmcs_hen = hen.body.coords.nmcs
     nmcs_egg = egg.body.coords.nmcs
     free_idx_hen = hen.body.coords.free_idx
@@ -213,12 +214,19 @@ function get_joint_idx(cst::Union{PrototypeJoint,CableJoint},bodyid2sys_free_coo
         free_idx_hen,
         free_idx_egg .+ ncoords_hen
     )
+    full_idx, free_idx
+end
+
+function get_appar_idx(appar::Apparatus{<:jointType},bodyid2sys_free_coords) where {jointType<:Union{PrototypeJoint,CableJoint}}
+    (;joint) = appar
+    (;hen,egg) = joint.hen2egg
+    id_hen = hen.body.prop.id
+    id_egg = egg.body.prop.id
     free_hen = bodyid2sys_free_coords[id_hen]
     free_egg = bodyid2sys_free_coords[id_egg]
     sys_free_coords_idx = vcat(
         free_hen,
         free_egg
     )
-    # full_idx, sys_full_idx
-    full_idx, free_idx, sys_free_coords_idx
+    sys_free_coords_idx
 end

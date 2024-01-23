@@ -23,6 +23,7 @@ function StructureState(bodies,apparatuses,cnt::Connectivity)
         num_of_intrinsic_cstr,
         num_of_extrinsic_cstr,
         num_of_cstr,
+        num_of_add_var,
         sys_free_coords_idx,
         sys_pres_coords_idx,
         bodyid2sys_intrinsic_cstr_idx,
@@ -43,10 +44,11 @@ function StructureState(bodies,apparatuses,cnt::Connectivity)
     q̈ = zero(q)
     F = zero(q)
     λ = Vector{T}(undef,num_of_cstr)
+    s = Vector{T}(undef,num_of_add_var)
     c = get_local_coords(bodies,numbered)
     p = zero(q)
     p̌ = Vector{T}(undef,num_of_free_coords)
-    system = NonminimalCoordinatesState(t,q,q̇,q̈,F,p,p̌,λ,sys_free_coords_idx,sys_pres_coords_idx,c)
+    system = NonminimalCoordinatesState(t,q,q̇,q̈,F,p,p̌,λ,s,sys_free_coords_idx,sys_pres_coords_idx,c)
     members = [
         begin
             qmem = @view q[bodyid2sys_full_coords[bodyid]]
@@ -54,12 +56,13 @@ function StructureState(bodies,apparatuses,cnt::Connectivity)
             q̈mem = @view q̈[bodyid2sys_full_coords[bodyid]]
             Fmem = @view F[bodyid2sys_full_coords[bodyid]]
             λmem = @view λ[bodyid2sys_intrinsic_cstr_idx[bodyid]]
+            smem = @view s[Int[]]
             cmem = @view c[bodyid2sys_loci_coords_idx[bodyid]]
             pmem = zero(p[bodyid2sys_full_coords[bodyid]])
             p̌mem = zero(p[bodyid2sys_free_coords[bodyid]])
             NonminimalCoordinatesState(
                 t,
-                qmem,q̇mem,q̈mem,Fmem,pmem,p̌mem,λmem,
+                qmem,q̇mem,q̈mem,Fmem,pmem,p̌mem,λmem,smem,
                 free_idx_by_body[bodyid],
                 pres_idx_by_body[bodyid],
                 cmem

@@ -111,6 +111,8 @@ import .ANCF
 
 include("members/flexibles/flexible_body.jl")
 
+include("members/apparatus.jl")
+
 include("members/forces/spring_dampers.jl")
 
 include("members/joints.jl")

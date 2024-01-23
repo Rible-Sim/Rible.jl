@@ -1,80 +1,4 @@
 
-mutable struct ClusterNonminimalCoordinatesState{T,qT,qviewT}
-    t::T
-    q::qT
-    q̇::qT
-    q̈::qT
-    F::qT
-    λ::qT
-    s::qT
-    q̌::qviewT
-    q̌̇::qviewT
-    q̌̈::qviewT
-    q̃::qviewT
-    q̃̇::qviewT
-    q̃̈::qviewT
-    F̌::qviewT
-end
-
-function ClusterNonminimalCoordinatesState(t,q,q̇,q̈,F,λ,free_idx,pres_idx,s)
-    q̌ = @view q[free_idx]
-    q̌̇ = @view q̇[free_idx]
-    q̌̈ = @view q̈[free_idx]
-    q̃ = @view q[pres_idx]
-    q̃̇ = @view q̇[pres_idx]
-    q̃̈ = @view q̈[pres_idx]
-    F̌ = @view F[free_idx]
-    ClusterNonminimalCoordinatesState(t,q,q̇,q̈,F,λ,s,q̌,q̌̇,q̌̈,q̃,q̃̇,q̃̈,F̌)
-end
-
-
-
-function StructureState(bodies,apparatuses,cnt::Connectivity{<:Any,<:Any,<:NamedTuple{(:connected, :clustered)},<:Any})
-    (;clustercables) = apparatuses
-    (;indexed,jointed) = cnt
-    (;num_of_full_coords,num_of_intrinsic_cstr,sys_free_coords_idx,sys_pres_coords_idx) = indexed
-    (;bodyid2sys_intrinsic_cstr_idx,bodyid2sys_full_coords,bodyid2sys_free_coords,bodyid2sys_pres_coords) = indexed
-    (;num_of_extrinsic_cstr) = jointed
-    nclustercables = length(clustercables)
-    ns = sum([length(clustercables[i].sps) for i in 1:nclustercables])
-    num_of_cstr = num_of_intrinsic_cstr + num_of_extrinsic_cstr
-    nb = length(bodies)
-    pres_idx_by_body = Vector{Vector{Int}}(undef,nb)
-    free_idx_by_body = Vector{Vector{Int}}(undef,nb)
-    foreach(bodies) do body
-        bodyid = body.prop.id
-        pres_idx_by_body[bodyid] = body.state.cache.pres_idx
-        free_idx_by_body[bodyid] = body.state.cache.free_idx
-    end
-    T = get_numbertype(bodies)
-    t = zero(T)
-    q = Vector{T}(undef,num_of_full_coords)
-    q̇ = zero(q)
-    q̈ = zero(q)
-    F = zero(q)
-    s = zeros(T, 2ns)
-    λ = Vector{T}(undef,num_of_cstr)
-    system = ClusterNonminimalCoordinatesState(t,q,q̇,q̈,F,λ,sys_free_coords_idx,sys_pres_coords_idx,s)
-    members = [
-        begin
-            qmem = @view q[bodyid2sys_full_coords[bodyid]]
-            q̇mem = @view q̇[bodyid2sys_full_coords[bodyid]]
-            q̈mem = @view q̈[bodyid2sys_full_coords[bodyid]]
-            Fmem = @view F[bodyid2sys_full_coords[bodyid]]
-            λmem = @view λ[bodyid2sys_intrinsic_cstr_idx[bodyid]]
-            NonminimalCoordinatesState(t,qmem,q̇mem,q̈mem,Fmem,λmem,
-                                    free_idx_by_body[bodyid],pres_idx_by_body[bodyid])
-        end
-        for bodyid = 1:nb
-    ]
-    foreach(bodies) do body
-        (;origin_frame,cache) = body.state
-        q,q̇ = cartesian_frame2coords(cache.funcs.nmcs,origin_frame)
-        members[body.prop.id].q .= q
-        members[body.prop.id].q̇ .= q̇
-    end
-    StructureState(system,members)
-end
 
 function update_apparatuses!(st, @eponymargs(clustered,))
     (;clustercables) = st.apparatuses
@@ -117,12 +41,6 @@ function update_apparatuses!(st, @eponymargs(clustered,))
         end
     end
 end
-
-function update_apparatuses!(st, @eponymargs(connected, clustered))
-    update_apparatuses!(st, @eponymtuple(connected))
-    update_apparatuses!(st, @eponymtuple(clustered))
-end
-
 
 function distribute_s̄!(st::AbstractStructure, s̄)
     s⁺ = @view s̄[begin:2:end]

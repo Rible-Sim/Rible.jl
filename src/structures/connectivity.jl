@@ -1,15 +1,3 @@
-struct Apparatus{jointType,forceType}
-    id::Int
-    joint::jointType
-    force::forceType
-end
-
-function Base.isless(a::Apparatus,b::Apparatus)
-    isless(a.id,b.id)
-end
-
-get_id(appar::Apparatus) = appar.id
-
 function connect(bodies, spring_dampers; connecting_matrix=Int[;;], istart = 0)
     _,nb = check_id_sanity(bodies)
     if size(connecting_matrix,2) > nb
@@ -35,11 +23,15 @@ function connect(bodies, spring_dampers; connecting_matrix=Int[;;], istart = 0)
             Hen2Egg(Signifier(rbs_sorted[rbid1],pid1),Signifier(rbs_sorted[rbid2],pid2)),
             0,
         )
+        full_coords_idx, free_coords_idx = get_joint_idx(joint)
         force = spring_dampers[j]
         cable = Apparatus(
             istart+j,
             joint,
-            force
+            force,
+            0,
+            full_coords_idx,
+            free_coords_idx
         )
         push!(ret,cable)
     end
@@ -88,6 +80,7 @@ struct Indexed{id2idxType,idxType}
     num_of_cstr::Int
     num_of_dof_unconstrained::Int
     num_of_dof::Int
+    num_of_add_var::Int
     sys_free_coords_idx::idxType
     sys_pres_coords_idx::idxType
     bodyid2sys_full_coords::id2idxType
@@ -96,9 +89,8 @@ struct Indexed{id2idxType,idxType}
     bodyid2sys_intrinsic_cstr_idx::id2idxType
     bodyid2sys_dof_idx::id2idxType
     apparid2sys_extrinsic_cstr_idx::id2idxType
-    apparid2full_idx::id2idxType
-    apparid2free_idx::id2idxType
     apparid2sys_free_coords_idx::id2idxType
+    apparid2sys_add_var_idx::id2idxType
 end
 
 function index_incstr(bodies)
@@ -196,20 +188,25 @@ function index(bodies,apparatuses=Int[];sharing_matrix::AbstractMatrix=Int[;;])
     num_of_pres_coords = length(sys_pres_coords_idx)
     num_of_full_coords = length(sys_full_coords_idx)
     # num_of_extrinsic_cstr = mapreduce((apparatus)->apparatus.num_of_cstr,+,apparatuses,init=0)
-    nexcst_by_joint = zeros(Int,num_of_apparatuses)
+    num_of_excst_by_joint = zeros(Int,num_of_apparatuses)
+    num_of_add_var_by_appar = zeros(Int,num_of_apparatuses)
     num_of_joint_apparatuses = 0
     num_of_force_apparatuses = 0
-    apparid2full_idx = Vector{Vector{Int}}(undef,num_of_apparatuses)
-    apparid2free_idx = Vector{Vector{Int}}(undef,num_of_apparatuses)
     apparid2sys_free_coords_idx = Vector{Vector{Int}}(undef,num_of_apparatuses)
-    apparid2sys_extrinsic_cstr_idx = Vector{Int}[]
-    ilast = 0
+    apparid2sys_add_var_idx = Vector{Vector{Int}}(undef,num_of_apparatuses)
+    apparid2sys_extrinsic_cstr_idx = Vector{Vector{Int}}(undef,num_of_apparatuses)
+    num_of_add_var_last = 0
+    num_excst_last = 0
     if num_of_apparatuses > 0
         foreach(apparatuses) do apparatus
-            nexcst_by_joint[apparatus.id] = apparatus.joint.num_of_cstr
-            (;id,joint) = apparatus
-            apparid2full_idx[id], apparid2free_idx[id], apparid2sys_free_coords_idx[id] = 
-            get_joint_idx(joint,bodyid2sys_free_coords)
+            id = apparatus.id
+            num_of_add_var_by_appar[id] = apparatus.num_of_add_var
+            apparid2sys_free_coords_idx[id] = get_appar_idx(apparatus,bodyid2sys_free_coords)
+            apparid2sys_add_var_idx[id] = collect(num_of_add_var_last+1:num_of_add_var_last+num_of_add_var_by_appar[id])
+            num_of_add_var_last += num_of_add_var_by_appar[id]
+            num_of_excst_by_joint[id] = apparatus.joint.num_of_cstr
+            apparid2sys_extrinsic_cstr_idx[id] = collect(num_excst_last+1:num_excst_last+num_of_excst_by_joint[id])
+            num_excst_last += num_of_excst_by_joint[id]
             if !(apparatus.joint isa Nothing)
                 num_of_joint_apparatuses += 1
             end
@@ -218,16 +215,12 @@ function index(bodies,apparatuses=Int[];sharing_matrix::AbstractMatrix=Int[;;])
             end
         end
     end
-    num_of_extrinsic_cstr = sum(nexcst_by_joint)
+    num_of_extrinsic_cstr = sum(num_of_excst_by_joint)
+    num_of_add_var = sum(num_of_add_var_by_appar)
     num_of_cstr = num_of_intrinsic_cstr + num_of_extrinsic_cstr
     num_of_dof = num_of_free_coords - num_of_cstr
     if num_of_dof <= 0
         @warn "Non positive degree of freedom: $num_of_dof."
-    end
-    for apparid = 1:num_of_apparatuses
-        nexcst = nexcst_by_joint[apparid]
-        push!(apparid2sys_extrinsic_cstr_idx,collect(ilast+1:ilast+nexcst))
-        ilast += nexcst
     end
 
     Indexed(
@@ -243,6 +236,7 @@ function index(bodies,apparatuses=Int[];sharing_matrix::AbstractMatrix=Int[;;])
         num_of_cstr,
         num_of_dof_unconstrained,
         num_of_dof,
+        num_of_add_var,
         sys_free_coords_idx,
         sys_pres_coords_idx,
         bodyid2sys_full_coords,
@@ -251,9 +245,8 @@ function index(bodies,apparatuses=Int[];sharing_matrix::AbstractMatrix=Int[;;])
         bodyid2sys_intrinsic_cstr_idx,
         bodyid2sys_dof_idx,
         apparid2sys_extrinsic_cstr_idx,
-        apparid2full_idx,
-        apparid2free_idx,
-        apparid2sys_free_coords_idx
+        apparid2sys_free_coords_idx,
+        apparid2sys_add_var_idx
     )
 end
 
