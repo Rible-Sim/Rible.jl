@@ -188,7 +188,7 @@ else
     cables = [RB.DistanceSpringDamper3D(0.0,k[i],0.0;slack=false) for i = 1:ncables]
 end
 acs = [
-    RB.ManualActuator(i,[i,i+hncables],zeros(2))
+    RB.RegisterActuator(i,[i,i+hncables],zeros(2))
     for i = 1:hncables
 ]
 apparatuses = (cables = cables,)

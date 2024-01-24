@@ -126,7 +126,7 @@ function quad(c=100.0;
     #
     apparatuses = (cables = cables,)
     acs = [
-    RB.ManualActuator(
+    RB.RegisterActuator(
         i,
         collect(1:6), [original_restlens[6*(i-1)+j] for j = 1:6],
     ) for i = 1:4

@@ -138,7 +138,7 @@ function make_new_tail(n)
         [RB.DistanceSpringDamper2D( 0.5original_restlens[i], ks[i], 0.0) for i = 1:ncables]  #
     apparatuses = (cables = cables,)
     acs = [
-        RB.ManualActuator(1,
+        RB.RegisterActuator(1,
             [4(i-1)+j for i = 1:n for j = 1:4],
             5original_restlens[[4(i-1)+j for i = 1:n for j = 1:4]],
         )

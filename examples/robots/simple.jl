@@ -80,7 +80,7 @@ pretty_table(
 #
 apparatuses = (cables = cables,)
 acs = [
-RB.ManualActuator(
+RB.RegisterActuator(
     i,
     collect(1:2m), [original_restlens[2m*(i-1)+j] for j = 1:6],
 ) for i = [1]

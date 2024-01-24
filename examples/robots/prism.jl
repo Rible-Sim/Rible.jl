@@ -209,7 +209,7 @@ cable_length = 0.1Unitful.m
 cables_prism = [RB.DistanceSpringDamper3D(0.0,   ustrip(Unitful.N/Unitful.m,κ),0.0;slack=true) for i = 1:ncables_prism]
 cables = cables_prism
 acs = [
-    RB.ManualActuator(
+    RB.RegisterActuator(
         1,
         collect(1:ncables_prism),
         zeros(ncables_prism)

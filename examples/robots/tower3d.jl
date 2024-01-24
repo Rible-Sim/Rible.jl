@@ -130,7 +130,7 @@ pretty_table(
     )
 )
 cables = [RB.DistanceSpringDamper3D(restlens[i],ks[i],cs[i];slack=true) for i = 1:ncables]
-acs = [RB.ManualActuator(1,collect(1:ncables),restlens[1:ncables])]
+acs = [RB.RegisterActuator(1,collect(1:ncables),restlens[1:ncables])]
 apparatuses = (cables = cables,)
 hub = (actuators = acs,)
 cnt_matrix_cables = [

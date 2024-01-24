@@ -88,7 +88,7 @@ function links(n,di,rm;k=3e1,c=0.0)
     cs = repeat(fill(c,6),n-1)
     ss = [RB.SString3D(i,stringlens[i],ks[i],cs[i]) for i = 1:nstrings]
 	apparatuses = (strings=ss,)
-	acs = [RB.ManualActuator(RB.SimpleRegistor(6(i-1)+j,stringlens[6(i-1)+j])) for i = 1:n-1  for j = 1:6]
+	acs = [RB.RegisterActuator(RB.SimpleRegistor(6(i-1)+j,stringlens[6(i-1)+j])) for i = 1:n-1  for j = 1:6]
 	hub = (actuators=acs,)
 	bodynq = RB.get_num_of_coords(rbs[1])
     bodyid2q_raw = [(bodynq*(i-1)+1:bodynq*i) for i = 1:n]

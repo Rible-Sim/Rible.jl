@@ -82,7 +82,7 @@ ks = repeat(vcat(fill(kH, 4), fill(kR, 4)), n - 1)
 cs = repeat(fill(c, 8), n - 1)
 cables = [RB.DistanceSpringDamper3D( cablelens[i], ks[i], cs[i]) for i = 1:ncables]
 apparatuses = (cables=cables,)
-acs = [RB.ManualActuator(1, collect(1:ncables), cablelens[1:ncables])]
+acs = [RB.RegisterActuator(1, collect(1:ncables), cablelens[1:ncables])]
 hub = (actuators=acs,)
 
 matrix_cnt_raw = Vector{Matrix{Int}}()

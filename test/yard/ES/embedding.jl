@@ -333,7 +333,7 @@ function make_multi_stages_pres_actor(friction_coefficients;start = 0.0, stop = 
 
     RB.PrescribedActuator(
         1,
-        RB.ManualActuator(1,collect(1:nμ),zeros(nμ),RB.Uncoupled()),
+        RB.RegisterActuator(1,collect(1:nμ),zeros(nμ),RB.Uncoupled()),
         itp
     )
 end

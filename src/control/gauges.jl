@@ -184,7 +184,7 @@ function get_errors(structure,gauges,coalition)
     e
 end
 
-function errors_jacobian!(∂e∂q,∂e∂q̇,bot::Robot,)
+function errors_jacobian!(∂e∂q,∂e∂q̇,bot::Robot)
     (;structure,hub) = bot
     (;gauges,coalition) = hub
     (;num_of_errors, gaugeid2error_idx,) = coalition.nt
@@ -194,7 +194,7 @@ function errors_jacobian!(∂e∂q,∂e∂q̇,bot::Robot,)
     end
 end
 
-function error_jacobian(bot::Robot,)
+function errors_jacobian(bot::Robot)
     (;structure,hub) = bot
     (;num_of_free_coords) = structure.connectivity.indexed
     (;num_of_errors, gaugeid2error_idx,) = hub.coalition.nt

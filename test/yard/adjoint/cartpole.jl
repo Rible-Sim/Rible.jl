@@ -43,7 +43,8 @@ RB.solve!(
     dt
 )
 plot_traj!(cp_sim;showmesh=false,showground=false)
-
+cp_sim.control_traj.u
+cp_sim.traj.t
 # gauges terminal
 m1 = RB.measure(cp_terminal.structure,cp_terminal.hub.gauges.data[1][1])
 ## m2 = RB.measure(cp_terminal,cp_terminal.hub.gauges.data[2][1])
@@ -61,6 +62,8 @@ RB.error_jacobian(cp_sim)
 RB.cost_jacobian!(cp_sim,)
 
 # cost in actuators
+RB.get_num_of_actions(cp_sim.hub.actuators.data[1][1])
+cp_sim.hub.actuators.data[1][1]
 RB.generalized_force(cp_sim,cp_sim.hub.actuators.data[1][1])
 RB.generalized_force(cp_sim,cp_sim.hub.actuators.data[2][1])
 RB.action_jacobian(cp_sim,cp_sim.hub.actuators.data[1][1])

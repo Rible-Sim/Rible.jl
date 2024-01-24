@@ -194,7 +194,7 @@ cables_prism = [
 ]
 cables = cables_prism
 acs = [
-    RB.ManualActuator(
+    RB.RegisterActuator(
         1,
         collect(1:ncables_prism),
         zeros(ncables_prism)

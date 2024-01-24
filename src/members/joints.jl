@@ -56,11 +56,14 @@ function FixedIndicesConstraint(id::Int,body,idx,violations)
         A[i,j] = 1
     end
     joint = LinearJoint(body,num_of_cstr,A,violations)
+    full_idx, free_idx = get_joint_idx(joint)
     force = nothing
     Apparatus(
         id,
         joint,
         force,
+        0,
+        full_idx, free_idx
     )
 end
 
@@ -182,10 +185,13 @@ function PrototypeJoint(id,hen2egg,force,joint_type::Symbol)
         values,
         cache
     )
+    full_idx, free_idx = get_joint_idx(joint)
     Apparatus(
         id,
         joint,
         force,
+        0,
+        full_idx, free_idx
     )
 end
 

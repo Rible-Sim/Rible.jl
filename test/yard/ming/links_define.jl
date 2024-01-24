@@ -248,7 +248,7 @@ function spine_true(n,dis,rm;
 	tensioned = @eponymtuple(connected,)
 
 	acs = [
-		RB.ManualActuator(i,i,cablelens[i])
+		RB.RegisterActuator(i,i,cablelens[i])
 		for i = cables_idx
 	]
 	hub = (actuators=acs,)

@@ -73,12 +73,10 @@ struct ControlHub{gaugesType,actuatorsType,coalitionType,stateType}
     function ControlHub(structure::AbstractStructure,gauges,actuators,coalition::Coalition)
         e = get_errors(structure,gauges,coalition)
         u = get_actions(structure,actuators,coalition)
-        state = ComponentArray(
-            @eponymtuple(
+        state = @eponymtuple(
                 e,
                 u,
             )
-        )
         new{typeof(gauges),typeof(actuators),typeof(coalition),typeof(state)}(
             gauges,actuators,coalition,state
         )
@@ -96,8 +94,11 @@ function get_actions(structure,actuators,coalition)
     u
 end
 
-function get_actions!(bot,structure,actuators,coalition)
+function get_actions!(bot::Robot,t::Number)
+    (;structure,hub) = bot
+    (;actuators,coalition) = hub
     (;num_of_actions,actid2sys_actions) = coalition.nt
+    structure.state.system.t = t
     T = get_numbertype(structure)
     u = zeros(T,num_of_actions)
     foreach(actuators) do actuator
@@ -148,14 +149,22 @@ function cost!(bot::Robot,)
     cost!(bot,q,q̇,u,t)
 end
 
-function cost_jacobian!(∂ϕ∂qᵀ,∂ϕ∂q̇ᵀ,∂ϕ∂uᵀ,bot::Robot,q::AbstractVector,q̇::AbstractVector,u::AbstractVector,t)
+function cost_jacobian!(∂ϕ∂qᵀ,∂ϕ∂q̇ᵀ,bot::Robot,q::AbstractVector,q̇::AbstractVector,t)
+    (;structure,hub) = bot
+    (;coalition) = hub
+    update!(structure,q,q̇,t)
+    ∂e∂q, ∂e∂q̇ = errors_jacobian(bot,)
+    ∂ϕ∂qᵀ .= transpose(sum(∂e∂q,dims=1))
+    ∂ϕ∂q̇ᵀ .= transpose(sum(∂e∂q̇, dims=1))
+end
+
+function cost_jacobian!(∂ϕ∂uᵀ,bot::Robot,q::AbstractVector,q̇::AbstractVector,u::AbstractVector,t)
     (;structure,hub) = bot
     (;coalition) = hub
     actuate!(bot,q,q̇,u,t)
     (;num_of_errors, gaugeid2error_idx, num_of_actions, actid2sys_actions) = coalition.nt
-    ∂e∂q, ∂e∂q̇ = error_jacobian(bot,)
-    ∂ϕ∂qᵀ .= transpose(sum(∂e∂q,dims=1))
-    ∂ϕ∂q̇ᵀ .= transpose(sum(∂e∂q̇, dims=1))
+    ∂e∂q, ∂e∂q̇ = errors_jacobian(bot,)
+    ∂ϕ∂uᵀ .= transpose(sum(∂e∂q,dims=1))
 end
 
 function cost_jacobian!(bot::Robot)
@@ -194,7 +203,7 @@ function make_pres_actor(μ0,μ1,start,stop)
 
     PrescribedActuator(
         1,
-        ManualActuator(1,collect(1:nμ),zeros(nμ),Uncoupled()),
+        RegisterActuator(1,collect(1:nμ),zeros(nμ),Uncoupled()),
         itp
     )
 end

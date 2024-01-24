@@ -242,8 +242,8 @@ function Simulator(prob::AbstractDynamicsProblem,solver::AbstractDynamicsSolver,
         tspan,dt,restart=true,karg...
     )
     (;bot,) = prob
-    (;structure,traj,contacts_traj) = bot
-    totalstep = prepare_traj!(traj,contacts_traj;tspan,dt,restart)
+    (;structure,traj,contacts_traj,control_traj) = bot
+    totalstep = prepare_traj!(bot;tspan,dt,restart)
     (;prescribe!, actuate!) = controller
     if !isa(prescribe!, Nothing)
         for i in eachindex(traj)
@@ -296,21 +296,29 @@ const DEFAULT_CALLBACK = DiscreteCallback(
 const NO_CONTROL = (sim,cache) -> nothing
 
 
-function prepare_traj!(traj,contacts_traj;tspan,dt,restart=true)
+function prepare_traj!(bot::Robot;tspan,dt,restart=true)
+    (;traj,contacts_traj,control_traj) = bot
     if restart
         resize!(traj,1)
         resize!(contacts_traj,1)
+        resize!(control_traj,1)
     end
+    nlaststep = length(traj)
     tstart,tend = tspan
     totaltime = tend - tstart
     totalstep = ceil(Int,totaltime/dt)
-    for istep = 1:totalstep
-        push!(traj,deepcopy(traj[end]))        
-        push!(contacts_traj,deepcopy(contacts_traj[end]))
-        for c in contacts_traj[end]
+    resize!(traj,nlaststep+totalstep)
+    resize!(contacts_traj,nlaststep+totalstep)
+    resize!(control_traj,nlaststep+totalstep)
+    for istep = nlaststep+1:nlaststep+totalstep
+        traj[istep] = deepcopy(traj[nlaststep])
+        traj.t[istep] = tstart + dt*(istep-1)
+        contacts_traj[istep] = deepcopy(contacts_traj[nlaststep])
+        for c in contacts_traj[istep]
             c.state.active = false
         end
-        traj.t[end] = tstart + dt*istep
+        control_traj[istep] = deepcopy(control_traj[nlaststep])
+        control_traj[istep].u .= get_actions!(bot,traj.t[istep])
     end
     totalstep
 end

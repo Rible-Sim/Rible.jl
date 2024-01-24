@@ -112,7 +112,7 @@ indexed = RB.index(rbs,sharing)
 # ks = vcat(fill(k,naux),fill(k,ness))
 # cs = fill(c,ncables)
 # cables = [RB.DistanceSpringDamper2D(restlens[i],ks[i],cs[i];slack) for i = 1:ncables]
-# acs = [RB.ManualActuator(1,collect(1:ncables),restlens[1:ncables])]
+# acs = [RB.RegisterActuator(1,collect(1:ncables),restlens[1:ncables])]
 # apparatuses = (cables = cables,)
 # hub = (actuators = acs,)
 cnt_matrix = [
@@ -142,7 +142,7 @@ else
     cables = [RB.DistanceSpringDamper2D(0.0,k[i],0.0;slack=false) for i = 1:ncables]
 end
 acs = [
-    RB.ManualActuator(i,[i],zeros(1))
+    RB.RegisterActuator(i,[i],zeros(1))
     for i = 1:hncables
 ]
 hub = (actuators = acs,)

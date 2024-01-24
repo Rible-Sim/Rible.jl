@@ -633,8 +633,6 @@ function build_tangent_stiffness_matrix!(∂Q̌∂q̌,st)
         num_of_free_coords,
         bodyid2sys_free_coords,
         bodyid2sys_full_coords,
-        apparid2full_idx,
-        apparid2free_idx,
         apparid2sys_free_coords_idx
     ) = indexed
     T = get_numbertype(st)
@@ -699,8 +697,8 @@ function build_tangent_stiffness_matrix!(∂Q̌∂q̌,st)
             (;
                 relative_core
             ) = cache
-            full_idx = apparid2full_idx[appar.id]
-            free_idx = apparid2free_idx[appar.id]
+            full_idx = appar.full_coords_idx
+            free_idx = appar.free_coords_idx
             sys_free_coords_idx = apparid2sys_free_coords_idx[appar.id]
             (;mask,k) = appar.force
             (;hen,egg) = hen2egg

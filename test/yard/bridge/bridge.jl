@@ -188,21 +188,21 @@ function nbridge(n,m=2;θ=missing,r=missing,c=0.0,h=1.0,o2=[0,4.0,0],right=false
     st = RB.Structure(rigidbodies,apparatuses,cnt)
 
 	actuators_active =
-		RB.ManualActuator(
+		RB.RegisterActuator(
 			1,
 			         active_cable_idx,
 			restlens[active_cable_idx],
 			RB.Serial()
 		)
 	actuators_stale =
-		RB.ManualActuator(
+		RB.RegisterActuator(
 			2,
 			stale_cable_idx,
 			restlens[stale_cable_idx],
 			RB.Serial()
 		)
 	actuators_rings = [
-		RB.ManualActuator(
+		RB.RegisterActuator(
 			2+j,
 				     [k*nhcables + CA((j-1)*5*n+1:j*5n)[i*5] for i = 1:n],
 			restlens[[k*nhcables + CA((j-1)*5*n+1:j*5n)[i*5] for i = 1:n]],
@@ -413,21 +413,21 @@ function nrailbridge(n,m=2;θ=missing,r=missing,c=0.0,h=1.0,o2=[0,4.0,0],right=f
 
 	# 作动器
 	actuators_active =
-		RB.ManualActuator(
+		RB.RegisterActuator(
 			1,
 			         active_cable_idx,
 			restlens[active_cable_idx],
 			RB.Serial()
 		)
 	actuators_stale =
-		RB.ManualActuator(
+		RB.RegisterActuator(
 			2,
 			stale_cable_idx,
 			restlens[stale_cable_idx],
 			RB.Serial()
 		)
 	actuators_rings = [
-		RB.ManualActuator(
+		RB.RegisterActuator(
 			2+j,
 				     [k*nhcables + CA((j-1)*5*n+1:j*5n)[i*5] for i = 1:n],
 			restlens[[k*nhcables + CA((j-1)*5*n+1:j*5n)[i*5] for i = 1:n]],

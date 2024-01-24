@@ -16,7 +16,9 @@ function action_jacobian(bot::Robot,q,q̇,λ,u)
 end
 
 abstract type AbstractOperator end
-struct ManualOperator <: AbstractOperator end
+struct ManualOperator{T} <: AbstractOperator 
+    u::Vector{T}
+end
 struct TimeOperator <: AbstractOperator end
 
 abstract type AbstractActuator end
@@ -31,8 +33,9 @@ struct ExternalForceActuator{sigType,operType,forceType} <: AbstractActuator
     force::forceType
 end
 
-get_num_of_actions(::ExternalForceActuator) = 1
+get_num_of_actions(::ExternalForceActuator{sigType,TimeOperator}) where {sigType} = 0
 
+# ExternalForceActuator TimeOperator
 function generalized_force(structure::Structure,actuator::ExternalForceActuator{sigType,<:TimeOperator}) where {sigType}
     (;state) = structure
     (;t) = state.system
@@ -49,18 +52,8 @@ function generalized_force(structure::Structure,actuator::ExternalForceActuator{
 end
 
 function generalized_force_jacobian(structure::Structure,actuator::ExternalForceActuator{sigType,<:TimeOperator}) where {sigType}
-    (;state) = structure
-    (;t) = state.system
-    (;signifier,operator) = actuator
-    (;body,pid,) = signifier
-    (;prop,coords) = body
-    (;nmcs) = coords
-    bid = body.prop.id
-    (;q) = state.members[bid]
-    c = to_local_coords(nmcs,prop.loci[pid].position)
-    Tbody = build_T(structure,bid)
-    C = to_position_jacobian(nmcs,q,c)*Tbody
-    transpose(C)*force(t)
+    T = get_numbertype(structure)
+    spzeros(T,get_num_of_free_coords(structure),0)
 end
 
 function execute!(structure::Structure,actuator::ExternalForceActuator{sigType,<:TimeOperator}) where {sigType}
@@ -75,17 +68,13 @@ function get_actions(structure::Structure,actuator::ExternalForceActuator{sigTyp
     t
 end
 
-function generalized_force(actuator::ExternalForceActuator{sigType,<:ManualOperator}) where {sigType}
+# ExternalForceActuator ManualOperator
+get_num_of_actions(actuator::ExternalForceActuator{sigType,<:ManualOperator}) where {sigType} = length(actuator.operator.u)
+
+function generalized_force(structure::Structure,actuator::ExternalForceActuator{sigType,<:ManualOperator}) where {sigType}
     (;state) = structure
     (;t) = state.system
     (;signifier,operator,force) = actuator
-    force(signifier,t)
-end
-
-function generalized_force_jacobian(structure::Structure,actuator::ExternalForceActuator{sigType,<:ManualOperator}) where {sigType}
-    (;state) = structure
-    (;t) = state.system
-    (;signifier,operator) = actuator
     (;body,pid,) = signifier
     (;prop,coords) = body
     (;nmcs) = coords
@@ -94,20 +83,34 @@ function generalized_force_jacobian(structure::Structure,actuator::ExternalForce
     c = to_local_coords(nmcs,prop.loci[pid].position)
     Tbody = build_T(structure,bid)
     C = to_position_jacobian(nmcs,q,c)*Tbody
-    transpose(C)*operator(t)
-    force(signifier,t)
+    operator.u.*transpose(C)*force
+end
+
+function generalized_force_jacobian(structure::Structure,actuator::ExternalForceActuator{sigType,<:ManualOperator}) where {sigType}
+    (;state) = structure
+    (;t) = state.system
+    (;signifier,operator,force) = actuator
+    (;body,pid,) = signifier
+    (;prop,coords) = body
+    (;nmcs) = coords
+    bid = body.prop.id
+    (;q) = state.members[bid]
+    c = to_local_coords(nmcs,prop.loci[pid].position)
+    Tbody = build_T(structure,bid)
+    C = to_position_jacobian(nmcs,q,c)*Tbody
+    transpose(C)*force
 end
 
 function execute!(structure::Structure,actuator::ExternalForceActuator{sigType,<:ManualOperator}) where {sigType}
     (;id,signifier,operator,force) = actuator
-    structure.state.system.F .+= generalized_force(actuator)
+    structure.state.system.F .+= generalized_force(structure::Structure,actuator)
 end
 
 function get_actions(structure::Structure,actuator::ExternalForceActuator{sigType,<:ManualOperator}) where {sigType}
     (;signifier,operator,force) = actuator
     (;state) = structure
     (;t) = state.system
-    t
+    operator.u
 end
 
 struct RegisterActuator{RT,CT,registerType} <: AbstractActuator

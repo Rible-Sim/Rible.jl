@@ -94,8 +94,6 @@ function cstr_jacobian(appar::Apparatus{<:PrototypeJoint},structure::Structure,q
       bodyid2sys_full_coords,
       num_of_free_coords,
       num_of_full_coords,
-      apparid2full_idx,
-      apparid2free_idx,
     ) = indexed
     (;sys_loci2coords_idx,bodyid2sys_loci_idx) = numbered
     (;
@@ -104,8 +102,8 @@ function cstr_jacobian(appar::Apparatus{<:PrototypeJoint},structure::Structure,q
         cache,
         mask_1st,mask_2nd,mask_3rd,mask_4th
     ) = appar.joint
-    full_idx = apparid2full_idx[appar.id]
-    free_idx = apparid2free_idx[appar.id]
+    full_idx = appar.full_coords_idx
+    free_idx = appar.free_coords_idx
     (;hen,egg) = hen2egg
     id_hen = hen.body.prop.id
     id_egg = egg.body.prop.id
@@ -134,8 +132,6 @@ function cstr_forces_jacobian(appar::Apparatus{<:PrototypeJoint},structure,q,λ)
       bodyid2sys_full_coords,
       num_of_free_coords,
       num_of_full_coords,
-      apparid2full_idx,
-      apparid2free_idx
     ) = indexed
     (;
         num_of_cstr,
@@ -143,8 +139,8 @@ function cstr_forces_jacobian(appar::Apparatus{<:PrototypeJoint},structure,q,λ)
         cache,
         mask_1st,mask_2nd,mask_3rd,mask_4th
     ) = appar.joint
-    full_idx = apparid2full_idx[appar.id]
-    free_idx = apparid2free_idx[appar.id]
+    full_idx = appar.full_coords_idx
+    free_idx = appar.free_coords_idx
     (;hen,egg) = hen2egg
     id_hen = hen.body.prop.id
     id_egg = egg.body.prop.id
@@ -175,8 +171,6 @@ function cstr_velocity_jacobian(appar::Apparatus{<:PrototypeJoint},structure,q,q
       bodyid2sys_full_coords,
       num_of_free_coords,
       num_of_full_coords,
-      apparid2full_idx,
-      apparid2free_idx
     ) = indexed
     (;
         num_of_cstr,
@@ -184,8 +178,8 @@ function cstr_velocity_jacobian(appar::Apparatus{<:PrototypeJoint},structure,q,q
         cache,
         mask_1st,mask_2nd,mask_3rd,mask_4th
     ) = appar.joint
-    full_idx = apparid2full_idx[appar.id]
-    free_idx = apparid2free_idx[appar.id]
+    full_idx = appar.full_coords_idx
+    free_idx = appar.free_coords_idx
     (;hen,egg) = hen2egg
     id_hen = hen.body.prop.id
     id_egg = egg.body.prop.id

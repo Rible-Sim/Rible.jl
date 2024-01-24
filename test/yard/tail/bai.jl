@@ -200,7 +200,7 @@ function make_bai(meshes,质心,质量,惯量)
         [RB.DistanceSpringDamper2D( original_restlens[i], ks[i], 0.0;slack=true) for i = 1:ncables]  #
     apparatuses = (cables = cables,)
     acs = [
-        RB.ManualActuator(1,
+        RB.RegisterActuator(1,
             [1:2(nb-1)],
             original_restlens,
         )

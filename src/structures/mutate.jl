@@ -77,8 +77,6 @@ function update_apparatus!(st::AbstractStructure, appar::Apparatus{<:PrototypeJo
       bodyid2sys_full_coords,
       num_of_free_coords,
       num_of_full_coords,
-      apparid2full_idx,
-      apparid2free_idx,
       apparid2sys_free_coords_idx
     ) = indexed
     (;
@@ -90,8 +88,8 @@ function update_apparatus!(st::AbstractStructure, appar::Apparatus{<:PrototypeJo
     (;
         relative_core
     ) = cache
-    full_idx = apparid2full_idx[appar.id]
-    free_idx = apparid2free_idx[appar.id]
+    full_idx = appar.full_coords_idx
+    free_idx = appar.free_coords_idx
     sys_free_coords_idx = apparid2sys_free_coords_idx[appar.id]
     spring_damper = appar.force
     (;mask,k) = spring_damper
