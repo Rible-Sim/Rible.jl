@@ -1,71 +1,110 @@
-function connect(bodies, spring_dampers; connecting_matrix=Int[;;], istart = 0)
-    _,nb = check_id_sanity(bodies)
-    if size(connecting_matrix,2) > nb
-        @warn "Cropping the connecting matrix."
-        cm = connecting_matrix[:,1:nb]
-    else
-        cm = connecting_matrix[:,:]
-    end
+function connect_spring(bodies, spring_dampers; cm=Int[;;], istart=0)
+    _, nb = check_id_sanity(bodies)
+    @assert size(cm, 2) == 4
     rbs_sorted = sort(bodies)
     ret = []
     j = 0
     for row in eachrow(cm)
-        rbids = findall(!iszero,row)
-        if isempty(rbids)
-            continue
-        end
-        @assert length(rbids) == 2
-        @assert reduce(*,row[rbids]) < 0
-        rbid1,rbid2 = ifelse(row[rbids[1]]>0,rbids,reverse(rbids))
-        pid1,pid2 = Int64.(abs.(row[[rbid1,rbid2]]))
+        rbid1, pid1, rbid2, pid2 = row
         j += 1
         joint = CableJoint(
-            Hen2Egg(Signifier(rbs_sorted[rbid1],pid1),Signifier(rbs_sorted[rbid2],pid2)),
+            Hen2Egg(Signifier(rbs_sorted[rbid1], pid1), Signifier(rbs_sorted[rbid2], pid2)),
             0,
         )
         full_coords_idx, free_coords_idx = get_joint_idx(joint)
         force = spring_dampers[j]
         cable = Apparatus(
-            istart+j,
+            istart + j,
             joint,
             force,
             0,
             full_coords_idx,
             free_coords_idx
         )
-        push!(ret,cable)
+        push!(ret, cable)
     end
     ret
 end
 
-function cluster(bodies, cm2_input)
+function connect_clusters(bodies, cluster_sps, cluster_segs, cms)
+    _, nb = check_id_sanity(bodies)
+    rets = []
+    clusterID = 0
+    for (cluster_seg, cm) in zip(cluster_segs, cms)
+        @assert size(cm, 2) == 4
+        rbs_sorted = sort(bodies)
+        ret = []
+        j = 0
+        clusterID += 1
+        for row in eachrow(cm)
+            rbid1, pid1, rbid2, pid2 = row
+            j += 1
+            joint = CableJoint(
+                Hen2Egg(Signifier(rbs_sorted[rbid1], pid1), Signifier(rbs_sorted[rbid2], pid2)),
+                0,
+            )
+            segs = Apparatus(
+                j,
+                joint,
+                cluster_seg,
+                0,
+                Int[],
+                Int[]
+            )
+            push!(ret, segs)
+        end
+        push!(rets, Apparatus(clusterID, ClusterJoint(cluster_sps[clusterID], 0), ret, 0, Int[], Int[]))
+    end
+    rets
+end
+
+function connect_spring_and_clusters(bodies, spring_dampers, cluster_sps, cluster_segs, connecting_matrix, connecting_cluster_matrix; istart=0)
+    ret1 = connect_spring(bodies, spring_dampers; cm=connecting_matrix, istart)
+    ret2 = connect_clusters(bodies, cluster_sps, cluster_segs, connecting_cluster_matrix)
+    return vcat(ret1, ret2)
+end
+
+function connect(bodies, spring_dampers; connecting_matrix=Int[;;], istart=0)
+    _, nb = check_id_sanity(bodies)
+    if size(connecting_matrix, 2) > nb
+        @warn "Cropping the connecting matrix."
+        cm = connecting_matrix[:, 1:nb]
+    else
+        cm = connecting_matrix[:, :]
+    end
     rbs_sorted = sort(bodies)
-    ret_raw = []
-    cm = cm2_input
+    ret = []
+    j = 0
     for row in eachrow(cm)
-        iret = Vector{Hen2Egg}()
-        is = 0
-        rbids = findall(!iszero,row)
+        rbids = findall(!iszero, row)
         if isempty(rbids)
             continue
         end
-        nrbid = length(rbids)
-        for i in 1:nrbid-1
-            is += 1
-            rbid1 = rbids[i]; rbid2 = rbids[i+1]
-            pid1 = Int64(row[rbids[i]]); pid2 = Int64(row[rbids[i+1]])
-            push!(iret,Hen2Egg(is,Signifier(rbs_sorted[rbid1],pid1),Signifier(rbs_sorted[rbid2],pid2)))
-        end
-        push!(ret_raw, iret)
+        @assert length(rbids) == 2
+        @assert reduce(*, row[rbids]) < 0
+        rbid1, rbid2 = ifelse(row[rbids[1]] > 0, rbids, reverse(rbids))
+        pid1, pid2 = Int64.(abs.(row[[rbid1, rbid2]]))
+        j += 1
+        joint = CableJoint(
+            Hen2Egg(Signifier(rbs_sorted[rbid1], pid1), Signifier(rbs_sorted[rbid2], pid2)),
+            0,
+        )
+        full_coords_idx, free_coords_idx = get_joint_idx(joint)
+        force = spring_dampers[j]
+        cable = Apparatus(
+            istart + j,
+            joint,
+            force,
+            0,
+            full_coords_idx,
+            free_coords_idx
+        )
+        push!(ret, cable)
     end
-    ret2 = TypeSortedCollection(ret_raw)
+    ret
 end
 
-function connect_and_cluster(bodies, connecting_matrix, cm2_input)
-    ret1 = connect(bodies, connecting_matrix)
-    ret2 = cluster(bodies, cm2_input)
-    return (connected=ret1, clustered=ret2)
-end
+
 
 struct Indexed{id2idxType,idxType}
     num_of_bodies::Int

@@ -1,17 +1,17 @@
 
-function cstr_function(appar::Apparatus{<:CableJoint},structure,q,c)
+function cstr_function(appar::Apparatus,structure,q,c)
     T = get_numbertype(structure)
     zeros(T,0)
 end
 
-function cstr_jacobian(appar::Apparatus{<:CableJoint},structure,q)
+function cstr_jacobian(appar::Apparatus,structure,q)
     (;apparid2sys_free_coords_idx) = structure.connectivity.indexed
     jointed_sys_free_idx = apparid2sys_free_coords_idx[appar.id]
     T = get_numbertype(structure)
     zeros(T,0,length(jointed_sys_free_idx))
 end
 
-function cstr_forces_jacobian(appar::Apparatus{<:CableJoint},structure,q,λ)
+function cstr_forces_jacobian(appar::Apparatus,structure,q,λ)
     (;apparid2sys_free_coords_idx) = structure.connectivity.indexed
     jointed_sys_free_idx = apparid2sys_free_coords_idx[appar.id]
     T = get_numbertype(structure)
@@ -19,7 +19,7 @@ function cstr_forces_jacobian(appar::Apparatus{<:CableJoint},structure,q,λ)
 
 end
 
-function cstr_velocity_jacobian(appar::Apparatus{<:CableJoint},structure,q,q̇)
+function cstr_velocity_jacobian(appar::Apparatus,structure,q,q̇)
     (;apparid2sys_free_coords_idx) = structure.connectivity.indexed
     jointed_sys_free_idx = apparid2sys_free_coords_idx[appar.id]
     T = get_numbertype(structure)

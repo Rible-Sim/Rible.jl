@@ -203,6 +203,11 @@ struct CableJoint{hen2eggType} <: AbstractJoint
     num_of_cstr::Int
 end
 
+struct ClusterJoint{SlidingPointsType} <: AbstractJoint
+    sps::SlidingPointsType
+    num_of_cstr::Int
+end
+
 
 function get_joint_idx(joint::Union{PrototypeJoint,CableJoint})
     (;hen,egg) = joint.hen2egg
@@ -235,4 +240,8 @@ function get_appar_idx(appar::Apparatus{<:jointType},bodyid2sys_free_coords) whe
         free_egg
     )
     sys_free_coords_idx
+end
+
+function get_appar_idx(appar::Apparatus,bodyid2sys_free_coords)
+    Int[]
 end

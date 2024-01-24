@@ -225,7 +225,6 @@ mutable struct SlidingPoint{T}
 end
 
 struct DistanceSpringDamperSegment{N,T}
-    id::Int
     k::T
     c::T
     prestress::T
@@ -245,22 +244,22 @@ end
 
 function SlidingPoint(μ)
     θ = one(μ) * 2pi
-    #θ = zero(μ)
-    α = calculate_α(μ,θ)
+    α = calculate_α(μ, θ)
     s = zero(μ)
-    s⁺,s⁻ = s2s̄(s)
-    SlidingPoint(μ,θ,α,s,s⁺,s⁻)
+    s⁺, s⁻ = s2s̄(s)
+    SlidingPoint(μ, θ, α, s, s⁺, s⁻)
 end
 
 struct ClusterDistanceSpringDampers{spsType,segsType}
-    Signifier::Int
     sps::spsType
     segs::segsType
 end
 
-function ClusterDistanceSpringDampers( nsp, segs;μ=0.0)
+function ClusterDistanceSpringDampers(segs; μ=0.0)
+    @show 11
+    nsp = length(segs) - 1
     sps = StructArray([SlidingPoint(μ) for i = 1:nsp])
-    ClusterDistanceSpringDampers( sps, segs)
+    ClusterDistanceSpringDampers(sps, segs)
 end
 
 function s2s̄(s::Number)
