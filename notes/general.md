@@ -184,6 +184,7 @@ To do this, use `include`, docs/test/benchmark; use `includet` dev;
   - [ ] value/reward will always depends on position variables: final state or intermediate states
   - [ ] uppon convergence, an additional Newton iteration is performed to compute all the derivatives/gradients/jacobians/adjoint and cached
   - [ ] cache differentials, w.r.t action(forces/torques), structual parameters (stiffness/geometry), joints(location, axes), initial conditions, 
+  - [ ] move gravity to actuators
 # Show case
 - [ ] pecking wood bird examples
 - [ ] 走钢丝

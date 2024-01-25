@@ -7,14 +7,6 @@ function actuate!(bot::Robot,u::AbstractVector,t::Number)
     end
 end
 
-function action_jacobian(bot::Robot,q,q̇,λ,u)
-    (;num_of_actions) = bot.hub.scheme
-    ∂f∂u = zeros(T,nu)
-    foreach(actuators) do actuator
-        ∂f∂u .+= action_jacobian(bot,actuator)
-    end
-end
-
 abstract type AbstractOperator end
 struct ManualOperator{T} <: AbstractOperator 
     u::Vector{T}
@@ -25,6 +17,13 @@ abstract type AbstractActuator end
 
 get_id(actuator::AbstractActuator) = actuator.id
 get_numbertype(actuator::AbstractActuator) = get_numbertype(actuator.signifier)
+get_num_of_actions(::AbstractActuator) = 0
+function execute!(structure::Structure,actuator)
+    (;id,signifier,operator,force) = actuator
+    structure.state.system.F .+= generalized_force(structure,actuator)
+end
+function generalized_force_jacobian!(∂F∂u,structure::Structure,actuator)
+end
 
 struct ExternalForceActuator{sigType,operType,forceType} <: AbstractActuator
     id::Int
@@ -33,9 +32,15 @@ struct ExternalForceActuator{sigType,operType,forceType} <: AbstractActuator
     force::forceType
 end
 
-get_num_of_actions(::ExternalForceActuator{sigType,TimeOperator}) where {sigType} = 0
-
 # ExternalForceActuator TimeOperator
+
+function get_actions(structure::Structure,actuator::ExternalForceActuator{sigType,<:TimeOperator}) where {sigType}
+    (;signifier,operator,force) = actuator
+    (;state) = structure
+    (;t) = state.system
+    t
+end
+
 function generalized_force(structure::Structure,actuator::ExternalForceActuator{sigType,<:TimeOperator}) where {sigType}
     (;state) = structure
     (;t) = state.system
@@ -51,25 +56,15 @@ function generalized_force(structure::Structure,actuator::ExternalForceActuator{
     transpose(C)*force(t)
 end
 
-function generalized_force_jacobian(structure::Structure,actuator::ExternalForceActuator{sigType,<:TimeOperator}) where {sigType}
-    T = get_numbertype(structure)
-    spzeros(T,get_num_of_free_coords(structure),0)
-end
+# ExternalForceActuator ManualOperator
+get_num_of_actions(actuator::ExternalForceActuator{sigType,<:ManualOperator}) where {sigType} = length(actuator.operator.u)
 
-function execute!(structure::Structure,actuator::ExternalForceActuator{sigType,<:TimeOperator}) where {sigType}
-    (;id,signifier,operator,force) = actuator
-    structure.state.system.F .+= generalized_force(structure,actuator)
-end
-
-function get_actions(structure::Structure,actuator::ExternalForceActuator{sigType,<:TimeOperator}) where {sigType}
+function get_actions(structure::Structure,actuator::ExternalForceActuator{sigType,<:ManualOperator}) where {sigType}
     (;signifier,operator,force) = actuator
     (;state) = structure
     (;t) = state.system
-    t
+    operator.u
 end
-
-# ExternalForceActuator ManualOperator
-get_num_of_actions(actuator::ExternalForceActuator{sigType,<:ManualOperator}) where {sigType} = length(actuator.operator.u)
 
 function generalized_force(structure::Structure,actuator::ExternalForceActuator{sigType,<:ManualOperator}) where {sigType}
     (;state) = structure
@@ -86,7 +81,7 @@ function generalized_force(structure::Structure,actuator::ExternalForceActuator{
     operator.u.*transpose(C)*force
 end
 
-function generalized_force_jacobian(structure::Structure,actuator::ExternalForceActuator{sigType,<:ManualOperator}) where {sigType}
+function generalized_force_jacobian!(∂F∂u, structure::Structure,actuator::ExternalForceActuator{sigType,<:ManualOperator}) where {sigType}
     (;state) = structure
     (;t) = state.system
     (;signifier,operator,force) = actuator
@@ -98,19 +93,7 @@ function generalized_force_jacobian(structure::Structure,actuator::ExternalForce
     c = to_local_coords(nmcs,prop.loci[pid].position)
     Tbody = build_T(structure,bid)
     C = to_position_jacobian(nmcs,q,c)*Tbody
-    transpose(C)*force
-end
-
-function execute!(structure::Structure,actuator::ExternalForceActuator{sigType,<:ManualOperator}) where {sigType}
-    (;id,signifier,operator,force) = actuator
-    structure.state.system.F .+= generalized_force(structure::Structure,actuator)
-end
-
-function get_actions(structure::Structure,actuator::ExternalForceActuator{sigType,<:ManualOperator}) where {sigType}
-    (;signifier,operator,force) = actuator
-    (;state) = structure
-    (;t) = state.system
-    operator.u
+    ∂F∂u .= transpose(C)*force
 end
 
 struct RegisterActuator{RT,CT,registerType} <: AbstractActuator

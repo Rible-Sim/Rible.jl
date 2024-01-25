@@ -66,10 +66,10 @@ RB.get_num_of_actions(cp_sim.hub.actuators.data[1][1])
 cp_sim.hub.actuators.data[1][1]
 RB.generalized_force(cp_sim,cp_sim.hub.actuators.data[1][1])
 RB.generalized_force(cp_sim,cp_sim.hub.actuators.data[2][1])
-RB.action_jacobian(cp_sim,cp_sim.hub.actuators.data[1][1])
-RB.action_jacobian(cp_sim,cp_sim.hub.actuators.data[2][1])
+RB.actions_jacobian(cp_sim,cp_sim.hub.actuators.data[1][1])
+RB.actions_jacobian(cp_sim,cp_sim.hub.actuators.data[2][1])
 
-RB.action_jacobian(cp_terminal,cp_terminal.hub.actuators.data[2][1])
+RB.actions_jacobian(cp_terminal,cp_terminal.hub.actuators.data[2][1])
 
 ## path_pos_vel_cost(cp_sim) # interpolate reference trajectory
 
@@ -92,11 +92,13 @@ dssolver = RB.AdjointDynamicsSensitivitySolver(
 )
 adprob  = RB.AdjointDynamicsProblem(cp_sim,nothing)
 
-RB.solve!(
+_,solvercache = RB.solve!(
     dsprob,
     dssolver;
     tspan,
     dt
 )
+
+solvercache.cache.∂J∂uᵀ[1,:]
 
 plot_traj!(cp_sim;showmesh=false,showground=false)

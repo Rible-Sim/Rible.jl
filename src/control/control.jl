@@ -15,13 +15,13 @@ function Coalition(structure::AbstractStructure,gauges,actuators)
     num_of_error_gauges = 0
     num_of_capta_gauges = 0
     sys_errors_idx = Int[]
-    gaugeid2error_idx = Vector{Vector{Int}}(undef,num_of_gauges)
+    gaugeid2sys_errors_idx = Vector{Vector{Int}}(undef,num_of_gauges)
     if num_of_gauges > 0
         foreach(gauges) do gauge
             gid = gauge.id
             nerr = get_num_of_errors(gauge)
-            gaugeid2error_idx[gid] = collect(length(sys_errors_idx)+1:length(sys_errors_idx)+nerr)
-            append!(sys_errors_idx,gaugeid2error_idx[gid])
+            gaugeid2sys_errors_idx[gid] = collect(length(sys_errors_idx)+1:length(sys_errors_idx)+nerr)
+            append!(sys_errors_idx,gaugeid2sys_errors_idx[gid])
             if !(gauge isa ErrorGauge)
                 num_of_error_gauges += 1
             end
@@ -34,7 +34,7 @@ function Coalition(structure::AbstractStructure,gauges,actuators)
     num_of_errors = length(sys_errors_idx)
 
     sys_actions_idx = Int[]
-    actid2sys_actions = Vector{Int}[]
+    actid2sys_actions_idx = Vector{Int}[]
     ntotal_by_act = zeros(Int,num_of_actuators)
     pres_idx_by_act = Vector{Vector{Int}}(undef,num_of_actuators)
     free_idx_by_act = Vector{Vector{Int}}(undef,num_of_actuators)
@@ -46,11 +46,11 @@ function Coalition(structure::AbstractStructure,gauges,actuators)
     end
     for actid = 1:num_of_actuators
         ntotal = ntotal_by_act[actid]
-        push!(actid2sys_actions,fill(-1,ntotal))
+        push!(actid2sys_actions_idx,fill(-1,ntotal))
         unshareds = collect(1:ntotal)
         nusi = length(unshareds)
-        actid2sys_actions[actid][unshareds] = collect(length(sys_actions_idx)+1:length(sys_actions_idx)+nusi)
-        append!(sys_actions_idx,actid2sys_actions[actid][unshareds])
+        actid2sys_actions_idx[actid][unshareds] = collect(length(sys_actions_idx)+1:length(sys_actions_idx)+nusi)
+        append!(sys_actions_idx,actid2sys_actions_idx[actid][unshareds])
     end
 
     num_of_actions = length(sys_actions_idx)
@@ -59,8 +59,8 @@ function Coalition(structure::AbstractStructure,gauges,actuators)
         @eponymtuple(
             num_of_actuators, num_of_gauges,
             num_of_error_gauges, num_of_capta_gauges,
-            num_of_errors,gaugeid2error_idx,
-            num_of_actions, actid2sys_actions, 
+            num_of_errors,gaugeid2sys_errors_idx,
+            num_of_actions, actid2sys_actions_idx, 
         )
     )
 end
@@ -83,12 +83,14 @@ struct ControlHub{gaugesType,actuatorsType,coalitionType,stateType}
     end
 end
 
+get_num_of_actions(bot) = bot.hub.coalition.nt.num_of_actions
+
 function get_actions(structure,actuators,coalition)
-    (;num_of_actions,actid2sys_actions) = coalition.nt
+    (;num_of_actions,actid2sys_actions_idx) = coalition.nt
     T = get_numbertype(structure)
     u = zeros(T,num_of_actions)
     foreach(actuators) do actuator
-        act_idx = actid2sys_actions[actuator.id]
+        act_idx = actid2sys_actions_idx[actuator.id]
         u[act_idx] .= get_actions(structure,actuator)
     end
     u
@@ -97,12 +99,12 @@ end
 function get_actions!(bot::Robot,t::Number)
     (;structure,hub) = bot
     (;actuators,coalition) = hub
-    (;num_of_actions,actid2sys_actions) = coalition.nt
+    (;num_of_actions,actid2sys_actions_idx) = coalition.nt
     structure.state.system.t = t
     T = get_numbertype(structure)
     u = zeros(T,num_of_actions)
     foreach(actuators) do actuator
-        act_idx = actid2sys_actions[actuator.id]
+        act_idx = actid2sys_actions_idx[actuator.id]
         u[act_idx] .= get_actions(structure,actuator)
     end
     u
@@ -149,12 +151,21 @@ function cost!(bot::Robot,)
     cost!(bot,q,q̇,u,t)
 end
 
-function cost_jacobian!(∂ϕ∂qᵀ,∂ϕ∂q̇ᵀ,bot::Robot,q::AbstractVector,q̇::AbstractVector,t)
-    (;structure,hub) = bot
-    (;coalition) = hub
-    update!(structure,q,q̇,t)
+function cost_jacobian!(∂ϕ∂qᵀ,∂ϕ∂q̇ᵀ,bot::Robot,q::AbstractVector,q̇::AbstractVector,t;gravity)
+    (;structure,) = bot
+    structure.state.system.t = t
+    structure.state.system.q .= q
+    structure.state.system.q̇ .= q̇
+    clear_forces!(structure)
+    stretch_rigids!(structure)
+    update_bodies!(structure)
+    update_apparatuses!(structure)
+    if gravity
+        apply_gravity!(structure)
+    end
+    assemble_forces!(structure)
     ∂e∂q, ∂e∂q̇ = errors_jacobian(bot,)
-    ∂ϕ∂qᵀ .= transpose(sum(∂e∂q,dims=1))
+    ∂ϕ∂qᵀ .= transpose(sum(∂e∂q, dims=1))
     ∂ϕ∂q̇ᵀ .= transpose(sum(∂e∂q̇, dims=1))
 end
 
@@ -162,8 +173,7 @@ function cost_jacobian!(∂ϕ∂uᵀ,bot::Robot,q::AbstractVector,q̇::AbstractV
     (;structure,hub) = bot
     (;coalition) = hub
     actuate!(bot,q,q̇,u,t)
-    (;num_of_errors, gaugeid2error_idx, num_of_actions, actid2sys_actions) = coalition.nt
-    ∂e∂q, ∂e∂q̇ = errors_jacobian(bot,)
+    (;num_of_errors, gaug_idxeid2sys_error_idx, num_of_actions, actid2sys_actions) = coalition.nt
     ∂ϕ∂uᵀ .= transpose(sum(∂e∂q,dims=1))
 end
 
@@ -174,7 +184,36 @@ function cost_jacobian!(bot::Robot)
     ∂ϕ∂qᵀ = zeros(T,length(q))
     ∂ϕ∂q̇ᵀ = zeros(T,length(q̇))
     ∂ϕ∂uᵀ = zeros(T,length(u))
-    cost_jacobian!(∂ϕ∂qᵀ,∂ϕ∂q̇ᵀ,∂ϕ∂uᵀ,bot,q,q̇,u,t)
+    cost_jacobian!(∂ϕ∂qᵀ,∂ϕ∂q̇ᵀ,bot,q,q̇,t)
+    cost_jacobian!(∂ϕ∂uᵀ,bot,q,q̇,u,t)
+end
+
+function generalized_force_jacobain!(∂F∂u,bot::Robot,q::AbstractVector,q̇::AbstractVector,u::AbstractVector,t::Number;gravity=false)
+    (;structure,hub) = bot
+    (;actuators,coalition) = hub
+    structure.state.system.t = t
+    structure.state.system.q .= q
+    structure.state.system.q̇ .= q̇
+    hub.state.u .= u
+    clear_forces!(structure)
+    stretch_rigids!(structure)
+    update_bodies!(structure)
+    update_apparatuses!(structure)
+    if gravity
+        apply_gravity!(structure)
+    end
+    actuate!(bot,t)
+    assemble_forces!(structure)
+    (;num_of_actions,actid2sys_actions_idx) = coalition.nt
+    ∂F∂u .= 0.0
+    foreach(actuators) do actuator
+        u_idx = actid2sys_actions_idx[actuator.id]
+        generalized_force_jacobian!(
+            (@view ∂F∂u[:,u_idx]),
+            structure,
+            actuator
+        )
+    end
 end
 
 function set_restlen!(structure,u)

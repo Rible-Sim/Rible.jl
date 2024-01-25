@@ -8,8 +8,14 @@ function generate_cache(
         ::Val{true};
         dt,kargs...
     )
-    (;bot) = simulator.prob
+    (;prob) = simulator
+    (;bot) = prob
     (;structure) = bot
+    options = merge(
+        (gravity=true,factor=1,checkpersist=true), #default
+        prob.options,
+        solver.forward_solver.options,
+    )
     Mₘ = assemble_M(structure)
     M⁻¹ₖ = assemble_M⁻¹(structure)
     ∂Mₘhq̇ₘ∂qₘ = assemble_∂Mq̇∂q(structure)
@@ -18,10 +24,10 @@ function generate_cache(
     M_and_Jac_M! = make_M_and_Jac_M!(structure)
     Φ = make_cstr_function(structure)
     A = make_cstr_jacobian(structure)
-    F!(F,q,q̇,t) = generalized_force!(F,bot,q,q̇,t)
+    F!(F,q,q̇,t) = generalized_force!(F,bot,q,q̇,t;gravity=options.gravity)
     Jac_F!(∂F∂q̌,∂F∂q̌̇,q,q̇,t) = generalized_force_jacobain!(∂F∂q̌,∂F∂q̌̇,bot,q,q̇,t)
     ∂Aᵀλ∂q(q,λ) = cstr_forces_jacobian(structure,q,λ)
-    adjoint_traj = StructArray(
+    adjoint_traj = VectorOfArray(
         [
             ComponentArray(
                 a = zero(state.q),
@@ -31,7 +37,7 @@ function generate_cache(
             for state in bot.traj
         ]
     )
-    Jac_ϕ!(∂ϕ∂qᵀ,∂ϕ∂q̇ᵀ,q,q̇,t) = cost_jacobian!(∂ϕ∂qᵀ,∂ϕ∂q̇ᵀ,bot,q,q̇,t)
+    Jac_ϕ!(∂ϕ∂qᵀ,∂ϕ∂q̇ᵀ,q,q̇,t) = cost_jacobian!(∂ϕ∂qᵀ,∂ϕ∂q̇ᵀ,bot,q,q̇,t;gravity=options.gravity)
     cache = @eponymtuple(
         F!,Jac_F!,
         Mₘ,M⁻¹ₖ,
@@ -96,24 +102,24 @@ function solve!(simulator::Simulator,solvercache::Adjoint_Zhong06_Constant_Mass_
         Jacᵏ⁺¹ₖ₊₁[    1:nq ,2nq+1:end] .= -mass_norm.*transpose(Aₖ)
         Jacᵏ⁺¹ₖ₊₁[ nq+1:2nq,2nq+1:end] .= -mass_norm.*transpose(Aₖ₊₁)
     end
-    qₖ₊₁ = traj.q[totalstep]
-    q̇ₖ₊₁ = traj.q̇[totalstep]
-    qₖ = traj.q[totalstep-1]
-    λₘ = traj.λ[totalstep]
-    tₖ₊₁ = traj.t[totalstep]
-    tₖ = traj.t[totalstep-1]
+    qₖ₊₁ = traj.q[totalstep+1]
+    q̇ₖ₊₁ = traj.q̇[totalstep+1]
+    qₖ = traj.q[totalstep]
+    λₘ = traj.λ[totalstep+1]
+    tₖ₊₁ = traj.t[totalstep+1]
+    tₖ = traj.t[totalstep]
     tₘ = 1/2*(tₖ₊₁ + tₖ)
     Aₖ₊₁ = A(qₖ₊₁)
     Aₖ = A(qₖ)
     Jac!(Jacᵏ⁺¹ₖ₊₁,Jacᵏ⁺¹ₖ,qₖ₊₁,qₖ,λₘ,Mₘ,∂Mₘhq̇ₘ∂qₘ,∂F∂q,∂F∂q̇,Aₖ₊₁,Aₖ,tₘ)
-    yN = adjoint_traj[totalstep]
+    yN = adjoint_traj[totalstep+1]
     ## yN .= transpose(Jacᵏ⁺¹ₖ₊₁)\(-1/2*∂ϕ∂xᵀ-∂S∂xᵀ)
     Jac_ϕ!(∂S∂qᵀ,∂S∂q̇ᵀ,qₖ₊₁,q̇ₖ₊₁,tₘ)
     ∂S∂xᵀ[1:nq] = ∂S∂qᵀ
     yN .= transpose(Jacᵏ⁺¹ₖ₊₁)\(-∂S∂xᵀ)
-
+    @show adjoint_traj[end]
     prog = Progress(totalstep; dt=1.0, enabled=progress)
-    for timestep = totalstep-1:-1:1
+    for timestep = totalstep:-1:1
         #---------Step k Control-----------
         # control!(sim,cache)
         #---------Step k Control-----------
@@ -168,23 +174,40 @@ function generate_cache(
         ::Val{true};
         dt,kargs...
     )
-    (;bot) = simulator.prob
-    (;structure) = bot
+    (;prob) = simulator
+    (;bot) = prob
+    (;structure,hub) = bot
+    options = merge(
+        (gravity=true,factor=1,checkpersist=true), #default
+        prob.options,
+        solver.forward_solver.options,
+    )
     forward_cache = solve!(simulator,solver.forward_solver;dt,kargs...)
     adjoint_cache = solve!(simulator,solver.adjoint_solver;dt,kargs...)
-    ∂J∂uᵀ
-    ∂J∂uᵀ = [
-        ComponentArray(
-            a = zero(state.q),
-            b = zero(state.p),
-            μ = zero(state.λ),
-        )
-        for state in bot.traj
-    ]
-    ∂f∂u(q,q̇,λ,u) = action_jacobian(q,q̇,λ,u)
+    ∂J∂uᵀ = VectorOfArray(
+        [
+            zero(hub.state.u)
+            for _ in  1:simulator.totalstep
+        ]
+    )
+    (;num_of_free_coords) = structure.connectivity.indexed
+    T = get_numbertype(bot)
+    nu = get_num_of_actions(bot)
+    nq = get_num_of_free_coords(structure)
+    nλ = get_num_of_cstr(structure)
+    nx = ny = 2nq+nλ
+    ∂Fₘ∂uₘ = zeros(T,nq,nu)
+    Jacᵏ⁺¹ₘ = zeros(T,nx,nu)
+    function ∂f∂u!(Jacᵏ⁺¹ₘ,∂Fₘ∂uₘ,q,q̇,u,t,h)
+        generalized_force_jacobain!(∂Fₘ∂uₘ,bot,q,q̇,u,t;gravity=options.gravity)
+        Jacᵏ⁺¹ₘ[   1: nq,1:nu] .= -h^2/2*∂Fₘ∂uₘ
+        Jacᵏ⁺¹ₘ[nq+1:2nq,1:nu] .= -h^2/2*∂Fₘ∂uₘ
+        Jacᵏ⁺¹ₘ[2nq+1:end] .= 0.0
+    end
     cache = @eponymtuple(
         forward_cache,
-        adjoint_cache
+        adjoint_cache,
+        ∂J∂uᵀ,∂f∂u!,∂Fₘ∂uₘ,Jacᵏ⁺¹ₘ
     )
     Adjoint_Sensitivity_Zhong06_Constant_Mass_Cache(cache)
 end
@@ -194,11 +217,14 @@ function solve!(simulator::Simulator,solvercache::Adjoint_Sensitivity_Zhong06_Co
                 progress=true,exception=true)
     (;prob,controller,tspan,restart,totalstep) = simulator
     (;bot,) = prob
-    (;structure,traj) = bot
+    (;structure,traj,control_traj) = bot
     (;
         forward_cache,
-        adjoint_cache
+        adjoint_cache,
+        ∂J∂uᵀ,∂f∂u!,∂Fₘ∂uₘ,Jacᵏ⁺¹ₘ
     ) = solvercache.cache
+    (;adjoint_traj) = adjoint_cache.cache
+    h = dt
     T = get_numbertype(structure)
     nq = get_num_of_free_coords(structure)
     nλ = get_num_of_cstr(structure)
@@ -206,18 +232,21 @@ function solve!(simulator::Simulator,solvercache::Adjoint_Sensitivity_Zhong06_Co
     ∂S∂xᵀ = zeros(T,nx)
     ∂S∂qᵀ = zeros(T,nq)
     ∂S∂q̇ᵀ = zeros(T,nq)
-    ∂F∂q = zeros(T,nq,nq)
-    ∂F∂q̇ = zeros(T,nq,nq)
-    Jacᵏ⁺¹ₖ₊₁ = zeros(T,ny,ny)
-    Jacᵏₖ = Jacᵏ⁺¹ₖ₊₁
-    Jacᵏ⁺¹ₖ = zeros(T,ny,ny)
-    Jacᵏ⁺¹ₖ_backup = zeros(T,ny,ny)
     ## q0 = traj.q[begin]
     ## M!(Mₘ,q0)
     ## step = 0
     ## mr = norm(Mₘ,Inf)
     ## mass_norm = mr
     for timestep = 1:totalstep
-        ∂J∂uᵀ[timestep] = transpose(∂f∂u)*adjoint_traj.y[timestep]#+η*∂ϕ∂u
+        qₖ₊₁ = traj.q[timestep+1]
+        qₖ = traj.q[timestep]
+        uₘ = control_traj.u[timestep+1]
+        qₘ = (qₖ₊₁.+qₖ)./2
+        q̇ₘ = (qₖ₊₁.-qₖ)./h
+        tₖ₊₁ = traj.t[totalstep+1]
+        tₖ = traj.t[totalstep]
+        tₘ = 1/2*(tₖ₊₁ + tₖ)
+        ∂f∂u!(Jacᵏ⁺¹ₘ,∂Fₘ∂uₘ,qₘ,q̇ₘ,uₘ,tₘ,h)
+        ∂J∂uᵀ[timestep] .= transpose(Jacᵏ⁺¹ₘ)*adjoint_traj[timestep+1]#+η*∂ϕ∂u
     end
 end

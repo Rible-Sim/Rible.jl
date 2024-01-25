@@ -67,15 +67,6 @@ function generalized_force_jacobain!(∂F∂q̌,∂F∂q̌̇,bot,q,q̇,t)
     build_tangent_damping_matrix!(∂F∂q̌̇,structure)
 end
 
-function generalized_force_jacobain!(∂F∂u,bot,u,t)
-    (;structure) = bot
-    ∂F∂u .= 0
-    clear_forces!(structure)
-    lazy_update_bodies!(structure,q,q̇)
-    update_apparatuses!(structure)
-    build_tangent_stiffness_matrix!(∂F∂u,structure)
-end
-
 struct ContactCache{cacheType}
     cache::cacheType
 end
