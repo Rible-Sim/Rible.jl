@@ -3,7 +3,8 @@ function cart_pole(;
         ẏ0 =  0.0,
         θ0 =  π/2,
         ω0 =  0.0,
-        coordsType = RB.NCF.NC
+        coordsType = RB.NCF.NC,
+        f = (t)->[1.0],
     )
     SVo3 = SVector{3}([0.0,0.0,0.0])
     b = 0.02
@@ -225,8 +226,8 @@ function cart_pole(;
     pos_vel_errors = RB.ErrorGauge(
         1,
         RB.Signifier(cart,5,5),
-        RB.PosVelCapta(),
-        zeros(6)
+        RB.PositionCapta(),
+        zeros(3)
     )
     ## angle_err = RB.ErrorGauge(
     ##     RB.Gauge(
@@ -239,8 +240,9 @@ function cart_pole(;
     force_actuator = RB.ExternalForceActuator(
         1,
         RB.Signifier(cart,5,5),
-        RB.ManualOperator([1.0]),
+        RB.TimeOperator(f),
         [0,1.0,0],
+        [0.0],
     )
     actuators = TypeSortedCollection([force_actuator,])
     hub = RB.ControlHub(

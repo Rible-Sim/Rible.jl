@@ -110,9 +110,12 @@ function get_actions!(bot::Robot,t::Number)
     u
 end
 
-function actuate!(bot::Robot,q::AbstractVector,q̇::AbstractVector,u::AbstractVector,t)
+function actuate!(bot::Robot,u::Nothing,t::Number) end
+
+function actuate!(bot::Robot,q::AbstractVector,q̇::AbstractVector,t)
     (;structure,hub) = bot
-    (;actuators) = hub
+    (;actuators,state,coalition) = hub
+    (;actid2sys_actions_idx) = coalition.nt
     foreach(actuators) do actuator
         execute!(structure,actuator)
     end
@@ -131,12 +134,12 @@ end
 # For now, the cost is simply the sum of errors
 #todo weighted sum
 #todo user-defined cost
-function cost!(bot::Robot,q::AbstractVector,q̇::AbstractVector,u::AbstractVector,t)
+function cost!(bot::Robot,q::AbstractVector,q̇::AbstractVector,t)
     ## (;q,p,λ) = x
     (;structure,hub) = bot
     (;gauges) = hub
     T = get_numbertype(bot)
-    actuate!(bot,q,q̇,u,t)
+    update!(structure,q,q̇,t)
     ϕ = zero(T)
     foreach(gauges) do gauge
         ϕ += measure(structure,gauge)
@@ -147,8 +150,7 @@ end
 function cost!(bot::Robot,)
     ## (;q,p,λ) = x
     (;q,q̇,t) = bot.structure.state.system
-    (;u) = bot.hub.state
-    cost!(bot,q,q̇,u,t)
+    cost!(bot,q,q̇,t)
 end
 
 function cost_jacobian!(∂ϕ∂qᵀ,∂ϕ∂q̇ᵀ,bot::Robot,q::AbstractVector,q̇::AbstractVector,t;gravity)

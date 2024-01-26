@@ -6,9 +6,7 @@ struct PosVelCapta <: AbstractCapta end
 struct AngleCapta <: AbstractCapta end
 
 function measure(structure::Structure,signifier::Signifier,capta::PositionCapta)
-    (;signifier,) = gauge
-    body = signifier.body
-    (;pid) = signifier
+    (;pid,body) = signifier
     (;prop,state,cache) = body
     state.loci_states[pid].frame.position
 end
@@ -21,8 +19,7 @@ function measure(structure::Structure,signifier::Signifier,capta::VelocityCapta)
 end
 
 function measure(structure::Structure,signifier::Signifier,capta::PosVelCapta)
-    body = signifier.body
-    (;pid) = signifier
+    (;body,pid) = signifier
     (;prop,state,cache) = body
     vcat(
         state.loci_states[pid].frame.position,
@@ -36,7 +33,7 @@ function measure_jacobian(structure::Structure,signifier::Signifier,capta::Posit
     (;prop,state,cache,coords) = body
     (;nmcs) = coords
     q = structure.state.members[body.prop.id].q
-    c = to_local_coords(nmcs,prop.loci[pid].frame.position)
+    c = to_local_coords(nmcs,prop.loci[pid].position)
     Tbody = build_T(structure,body.prop.id)
     C = to_position_jacobian(nmcs,q,c)*Tbody
     C,zero(C)
