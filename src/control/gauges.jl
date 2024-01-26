@@ -46,7 +46,7 @@ function measure_jacobian(structure::Structure,signifier::Signifier,capta::Veloc
     (;nmcs) = coords
     q = structure.state.members[body.prop.id].q
     q̇ = structure.state.members[body.prop.id].q̇
-    c = to_local_coords(nmcs,q,prop.loci[pid].frame.position)
+    c = to_local_coords(nmcs,prop.loci[pid].position)
     Tbody = build_T(structure,body.prop.id)
     C = to_position_jacobian(nmcs,q,c)*Tbody
     ∂Cq̇∂q = to_velocity_jacobian(nmcs,q,q̇,c)*Tbody

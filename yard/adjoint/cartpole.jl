@@ -78,7 +78,7 @@ RB.actions_jacobian(cp_terminal,cp_terminal.hub.actuators.data[2][1])
 ##     path_cost(x,ẋ,u,t),
 ##     terminal_cost(x,ẋ,u,tend),
 ## )
-
+cp_sim = cart_pole(;θ0=π/4,y0 = -1.0,coordsType)
 dsprob = RB.DynamicsSensitivityProblem(cp_sim)
 adsolver = RB.DiscreteAdjointDynamicsSolver(
     RB.DynamicsSolver(

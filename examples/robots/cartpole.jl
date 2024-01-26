@@ -226,7 +226,11 @@ function cart_pole(;
     pos_vel_errors = RB.ErrorGauge(
         1,
         RB.Signifier(cart,5,5),
-        RB.PositionCapta(),
+        ## RB.PositionCapta(),
+        ## zeros(3),
+        ## RB.PosVelCapta(),
+        ## zeros(6),
+        RB.VelocityCapta(),
         zeros(3)
     )
     ## angle_err = RB.ErrorGauge(

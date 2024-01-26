@@ -135,7 +135,6 @@ end
 #todo weighted sum
 #todo user-defined cost
 function cost!(bot::Robot,q::AbstractVector,q̇::AbstractVector,t)
-    ## (;q,p,λ) = x
     (;structure,hub) = bot
     (;gauges) = hub
     T = get_numbertype(bot)
@@ -148,12 +147,11 @@ function cost!(bot::Robot,q::AbstractVector,q̇::AbstractVector,t)
 end
 
 function cost!(bot::Robot,)
-    ## (;q,p,λ) = x
     (;q,q̇,t) = bot.structure.state.system
     cost!(bot,q,q̇,t)
 end
 
-function cost_jacobian!(∂ϕ∂qᵀ,∂ϕ∂q̇ᵀ,bot::Robot,q::AbstractVector,q̇::AbstractVector,t;gravity)
+function cost_jacobian!(∂ϕ∂qᵀ,∂ϕ∂q̇ᵀ,∂ϕ∂pᵀ,bot::Robot,q::AbstractVector,q̇::AbstractVector,t;gravity)
     (;structure,) = bot
     structure.state.system.t = t
     structure.state.system.q .= q
@@ -166,12 +164,17 @@ function cost_jacobian!(∂ϕ∂qᵀ,∂ϕ∂q̇ᵀ,bot::Robot,q::AbstractVector
         apply_gravity!(structure)
     end
     assemble_forces!(structure)
+    M⁻¹ = assemble_M⁻¹(structure)
+    ∂M⁻¹p∂q = assemble_∂M⁻¹p∂q(structure)
     ∂e∂q, ∂e∂q̇ = errors_jacobian(bot,)
     ∂ϕ∂qᵀ .= transpose(sum(∂e∂q, dims=1))
     ∂ϕ∂q̇ᵀ .= transpose(sum(∂e∂q̇, dims=1))
+    # if addable
+    ∂ϕ∂qᵀ .+= transpose(∂M⁻¹p∂q)*∂ϕ∂q̇ᵀ
+    ∂ϕ∂pᵀ .= transpose(M⁻¹)*∂ϕ∂q̇ᵀ
 end
 
-function cost_jacobian!(∂ϕ∂uᵀ,bot::Robot,q::AbstractVector,q̇::AbstractVector,u::AbstractVector,t)
+function cost_action_jacobian!(∂ϕ∂uᵀ,bot::Robot,q::AbstractVector,q̇::AbstractVector,u::AbstractVector,t)
     (;structure,hub) = bot
     (;coalition) = hub
     actuate!(bot,q,q̇,u,t)
