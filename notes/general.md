@@ -122,8 +122,8 @@ run `makedocs` to actually run `@example` codes and generates docs.
 
 Examples are reused for dev/docs/test/benchmark.
 To do this, use `include`, docs/test/benchmark; use `includet` dev;
-- [ ] where to put assets?
-  - [ ] in robots too?
+- [x] where to put assets?
+  - [x] `/assets``
   - [ ] already independent of `.jl` files
 - [ ] where to put `vis.jl`?
   - [ ] something like `deps.jl`
@@ -175,16 +175,17 @@ To do this, use `include`, docs/test/benchmark; use `includet` dev;
   - [ ] allow spring-damper to be defined without extrinsic joints
   - [ ] provide high-level interfaces for joint-spring-damper
 - [x] put contacts into loci
-- [ ] local distribution law
+- [x] (not possible) local distribution law
 - [ ] try SNAKE/RATTLE scheme
 - [ ] visualize Locus/LocusState
-- [ ] investigate scaling, may be scale relative velocity to position?
-- [ ] A (moving) frame type for (origin_position,R,origin_velocity,ω) ? quaternion?
+- [x] investigate scaling, may be scale relative velocity to position?
+- [x] A (moving) frame type for (origin_position,R,origin_velocity,ω) ? quaternion?
 - [ ] ReinforcementLearning
-  - [ ] value/reward will always depends on position variables: final state or intermediate states
-  - [ ] uppon convergence, an additional Newton iteration is performed to compute all the derivatives/gradients/jacobians/adjoint and cached
+  - [ ] value/reward will always depend on position variables: final state or intermediate states
+  - [ ] upon convergence, an additional Newton iteration is performed to compute all the derivatives/gradients/jacobians/adjoint and cached
   - [ ] cache differentials, w.r.t action(forces/torques), structual parameters (stiffness/geometry), joints(location, axes), initial conditions, 
   - [ ] move gravity to actuators
+  - [ ] higher control law (feedback or not) struct, to include function approximator (NN)
 # Show case
 - [ ] pecking wood bird examples
 - [ ] 走钢丝

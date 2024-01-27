@@ -1,6 +1,6 @@
 using Revise #jl
 import Rible as RB
-include(joinpath(pathof(RB),"../../yard/nonsmooth.jl"))
+include(joinpath(pathof(RB),"../../yard/adjoint.jl"))
 using AbbreviatedStackTraces #jl
 ENV["JULIA_STACKTRACE_ABBREVIATED"] = true #jl
 ENV["JULIA_STACKTRACE_MINIMAL"] = true #jl
@@ -13,7 +13,7 @@ elseif Sys.isapple() #src
 end #src
 include(joinpath(pathof(RB),"../../test/vis.jl"))
 includet(joinpath(pathof(RB),"../../test/vis.jl")) #jl
-
+using OptimizationOptimJL
 tw = 455.8843 #pt |> pt2px
 scalefactor = 4
 
@@ -25,25 +25,84 @@ coordsType=RB.QCF.QC
 coordsType=RB.NCF.NC
 
 cp_terminal = cart_pole(;coordsType)
-cp_sim = cart_pole(;θ0=π/4,y0 = -1.0,coordsType)
+f(t) = [1.0]
+@time cp_sim = cart_pole(;θ0=π/4,y0 = -1.0,coordsType,f)
+
+
+function forward_dyn(u = ones(10),params=nothing;
+        tspan = (0.0,0.1),
+        dt = 1e-2
+    )
+    times = tspan[1]+dt/2:dt:tspan[2]
+    f(t) = [extrapolate(scale(interpolate(u, BSpline(Constant())), times), Line())(t)]
+    bot = cart_pole(;θ0=π/4,y0 = -1.0,coordsType,f)
+    RB.solve!(
+        RB.DynamicsProblem(bot),
+        RB.DynamicsSolver(
+            RB.Zhong06()
+        );
+        tspan,
+        dt
+    )
+    bot
+end
+
+function J(u = ones(10),params=nothing;
+        tspan = (0.0,0.1),
+        dt = 1e-2
+    )
+    bot = forward_dyn(u;tspan,dt)    
+    RB.cost!(bot,bot.traj.q[end],bot.traj.q̇[end],bot.traj.t[end])
+end
+
+function dJ!(G, u = ones(10),params=nothing;
+        tspan = (0.0,0.1),
+        dt = 1e-2
+    )
+    times = tspan[1]+dt/2:dt:tspan[2]
+    f(t) = [extrapolate(scale(interpolate(u, BSpline(Constant())), times), Line())(t)]
+    bot = cart_pole(;θ0=π/4,y0 = -1.0,coordsType,f)
+    dsprob = RB.DynamicsSensitivityProblem(bot)
+    adsolver = RB.DiscreteAdjointDynamicsSolver(
+        RB.DynamicsSolver(
+            RB.Zhong06()
+        )
+    )
+    dssolver = RB.AdjointDynamicsSensitivitySolver(
+        dsolver,
+        adsolver
+    )
+    ## adprob  = RB.AdjointDynamicsProblem(bot,nothing)  )
+    _,solvercache = RB.solve!(
+        dsprob,
+        dssolver;
+        tspan,
+        dt
+    )
+    G .= solvercache.cache.∂J∂uᵀ[1,:]
+end
+
+cp_sim = forward_dyn()
+J()
+dJ()
+
+J(ones(10))
+
+FiniteDiff.finite_difference_gradient(J,ones(10))
+
+optprob = OptimizationFunction(J, Optimization.AutoFiniteDiff())
+prob = Optimization.OptimizationProblem(optprob, ones(10), )
+sol = solve(prob, Optim.LBFGS())
+sol.u
+
+optprob = OptimizationFunction(J, grad = dJ!)
+prob = Optimization.OptimizationProblem(optprob, ones(10),)
+sol = solve(prob, Optim.LBFGS())
+sol.u
+cp_sim = forward_dyn(sol.u)
 
 plot_traj!(cp_terminal;showmesh=false,showground=false)
 plot_traj!(cp_sim;showmesh=false,showground=false)
-
-tspan = (0.0,0.1)
-dt = 1e-2
-prob = RB.DynamicsProblem(cp_sim)
-dsolver = RB.DynamicsSolver(
-    RB.Zhong06()
-)
-RB.solve!(
-    prob,
-    dsolver;
-    tspan,
-    dt
-)
-plot_traj!(cp_sim;showmesh=false,showground=false)
-
 # gauges terminal
 m1 = RB.measure(cp_terminal.structure,cp_terminal.hub.gauges.data[1][1])
 ## m2 = RB.measure(cp_terminal,cp_terminal.hub.gauges.data[2][1])
@@ -70,59 +129,6 @@ RB.actions_jacobian(cp_sim,cp_sim.hub.actuators.data[2][1])
 
 RB.actions_jacobian(cp_terminal,cp_terminal.hub.actuators.data[2][1])
 
-## path_pos_vel_cost(cp_sim) # interpolate reference trajectory
 
-## terminal_pos_vel_cost(cp_sim)
 
-## cost = (
-##     path_cost(x,ẋ,u,t),
-##     terminal_cost(x,ẋ,u,tend),
-## )
-cp_sim = cart_pole(;θ0=π/4,y0 = -1.0,coordsType)
-dsprob = RB.DynamicsSensitivityProblem(cp_sim)
-adsolver = RB.DiscreteAdjointDynamicsSolver(
-    RB.DynamicsSolver(
-        RB.Zhong06()
-    )
-)
-dssolver = RB.AdjointDynamicsSensitivitySolver(
-    dsolver,
-    adsolver
-)
-adprob  = RB.AdjointDynamicsProblem(cp_sim,nothing)
-
-_,solvercache = RB.solve!(
-    dsprob,
-    dssolver;
-    tspan,
-    dt
-)
-
-solvercache.cache.∂J∂uᵀ[1,:]
-
-RB.cost!(cp_sim,cp_sim.traj.q[end],cp_sim.traj.q̇[end],cp_sim.control_traj.u[end],cp_sim.traj.t[end])
-interpolation
-Interpolations
-
-function J(u)
-    tspan = (0.0,0.1)
-    dt = 1e-2
-    xs = tspan[1]+dt/2:dt:tspan[2]
-    scaled_itp = extrapolate(scale(interpolate(u, BSpline(Constant())), xs), Line())
-    bot = cart_pole(;θ0=π/4,y0 = -1.0,coordsType,f=(t)->[scaled_itp(t)])
-    RB.solve!(
-        RB.DynamicsProblem(bot),
-        RB.DynamicsSolver(
-            RB.Zhong06()
-        );
-        tspan,
-        dt
-    )
-    RB.cost!(bot,bot.traj.q[end],bot.traj.q̇[end],bot.traj.t[end])
-end
-J(ones(10))
-
-FiniteDiff.finite_difference_gradient(J,ones(10))
-
-import FiniteDiff
-plot_traj!(cp_sim;showmesh=false,showground=false)
+plot_traj!(bot;showmesh=false,showground=false)
