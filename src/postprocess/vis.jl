@@ -91,7 +91,7 @@ function MakieCore.plot!(viz::Viz{Tuple{S}};
 end
 
 function MakieCore.plot!(viz::Viz{Tuple{S}};
-) where {S<:Apparatus{<:ClusterJoint}}
+    ) where {S<:Apparatus{<:ClusterJoint}}
     cluster_cable_ob = viz[:structure]
     # foreach(cluster_cable_ob[].force) do cluster_seg
     n_segs = length(cluster_cable_ob[].force)
@@ -116,8 +116,9 @@ function MakieCore.plot!(viz::Viz{Tuple{S}};
         )
     end
 end
+
 function MakieCore.plot!(viz::Viz{Tuple{S}};
-) where {S<:Apparatus{<:CableJoint}}
+    ) where {S<:Apparatus{<:CableJoint}}
     cable_appar_ob = viz[:structure]
 
     seg_ob = lift(cable_appar_ob) do cab

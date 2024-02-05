@@ -10,7 +10,7 @@ function generate_cache(
         dt,kargs...
     )
     (;prob) = simulator
-    (;bot) = prob
+    (;bot,policy) = prob
     (;traj,structure) = bot
     options = merge(
         (gravity=true,factor=1,checkpersist=true), #default
@@ -20,8 +20,8 @@ function generate_cache(
     (;M,M⁻¹,M̌,M̌⁻¹,Ḿ,M̄)= build_mass_matrices(structure)
     A = make_cstr_jacobian(structure)
     Φ = make_cstr_function(structure)
-    F!(F,q,q̇,t) = generalized_force!(F,bot,q,q̇,t;gravity=options.gravity)
-    Jac_F!(∂F∂q̌,∂F∂q̌̇,q,q̇,t) = generalized_force_jacobain!(∂F∂q̌,∂F∂q̌̇,bot,q,q̇,t)
+    F!(F,q,q̇,t) = generalized_force!(F,bot,policy,q,q̇,t;gravity=options.gravity)
+    Jac_F!(∂F∂q̌,∂F∂q̌̇,q,q̇,t) = generalized_force_jacobian!(∂F∂q̌,∂F∂q̌̇,bot,policy,q,q̇,t)
     q̌0 = traj.q̌[begin]
     λ0 = traj.λ[begin]
     q̇0 = traj.q̇[begin]
@@ -72,6 +72,7 @@ function solve!(sim::Simulator,cache::Zhong06_Constant_Mass_Cache;
     mr = norm(Ḿ,Inf)
     mass_norm = mr
     h = dt
+    T = get_numbertype(bot)
     function make_Res_stepk(qₖ,q̌ₖ,λₖ,qₖ₋₁,p̌ₖ₋₁,F̌,Aᵀₖ₋₁,tₖ₋₁)
         @inline @inbounds function inner_Res_stepk!(Res,x)
             q̌ₖ .= x[   1:nq̌   ]
@@ -129,6 +130,7 @@ function solve!(sim::Simulator,cache::Zhong06_Constant_Mass_Cache;
         Aᵀₖ₋₁ = transpose(A(qₖ₋₁))
         Res_stepk! = make_Res_stepk(qₖ,q̌ₖ,λₖ,qₖ₋₁,p̌ₖ₋₁,F̌,Aᵀₖ₋₁,tₖ₋₁)
         isconverged = false
+        normRes = typemax(T)
         if false #Jac_F! isa Missing
             dfk = OnceDifferentiable(Res_stepk!,xₖ,Res)
             Res_stepk_result = nlsolve(dfk, xₖ; ftol, iterations=maxiters, method=:newton)
@@ -172,7 +174,7 @@ function solve!(sim::Simulator,cache::Zhong06_Constant_Mass_Cache;
         
         if !isconverged
             if exception
-                error("Not Converged! Step=$timestep")
+                error("Not Converged! Step=$timestep, normRes=$normRes")
             else
                 # sim.convergence = false
                 break

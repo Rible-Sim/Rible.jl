@@ -59,6 +59,9 @@ struct StaticContactSurfaces{surfacesType} <: StaticContactEnvironment
 end
 
 struct EmptySpace <: StaticContactEnvironment end
+struct GravitySpace{T} <: StaticContactEnvironment 
+    gravity::T
+end
 
 abstract type ContactGeometry end
 abstract type ContactPrimitive <: ContactGeometry end

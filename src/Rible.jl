@@ -25,6 +25,8 @@ using CoordinateTransformations
 using EponymTuples
 using Unitful
 import IterTools
+import Lux
+import Zygote
 # solvers
 using RowEchelon
 using NLsolve

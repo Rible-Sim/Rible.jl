@@ -2,6 +2,10 @@ abstract type AbstractOperator end
 struct TimeOperator{fType} <: AbstractOperator 
     f::fType
 end
+struct NonOperator <: AbstractOperator end
+struct FeedbackOperator <: AbstractOperator 
+    num_of_actions::Int
+end
 
 abstract type AbstractActuator end
 
@@ -22,7 +26,14 @@ struct ExternalForceActuator{sigType,operType,forceType,T} <: AbstractActuator
     force::forceType
     action::Vector{T}
 end
+
 get_num_of_actions(actuator::ExternalForceActuator) = length(actuator.action)
+
+function get_actions(structure::Structure,actuator::ExternalForceActuator{sigType,<:FeedbackOperator}) where {sigType}
+    (;signifier,operator,force) = actuator
+    T = get_numbertype(structure)
+    zeros(T,operator.num_of_actions)
+end
 
 function get_actions(structure::Structure,actuator::ExternalForceActuator{sigType,<:TimeOperator}) where {sigType}
     (;signifier,operator,force) = actuator
@@ -32,7 +43,45 @@ function get_actions(structure::Structure,actuator::ExternalForceActuator{sigTyp
 end
 
 # ExternalForceActuator TimeOperator
-function generalized_force(structure::Structure,actuator::ExternalForceActuator{sigType,<:TimeOperator}) where {sigType}
+function generalized_force(structure::Structure,actuator::ExternalForceActuator) 
+    (;state) = structure
+    (;signifier,operator,force) = actuator
+    (;body,pid,) = signifier
+    (;prop,coords) = body
+    (;nmcs) = coords
+    bid = body.prop.id
+    (;q) = state.members[bid]
+    c = to_local_coords(nmcs,prop.loci[pid].position)
+    Tbody = build_T(structure,bid)
+    C = to_position_jacobian(nmcs,q,c)*Tbody
+    transpose(C)*force
+end
+
+function generalized_force_jacobian!(∂F∂u, structure::Structure,actuator::ExternalForceActuator)
+    (;state) = structure
+    (;signifier,operator,force) = actuator
+    (;body,pid,) = signifier
+    (;prop,coords) = body
+    (;nmcs) = coords
+    bid = body.prop.id
+    (;q) = state.members[bid]
+    c = to_local_coords(nmcs,prop.loci[pid].position)
+    Tbody = build_T(structure,bid)
+    C = to_position_jacobian(nmcs,q,c)*Tbody
+    ∂F∂u .= transpose(C)*force
+end
+
+function execute!(structure::Structure,actuator::ExternalForceActuator{sigType,<:TimeOperator}) where {sigType}
+    (;id,signifier,operator,force) = actuator
+    structure.state.system.F .+= operator.f(t).*generalized_force(structure,actuator)
+end
+
+function execute!(structure::Structure,actuator::ExternalForceActuator{sigType,<:FeedbackOperator},u) where {sigType}
+    (;id,signifier,operator,force) = actuator
+    structure.state.system.F .+= u.*generalized_force(structure,actuator)
+end
+
+function generalized_force(structure::Structure,actuator::ExternalForceActuator{sigType,<:FeedbackOperator},u) where {sigType}
     (;state) = structure
     (;t) = state.system
     (;signifier,operator,force) = actuator
@@ -44,10 +93,10 @@ function generalized_force(structure::Structure,actuator::ExternalForceActuator{
     c = to_local_coords(nmcs,prop.loci[pid].position)
     Tbody = build_T(structure,bid)
     C = to_position_jacobian(nmcs,q,c)*Tbody
-    operator.f(t).*transpose(C)*force
+    u.*transpose(C)*force
 end
 
-function generalized_force_jacobian!(∂F∂u, structure::Structure,actuator::ExternalForceActuator{sigType,<:TimeOperator}) where {sigType}
+function generalized_force_jacobian!(∂F∂u, structure::Structure,actuator::ExternalForceActuator{sigType,<:FeedbackOperator},u) where {sigType}
     (;state) = structure
     (;t) = state.system
     (;signifier,operator,force) = actuator
@@ -60,6 +109,21 @@ function generalized_force_jacobian!(∂F∂u, structure::Structure,actuator::Ex
     Tbody = build_T(structure,bid)
     C = to_position_jacobian(nmcs,q,c)*Tbody
     ∂F∂u .= transpose(C)*force
+end
+
+function GravityActuator(id,body::AbstractBody)
+    T = get_numbertype(body)
+    signifier = body
+    operator = NonOperator()
+    action = T[]
+    force = get_gravity(body)
+    ExternalForceActuator(
+        id,
+        signifier,
+        operator,
+        force,
+        action
+    )
 end
 
 struct RegisterActuator{RT,CT,registerType} <: AbstractActuator

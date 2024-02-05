@@ -65,27 +65,34 @@ function Coalition(structure::AbstractStructure,gauges,actuators)
     )
 end
 
-struct ControlHub{gaugesType,actuatorsType,coalitionType,stateType}
+struct ControlHub{gaugesType,actuatorsType,coalitionType,stateType,controlType}
     gauges::gaugesType
     actuators::actuatorsType
     coalition::coalitionType
     state::stateType
-    function ControlHub(structure::AbstractStructure,gauges,actuators,coalition::Coalition)
+    control::controlType
+    function ControlHub(structure::AbstractStructure,gauges,actuators,coalition::Coalition,control=nothing)
         e = get_errors(structure,gauges,coalition)
-        u = get_actions(structure,actuators,coalition)
+        if control isa Nothing
+            u = get_actions(structure,actuators,coalition)
+        else
+            q = get_coords(structure)
+            q̇ = get_velocs(structure)
+            u = control(vcat(q,q̇))
+        end
         state = @eponymtuple(
                 e,
                 u,
             )
-        new{typeof(gauges),typeof(actuators),typeof(coalition),typeof(state)}(
-            gauges,actuators,coalition,state
+        new{typeof(gauges),typeof(actuators),typeof(coalition),typeof(state),typeof(control)}(
+            gauges,actuators,coalition,state,control
         )
     end
 end
 
 get_num_of_actions(bot) = bot.hub.coalition.nt.num_of_actions
 
-function get_actions(structure,actuators,coalition)
+function get_actions(structure::AbstractStructure,actuators,coalition::Coalition)
     (;num_of_actions,actid2sys_actions_idx) = coalition.nt
     T = get_numbertype(structure)
     u = zeros(T,num_of_actions)
@@ -112,14 +119,20 @@ end
 
 function actuate!(bot::Robot,u::Nothing,t::Number) end
 
-function actuate!(bot::Robot,q::AbstractVector,q̇::AbstractVector,t)
+function actuate!(bot::Robot,control::Function,q::AbstractVector,q̇::AbstractVector,t)
     (;structure,hub) = bot
-    (;actuators,state,coalition) = hub
+    (;actuators,state,coalition,) = hub
     (;actid2sys_actions_idx) = coalition.nt
+    state.u .= control(vcat(q,q̇))
+    @show state.u
     foreach(actuators) do actuator
-        execute!(structure,actuator)
+        idx = actid2sys_actions_idx[actuator.id]
+        execute!(
+            structure,
+            actuator,
+            (@view state.u[idx])
+        )
     end
-    update!(structure,q,q̇,t)
 end
 
 function actuate!(bot::Robot,t::Number=bot.structure.state.system.t)
@@ -193,13 +206,12 @@ function cost_jacobian!(bot::Robot)
     cost_jacobian!(∂ϕ∂uᵀ,bot,q,q̇,u,t)
 end
 
-function generalized_force_jacobain!(∂F∂u,bot::Robot,q::AbstractVector,q̇::AbstractVector,u::AbstractVector,t::Number;gravity=false)
+function generalized_force_jacobian!(∂F∂θ,bot::Robot,policy::AbstractPolicy,q::AbstractVector,q̇::AbstractVector,t::Number;gravity=false)
     (;structure,hub) = bot
     (;actuators,coalition) = hub
     structure.state.system.t = t
     structure.state.system.q .= q
     structure.state.system.q̇ .= q̇
-    hub.state.u .= u
     clear_forces!(structure)
     stretch_rigids!(structure)
     update_bodies!(structure)
@@ -207,10 +219,13 @@ function generalized_force_jacobain!(∂F∂u,bot::Robot,q::AbstractVector,q̇::
     if gravity
         apply_gravity!(structure)
     end
-    actuate!(bot,t)
+    control = (x) -> Lux.apply(policy.nt.actor,x,policy.nt.ps,policy.nt.st)[1]
+    actuate!(bot,control,q,q̇,t)
     assemble_forces!(structure)
     (;num_of_actions,actid2sys_actions_idx) = coalition.nt
-    ∂F∂u .= 0.0
+    T = get_numbertype(structure)
+    nq = get_num_of_free_coords(structure)
+    ∂F∂u = zeros(T,nq,num_of_actions)
     foreach(actuators) do actuator
         u_idx = actid2sys_actions_idx[actuator.id]
         generalized_force_jacobian!(
@@ -219,6 +234,35 @@ function generalized_force_jacobain!(∂F∂u,bot::Robot,q::AbstractVector,q̇::
             actuator
         )
     end
+    # correct when F(u(q,q̇)) or when F(q,q̇,u), because only `u` depends on `\theta`
+    ∂u∂θ = Zygote.jacobian(
+        (p) -> Lux.apply(policy.nt.actor,vcat(q,q̇),p,policy.nt.st)[1],
+        policy.nt.ps
+    )[1]
+    ∂F∂θ .= ∂F∂u*∂u∂θ
+end
+
+function generalized_force_jacobian!(∂F∂q̌,∂F∂q̌̇,bot::Robot,control_jac::Function,q::AbstractVector,q̇::AbstractVector,t::Number;gravity=false)
+    (;structure,hub) = bot
+    (;actuators,coalition) = hub
+    T = get_numbertype(structure)
+    nq = get_num_of_free_coords(structure)
+    (;num_of_actions,actid2sys_actions_idx) = coalition.nt
+    ∂F∂u = zeros(T,nq,num_of_actions)
+    foreach(actuators) do actuator
+        u_idx = actid2sys_actions_idx[actuator.id]
+        generalized_force_jacobian!(
+            (@view ∂F∂u[:,u_idx]),
+            structure,
+            actuator
+        )
+    end
+    # only correct when F(u(q,q̇)) but not when F(q,q̇,u)
+    ∂u∂x = control_jac(vcat(q,q̇))
+    ∂u∂q̌ = @view ∂u∂x[:,   1: nq]
+    ∂u∂q̌̇ = @view ∂u∂x[:,nq+1:2nq]
+    ∂F∂q̌ .= ∂F∂u*∂u∂q̌
+    ∂F∂q̌̇ .= ∂F∂u*∂u∂q̌̇
 end
 
 function set_restlen!(structure,u)
@@ -250,4 +294,9 @@ function make_pres_actor(μ0,μ1,start,stop)
         RegisterActuator(1,collect(1:nμ),zeros(nμ),Uncoupled()),
         itp
     )
+end
+
+function get_num_of_params(policy::AbstractPolicy)
+    (;ps) = policy.nt
+    length(ps)
 end

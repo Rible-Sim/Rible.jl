@@ -5,6 +5,7 @@ function cart_pole(;
         ω0 =  0.0,
         coordsType = RB.NCF.NC,
         f = (t)->[1.0],
+        control = nothing,
     )
     SVo3 = SVector{3}([0.0,0.0,0.0])
     b = 0.02
@@ -241,10 +242,17 @@ function cart_pole(;
     ##     π/2
     ## )
     gauges = TypeSortedCollection([pos_vel_errors,])
+    gravity_actuators = [
+        RB.GravityActuator(
+            i,
+            rbs[i]
+        )
+        for i = 1:3
+    ]
     force_actuator = RB.ExternalForceActuator(
         1,
         RB.Signifier(cart,5,5),
-        RB.TimeOperator(f),
+        RB.FeedbackOperator(1),
         [0,1.0,0],
         [0.0],
     )
@@ -254,8 +262,9 @@ function cart_pole(;
         gauges,
         actuators,
         RB.Coalition(
-            structure,gauges,actuators
-        )
+            structure,gauges,actuators,
+        ),
+        control,
     )
     RB.Robot(structure,hub)
 end

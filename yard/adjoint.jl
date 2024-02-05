@@ -16,6 +16,9 @@ using ForwardDiff
 import FiniteDiff
 using Optimization
 using OptimizationOptimJL
+using Lux
+using Random
+using Zygote
 # data
 using TypedTables
 using DataStructures
@@ -24,6 +27,7 @@ using CoordinateTransformations
 using EponymTuples
 using IterTools
 using Unitful
+using ComponentArrays
 # visualize/plot
 import GeometryBasics as GB
 using Makie

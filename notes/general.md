@@ -184,8 +184,10 @@ To do this, use `include`, docs/test/benchmark; use `includet` dev;
   - [ ] value/reward will always depend on position variables: final state or intermediate states
   - [ ] upon convergence, an additional Newton iteration is performed to compute all the derivatives/gradients/jacobians/adjoint and cached
   - [ ] cache differentials, w.r.t action(forces/torques), structual parameters (stiffness/geometry), joints(location, axes), initial conditions, 
-  - [ ] move gravity to actuators
+  - [ ] move gravity to env
   - [ ] higher control law (feedback or not) struct, to include function approximator (NN)
 # Show case
 - [ ] pecking wood bird examples
-- [ ] 走钢丝
+- [ ] 走钢丝 
+- [ ] whip 
+- [ ] similar flexible and rigid-flexible coupling things

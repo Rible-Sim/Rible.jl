@@ -100,8 +100,15 @@ abstract type AbstractMechanicsProblem end
 
 abstract type AbstractDynamicsProblem <: AbstractMechanicsProblem end
 
-struct DynamicsProblem{RobotType,envType,contact_modelType,apparatus_modelType,optionsType} <: AbstractDynamicsProblem
+abstract type AbstractPolicy end
+struct NoPolicy end
+struct ActorPolicy{T} <: AbstractPolicy
+    nt::T
+end
+
+struct DynamicsProblem{RobotType,policyType,envType,contact_modelType,apparatus_modelType,optionsType} <: AbstractDynamicsProblem
     bot::RobotType
+    policy::policyType
     env::envType
     contact_model::contact_modelType
     apparatus_model::apparatus_modelType
@@ -109,35 +116,40 @@ struct DynamicsProblem{RobotType,envType,contact_modelType,apparatus_modelType,o
 end
 
 function DynamicsProblem(bot::Robot;options...)
-    DynamicsProblem(bot::Robot,EmptySpace(),Contactless(),NoTendon(),values(options))
+    DynamicsProblem(bot::Robot,NoPolicy(),EmptySpace(),Contactless(),NoTendon(),values(options))
+end
+
+function DynamicsProblem(bot::Robot,policy::AbstractPolicy;options...)
+    DynamicsProblem(bot::Robot,policy,EmptySpace(),Contactless(),NoTendon(),values(options))
 end
 
 function DynamicsProblem(bot::Robot,contact_model::AbstractContactModel;options...)
-    DynamicsProblem(bot::Robot,EmptySpace(),contact_model,NoTendon(),values(options))
+    DynamicsProblem(bot::Robot,NoPolicy(),EmptySpace(),contact_model,NoTendon(),values(options))
 end
 
 function DynamicsProblem(bot::Robot,env::AbstractContactEnvironment,contact_model::AbstractContactModel;options...)
-    DynamicsProblem(bot::Robot,env,contact_model,NoTendon(),values(options))
+    DynamicsProblem(bot::Robot,NoPolicy(),env,contact_model,NoTendon(),values(options))
 end
 
-struct DynamicsSensitivityProblem{RobotType,envType,contact_modelType,apparatus_modelType,optionsType} <: AbstractDynamicsProblem
+struct DynamicsSensitivityProblem{RobotType,policyType,envType,contact_modelType,apparatus_modelType,optionsType} <: AbstractDynamicsProblem
     bot::RobotType
+    policy::policyType
     env::envType
     contact_model::contact_modelType
     apparatus_model::apparatus_modelType
     options::optionsType
 end
 
-function DynamicsSensitivityProblem(bot::Robot;options...)
-    DynamicsSensitivityProblem(bot::Robot,EmptySpace(),Contactless(),NoTendon(),values(options))
+function DynamicsSensitivityProblem(bot::Robot,policy=NoPolicy();options...)
+    DynamicsSensitivityProblem(bot::Robot,policy,EmptySpace(),Contactless(),NoTendon(),values(options))
 end
 
 function DynamicsSensitivityProblem(bot::Robot,contact_model::AbstractContactModel;options...)
-    DynamicsSensitivityProblem(bot::Robot,EmptySpace(),contact_model,NoTendon(),values(options))
+    DynamicsSensitivityProblem(bot::Robot,NoPolicy(),EmptySpace(),contact_model,NoTendon(),values(options))
 end
 
 function DynamicsSensitivityProblem(bot::Robot,env::AbstractContactEnvironment,contact_model::AbstractContactModel;options...)
-    DynamicsSensitivityProblem(bot::Robot,env,contact_model,NoTendon(),values(options))
+    DynamicsSensitivityProblem(bot::Robot,NoPolicy(),env,contact_model,NoTendon(),values(options))
 end
 
 struct AdjointDynamicsSensitivitySolver{forward_solverType,adjoint_solverType} <: AbstractDynamicsSolver
@@ -145,8 +157,9 @@ struct AdjointDynamicsSensitivitySolver{forward_solverType,adjoint_solverType} <
     adjoint_solver::adjoint_solverType
 end
 
-struct AdjointDynamicsProblem{RobotType,envType,contact_modelType,apparatus_modelType,optionsType,costType} <: AbstractDynamicsProblem
+struct AdjointDynamicsProblem{RobotType,policyType,envType,contact_modelType,apparatus_modelType,optionsType,costType} <: AbstractDynamicsProblem
     bot::RobotType
+    policy::policyType
     env::envType
     contact_model::contact_modelType
     apparatus_model::apparatus_modelType
@@ -155,7 +168,7 @@ struct AdjointDynamicsProblem{RobotType,envType,contact_modelType,apparatus_mode
 end
 
 function AdjointDynamicsProblem(bot::Robot,cost;options...)
-    AdjointDynamicsProblem(bot::Robot,EmptySpace(),Contactless(),NoTendon(),cost,values(options))
+    AdjointDynamicsProblem(bot::Robot,NoPolicy(),EmptySpace(),Contactless(),NoTendon(),cost,values(options))
 end
 
 struct SolverHistory{dataType}
@@ -318,7 +331,7 @@ function prepare_traj!(bot::Robot;tspan,dt,restart=true)
             c.state.active = false
         end
         control_traj[istep] = deepcopy(control_traj[nlaststep])
-        control_traj[istep].u .= get_actions!(bot,traj.t[istep])
+        ## control_traj[istep].u .= get_actions!(bot,traj.t[istep])
     end
     totalstep
 end
