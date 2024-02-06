@@ -44,10 +44,10 @@ material_properties = Table(
 )
 
 function generalized_force!(F,bot::Robot,q,q̇,t,::Nothing;gravity=true,(user_defined_force!)=(F,t)->nothing)
-    generalized_force!(F,bot,nothing,q,q̇,t;gravity,user_defined_force!)
+    generalized_force!(F,bot,NoPolicy(),q,q̇,t;gravity,user_defined_force!)
 end
 
-function generalized_force!(F,bot::Robot,::Nothing,q,q̇,t,;gravity=true,(user_defined_force!)=(F,t)->nothing)
+function generalized_force!(F,bot::Robot,::NoPolicy,q,q̇,t,;gravity=true,(user_defined_force!)=(F,t)->nothing)
     (;structure) = bot
     clear_forces!(structure)
     lazy_update_bodies!(structure,q,q̇)
