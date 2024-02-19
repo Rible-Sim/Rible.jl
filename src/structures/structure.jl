@@ -14,6 +14,23 @@ State Constructor.
 $(TYPEDSIGNATURES)
 """
 function StructureState(bodies,apparatuses,cnt::Connectivity)
+    function s_inner!(s, s_idx, appar::Apparatus{<:ClusterJoint})
+        (;joint) = appar
+        (;sps) = joint
+        length(s_idx)!=0 ? push!(s_idx, length(sps)+s_idx[end]) : push!(s_idx, length(sps))
+        push!(s, reduce(vcat, [[copy(sp.s⁺), copy(sp.s⁻)] for sp in sps]))
+    end
+    function s_inner!(s, s_idx, appar::Apparatus{<:CableJoint})
+    end
+    function s_view(s, s_idx, bodyid)
+        if bodyid > length(s_idx)
+            return Vector{Int64}()
+        elseif bodyid == 1
+            return @view s[1:2s_idx[1]]
+        else
+            return @view s[2s_idx[bodyid-1]+1:2s_idx[bodyid]]
+        end
+    end
     (;numbered,indexed) = cnt
     (;bodyid2sys_loci_coords_idx) = numbered
     (;
@@ -44,7 +61,12 @@ function StructureState(bodies,apparatuses,cnt::Connectivity)
     q̈ = zero(q)
     F = zero(q)
     λ = Vector{T}(undef,num_of_cstr)
-    s = Vector{T}(undef,num_of_add_var)
+    s = []
+    s_idx = Int[]
+    foreach(apparatuses) do appar
+        s_inner!(s, s_idx, appar)
+    end
+    s = reduce(vcat ,s)
     c = get_local_coords(bodies,numbered)
     p = zero(q)
     p̌ = Vector{T}(undef,num_of_free_coords)
@@ -56,7 +78,8 @@ function StructureState(bodies,apparatuses,cnt::Connectivity)
             q̈mem = @view q̈[bodyid2sys_full_coords[bodyid]]
             Fmem = @view F[bodyid2sys_full_coords[bodyid]]
             λmem = @view λ[bodyid2sys_intrinsic_cstr_idx[bodyid]]
-            smem = @view s[Int[]]
+            smem = s_view(s, s_idx, bodyid)
+            # smem = @view s[Int[]]
             cmem = @view c[bodyid2sys_loci_coords_idx[bodyid]]
             pmem = zero(p[bodyid2sys_full_coords[bodyid]])
             p̌mem = zero(p[bodyid2sys_free_coords[bodyid]])
@@ -400,6 +423,57 @@ function make_cstr_jacobian(structure::AbstractStructure,q0::AbstractVector)
         cstr_jacobian(structure,q,c)
     end
     inner_cstr_jacobian
+end
+
+struct FischerBurmeister{T}
+    ϵ::T
+    X₁::T
+    X₂::T
+end
+FischerBurmeister() = FischerBurmeister(1e-14,1.0,1.0)
+function (f::FischerBurmeister)(x,y)
+    √((x/f.X₁)^2+(y*f.X₂)^2+2f.ϵ^2) - (x/f.X₁+y*f.X₂)
+end
+
+function build_ψ(structure::AbstractStructure)
+    (;apparatuses) = structure
+    nclustercables = 0
+    ns = 0
+    FB = FischerBurmeister(1e-14, 10., 10.)
+    foreach(apparatuses) do appar
+        if isa(appar, Apparatus{<:ClusterJoint})
+            nclustercables += 1
+            ns += length(appar.joint.sps)
+        end
+    end
+    function _inner_ψ(s̄)
+        ψ = Vector{eltype(s̄)}(undef,2ns)
+        ψ⁺ = @view ψ[begin:2:end]
+        ψ⁻ = @view ψ[begin+1:2:end]
+        s⁺ = @view s̄[begin:2:end]
+        s⁻ = @view s̄[begin+1:2:end]
+        is = 0
+        foreach(apparatuses) do appar
+            if isa(appar, Apparatus{<:ClusterJoint})
+                (;sps) = appar.joint
+                (;force) = appar
+                nsi = length(sps)
+                for (i, sp) in enumerate(sps)
+                    ζ⁺ = force[i+1].force.state.tension/sp.α - force[i].force.state.tension
+                    ζ⁻ = force[i].force.state.tension - sp.α*force[i+1].force.state.tension
+                    ψ⁺[is+i] = FB(ζ⁺, s⁺[is+i])
+                    ψ⁻[is+i] = FB(ζ⁻, s⁻[is+i])
+                end
+                is += nsi
+            end
+        end
+        ψ
+    end
+
+    function inner_ψ(s̄)
+        _inner_ψ(s̄)
+    end
+    inner_ψ
 end
 
 function build_F̌(st,bodyid,pid,f)

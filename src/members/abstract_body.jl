@@ -25,14 +25,14 @@ function strain!(F,state::AbstractBodyState,cache::AbstractBodyCache) end
 Nonminimal Coordinates State Type.
 $(TYPEDEF)
 """
-mutable struct NonminimalCoordinatesState{T,qT,qviewT,pT}
+mutable struct NonminimalCoordinatesState{T,qT,qviewT,pT,sT}
     t::T
     q::qT
     q̇::qT
     q̈::qT
     F::qT
     λ::qT
-    s::qT
+    s::sT
     q̌::qviewT
     q̌̇::qviewT
     q̌̈::qviewT
@@ -55,7 +55,7 @@ mutable struct NonminimalCoordinatesState{T,qT,qviewT,pT}
         q̃̇ = @view q̇[pres_idx]
         q̃̈ = @view q̈[pres_idx]
         F̌ = @view F[free_idx]
-        new{typeof(t),typeof(q),typeof(q̌),typeof(p)}(t,q,q̇,q̈,F,λ,s,q̌,q̌̇,q̌̈,q̃,q̃̇,q̃̈,F̌,p,p̌,c)
+        new{typeof(t),typeof(q),typeof(q̌),typeof(p),typeof(s)}(t,q,q̇,q̈,F,λ,s,q̌,q̌̇,q̌̈,q̃,q̃̇,q̃̈,F̌,p,p̌,c)
     end
 end
 

@@ -30,7 +30,9 @@ function connect_clusters(bodies, cluster_sps, cluster_segs, cms)
     _, nb = check_id_sanity(bodies)
     rets = []
     clusterID = 0
-    for (cluster_seg, cm) in zip(cluster_segs, cms)
+    # for (cluster_seg, cm) in zip(cluster_segs, cms)
+    for (idx, cm) in enumerate(cms)
+        cluster_seg = cluster_segs[idx]
         @assert size(cm, 2) == 4
         rbs_sorted = sort(bodies)
         ret = []
@@ -43,10 +45,11 @@ function connect_clusters(bodies, cluster_sps, cluster_segs, cms)
                 Hen2Egg(Signifier(rbs_sorted[rbid1], pid1), Signifier(rbs_sorted[rbid2], pid2)),
                 0,
             )
+            # TO FIX
             segs = Apparatus(
                 j,
                 joint,
-                cluster_seg,
+                deepcopy(cluster_seg),
                 0,
                 Int[],
                 Int[]

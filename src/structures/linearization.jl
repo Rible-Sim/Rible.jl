@@ -844,6 +844,13 @@ function build_∂Q̌∂s̄(st)
     return ∂Q̌∂s̄'
 end
 
+function build_ζ()
+end
+
+function build_∂ζ∂s̄(∂ζ∂s̄, st)
+end
+
+
 function build_Ǩ(st)
     _,λ = check_static_equilibrium_output_multipliers(st)
     build_Ǩ(st,λ)

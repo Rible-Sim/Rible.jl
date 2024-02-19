@@ -97,14 +97,9 @@ function MakieCore.plot!(viz::Viz{Tuple{S}};
     n_segs = length(cluster_cable_ob[].force)
     for i in 1:n_segs
         seg_ob = lift(cluster_cable_ob) do seg
-            iseg = seg.force[i].joint.hen2egg
-            pid1 = iseg.hen.pid
-            pid2 = iseg.egg.pid
-            point_start = iseg.hen.body.prop.loci[pid1].position+iseg.hen.body.state.origin_frame.position |> GB.Point
-            point_stop = iseg.egg.body.prop.loci[pid2].position+iseg.egg.body.state.origin_frame.position |> GB.Point
-            # point_start = seg.force[i].force.state.start |> GB.Point
-            # point_stop = seg.force[i].force.state.stop |> GB.Point
-            @show point_start, point_stop
+            iseg = seg.force[i].force
+            point_start = iseg.state.start |> GB.Point
+            point_stop = iseg.state.stop |> GB.Point
             [(point_start, point_stop)]
         end
         linestyle_ob = :solid

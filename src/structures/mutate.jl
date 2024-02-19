@@ -70,6 +70,39 @@ function update_apparatus!(st::AbstractStructure, appar::Apparatus{<:CableJoint}
     f_egg .-= force.state.force
 end
 
+function update_apparatus!(st::AbstractStructure, appar::Apparatus{<:ClusterJoint})
+    (;id, joint, force) = appar
+    (;sps) = joint
+    nAppar = length(appar.force)
+    for (idx, iappar) in enumerate(force)
+        ijoint = iappar.joint
+        iforce = iappar.force
+        hen = ijoint.hen2egg.hen
+        egg = ijoint.hen2egg.egg
+        locus_state_hen = hen.body.state.loci_states[hen.pid]
+        locus_state_egg = egg.body.state.loci_states[egg.pid]
+        p_hen = locus_state_hen.frame.position
+        ṗ_hen = locus_state_hen.frame.velocity
+        f_hen = locus_state_hen.force
+        p_egg = locus_state_egg.frame.position
+        ṗ_egg = locus_state_egg.frame.velocity
+        f_egg = locus_state_egg.force
+        if (idx==1)
+            s1 = 0
+            s2 = sps[idx].s
+        elseif (idx==nAppar)
+            s1 = sps[nAppar-1].s
+            s2 = 0
+        else
+            s1 = sps[idx-1].s
+            s2 = sps[idx].s
+        end
+        update!(iforce, p_hen, p_egg, ṗ_hen, ṗ_egg, s1, s2)
+        f_hen .+= iforce.state.force
+        f_egg .-= iforce.state.force
+    end
+end
+
 function update_apparatus!(st::AbstractStructure, appar::Apparatus{<:PrototypeJoint,<:RotationalSpringDamper})
     (;indexed,numbered) = st.connectivity
     (;system) = st.state
@@ -114,6 +147,25 @@ function update_apparatus!(st::AbstractStructure, appar::Apparatus{<:PrototypeJo
     for i in mask
         torque = torques[i]
         system.F̌[sys_free_coords_idx] .-= angles_jacobian[i,free_idx]*torque
+    end
+end
+
+function update_s!(st::AbstractStructure, s̄)
+    (;apparatuses) = st
+    st.state.system.s .= s̄
+    foreach(apparatuses) do appar 
+        if isa(appar, Apparatus{<:ClusterJoint})
+            (;sps) = appar.joint
+            appar.joint.sps[1].s = 1000
+            for (id, sp) in enumerate(sps)
+                # @show id, s̄[2id-1]
+                # @show sp.s
+                sp.s⁺ = s̄[2id-1]
+                sp.s⁻ = s̄[2id]
+                sp.s = sp.s⁺ - sp.s⁻
+                # @show sp.s
+            end
+        end
     end
 end
 

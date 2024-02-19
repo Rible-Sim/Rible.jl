@@ -21,26 +21,29 @@ function generate_cache(
     (;M,M⁻¹,M̌,M̌⁻¹,Ḿ,M̄)= build_mass_matrices(structure)
     A = make_cstr_jacobian(structure)
     Φ = make_cstr_function(structure)
-    F!(F,q,q̇,t) = generalized_force!(F,bot,policy,q,q̇,t;gravity=options.gravity)
+    ψ = build_ψ(structure)
+    F!(F,q,s,q̇,t) = generalized_force!(F,bot,policy,q,s,q̇,t;gravity=options.gravity)
     Jac_F!(∂F∂q̌,∂F∂q̌̇,q,q̇,t) = generalized_force_jacobian!(∂F∂q̌,∂F∂q̌̇,bot,policy,q,q̇,t)
     q̌0 = traj.q̌[begin]
     λ0 = traj.λ[begin]
     q̇0 = traj.q̇[begin]
     q̇0 = traj.q̇[begin]
     p̌0 = traj.p̌[begin] .= Ḿ*q̇0
+    s0 = traj.s[begin]
     T = eltype(q̌0)
     nq̌ = length(q̌0)
     nλ = length(λ0)
+    ns = length(s0)
     ∂F∂q̌ = zeros(T,nq̌,nq̌)
     ∂F∂q̌̇ = zeros(T,nq̌,nq̌)
-    nx = nq̌ + nλ
-    xₖ = vcat(q̌0,λ0)
+    nx = nq̌ + nλ + ns
+    xₖ = vcat(q̌0,λ0,s0)
     Res = zero(xₖ)
     Jac = Res*transpose(Res)
     Zhong06_Constant_Mass_Cluster_Cables_Cache(solver,
         @eponymtuple(
             F!,Jac_F!,
-            Ḿ,M̌,M̄,M̌⁻¹,A,Φ,
+            Ḿ,M̌,M̄,M̌⁻¹,A,Φ,ψ,
             ∂F∂q̌,∂F∂q̌̇,
             nq̌,nλ,nx,
             xₖ,
@@ -63,7 +66,7 @@ function solve!(sim::Simulator,cache::Zhong06_Constant_Mass_Cluster_Cables_Cache
     (;traj) = bot
     (;
         F!,Jac_F!,
-        Ḿ,M̌,M̄,M̌⁻¹,A,Φ,
+        Ḿ,M̌,M̄,M̌⁻¹,A,Φ,ψ,
         ∂F∂q̌,∂F∂q̌̇,
         nq̌,nλ,nx,
         xₖ,
@@ -74,24 +77,27 @@ function solve!(sim::Simulator,cache::Zhong06_Constant_Mass_Cluster_Cables_Cache
     mass_norm = mr
     h = dt
     T = get_numbertype(bot)
-    function make_Res_stepk(qₖ,q̌ₖ,λₖ,qₖ₋₁,p̌ₖ₋₁,F̌,Aᵀₖ₋₁,tₖ₋₁)
+    function make_Res_stepk(qₖ,q̌ₖ,λₖ,sₖ,qₖ₋₁,p̌ₖ₋₁,F̌,Aᵀₖ₋₁,tₖ₋₁)
         @inline @inbounds function inner_Res_stepk!(Res,x)
             q̌ₖ .= x[   1:nq̌   ]
             λₖ .= x[nq̌+1:nq̌+nλ]
+            sₖ .= x[nq̌+nλ+1:nx]
             qₘ = (qₖ.+qₖ₋₁)./2
             q̇ₘ = (qₖ.-qₖ₋₁)./h
             tₘ = tₖ₋₁+h/2
-            F!(F̌,qₘ, q̇ₘ, tₘ)
+            F!(F̌,qₘ, sₖ, q̇ₘ, tₘ)
             Res[   1:nq̌   ] .= Ḿ*(qₖ.-qₖ₋₁) .-
                                h.*p̌ₖ₋₁ .-
                                (h^2)/2 .*F̌ .+
                                mass_norm.*Aᵀₖ₋₁*λₖ
             Res[nq̌+1:nq̌+nλ] .= mass_norm.*Φ(qₖ)
+            Res[nq̌+nλ+1:nx] .= ψ(sₖ)
         end
     end
 
-    function Jac_stepk!(Jac,x,qₖ,q̌ₖ,qₖ₋₁,∂F∂q̌,∂F∂q̌̇,Aᵀₖ₋₁,tₖ₋₁)
+    function Jac_stepk!(Jac,x,qₖ,sₖ,q̌ₖ,qₖ₋₁,∂F∂q̌,∂F∂q̌̇,Aᵀₖ₋₁,tₖ₋₁)
         q̌ₖ .= x[1:nq̌]
+        sₖ .= x[nq̌+nλ+1:end]
         qₘ = (qₖ.+qₖ₋₁)./2
         q̇ₘ = (qₖ.-qₖ₋₁)./h
         tₘ = tₖ₋₁+h/2
@@ -116,10 +122,12 @@ function solve!(sim::Simulator,cache::Zhong06_Constant_Mass_Cluster_Cables_Cache
         tₖ₋₁ = traj.t[timestep]
         tₖ   = traj.t[timestep+1]
         qₖ₋₁ = traj.q[timestep]
+        sₖ₋₁ = traj.s[timestep]
         q̌ₖ₋₁ = traj.q̌[timestep]
         q̌̇ₖ₋₁ = traj.q̌̇[timestep]
         p̌ₖ₋₁ = traj.p̌[timestep] 
         qₖ = traj.q[timestep+1]
+        sₖ = traj.s[timestep+1]
         q̌ₖ = traj.q̌[timestep+1]
         q̌̇ₖ = traj.q̌̇[timestep+1]
         q̃̇ₖ = traj.q̃̇[timestep+1]
@@ -128,13 +136,16 @@ function solve!(sim::Simulator,cache::Zhong06_Constant_Mass_Cluster_Cables_Cache
         F̌ = traj.F̌[timestep+1]
         xₖ[   1:nq̌]    .= q̌ₖ₋₁ .+ h.*q̌̇ₖ₋₁
         xₖ[nq̌+1:nq̌+nλ] .= 0
+        xₖ[nq̌+nλ+1:nx] .= sₖ₋₁
         Aᵀₖ₋₁ = transpose(A(qₖ₋₁))
-        Res_stepk! = make_Res_stepk(qₖ,q̌ₖ,λₖ,qₖ₋₁,p̌ₖ₋₁,F̌,Aᵀₖ₋₁,tₖ₋₁)
+        Res_stepk! = make_Res_stepk(qₖ,q̌ₖ,λₖ,sₖ₋₁,qₖ₋₁,p̌ₖ₋₁,F̌,Aᵀₖ₋₁,tₖ₋₁)
         isconverged = false
         normRes = typemax(T)
-        if false #Jac_F! isa Missing
+        if true #Jac_F! isa Missing
             dfk = OnceDifferentiable(Res_stepk!,xₖ,Res)
+            @show "begin"
             Res_stepk_result = nlsolve(dfk, xₖ; ftol, iterations=maxiters, method=:newton)
+            @show "end"
             isconverged = converged(Res_stepk_result)
             iteration_break = Res_stepk_result.iterations
             Res_stepk_result.iterations
@@ -183,6 +194,7 @@ function solve!(sim::Simulator,cache::Zhong06_Constant_Mass_Cluster_Cables_Cache
         end
         q̌ₖ .= xₖ[   1:nq̌   ]
         λₖ .= xₖ[nq̌+1:nq̌+nλ]
+        sₖ .= xₖ[nq̌+nλ+1:nx]
         Momentum_k!(p̌ₖ,p̌ₖ₋₁,qₖ,qₖ₋₁,λₖ,Ḿ,A,Aᵀₖ₋₁,mass_norm,h)
         q̌̇ₖ .= M̌⁻¹*(p̌ₖ.-M̄*q̃̇ₖ )
         #---------Step k finisher-----------

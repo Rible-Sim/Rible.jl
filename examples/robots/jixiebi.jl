@@ -178,8 +178,8 @@ function build_jixiebi(n; ks1=80.0, restlens1=50.0,
     spring_dampers = [(i <= 12n) ? RB.DistanceSpringDamper3D(restlens1, ks1, 0.02) : RB.DistanceSpringDamper3D(restlens2, ks2, 0.02) for i in 1:nstrings]
 
     ncluster = 1
-    cluster_segs = [RB.DistanceSpringDamperSegment(restlens2, ks2) for _ in 1:5n]
-    cluster_sps = [StructArray([RB.SlidingPoint(0.0) for _ in 1:5n-1]) for _ in 1:ncluster]
+    cluster_segs = [RB.DistanceSpringDamperSegment(restlens2, ks2, prestress=100.0) for _ in 1:5n]
+    cluster_sps = [[RB.SlidingPoint(0.02) for i in 1:5n-1] for _ in 1:ncluster]
 
     matrix_cnt_raw = Vector{Matrix{Int}}()
 

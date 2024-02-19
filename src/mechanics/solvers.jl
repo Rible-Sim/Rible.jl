@@ -136,10 +136,6 @@ function DynamicsProblem(bot::Robot,contact_model::AbstractContactModel;options.
     DynamicsProblem(bot::Robot,NoPolicy(),GravitySpace(true),contact_model,Naive(),values(options))
 end
 
-function DynamicsProblem(bot::Robot,contact_model::AbstractContactModel;options...)
-    DynamicsProblem(bot::Robot,NoPolicy(),GravitySpace(true),contact_model,Naive(),values(options))
-end
-
 function DynamicsProblem(bot::Robot,env::AbstractContactEnvironment,contact_model::AbstractContactModel;options...)
     DynamicsProblem(bot::Robot,NoPolicy(),env,contact_model,Naive(),values(options))
 end

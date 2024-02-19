@@ -233,9 +233,33 @@ struct DistanceSpringDamperSegment{N,T}
 end
 
 function DistanceSpringDamperSegment( original_restlen, k; c=zero(k), prestress=zero(k))
-    direction = MVector{2}(one(k), zero(k))
+    direction = MVector{3}(one(k), zero(k), zero(k))
     state = DistanceSpringDamperState(original_restlen, direction)
     DistanceSpringDamperSegment( k, c, prestress, original_restlen, state)
+end
+
+"""
+$(TYPEDSIGNATURES)
+"""
+function update!(cab::DistanceSpringDamperSegment, p1, p2, ṗ1, ṗ2, s1, s2)
+	(;k, c, state, prestress) = cab
+    state.start,     state.stop = p1, p2
+    state.start_vel, state.stop_vel = ṗ1, ṗ2
+	l = p2 - p1
+	l̇ = ṗ2 - ṗ1
+	state.length = norm(l)
+	state.direction = l/state.length
+	state.lengthdot = (transpose(state.direction)*l̇)
+	deformation = state.length - state.restlen - s2 + s1
+	f = k*deformation + c*state.lengthdot + prestress
+    if deformation < 0
+        state.tension = 0.0
+    elseif f < 0
+        state.tension = 0.0
+    else
+        state.tension = f
+    end
+	state.force .= state.tension.*state.direction
 end
 
 function calculate_α(μ,θ)
