@@ -45,11 +45,11 @@ function connect_clusters(bodies, cluster_sps, cluster_segs, cms)
                 Hen2Egg(Signifier(rbs_sorted[rbid1], pid1), Signifier(rbs_sorted[rbid2], pid2)),
                 0,
             )
-            # TO FIX
             segs = Apparatus(
                 j,
                 joint,
                 deepcopy(cluster_seg),
+                # INFO 2: 这里需要使用deepcopy，如果不使用deepcopy会发现所有的滑动绳索的所有seg都指向同一个seg
                 0,
                 Int[],
                 Int[]

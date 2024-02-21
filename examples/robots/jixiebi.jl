@@ -180,6 +180,7 @@ function build_jixiebi(n; ks1=80.0, restlens1=50.0,
     ncluster = 1
     cluster_segs = [RB.DistanceSpringDamperSegment(restlens2, ks2, prestress=100.0) for _ in 1:5n]
     cluster_sps = [[RB.SlidingPoint(0.02) for i in 1:5n-1] for _ in 1:ncluster]
+    #INFO 1: 之前使用了StructArrays，但是在后面发现无法更新sps里面的数据，所以改用了普通的数组
 
     matrix_cnt_raw = Vector{Matrix{Int}}()
 

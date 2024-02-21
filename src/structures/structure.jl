@@ -79,6 +79,9 @@ function StructureState(bodies,apparatuses,cnt::Connectivity)
             Fmem = @view F[bodyid2sys_full_coords[bodyid]]
             λmem = @view λ[bodyid2sys_intrinsic_cstr_idx[bodyid]]
             smem = s_view(s, s_idx, bodyid)
+            #INFO 4: 借用了已经存在的smem来表示滑动绳索的偏移量，实际上这里存储的是s̄，也就是s⁺₁,s⁻₁,...s⁺ₙ,s⁻ₙ，
+            # 但是s实际上和member没有关系，也就是和刚体的数量没有关系，所以只是暂时存储在这里，
+            # 不过实际上这里存储的数据没有什么作用，因为这里的数据不是引用（不知道怎么弄成view)而是复制。
             # smem = @view s[Int[]]
             cmem = @view c[bodyid2sys_loci_coords_idx[bodyid]]
             pmem = zero(p[bodyid2sys_full_coords[bodyid]])
@@ -455,6 +458,7 @@ function build_ψ(structure::AbstractStructure)
         is = 0
         foreach(apparatuses) do appar
             if isa(appar, Apparatus{<:ClusterJoint})
+                #INFO 3: 因为对apparatuses使用了typeSortedCollection，所以我需要对所有的apparatuses进行遍历，然后用if判断来取出滑动绳索，后面涉及到滑动绳索的情况都基本这样。
                 (;sps) = appar.joint
                 (;force) = appar
                 nsi = length(sps)

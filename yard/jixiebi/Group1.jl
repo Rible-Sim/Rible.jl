@@ -18,6 +18,27 @@ includet(joinpath(pathof(RB),"../../examples/robots/jixiebi.jl")) #jl
 bot = build_jixiebi(4)
 plot_traj!(bot)
 
+tspan = (0.0,1.0)
+dt = 1e-2
+
+RB.solve!(
+    RB.DynamicsProblem(bot,RB.EulerEytelwein()),
+    RB.DynamicsSolver(
+        RB.Zhong06(),
+        RB.MonolithicApparatusSolver(
+            RB.SmoothedFischerBurmeister()
+            # 没有使用，只用来多重派发
+        )
+    );
+    tspan,
+    dt,
+    ftol=1e-7,verbose=true
+)
+plot_traj!(bot)
+
+
+# ----------------------------------------------------------------
+
 s0 = 1:38
 RB.update_s!(bot.structure, s0)
 
@@ -37,9 +58,6 @@ foreach(bot.structure.apparatuses) do appar
 end
 
 
-tspan = (0.0,1.0)
-dt = 1e-2
-
 # 视滑动绳索为普通绳索
 RB.solve!(
     RB.DynamicsProblem(bot,),
@@ -53,19 +71,6 @@ RB.solve!(
 
 plot_traj!(bot)
 
-# 派发到"dynamics_solvers/Zhong06_family/Zhong06_constant_mass_cluster_cables.jl")，目前和上面的算法一样
-RB.solve!(
-    RB.DynamicsProblem(bot,RB.EulerEytelwein()),
-    RB.DynamicsSolver(
-        RB.Zhong06(),
-        RB.MonolithicApparatusSolver(
-            RB.SmoothedFischerBurmeister()
-        )
-    );
-    tspan,
-    dt,
-    ftol=1e-7,verbose=true
-)
 
 #todo 将原来的算法src/mechanics/dynamics_solvers/Zhong06_family/Zhong06_sliding_cable_FB.jl适配到Zhong06_constant_mass_cluster_cables.jl的代码中
 

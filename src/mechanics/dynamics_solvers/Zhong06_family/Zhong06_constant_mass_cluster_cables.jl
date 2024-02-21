@@ -143,9 +143,7 @@ function solve!(sim::Simulator,cache::Zhong06_Constant_Mass_Cluster_Cables_Cache
         normRes = typemax(T)
         if true #Jac_F! isa Missing
             dfk = OnceDifferentiable(Res_stepk!,xₖ,Res)
-            @show "begin"
             Res_stepk_result = nlsolve(dfk, xₖ; ftol, iterations=maxiters, method=:newton)
-            @show "end"
             isconverged = converged(Res_stepk_result)
             iteration_break = Res_stepk_result.iterations
             Res_stepk_result.iterations

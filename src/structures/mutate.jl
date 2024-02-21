@@ -153,6 +153,7 @@ end
 function update_s!(st::AbstractStructure, s̄)
     (;apparatuses) = st
     st.state.system.s .= s̄
+    #INFO 5: 因为上面不是引用，所以还需要下面的代码
     foreach(apparatuses) do appar 
         if isa(appar, Apparatus{<:ClusterJoint})
             (;sps) = appar.joint
