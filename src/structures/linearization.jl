@@ -683,10 +683,31 @@ function build_tangent_stiffness_matrix!(∂Q̌∂q̌,st)
                 J̌[:,mfree_hen] .-= C_hen[:,free_idx_hen]
                 ∂Q̌∂q̌ .-= transpose(J̌)*D*J̌
             end
-            # ∂Q̌∂q̌_full[mfree_egg,mfree_egg] .+= transpose(C_egg)*D*C_egg
-            # ∂Q̌∂q̌_full[mfree_hen,mfree_egg] .-= transpose(C_hen)*D*C_egg
-            # ∂Q̌∂q̌_full[mfree_egg,mfree_hen] .-= transpose(C_egg)*D*C_hen
-            # ∂Q̌∂q̌_full[mfree_hen,mfree_hen] .+= transpose(C_hen)*D*C_hen
+        elseif appar.joint isa ClusterJoint
+            foreach(appar.force) do seg
+                (;hen, egg) = seg.joint.hen2egg
+                body_hen = hen.body
+                body_egg = egg.body
+                C_hen = body_hen.cache.Cps[hen.pid]
+                C_egg = body_egg.cache.Cps[egg.pid]
+                free_idx_hen = body_hen.coords.free_idx
+                free_idx_egg = body_egg.coords.free_idx
+                mfree_hen = bodyid2sys_free_coords[body_hen.prop.id]
+                mfree_egg = bodyid2sys_free_coords[body_egg.prop.id]
+                (;k, c, state) = seg.force
+                (;direction, tension) = state
+                l = state.length
+                l̇ = state.lengthdot
+                D .= direction*transpose(direction)
+                density = tension / l
+                β = c*l̇/l + density
+                D .*= k - β
+                D .+= β .* Im
+                J̌ .= 0
+                J̌[:,mfree_egg] .+= C_egg[:,free_idx_egg]
+                J̌[:,mfree_hen] .-= C_hen[:,free_idx_hen]
+                ∂Q̌∂q̌ .-= transpose(J̌)*D*J̌
+            end
         elseif appar.force isa RotationalSpringDamper
             (;
                 num_of_cstr,

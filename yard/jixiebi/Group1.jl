@@ -18,6 +18,13 @@ includet(joinpath(pathof(RB),"../../examples/robots/jixiebi.jl")) #jl
 bot = build_jixiebi(4)
 plot_traj!(bot)
 
+nq̌ = length(bot.traj.q̌[1])
+temp = zeros(nq̌, nq̌)
+temp1 = zeros(nq̌, nq̌)
+RB.build_tangent_stiffness_matrix!(temp1, bot.structure)
+
+
+
 tspan = (0.0,1.0)
 dt = 1e-2
 
