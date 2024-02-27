@@ -30,9 +30,8 @@ function connect_clusters(bodies, cluster_sps, cluster_segs, cms)
     _, nb = check_id_sanity(bodies)
     rets = []
     clusterID = 0
-    # for (cluster_seg, cm) in zip(cluster_segs, cms)
-    for (idx, cm) in enumerate(cms)
-        cluster_seg = cluster_segs[idx]
+    num_segs = 0
+    for (cluster_seg, cm) in zip(cluster_segs, cms)
         @assert size(cm, 2) == 4
         rbs_sorted = sort(bodies)
         ret = []
@@ -48,15 +47,15 @@ function connect_clusters(bodies, cluster_sps, cluster_segs, cms)
             segs = Apparatus(
                 j,
                 joint,
-                deepcopy(cluster_seg),
-                # INFO 2: 这里需要使用deepcopy，如果不使用deepcopy会发现所有的滑动绳索的所有seg都指向同一个seg
-                0,
+                cluster_seg[j],
+                num_segs,
                 Int[],
                 Int[]
             )
             push!(ret, segs)
         end
-        push!(rets, Apparatus(clusterID, ClusterJoint(cluster_sps[clusterID], 0), ret, 0, Int[], Int[]))
+        num_segs += size(cm, 1)
+        push!(rets, Apparatus(clusterID, ClusterJoint(cluster_sps[clusterID], 0), ret, 2j-2, Int[], Int[]))
     end
     rets
 end

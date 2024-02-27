@@ -802,73 +802,240 @@ function build_tangent_damping_matrix!(∂Q̌∂q̌̇,st)
 end
 
 function build_∂Q̌∂s̄(st)
-    (;connectivity) = st
-    (;cables,clustercables) = st.apparatuses
-    nclustercables = length(clustercables)
-    (;tensioned,indexed) = connectivity
-    (;num_of_full_coords,num_of_free_coords,sys_free_coords_idx,bodyid2sys_free_coords,bodyid2sys_full_coords) = indexed
-    ns = sum([length(clustercables[i].sps) for i in 1:nclustercables])
+    (; bodies, apparatuses, connectivity) = st
+    (; indexed, numbered) = connectivity
+    (;
+        num_of_free_coords,
+        bodyid2sys_free_coords,
+        bodyid2sys_full_coords,
+        apparid2sys_free_coords_idx
+    ) = indexed
+    ns = 0
+    nc = 0
+    foreach(apparatuses) do appar
+        if isa(appar.joint, ClusterJoint)
+            ns += length(appar.joint.sps)
+            nc += 1
+        end
+    end
     T = get_numbertype(st)
     num_of_dim = get_num_of_dims(st)
-    ∂Q̌∂s̄ = zeros(T,2ns,num_of_free_coords)
+    ∂Q̌∂s̄ = zeros(T, 2ns, num_of_free_coords)
     D = zeros(T, num_of_dim)
     lkn = zeros(T, 2ns, num_of_dim)
-    # Im = Symmetric(SMatrix{num_of_dim,num_of_dim}(one(T)*I))
-    J̌ = zeros(T,num_of_dim,num_of_free_coords)
+    J̌ = zeros(T, num_of_dim, num_of_free_coords)
 
     N_list = Vector{SparseMatrixCSC{Float64,Int64}}()
-    kc = Vector{Float64}()
-    for (cid,clustercable) in enumerate(clustercables)
-        (;segs) = clustercable
-        nsegs = length(segs)
-        for (sid, seg) in enumerate(segs)
-            push!(kc, seg.k)
+    kc = zeros(T, ns + nc)
+    foreach(apparatuses) do appar
+        if isa(appar.joint, ClusterJoint)
+            (; force) = appar
+            nsegs = length(force)
+            for seg in force
+                (; id, num_of_add_var) = seg
+                kc[id+num_of_add_var] = seg.force.k
+            end
+            N = zeros(Float64, nsegs, 2nsegs - 2)
+            N[1, 1:2] = [1 -1]
+            N[end, end-1:end] = [-1 1]
+            for i in 2:nsegs-1
+                N[i, 2i-3:2i] = [-1 1 1 -1]
+            end
+            push!(N_list, N)
         end
-        N = sparse(zeros(Float64, nsegs, 2nsegs-2))
-        N[1,1:2]=[1 -1]; N[end,end-1:end]=[-1 1]
-        for i in 2:nsegs-1
-            N[i, 2i-3:2i] = [-1 1 1 -1]
-        end
-        push!(N_list, N)
     end
-    N = reduce(blockdiag,N_list)
-    i = 0; j = 0
-    foreach(tensioned.clustered) do clustercable
-        i += 1
-        foreach(clustercable) do cc
-            j += 1
-            cable = clustercables[i].segs[cc.id]
-            (;hen,egg) = cc
-            rb1 = hen.body
-            rb2 = egg.body
-            C1 = rb1.state.cache.Cps[hen.pid]
-            C2 = rb2.state.cache.Cps[egg.pid]
-            free_idx1 = rb1.state.cache.free_idx
-            free_idx2 = rb2.state.cache.free_idx
-            mfree1 = bodyid2sys_free_coords[rb1.prop.id]
-            mfree2 = bodyid2sys_free_coords[rb2.prop.id]
-            (;k,c,state) = cable
-            (;direction,tension) = state
-            if tension == 0
-                ∂Q̌∂s̄ .-= 0
-            else
-                D .= direction
-                J̌ .= 0
-                J̌[:,mfree2] .+= C2[:,free_idx2]
-                J̌[:,mfree1] .-= C1[:,free_idx1]
-                kN = kc[j] .* N[j,:]
-                @tullio lkn[k, l] = D[l] * kN[k]
-                ∂Q̌∂s̄ .-= lkn * J̌
+    N = reduce(blockdiag, N_list)
+    foreach(apparatuses) do appar
+        if isa(appar.joint, ClusterJoint)
+            (; force) = appar
+            foreach(force) do seg
+                idx = seg.id + seg.num_of_add_var
+                (; hen, egg) = seg.joint.hen2egg
+                body_hen = hen.body
+                body_egg = egg.body
+                C_hen = body_hen.cache.Cps[hen.pid]
+                C_egg = body_egg.cache.Cps[egg.pid]
+                free_idx_hen = body_hen.coords.free_idx
+                free_idx_egg = body_egg.coords.free_idx
+                mfree_hen = bodyid2sys_free_coords[body_hen.prop.id]
+                mfree_egg = bodyid2sys_free_coords[body_egg.prop.id]
+                (; k, c, state) = seg.force
+                (; direction, tension) = state
+                if tension == 0
+                    ∂Q̌∂s̄ .-= 0
+                else
+                    D .= direction
+                    J̌ .= 0
+                    J̌[:, mfree_egg] .+= C_egg[:, free_idx_egg]
+                    J̌[:, mfree_hen] .-= C_hen[:, free_idx_hen]
+                    kN = kc[idx] .* N[idx, :]
+                    @tullio lkn[k, l] = D[l] * kN[k]
+                    ∂Q̌∂s̄ .-= lkn * J̌
+                end
             end
         end
     end
     return ∂Q̌∂s̄'
 end
 
-function build_ζ()
+function build_ζ(st)
+    (; apparatuses, connectivity) = st
+    (; apparid2sys_add_var_idx) = connectivity.indexed
+    ns = 0
+    foreach(apparatuses) do appar
+        if isa(appar.joint, ClusterJoint)
+            ns += length(appar.joint.sps)
+        end
+    end
+    ζ = Vector{Float64}(undef, 2ns)
+    ζ⁺ = @view ζ[begin:2:end]
+    ζ⁻ = @view ζ[begin+1:2:end]
+    foreach(apparatuses) do appar
+        if isa(appar.joint, ClusterJoint)
+            (; force, joint, id) = appar
+            (; sps) = joint
+            nsp = length(sps)
+            idx_begin = Int((apparid2sys_add_var_idx[id][1]-1) / 2)
+            for i in 1:nsp
+                ζ⁺[idx_begin+i] = force[i+1].force.state.tension / sps[i].α - force[i].force.state.tension
+                ζ⁻[idx_begin+i] = force[i].force.state.tension - sps[i].α * force[i+1].force.state.tension
+            end
+        end
+    end
+    return ζ
 end
 
-function build_∂ζ∂s̄(∂ζ∂s̄, st)
+function get_clusterA(st)
+    (; apparatuses) = st
+    nc = 0
+    foreach(apparatuses) do appar
+        if isa(appar.joint, ClusterJoint)
+            nc += 1
+        end
+    end
+    A_list = [Matrix{Float64}(undef, 1, 1) for _ in 1:nc]
+    foreach(apparatuses) do appar
+        if isa(appar.joint, ClusterJoint)
+            (; force, joint, id) = appar
+            (; sps) = joint
+            n = length(sps)
+            ap = [-force[i+1].force.k for i in 1:n-1]
+            ap0 = [force[i].force.k + force[i+1].force.k/sps[i].α for i in 1:n]
+            ap1 = [-force[i+1].force.k/sps[i].α for i in 1:n-1]
+            an0 = [force[i].force.k + force[i+1].force.k*sps[i].α for i in 1:n]
+            an1 = [-force[i+1].force.k*sps[i].α for i in 1:n-1]
+            A⁺ = diagm(-1=>ap, 0=>ap0, 1=>ap1)
+            A⁻ = diagm(-1=>ap, 0=>an0, 1=>an1)
+            A = [A⁺ -A⁺; -A⁻ A⁻]
+            A_list[id] = A
+        end
+        return A_list
+    end
+    return A_list
+end
+
+function get_TransMatrix(n)
+    T = zeros(Float64, 2n, 2n)
+    for (j, i) in enumerate(1:2:2n)
+        T[i, j] = 1
+    end
+    for (j, i) in enumerate(2:2:2n)
+        T[i, j+n] = 1
+    end
+    return T
+end
+
+function build_∂ζ∂s̄(st)
+    (; apparatuses) = st
+    nc = 0
+    foreach(apparatuses) do appar
+        if isa(appar.joint, ClusterJoint)
+            nc += 1
+        end
+    end
+    A_list = [SparseMatrixCSC{Float64,Int64}(undef, 1, 1) for _ in 1:nc]
+    clusterA = get_clusterA(st)
+    foreach(apparatuses) do appar
+        if isa(appar.joint, ClusterJoint)
+            (; force, id) = appar
+            nsegs = length(force)
+            T = get_TransMatrix(nsegs - 1)
+            A = T*clusterA[id]*T'
+            A_list[id] = A
+        end
+    end
+    return reduce(blockdiag, A_list)
+end
+
+function build_∂ζ∂q(st)
+    (; apparatuses, connectivity) = st
+    (; indexed) = connectivity
+    (; num_of_free_coords, bodyid2sys_free_coords, apparid2sys_add_var_idx) = indexed
+    T = get_numbertype(st)
+    num_of_dim = get_num_of_dims(st)
+    ns = 0
+    nc = 0
+    foreach(apparatuses) do appar
+        if isa(appar.joint, ClusterJoint)
+            ns += length(appar.joint.sps)
+            nc += 1
+        end
+    end
+    ∂l∂q = zeros(T, ns+nc, num_of_free_coords)
+    foreach(apparatuses) do appar
+        if isa(appar.joint, ClusterJoint)
+            (; force) = appar
+            foreach(force) do seg
+                idx = seg.id + seg.num_of_add_var
+                J̌ = zeros(T, num_of_dim, num_of_free_coords)
+                (; hen, egg) = seg.joint.hen2egg
+                body_hen = hen.body
+                body_egg = egg.body
+                C_hen = body_hen.cache.Cps[hen.pid]
+                C_egg = body_egg.cache.Cps[egg.pid]
+                free_idx_hen = body_hen.coords.free_idx
+                free_idx_egg = body_egg.coords.free_idx
+                mfree_hen = bodyid2sys_free_coords[body_hen.prop.id]
+                mfree_egg = bodyid2sys_free_coords[body_egg.prop.id]
+                (; direction) = seg.force.state
+                J̌[:, mfree_egg] .+= C_egg[:, free_idx_egg]
+                J̌[:, mfree_hen] .-= C_hen[:, free_idx_hen]
+                ∂l∂q[idx, :] = direction'*J̌
+            end
+        end
+    end
+    kc = zeros(T, ns + nc)
+    αc = zeros(T, ns)
+    b_list = [SparseMatrixCSC{Float64,Int64}(undef, 1, 1) for _ in 1:nc]
+    T_list = [SparseMatrixCSC{Float64,Int64}(undef, 1, 1) for _ in 1:nc]
+    foreach(apparatuses) do appar
+        if isa(appar.joint, ClusterJoint)
+            (; force, joint, id) = appar
+            (; sps) = joint
+            nsegs = length(force)
+            nsp = length(sps)
+            sp_idx = apparid2sys_add_var_idx[id]
+            sp_idx_begin = Int((sp_idx[1]-1) / 2)
+            foreach(force) do seg
+                kc_idx = seg.id + seg.num_of_add_var
+                kc[kc_idx] = seg.force.k
+            end
+            for i in 1:nsp
+                αc[sp_idx_begin+i] = sps[i].α
+            end
+            b⁺ = zeros(Float64, nsegs-1, nsegs)
+            b⁻ = zeros(Float64, nsegs-1, nsegs)
+            for i in 1:nsegs-1
+                b⁺[i, i:i+1] = [-kc[i] kc[i+1]/αc[i]]
+                b⁻[i, i:i+1] = [kc[i] -kc[i+1]*αc[i]]
+            end
+            b_list[id] = vcat(b⁺, b⁻)
+            T_list[id] = get_TransMatrix(nsegs - 1)
+        end
+    end
+    b = reduce(blockdiag, b_list)
+    T = reduce(blockdiag, T_list)
+    return T*b*∂l∂q
 end
 
 

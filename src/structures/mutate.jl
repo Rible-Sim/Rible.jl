@@ -153,18 +153,15 @@ end
 function update_s!(st::AbstractStructure, s̄)
     (;apparatuses) = st
     st.state.system.s .= s̄
-    #INFO 5: 因为上面不是引用，所以还需要下面的代码
     foreach(apparatuses) do appar 
         if isa(appar, Apparatus{<:ClusterJoint})
+            (;id) = appar
             (;sps) = appar.joint
-            appar.joint.sps[1].s = 1000
-            for (id, sp) in enumerate(sps)
-                # @show id, s̄[2id-1]
-                # @show sp.s
-                sp.s⁺ = s̄[2id-1]
-                sp.s⁻ = s̄[2id]
+            idx = st.connectivity.indexed.apparid2sys_add_var_idx[id]
+            for (i, sp) in enumerate(sps)
+                sp.s⁺ = s̄[idx[2i-1]]
+                sp.s⁻ = s̄[idx[2i]]
                 sp.s = sp.s⁺ - sp.s⁻
-                # @show sp.s
             end
         end
     end

@@ -118,19 +118,6 @@ function generalized_force_jacobian!(∂F∂q̌,∂F∂q̌̇,bot::Robot,policy::
     build_tangent_damping_matrix!(∂F∂q̌̇,structure)
 end
 
-function generalized_force_jacobian!(∂F∂q̌, ∂F∂q̌̇, ∂ζ∂s̄, ∂ζ∂q, bot::Robot, policy, q, q̇, t)
-    (; structure) = bot
-    ∂F∂q̌ .= 0
-    ∂F∂q̌̇ .= 0
-    ∂ζ∂s̄ .= 0
-    ∂ζ∂q .= 0
-    clear_forces!(structure)
-    lazy_update_bodies!(structure, q, q̇)
-    update_apparatuses!(structure)
-    build_tangent_stiffness_matrix!(∂F∂q̌, structure)
-    build_tangent_damping_matrix!(∂F∂q̌̇, structure)
-end
-
 struct ContactCache{cacheType}
     cache::cacheType
 end

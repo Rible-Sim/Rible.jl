@@ -177,10 +177,18 @@ function build_jixiebi(n; ks1=80.0, restlens1=50.0,
     restlens2 = restlens2
     spring_dampers = [(i <= 12n) ? RB.DistanceSpringDamper3D(restlens1, ks1, 0.02) : RB.DistanceSpringDamper3D(restlens2, ks2, 0.02) for i in 1:nstrings]
 
-    ncluster = 1
-    cluster_segs = [RB.DistanceSpringDamperSegment(restlens2, ks2, prestress=100.0) for _ in 1:5n]
-    cluster_sps = [[RB.SlidingPoint(0.02) for i in 1:5n-1] for _ in 1:ncluster]
-    #INFO 1: 之前使用了StructArrays，但是在后面发现无法更新sps里面的数据，所以改用了普通的数组
+    restlencs = zeros(Float64, 5n-1)
+    restlenc1 = 266.77
+    for i in 1:5n-1
+        if (mod(i,5) == 0) 
+            restlencs[i] = restlenc1
+        else
+            restlencs[i] = restlenc
+        end
+    end
+    ncluster = 3
+    cluster_segs = [[RB.DistanceSpringDamperSegment(restlencs[i], kc, prestress=pre) for i in 1:5n-1] for _ in 1:ncluster]
+    cluster_sps = [[RB.SlidingPoint(0.01) for i in 1:5n-2] for _ in 1:ncluster]
 
     matrix_cnt_raw = Vector{Matrix{Int}}()
 
@@ -216,33 +224,40 @@ function build_jixiebi(n; ks1=80.0, restlens1=50.0,
     end
     connecting_matrix = reduce(vcat, matrix_cnt_raw)
 
-    matrix_cnt_raw = Vector{Matrix{Int}}()
+    matrix_cnt_raw = [Vector{Matrix{Int}}() for _ in 1:ncluster]
 
     for i in 1:n
         j = 4i - 3
-        s = zeros(5, 4)
+        s= i==1 ? zeros(4, 4, ncluster) : zeros(5, 4, ncluster)
         if (i == 1)
-            s[1, :] = [j, 7, j, 10]
-            s[2, :] = [j, 10, j + 1, 7]
-            s[3, :] = [j + 1, 7, j + 2, 7]
-            s[4, :] = [j + 2, 7, j + 3, 7]
-            s[5, :] = [j + 3, 7, j + 4, 13]
+            for k in 0:ncluster-1
+                s[1, :, k+1] = [j, 10+k, j + 1, 7+k]
+                s[2, :, k+1] = [j + 1, 7+k, j + 2, 7+k]
+                s[3, :, k+1] = [j + 2, 7+k, j + 3, 7+k]
+                s[4, :, k+1] = [j + 3, 7+k, j + 4, 13+k]
+            end
         elseif (i == n)
-            s[1, :] = [j, 13, j, 19]
-            s[2, :] = [j, 19, j + 1, 7]
-            s[3, :] = [j + 1, 7, j + 2, 7]
-            s[4, :] = [j + 2, 7, j + 3, 7]
-            s[5, :] = [j + 3, 7, j + 4, 7]
+            for k in 0:ncluster-1
+                s[1, :, k+1] = [j, 13+k, j, 19+k]
+                s[2, :, k+1] = [j, 19+k, j + 1, 7+k]
+                s[3, :, k+1] = [j + 1, 7+k, j + 2, 7+k]
+                s[4, :, k+1] = [j + 2, 7+k, j + 3, 7+k]
+                s[5, :, k+1] = [j + 3, 7+k, j + 4, 7+k]
+            end
         else
-            s[1, :] = [j, 13, j, 19]
-            s[2, :] = [j, 19, j + 1, 7]
-            s[3, :] = [j + 1, 7, j + 2, 7]
-            s[4, :] = [j + 2, 7, j + 3, 7]
-            s[5, :] = [j + 3, 7, j + 4, 13]
+            for k in 0:ncluster-1
+                s[1, :, k+1] = [j, 13+k, j, 19+k]
+                s[2, :, k+1] = [j, 19+k, j + 1, 7+k]
+                s[3, :, k+1] = [j + 1, 7+k, j + 2, 7+k]
+                s[4, :, k+1] = [j + 2, 7+k, j + 3, 7+k]
+                s[5, :, k+1] = [j + 3, 7+k, j + 4, 13+k]
+            end
         end
-        push!(matrix_cnt_raw, s)
+        for k in 1:ncluster
+            push!(matrix_cnt_raw[k], s[:,:,k])
+        end
     end
-    connecting_cluster_matrix = [reduce(vcat, matrix_cnt_raw)]
+    connecting_cluster_matrix = [reduce(vcat, matrix_cnt_raw[k]) for k in 1:ncluster]
     cables_and_clusters = RB.connect_spring_and_clusters(bodies, spring_dampers, cluster_sps, cluster_segs, connecting_matrix, connecting_cluster_matrix, istart=ncluster)
     apparatuses = TypeSortedCollection(cables_and_clusters)
 

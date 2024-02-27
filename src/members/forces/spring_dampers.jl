@@ -252,9 +252,7 @@ function update!(cab::DistanceSpringDamperSegment, p1, p2, ṗ1, ṗ2, s1, s2)
 	state.lengthdot = (transpose(state.direction)*l̇)
 	deformation = state.length - state.restlen - s2 + s1
 	f = k*deformation + c*state.lengthdot + prestress
-    if deformation < 0
-        state.tension = 0.0
-    elseif f < 0
+    if f < 0
         state.tension = 0.0
     else
         state.tension = f

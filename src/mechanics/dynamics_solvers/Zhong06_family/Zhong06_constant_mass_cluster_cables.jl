@@ -102,10 +102,28 @@ function solve!(sim::Simulator,cache::Zhong06_Constant_Mass_Cluster_Cables_Cache
         q̇ₘ = (qₖ.-qₖ₋₁)./h
         tₘ = tₖ₋₁+h/2
         Jac_F!(∂F∂q̌,∂F∂q̌̇,qₘ,q̇ₘ,tₘ)
+        ζ = build_ζ(bot.structure)
+        ∂ζ∂q = build_∂ζ∂q(bot.structure)
+        ∂ζ∂s̄ = build_∂ζ∂s̄(bot.structure)
+        n = length(ζ)
+        ∂s̄∂s̄ = I(n)
+        ∂F∂s̄ = build_∂Q̌∂s̄(bot.structure)
+        κ₁ = 10; κ₂ = 10
+        coes = diagm([((ζ[i]/κ₁)^2 + (κ₂*sₖ[i])^2)^(-1/2) for i in 1:n])
+        coζ = coes*diagm([ζ[i]/κ₁^2 for i in 1:n]) - diagm([1/κ₁ for i in 1:n])
+        cos̄ = coes*diagm([κ₂^2*sₖ[i] for i in 1:n]) - diagm([κ₂ for i in 1:n])
+
         Jac[   1:nq̌ ,   1:nq̌ ] .=  M̌.-(h^2)/2 .*(1/2 .*∂F∂q̌.+1/h.*∂F∂q̌̇)
-        Jac[   1:nq̌ ,nq̌+1:end] .=  mass_norm.*Aᵀₖ₋₁
-        Jac[nq̌+1:end,   1:nq̌ ] .=  mass_norm.*A(qₖ)
-        Jac[nq̌+1:end,nq̌+1:end] .=  0.0
+        Jac[   1:nq̌ ,nq̌+1:nq̌+nλ] .=  mass_norm.*Aᵀₖ₋₁
+        Jac[   1:nq̌ ,nq̌+nλ+1:end] .=  -1/2 * dt^2 .* ∂F∂s̄
+
+        Jac[nq̌+1:nq̌+nλ,   1:nq̌ ] .=  mass_norm.*A(qₖ)
+        Jac[nq̌+1:nq̌+nλ,   nq̌+1:nq̌+nλ ] .= 0.0 
+        Jac[nq̌+1:nq̌+nλ,   nq̌+nλ+1:end ] .= 0.0 
+
+        Jac[nq̌+nλ+1:end,1:nq̌] .= 1/2 * coζ*∂ζ∂q 
+        Jac[nq̌+nλ+1:end,nq̌+1:nq̌+nλ] .= 0.0
+        Jac[nq̌+nλ+1:end,nq̌+nλ+1:end] .= coζ*∂ζ∂s̄ + cos̄*∂s̄∂s̄
     end
 
     iteration_break = 0
@@ -141,7 +159,7 @@ function solve!(sim::Simulator,cache::Zhong06_Constant_Mass_Cluster_Cables_Cache
         Res_stepk! = make_Res_stepk(qₖ,q̌ₖ,λₖ,sₖ₋₁,qₖ₋₁,p̌ₖ₋₁,F̌,Aᵀₖ₋₁,tₖ₋₁)
         isconverged = false
         normRes = typemax(T)
-        if true #Jac_F! isa Missing
+        if false#Jac_F! isa Missing
             dfk = OnceDifferentiable(Res_stepk!,xₖ,Res)
             Res_stepk_result = nlsolve(dfk, xₖ; ftol, iterations=maxiters, method=:newton)
             isconverged = converged(Res_stepk_result)
@@ -149,26 +167,8 @@ function solve!(sim::Simulator,cache::Zhong06_Constant_Mass_Cluster_Cables_Cache
             Res_stepk_result.iterations
             xₖ .= Res_stepk_result.zero
         else
-            # if timestep == 10
-            #     Jac_ref = zeros(nq̌+nλ,nq̌+nλ)
-            #     FiniteDiff.finite_difference_jacobian!(Jac_ref,Res_stepk!,xₖ)
-            #     Jac_my = zeros(nq̌+nλ,nq̌+nλ)
-            #     Jac_stepk!(Jac_my,xₖ)
-            #     diff_Jac = Jac_my .- Jac_ref
-            #     diff_Jac[abs.(diff_Jac).<1e-5] .= 0.0
-            #     diff_rowidx = findall((x)-> x>1e-5,norm.(eachrow(diff_Jac)))
-            #     @show diff_rowidx .- length(q̌ₖ)                
-            #     @show diff_Jac[end-4:end-3,:]
-            #     @show findall((x)->abs(x)>0,diff_Jac[114+length(q̌ₖ),:])
-            #     @show findall((x)->abs(x)>0,diff_Jac[115+length(q̌ₖ),:])
-            #     @show Jac_my[end-4:end-3,:]
-            #     @show Jac_ref[end-4:end-3,:]
-            # end
-            # @show maximum(abs.(diff_Jac))for iteration = 1:maxiters
-            # @show iteration,D,ηs,restitution_coefficients,gaps
             for iteration = 1:maxiters
                 Res_stepk!(Res,xₖ)
-                # @show Res
                 normRes = norm(Res)
                 if normRes < ftol
                     isconverged = true
@@ -176,7 +176,7 @@ function solve!(sim::Simulator,cache::Zhong06_Constant_Mass_Cluster_Cables_Cache
                     break
                 end                
                 # FiniteDiff.finite_difference_jacobian!(Jac,Res_stepk!,xₖ,Val{:central})
-                Jac_stepk!(Jac,xₖ,qₖ,q̌ₖ,qₖ₋₁,∂F∂q̌,∂F∂q̌̇,Aᵀₖ₋₁,tₖ₋₁)
+                Jac_stepk!(Jac,xₖ,qₖ,sₖ,q̌ₖ,qₖ₋₁,∂F∂q̌,∂F∂q̌̇,Aᵀₖ₋₁,tₖ₋₁)
                 xₖ .+= Jac\(-Res)
             end
             # dfk = OnceDifferentiable(Res_stepk!,Jac_stepk!,xₖ,Res)

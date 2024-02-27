@@ -14,23 +14,6 @@ State Constructor.
 $(TYPEDSIGNATURES)
 """
 function StructureState(bodies,apparatuses,cnt::Connectivity)
-    function s_inner!(s, s_idx, appar::Apparatus{<:ClusterJoint})
-        (;joint) = appar
-        (;sps) = joint
-        length(s_idx)!=0 ? push!(s_idx, length(sps)+s_idx[end]) : push!(s_idx, length(sps))
-        push!(s, reduce(vcat, [[copy(sp.s⁺), copy(sp.s⁻)] for sp in sps]))
-    end
-    function s_inner!(s, s_idx, appar::Apparatus{<:CableJoint})
-    end
-    function s_view(s, s_idx, bodyid)
-        if bodyid > length(s_idx)
-            return Vector{Int64}()
-        elseif bodyid == 1
-            return @view s[1:2s_idx[1]]
-        else
-            return @view s[2s_idx[bodyid-1]+1:2s_idx[bodyid]]
-        end
-    end
     (;numbered,indexed) = cnt
     (;bodyid2sys_loci_coords_idx) = numbered
     (;
@@ -61,12 +44,16 @@ function StructureState(bodies,apparatuses,cnt::Connectivity)
     q̈ = zero(q)
     F = zero(q)
     λ = Vector{T}(undef,num_of_cstr)
-    s = []
-    s_idx = Int[]
+    s = Vector{Float64}()
     foreach(apparatuses) do appar
-        s_inner!(s, s_idx, appar)
+        (;joint) = appar
+        if isa(joint, ClusterJoint)
+            for sp in joint.sps
+                append!(s, sp.s⁺)
+                append!(s, sp.s⁻)
+            end
+        end
     end
-    s = reduce(vcat ,s)
     c = get_local_coords(bodies,numbered)
     p = zero(q)
     p̌ = Vector{T}(undef,num_of_free_coords)
@@ -78,11 +65,7 @@ function StructureState(bodies,apparatuses,cnt::Connectivity)
             q̈mem = @view q̈[bodyid2sys_full_coords[bodyid]]
             Fmem = @view F[bodyid2sys_full_coords[bodyid]]
             λmem = @view λ[bodyid2sys_intrinsic_cstr_idx[bodyid]]
-            smem = s_view(s, s_idx, bodyid)
-            #INFO 4: 借用了已经存在的smem来表示滑动绳索的偏移量，实际上这里存储的是s̄，也就是s⁺₁,s⁻₁,...s⁺ₙ,s⁻ₙ，
-            # 但是s实际上和member没有关系，也就是和刚体的数量没有关系，所以只是暂时存储在这里，
-            # 不过实际上这里存储的数据没有什么作用，因为这里的数据不是引用（不知道怎么弄成view)而是复制。
-            # smem = @view s[Int[]]
+            smem = @view s[Int[]]
             cmem = @view c[bodyid2sys_loci_coords_idx[bodyid]]
             pmem = zero(p[bodyid2sys_full_coords[bodyid]])
             p̌mem = zero(p[bodyid2sys_free_coords[bodyid]])
@@ -458,7 +441,6 @@ function build_ψ(structure::AbstractStructure)
         is = 0
         foreach(apparatuses) do appar
             if isa(appar, Apparatus{<:ClusterJoint})
-                #INFO 3: 因为对apparatuses使用了typeSortedCollection，所以我需要对所有的apparatuses进行遍历，然后用if判断来取出滑动绳索，后面涉及到滑动绳索的情况都基本这样。
                 (;sps) = appar.joint
                 (;force) = appar
                 nsi = length(sps)
