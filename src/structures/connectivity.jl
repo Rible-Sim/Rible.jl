@@ -34,6 +34,7 @@ function connect_clusters(bodies, cluster_sps, cluster_segs, cms)
     for (cluster_seg, cm) in zip(cluster_segs, cms)
         @assert size(cm, 2) == 4
         rbs_sorted = sort(bodies)
+        #TODO 这里ret的类型是Vector{Any}， 导致下面的Apparatus不是concrete， 会影响运算性能， 建议修改
         ret = []
         j = 0
         clusterID += 1
@@ -63,7 +64,7 @@ end
 function connect_spring_and_clusters(bodies, spring_dampers, cluster_sps, cluster_segs, connecting_matrix, connecting_cluster_matrix; istart=0)
     ret1 = connect_spring(bodies, spring_dampers; cm=connecting_matrix, istart)
     ret2 = connect_clusters(bodies, cluster_sps, cluster_segs, connecting_cluster_matrix)
-    return vcat(ret1, ret2)
+    ret1, ret2
 end
 
 function connect(bodies, spring_dampers; connecting_matrix=Int[;;], istart=0)

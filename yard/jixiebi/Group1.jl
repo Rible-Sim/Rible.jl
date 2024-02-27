@@ -21,8 +21,16 @@ plot_traj!(bot)
 tspan = (0.0,1.0)
 dt = 1e-2
 
+policy = RB.TimePolicy(
+    #目前还不清楚要用到什么， 所以先用namedtuple打包
+    @eponymtuple(
+        #驱动量是且仅是时间的函数
+        f = (t) -> [1.0]
+    )
+)
+
 RB.solve!(
-    RB.DynamicsProblem(bot,RB.EulerEytelwein()),
+    RB.DynamicsProblem(bot,policy,RB.EulerEytelwein()),
     RB.DynamicsSolver(
         RB.Zhong06(),
         RB.MonolithicApparatusSolver(

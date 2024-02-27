@@ -1,9 +1,6 @@
 abstract type AbstractOperator end
-struct TimeOperator{fType} <: AbstractOperator 
-    f::fType
-end
 struct NonOperator <: AbstractOperator end
-struct FeedbackOperator <: AbstractOperator 
+struct NaiveOperator <: AbstractOperator 
     num_of_actions::Int
 end
 
@@ -29,20 +26,14 @@ end
 
 get_num_of_actions(actuator::ExternalForceActuator) = length(actuator.action)
 
-function get_actions(structure::Structure,actuator::ExternalForceActuator{sigType,<:FeedbackOperator}) where {sigType}
-    (;signifier,operator,force) = actuator
+function get_actions(structure::Structure,actuator::ExternalForceActuator{sigType,<:NaiveOperator}) where {sigType}
+    (;signifier,operator,) = actuator
     T = get_numbertype(structure)
     zeros(T,operator.num_of_actions)
 end
 
-function get_actions(structure::Structure,actuator::ExternalForceActuator{sigType,<:TimeOperator}) where {sigType}
-    (;signifier,operator,force) = actuator
-    (;state) = structure
-    (;t) = state.system
-    operator.f(t)
-end
 
-# ExternalForceActuator TimeOperator
+# ExternalForceActuator 
 function generalized_force(structure::Structure,actuator::ExternalForceActuator) 
     (;state) = structure
     (;signifier,operator,force) = actuator
@@ -71,17 +62,12 @@ function generalized_force_jacobian!(∂F∂u, structure::Structure,actuator::Ex
     ∂F∂u .= transpose(C)*force
 end
 
-function execute!(structure::Structure,actuator::ExternalForceActuator{sigType,<:TimeOperator}) where {sigType}
-    (;id,signifier,operator,force) = actuator
-    structure.state.system.F .+= operator.f(t).*generalized_force(structure,actuator)
-end
-
-function execute!(structure::Structure,actuator::ExternalForceActuator{sigType,<:FeedbackOperator},u) where {sigType}
+function execute!(structure::Structure,actuator::ExternalForceActuator{<:AbstractBody,<:NaiveOperator},u) 
     (;id,signifier,operator,force) = actuator
     structure.state.system.F .+= u.*generalized_force(structure,actuator)
 end
 
-function generalized_force(structure::Structure,actuator::ExternalForceActuator{sigType,<:FeedbackOperator},u) where {sigType}
+function generalized_force(structure::Structure,actuator::ExternalForceActuator{<:AbstractBody,<:NaiveOperator},u) 
     (;state) = structure
     (;t) = state.system
     (;signifier,operator,force) = actuator
@@ -96,7 +82,7 @@ function generalized_force(structure::Structure,actuator::ExternalForceActuator{
     u.*transpose(C)*force
 end
 
-function generalized_force_jacobian!(∂F∂u, structure::Structure,actuator::ExternalForceActuator{sigType,<:FeedbackOperator},u) where {sigType}
+function generalized_force_jacobian!(∂F∂u, structure::Structure,actuator::ExternalForceActuator{<:AbstractBody,<:NaiveOperator},u) 
     (;state) = structure
     (;t) = state.system
     (;signifier,operator,force) = actuator
@@ -109,6 +95,14 @@ function generalized_force_jacobian!(∂F∂u, structure::Structure,actuator::Ex
     Tbody = build_T(structure,bid)
     C = to_position_jacobian(nmcs,q,c)*Tbody
     ∂F∂u .= transpose(C)*force
+end
+
+#TODO 重要的地方
+function execute!(structure::Structure,actuator::ExternalForceActuator{<:Apparatus{<:ClusterJoint},<:NaiveOperator},u) 
+    (;id,signifier,operator,force) = actuator
+    appar = signifier
+    (;joint) = appar
+    #用驱动量u和joint的相关变量和参数， 计算驱动力， 加到系统中
 end
 
 function GravityActuator(id,body::AbstractBody)

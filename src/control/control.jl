@@ -103,7 +103,7 @@ function get_actions(structure::AbstractStructure,actuators,coalition::Coalition
     u
 end
 
-function get_actions!(bot::Robot,t::Number)
+function get_actions!(bot::Robot,t::Real=bot.structure.state.system.t)
     (;structure,hub) = bot
     (;actuators,coalition) = hub
     (;num_of_actions,actid2sys_actions_idx) = coalition.nt
@@ -117,12 +117,13 @@ function get_actions!(bot::Robot,t::Number)
     u
 end
 
-function actuate!(bot::Robot,u::Nothing,t::Number) end
+function actuate!(bot::Robot,u::Nothing) end
 
-function actuate!(bot::Robot,control::Function,q::AbstractVector,q̇::AbstractVector,t)
+function actuate!(bot::Robot,policy::ActorPolicy,q::AbstractVector,q̇::AbstractVector,t::Real,s=nothing)
     (;structure,hub) = bot
     (;actuators,state,coalition,) = hub
     (;actid2sys_actions_idx) = coalition.nt
+    control = (x) -> Lux.apply(policy.nt.actor,x,policy.nt.ps,policy.nt.st)[1]
     state.u .= control(vcat(q,q̇))
     @show state.u
     foreach(actuators) do actuator
@@ -135,7 +136,24 @@ function actuate!(bot::Robot,control::Function,q::AbstractVector,q̇::AbstractVe
     end
 end
 
-function actuate!(bot::Robot,t::Number=bot.structure.state.system.t)
+function actuate!(bot::Robot,policy::TimePolicy,q::AbstractVector,q̇::AbstractVector,t::Real,s=nothing)
+    (;structure,hub) = bot
+    (;actuators,state,coalition,) = hub
+    (;actid2sys_actions_idx) = coalition.nt
+    control = policy.nt.f
+    state.u .= control(t)
+    @show state.u
+    foreach(actuators) do actuator
+        idx = actid2sys_actions_idx[actuator.id]
+        execute!(
+            structure,
+            actuator,
+            (@view state.u[idx])
+        )
+    end
+end
+
+function actuate!(bot::Robot,t::Real=bot.structure.state.system.t)
     (;structure,hub) = bot
     bot.structure.state.system.t = t
     (;actuators) = hub
@@ -206,8 +224,7 @@ function cost_jacobian!(bot::Robot)
     cost_jacobian!(∂ϕ∂uᵀ,bot,q,q̇,u,t)
 end
 
-function generalized_force_jacobian!(∂F∂θ,bot::Robot,policy::AbstractPolicy,q::AbstractVector,q̇::AbstractVector,t::Number;gravity=false)
-    (;structure,hub) = bot
+function generalized_force_jacobian!(∂F∂θ,structure::Structure,hub,policy::AbstractPolicy,q::AbstractVector,q̇::AbstractVector,t::Real;gravity=false)
     (;actuators,coalition) = hub
     structure.state.system.t = t
     structure.state.system.q .= q
@@ -242,8 +259,9 @@ function generalized_force_jacobian!(∂F∂θ,bot::Robot,policy::AbstractPolicy
     ∂F∂θ .= ∂F∂u*∂u∂θ
 end
 
-function generalized_force_jacobian!(∂F∂q̌,∂F∂q̌̇,bot::Robot,control_jac::Function,q::AbstractVector,q̇::AbstractVector,t::Number;gravity=false)
-    (;structure,hub) = bot
+function generalized_force_jacobian!(∂F∂q̌,∂F∂q̌̇,structure::Structure,hub,policy::ActorPolicy,q::AbstractVector,q̇::AbstractVector,t::Real;gravity=false)
+    control = (x) -> Lux.apply(policy.nt.actor,x,policy.nt.ps,policy.nt.st)[1]
+    control_jac = (s) -> Zygote.jacobian(control, s)[1]
     (;actuators,coalition) = hub
     T = get_numbertype(structure)
     nq = get_num_of_free_coords(structure)
@@ -263,6 +281,9 @@ function generalized_force_jacobian!(∂F∂q̌,∂F∂q̌̇,bot::Robot,control_
     ∂u∂q̌̇ = @view ∂u∂x[:,nq+1:2nq]
     ∂F∂q̌ .= ∂F∂u*∂u∂q̌
     ∂F∂q̌̇ .= ∂F∂u*∂u∂q̌̇
+end
+
+function generalized_force_jacobian!(∂F∂q̌,∂F∂q̌̇,structure::Structure,hub,policy::TimePolicy,q::AbstractVector,q̇::AbstractVector,t::Real;gravity=false)
 end
 
 function set_restlen!(structure,u)

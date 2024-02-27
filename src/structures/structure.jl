@@ -144,7 +144,7 @@ function lazy_update!(st::AbstractStructure; gravity=false)
     assemble_forces!(st)
 end
 
-function update!(st::Structure,q::AbstractVector,q̇::AbstractVector=zero(q),t::Number=st.state.system.t)
+function update!(st::Structure,q::AbstractVector,q̇::AbstractVector=zero(q),t::Real=st.state.system.t)
     st.state.system.t = t
     st.state.system.q .= q
     st.state.system.q̇ .= q̇

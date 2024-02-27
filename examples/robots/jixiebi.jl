@@ -258,15 +258,30 @@ function build_jixiebi(n; ks1=80.0, restlens1=50.0,
         end
     end
     connecting_cluster_matrix = [reduce(vcat, matrix_cnt_raw[k]) for k in 1:ncluster]
-    cables_and_clusters = RB.connect_spring_and_clusters(bodies, spring_dampers, cluster_sps, cluster_segs, connecting_matrix, connecting_cluster_matrix, istart=ncluster)
-    apparatuses = TypeSortedCollection(cables_and_clusters)
+    cables, clusters = RB.connect_spring_and_clusters(bodies, spring_dampers, cluster_sps, cluster_segs, connecting_matrix, connecting_cluster_matrix, istart=ncluster)
+    apparatuses = TypeSortedCollection(vcat(cables, clusters))
 
     indexed = RB.index(bodies, apparatuses;)
     numbered = RB.number(bodies, apparatuses)
     cnt = RB.Connectivity(numbered, indexed)
     structure = RB.Structure(bodies, apparatuses, cnt)
+    # 测量器/传感器， 可测量误差， 之后用于定义cost函数， 实现优化或反馈控制， 目前暂时用不到。
     gauges = Int[]
-    actuators = Int[]
+    # 作动器， 依附于一个或多个bodies或apparatuses， 其类型分派给execute!来施加不同的驱动力
+    actuators = [
+        # 试下ExternalForceActuator堪不堪用， 不堪用的话再搞个新的Actuator
+        RB.ExternalForceActuator(
+            i,
+            cluster,
+            #操作员， 1个驱动量
+            RB.NaiveOperator(1),
+            #外力， 可能不需要用到
+            0.0,
+            #驱动量数值，
+            [0.0],
+        )
+        for (i,cluster) in enumerate(clusters)
+    ]
     hub = RB.ControlHub(
         structure,
         gauges,

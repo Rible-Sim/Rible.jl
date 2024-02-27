@@ -110,6 +110,9 @@ struct NoPolicy <: AbstractPolicy end
 struct ActorPolicy{T} <: AbstractPolicy
     nt::T
 end
+struct TimePolicy{T} <: AbstractPolicy
+    nt::T
+end
 
 struct DynamicsProblem{RobotType,policyType,envType,contact_modelType,apparatus_modelType,optionsType} <: AbstractDynamicsProblem
     bot::RobotType
@@ -126,6 +129,10 @@ end
 
 function DynamicsProblem(bot::Robot,policy::AbstractPolicy;options...)
     DynamicsProblem(bot::Robot,policy,GravitySpace(true),Contactless(),Naive(),values(options))
+end
+
+function DynamicsProblem(bot::Robot,policy::AbstractPolicy,appar_model::AbstractApparatusModel;options...)
+    DynamicsProblem(bot::Robot,policy,GravitySpace(true),Contactless(),appar_model,values(options))
 end
 
 function DynamicsProblem(bot::Robot,appar_model::AbstractApparatusModel;options...)

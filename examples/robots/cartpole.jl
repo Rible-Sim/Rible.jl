@@ -252,7 +252,7 @@ function cart_pole(;
     force_actuator = RB.ExternalForceActuator(
         1,
         RB.Signifier(cart,5,5),
-        RB.FeedbackOperator(1),
+        RB.NaiveOperator(1),
         [0,1.0,0],
         [0.0],
     )

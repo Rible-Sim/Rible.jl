@@ -47,7 +47,7 @@ function generalized_force!(F,bot::Robot,q,q̇,t,::Nothing;gravity=true,(user_de
     generalized_force!(F,bot,NoPolicy(),q,q̇,t;gravity,user_defined_force!)
 end
 
-function generalized_force!(F,bot::Robot,::NoPolicy,q,q̇,t,;gravity=true,(user_defined_force!)=(F,t)->nothing)
+function generalized_force!(F,bot::Robot,::NoPolicy,q,q̇,t,s=nothing;gravity=true,(user_defined_force!)=(F,t)->nothing)
     (;structure) = bot
     clear_forces!(structure)
     lazy_update_bodies!(structure,q,q̇)
@@ -60,60 +60,33 @@ function generalized_force!(F,bot::Robot,::NoPolicy,q,q̇,t,;gravity=true,(user_
     user_defined_force!(F,t)
 end
 
-function generalized_force!(F,bot::Robot,policy::ActorPolicy,q,q̇,t;gravity=true,(user_defined_force!)=(F,t)->nothing)
+function generalized_force!(F,bot::Robot,policy::AbstractPolicy,q,q̇,t,s=nothing;gravity=true,(user_defined_force!)=(F,t)->nothing)
     (;structure) = bot
     clear_forces!(structure)
     lazy_update_bodies!(structure,q,q̇)
-    update_apparatuses!(structure)
-    if gravity
-        apply_gravity!(structure;factor=1)
-    end
-    control = (x) -> Lux.apply(policy.nt.actor,x,policy.nt.ps,policy.nt.st)[1]
-    actuate!(bot,control,q,q̇,t)
-    assemble_forces!(F,structure)
-    user_defined_force!(F,t)
-end
-
-function generalized_force!(F,bot::Robot,policy,q,s,q̇,t;gravity=true,(user_defined_force!)=(F,t)->nothing)
-    (;structure) = bot
-    clear_forces!(structure)
-    lazy_update_bodies!(structure,q,q̇)
+    #TODO 考虑将update_s!改为update_apparatuses!的一个method,即update_apparatuses!(structure,s)
     update_s!(structure, s)
     update_apparatuses!(structure)
     if gravity
         apply_gravity!(structure;factor=1)
     end
-    # control = (x) -> Lux.apply(policy.nt.actor,x,policy.nt.ps,policy.nt.st)[1]
-    # actuate!(bot,control,q,q̇,t)
+    actuate!(bot,policy,q,q̇,t,s)
     assemble_forces!(F,structure)
     user_defined_force!(F,t)
 end
 
-function generalized_force_jacobian!(∂F∂q̌,∂F∂q̌̇,bot::Robot,q,q̇,t)
-    generalized_force_jacobian!(∂F∂q̌,∂F∂q̌̇,bot,NoPolicy(),q,q̇,t)
+function generalized_force_jacobian!(∂F∂q̌,∂F∂q̌̇,bot::Robot,q,q̇,t,s=nothing)
+    generalized_force_jacobian!(∂F∂q̌,∂F∂q̌̇,bot,NoPolicy(),q,q̇,t,s=nothing)
 end
 
-function generalized_force_jacobian!(∂F∂q̌,∂F∂q̌̇,bot::Robot,policy::NoPolicy,q,q̇,t)
-    (;structure) = bot
+function generalized_force_jacobian!(∂F∂q̌,∂F∂q̌̇,bot::Robot,policy::AbstractPolicy,q,q̇,t,s=nothing)
+    (;structure,hub) = bot
     ∂F∂q̌ .= 0
     ∂F∂q̌̇ .= 0
     clear_forces!(structure)
     lazy_update_bodies!(structure,q,q̇)
     update_apparatuses!(structure)
-    build_tangent_stiffness_matrix!(∂F∂q̌,structure)
-    build_tangent_damping_matrix!(∂F∂q̌̇,structure)
-end
-
-function generalized_force_jacobian!(∂F∂q̌,∂F∂q̌̇,bot::Robot,policy::ActorPolicy,q,q̇,t)
-    (;structure) = bot
-    ∂F∂q̌ .= 0
-    ∂F∂q̌̇ .= 0
-    clear_forces!(structure)
-    lazy_update_bodies!(structure,q,q̇)
-    update_apparatuses!(structure)
-    control = (x) -> Lux.apply(policy.nt.actor,x,policy.nt.ps,policy.nt.st)[1]
-    control_jac = (s) -> Zygote.jacobian(control, s)[1]
-    generalized_force_jacobian!(∂F∂q̌,∂F∂q̌̇,bot,control_jac,q,q̇,t)
+    generalized_force_jacobian!(∂F∂q̌,∂F∂q̌̇,structure,hub,policy,q,q̇,t)
     build_tangent_stiffness_matrix!(∂F∂q̌,structure)
     build_tangent_damping_matrix!(∂F∂q̌̇,structure)
 end
