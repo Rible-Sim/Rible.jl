@@ -140,6 +140,9 @@ function actuate!(bot::Robot,policy::TimePolicy,q::AbstractVector,q̇::AbstractV
     (;actuators,state,coalition,) = hub
     (;actid2sys_actions_idx) = coalition.nt
     control = policy.nt.f
+    structure.state.system.t = t
+    # INFO 2 在计算过程当中系统的t一直都是0，我不清楚应该在哪里更新时间t
+    # 目前暂时放在这里,不过其实更新不更新没有什么区别。
     state.u .= control(t)
     foreach(actuators) do actuator
         idx = actid2sys_actions_idx[actuator.id]

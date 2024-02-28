@@ -282,6 +282,7 @@ function build_jixiebi(n; ks1=80.0, restlens1=50.0,
         )
         for (i,cluster) in enumerate(clusters)
     ]
+    # INFO 3 这个驱动量数值一直没变化，而且没用到。
     hub = RB.ControlHub(
         structure,
         gauges,

@@ -48,6 +48,7 @@ function update_apparatuses!(st::AbstractStructure, s=nothing)
     if s !== nothing
         update_apparatus!(st, s)
     end
+    # INFO 4 感觉很丑陋，但是没有什么其他好办法
     foreach(apparatuses) do appar
         update_apparatus!(st, appar)
     end
