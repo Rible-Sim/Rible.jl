@@ -24,7 +24,7 @@ policy = RB.TimePolicy(
     #目前还不清楚要用到什么， 所以先用namedtuple打包
     @eponymtuple(
         #驱动量是且仅是时间的函数
-        f = (t) -> [10.0]
+        f = (t) -> [10.0t]
     )
 )
 

@@ -205,7 +205,6 @@ function solve!(sim::Simulator,cache::Zhong06_Constant_Mass_Cluster_Cables_Cache
             print(progstr)
         end
         next!(prog)
-        bot.structure.state.system.t = tₖ
     end
 
     bot
