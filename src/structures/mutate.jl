@@ -43,15 +43,29 @@ end
 Update DistanceSpringDamper Tension 
 $(TYPEDSIGNATURES)
 """
-function update_apparatuses!(st::AbstractStructure, s=nothing)
+function update_apparatuses!(st::AbstractStructure)
     (;apparatuses) = st
-    if s !== nothing
-        update_apparatus!(st, s)
-    end
-    # INFO 4 感觉很丑陋，但是没有什么其他好办法
     foreach(apparatuses) do appar
         update_apparatus!(st, appar)
     end
+end
+
+function update_apparatuses!(st::AbstractStructure, s̄::AbstractVector{T}) where {T}
+    (;apparatuses) = st
+    st.state.system.s .= s̄
+    foreach(apparatuses) do appar 
+        if isa(appar, Apparatus{<:ClusterJoint})
+            (;id) = appar
+            (;sps) = appar.joint
+            idx = st.connectivity.indexed.apparid2sys_add_var_idx[id]
+            for (i, sp) in enumerate(sps)
+                sp.s⁺ = s̄[idx[2i-1]]
+                sp.s⁻ = s̄[idx[2i]]
+                sp.s = sp.s⁺ - sp.s⁻
+            end
+        end
+    end
+    update_apparatuses!(st)
 end
 
 function update_apparatus!(st::AbstractStructure, appar::Apparatus)
@@ -151,23 +165,6 @@ function update_apparatus!(st::AbstractStructure, appar::Apparatus{<:PrototypeJo
     for i in mask
         torque = torques[i]
         system.F̌[sys_free_coords_idx] .-= angles_jacobian[i,free_idx]*torque
-    end
-end
-
-function update_apparatus!(st::AbstractStructure, s̄::AbstractVector{T}) where {T}
-    (;apparatuses) = st
-    st.state.system.s .= s̄
-    foreach(apparatuses) do appar 
-        if isa(appar, Apparatus{<:ClusterJoint})
-            (;id) = appar
-            (;sps) = appar.joint
-            idx = st.connectivity.indexed.apparid2sys_add_var_idx[id]
-            for (i, sp) in enumerate(sps)
-                sp.s⁺ = s̄[idx[2i-1]]
-                sp.s⁻ = s̄[idx[2i]]
-                sp.s = sp.s⁺ - sp.s⁻
-            end
-        end
     end
 end
 
