@@ -34,8 +34,8 @@ function connect_clusters(bodies, cluster_sps, cluster_segs, cms)
     for (cluster_seg, cm) in zip(cluster_segs, cms)
         @assert size(cm, 2) == 4
         rbs_sorted = sort(bodies)
-        #TODO 这里ret的类型是Vector{Any}， 导致下面的Apparatus不是concrete， 会影响运算性能， 建议修改
-        ret = []
+        #DONE 这里ret的类型是Vector{Any}， 导致下面的Apparatus不是concrete， 会影响运算性能， 建议修改
+        ret = Vector{Apparatus{<:CableJoint, <:DistanceSpringDamperSegment}}(undef, size(cm, 1))
         j = 0
         clusterID += 1
         for row in eachrow(cm)
@@ -53,7 +53,8 @@ function connect_clusters(bodies, cluster_sps, cluster_segs, cms)
                 Int[],
                 Int[]
             )
-            push!(ret, segs)
+            # push!(ret, segs)
+            ret[j] = segs
         end
         num_segs += size(cm, 1)
         push!(rets, Apparatus(clusterID, ClusterJoint(cluster_sps[clusterID], 0), ret, 2j-2, Int[], Int[]))

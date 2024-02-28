@@ -22,7 +22,6 @@ function generate_cache(
     A = make_cstr_jacobian(structure)
     Φ = make_cstr_function(structure)
     ψ = build_ψ(structure)
-    #注意改变了s的位置，因为s应该是可选的，不一定要有
     F!(F,q,s,q̇,t) = generalized_force!(F,bot,policy,q,q̇,t,s;gravity=options.gravity)
     Jac_F!(∂F∂q̌,∂F∂q̌̇,q,q̇,t) = generalized_force_jacobian!(∂F∂q̌,∂F∂q̌̇,bot,policy,q,q̇,t)
     q̌0 = traj.q̌[begin]
@@ -206,6 +205,7 @@ function solve!(sim::Simulator,cache::Zhong06_Constant_Mass_Cluster_Cables_Cache
             print(progstr)
         end
         next!(prog)
+        bot.structure.state.system.t = tₖ
     end
 
     bot

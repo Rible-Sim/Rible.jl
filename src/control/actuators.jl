@@ -97,12 +97,16 @@ function generalized_force_jacobian!(∂F∂u, structure::Structure,actuator::Ex
     ∂F∂u .= transpose(C)*force
 end
 
-#TODO 重要的地方
+#DONE? 重要的地方
 function execute!(structure::Structure,actuator::ExternalForceActuator{<:Apparatus{<:ClusterJoint},<:NaiveOperator},u) 
     (;id,signifier,operator,force) = actuator
-    appar = signifier
-    (;joint) = appar
+    (;state) = structure
+    (;t) = state.system
+    segs = signifier.force
     #用驱动量u和joint的相关变量和参数， 计算驱动力， 加到系统中
+    if id == 1
+        segs[1].force.state.restlen = segs[1].force.original_restlen - u[1]*t
+    end
 end
 
 function GravityActuator(id,body::AbstractBody)

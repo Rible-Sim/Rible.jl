@@ -64,9 +64,8 @@ function generalized_force!(F,bot::Robot,policy::AbstractPolicy,q,q̇,t,s=nothin
     (;structure) = bot
     clear_forces!(structure)
     lazy_update_bodies!(structure,q,q̇)
-    #TODO 考虑将update_s!改为update_apparatuses!的一个method,即update_apparatuses!(structure,s)
-    update_s!(structure, s)
-    update_apparatuses!(structure)
+    #DONE 考虑将update_s!改为update_apparatuses!的一个method,即update_apparatuses!(structure,s)
+    update_apparatuses!(structure, s)
     if gravity
         apply_gravity!(structure;factor=1)
     end

@@ -15,20 +15,20 @@ includet(joinpath(pathof(RB),"../../test/vis.jl")) #jl
 include(joinpath(pathof(RB),"../../examples/robots/jixiebi.jl"))
 includet(joinpath(pathof(RB),"../../examples/robots/jixiebi.jl")) #jl
 
-bot = build_jixiebi(4)
 plot_traj!(bot)
 
-tspan = (0.0,1.0)
+tspan = (0.0,10.0)
 dt = 1e-2
 
 policy = RB.TimePolicy(
     #目前还不清楚要用到什么， 所以先用namedtuple打包
     @eponymtuple(
         #驱动量是且仅是时间的函数
-        f = (t) -> [1.0]
+        f = (t) -> [10.0]
     )
 )
 
+bot = build_jixiebi(4)
 RB.solve!(
     RB.DynamicsProblem(bot,policy,RB.EulerEytelwein()),
     RB.DynamicsSolver(
@@ -42,4 +42,5 @@ RB.solve!(
     dt,
     ftol=1e-7,verbose=true
 )
+1
 plot_traj!(bot)

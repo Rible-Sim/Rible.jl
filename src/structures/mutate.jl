@@ -43,8 +43,11 @@ end
 Update DistanceSpringDamper Tension 
 $(TYPEDSIGNATURES)
 """
-function update_apparatuses!(st::AbstractStructure)
+function update_apparatuses!(st::AbstractStructure, s=nothing)
     (;apparatuses) = st
+    if s !== nothing
+        update_apparatus!(st, s)
+    end
     foreach(apparatuses) do appar
         update_apparatus!(st, appar)
     end
@@ -150,7 +153,7 @@ function update_apparatus!(st::AbstractStructure, appar::Apparatus{<:PrototypeJo
     end
 end
 
-function update_s!(st::AbstractStructure, s̄)
+function update_apparatus!(st::AbstractStructure, s̄::AbstractVector{T}) where {T}
     (;apparatuses) = st
     st.state.system.s .= s̄
     foreach(apparatuses) do appar 

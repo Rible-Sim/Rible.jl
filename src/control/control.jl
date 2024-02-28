@@ -125,7 +125,6 @@ function actuate!(bot::Robot,policy::ActorPolicy,q::AbstractVector,q̇::Abstract
     (;actid2sys_actions_idx) = coalition.nt
     control = (x) -> Lux.apply(policy.nt.actor,x,policy.nt.ps,policy.nt.st)[1]
     state.u .= control(vcat(q,q̇))
-    @show state.u
     foreach(actuators) do actuator
         idx = actid2sys_actions_idx[actuator.id]
         execute!(
@@ -142,7 +141,6 @@ function actuate!(bot::Robot,policy::TimePolicy,q::AbstractVector,q̇::AbstractV
     (;actid2sys_actions_idx) = coalition.nt
     control = policy.nt.f
     state.u .= control(t)
-    @show state.u
     foreach(actuators) do actuator
         idx = actid2sys_actions_idx[actuator.id]
         execute!(
