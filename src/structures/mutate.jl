@@ -43,7 +43,7 @@ end
 Update DistanceSpringDamper Tension 
 $(TYPEDSIGNATURES)
 """
-function update_apparatuses!(st::AbstractStructure)
+function update_apparatuses!(st::AbstractStructure, s=nothing)
     (;apparatuses) = st
     foreach(apparatuses) do appar
         update_apparatus!(st, appar)

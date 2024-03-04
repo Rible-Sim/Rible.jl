@@ -150,7 +150,13 @@ function DynamicsProblem(bot::Robot,env::AbstractContactEnvironment,contact_mode
     DynamicsProblem(bot::Robot,NoPolicy(),env,contact_model,Naive(),values(options))
 end
 
-function DynamicsProblem(bot::Robot,policy::AbstractPolicy,env::AbstractContactEnvironment,contact_model::AbstractContactModel,appar_model::AbstractApparatusModel;options...)
+
+function DynamicsProblem(bot::Robot,policy::AbstractPolicy,
+        env::AbstractContactEnvironment,
+        contact_model::AbstractContactModel,
+        appar_model::AbstractApparatusModel=Naive(),;
+        options...
+    )
     DynamicsProblem(bot::Robot,policy,env,contact_model,appar_model,values(options))
 end
 

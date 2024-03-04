@@ -30,7 +30,7 @@ policy = RB.TimePolicy(
 θ=0.0
 ground_plane = RB.StaticContactSurfaces(
     [
-        RB.HalfSpace([-tan(θ),0,1],zeros(3)),
+        RB.HalfSpace([-tan(θ),0,1],[0.0,0.0,-1000.0]),
     ]
 );
 
@@ -87,4 +87,32 @@ RB.solve!(
     dt,
     ftol=1e-7,verbose=true
 )
-plot_traj!(bot)
+
+# 无视滑动绳索的接触碰撞
+RB.solve!(
+    RB.DynamicsProblem(
+        bot,policy,
+        ground_plane,
+        RB.RestitutionFrictionCombined(
+            RB.NewtonRestitution(),
+            RB.CoulombFriction(),
+        ),
+    ),
+    RB.DynamicsSolver(
+        RB.Zhong06(),
+        RB.InnerLayerContactSolver(
+            RB.InteriorPointMethod()
+        ),
+    );
+    # 时间再长不收敛了， 之后再查查
+    tspan=(0.0,12.3),
+    dt,
+    ftol=1e-7,verbose=true
+)
+
+plot_traj!(bot;
+    ground=ground_plane,
+    xlims = (-1000.,4000.),
+    ylims = (-1000.,1000.),
+    zlims = (-2000.,1000.),
+)
