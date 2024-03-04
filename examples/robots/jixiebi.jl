@@ -130,8 +130,8 @@ function build_jixiebi(n; ks1=80.0, restlens1=50.0,
         if i == 1
             contactable = false
             visible = true
-            ci = collect(1:12)
-            Φi = Int[]
+            ci = Int[]
+            Φi = collect(1:6)
         else
             contactable = true
             visible = true
@@ -167,8 +167,8 @@ function build_jixiebi(n; ks1=80.0, restlens1=50.0,
         coords = RB.NonminimalCoordinates(nmcs, ci, Φi)
         rb = RB.RigidBody(prop, state, coords, rdsi.mesh)
     end
-    bodies = TypeSortedCollection([rigidbody(i, rds[i], r̄s[i]) for i in 1:nb])
-
+    rbs = [rigidbody(i, rds[i], r̄s[i]) for i in 1:nb]
+    bodies = TypeSortedCollection(rbs)
 
     nstrings = 24n
     ks1 = ks1
@@ -258,8 +258,9 @@ function build_jixiebi(n; ks1=80.0, restlens1=50.0,
         end
     end
     connecting_cluster_matrix = [reduce(vcat, matrix_cnt_raw[k]) for k in 1:ncluster]
-    cables, clusters = RB.connect_spring_and_clusters(bodies, spring_dampers, cluster_sps, cluster_segs, connecting_matrix, connecting_cluster_matrix, istart=ncluster)
-    apparatuses = TypeSortedCollection(vcat(cables, clusters))
+    cables, clusters = RB.connect_spring_and_clusters(bodies, spring_dampers, cluster_sps, cluster_segs, connecting_matrix, connecting_cluster_matrix, istart=ncluster+1)
+    cst1 = RB.FixedBodyConstraint(ncluster+1,rbs[1])
+    apparatuses = TypeSortedCollection(vcat([cst1],cables, clusters))
 
     indexed = RB.index(bodies, apparatuses;)
     numbered = RB.number(bodies, apparatuses)

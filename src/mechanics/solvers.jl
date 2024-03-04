@@ -88,13 +88,16 @@ end
 function DynamicsSolver(integrator::AbstractIntegrator,contact_solver::AbstractContactSolver,options::NamedTuple)
     DynamicsSolver(integrator,contact_solver,nothing,options)
 end
+function DynamicsSolver(integrator::AbstractIntegrator,contact_solver::AbstractContactSolver;options...)
+    DynamicsSolver(integrator,contact_solver,nothing,values(options))
+end
 
 function DynamicsSolver(integrator::AbstractIntegrator,apparatus_solver::AbstractApparatusSolver;options...)
     DynamicsSolver(integrator,nothing,apparatus_solver,values(options))
 end
 
-function DynamicsSolver(integrator::AbstractIntegrator,contact_solver::AbstractContactSolver;options...)
-    DynamicsSolver(integrator,contact_solver,nothing,values(options))
+function DynamicsSolver(integrator::AbstractIntegrator,contact_solver::AbstractContactSolver,apparatus_solver::AbstractApparatusSolver;options...)
+    DynamicsSolver(integrator,contact_solver,apparatus_solver,values(options))
 end
 
 struct DiscreteAdjointDynamicsSolver{integratorType,contact_solverType,apparatus_solverType,optionsType} <: AbstractDynamicsSolver 
@@ -145,6 +148,10 @@ end
 
 function DynamicsProblem(bot::Robot,env::AbstractContactEnvironment,contact_model::AbstractContactModel;options...)
     DynamicsProblem(bot::Robot,NoPolicy(),env,contact_model,Naive(),values(options))
+end
+
+function DynamicsProblem(bot::Robot,policy::AbstractPolicy,env::AbstractContactEnvironment,contact_model::AbstractContactModel,appar_model::AbstractApparatusModel;options...)
+    DynamicsProblem(bot::Robot,policy,env,contact_model,appar_model,values(options))
 end
 
 struct DynamicsSensitivityProblem{RobotType,policyType,envType,contact_modelType,apparatus_modelType,optionsType} <: AbstractDynamicsProblem
@@ -397,6 +404,7 @@ include("dynamics_solvers/Zhong06_family/Zhong06_constant_mass.jl")
 include("dynamics_solvers/Zhong06_family/Zhong06_nonconstant_mass.jl")
 include("dynamics_solvers/Zhong06_family/Zhong06_CCP_constant_mass.jl")
 include("dynamics_solvers/Zhong06_family/Zhong06_CCP_constant_mass_mono.jl")
+include("dynamics_solvers/Zhong06_family/Zhong06_CCP_constant_mass_cluster_cables.jl")
 include("dynamics_solvers/Zhong06_family/Zhong06_CCP_nonconstant_mass.jl")
 include("dynamics_solvers/Zhong06_family/Zhong06_frictionless_nonconstant_mass.jl")
 include("dynamics_solvers/Zhong06_family/Zhong06_frictionless_nonconstant_mass_mono.jl")
