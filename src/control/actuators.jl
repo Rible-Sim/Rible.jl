@@ -104,9 +104,7 @@ function execute!(structure::Structure,actuator::ExternalForceActuator{<:Apparat
     (;t) = state.system
     segs = signifier.force
     #用驱动量u和joint的相关变量和参数， 计算驱动力， 加到系统中
-    if id == 1
-        segs[1].force.state.restlen = segs[1].force.original_restlen - u[1]
-    end
+    segs[1].force.state.restlen = segs[1].force.original_restlen - u[1]
     # INFO 1 不知道怎么计算驱动力，加到系统中，我先仿照之前的做法，也就是直接改变滑动绳索最末端的静止长度
     # 但是这个函数在计算force的时候调用（我也不知道为什么施加驱动要在构建force的时候执行），
     # 所以他每个计算步实际上要执行多次，这样不能简单地 -=。

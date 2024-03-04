@@ -63,13 +63,12 @@ end
 function generalized_force!(F,bot::Robot,policy::AbstractPolicy,q,q̇,t,s=nothing;gravity=true,(user_defined_force!)=(F,t)->nothing)
     (;structure) = bot
     clear_forces!(structure)
+    actuate!(bot,policy,q,q̇,t,s)
     lazy_update_bodies!(structure,q,q̇)
-    #DONE 考虑将update_s!改为update_apparatuses!的一个method,即update_apparatuses!(structure,s)
     update_apparatuses!(structure, s)
     if gravity
         apply_gravity!(structure;factor=1)
     end
-    actuate!(bot,policy,q,q̇,t,s)
     assemble_forces!(F,structure)
     user_defined_force!(F,t)
 end
