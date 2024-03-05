@@ -15,7 +15,7 @@ includet(joinpath(pathof(RB),"../../test/vis.jl")) #jl
 include(joinpath(pathof(RB),"../../examples/robots/jixiebi.jl"))
 includet(joinpath(pathof(RB),"../../examples/robots/jixiebi.jl")) #jl
 
-tspan = (0.0,30.0)
+tspan = (0.0,6.0)
 dt = 1e-2
 
 policy = RB.TimePolicy(
@@ -30,7 +30,7 @@ policy = RB.TimePolicy(
 θ=0.0
 ground_plane = RB.StaticContactSurfaces(
     [
-        RB.HalfSpace([-tan(θ),0,1],[0.0,0.0,-1000.0]),
+        RB.HalfSpace([-tan(θ),0,1],[0.0,0.0,-150.0]),
     ]
 );
 
@@ -64,6 +64,7 @@ RB.solve!(
 # （1) 增加内层迭代 IPM!(Λₖ,na,nΛ,Λₖini,yₖini,(1/α0).*𝐍 .+ L,𝐡;ftol,Nmax)
 # （2) 检查接触力是否满足摩擦碰撞定律
 
+bot = build_jixiebi(4)
 RB.solve!(
     RB.DynamicsProblem(
         bot,policy,
@@ -88,31 +89,11 @@ RB.solve!(
     ftol=1e-7,verbose=true
 )
 
-# 无视滑动绳索的接触碰撞
-RB.solve!(
-    RB.DynamicsProblem(
-        bot,policy,
-        ground_plane,
-        RB.RestitutionFrictionCombined(
-            RB.NewtonRestitution(),
-            RB.CoulombFriction(),
-        ),
-    ),
-    RB.DynamicsSolver(
-        RB.Zhong06(),
-        RB.InnerLayerContactSolver(
-            RB.InteriorPointMethod()
-        ),
-    );
-    # 时间再长不收敛了， 之后再查查
-    tspan=(0.0,12.3),
-    dt,
-    ftol=1e-7,verbose=true
-)
-
 plot_traj!(bot;
     ground=ground_plane,
-    xlims = (-1000.,4000.),
+    xlims=(-1000.0, 4000.0),
     ylims = (-1000.,1000.),
     zlims = (-2000.,1000.),
+    showlabels = false,
+    showpoints = false,
 )

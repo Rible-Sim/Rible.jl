@@ -106,7 +106,7 @@ function MakieCore.plot!(viz::Viz{Tuple{S}};
         MakieCore.linesegments!(
             viz, seg_ob,
             color=:red,
-            linewidth=5,
+            linewidth=2,
             linestyle=linestyle_ob
         )
     end
