@@ -142,6 +142,7 @@ function activate_frictional_contacts!(structure,contact_env::ContactRigidBodies
     na = 0
     for contact in contact_bodies
         contact.pid = 1
+        # INFO 3: 第一个loci不动，从第二个开始
     end
     update_bodies!(structure,q)
 
@@ -157,6 +158,7 @@ function activate_frictional_contacts!(structure,contact_env::ContactRigidBodies
                 end
             end
         end
+        # INFO 4: 重置所有的contact_state
     end
 
     foreach(structure.bodies) do body
@@ -187,12 +189,14 @@ function activate_frictional_contacts!(structure,contact_env::ContactRigidBodies
                             c(x) = NCF.to_local_coords(nmcs,x)
                             C(c) = NCF.to_position_jacobian(nmcs,q,c)
                             ibody.cache.Cps[contact_bodies[cid].pid] = C(c(frame.position))
+                            # INFO 5: 更新Cps，这里的q当前的q。
                         end
                     end
                     if contact_state.persistent
                         persistent_bits[bodyid2sys_loci_idx[bid][pid]] = true
                     end
                     na += 2
+                    # INFO 6: 一个碰撞对应两个na
                 end
             end
         end

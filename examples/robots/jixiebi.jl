@@ -477,6 +477,7 @@ function build_small_jixiebi(n; ks1=80.0, restlens1=0.050,
 
         ri = pos
         aps = [[radius 0.0 0.0] for _ in 1:10]
+        # INFO 2: 第一个aps保留这个物体的特征长度，其他的aps备用
         theta = 0
         α = [cos(theta) -sin(theta) 0;
             sin(theta) cos(theta) 0;

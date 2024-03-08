@@ -283,6 +283,7 @@ function contact_gap_and_normal(x::AbstractVector, contact_bodies::Vector{<:Cont
         # gaps[i] = gap
         # normals[i] = normal
         # contact_ids[i] = i
+        # INFO 1: 不能写成上面的形式，感觉应该是TypeSortedCollections的原因
     end
     if all(gaps .< 0)
         icb = argmax(gaps)
