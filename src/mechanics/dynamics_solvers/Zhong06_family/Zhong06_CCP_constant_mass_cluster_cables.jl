@@ -23,7 +23,7 @@ function generate_cache(
     (;bot,policy,env) = prob
     (;structure) = bot
     options = merge(
-        (gravity=true,factor=1,checkpersist=true), #default
+        (gravity=false,factor=1,checkpersist=true), #default
         prob.options,
         solver.options,
     )
@@ -293,7 +293,7 @@ function solve!(sim::Simulator,solver_cache::Zhong06_CCP_Constant_Mass_Cluster_C
             x[   nq+1:nq+nλ]       .= 0.0
             x[nq+nλ+1:nx]   .= sₖ₋₁
             Λʳₖ .= Λₖ
-            Nmax = 50
+            Nmax = maxiters
             for iteration = 1:maxiters
                 if timestep == 3092
                     ## @show L
