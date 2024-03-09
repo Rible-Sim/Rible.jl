@@ -15,15 +15,14 @@ includet(joinpath(pathof(RB),"../../test/vis.jl")) #jl
 include(joinpath(pathof(RB),"../../examples/robots/jixiebi.jl"))
 includet(joinpath(pathof(RB),"../../examples/robots/jixiebi.jl")) #jl
 
-tspan = (0.0,6.0)
-dt = 2e-3
 dt = 1e-2
 
 policy = RB.TimePolicy(
     #目前还不清楚要用到什么， 所以先用namedtuple打包
     @eponymtuple(
         #驱动量是且仅是时间的函数
-        f = (t) -> [0.0, t<15 ? t : 15, t<15 ? t : 15]
+        # f = (t) -> reduce(vcat, [[0.0, 2t,  2t] for _ in 1:4])
+        f = (t) -> reduce(vcat, [[0.0, 2t, 2t, 0.0, 0.5t, 0.5t] for _ in 1:2])
         # f = (t) -> [0.0, 0.0, 0.0]
     )
 )
@@ -39,20 +38,21 @@ policy = RB.TimePolicy(
 
 rigid_contacts = RB.ContactRigidBodies(
     [
-        RB.RigidSphere(18)
+        RB.RigidSphere(53)
     ]
 )
 
 # parameters
 restitution_coefficients = 0.5
 friction_coefficients = 0.1
-bot_small = build_small_jixiebi(4)
+bot_4 = build_4_jixiebis(3)
+# bot_small = build_small_jixiebi(3)
 
 # bot = build_jixiebi(4)
 
 # RB.solve!(
 #     RB.DynamicsProblem(
-#         bot_small,policy,
+#         bot_4,policy,
 #         RB.EulerEytelwein(),
 #     ),
 #     RB.DynamicsSolver(
@@ -61,7 +61,7 @@ bot_small = build_small_jixiebi(4)
 #             RB.SmoothedFischerBurmeister()
 #         ),
 #     );
-#     tspan=(0.0,0.3),
+#     tspan=(0.0,1.0),
 #     dt,
 #     ftol=1e-7,verbose=true
 # )
@@ -69,7 +69,7 @@ bot_small = build_small_jixiebi(4)
 # bot = build_jixiebi(4)
 RB.solve!(
     RB.DynamicsProblem(
-        bot_small,policy,
+        bot_4,policy,
         # ground_plane,
         rigid_contacts,
         RB.RestitutionFrictionCombined(
@@ -87,7 +87,7 @@ RB.solve!(
             RB.SmoothedFischerBurmeister()
         ),
     );
-    tspan=(0.0, 20.0),
+    tspan=(0.0, 2.2),
     dt,
     ftol=1e-7,verbose=true,
     maxiters=50
@@ -113,7 +113,8 @@ RB.solve!(
 #     ftol=1e-7, verbose=true
 # )
 
-plot_traj!(bot_small;
+
+plot_traj!(bot_4;
     # ground=ground_plane,
     showground  = false,
     xlims=(-1.0, 4.0),
@@ -122,3 +123,4 @@ plot_traj!(bot_small;
     showlabels = false,
     showpoints = false,
 )
+

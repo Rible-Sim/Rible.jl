@@ -254,6 +254,18 @@ function plot_traj!(bot::RB.Robot;
             # cam = Makie.camera(ax.scene)
             # cam = cam3d!(ax.scene, projectiontype=Makie.Orthographic)
             # update_cam!(ax.scene, cam)
+            # ax = LScene(fig[1,1],show_axis=false) #
+            # scale = 1e3
+            # m0_yellow = load("yard/jixiebi/m0_yellow.STL") |> RB.make_patch(;rot=RotY(pi/2),trans=[-0.50, 0.0, 0.8],scale=1/scale,color=:yellow)
+            # m0_blue1 = load("yard/jixiebi/m0_blue.STL") |> RB.make_patch(;rot=RotY(pi/2), trans=[-0.5,0.23,0.37], scale=1/scale,color=:blue)
+            # m0_blue2 = load("yard/jixiebi/m0_blue.STL") |> RB.make_patch(;rot=RotY(pi/2), trans=[0.5,0.23,0.37], scale=1/scale,color=:blue)
+            # m0_blue3 = load("yard/jixiebi/m0_blue.STL") |> RB.make_patch(;rot=RotY(pi/2)*RotX(-pi/2), trans=[-0.23,0.5,0.37], scale=1/scale,color=:blue)
+            # m0_blue4 = load("yard/jixiebi/m0_blue.STL") |> RB.make_patch(;rot=RotY(pi/2)*RotX(-pi/2), trans=[-0.23,-0.5,0.37], scale=1/scale,color=:blue)
+            # mesh!(ax, m0_yellow)
+            # mesh!(ax, m0_blue1)
+            # mesh!(ax, m0_blue2)
+            # mesh!(ax, m0_blue3)
+            # mesh!(ax, m0_blue4)
         else
             error("Unknown AxisType")
         end

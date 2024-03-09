@@ -173,7 +173,7 @@ function MakieCore.plot!(viz::Viz{Tuple{S}};
         meshcolor=viz.refcolor[]
         viz.showcables[] = false
     else
-        meshcolor=viz.meshcolor[]
+        meshcolor=nothing
         cablecolor = viz.cablecolor[]
         cablelabelcolor = viz.cablelabelcolor[]
     end
