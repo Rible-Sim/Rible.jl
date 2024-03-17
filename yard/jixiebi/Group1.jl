@@ -21,8 +21,8 @@ policy = RB.TimePolicy(
     #目前还不清楚要用到什么， 所以先用namedtuple打包
     @eponymtuple(
         #驱动量是且仅是时间的函数
-        # f = (t) -> reduce(vcat, [[0.0, 2t,  2t] for _ in 1:4])
-        f = (t) -> reduce(vcat, [[0.0, 2t, 2t, 0.0, 0.5t, 0.5t] for _ in 1:2])
+        f = (t) -> reduce(vcat, [[0.0, 2t,  2t] for _ in 1:4])
+        ## f = (t) -> reduce(vcat, [[0.0, 2t, 2t, 0.0, 0.5t, 0.5t] for _ in 1:2])
         # f = (t) -> [0.0, 0.0, 0.0]
     )
 )
@@ -114,13 +114,32 @@ RB.solve!(
 # )
 
 
+
+scale = 1e3
+m0_yellow = load("yard/jixiebi/m0_yellow.STL") |> RB.make_patch(;rot=RotY(pi/2),trans=[-0.50, 0.0, 0.8],scale=1/scale,color=:yellow)
+m0_blue1 = load("yard/jixiebi/m0_blue.STL") |> RB.make_patch(;rot=RotY(pi/2), trans=[-0.5,0.23,0.37], scale=1/scale,color=:blue)
+m0_blue2 = load("yard/jixiebi/m0_blue.STL") |> RB.make_patch(;rot=RotY(pi/2), trans=[0.5,0.23,0.37], scale=1/scale,color=:blue)
+m0_blue3 = load("yard/jixiebi/m0_blue.STL") |> RB.make_patch(;rot=RotY(pi/2)*RotX(-pi/2), trans=[-0.23,0.5,0.37], scale=1/scale,color=:blue)
+m0_blue4 = load("yard/jixiebi/m0_blue.STL") |> RB.make_patch(;rot=RotY(pi/2)*RotX(-pi/2), trans=[-0.23,-0.5,0.37], scale=1/scale,color=:blue)
+sat_mesh = GB.merge([m0_yellow,m0_blue1,m0_blue2,m0_blue3,m0_blue4])
+
 plot_traj!(bot_4;
-    # ground=ground_plane,
+    ## ground=ground_plane,
     showground  = false,
+    ## AxisType = Axis3,
+    show_axis = false,
     xlims=(-1.0, 4.0),
     ylims = (-1.,1.),
     zlims = (-2.,1.),
     showlabels = false,
     showpoints = false,
+    showinfo = false,
+    sup! = (ax,tgob,subgrid_idx) -> begin
+        mesh!(ax,sat_mesh)
+        ## hidedecorations!(ax)
+        ## hidespines!(ax)
+    end
 )
 
+jldsave("bot_4_two.jld2"; bot_4)
+jldsave("bot_4_four.jld2"; bot_4)

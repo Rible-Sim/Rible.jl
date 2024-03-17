@@ -739,7 +739,7 @@ function build_4_jixiebis(n; ks1=80.0, restlens1=0.050,
         [len42, r2 * sqrt(3) / 2, -r2 / 2],
         [len42, -r2 * sqrt(3) / 2, -r2 / 2]]
 
-    rigid_color = :darkgreen
+    rigid_color = :teal
     mesh1 = load(RB.assetpath("jixiebi/m1.STL")) |> RB.make_patch(; rot=RotZ(-π / 2)) |> RB.make_patch(; rot=RotX(pi / 6), scale=1 / scale, color=rigid_color)
     mesh2 = load(RB.assetpath("jixiebi/m2.STL")) |> RB.make_patch(; rot=RotZ(-π / 2)) |> RB.make_patch(; rot=RotX(pi / 6), scale=1 / scale, color=rigid_color)
     mesh3 = load(RB.assetpath("jixiebi/m3.STL")) |> RB.make_patch(; rot=RotZ(-π / 2)) |> RB.make_patch(; rot=RotX(pi / 6), scale=1 / scale, color=rigid_color)
