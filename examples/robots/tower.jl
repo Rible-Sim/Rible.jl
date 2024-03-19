@@ -98,43 +98,49 @@ function tower(;k=nothing)
     end	
 
     display(cnt_matrix_elas)
-    cnt_matrix = Matrix(cnt_matrix_elas')
-    ncables = size(cnt_matrix,1)
+    connecting_matrix = Matrix(cnt_matrix_elas')
+    ncables = size(connecting_matrix,1)
     if k isa Nothing
-        cables = [RB.DistanceSpringDamper3D(0.0,100.0,0.0;slack=false) for i = 1:ncables]
+        spring_dampers = [RB.DistanceSpringDamper3D(0.0,100.0,0.0;slack=false) for i = 1:ncables]
     else
-        cables = [RB.DistanceSpringDamper3D(0.0,k[i],0.0;slack=false) for i = 1:ncables]
+        spring_dampers = [RB.DistanceSpringDamper3D(0.0,k[i],0.0;slack=false) for i = 1:ncables]
     end
-    apparatuses = (cables = cables,)
-    connected = RB.connect(rbs,cnt_matrix)
+    cables = RB.connect(rbs,spring_dampers;connecting_matrix)
 
     cst1 = RB.PinJoint(
-        1,
+        ncables+1,
         RB.Hen2Egg(
-            1,
             RB.Signifier(base,1),
             RB.Signifier(bar,1),
         )
     )
     
     cst2 = RB.PinJoint(
-        2,
+        ncables+2,
         RB.Hen2Egg(
-            2,
             RB.Signifier(bar,2),
             RB.Signifier(top,1)
         )
     )
 
-    jointedmembers = RB.join((cst1,cst2,),indexed)
+    apparatuses = TypeSortedCollection(
+        vcat(cables,cst1,cst2)
+    )
 
+    indexed = RB.index(rbs, apparatuses)
+    numbered = RB.number(rbs, apparatuses)
     cnt = RB.Connectivity(
-            numbered,
-            indexed,
-            @eponymtuple(connected,),
-            jointedmembers
-        )
-
+        numbered, 
+        indexed,
+    )
     st = RB.Structure(rbs,apparatuses,cnt)
-    bot = RB.Robot(st,)
+    gauges = Int[]
+    actuators = Int[]
+    hub = RB.ControlHub(
+        st,
+        gauges,
+        actuators,
+        RB.Coalition(st,gauges,actuators)
+    )
+    bot = RB.Robot(st,hub)
 end

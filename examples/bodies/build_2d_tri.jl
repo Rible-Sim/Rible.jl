@@ -70,9 +70,9 @@ state = RB.RigidBodyState(prop,ro,α,ṙo,ω)
 coords = RB.NonminimalCoordinates(nmcs,ci,cstr_idx)
 trimesh = begin
     if id == 1
-        load(RB.assetpath("零件1 - 副本.STL")) |> make_patch(;scale=1/1000,color=:mediumpurple4)
+        load(RB.assetpath("零件1 - 副本.STL")) |> RB.make_patch(;scale=1/1000,color=:mediumpurple4)
     else
-        load(RB.assetpath("零件1.STL")) |> make_patch(;scale=1/1000,color=:slategray4)
+        load(RB.assetpath("零件1.STL")) |> RB.make_patch(;scale=1/1000,color=:slategray4)
     end
 end
 body = RB.RigidBody(prop,state,coords,trimesh)

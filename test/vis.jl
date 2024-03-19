@@ -176,6 +176,8 @@ function plot_traj!(bot::RB.Robot;
         showback=false,
         actuate=false,
         figname=nothing,
+        rowgap=0,
+        colgap=0,
         showinit=false,
         auto=false,
         titleformatfunc = (subgrid_idx,tt)-> begin
@@ -395,6 +397,8 @@ function plot_traj!(bot::RB.Robot;
                 end
             end
         end
+        colgap!(grid1,colgap)
+        rowgap!(grid1,rowgap)
     end
     if fig isa Figure
         savefig(fig,figname)

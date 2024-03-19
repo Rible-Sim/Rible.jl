@@ -217,77 +217,77 @@ end
 
 function build_material_stiffness_matrix!(st::Structure,q,k)
     (;num_of_dim) = st
-    (;indexed,tensioned) = st.connectivity
+    (;indexed,) = st.connectivity
     (;num_of_full_coords,num_of_free_coords,sys_free_coords_idx,bodyid2sys_full_coords) = indexed
-    (;connected) = tensioned
-    (;cables) = st.apparatuses
     update!(st,q)
     Jj = zeros(eltype(q),num_of_dim,num_of_full_coords)
     retǨm = zeros(eltype(q),num_of_free_coords,num_of_free_coords)
-    foreach(connected) do scnt
-        j = scnt.id
-        rb1 = scnt.hen.body
-        rb2 = scnt.egg.body
-        ap1id = scnt.hen.pid
-        ap2id = scnt.egg.pid
-        C1 = rb1.cache.Cps[ap1id]
-        C2 = rb2.cache.Cps[ap2id]
-        mfull1 = bodyid2sys_full_coords[rb1.prop.id]
-        mfull2 = bodyid2sys_full_coords[rb2.prop.id]
-        cable = cables[j]
-        (;state) = cable
-        (;length,) = state
-        s = 1/length
-        Jj .= 0
-        Jj[:,mfull2] .+= C2
-        Jj[:,mfull1] .-= C1
-        Uj = transpose(Jj)*Jj
-        Ūjq = Uj[sys_free_coords_idx,:]*q
-        retǨm .+= k[j]*s^2*(Ūjq*transpose(Ūjq))
+    foreach(st.apparatuses) do appar
+        if appar.joint isa CableJoint
+            j = appar.id
+            (;force,joint) = appar
+            (;hen,egg) = joint.hen2egg
+            rb1 = hen.body
+            rb2 = egg.body
+            ap1id = hen.pid
+            ap2id = egg.pid
+            C1 = rb1.cache.Cps[ap1id]
+            C2 = rb2.cache.Cps[ap2id]
+            mfull1 = bodyid2sys_full_coords[rb1.prop.id]
+            mfull2 = bodyid2sys_full_coords[rb2.prop.id]
+            (;state) = force
+            (;length,) = state
+            s = 1/length
+            Jj .= 0
+            Jj[:,mfull2] .+= C2
+            Jj[:,mfull1] .-= C1
+            Uj = transpose(Jj)*Jj
+            Ūjq = Uj[sys_free_coords_idx,:]*q
+            retǨm .+= k[j]*s^2*(Ūjq*transpose(Ūjq))
+        end
     end
     retǨm
 end
 
 function build_geometric_stiffness_matrix!(st::Structure,q,f)
     (;num_of_dim) = st
-    (;indexed,tensioned) = st.connectivity
+    (;indexed,) = st.connectivity
     (;num_of_full_coords,num_of_free_coords,sys_free_coords_idx,bodyid2sys_full_coords) = indexed
-    (;connected) = tensioned
-    (;cables) = st.apparatuses
     update!(st,q)
     Jj = zeros(eltype(q),num_of_dim,num_of_full_coords)
     retǨg = zeros(eltype(q),num_of_free_coords,num_of_free_coords)
-    foreach(connected) do scnt
-        j = scnt.id
-        rb1 = scnt.hen.body
-        rb2 = scnt.egg.body
-        ap1id = scnt.hen.pid
-        ap2id = scnt.egg.pid
-        C1 = rb1.cache.Cps[ap1id]
-        C2 = rb2.cache.Cps[ap2id]
-        mfull1 = bodyid2sys_full_coords[rb1.prop.id]
-        mfull2 = bodyid2sys_full_coords[rb2.prop.id]
-        cable = cables[j]
-        (;state) = cable
-        (;length,) = state
-        s = 1/length
-        Jj .= 0
-        Jj[:,mfull2] .+= C2
-        Jj[:,mfull1] .-= C1
-        Uj = transpose(Jj)*Jj
-        Ǔj = @view Uj[sys_free_coords_idx,sys_free_coords_idx]
-        Ūjq = Uj[sys_free_coords_idx,:]*q
-        retǨg .+= f[j]/length*(Ǔj-s^2*Ūjq*transpose(Ūjq))
+    foreach(st.apparatuses) do appar
+        if appar.joint isa CableJoint
+            j = appar.id
+            (;force,joint) = appar
+            (;hen,egg) = joint.hen2egg
+            rb1 = hen.body
+            rb2 = egg.body
+            ap1id = hen.pid
+            ap2id = egg.pid
+            C1 = rb1.cache.Cps[ap1id]
+            C2 = rb2.cache.Cps[ap2id]
+            mfull1 = bodyid2sys_full_coords[rb1.prop.id]
+            mfull2 = bodyid2sys_full_coords[rb2.prop.id]
+            (;state) = force
+            (;length,) = state
+            s = 1/length
+            Jj .= 0
+            Jj[:,mfull2] .+= C2
+            Jj[:,mfull1] .-= C1
+            Uj = transpose(Jj)*Jj
+            Ǔj = @view Uj[sys_free_coords_idx,sys_free_coords_idx]
+            Ūjq = Uj[sys_free_coords_idx,:]*q
+            retǨg .+= f[j]/length*(Ǔj-s^2*Ūjq*transpose(Ūjq))
+        end
     end
     retǨg
 end
 
 function make_Ǩm_Ǩg(st,q0)
     (;num_of_dim) = st
-    (;numbered,indexed,tensioned) = st.connectivity
+    (;numbered,indexed,) = st.connectivity
     (;num_of_full_coords,num_of_free_coords,sys_pres_coords_idx,sys_free_coords_idx,bodyid2sys_full_coords) = indexed
-    (;connected) = tensioned
-    (;cables) = st.apparatuses
     (;bodyid2sys_loci_idx,sys_loci2coords_idx) = numbered
     function inner_Ǩm_Ǩg(q̌,s,μ,k,c)
 		q = Vector{eltype(q̌)}(undef,num_of_full_coords)
@@ -296,14 +296,15 @@ function make_Ǩm_Ǩg(st,q0)
         Jj = zeros(eltype(q̌),num_of_dim,num_of_full_coords)
         retǨm = zeros(eltype(q̌),num_of_free_coords,num_of_free_coords)
         retǨg = zeros(eltype(q̌),num_of_free_coords,num_of_free_coords)
-        foreach(connected) do scnt
-            j = scnt.id
-            rb1 = scnt.hen.body
-            rb2 = scnt.egg.body
+        foreach(st.apparatuses) do appar
+            j = appar.id
+            (;hen,egg) = appar.joint.hen2egg
+            rb1 = hen.body
+            rb2 = egg.body
             rb1id = rb1.prop.id
             rb2id = rb2.prop.id
-            ap1id = scnt.hen.pid
-            ap2id = scnt.egg.pid
+            ap1id = hen.pid
+            ap2id = egg.pid
             c1 = c[sys_loci2coords_idx[bodyid2sys_loci_idx[rb1id][ap1id]]]
             c2 = c[sys_loci2coords_idx[bodyid2sys_loci_idx[rb2id][ap2id]]]
             C1 = rb1.state.cache.funcs.C(c1)
@@ -328,18 +329,19 @@ function make_Ǩm_Ǩg(st,q0)
         Jj = zeros(eltype(q̌),num_of_dim,num_of_full_coords)
         retǨm = zeros(eltype(q̌),num_of_free_coords,num_of_free_coords)
         retǨg = zeros(eltype(q̌),num_of_free_coords,num_of_free_coords)
-        foreach(connected) do scnt
-            j = scnt.id
-            rb1 = scnt.hen.body
-            rb2 = scnt.egg.body
-            ap1id = scnt.hen.pid
-            ap2id = scnt.egg.pid
+        foreach(st.apparatuses) do appar
+            j = appar.id
+            (;force,joint) = appar
+            (;hen,egg) = joint.hen2egg
+            rb1 = hen.body
+            rb2 = egg.body
+            ap1id = hen.pid
+            ap2id = egg.pid
             C1 = rb1.state.cache.Cps[ap1id]
             C2 = rb2.state.cache.Cps[ap2id]
             mfull1 = bodyid2sys_full_coords[rb1.prop.id]
             mfull2 = bodyid2sys_full_coords[rb2.prop.id]
-            cable = cables[j]
-            (;k,c,state,slack) = cable
+            (;k,c,state,slack) = force
             (;direction,tension,length,lengthdot) = state
             s = 1/length
             Jj .= 0
@@ -357,10 +359,9 @@ end
 
 function make_S(st,q0)
     (;num_of_dim) = st
-    (;numbered,indexed,tensioned) = st.connectivity
+    (;numbered,indexed,) = st.connectivity
     (;sys_pres_coords_idx,sys_free_coords_idx,num_of_full_coords,bodyid2sys_full_coords) = indexed
     (;bodyid2sys_loci_idx,sys_loci2coords_idx) = numbered
-    (;connected) = tensioned
     (;cables) = st.apparatuses
     ncables = length(cables)
     function inner_S(q̌,s)
@@ -369,14 +370,16 @@ function make_S(st,q0)
 		q[sys_free_coords_idx] .= q̌
         ret = zeros(eltype(q̌),ncables)
         Jj = zeros(eltype(q̌),num_of_dim,num_of_full_coords)
-        foreach(connected) do scnt
-            j = scnt.id
-            rb1 = scnt.hen.body
-            rb2 = scnt.egg.body
+        foreach(st.apparatuses) do appar
+            j = appar.id
+            (;force,joint) = appar
+            (;hen,egg) = joint.hen2egg
+            rb1 = hen.body
+            rb2 = egg.body
             rb1id = rb1.prop.id
             rb2id = rb2.prop.id
-            ap1id = scnt.hen.pid
-            ap2id = scnt.egg.pid
+            ap1id = hen.pid
+            ap2id = egg.pid
             # c1 = c[sys_loci2coords_idx[bodyid2sys_loci_idx[rb1id][ap1id]]]
             # c2 = c[sys_loci2coords_idx[bodyid2sys_loci_idx[rb2id][ap2id]]]
             # C1 = rb1.state.cache.funcs.C(c1)
@@ -399,14 +402,15 @@ function make_S(st,q0)
         q[sys_free_coords_idx] .= q̌
         ret = zeros(eltype(q̌),ncables)
         Jj = zeros(eltype(q̌),num_of_dim,num_of_full_coords)
-        foreach(connected) do scnt
-            j = scnt.id
-            rb1 = scnt.hen.body
-            rb2 = scnt.egg.body
+        foreach(st.apparatuses) do appar
+            j = appar.id
+            (;hen,egg) = appar.joint.hen2egg
+            rb1 = hen.body
+            rb2 = egg.body
             rb1id = rb1.prop.id
             rb2id = rb2.prop.id
-            ap1id = scnt.hen.pid
-            ap2id = scnt.egg.pid
+            ap1id = hen.pid
+            ap2id = egg.pid
             c1 = c[sys_loci2coords_idx[bodyid2sys_loci_idx[rb1id][ap1id]]]
             c2 = c[sys_loci2coords_idx[bodyid2sys_loci_idx[rb2id][ap2id]]]
             C1 = rb1.state.cache.funcs.C(c1)

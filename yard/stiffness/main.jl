@@ -1,3 +1,12 @@
+
+using Revise #jl
+import Rible as RB
+
+include(joinpath(pathof(RB),"../../yard/stability_stiffness.jl"))
+using AbbreviatedStackTraces #jl
+ENV["JULIA_STACKTRACE_ABBREVIATED"] = true #jl
+ENV["JULIA_STACKTRACE_MINIMAL"] = true #jl
+
 figdir::String = ""
 if Sys.iswindows()
     figdir::String = raw"C:\Users\luo22\OneDrive\Papers\TensegrityStability"
@@ -5,14 +14,35 @@ elseif Sys.isapple()
     figdir::String = raw"/Users/jacob/Library/CloudStorage/OneDrive-SharedLibraries-onedrive/Papers/TensegrityStability"
 end
 
-includet("deps.jl")
-import Rible as RB
-include("../../vis.jl")
-includet("../../vis.jl")
+include(joinpath(pathof(RB),"../../test/vis.jl"))
+includet(joinpath(pathof(RB),"../../test/vis.jl")) #jl
 
-fontsize = 8 |> pt2px
-tw = 468 |> pt2px
-th = 622 |> pt2px
+include(joinpath(pathof(RB),"../../examples/bodies/rigidbar.jl"))
+includet(joinpath(pathof(RB),"../../examples/bodies/rigidbar.jl")) #jl
+include(joinpath(pathof(RB),"../../examples/robots/superball.jl"))
+includet(joinpath(pathof(RB),"../../examples/robots/superball.jl")) #jl
+
+
+include(joinpath(pathof(RB),"../../examples/bodies/make_3d_bar.jl"))
+includet(joinpath(pathof(RB),"../../examples/bodies/make_3d_bar.jl")) #jl
+include(joinpath(pathof(RB),"../../examples/bodies/make_3d_plate.jl"))
+includet(joinpath(pathof(RB),"../../examples/bodies/make_3d_plate.jl")) #jl
+include(joinpath(pathof(RB),"../../examples/robots/prism.jl"))
+includet(joinpath(pathof(RB),"../../examples/robots/prism.jl")) #jl
+
+include(joinpath(pathof(RB),"../../examples/bodies/make_3d_tri.jl"))
+includet(joinpath(pathof(RB),"../../examples/bodies/make_3d_tri.jl")) #jl
+include(joinpath(pathof(RB),"../../examples/robots/tower.jl"))
+includet(joinpath(pathof(RB),"../../examples/robots/tower.jl")) #jl
+
+include(joinpath(pathof(RB),"../../examples/bodies/build_2d_tri.jl"))
+includet(joinpath(pathof(RB),"../../examples/bodies/build_2d_tri.jl")) #jl
+include(joinpath(pathof(RB),"../../examples/robots/two_tri.jl"))
+includet(joinpath(pathof(RB),"../../examples/robots/two_tri.jl")) #jl
+
+fontsize = 8 
+cw = 240.7103
+tw = 494.22432
 #-- preamble end
 
 #-- one_tri_one_bar
@@ -52,7 +82,7 @@ end
 function build_nullspace_on_free(st)
     (;sys_free_coords_idx,bodyid2sys_dof_idx) = st.connectivity.indexed
     q = RB.get_coords(bot.structure)
-    Nin = RB.make_intrinsic_nullspace(st,q)[
+    Nin = RB.intrinsic_nullspace(st,q)[
         sys_free_coords_idx,
         reduce(vcat,bodyid2sys_dof_idx[2:end])
     ]
@@ -75,13 +105,13 @@ f = RB.get_cables_tension(bot)
 
 function verify_lambda(st)
     T = RB.get_numbertype(st)
-    λs = zeros(T,st.num_of_bodies)
+    λs = zeros(T,st.connectivity.indexed.num_of_bodies)
     foreach(st.bodies) do body
         (;prop,state) = body
-        (;loci_states,origin_position) = state
+        (;loci_states,origin_frame) = state
         # @myshow prop.id
         for locus_state in loci_states
-            λs[prop.id] += -1/2*(locus_state.position-origin_position)'*locus_state.force
+            λs[prop.id] += -1/2*(locus_state.frame.position-origin_frame.position)'*locus_state.force
         end
     end
     λs
@@ -118,7 +148,7 @@ l = RB.get_cables_len(bot.structure)
 λ = inv(Ǎ*transpose(Ǎ))*Ǎ*Bᵀ*f
 @myshow verify_lambda(bot.structure)
 @myshow λ
-Ǩa = RB.cstr_forces_jacobian(bot.structure,λ)
+Ǩa = RB.cstr_forces_jacobian(bot.structure,q,λ)
 𝒦a = transpose(Ň)*Ǩa*Ň |> Symmetric 
 vals_𝒦a,vecs_𝒦a = eigen(𝒦a)
 @myshow sort(vals_𝒦a)
@@ -136,7 +166,7 @@ vec𝒦ps = [
         # @show s
         λi = inv(Ǎ*transpose(Ǎ))*Ǎ*Bᵀ*si
         # @show f,λ
-        Ǩai = - RB.cstr_forces_jacobian(bot.structure,λi)
+        Ǩai = RB.cstr_forces_jacobian(bot.structure,q,λi)
 
         Ǩgi = RB.build_geometric_stiffness_matrix!(bot.structure,q,si)
 
@@ -171,10 +201,11 @@ v'*𝒦*v
 vm[:,1] = v
 orthovm = RB.modified_gram_schmidt(vm)
 
-with_theme(theme_pub;
-    size = (0.9tw,0.3tw),
-    fontsize = 6.5 |> pt2px,
-    figure_padding = (2fontsize,fontsize,0,0),
+
+GM.activate!(;scalefactor=2);with_theme(theme_pub;
+    size = (1cw,0.9cw),
+    fontsize = 6.5 ,
+    figure_padding = (0,0,-2.5fontsize,0),
     Axis3 = (        
         azimuth = 3.7555306333269844,
         elevation = 0.3726990816987242,
@@ -190,12 +221,16 @@ with_theme(theme_pub;
         ratio = norm(δq̌i)/norm(q̌)
         botvis.traj.q̌[end] .= q̌ .+ scaling.*δq̌i/ratio
     end
+    fig = Figure()
+    gd1 = fig[1,1:2] = GridLayout()
+    gd2 = fig[2,1:2] = GridLayout()
+    rowgap!(fig.layout,0)
     plot_traj!(
         botvis;
-        figsize = (0.8tw,0.26tw),
+        fig = gd1,
         AxisType=Axis3,
-        gridsize=(1,nk+1),        
-        atsteps=1:nk+1,
+        gridsize=(1,1),
+        atsteps=1:1,
         doslide=false,
         showlabels=false,
         showpoints=false,
@@ -210,20 +245,42 @@ with_theme(theme_pub;
                     rich("($(alphabet[sgi])) ", font=:bold),
                     [
                         "Initial",
+                    ][sgi]
+                )
+        end,
+    )
+    plot_traj!(
+        botvis;
+        fig = gd2,
+        AxisType=Axis3,
+        gridsize=(1,nk),        
+        atsteps=2:nk+1,
+        doslide=false,
+        showlabels=false,
+        showpoints=false,
+        # showcables = false,
+        showground = false,
+        xlims = (-1e0,1e0),
+        ylims = (-1e0,1e0),
+        zlims = (-1e-5,2e0),
+        slack_linestyle = :solid,
+        showinit = true,titleformatfunc = (sgi,tt)-> begin
+            rich(
+                    rich("($(alphabet[sgi+1])) ", font=:bold),
+                    [
                         "Mechanism Mode 1",
                         "Mechanism Mode 2"
                     ][sgi]
                 )
         end,
         sup! = (ax,tgob,sgi)->begin
-            if sgi != 1
-                hidedecorations!(ax)
-                xlims!(ax,-1.0e0,1.2e0)
-                ylims!(ax,-1.2e0,1.0e0)
-            end
+            hidedecorations!(ax)
+            xlims!(ax,-1.0e0,1.2e0)
+            ylims!(ax,-1.2e0,1.0e0)
         end,
-        figname="superball"
     )
+    savefig(fig,"superball")
+    fig
 end
 
 Ňv = Ň*nullspace(v')
@@ -254,7 +311,7 @@ vecr𝒦ps = [
         # @show s
         λi = inv(Ǎ*transpose(Ǎ))*Ǎ*Bᵀ*si
         # @show f,λ
-        Ǩai = RB.cstr_forces_jacobian(bot.structure,λi)
+        Ǩai = RB.cstr_forces_jacobian(bot.structure,q,λi)
 
         Ǩgi = RB.build_geometric_stiffness_matrix!(bot.structure,q,si)
 
@@ -305,7 +362,7 @@ maxminmodes = hcat(
 )
 
 with_theme(theme_pub;
-    fontsize = 6.5 |> pt2px,
+    fontsize = 6.5 ,
     size = (0.8tw,0.18tw),
     figure_padding = (0,0,-fontsize,0),
     Axis3 = (        
@@ -378,7 +435,7 @@ size(rρs,1)
 ]
 
 with_theme(theme_pub;
-        size = (0.3tw,0.2tw),
+        size = (0.6cw,0.35cw),
         figure_padding = (0,fontsize,0,fontsize),
     ) do 
     fig = Figure()
@@ -388,7 +445,7 @@ with_theme(theme_pub;
     )
     lines!(ax,σs,rρs[1,:],)
     xlims!(ax,0,5500)
-    ylims!(ax,-400,600)
+    ylims!(ax,-200,600)
     # for i = axes(rρs,1)
     #     lines!(ax,σs,rρs[i,:],)
     # end
@@ -427,18 +484,17 @@ prism1 = prisms(;
 )
 bot = prism1
 rb1 = RB.get_bodies(bot)[1]
-viz(rb1) 
+ 
 plot_traj!(bot;showground=false)
 RB.check_static_equilibrium_output_multipliers(bot.structure)
-@myshow bot.structure.num_of_dof
+@myshow bot.structure.connectivity.indexed.num_of_dof
 RB.update!(bot.structure)
 f = RB.get_cables_tension(bot)
-
 # for use with Class-1 and the 1st rigid fixed
 function build_nullspace_on_free(st)
     (;sys_free_coords_idx,bodyid2sys_full_coords,bodyid2sys_dof_idx) = st.connectivity.indexed
     q = RB.get_coords(bot.structure)
-    Nin = RB.make_intrinsic_nullspace(st,q)[
+    Nin = RB.intrinsic_nullspace(st,q)[
         sys_free_coords_idx,
         reduce(vcat,bodyid2sys_dof_idx[begin:end-1])
     ]
@@ -487,10 +543,10 @@ D
 ns = size(S,2)
 nk = size(D,2)
 
-GM.activate!();with_theme(theme_pub;
-        size = (0.95tw,0.24tw),
-        figure_padding = (2fontsize,0,0,0),
-        fontsize = 6.5 |> pt2px,
+GM.activate!(;scalefactor=4);with_theme(theme_pub;
+        size = (1cw,0.30tw),
+        figure_padding = (0,0,-2fontsize,0),
+        fontsize = 6.5 ,
         Axis3 = (
             azimuth = 3.8255306333269843,
             elevation = 0.2026990816987241
@@ -503,7 +559,10 @@ GM.activate!();with_theme(theme_pub;
     fig = Figure()
     gd1 = fig[1,1] = GridLayout()
     gd2 = fig[1,2:3] = GridLayout()
-    gd3 = fig[1,4:5] = GridLayout()
+    gd3_holder = fig[2,1:3] = GridLayout()
+    gd3 = gd3_holder[1,1:2] = GridLayout()
+    colgap!(fig.layout,0)
+    rowgap!(fig.layout,-fontsize)
     botmm = deepcopy(bot)
     plot_traj!(
         bot;
@@ -524,8 +583,8 @@ GM.activate!();with_theme(theme_pub;
                 )
         end,
         sup! = (ax,tgob,sgi)->begin
-            hidex(ax)
-            hidey(ax)
+            RB.hidex(ax)
+            RB.hidey(ax)
             # xlims!(ax,-1.0e0,1.2e0)
             # ylims!(ax,-1.2e0,1.0e0)
         end,
@@ -560,10 +619,10 @@ GM.activate!();with_theme(theme_pub;
             ax.elevation = 0.18269908169872395
             # azimuth = 4.665530633326984
             # elevation = 0.16269908169872424
-            hidexyz(ax)
+            RB.hidexyz(ax)
             @myshow Sbool[:,sgi]
             linesegs_cables = @lift begin
-                get_linesegs_cables($tgob;)[Sbool[:,sgi]]
+                RB.get_linesegs_cables($tgob;)[Sbool[:,sgi]]
             end
             linesegments!(ax, 
                 linesegs_cables, 
@@ -571,18 +630,18 @@ GM.activate!();with_theme(theme_pub;
                 # linewidth = cablewidth
                 )
             rcs_by_cables = @lift begin
-                (;tensioned) = $tgob.connectivity
+                cables = RB.get_cables($tgob)
                 num_of_dim = RB.get_num_of_dims($tgob)
                 T = RB.get_numbertype($tgob)
                 ret = Vector{MVector{num_of_dim,T}}()
                 mapreduce(
-                    (scnt)->
+                    (cable)->
                     [(
-                        scnt.hen.body.state.loci_states[scnt.hen.pid].position.+
-                        scnt.egg.body.state.loci_states[scnt.egg.pid].position
+                        cable.joint.hen2egg.hen.body.state.loci_states[cable.joint.hen2egg.hen.pid].frame.position.+
+                        cable.joint.hen2egg.egg.body.state.loci_states[cable.joint.hen2egg.egg.pid].frame.position
                     )./2],
                     vcat,
-                    tensioned.connected
+                    cables
                     ;init=ret
                 )
             end
@@ -597,14 +656,14 @@ GM.activate!();with_theme(theme_pub;
             #     ax,
             #     rcs_by_cables[][Sbool[:,sgi]],
             #     marker = :rect, 
-            #     markersize = 12 |> pt2px, 
+            #     markersize = 12 , 
             #     color = :white
             # )
             text!(
                 ax,
                 Stext,
                 position = rcs_by_cables[][Sbool[:,sgi]],
-                fontsize = 5 |> pt2px,
+                fontsize = 5 ,
                 color = :red,
                 align = (:center, :center),
                 # offset = (-fontsize/2, 0)
@@ -633,7 +692,7 @@ GM.activate!();with_theme(theme_pub;
         showground = false,
         xlims = (-8e-2,8e-2),
         ylims = (-8e-2,8e-2),
-        zlims = (-1e-5,2.5e-1),
+        zlims = (-1e-5,2.1e-1),
         slack_linestyle = :solid,
         showinit = true,titleformatfunc = (sgi,tt)-> begin
             rich(
@@ -645,7 +704,7 @@ GM.activate!();with_theme(theme_pub;
                 )
         end,
         sup! = (ax,tgob,sgi)->begin
-            hidexyz(ax)
+            RB.hidexyz(ax)
             # xlims!(ax,-1.0e0,1.2e0)
             # ylims!(ax,-1.2e0,1.0e0)
         end,
@@ -670,7 +729,7 @@ f = S*ᾱ
 
 λ = inv(Ǎ*transpose(Ǎ))*Ǎ*Bᵀ*f
 # @show f,λ
-Ǩa = RB.cstr_forces_jacobian(bot.structure,λ)
+Ǩa = RB.cstr_forces_jacobian(bot.structure,q,λ)
 𝒦ain = transpose(Nin)*Ǩa*Nin
 𝒦a = transpose(Ň)*Ǩa*Ň |> Symmetric 
 vals_𝒦a,vecs_𝒦a = eigen(𝒦a)
@@ -697,7 +756,7 @@ vec𝒦ps = [
         # @show s
         λi = inv(Ǎ*transpose(Ǎ))*Ǎ*Bᵀ*si
         # @show f,λ
-        Ǩai = RB.cstr_forces_jacobian(bot.structure,λi)
+        Ǩai = RB.cstr_forces_jacobian(bot.structure,q,λi)
 
         Ǩgi = RB.build_geometric_stiffness_matrix!(bot.structure,q,si)
 
@@ -760,7 +819,8 @@ Vals =  [
 ] |> VectorOfArray
 
 with_theme(theme_pub;
-        size = (0.6tw,0.2tw),
+        size = (1cw,0.3cw),
+        fontsize = 6.5,
         figure_padding = (0,fontsize,0,0),
     ) do 
     fig = Figure()
@@ -865,7 +925,8 @@ Vals_α =  [
 ] |> VectorOfArray
 
 with_theme(theme_pub;
-        size = (0.6tw,0.2tw),
+        size = (1cw,0.3cw),
+        fontsize = 6.5,
         figure_padding = (0,fontsize,0,0),
     ) do 
     fig = Figure()
@@ -925,14 +986,14 @@ end
 two = two_tri()
 bot = two
 plot_traj!(bot;showground=false)
-bot.structure.num_of_dof
+bot.structure.connectivity.indexed.num_of_dof
 
 RB.check_static_equilibrium_output_multipliers(bot.structure)
 
 function make_nullspace_on_free(st)    
     (;sys_free_coords_idx,bodyid2sys_dof_idx) = st.connectivity.indexed
     q = RB.get_coords(bot.structure)
-    Nin = RB.make_intrinsic_nullspace(st,q)
+    Nin = RB.intrinsic_nullspace(st,q)
     Nin[
         sys_free_coords_idx,
         reduce(vcat,bodyid2sys_dof_idx[2:end])
@@ -985,9 +1046,9 @@ nk = size(D,2)
 ns = size(S,2)
 
 GM.activate!();with_theme(theme_pub;
-        size = (0.9tw,0.22tw),
-        figure_padding = (fontsize,0,0,0),
-        fontsize = 6.5 |> pt2px,
+        size = (1cw,0.6cw),
+        figure_padding = (-1fontsize,-1fontsize,-1fontsize,0),
+        fontsize = 6.5 ,
         Axis3 = (
             azimuth = -π/2-1e-10,
             elevation = π/2,
@@ -1001,8 +1062,11 @@ GM.activate!();with_theme(theme_pub;
     Sbool = S.> maxS*rtol
     S[.!Sbool] .= 0.0
     fig = Figure()
-    gd1 = fig[1,1] = GridLayout(;tellheight=false)
-    gd2 = fig[1,2:3] = GridLayout(;tellheight=false)
+    gd1 = fig[1,1:2] = GridLayout(;tellheight=false)
+    gd2 = fig[2,1:2] = GridLayout(;tellheight=false)
+    ## colgap!(gd2,-fontsize)
+    rowsize!(fig.layout,1,Relative(0.3))
+    rowgap!(fig.layout,0fontsize)
     plot_traj!(
         bot,
         fig = gd1,
@@ -1021,10 +1085,10 @@ GM.activate!();with_theme(theme_pub;
         end,
         sup! = (ax,tgob,sgi)-> begin
             # cables
-            hidez(ax)
+            RB.hidez(ax)
         end
     )
-    rowsize!(gd1,1,Fixed(0.1tw))
+    ## rowsize!(gd1,1,Fixed(0.3cw))
     plot_traj!(
         bot,
         fig = gd2,
@@ -1037,7 +1101,8 @@ GM.activate!();with_theme(theme_pub;
         showcables = false,
         xlims = (-0.5,0.5),
         ylims = (-0.15,0.15),
-        rowgap=0,
+        rowgap=-1fontsize,
+        colgap=-2fontsize,
         titleformatfunc = (sgi,tt)-> begin
             rich(
                     rich("($(alphabet[sgi+1])) ", font=:bold),
@@ -1051,10 +1116,10 @@ GM.activate!();with_theme(theme_pub;
         end,
         sup! = (ax,tgob,sgi)-> begin
             # cables
-            hidexyz(ax)
+            RB.hidexyz(ax)
             @myshow Sbool[:,sgi]
             linesegs_cables = @lift begin
-                get_linesegs_cables($tgob;)[Sbool[:,sgi]]
+                RB.get_linesegs_cables($tgob;)[Sbool[:,sgi]]
             end
             linesegments!(ax, 
                 linesegs_cables, 
@@ -1062,18 +1127,18 @@ GM.activate!();with_theme(theme_pub;
                 # linewidth = cablewidth
                 )
             rcs_by_cables = @lift begin
-                (;tensioned) = $tgob.connectivity
+                cables = RB.get_cables($tgob)
                 num_of_dim = RB.get_num_of_dims($tgob)
                 T = RB.get_numbertype($tgob)
                 ret = Vector{MVector{num_of_dim,T}}()
                 mapreduce(
-                    (scnt)->
+                    (cable)->
                     [(
-                        scnt.hen.body.state.loci_states[scnt.hen.pid].position.+
-                        scnt.egg.body.state.loci_states[scnt.egg.pid].position
+                        cable.joint.hen2egg.hen.body.state.loci_states[cable.joint.hen2egg.hen.pid].frame.position.+
+                        cable.joint.hen2egg.egg.body.state.loci_states[cable.joint.hen2egg.egg.pid].frame.position
                     )./2],
                     vcat,
-                    tensioned.connected
+                    cables
                     ;init=ret
                 )
             end
@@ -1088,14 +1153,14 @@ GM.activate!();with_theme(theme_pub;
             #     ax,
             #     rcs_by_cables[][Sbool[:,sgi]],
             #     marker = :rect, 
-            #     markersize = 12 |> pt2px, 
+            #     markersize = 12 , 
             #     color = :white
             # )
             text!(
                 ax,
                 Stext,
                 position = rcs_by_cables[][Sbool[:,sgi]],
-                fontsize = 5 |> pt2px,
+                fontsize = 5 ,
                 color = :red,
                 align = (:center, :center),
                 # offset = (-fontsize/2, 0)
@@ -1121,7 +1186,7 @@ struct𝒦 = [
         # @show s
         λ = inv(Ǎ*transpose(Ǎ))*Ǎ*Bᵀ*s
         # @show f,λ
-        Ǩa = RB.cstr_forces_jacobian(bot.structure,λ)
+        Ǩa = RB.cstr_forces_jacobian(bot.structure,q,λ)
 
         Ǩg = RB.build_geometric_stiffness_matrix!(bot.structure,q,s)
 
@@ -1159,7 +1224,7 @@ Vals =  [
 ] |> VectorOfArray
 
 GM.activate!();with_theme(theme_pub;
-        size = (0.5tw,0.2tw),
+        size = (0.8cw,0.3cw),
         figure_padding = (0,fontsize,0,fontsize),
     ) do 
     fig = Figure()
@@ -1235,7 +1300,7 @@ f = sum(S,dims=2)
 # equivalent μ
 # μ = l .- (f./k)
 
-λ = -inv(Ǎ*transpose(Ǎ))*Ǎ*Bᵀ*f
+λ = inv(Ǎ*transpose(Ǎ))*Ǎ*Bᵀ*f
 # @show f,λ
 Ǩa = RB.cstr_forces_jacobian(bot.structure,λ)
 𝒦a = transpose(Ň)*Ǩa*Ň |> Symmetric 
@@ -1255,7 +1320,7 @@ vec𝒦ps = [
         # @show s
         λi = inv(Ǎ*transpose(Ǎ))*Ǎ*Bᵀ*si
         # @show f,λ
-        Ǩai = - RB.cstr_forces_jacobian(bot.structure,λi)
+        Ǩai = RB.cstr_forces_jacobian(bot.structure,λi)
 
         Ǩgi = RB.build_geometric_stiffness_matrix!(bot.structure,q,si)
 
@@ -1380,14 +1445,14 @@ end
 towerbot = tower()
 bot = towerbot
 
-@myshow bot.structure.num_of_dof
+@myshow bot.structure.connectivity.indexed.num_of_dof
 
 plot_traj!(bot;showground=false)
 
 function build_nullspace_on_free(st)
     (;sys_free_coords_idx,bodyid2sys_full_coords,bodyid2sys_dof_idx) = st.connectivity.indexed
     q = RB.get_coords(bot.structure)
-    Nin = RB.make_intrinsic_nullspace(st,q)[
+    Nin = RB.intrinsic_nullspace(st,q)[
         sys_free_coords_idx,
         reduce(vcat,bodyid2sys_dof_idx[begin+1:end])
     ]    
@@ -1416,7 +1481,7 @@ Ǎ = RB.make_cstr_jacobian(bot.structure)(q)
 Ň = build_nullspace_on_free(bot.structure)
 Q̃ = RB.build_Q̃(bot.structure)
 L̂ = RB.build_L̂(bot.structure)
-
+rank(Ň)
 Ǎ*Ň |> norm
 
 # Left hand side
@@ -1436,9 +1501,9 @@ l = RB.get_cables_len(bot.structure)
 
 isis = [8,14,24]
 GM.activate!();with_theme(theme_pub;
-        size = (0.95tw,0.2tw),
-        figure_padding = (2fontsize,0,0,0),
-        fontsize = 6.5 |> pt2px,
+        size = (1cw,0.3tw),
+        figure_padding = (-fontsize,-fontsize,-2fontsize,0),
+        fontsize = 6.5 ,
         Axis3 = (
             azimuth = 3.8255306333269843,
             elevation = 0.2026990816987241
@@ -1450,7 +1515,10 @@ GM.activate!();with_theme(theme_pub;
     S[.!Sbool] .= 0.0
     fig = Figure()
     gd1 = fig[1,1] = GridLayout()
-    gd2 = fig[1,2:3+1] = GridLayout()
+    gd2_holder = fig[2,:] = GridLayout()
+    gd2 = gd2_holder[1,1:3] = GridLayout()
+    ## rowsize!(fig.layout,1,Relative(0.3))
+    rowgap!(fig.layout,-1fontsize)
     botmm = deepcopy(bot)
     plot_traj!(
         bot;
@@ -1471,8 +1539,8 @@ GM.activate!();with_theme(theme_pub;
                 )
         end,
         sup! = (ax,tgob,sgi)->begin
-            hidex(ax)
-            hidey(ax)
+            RB.hidex(ax)
+            RB.hidey(ax)
             # xlims!(ax,-1.0e0,1.2e0)
             # ylims!(ax,-1.2e0,1.0e0)
         end,
@@ -1489,12 +1557,13 @@ GM.activate!();with_theme(theme_pub;
         xlims = (-1.5e0,1.5e0),
         ylims = (-1.5e0,1.5e0),
         zlims = (-0.6e0,1.5e0),
+        colgap = -2fontsize,
         showground = false,
         showinit = true,
         titleformatfunc = (sgi,tt)-> begin
             rich(
                     rich("($(alphabet[sgi+1])) ", font=:bold),
-                    "Self-stress State $sgi"
+                    "Self-stress State $(isis[sgi])"
                 )
         end,
         sup! = (ax,tgob,sgi_input)-> begin
@@ -1504,10 +1573,10 @@ GM.activate!();with_theme(theme_pub;
             ax.elevation = 0.18269908169872395
             # azimuth = 4.665530633326984
             # elevation = 0.16269908169872424
-            hidexyz(ax)
+            RB.hidexyz(ax)
             @myshow Sbool[:,sgi]
             linesegs_cables = @lift begin
-                get_linesegs_cables($tgob;)[Sbool[:,sgi]]
+                RB.get_linesegs_cables($tgob;)[Sbool[:,sgi]]
             end
             linesegments!(ax, 
                 linesegs_cables, 
@@ -1515,18 +1584,18 @@ GM.activate!();with_theme(theme_pub;
                 # linewidth = cablewidth
                 )
             rcs_by_cables = @lift begin
-                (;tensioned) = $tgob.connectivity
+                cables = RB.get_cables($tgob)
                 num_of_dim = RB.get_num_of_dims($tgob)
                 T = RB.get_numbertype($tgob)
                 ret = Vector{MVector{num_of_dim,T}}()
                 mapreduce(
-                    (scnt)->
+                    (cable)->
                     [(
-                        scnt.hen.body.state.loci_states[scnt.hen.pid].+
-                        scnt.egg.body.state.loci_states[scnt.egg.pid]
+                        cable.joint.hen2egg.hen.body.state.loci_states[cable.joint.hen2egg.hen.pid].frame.position.+
+                        cable.joint.hen2egg.egg.body.state.loci_states[cable.joint.hen2egg.egg.pid].frame.position
                     )./2],
                     vcat,
-                    tensioned.connected
+                    cables
                     ;init=ret
                 )
             end
@@ -1541,14 +1610,14 @@ GM.activate!();with_theme(theme_pub;
             #     ax,
             #     rcs_by_cables[][Sbool[:,sgi]],
             #     marker = :rect, 
-            #     markersize = 12 |> pt2px, 
+            #     markersize = 12 , 
             #     color = :white
             # )
             text!(
                 ax,
                 Stext,
                 position = rcs_by_cables[][Sbool[:,sgi]],
-                fontsize = 5 |> pt2px,
+                fontsize = 5 ,
                 color = :red,
                 align = (:center, :center),
                 # offset = (-fontsize/2, 0)
@@ -1566,9 +1635,9 @@ f = S*ᾱ
 # equivalent μ
 # μ = l .- (f./k)
 
-λ = -inv(Ǎ*transpose(Ǎ))*Ǎ*Bᵀ*f
+λ = inv(Ǎ*transpose(Ǎ))*Ǎ*Bᵀ*f
 # @show f,λ
-Ǩa = RB.cstr_forces_jacobian(bot.structure,λ)
+Ǩa = RB.cstr_forces_jacobian(bot.structure,q,λ)
 𝒦a = transpose(Ň)*Ǩa*Ň |> Symmetric 
 vals_𝒦a,vecs_𝒦a = eigen(𝒦a)
 @myshow sort(vals_𝒦a)
@@ -1588,7 +1657,7 @@ vec𝒦ps = [
         # @show s
         λi = inv(Ǎ*transpose(Ǎ))*Ǎ*Bᵀ*si
         # @show f,λ
-        Ǩai = - RB.cstr_forces_jacobian(bot.structure,λi)
+        Ǩai = RB.cstr_forces_jacobian(bot.structure,q,λi)
 
         Ǩgi = RB.build_geometric_stiffness_matrix!(bot.structure,q,si)
 
@@ -1661,7 +1730,8 @@ Vals_alpha3 =  [
 
 
 with_theme(theme_pub;
-        size = (0.35tw,0.2tw),
+        size = (0.6cw,0.36cw),
+        fontsize = 6.5,
         figure_padding = (0,fontsize,0,fontsize),
     ) do 
     fig = Figure()
@@ -1779,7 +1849,7 @@ f =  S*ᾱ
 GM.activate!();with_theme(theme_pub;
         size = (0.95tw,0.24tw),
         figure_padding = (2fontsize,0,0,0),
-        fontsize = 6.5 |> pt2px,
+        fontsize = 6.5 ,
         Axis3 = (
             azimuth = 3.8255306333269843,
             elevation = 0.2026990816987241
@@ -1844,7 +1914,7 @@ GM.activate!();with_theme(theme_pub;
             ax.elevation = 0.18269908169872395
             # azimuth = 4.665530633326984
             # elevation = 0.16269908169872424
-            hidexyz(ax)
+            RB.hidexyz(ax)
             @myshow Sbool[:,sgi]
             linesegs_cables = @lift begin
                 get_linesegs_cables($tgob;)[Sbool[:,sgi]]
@@ -1881,14 +1951,14 @@ GM.activate!();with_theme(theme_pub;
             #     ax,
             #     rcs_by_cables[][Sbool[:,sgi]],
             #     marker = :rect, 
-            #     markersize = 12 |> pt2px, 
+            #     markersize = 12 , 
             #     color = :white
             # )
             text!(
                 ax,
                 Stext,
                 position = rcs_by_cables[][Sbool[:,sgi]],
-                fontsize = 5 |> pt2px,
+                fontsize = 5 ,
                 color = :red,
                 align = (:center, :center),
                 # offset = (-fontsize/2, 0)
@@ -1899,7 +1969,7 @@ GM.activate!();with_theme(theme_pub;
     fig
 end
 
-λ = -inv(Ǎ*transpose(Ǎ))*Ǎ*Bᵀ*f
+λ = inv(Ǎ*transpose(Ǎ))*Ǎ*Bᵀ*f
 # @show f,λ
 Ǩa = RB.cstr_forces_jacobian(bot.structure,λ)
 𝒦a = transpose(Ň)*Ǩa*Ň |> Symmetric 
@@ -1924,7 +1994,7 @@ struct𝒦p = [
         # @show s
         λ = inv(Ǎ*transpose(Ǎ))*Ǎ*Bᵀ*s
         # @show f,λ
-        Ǩa = - RB.cstr_forces_jacobian(bot.structure,λ)
+        Ǩa = RB.cstr_forces_jacobian(bot.structure,q,λ)
         𝒦a = transpose(Ň)*Ǩa*Ň
 
         Ǩg = RB.build_geometric_stiffness_matrix!(bot.structure,q,s)
@@ -2051,7 +2121,7 @@ with_theme(theme_pub;
     fig
 end
 
-λ = -inv(Ǎ*transpose(Ǎ))*Ǎ*Bᵀ*f
+λ = inv(Ǎ*transpose(Ǎ))*Ǎ*Bᵀ*f
 # @show f,λ
 using Symbolics
 @variables λ[1:6]

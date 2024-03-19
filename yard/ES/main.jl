@@ -1916,7 +1916,7 @@ S,D = RB.static_kinematic_determine(ℬᵀ)
 ns = size(S,2)
 nk = size(D,2)
 
-λ = -inv(Ǎ*transpose(Ǎ))*Ǎ*Bᵀ*f
+λ = inv(Ǎ*transpose(Ǎ))*Ǎ*Bᵀ*f
 Ǩa = RB.cstr_forces_jacobian(bot.st,λ)
 𝒦a = transpose(Ň)*Ǩa*Ň |> Symmetric 
 vals_𝒦a,vecs_𝒦a = eigen(𝒦a)

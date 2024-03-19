@@ -1,23 +1,28 @@
-include("deps.jl")
+
+using Revise #jl
+import Rible as RB
+
+include(joinpath(pathof(RB),"../../yard/stability_stiffness.jl"))
 using AbbreviatedStackTraces #jl
 ENV["JULIA_STACKTRACE_ABBREVIATED"] = true #jl
 ENV["JULIA_STACKTRACE_MINIMAL"] = true #jl
-using Revise #jl
-import Rible as RB
-figdir::String = joinpath(pathof(RB),"../../tmp")
-if Sys.iswindows() #src
-    figdir::String = raw"C:\Users\luo22\OneDrive\Papers\FrictionalContact\CMAME" #src
-elseif Sys.isapple() #src
-    figdir::String = raw"/Users/jacob/Library/CloudStorage/OneDrive-SharedLibraries-onedrive/Papers/FrictionalContact/CMAME" #src
-end #src
-include("../../vis.jl")
-includet("../../vis.jl") #jl
+
+figdir::String = ""
+if Sys.iswindows()
+    figdir::String = raw"C:\Users\luo22\OneDrive\Papers\TensegrityStability"
+elseif Sys.isapple()
+    figdir::String = raw"/Users/jacob/Library/CloudStorage/OneDrive-SharedLibraries-onedrive/Papers/TensegrityStability"
+end
+
+include(joinpath(pathof(RB),"../../test/vis.jl"))
+includet(joinpath(pathof(RB),"../../test/vis.jl")) #jl
 
 #-- T bars
-include("../../../examples/bodies/make_3d_bar.jl")
-includet("../../../examples/bodies/make_3d_bar.jl") #jl
-include("../../../examples/robots/Tbars.jl")
-includet("../../../examples/robots/Tbars.jl")#jl
+include(joinpath(pathof(RB),"../../examples/bodies/make_3d_bar.jl"))
+includet(joinpath(pathof(RB),"../../examples/bodies/make_3d_bar.jl")) #jl
+include(joinpath(pathof(RB),"../../examples/robots/Tbars.jl"))
+includet(joinpath(pathof(RB),"../../examples/robots/Tbars.jl"))#jl
+
 tbbot = Tbars(;θ=π/4)
 bot = tbbot
 @myshow bot.structure.connectivity.indexed.num_of_dof
@@ -39,8 +44,8 @@ plot_traj!(bot;showarrows = false, showground=false)
 
 #todo slider with no hook
 GM.activate!();with_theme(theme_pub;
-        size = (1tw,0.15tw),
-        figure_padding = (0,0,fontsize/2,0),
+        size = (1cw,0.6cw),
+        figure_padding = (0,0,-fontsize/2,0),
         Axis3 = (
             # azimuth = -1.8701322643948965,
             # elevation = 0.6128666392948965,
@@ -51,9 +56,10 @@ GM.activate!();with_theme(theme_pub;
     ) do 
     fig = Figure()
     gd0 = fig[1,1] = GridLayout(;tellheight=false)
-    gd1 = fig[1,2] = GridLayout(;tellheight=false)
+    gd1 = fig[2,1] = GridLayout(;tellheight=false)
     # rowsize!(gd0,1,Fixed(0.15tw))
     # rowsize!(gd1,1,Fixed(0.15tw))
+    rowgap!(fig.layout,0)
     bot0 = Tbars(;θ=0)
     plot_traj!(
         bot0,
@@ -75,7 +81,7 @@ GM.activate!();with_theme(theme_pub;
         end,
         sup! = (ax,tgob,sgi)-> begin
             # cables
-            hidez(ax)
+            RB.hidez(ax)
         end
     )
     bot1 = Tbars(;θ=π/4)
@@ -98,7 +104,7 @@ GM.activate!();with_theme(theme_pub;
         end,
         sup! = (ax,tgob,sgi)-> begin
             # cables
-            hidez(ax)
+            RB.hidez(ax)
         end
     )
     savefig(fig,"Tbars")
@@ -188,7 +194,7 @@ struct𝒦 = [
         # @show s
         λ = inv(Ǎ*transpose(Ǎ))*Ǎ*Bᵀ*s
         @show λ
-        Ǩa = - RB.cstr_forces_jacobian(bot.structure,q,λ)
+        Ǩa = RB.cstr_forces_jacobian(bot.structure,q,λ)
 
         Ǩg = RB.build_geometric_stiffness_matrix!(bot.structure,q,s)
 
@@ -208,8 +214,9 @@ mat𝒦as = reduce(hcat,struct𝒦.𝒦a)
 mat𝒦ps = reduce(hcat,struct𝒦.𝒦p)
 
 GM.activate!();with_theme(theme_pub;
-        size = (0.95tw,0.18tw),
-        figure_padding = (0,0,0,0),
+        size = (1cw,0.72cw),
+        fontsize=6.5,
+        figure_padding = (-fontsize,-fontsize,-2fontsize,0),
         Axis3 = (
             azimuth = -π/2-1e-10,
             elevation = π/2,
@@ -226,7 +233,7 @@ GM.activate!();with_theme(theme_pub;
         bot0,
         fig = gd,
         AxisType=Axis3,
-        gridsize = (1,4),
+        gridsize = (2,2),
         showpoints = false,
         showlabels = false,
         showground = false,
@@ -234,7 +241,7 @@ GM.activate!();with_theme(theme_pub;
         showcables = false,
         xlims = (-2.2,1.2),
         ylims = (-1.2,1.2),
-        rowgap=0,
+        rowgap=-fontsize,
         titleformatfunc = (sgi,tt)-> begin
             rich(
                     rich("($(alphabet[sgi])) ", font=:bold),
@@ -251,7 +258,7 @@ GM.activate!();with_theme(theme_pub;
             RB.hidexyz(ax)
             @myshow Sbool[:,sgi]
             linesegs_cables = @lift begin
-                get_linesegs_cables($tgob;)[Sbool[:,sgi]]
+                RB.get_linesegs_cables($tgob;)[Sbool[:,sgi]]
             end
             linesegments!(ax, 
                 linesegs_cables, 
@@ -259,18 +266,18 @@ GM.activate!();with_theme(theme_pub;
                 # linewidth = cablewidth
                 )
             rcs_by_cables = @lift begin
-                (;tensioned) = $tgob.connectivity
+                cables = RB.get_cables($tgob)
                 num_of_dim = RB.get_num_of_dims($tgob)
                 T = RB.get_numbertype($tgob)
                 ret = Vector{MVector{num_of_dim,T}}()
                 mapreduce(
-                    (scnt)->
+                    (cable)->
                     [(
-                        scnt.hen.body.state.loci_states[scnt.hen.pid].position.+
-                        scnt.egg.body.state.loci_states[scnt.egg.pid].position
+                        cable.joint.hen2egg.hen.body.state.loci_states[cable.joint.hen2egg.hen.pid].frame.position.+
+                        cable.joint.hen2egg.egg.body.state.loci_states[cable.joint.hen2egg.egg.pid].frame.position
                     )./2],
                     vcat,
-                    tensioned.connected
+                    cables
                     ;init=ret
                 )
             end
@@ -285,14 +292,14 @@ GM.activate!();with_theme(theme_pub;
             #     ax,
             #     rcs_by_cables[][Sbool[:,sgi]],
             #     marker = :rect, 
-            #     markersize = 12 |> pt2px, 
+            #     markersize = 12 , 
             #     color = :white
             # )
             text!(
                 ax,
                 Stext,
                 position = rcs_by_cables[][Sbool[:,sgi]],
-                fontsize = 5 |> pt2px,
+                fontsize = 5 ,
                 color = :red,
                 align = (:left, :top),
                 offset = (fontsize/4, 0)
@@ -327,7 +334,8 @@ Vals =  [
 ] |> VectorOfArray
 
 GM.activate!();with_theme(theme_pub;
-        size = (0.45tw,0.2tw),
+        size = (0.8cw,0.3cw),
+        fontsize = 6.5,
         figure_padding = (0,fontsize,0,fontsize),
     ) do 
     fig = Figure()

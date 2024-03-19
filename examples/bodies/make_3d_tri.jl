@@ -92,7 +92,7 @@ if loadmesh
 else
     trimesh = GB.merge(
         [
-            endpoints2mesh(loci_positions[i],loci_positions[j];
+            RB.endpoints2mesh(loci_positions[i],loci_positions[j];
             radius,color)
             for (i,j) in [
                 [1,2],[1,3],[1,4],

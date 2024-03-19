@@ -10,7 +10,7 @@ function superball(c=0.0;
         l = 1.7/2,
         d = l/2,
         k = 4000.0,
-        constrained = true,
+        visible = true,
         loadmesh = true,
     )
 
@@ -40,9 +40,9 @@ function superball(c=0.0;
             m = 5.0,
             μ,
             e,
-            visible = ifelse(i==1 && constrained,true,false),
-            ci = ifelse(i==1 && constrained,collect(1:6),Int[]),
-            cstr_idx = ifelse(i==1 && constrained,Int[],[1]),
+            visible = ifelse(i==1 && visible,true,false),
+            ci = ifelse(i==1 && visible,collect(1:6),Int[]),
+            cstr_idx = ifelse(i==1 && visible,Int[],[1]),
             loadmesh,
             isbody =false,
         )
@@ -81,19 +81,19 @@ function superball(c=0.0;
             [5,6]
         ]
     )
-    matrix_cnt = zeros(Int,ncables,6)
+    connecting_matrix = zeros(Int,ncables,6)
     for lev = 1:3
-        matrix_cnt[8(lev-1)+1, [nb[lev][1],nb[lev+1][1]]] = [1, -1]
-        matrix_cnt[8(lev-1)+2, [nb[lev][1],nb[lev+1][1]]] = [2, -1]
-        matrix_cnt[8(lev-1)+3, [nb[lev][1],nb[lev+1][2]]] = [1, -2]
-        matrix_cnt[8(lev-1)+4, [nb[lev][1],nb[lev+1][2]]] = [2, -2]
-        matrix_cnt[8(lev-1)+5, [nb[lev][2],nb[lev+1][2]]] = [1, -1]
-        matrix_cnt[8(lev-1)+6, [nb[lev][2],nb[lev+1][2]]] = [2, -1]
-        matrix_cnt[8(lev-1)+7, [nb[lev][2],nb[lev+1][1]]] = [1, -2]
-        matrix_cnt[8(lev-1)+8, [nb[lev][2],nb[lev+1][1]]] = [2, -2]
+        connecting_matrix[8(lev-1)+1, [nb[lev][1],nb[lev+1][1]]] = [1, -1]
+        connecting_matrix[8(lev-1)+2, [nb[lev][1],nb[lev+1][1]]] = [2, -1]
+        connecting_matrix[8(lev-1)+3, [nb[lev][1],nb[lev+1][2]]] = [1, -2]
+        connecting_matrix[8(lev-1)+4, [nb[lev][1],nb[lev+1][2]]] = [2, -2]
+        connecting_matrix[8(lev-1)+5, [nb[lev][2],nb[lev+1][2]]] = [1, -1]
+        connecting_matrix[8(lev-1)+6, [nb[lev][2],nb[lev+1][2]]] = [2, -1]
+        connecting_matrix[8(lev-1)+7, [nb[lev][2],nb[lev+1][1]]] = [1, -2]
+        connecting_matrix[8(lev-1)+8, [nb[lev][2],nb[lev+1][1]]] = [2, -2]
     end
-    # display(matrix_cnt)
-    cables = RB.connect(rigdibodies, spring_dampers, matrix_cnt, 0)
+    # display(connecting_matrix)
+    cables = RB.connect(rigdibodies, spring_dampers; connecting_matrix, istart=0)
 
     apparatuses = TypeSortedCollection(
         cables
@@ -106,7 +106,14 @@ function superball(c=0.0;
         numbered, 
         indexed,
     )
-
     st = RB.Structure(rigdibodies, apparatuses, cnt, )
-    bot = RB.Robot(st,)
+    gauges = Int[]
+    actuators = Int[]
+    hub = RB.ControlHub(
+        st,
+        gauges,
+        actuators,
+        RB.Coalition(st,gauges,actuators)
+    )
+    bot = RB.Robot(st,hub)
 end

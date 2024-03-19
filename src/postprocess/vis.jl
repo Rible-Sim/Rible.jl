@@ -348,16 +348,16 @@ function get_groundmesh(::Nothing,rect)
 end
 
 function get_linesegs_cables(structure;slackonly=false,noslackonly=false)
-    (;connected) = structure.connectivity.tensioned
-    (;cables) = structure.apparatuses
+    cables = get_cables(structure)
     ndim = get_num_of_dims(structure)
     T = get_numbertype(structure)
-    linesegs_cables = Vector{Tuple{Point{ndim,T},Point{ndim,T}}}()
-    foreach(connected) do scnt
-        scable = cables[scnt.id]
-        ret = (Point(scnt.hen.body.state.loci_states[scnt.hen.pid].position),
-                Point(scnt.egg.body.state.loci_states[scnt.egg.pid].position))
-        slacking = scable.state.tension <= 0
+    linesegs_cables = Vector{Tuple{GB.Point{ndim,T},GB.Point{ndim,T}}}()
+    foreach(cables) do cable
+        force = cable.force
+        (;hen,egg) = cable.joint.hen2egg
+        ret = (GB.Point(hen.body.state.loci_states[hen.pid].frame.position),
+                GB.Point(egg.body.state.loci_states[egg.pid].frame.position))
+        slacking = force.state.tension <= 0
         if (slackonly && slacking) ||
            (noslackonly && !slacking) ||
            (!slackonly && !noslackonly)

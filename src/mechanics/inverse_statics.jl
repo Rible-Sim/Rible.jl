@@ -25,7 +25,7 @@ function build_Q̃(structure)
     foreach(structure.apparatuses) do appar
         j = appar.id
         if appar.joint isa CableJoint
-            (;hen,egg) = appar.joint
+            (;hen,egg) = appar.joint.hen2egg
             C1 = hen.body.cache.Cps[hen.pid]
             C2 = egg.body.cache.Cps[egg.pid]
             uci1 = hen.body.coords.free_idx
@@ -62,16 +62,14 @@ end
 
 function build_L̂(st)
     (;connectivity,num_of_dim) = st
-    (;connected) = connectivity.tensioned
-    (;cables) = st.apparatuses
-    ncables = length(cables)
+    cables = get_cables(st)
+    num_of_cables = length(cables)
     T = get_numbertype(st)
-    L̂ = spzeros(T, ncables*num_of_dim, ncables)
-    foreach(connected) do scnt
-        j = scnt.id
-        scable = cables[j]
+    L̂ = spzeros(T, num_of_cables*num_of_dim, num_of_cables)
+    foreach(cables) do cable
+        j = cable.id
         js = (j-1)*num_of_dim
-        L̂[js+1:js+num_of_dim,j] = scable.state.direction
+        L̂[js+1:js+num_of_dim,j] = cable.force.state.direction
     end
     L̂
 end
@@ -483,17 +481,16 @@ function check_static_equilibrium_output_multipliers!(st,q,F=nothing;
         # stpt = nothing
     )
     clear_forces!(st)
-    update_bodies!(st)
+    update_bodies!(st,q)
     update_apparatuses!(st)
     # check_restlen(st,get_cables_restlen(st))
     if gravity
         apply_gravity!(st)
     end
-    assemble_forces!(generalized_forces,st)
+    generalized_forces = assemble_forces!(st)
     if !isnothing(F)
         generalized_forces .+= F[:]
     end
-    q = get_coords(st)
     c = get_local_coords(st)
     q̌ = get_free_coords(st)
     A = make_cstr_jacobian(st,q)(q̌,c)
