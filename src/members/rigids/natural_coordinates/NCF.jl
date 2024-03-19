@@ -10,7 +10,7 @@ using EponymTuples
 using ForwardDiff
 using DocStringExtensions
 
-import ..Rible: HouseholderOrthogonalization, skew, Axes, GECP, CartesianFrame
+import ..Rible: HouseholderOrthogonalization, skew, Axes, GECP, CartesianFrame, rotation_matrix
 
 import ..Rible: get_num_of_cstr, get_num_of_coords
 import ..Rible: get_num_of_dof, get_num_of_local_dims

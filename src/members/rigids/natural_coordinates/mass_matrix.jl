@@ -1,6 +1,6 @@
 
 # Mass matrices
-Ī2J̄(::Union{NC2D2C,NC3D3C,NC2D6C,NC3D6C},Ī)  = Ī
+Ī2J̄(::Union{NC2D2C,NC3D3C,NC2D4C,NC2D6C,NC3D6C},Ī)  = Ī
 Ī2J̄(::NC3D12C,Ī) = 1/2*tr(Ī)*I-Ī
 
 function Īg2az(nmcs,m,Īg,mass_center)

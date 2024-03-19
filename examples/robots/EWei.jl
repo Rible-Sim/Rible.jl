@@ -40,7 +40,7 @@ function BuildTail()
     function Get_apsAB(r̄, mass_locus)
         ri = r̄
         rj = r̄ + 2* [mass_locus[2], mass_locus[1]]
-        aps = [[0.0, 0.0], 2r̄g, [15.1, 0.0]]
+        aps = [[0.0, 0.0], 2r̄, [15.1, 0.0]]
         return ri, rj, aps
     end
 
@@ -269,7 +269,7 @@ function BuildTail()
         actuators,
         RB.Coalition(st,gauges,actuators)
     )
-    bot = RB.Robot(st,)
+    bot = RB.Robot(st,hub)
 end
 
 """
@@ -311,7 +311,7 @@ function BuildTail(type; β=1.0, μ=0.02)
     function Get_apsAB(r̄, mass_locus)
         ri = r̄
         rj = r̄ + 2* [mass_locus[2], mass_locus[1]]
-        aps = [[0.0, 0.0], 2r̄g, [15.1, 0.0]]
+        aps = [[0.0, 0.0], 2r̄, [15.1, 0.0]]
         return ri, rj, aps
     end
 
@@ -345,23 +345,23 @@ function BuildTail(type; β=1.0, μ=0.02)
             4 => Get_apsC()
         end
     end
-    asbMid = load("STL/装配体-中间部分.STL") |> make_patch(;trans=[0.0,0,0],rot=RotZ(deg2rad(-77)))
-    crSec1 = load("STL/截面形状-1.STL") |> make_patch(;trans=[0.0,-5,0]) |> (x)->merge([x,asbMid])
-    crSec2 = load("STL/截面形状-2.STL") |> make_patch(;trans=[0.0,-5,0]) |> (x)->merge([x,asbMid])
-    crSec3 = load("STL/截面形状-3.STL") |> make_patch(;trans=[0.0,-5,0]) |> (x)->merge([x,asbMid])
-    crSec4f = load("STL/截面形状-4-随动段.STL") |> make_patch(;trans=[40,0,0.],rot=RotZ(-π/2))
-    crSec5f = load("STL/截面形状-5-随动段.STL") |> make_patch(;trans=[40,0,0.],rot=RotZ(-π/2))
-    crSec6f = load("STL/截面形状-6-随动段.STL") |> make_patch(;trans=[30,0,0.],rot=RotZ(-π/2))
-    crSec7f = load("STL/截面形状-7-随动段.STL") |> make_patch(;trans=[25,0,0.],rot=RotZ(-π/2))
-    crSec8f = load("STL/截面形状-8-随动段.STL") |> make_patch(;trans=[25,0,0.],rot=RotZ(-π/2))
-    crSec9f = load("STL/截面形状-9-随动段.STL") |> make_patch(;trans=[25,0,0.],rot=RotZ(-π/2))
-    crSec10f = load("STL/截面形状-10-随动段.STL") |> make_patch(;trans=[30,0,0.],rot=RotZ(-π/2))
+    asbMid = load(RB.assetpath("EWei_STL/装配体-中间部分.STL")) |> RB.make_patch(;trans=[0.0,0,0],rot=RotZ(deg2rad(-77)))
+    crSec1 = load(RB.assetpath("EWei_STL/截面形状-1.STL")) |> RB.make_patch(;trans=[0.0,-5,0]) |> (x)->merge([x,asbMid])
+    crSec2 = load(RB.assetpath("EWei_STL/截面形状-2.STL")) |> RB.make_patch(;trans=[0.0,-5,0]) |> (x)->merge([x,asbMid])
+    crSec3 = load(RB.assetpath("EWei_STL/截面形状-3.STL")) |> RB.make_patch(;trans=[0.0,-5,0]) |> (x)->merge([x,asbMid])
+    crSec4f = load(RB.assetpath("EWei_STL/截面形状-4-随动段.STL")) |> RB.make_patch(;trans=[40,0,0.],rot=RotZ(-π/2))
+    crSec5f = load(RB.assetpath("EWei_STL/截面形状-5-随动段.STL")) |> RB.make_patch(;trans=[40,0,0.],rot=RotZ(-π/2))
+    crSec6f = load(RB.assetpath("EWei_STL/截面形状-6-随动段.STL")) |> RB.make_patch(;trans=[30,0,0.],rot=RotZ(-π/2))
+    crSec7f = load(RB.assetpath("EWei_STL/截面形状-7-随动段.STL")) |> RB.make_patch(;trans=[25,0,0.],rot=RotZ(-π/2))
+    crSec8f = load(RB.assetpath("EWei_STL/截面形状-8-随动段.STL")) |> RB.make_patch(;trans=[25,0,0.],rot=RotZ(-π/2))
+    crSec9f = load(RB.assetpath("EWei_STL/截面形状-9-随动段.STL")) |> RB.make_patch(;trans=[25,0,0.],rot=RotZ(-π/2))
+    crSec10f = load(RB.assetpath("EWei_STL/截面形状-10-随动段.STL")) |> RB.make_patch(;trans=[30,0,0.],rot=RotZ(-π/2))
 
-    asbMot = load("STL/装配体-电机.STL") |> make_patch(;trans=[45.0,0,0],rot=RotZ(π))
+    asbMot = load(RB.assetpath("EWei_STL/装配体-电机.STL")) |> RB.make_patch(;trans=[45.0,0,0],rot=RotZ(π))
 
-    asbB32 = load("STL/装配体-中间梁6.0-32.STL") |> make_patch(;trans=[25.0,0,0])
-    asbB40 = load("STL/装配体-中间梁6.0-40.STL") |> make_patch(;trans=[25.0,0,0])
-    asbLF = load("STL/装配体-主动-随动.STL") |> make_patch(;trans=[55,0,0.],rot=RotZ( π/2))
+    asbB32 = load(RB.assetpath("EWei_STL/装配体-中间梁6.0-32.STL")) |> RB.make_patch(;trans=[25.0,0,0])
+    asbB40 = load(RB.assetpath("EWei_STL/装配体-中间梁6.0-40.STL")) |> RB.make_patch(;trans=[25.0,0,0])
+    asbLF = load(RB.assetpath("EWei_STL/装配体-主动-随动.STL")) |> RB.make_patch(;trans=[55,0,0.],rot=RotZ( π/2))
 
     rds = [
         RigidData(r̄gC, mC, iC, r̄lC, asbMot), #1
@@ -467,12 +467,13 @@ function BuildTail(type; β=1.0, μ=0.02)
         )
         ro = SVector{2}(ri)
         if i in rigidIndex
-            nmcs = RB.NCF.NC2P1V(SVector{2}(ri), SVector{2}(rj), ro, α)
+            nmcs = RB.NCF.NC2P1V(SVector{2}(ri), SVector{2}(rj), ro, RB.rotation_matrix(α))
         else
-            nmcs = RB.NCF.NC2D2P(SVector{2}(ri), SVector{2}(rj), ro, α)
+            nmcs = RB.NCF.NC2D2P(SVector{2}(ri), SVector{2}(rj), ro, RB.rotation_matrix(α))
         end
-        state = RB.RigidBodyState(prop, nmcs, ri, α, ṙo, ω, ci, cstr_idx)
-        body = RB.RigidBody(prop, state, rdsi.mesh)
+        state = RB.RigidBodyState(prop, ri, α, ṙo, ω, )
+        coords = RB.NonminimalCoordinates(nmcs, ci, cstr_idx)
+        body = RB.RigidBody(prop, state, coords, rdsi.mesh)
     end
 
     rbs = [rigidbody(i, rds[i], r̄s[i]) for i in 1:nb]

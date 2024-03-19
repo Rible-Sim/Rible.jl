@@ -428,207 +428,6 @@ function make_S(st,q0)
     inner_S
 end
 
-# Out-of-place ∂Q̌∂q̌ (dispatch)
-function build_tangent_stiffness_matrix(st)
-    build_tangent_stiffness_matrix(st, st.connectivity.tensioned)
-    build_tangent_stiffness_matrix(st, st.connectivity.jointed)
-end
-
-# Out-of-place ∂Q̌∂q̌ for cables and clustered cables
-function build_tangent_stiffness_matrix(st, @eponymargs(connected, clustered))
-    ∂Q̌∂q̌1 = build_tangent_stiffness_matrix(st, @eponymtuple(connected))
-    ∂Q̌∂q̌2 = build_tangent_stiffness_matrix(st, @eponymtuple(clustered))
-    return ∂Q̌∂q̌1 + ∂Q̌∂q̌2
-end
-
-# Out-of-place ∂Q̌∂q̌ for cables
-function build_tangent_stiffness_matrix(st,@eponymargs(connected,))
-    (;cables) = st.apparatuses
-    (;indexed) = st.connectivity
-    (;num_of_full_coords,num_of_free_coords,sys_free_coords_idx,bodyid2sys_free_coords,bodyid2sys_full_coords) = indexed
-    T = get_numbertype(st)
-    num_of_dim = get_num_of_dims(st)
-    ∂Q̌∂q̌ = zeros(T,num_of_free_coords,num_of_free_coords)
-    D = @MMatrix zeros(T,num_of_dim,num_of_dim)
-    Im = Symmetric(SMatrix{num_of_dim,num_of_dim}(one(T)*I))
-    J̌ = zeros(T,num_of_dim,num_of_free_coords)
-    foreach(connected) do cc
-        cable = cables[cc.id]
-        (;hen,egg) = cc
-        rb1 = hen.body
-        rb2 = egg.body
-        C1 = rb1.state.cache.Cps[hen.pid]
-        C2 = rb2.state.cache.Cps[egg.pid]
-        free_idx1 = rb1.state.cache.free_idx
-        free_idx2 = rb2.state.cache.free_idx
-        mfree1 = bodyid2sys_free_coords[rb1.prop.id]
-        mfree2 = bodyid2sys_free_coords[rb2.prop.id]
-        (;k,c,state,slack) = cable
-        (;direction,tension,length,lengthdot) = state
-        if slack && (tension==0)
-            ∂Q̌∂q̌ .= 0
-        else
-            D .= direction*transpose(direction)
-            density = tension/length
-            β = c*lengthdot/length + density
-            D .*= k-β
-            D .+= β.*Im
-            J̌ .= 0
-            J̌[:,mfree2] .+= C2[:,free_idx2]
-            J̌[:,mfree1] .-= C1[:,free_idx1]
-            ∂Q̌∂q̌ .-= transpose(J̌)*D*J̌
-        end
-        # ∂Q̌∂q̌_full[mfree2,mfree2] .+= transpose(C2)*D*C2
-        # ∂Q̌∂q̌_full[mfree1,mfree2] .-= transpose(C1)*D*C2
-        # ∂Q̌∂q̌_full[mfree2,mfree1] .-= transpose(C2)*D*C1
-        # ∂Q̌∂q̌_full[mfree1,mfree1] .+= transpose(C1)*D*C1
-    end
-    return ∂Q̌∂q̌
-end
-
-# Out-of-place ∂Q̌∂q̌ for cluster cables
-function build_tangent_stiffness_matrix(st,@eponymargs(clustered))
-    (;clustercables) = st.apparatuses
-    (;indexed) = st.connectivity
-    (;num_of_full_coords,num_of_free_coords,sys_free_coords_idx,bodyid2sys_free_coords,bodyid2sys_full_coords) = indexed
-    T = get_numbertype(st)
-    num_of_dim = get_num_of_dims(st)
-    ∂Q̌∂q̌ = zeros(T,num_of_free_coords,num_of_free_coords)
-    D = @MMatrix zeros(T,num_of_dim,num_of_dim)
-    Im = Symmetric(SMatrix{num_of_dim,num_of_dim}(one(T)*I))
-    J̌ = zeros(T,num_of_dim,num_of_free_coords)
-    i = 0
-    foreach(clustered) do clustercable
-        i += 1
-        foreach(clustercable) do cc
-            cable = clustercables[i].segs[cc.id]
-            (;hen,egg) = cc
-            rb1 = hen.body
-            rb2 = egg.body
-            C1 = rb1.state.cache.Cps[hen.pid]
-            C2 = rb2.state.cache.Cps[egg.pid]
-            free_idx1 = rb1.state.cache.free_idx
-            free_idx2 = rb2.state.cache.free_idx
-            mfree1 = bodyid2sys_free_coords[rb1.prop.id]
-            mfree2 = bodyid2sys_free_coords[rb2.prop.id]
-            (;k,c,state) = cable
-            (;direction,tension,length,lengthdot) = state
-            if tension==0
-                ∂Q̌∂q̌ .-= 0
-            else
-                D .= direction*transpose(direction)
-                density = tension/length
-                β = c*lengthdot/length + density
-                D .*= k-β
-                D .+= β.*Im
-                J̌ .= 0
-                J̌[:,mfree2] .+= C2[:,free_idx2]
-                J̌[:,mfree1] .-= C1[:,free_idx1]
-                ∂Q̌∂q̌ .-= transpose(J̌)*D*J̌
-            end
-        end
-    end
-    return ∂Q̌∂q̌
-end
-
-# Out-of-place ∂Q̌∂q̌̇ (dispatch)
-function build_tangent_damping_matrix(st)
-    build_tangent_damping_matrix(st, st.connectivity.tensioned)
-end
-
-# Out-of-place ∂Q̌∂q̌̇ for cables and clustered cables
-function build_tangent_damping_matrix(st, @eponymargs(connected, clustered))
-    ∂Q̌∂q̌̇1 = build_tangent_damping_matrix(st, @eponymtuple(connected))
-    ∂Q̌∂q̌̇2 = build_tangent_damping_matrix(st, @eponymtuple(clustered))
-    return ∂Q̌∂q̌̇1 + ∂Q̌∂q̌̇2
-end
-
-# Out-of-place ∂Q̌∂q̌̇ for cables
-function build_tangent_damping_matrix(st, @eponymargs(connected, ))
-    (;cables) = st.apparatuses
-    (;indexed) = st.connectivity
-    (;num_of_full_coords,num_of_free_coords,sys_free_coords_idx,bodyid2sys_free_coords,bodyid2sys_full_coords) = indexed
-    T = get_numbertype(st)
-    num_of_dim = get_num_of_dims(st)
-    ∂Q̌∂q̌̇ = zeros(T,num_of_free_coords,num_of_free_coords)
-    D = @MMatrix zeros(T,num_of_dim,num_of_dim)
-    Im = Symmetric(SMatrix{num_of_dim,num_of_dim}(one(T)*I))
-    J̌ = zeros(T,num_of_dim,num_of_free_coords)
-    foreach(connected) do cc
-        cable = cables[cc.id]
-        (;hen,egg) = cc
-        rb1 = hen.body
-        rb2 = egg.body
-        C1 = rb1.state.cache.Cps[hen.pid]
-        C2 = rb2.state.cache.Cps[egg.pid]
-        free_idx1 = rb1.state.cache.free_idx
-        free_idx2 = rb2.state.cache.free_idx
-        mfree1 = bodyid2sys_free_coords[rb1.prop.id]
-        mfree2 = bodyid2sys_free_coords[rb2.prop.id]
-        (;k,c,state,slack) = cable
-        (;direction,tension) = state
-        if slack && (tension == 0)
-            ∂Q̌∂q̌̇ .-= 0
-        else
-            D .= direction*transpose(direction)
-            D .*= c
-            J̌ .= 0
-            J̌[:,mfree2] .+= C2[:,free_idx2]
-            J̌[:,mfree1] .-= C1[:,free_idx1]
-
-            ∂Q̌∂q̌̇ .-= transpose(J̌)*D*J̌
-        end
-        # ∂Q̌∂q̌_full[mfrjiexee2,mfree2] .+= transpose(C2)*D*C2
-        # ∂Q̌∂q̌_full[mfree1,mfree2] .-= transpose(C1)*D*C2
-        # ∂Q̌∂q̌_full[mfree2,mfree1] .-= transpose(C2)*D*C1
-        # ∂Q̌∂q̌_full[mfree1,mfree1] .+= transpose(C1)*D*C1
-    end
-    return ∂Q̌∂q̌̇
-end
-
-# Out-of-place ∂Q̌∂q̌̇ for clustered cables
-function build_tangent_damping_matrix(st, @eponymargs(clustered, ))
-    (;clustercables) = st.apparatuses
-    (;indexed) = st.connectivity
-    (;num_of_full_coords,num_of_free_coords,sys_free_coords_idx,bodyid2sys_free_coords,bodyid2sys_full_coords) = indexed
-    T = get_numbertype(st)
-    num_of_dim = get_num_of_dims(st)
-    ∂Q̌∂q̌̇ = zeros(T,num_of_free_coords,num_of_free_coords)
-    D = @MMatrix zeros(T,num_of_dim,num_of_dim)
-    Im = Symmetric(SMatrix{num_of_dim,num_of_dim}(one(T)*I))
-    J̌ = zeros(T,num_of_dim,num_of_free_coords)
-    i = 0
-    foreach(clustered) do clustercable
-        i += 1
-        foreach(clustercable) do cc
-            cable = clustercables[i].segs[cc.id]
-            (;hen,egg) = cc
-            rb1 = hen.body
-            rb2 = egg.body
-            C1 = rb1.state.cache.Cps[hen.pid]
-            C2 = rb2.state.cache.Cps[egg.pid]
-            free_idx1 = rb1.state.cache.free_idx
-            free_idx2 = rb2.state.cache.free_idx
-            mfree1 = bodyid2sys_free_coords[rb1.prop.id]
-            mfree2 = bodyid2sys_free_coords[rb2.prop.id]
-            (;k,c,state) = cable
-            (;direction,tension) = state
-            if tension == 0
-                ∂Q̌∂q̌̇ .-= 0
-            else
-                D .= direction*transpose(direction)
-                D .*= c
-                J̌ .= 0
-                J̌[:,mfree2] .+= C2[:,free_idx2]
-                J̌[:,mfree1] .-= C1[:,free_idx1]
-
-                ∂Q̌∂q̌̇ .-= transpose(J̌)*D*J̌
-            end
-        end
-    end
-    return ∂Q̌∂q̌̇
-end
-
 # In-place ∂Q̌∂q̌ for cables and flexible bodies
 function build_tangent_stiffness_matrix!(∂Q̌∂q̌,st)
     (;bodies,apparatuses,connectivity) = st
@@ -1042,17 +841,19 @@ function build_∂ζ∂q(st)
     return T*b*∂l∂q
 end
 
-
 function build_Ǩ(st)
     _,λ = check_static_equilibrium_output_multipliers(st)
-    build_Ǩ(st,λ)
+    q = get_coords(st)
+    build_Ǩ(st,q,λ)
 end
 
-function build_Ǩ(st,λ)
+function build_Ǩ(st,q,λ)
     (;num_of_free_coords) = st.connectivity.indexed
     T = get_numbertype(st)
-    # Ǩ = zeros(T,num_of_free_coords,num_of_free_coords)
-    Ǩ = -build_tangent_stiffness_matrix(st) .- cstr_forces_jacobian(st,λ)
+    ǨmǨg = zeros(T,num_of_free_coords,num_of_free_coords)
+    build_tangent_stiffness_matrix!(ǨmǨg,st)
+    Ǩa = cstr_forces_jacobian(st,q,λ)
+    Ǩ = - ǨmǨg .- Ǩa
     # Ǩ .= Ǩ
     Ǩ
 end
@@ -1072,7 +873,7 @@ function undamped_eigen(st;gravity=false)
     q = get_coords(st)
     q̌ = get_free_coords(st)
     M̌ = assemble_M̌(st)
-    Ǩ = build_Ǩ(st,λ)
+    Ǩ = build_Ǩ(st,q,λ)
     Ǎ = make_cstr_jacobian(st)(q)
     Ň = nullspace(Ǎ)
     ℳ = transpose(Ň)*M̌*Ň

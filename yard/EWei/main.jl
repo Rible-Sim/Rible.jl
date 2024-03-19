@@ -1,46 +1,37 @@
-using LinearAlgebra
-using SparseArrays
-using StaticArrays
-using BenchmarkTools
-using FileIO, MeshIO
-using Printf
-using Makie
-import GLMakie as GM
-import CairoMakie as CM
-GM.activate!()
-using Unitful
-using NLsolve
-using Revise
-using StructArrays
-using EponymTuples
-using LaTeXStrings
-using StaticArrays
-using GeometryBasics
-using Rotations
-using CoordinateTransformations
-using Meshing
-using TypeSortedCollections
-using Match
+
+using Revise #jl
 import Rible as RB
-cd("examples/EWei")
-includet("define.jl")
-includet("../vis.jl")
+
+include(joinpath(pathof(RB),"../../yard/stability_stiffness.jl"))
+using AbbreviatedStackTraces #jl
+ENV["JULIA_STACKTRACE_ABBREVIATED"] = true #jl
+ENV["JULIA_STACKTRACE_MINIMAL"] = true #jl
+
+figdir::String = ""
+
+include(joinpath(pathof(RB),"../../test/vis.jl"))
+includet(joinpath(pathof(RB),"../../test/vis.jl")) #jl
+
+include(joinpath(pathof(RB),"../../examples/robots/EWei.jl"))
+includet(joinpath(pathof(RB),"../../examples/robots/EWei.jl")) #jl
+
 
 bot1 = BuildTail()
 
 bot1 = BuildTail(1; β=.9)
 
 # rigid body mesh
-RB.update!(bot1.st)
-RB.update_orientations!(bot1.st)
-rbs = RB.get_bodies(bot1.st)
-rbs[5].state.R
-rbs[5].state.cache.funcs.nmcs
-plot_rigid(rbs[2];showmesh=true,showupdatemesh=false)
+RB.update!(bot1.structure)
+rbs = RB.get_bodies(bot1.structure)
+rbs[5].state.origin_frame.axes
+rbs[5].coords.nmcs
+RB.viz(rbs[2];showmesh=true,showupdatemesh=false)
 
 # linearized dynamics
-ω², δq̌ = RB.undamped_eigen(bot1.st)
+ω², δq̌ = RB.undamped_eigen(bot1.structure)
 @show ω = [sqrt(ωi) for ωi in ω²[1:end]]
+
+plot_traj!(bot1)
 
 # nonlinear dynamics
 function dynfuncs(bot)

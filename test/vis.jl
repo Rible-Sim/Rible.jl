@@ -210,7 +210,7 @@ function plot_traj!(bot::RB.Robot;
                 1 for subgrid_idx in eachindex(subgrids)
             ]
         (a,b::Nothing) => [
-                time2step(a[subgrid_idx],traj.t)
+                RB.time2step(a[subgrid_idx],traj.t)
                 for subgrid_idx in eachindex(subgrids)
             ]
         (a::Nothing,b) => b
