@@ -267,6 +267,15 @@ function plot_traj!(bot::RB.Robot;
             mesh!(ax,groundmesh;color = :snow)
         end
         if showwire || showmesh || showcables || showlabels || showpoints
+            
+            RB.viz!(ax,tgob;
+                showmesh,
+                showwire,
+                showlabels,
+                showpoints,
+                showcables,
+                kargs...
+            )
             if showinit
                 RB.viz!(ax,tgobini;
                     showmesh,
@@ -277,14 +286,6 @@ function plot_traj!(bot::RB.Robot;
                     kargs...
                 )
             end
-            RB.viz!(ax,tgob;
-                showmesh,
-                showwire,
-                showlabels,
-                showpoints,
-                showcables,
-                kargs...
-            )
         end
         sup!(ax,tgob,subgrid_idx)
         if showtitle    
@@ -324,7 +325,7 @@ function plot_traj!(bot::RB.Robot;
                     "fig. height" => map(string,ax.height),
                     "fig. width" => map(string,ax.width)
                 ]
-                if ndim == 3 && AxisType == Axis3
+                if AxisType == Axis3
                     cam_info = [
                         "azimuth" => map(string,ax.azimuth),
                         "elevation" => map(string,ax.elevation)

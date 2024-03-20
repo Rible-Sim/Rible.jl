@@ -523,7 +523,7 @@ function check_jacobian_singularity(st)
             A_body = cstr_jacobian(body.coords,q_body)
             body_rank = rank(A_body)
             if body_rank < minimum(size(A_body))
-                @warn "The $(bodyid)th body's Jacobian is singular: rank(A(q))=$(body_rank)<$(minimum(size(A_rb)))"
+                @warn "The $(bodyid)th body's Jacobian is singular: rank(A(q))=$(body_rank)<$(minimum(size(A_body)))"
             end
         end
     end
