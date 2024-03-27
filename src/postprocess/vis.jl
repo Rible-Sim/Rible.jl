@@ -22,9 +22,11 @@ MakieCore.@recipe(Viz, structure) do scene
         cablewidth=0.6,
         meshcolor=:slategrey,
         fontsize = 12,
+        linewidth = 1,
     )
 end
 
+# AbstractBody
 function MakieCore.plot!(viz::Viz{Tuple{S}};
     ) where S <:AbstractBody
     body_ob = viz[:structure]
@@ -75,7 +77,7 @@ function MakieCore.plot!(viz::Viz{Tuple{S}};
             build_mesh(body_ob,color=viz.meshcolor[])
         end
         if viz.showwire[]
-            strokewidth = linewidth
+            strokewidth = viz.linewidth[]
         else
             strokewidth = 0
         end
@@ -83,13 +85,14 @@ function MakieCore.plot!(viz::Viz{Tuple{S}};
             MakieCore.mesh!(viz, meshes_ob; shading = MakieCore.Automatic())
         else
             MakieCore.poly!(viz, meshes_ob; shading = MakieCore.Automatic(),
-                # strokewidth
+                strokewidth
             )
         end
     end
     viz
 end
 
+# ClusterJoint
 function MakieCore.plot!(viz::Viz{Tuple{S}};
     ) where {S<:Apparatus{<:ClusterJoint}}
     cluster_cable_ob = viz[:structure]
@@ -112,6 +115,7 @@ function MakieCore.plot!(viz::Viz{Tuple{S}};
     end
 end
 
+# CableJoint
 function MakieCore.plot!(viz::Viz{Tuple{S}};
     ) where {S<:Apparatus{<:CableJoint}}
     cable_appar_ob = viz[:structure]
@@ -164,6 +168,7 @@ function MakieCore.plot!(viz::Viz{Tuple{S}};
     viz
 end
 
+# AbstractStructure
 function MakieCore.plot!(viz::Viz{Tuple{S}};
     ) where S <:AbstractStructure
     if viz.isref[]
@@ -244,7 +249,7 @@ function MakieCore.plot!(viz::Viz{Tuple{S}};
                 meshcolor,
                 pointcolor = viz.pointcolor[],
                 showmesh = viz.showmesh[],
-                # showwire = viz.showwire[],
+                showwire = viz.showwire[],
             )
         end
     end

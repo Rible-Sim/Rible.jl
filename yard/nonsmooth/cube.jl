@@ -1,55 +1,5 @@
 
 #-- cube
-function make_cube(origin_position = [0.0,0.0,0.5],
-    R = one(RotMatrix{3}),
-    origin_velocity = [2.0,0.0,0.0],
-    ω = [0.0,0.0,5.0];
-    μ = 0.9,
-    e = 0.0
-)
-m = 1.0
-mass_locus = zeros(3)
-inertia = SMatrix{3,3}(Matrix(1.0I,3,3))
-h = 5.0
-loci = [h.*[x,y,z] for z = [-1,1] for y = [-1,1] for x = [-1,1]]
-axes = [SVector(1.0,0,0) for _ = 1:length(loci)]
-friction_coefficients = [μ for _ = 1:length(loci)]
-restitution_coefficients = [e for _ = 1:length(loci)]
-pts = Point3.(loci)
-fcs = GB.QuadFace.([
-    [1,3,4,2],
-    [3,7,8,4],
-    [7,5,6,8],
-    [5,1,2,6],
-    [2,4,8,6],
-    [1,5,7,3]
-])
-nls = GB.normals(pts,fcs)
-cube_mesh = GB.Mesh(GB.meta(pts,normals=nls),fcs)
-prop = RB.RigidBodyProperty(
-    1,true,m,inertia,
-    mass_locus,loci,axes,
-    friction_coefficients,restitution_coefficients,
-    )
-ri = copy(origin_position)
-nmcs = RB.NCF.NC1P3V(ri,origin_position,R)
-state = RB.RigidBodyState(prop,origin_position,R,origin_velocity,ω)
-rb1 = RB.RigidBody(prop,state,cube_mesh)
-rbs = TypeSortedCollection((rb1,))
-numbered = RB.number(rbs)
-matrix_sharing = zeros(Int,0,0)
-indexed = RB.index(rbs,matrix_sharing)
-ss = Int[]
-apparatuses = (cables = ss,)
-hub = nothing
-#
-connected = RB.connect(rbs,zeros(Int,0,0))
-tensioned = @eponymtuple(connected)
-cnt = RB.Connectivity(numbered,indexed,tensioned)
-st = RB.Structure(rbs,apparatuses,cnt,)
-bot = RB.Robot(st,nothing)
-end
-
 cubebot = make_cube()
 plot_traj!(cubebot)
 

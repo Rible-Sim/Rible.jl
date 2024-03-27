@@ -19,7 +19,7 @@ function generate_cache(
     Φ = make_cstr_function(structure)
     A = make_cstr_jacobian(structure)
     F!(F,q,q̇,t) = generalized_force!(F,bot,q,q̇,t)
-    Jac_F!(∂F∂q̌,∂F∂q̌̇,q,q̇,t) = generalized_force_jacobain!(∂F∂q̌,∂F∂q̌̇,bot,q,q̇,t)
+    Jac_F!(∂F∂q̌,∂F∂q̌̇,q,q̇,t) = generalized_force_jacobian!(∂F∂q̌,∂F∂q̌̇,bot,q,q̇,t)
     ∂Aᵀλ∂q(q,λ) = cstr_forces_jacobian(structure,q,λ)
     adjoint_traj = StructArray(
         [

@@ -20,7 +20,7 @@ function generate_cache(
     (;bot,env) = prob
     (;structure) = bot
     F!(F,q,q̇,t) = generalized_force!(F,bot,q,q̇,t;gravity=true)
-    Jac_F!(∂F∂q̌,∂F∂q̌̇,q,q̇,t) = generalized_force_jacobain!(∂F∂q̌,∂F∂q̌̇,bot,q,q̇,t)
+    Jac_F!(∂F∂q̌,∂F∂q̌̇,q,q̇,t) = generalized_force_jacobian!(∂F∂q̌,∂F∂q̌̇,bot,q,q̇,t)
     
     M = Matrix(assemble_M(structure))
     Φ = make_cstr_function(bot)

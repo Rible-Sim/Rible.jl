@@ -19,7 +19,7 @@ function generate_cache(
     (;bot,env) = simulator.prob
     (;structure) = bot
     F!(F,q,q̇,t) = generalized_force!(F,bot,q,q̇,t)
-    Jac_F!(∂F∂q̌,∂F∂q̌̇,q,q̇,t) = generalized_force_jacobain!(∂F∂q̌,∂F∂q̌̇,bot,q,q̇,t)
+    Jac_F!(∂F∂q̌,∂F∂q̌̇,q,q̇,t) = generalized_force_jacobian!(∂F∂q̌,∂F∂q̌̇,bot,q,q̇,t)
     Mₘ = assemble_M(structure)
     ∂Mₘhq̇ₘ∂qₘ = assemble_∂Mq̇∂q(structure)
     M⁻¹ₖ = assemble_M⁻¹(structure)

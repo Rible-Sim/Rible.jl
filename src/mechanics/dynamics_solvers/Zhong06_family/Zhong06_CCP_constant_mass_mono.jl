@@ -6,6 +6,7 @@ end
 function generate_cache(
         simulator::Simulator{<:DynamicsProblem{
             RobotType,
+            policyType,
             EnvType,
             RestitutionFrictionCombined{NewtonRestitution,CoulombFriction}
         }},
@@ -15,12 +16,17 @@ function generate_cache(
         },
         ::Val{true};
         dt,kargs...
-    )   where {RobotType,EnvType}
+    )   where {RobotType,policyType,EnvType}
     (;prob) = simulator
-    (;bot,env) = prob
+    (;bot,policy,env) = prob
     (;structure) = bot
-    F!(F,q,q̇,t) = generalized_force!(F,bot,q,q̇,t;gravity=true)
-    Jac_F!(∂F∂q̌,∂F∂q̌̇,q,q̇,t) = generalized_force_jacobain!(∂F∂q̌,∂F∂q̌̇,bot,q,q̇,t)
+    options = merge(
+        (gravity=true,factor=1,checkpersist=true), #default
+        prob.options,
+        solver.options,
+    )
+    F!(F,q,q̇,t) = generalized_force!(F,bot,policy,q,q̇,t;gravity=true)
+    Jac_F!(∂F∂q̌,∂F∂q̌̇,q,q̇,t) = generalized_force_jacobian!(∂F∂q̌,∂F∂q̌̇,bot,policy,q,q̇,t)
     
     M = Matrix(assemble_M(structure))
     Φ = make_cstr_function(bot)
@@ -51,7 +57,8 @@ function generate_cache(
         persistent_bits,
         μs_sys,
         es_sys,
-        gaps_sys
+        gaps_sys,
+        options
     )
     Zhong06_CCP_Constant_Mass_Mono_Cache(cache)
 end
@@ -130,7 +137,7 @@ function make_step_k(
                 ∂y∂x[is+1:is+3,   1:n1] .= ∂v́⁺∂qₖ[is+1:is+3,:]
                 ∂y∂x[is+1:is+3,n1+1:n2] .= Dⁱₖ*∂vₖ∂λₘ
             end
-            ∂y∂x .= (I+Lv)*∂y∂x
+            ## ∂y∂x .= (I+Lv)*∂y∂x
             for i = 1:na
                 is = 3(i-1)
                 vⁱₖ₋₁ = @view v́ₖ₋₁[is+1:is+3]
@@ -143,15 +150,15 @@ function make_step_k(
                 𝐰[is+1:is+3] .= [v́ₜⁱ,0,0]
                 ∂y∂x[is+1     ,   1:n1] .+= 1/(norm(v́⁺[is+2:is+3])+1e-14)*(v́⁺[is+2]*∂v́⁺∂qₖ[is+2,:] .+ v́⁺[is+3]*∂v́⁺∂qₖ[is+3,:])
             end
-            𝐫𝐞𝐬[(n2   +1):(n2+ nΛ)] .= (h.*((I+Lv)*v́⁺ .+ 𝐰) .- h.*y)
+            𝐫𝐞𝐬[(n2   +1):(n2+ nΛ)] .= (h.*(v́⁺ .+ 𝐰) .- h.*y)
             𝐫𝐞𝐬[n2+nΛ+1:n2+2nΛ]     .= reduce(vcat,Λ_split⊙y_split)
             𝐉[      1:n1    , n2+   1:n2+ nΛ] .=  -mass_norm*h .*transpose(D)*H*(I+L)
             𝐉[n2+1:n2+ nΛ,      1:n2    ]     .=  h.*∂y∂x
             𝐉[n2+1:n2+ nΛ,    n2+nΛ+1:n2+2nΛ] .= -h.*I(nΛ)
             𝐉[n2+nΛ+1:n2+2nΛ, n2+   1:n2+ nΛ] .=  BlockDiagonal(mat.(y_split))
             𝐉[n2+nΛ+1:n2+2nΛ, n2+nΛ+1:n2+2nΛ] .=  BlockDiagonal(mat.(Λ_split))
-            if timestep == 850
-                @show 𝐉[n2+nΛ+1:n2+2nΛ,:]
+            if false
+                ## @show 𝐉[n2+nΛ+1:n2+2nΛ,:]
             end
         end
         # debug
@@ -164,12 +171,12 @@ function make_step_k(
 end
 
 function solve!(sim::Simulator,solver_cache::Zhong06_CCP_Constant_Mass_Mono_Cache;
-                dt,
-                ftol=1e-14,xtol=ftol,
-                verbose=false,verbose_contact=false,
-                maxiters=50,
-                max_restart=3,
-                progress=true,exception=true)
+        dt,
+        ftol=1e-14,xtol=ftol,
+        verbose=false,verbose_contact=false,
+        maxiters=50,max_restart=3,
+        progress=true,exception=true
+    )
     (;prob,controller,tspan,restart,totalstep) = sim
     (;bot,env) = prob
     (;structure,traj,contacts_traj) = bot
@@ -290,6 +297,9 @@ function solve!(sim::Simulator,solver_cache::Zhong06_CCP_Constant_Mass_Mono_Cach
                 else # na!=0
                     μ = transpose(y)*Λₖ/nΛ
                     Δxp .= lu𝐉\(-Res)
+                    ## @show Res[n2+1:n2+2nΛ]
+                    ## @show (Jac*Δxp)[n2+1:n2+2nΛ]
+                    ## @show Δxp[n2+1:n2+2nΛ]
                     αp_Λ = find_cone_step_length(Λ_split,ΔΛp_split,J)
                     αp_y = find_cone_step_length(y_split,Δyp_split,J)
                     αpmax = min(αp_Λ,αp_y)
@@ -302,7 +312,15 @@ function solve!(sim::Simulator,solver_cache::Zhong06_CCP_Constant_Mass_Mono_Cach
                         break
                     end
                     τ = σ*μp
-                    𝐫𝐞𝐬_c_split = -τ.*𝐞_split.+((Δyp_split)⊙(ΔΛp_split))
+                    𝐫𝐞𝐬_c_split = -τ.*𝐞_split#.+((Δyp_split)⊙(ΔΛp_split))
+                    if false
+                        ## @show Λₖ, normRes, μ, cond(Jac)
+                        ## @show  qr(Jac).R |> diag
+                        @show Res[1:n1] |> norm
+                        @show Res[n1+1:n2] |> norm
+                        @show Res[n2+1:n2+nΛ] |> norm
+                        @show Res[n2+nΛ+1:n2+2nΛ] |> norm
+                    end
                     Res[n2+nΛ+1:n2+2nΛ] .+= reduce(vcat,𝐫𝐞𝐬_c_split)
                     normRes = norm(Res)
                     if  normRes < ftol
@@ -326,18 +344,24 @@ function solve!(sim::Simulator,solver_cache::Zhong06_CCP_Constant_Mass_Mono_Cach
                     # α_record[iteration] = α
                     x .+= α.*Δxc
                     μ = transpose(y)*Λₖ/nΛ
-                    if timestep == 850
-                        @show Λₖ, normRes, μ, cond(Jac)
-                        @show  qr(Jac).R |> diag
+                    if false
+                        ## @show Λₖ, normRes, μ, cond(Jac)
+                        ## @show  qr(Jac).R |> diag
+                        @show Res[n2+nΛ+1:n2+2nΛ] |> norm
+                        @show (y_split)⊙(Λ_split)
+                        @show (Δyp_split)⊙(ΔΛp_split)
                     end
+                    ## @show Λₖ, μ
                 end
             end
             if isconverged
                 break
             end
             restart_count += 1
-            Λ_guess /= 10
-            # @warn "restarting step: $timestep, count: $restart_count, Λ_guess = $Λ_guess"
+            if na > 0
+                Λ_guess =  max(Λ_guess/10,maximum(abs.(Λₖ[begin:3:end])))
+            end
+            ## @warn "restarting step: $timestep, count: $restart_count, Λ_guess = $Λ_guess"
         end
         qₖ .= x[      1:nq]
         λₘ .= x[   nq+1:nq+nλ]

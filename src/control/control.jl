@@ -285,6 +285,9 @@ end
 function generalized_force_jacobian!(∂F∂q̌,∂F∂q̌̇,structure::Structure,hub,policy::TimePolicy,q::AbstractVector,q̇::AbstractVector,t::Real;gravity=false)
 end
 
+function generalized_force_jacobian!(∂F∂q̌,∂F∂q̌̇,structure::Structure,hub,policy::NoPolicy,q::AbstractVector,q̇::AbstractVector,t::Real;gravity=false)
+end
+
 function set_restlen!(structure,u)
     for (i,s) in enumerate(structure.apparatuses.apparatuses)
         s.state.restlen = u[i]

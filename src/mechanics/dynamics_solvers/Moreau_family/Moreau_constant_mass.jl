@@ -30,7 +30,7 @@ function generate_cache(
     A = make_cstr_jacobian(structure)
     Φ = make_cstr_function(structure)
     F!(F,q,q̇,t) = generalized_force!(F,bot,q,q̇,t)
-    Jac_F!(∂F∂q̌,∂F∂q̌̇,q,q̇,t) = generalized_force_jacobain!(∂F∂q̌,∂F∂q̌̇,bot,q,q̇,t)
+    Jac_F!(∂F∂q̌,∂F∂q̌̇,q,q̇,t) = generalized_force_jacobian!(∂F∂q̌,∂F∂q̌̇,bot,q,q̇,t)
     ∂Aᵀλ∂q(q::AbstractVector,λ) = cstr_forces_jacobian(structure,q,λ)
     ∂Aq̇∂q(q::AbstractVector,q̇) = cstr_velocity_jacobian(structure,q,q̇)
     q̌0 = traj.q̌[begin]
