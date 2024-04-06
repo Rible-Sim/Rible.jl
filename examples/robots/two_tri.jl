@@ -15,23 +15,15 @@ function two_tri(;k=100.0,c=0.0,ratio=0.8)
     )
 
     rbs = TypeSortedCollection((rb1,rb2))
-    numbered = RB.number(rbs)
-    matrix_sharing = [
-        1 1;
-        2 2;
-    ]
-    indexed = RB.index(rbs,matrix_sharing)
     #
     ncables = 4
     restlen1 = 0.05
     restlens = fill(restlen1,ncables)
     ks = fill(k,ncables)
     cs = fill(c,ncables)
-    cables = [RB.DistanceSpringDamper2D(restlens[i],ks[i],cs[i];slack=true) for i = 1:ncables]
-    acs = [RB.ManualActuator(1,1:ncables,restlens,RB.Uncoupled())]
-    apparatuses = (cables = cables,)
-    hub = (actuators = acs,)
-    cnt_matrix_cables = [
+    spring_dampers = [RB.DistanceSpringDamper2D(restlens[i],ks[i],cs[i];slack=true) for i = 1:ncables]
+
+    connecting_matrix = [
         3 -2 ;
        -2  3 ;
         5 -2 ;
@@ -39,14 +31,14 @@ function two_tri(;k=100.0,c=0.0,ratio=0.8)
         # 5 -2 ;
         # 4 -3 ;
     ]
-    connected = RB.connect(rbs,cnt_matrix_cables)
+    cables = RB.connect(rbs,spring_dampers;connecting_matrix)
     #
     # cst1 = RB.PinJoint(
     #     1,
     #     RB.Hen2Egg(
     #         1,
-    #         RB.ID(rb1,1),
-    #         RB.ID(rb2,1)
+    #         RB.Signifier(rb1,1),
+    #         RB.Signifier(rb2,1)
     #     )
     # )
 
@@ -63,13 +55,32 @@ function two_tri(;k=100.0,c=0.0,ratio=0.8)
 
     # jointedmembers = RB.join((cst1,),indexed)
 
+    apparatuses = TypeSortedCollection(
+        cables
+    )
+
+    numbered = RB.number(rbs,apparatuses)
+    sharing_matrix = [
+        1 1;
+        2 2;
+    ]
+    indexed = RB.index(rbs,apparatuses;sharing_matrix)
+
     cnt = RB.Connectivity(
         numbered,
         indexed,
-        @eponymtuple(connected,),
-        # jointedmembers
     )
 
     st = RB.Structure(rbs,apparatuses,cnt)
+    ## acs = [RB.RegisterActuator(1,1:ncables,restlens,RB.Uncoupled())]
+    ## hub = (actuators = acs,)
+    gauges = Int[]
+    actuators = Int[]
+    hub = RB.ControlHub(
+        st,
+        gauges,
+        actuators,
+        RB.Coalition(st,gauges,actuators)
+    )
     bot = RB.Robot(st,hub)
 end

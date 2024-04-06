@@ -133,13 +133,13 @@ function dualtri(num_of_dof,;onedir=[1.0,0.0],θ=0.0,k=400.0,c=0.0,restlen=0.16)
     function ganged_act(actid,id1,id2,original_restlens)
         ids = [id1,id2]
         original_values = original_restlens[[id1,id2]]
-        RB.ManualActuator(actid,ids,original_values,RB.Ganged())
+        RB.RegisterActuator(actid,ids,original_values,RB.Ganged())
     end
     acs = [ifelse(isodd(i),ganged_act(i,2(i-1)+1,2i,original_restlens),
                            ganged_act(i,2i,2(i-1)+1,original_restlens)) for i = 1:num_of_bodies-1]
     hub = (actuators=acs,)
     pjs = [
-        RB.PinJoint(i,RB.Hen2Egg(RB.ID(rbs[i],2,1),RB.ID(rbs[i+1],1)))
+        RB.PinJoint(i,RB.Hen2Egg(RB.Signifier(rbs[i],2,1),RB.Signifier(rbs[i+1],1)))
         for i = 1:num_of_bodies-1
     ]
     jointed = RB.join(pjs,indexed)

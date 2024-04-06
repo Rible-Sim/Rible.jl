@@ -10,11 +10,11 @@ using EponymTuples
 using ForwardDiff
 using DocStringExtensions
 
-import ..Rible: HouseholderOrthogonalization, skew, Axes, GECP, CartesianFrame
+import ..Rible: HouseholderOrthogonalization, skew, Axes, GECP, CartesianFrame, rotation_matrix
 
 import ..Rible: get_num_of_cstr, get_num_of_coords
 import ..Rible: get_num_of_dof, get_num_of_local_dims
-import ..Rible: to_local_coords, to_transformation
+import ..Rible: to_local_coords, to_position_jacobian, to_velocity_jacobian
 import ..Rible: find_rotation, find_angular_velocity
 import ..Rible: find_local_angular_velocity
 import ..Rible: get_deform

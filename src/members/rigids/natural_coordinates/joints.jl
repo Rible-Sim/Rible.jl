@@ -34,8 +34,8 @@ function build_joint_cache(
     # translate
 
     # translate
-    C_hen = to_transformation(nmcs_hen,q_hen,c_hen)
-    C_egg = to_transformation(nmcs_egg,q_egg,c_egg)
+    C_hen = to_position_jacobian(nmcs_hen,q_hen,c_hen)
+    C_egg = to_position_jacobian(nmcs_egg,q_egg,c_egg)
     J = [-C_hen C_egg;] |> sparse
     transformations = J[mask_1st,:]
 
@@ -137,7 +137,7 @@ end
 
 function get_joint_jacobian!(
         ret,
-        nmcs_hen::NC,nmcs_egg::NC,
+        nmcs_hen::NC, nmcs_egg::NC,
         loci_position_hen,
         loci_position_egg,
         cache,

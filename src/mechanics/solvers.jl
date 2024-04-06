@@ -17,11 +17,12 @@ struct NewtonRestitution <: AbstractRestitutionModel end
 struct PoissonRestitution <: AbstractRestitutionModel end
 struct StrangeRestitution <: AbstractRestitutionModel end
 
-abstract type AbstractTendonModel end
-struct NoTendon <: AbstractTendonModel end
-struct SlidingTendon <: AbstractTendonModel end
+abstract type AbstractApparatusModel end
+struct Naive <: AbstractApparatusModel end
+struct EulerEytelwein <: AbstractApparatusModel end
 
 abstract type AbstractSolver end
+abstract type AbstractDynamicsSolver <: AbstractSolver end
 
 abstract type AbstractComplementaritySolver <: AbstractSolver end
 struct InteriorPointMethod <: AbstractComplementaritySolver end
@@ -46,12 +47,13 @@ struct InnerLayerContactSolver{complementarity_solverType} <: AbstractContactSol
     complementarity_solver::complementarity_solverType
 end
 
-abstract type AbstractTendonSolver <: AbstractSolver end
+abstract type AbstractApparatusSolver <: AbstractSolver end
 
-struct MonolithicTendonSolver{complementarity_solverType} <: AbstractTendonSolver
+struct MonolithicApparatusSolver{complementarity_solverType} <: AbstractApparatusSolver
     complementarity_solver::complementarity_solverType
 end
-struct InnerLayerTendonSolver{complementarity_solverType} <: AbstractTendonSolver
+
+struct InnerLayerApparatusSolver{complementarity_solverType} <: AbstractApparatusSolver
     complementarity_solver::complementarity_solverType
 end
 
@@ -68,7 +70,7 @@ struct Moreau{T} <: AbstractIntegrator
     θ::T
 end
 
-struct DynamicsSolver{integratorType,contact_solverType,apparatus_solverType,optionsType} <: AbstractSolver 
+struct DynamicsSolver{integratorType,contact_solverType,apparatus_solverType,optionsType} <: AbstractDynamicsSolver 
     integrator::integratorType
     contact_solver::contact_solverType
     apparatus_solver::apparatus_solverType
@@ -86,13 +88,38 @@ end
 function DynamicsSolver(integrator::AbstractIntegrator,contact_solver::AbstractContactSolver,options::NamedTuple)
     DynamicsSolver(integrator,contact_solver,nothing,options)
 end
-
 function DynamicsSolver(integrator::AbstractIntegrator,contact_solver::AbstractContactSolver;options...)
     DynamicsSolver(integrator,contact_solver,nothing,values(options))
 end
 
-struct DynamicsProblem{RobotType,envType,contact_modelType,apparatus_modelType,optionsType}
+function DynamicsSolver(integrator::AbstractIntegrator,apparatus_solver::AbstractApparatusSolver;options...)
+    DynamicsSolver(integrator,nothing,apparatus_solver,values(options))
+end
+
+function DynamicsSolver(integrator::AbstractIntegrator,contact_solver::AbstractContactSolver,apparatus_solver::AbstractApparatusSolver;options...)
+    DynamicsSolver(integrator,contact_solver,apparatus_solver,values(options))
+end
+
+struct DiscreteAdjointDynamicsSolver{integratorType,contact_solverType,apparatus_solverType,optionsType} <: AbstractDynamicsSolver 
+    forward_solver::DynamicsSolver{integratorType,contact_solverType,apparatus_solverType,optionsType}
+end
+
+abstract type AbstractMechanicsProblem end
+
+abstract type AbstractDynamicsProblem <: AbstractMechanicsProblem end
+
+abstract type AbstractPolicy end
+struct NoPolicy <: AbstractPolicy end
+struct ActorPolicy{T} <: AbstractPolicy
+    nt::T
+end
+struct TimePolicy{T} <: AbstractPolicy
+    nt::T
+end
+
+struct DynamicsProblem{RobotType,policyType,envType,contact_modelType,apparatus_modelType,optionsType} <: AbstractDynamicsProblem
     bot::RobotType
+    policy::policyType
     env::envType
     contact_model::contact_modelType
     apparatus_model::apparatus_modelType
@@ -100,17 +127,78 @@ struct DynamicsProblem{RobotType,envType,contact_modelType,apparatus_modelType,o
 end
 
 function DynamicsProblem(bot::Robot;options...)
-    DynamicsProblem(bot::Robot,EmptySpace(),Contactless(),NoTendon(),values(options))
+    DynamicsProblem(bot::Robot,NoPolicy(),GravitySpace(true),Contactless(),Naive(),values(options))
+end
+
+function DynamicsProblem(bot::Robot,policy::AbstractPolicy;options...)
+    DynamicsProblem(bot::Robot,policy,GravitySpace(true),Contactless(),Naive(),values(options))
+end
+
+function DynamicsProblem(bot::Robot,policy::AbstractPolicy,appar_model::AbstractApparatusModel;options...)
+    DynamicsProblem(bot::Robot,policy,GravitySpace(true),Contactless(),appar_model,values(options))
+end
+
+function DynamicsProblem(bot::Robot,appar_model::AbstractApparatusModel;options...)
+    DynamicsProblem(bot::Robot,NoPolicy(),GravitySpace(true),Contactless(),appar_model,values(options))
 end
 
 function DynamicsProblem(bot::Robot,contact_model::AbstractContactModel;options...)
-    DynamicsProblem(bot::Robot,EmptySpace(),contact_model,NoTendon(),values(options))
+    DynamicsProblem(bot::Robot,NoPolicy(),GravitySpace(true),contact_model,Naive(),values(options))
 end
 
 function DynamicsProblem(bot::Robot,env::AbstractContactEnvironment,contact_model::AbstractContactModel;options...)
-    DynamicsProblem(bot::Robot,env,contact_model,NoTendon(),values(options))
+    DynamicsProblem(bot::Robot,NoPolicy(),env,contact_model,Naive(),values(options))
 end
 
+
+function DynamicsProblem(bot::Robot,policy::AbstractPolicy,
+        env::AbstractContactEnvironment,
+        contact_model::AbstractContactModel,
+        appar_model::AbstractApparatusModel=Naive(),;
+        options...
+    )
+    DynamicsProblem(bot::Robot,policy,env,contact_model,appar_model,values(options))
+end
+
+struct DynamicsSensitivityProblem{RobotType,policyType,envType,contact_modelType,apparatus_modelType,optionsType} <: AbstractDynamicsProblem
+    bot::RobotType
+    policy::policyType
+    env::envType
+    contact_model::contact_modelType
+    apparatus_model::apparatus_modelType
+    options::optionsType
+end
+
+function DynamicsSensitivityProblem(bot::Robot,policy=NoPolicy();options...)
+    DynamicsSensitivityProblem(bot::Robot,policy,GravitySpace(),Contactless(),Naive(),values(options))
+end
+
+function DynamicsSensitivityProblem(bot::Robot,contact_model::AbstractContactModel;options...)
+    DynamicsSensitivityProblem(bot::Robot,NoPolicy(),GravitySpace(),contact_model,Naive(),values(options))
+end
+
+function DynamicsSensitivityProblem(bot::Robot,env::AbstractContactEnvironment,contact_model::AbstractContactModel;options...)
+    DynamicsSensitivityProblem(bot::Robot,NoPolicy(),env,contact_model,Naive(),values(options))
+end
+
+struct AdjointDynamicsSensitivitySolver{forward_solverType,adjoint_solverType} <: AbstractDynamicsSolver
+    forward_solver::forward_solverType
+    adjoint_solver::adjoint_solverType
+end
+
+struct AdjointDynamicsProblem{RobotType,policyType,envType,contact_modelType,apparatus_modelType,optionsType,costType} <: AbstractDynamicsProblem
+    bot::RobotType
+    policy::policyType
+    env::envType
+    contact_model::contact_modelType
+    apparatus_model::apparatus_modelType
+    cost::costType
+    options::optionsType
+end
+
+function AdjointDynamicsProblem(bot::Robot,cost;options...)
+    AdjointDynamicsProblem(bot::Robot,NoPolicy(),GravitySpace(),Contactless(),Naive(),cost,values(options))
+end
 
 struct SolverHistory{dataType}
     data::dataType
@@ -122,7 +210,7 @@ function SolverHistory(data::NamedTuple,n)
     )
 end
 
-function SolverHistory(bot::Robot,solver::DynamicsSolver,n)
+function SolverHistory(bot::Robot,solver::AbstractDynamicsSolver,n)
     T = get_numbertype(bot)
     ini_record = (
         residual=zero(T),
@@ -135,7 +223,6 @@ function SolverHistory(bot::Robot,solver::DynamicsSolver,n)
         n
     )
 end
-
 
 function SolverHistory(
         bot::Robot,
@@ -158,7 +245,6 @@ function SolverHistory(
     )
 end
 
-
 function SolverHistory(
         bot::Robot,
         solver::DynamicsSolver{IntorType,<:MonolithicContactSolver},
@@ -179,7 +265,6 @@ function SolverHistory(
     )
 end
 
-
 function record!(sh::SolverHistory,data,k)
     sh.data[k] = data
 end
@@ -194,13 +279,13 @@ struct Simulator{ProbType,CtrlType,T,dataType}
     solver_history::SolverHistory{dataType}
 end
 
-function Simulator(prob::DynamicsProblem,solver::DynamicsSolver,
+function Simulator(prob::AbstractDynamicsProblem,solver::AbstractDynamicsSolver,
         controller = (prescribe! = nothing, actuate! = nothing);
         tspan,dt,restart=true,karg...
     )
     (;bot,) = prob
-    (;structure,traj,contacts_traj) = bot
-    totalstep = prepare_traj!(traj,contacts_traj;tspan,dt,restart)
+    (;structure,traj,contacts_traj,control_traj) = bot
+    totalstep = prepare_traj!(bot;tspan,dt,restart)
     (;prescribe!, actuate!) = controller
     if !isa(prescribe!, Nothing)
         for i in eachindex(traj)
@@ -253,39 +338,62 @@ const DEFAULT_CALLBACK = DiscreteCallback(
 const NO_CONTROL = (sim,cache) -> nothing
 
 
-function prepare_traj!(traj,contacts_traj;tspan,dt,restart=true)
+function prepare_traj!(bot::Robot;tspan,dt,restart=true)
+    (;traj,contacts_traj,control_traj) = bot
     if restart
         resize!(traj,1)
         resize!(contacts_traj,1)
+        resize!(control_traj,1)
     end
+    nlaststep = length(traj)
     tstart,tend = tspan
     totaltime = tend - tstart
     totalstep = ceil(Int,totaltime/dt)
-    for istep = 1:totalstep
-        push!(traj,deepcopy(traj[end]))        
-        push!(contacts_traj,deepcopy(contacts_traj[end]))
-        for c in contacts_traj[end]
+    resize!(traj,nlaststep+totalstep)
+    resize!(contacts_traj,nlaststep+totalstep)
+    resize!(control_traj,nlaststep+totalstep)
+    for istep = nlaststep+1:nlaststep+totalstep
+        traj[istep] = deepcopy(traj[nlaststep])
+        traj.t[istep] = tstart + dt*(istep-1)
+        contacts_traj[istep] = deepcopy(contacts_traj[nlaststep])
+        for c in contacts_traj[istep]
             c.state.active = false
         end
-        traj.t[end] = tstart + dt*istep
+        control_traj[istep] = deepcopy(control_traj[nlaststep])
+        ## control_traj[istep].u .= get_actions!(bot,traj.t[istep])
     end
     totalstep
 end
 
-function solve!(prob::DynamicsProblem,solver::DynamicsSolver,
+function solve!(prob::AbstractDynamicsProblem,solver::AbstractDynamicsSolver,
                 controller = (prescribe! = nothing, actuate! = nothing);
                 tspan,dt,restart=true,karg...)
     simulator = Simulator(prob,solver,controller;tspan,dt,restart)
-    solve!(simulator,solver;dt,karg...)
-    simulator
+    solvercache = solve!(simulator,solver;dt,karg...)
+    simulator, solvercache
 end
 
-function solve!(simulator::Simulator,solver::DynamicsSolver;karg...)
+function solve!(simulator::Simulator,solver::AbstractDynamicsSolver;karg...)
     solvercache = generate_cache(simulator,solver;karg...)
     solve!(simulator,solvercache;karg...)
     # retrieve!(simulator,solvercache)
-    # simulator,solvercache
+    solvercache
     # simulator.prob.bot
+end
+
+function generate_cache(
+        simulator::Simulator,
+        solver::AbstractDynamicsSolver;
+        dt,kargs...
+    ) 
+
+    generate_cache(
+        simulator,
+        solver,
+        has_constant_mass_matrix(simulator.prob.bot);
+        dt,kargs...
+    )
+
 end
 
 
@@ -302,11 +410,16 @@ include("dynamics_solvers/Zhong06_family/Zhong06_constant_mass.jl")
 include("dynamics_solvers/Zhong06_family/Zhong06_nonconstant_mass.jl")
 include("dynamics_solvers/Zhong06_family/Zhong06_CCP_constant_mass.jl")
 include("dynamics_solvers/Zhong06_family/Zhong06_CCP_constant_mass_mono.jl")
+include("dynamics_solvers/Zhong06_family/Zhong06_CCP_constant_mass_cluster_cables.jl")
 include("dynamics_solvers/Zhong06_family/Zhong06_CCP_nonconstant_mass.jl")
 include("dynamics_solvers/Zhong06_family/Zhong06_frictionless_nonconstant_mass.jl")
 include("dynamics_solvers/Zhong06_family/Zhong06_frictionless_nonconstant_mass_mono.jl")
-include("dynamics_solvers/Zhong06_family/Zhong06_sliding_cable_FB.jl")
+include("dynamics_solvers/Zhong06_family/Zhong06_constant_mass_cluster_cables.jl")
 # include("dynamics_solvers/Zhong06_family/Zhong06_nonholonomic_nonsmooth.jl")
+
+include("dynamics_solvers/Zhong06_family/Adjoint_Zhong06_nonconstant_mass.jl")
+include("dynamics_solvers/Zhong06_family/Adjoint_Zhong06_constant_mass.jl")
+
 
 include("dynamics_solvers/Alpha_family/Alpha.jl")
 include("dynamics_solvers/Alpha_family/AlphaCCP.jl")

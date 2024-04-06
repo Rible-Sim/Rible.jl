@@ -88,8 +88,8 @@ function one_tri_one_bar(;k=nothing)
         1,
         RB.Hen2Egg(
             1,
-            RB.ID(base,1),
-            RB.ID(bar,1),
+            RB.Signifier(base,1),
+            RB.Signifier(bar,1),
         )
     )
     

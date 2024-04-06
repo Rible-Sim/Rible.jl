@@ -115,8 +115,8 @@ function planar_parallel()
     connected = RB.connect(rigdibodies, cm)
     tensioned = @eponymtuple(connected,)
 
-    # j1 = RB.PrismaticJoint(1,RB.Hen2Egg(RB.ID(base,5,1),RB.ID(slider1,1,1)))
-    # j2 = RB.PrismaticJoint(2,RB.Hen2Egg(RB.ID(base,5,2),RB.ID(slider2,1,1)))
+    # j1 = RB.PrismaticJoint(1,RB.Hen2Egg(RB.Signifier(base,5,1),RB.Signifier(slider1,1,1)))
+    # j2 = RB.PrismaticJoint(2,RB.Hen2Egg(RB.Signifier(base,5,2),RB.Signifier(slider2,1,1)))
 
     # js = [
     #     j1,j2

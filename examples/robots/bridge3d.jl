@@ -188,7 +188,7 @@ else
     cables = [RB.DistanceSpringDamper3D(0.0,k[i],0.0;slack=false) for i = 1:ncables]
 end
 acs = [
-    RB.ManualActuator(i,[i,i+hncables],zeros(2))
+    RB.RegisterActuator(i,[i,i+hncables],zeros(2))
     for i = 1:hncables
 ]
 apparatuses = (cables = cables,)
@@ -232,9 +232,9 @@ connected = RB.connect(rbs,cnt_matrix)
 # connected = RB.connect(rbs,zeros(Int,0,0))
 # #
 #
-# cst1 = RB.PinJoint(RB.Hen2Egg(RB.ID(rb1_to_3[1],2),RB.ID(rb4,1)))
-# cst2 = RB.PinJoint(RB.Hen2Egg(RB.ID(rb1_to_3[2],2),RB.ID(rb4,2)))
-# cst3 = RB.PinJoint(RB.Hen2Egg(RB.ID(rb1_to_3[3],2),RB.ID(rb4,3)))
+# cst1 = RB.PinJoint(RB.Hen2Egg(RB.Signifier(rb1_to_3[1],2),RB.Signifier(rb4,1)))
+# cst2 = RB.PinJoint(RB.Hen2Egg(RB.Signifier(rb1_to_3[2],2),RB.Signifier(rb4,2)))
+# cst3 = RB.PinJoint(RB.Hen2Egg(RB.Signifier(rb1_to_3[3],2),RB.Signifier(rb4,3)))
 # jointedmembers = RB.join((cst1,cst2,cst3),indexed)
 #
 cnt = RB.Connectivity(numbered,indexed,@eponymtuple(connected,))

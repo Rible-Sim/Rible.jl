@@ -144,14 +144,14 @@ end
 
 
 """
-ID
+Signifier
 $(TYPEDEF)
 ---
 $(TYPEDFIELDS)
 """
-struct ID{sigType,pidType,aidType}
+struct Signifier{bodyType,pidType,aidType}
     "Signifier of body"
-    bodysig::sigType
+    body::bodyType
     "Index of the anchor point"
     pid::pidType
     "Index of the translational axis"
@@ -160,12 +160,12 @@ struct ID{sigType,pidType,aidType}
     rotid::aidType
 end
 
-function ID(bodysig,pid,trlid)
-    ID(bodysig,pid,trlid,trlid)
+function Signifier(body,pid,trlid)
+    Signifier(body,pid,trlid,trlid)
 end
 
-function ID(bodysig,pid)
-    ID(bodysig,pid,1,1)
+function Signifier(body,pid)
+    Signifier(body,pid,1,1)
 end
 
 """
@@ -174,7 +174,7 @@ $(TYPEDEF)
 ---
 $(TYPEDFIELDS)
 """
-struct Hen2Egg{henType<:ID,eggType<:ID}
+struct Hen2Egg{henType<:Signifier,eggType<:Signifier}
     "hen/parent/predecessor"
     hen::henType
     "egg/child/successor"
@@ -182,7 +182,7 @@ struct Hen2Egg{henType<:ID,eggType<:ID}
 end
 
 function get_id(thing)
-    1
+    0
 end
 
 function get_ids(things)
@@ -192,11 +192,11 @@ function get_ids(things)
 end
 
 function check_id_sanity(things)
-    ids,nb = get_ids(things)
-    if nb > 0 
-        @assert minimum(ids) == 1
-        @assert maximum(ids) == nb
+    ids,num_of_things = get_ids(things)
+    if num_of_things > 0 
+        @assert minimum(ids) == 1 "minimum(ids) = $(minimum(ids))"
+        @assert maximum(ids) == num_of_things "maximum(ids) = $(maximum(ids)), num_of_things = $num_of_things"
         @assert allunique(ids)
     end
-    ids,nb
+    ids,num_of_things
 end

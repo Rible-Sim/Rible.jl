@@ -225,7 +225,6 @@ mutable struct SlidingPoint{T}
 end
 
 struct DistanceSpringDamperSegment{N,T}
-    id::Int
     k::T
     c::T
     prestress::T
@@ -234,9 +233,31 @@ struct DistanceSpringDamperSegment{N,T}
 end
 
 function DistanceSpringDamperSegment( original_restlen, k; c=zero(k), prestress=zero(k))
-    direction = MVector{2}(one(k), zero(k))
+    direction = MVector{3}(one(k), zero(k), zero(k))
     state = DistanceSpringDamperState(original_restlen, direction)
     DistanceSpringDamperSegment( k, c, prestress, original_restlen, state)
+end
+
+"""
+$(TYPEDSIGNATURES)
+"""
+function update!(cab::DistanceSpringDamperSegment, p1, p2, ṗ1, ṗ2, s1, s2)
+	(;k, c, state, prestress) = cab
+    state.start,     state.stop = p1, p2
+    state.start_vel, state.stop_vel = ṗ1, ṗ2
+	l = p2 - p1
+	l̇ = ṗ2 - ṗ1
+	state.length = norm(l)
+	state.direction = l/state.length
+	state.lengthdot = (transpose(state.direction)*l̇)
+	deformation = state.length - state.restlen - s2 + s1
+	f = k*deformation + c*state.lengthdot + prestress
+    if f < 0
+        state.tension = 0.0
+    else
+        state.tension = f
+    end
+	state.force .= state.tension.*state.direction
 end
 
 function calculate_α(μ,θ)
@@ -245,22 +266,22 @@ end
 
 function SlidingPoint(μ)
     θ = one(μ) * 2pi
-    #θ = zero(μ)
-    α = calculate_α(μ,θ)
+    α = calculate_α(μ, θ)
     s = zero(μ)
-    s⁺,s⁻ = s2s̄(s)
-    SlidingPoint(μ,θ,α,s,s⁺,s⁻)
+    s⁺, s⁻ = s2s̄(s)
+    SlidingPoint(μ, θ, α, s, s⁺, s⁻)
 end
 
 struct ClusterDistanceSpringDampers{spsType,segsType}
-    ID::Int
     sps::spsType
     segs::segsType
 end
 
-function ClusterDistanceSpringDampers( nsp, segs;μ=0.0)
+function ClusterDistanceSpringDampers(segs; μ=0.0)
+    @show 11
+    nsp = length(segs) - 1
     sps = StructArray([SlidingPoint(μ) for i = 1:nsp])
-    ClusterDistanceSpringDampers( sps, segs)
+    ClusterDistanceSpringDampers(sps, segs)
 end
 
 function s2s̄(s::Number)

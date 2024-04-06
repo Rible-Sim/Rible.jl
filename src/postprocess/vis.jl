@@ -22,9 +22,11 @@ MakieCore.@recipe(Viz, structure) do scene
         cablewidth=0.6,
         meshcolor=:slategrey,
         fontsize = 12,
+        linewidth = 1,
     )
 end
 
+# AbstractBody
 function MakieCore.plot!(viz::Viz{Tuple{S}};
     ) where S <:AbstractBody
     body_ob = viz[:structure]
@@ -75,7 +77,7 @@ function MakieCore.plot!(viz::Viz{Tuple{S}};
             build_mesh(body_ob,color=viz.meshcolor[])
         end
         if viz.showwire[]
-            strokewidth = linewidth
+            strokewidth = viz.linewidth[]
         else
             strokewidth = 0
         end
@@ -83,15 +85,39 @@ function MakieCore.plot!(viz::Viz{Tuple{S}};
             MakieCore.mesh!(viz, meshes_ob; shading = MakieCore.Automatic())
         else
             MakieCore.poly!(viz, meshes_ob; shading = MakieCore.Automatic(),
-                # strokewidth
+                strokewidth
             )
         end
     end
     viz
 end
 
+# ClusterJoint
 function MakieCore.plot!(viz::Viz{Tuple{S}};
-    ) where S <: Apparatus{<:CableJoint}
+    ) where {S<:Apparatus{<:ClusterJoint}}
+    cluster_cable_ob = viz[:structure]
+    # foreach(cluster_cable_ob[].force) do cluster_seg
+    n_segs = length(cluster_cable_ob[].force)
+    for i in 1:n_segs
+        seg_ob = lift(cluster_cable_ob) do seg
+            iseg = seg.force[i].force
+            point_start = iseg.state.start |> GB.Point
+            point_stop = iseg.state.stop |> GB.Point
+            [(point_start, point_stop)]
+        end
+        linestyle_ob = :solid
+        MakieCore.linesegments!(
+            viz, seg_ob,
+            color=:red,
+            linewidth=2,
+            linestyle=linestyle_ob
+        )
+    end
+end
+
+# CableJoint
+function MakieCore.plot!(viz::Viz{Tuple{S}};
+    ) where {S<:Apparatus{<:CableJoint}}
     cable_appar_ob = viz[:structure]
 
     seg_ob = lift(cable_appar_ob) do cab
@@ -106,7 +132,7 @@ function MakieCore.plot!(viz::Viz{Tuple{S}};
         if cab.force.state.length > cab.force.state.restlen
             return :solid
         else
-            return viz.slack_linestyle[]
+            return :solid
         end
     end
 
@@ -142,6 +168,7 @@ function MakieCore.plot!(viz::Viz{Tuple{S}};
     viz
 end
 
+# AbstractStructure
 function MakieCore.plot!(viz::Viz{Tuple{S}};
     ) where S <:AbstractStructure
     if viz.isref[]
@@ -151,7 +178,7 @@ function MakieCore.plot!(viz::Viz{Tuple{S}};
         meshcolor=viz.refcolor[]
         viz.showcables[] = false
     else
-        meshcolor=viz.meshcolor[]
+        meshcolor=nothing
         cablecolor = viz.cablecolor[]
         cablelabelcolor = viz.cablelabelcolor[]
     end
@@ -175,7 +202,7 @@ function MakieCore.plot!(viz::Viz{Tuple{S}};
     (;num_of_bodies,) = connectivity.indexed
     cable_apparatuses_ob = lift(tgob) do tgob
         filter(sort(tgob.apparatuses)) do appar
-            appar.joint isa CableJoint
+            appar.joint isa Union{CableJoint, ClusterJoint}
         end
     end
 
@@ -222,7 +249,7 @@ function MakieCore.plot!(viz::Viz{Tuple{S}};
                 meshcolor,
                 pointcolor = viz.pointcolor[],
                 showmesh = viz.showmesh[],
-                # showwire = viz.showwire[],
+                showwire = viz.showwire[],
             )
         end
     end
@@ -326,16 +353,16 @@ function get_groundmesh(::Nothing,rect)
 end
 
 function get_linesegs_cables(structure;slackonly=false,noslackonly=false)
-    (;connected) = structure.connectivity.tensioned
-    (;cables) = structure.apparatuses
+    cables = get_cables(structure)
     ndim = get_num_of_dims(structure)
     T = get_numbertype(structure)
-    linesegs_cables = Vector{Tuple{Point{ndim,T},Point{ndim,T}}}()
-    foreach(connected) do scnt
-        scable = cables[scnt.id]
-        ret = (Point(scnt.hen.bodysig.state.loci_states[scnt.hen.pid].position),
-                Point(scnt.egg.bodysig.state.loci_states[scnt.egg.pid].position))
-        slacking = scable.state.tension <= 0
+    linesegs_cables = Vector{Tuple{GB.Point{ndim,T},GB.Point{ndim,T}}}()
+    foreach(cables) do cable
+        force = cable.force
+        (;hen,egg) = cable.joint.hen2egg
+        ret = (GB.Point(hen.body.state.loci_states[hen.pid].frame.position),
+                GB.Point(egg.body.state.loci_states[egg.pid].frame.position))
+        slacking = force.state.tension <= 0
         if (slackonly && slacking) ||
            (noslackonly && !slacking) ||
            (!slackonly && !noslackonly)

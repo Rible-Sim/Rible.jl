@@ -170,11 +170,14 @@ function plot_traj!(bot::RB.Robot;
         xlims=(-1.0,1.0),
         ylims=(-1.0,1.0),
         zlims=(-1e-3,1.0),
+        show_axis = true,
         showground=true,
         ground=nothing,
         showback=false,
         actuate=false,
         figname=nothing,
+        rowgap=0,
+        colgap=0,
         showinit=false,
         auto=false,
         titleformatfunc = (subgrid_idx,tt)-> begin
@@ -207,7 +210,7 @@ function plot_traj!(bot::RB.Robot;
                 1 for subgrid_idx in eachindex(subgrids)
             ]
         (a,b::Nothing) => [
-                time2step(a[subgrid_idx],traj.t)
+                RB.time2step(a[subgrid_idx],traj.t)
                 for subgrid_idx in eachindex(subgrids)
             ]
         (a::Nothing,b) => b
@@ -250,10 +253,11 @@ function plot_traj!(bot::RB.Robot;
         elseif AxisType <: LScene
             showinfo = false
             # ax = LScene(fig[1,1], show_axis=false, scenekw = (clear=true,))
-            ax = LScene(fig[1,1],) #
+            ax = LScene(fig[1,1], show_axis=show_axis, scenekw = (show_axis = show_axis,)) #
             # cam = Makie.camera(ax.scene)
             # cam = cam3d!(ax.scene, projectiontype=Makie.Orthographic)
             # update_cam!(ax.scene, cam)
+            # ax = LScene(fig[1,1],show_axis=false) #
         else
             error("Unknown AxisType")
         end
@@ -263,6 +267,15 @@ function plot_traj!(bot::RB.Robot;
             mesh!(ax,groundmesh;color = :snow)
         end
         if showwire || showmesh || showcables || showlabels || showpoints
+            
+            RB.viz!(ax,tgob;
+                showmesh,
+                showwire,
+                showlabels,
+                showpoints,
+                showcables,
+                kargs...
+            )
             if showinit
                 RB.viz!(ax,tgobini;
                     showmesh,
@@ -273,14 +286,6 @@ function plot_traj!(bot::RB.Robot;
                     kargs...
                 )
             end
-            RB.viz!(ax,tgob;
-                showmesh,
-                showwire,
-                showlabels,
-                showpoints,
-                showcables,
-                kargs...
-            )
         end
         sup!(ax,tgob,subgrid_idx)
         if showtitle    
@@ -320,7 +325,7 @@ function plot_traj!(bot::RB.Robot;
                     "fig. height" => map(string,ax.height),
                     "fig. width" => map(string,ax.width)
                 ]
-                if ndim == 3 && AxisType == Axis3
+                if AxisType == Axis3
                     cam_info = [
                         "azimuth" => map(string,ax.azimuth),
                         "elevation" => map(string,ax.elevation)
@@ -351,7 +356,7 @@ function plot_traj!(bot::RB.Robot;
                 framerate = 30 
                 skipstep = round(Int,1/framerate/dt*speedup)
                 recordsteps = 1:skipstep:length(traj.t)
-                record(fig, figname, recordsteps;
+                record(fig, figname, recordsteps; px_per_unit = 2,
                     framerate) do this_step
                     if actuate
                         RB.actuate!(bot,[traj.t[this_step]])
@@ -362,7 +367,7 @@ function plot_traj!(bot::RB.Robot;
                     # @show RB.mechanical_energy(structure)
                     #
                     this_time[] = traj.t[this_step]
-                    RB.analyse_slack(structure,true)
+                    ## RB.analyse_slack(structure,true)
                     tgob[] = structure
                 end
             else
@@ -393,8 +398,10 @@ function plot_traj!(bot::RB.Robot;
                 end
             end
         end
+        colgap!(grid1,colgap)
+        rowgap!(grid1,rowgap)
     end
-    if fig isa Figure
+    if (fig isa Figure) && !dorecord
         savefig(fig,figname)
         DataInspector(fig)
     end
@@ -501,8 +508,8 @@ function plot_self_stress_states(
                     mapreduce(
                         (scnt)->
                         [(
-                            scnt.hen.bodysig.state.loci_states[scnt.hen.pid].+
-                            scnt.egg.bodysig.state.loci_states[scnt.egg.pid]
+                            scnt.hen.body.state.loci_states[scnt.hen.pid].+
+                            scnt.egg.body.state.loci_states[scnt.egg.pid]
                         )./2],
                         vcat,
                         tensioned.connected

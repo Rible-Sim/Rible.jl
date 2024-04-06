@@ -84,7 +84,7 @@ pretty_table(
 if loadmesh
     trimesh = load(
         RB.assetpath("球铰/零件1.stl")
-    ) |> make_patch(;
+    ) |> RB.make_patch(;
     scale = 1/200, 
     color = :tomato1,
     trans = [0,0,-0.39]
@@ -92,14 +92,14 @@ if loadmesh
 else
     trimesh = GB.merge(
         [
-            endpoints2mesh(loci_positions[i],loci_positions[j];
+            RB.endpoints2mesh(loci_positions[i],loci_positions[j];
             radius,color)
             for (i,j) in [
                 [1,2],[1,3],[1,4],
                 [2,3],[3,4],[4,2]
             ]
         ]
-    ) |> make_patch(;color = :darkslategrey)
+    ) |> RB.make_patch(;color = :darkslategrey)
     #     platemesh = endpoints2mesh(
     #         SVector(0.0,0.0,-height/2),
     #         SVector(0.0,0.0, height/2);

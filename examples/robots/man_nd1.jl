@@ -143,7 +143,7 @@ function man_nd1(k=0.0,c=0.0;ratio=0.8)
     # @show  original_restlens
 	#
     cables = [RB.DistanceSpringDamper2D(original_restlens[i],ks[i],cs[i];slack=false) for i = 1:ncables]
-    acs = [RB.ManualActuator(i,i,original_restlens[i]) for i = 1:ncables]
+    acs = [RB.RegisterActuator(i,i,original_restlens[i]) for i = 1:ncables]
     apparatuses = (cables = cables,)
     hub = (actuators = acs,)
 

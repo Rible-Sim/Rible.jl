@@ -125,25 +125,24 @@ $(TYPEDSIGNATURES)
 """
 get_num_of_dims(bot::Robot) = get_num_of_dims(bot.structure)
 get_num_of_dims(st::AbstractStructure) = get_num_of_dims(st.bodies)
-get_num_of_dims(bodies::AbstractVector{<:AbstractBody}) = get_num_of_dims(eltype(bodies))
-get_num_of_dims(bodies::TypeSortedCollection) = get_num_of_dims(eltype(bodies.data[1]))
-get_num_of_dims(body::AbstractBody) = get_num_of_dims(typeof(body))
-get_num_of_dims(::Type{<:AbstractBody{N,T}}) where {N,T} = N
-get_num_of_dims(::AbstractBodyProperty{N}) where {N} = N
+get_num_of_dims(bodies::AbstractVector) = get_num_of_dims(bodies[begin])
+get_num_of_dims(bodies::TypeSortedCollection) = get_num_of_dims(bodies.data[1])
+get_num_of_dims(body::BodyType) where {BodyType<:AbstractBody{N,T}} where {N,T} = N
 
 get_numbertype(bot::Robot) = get_numbertype(bot.structure)
 get_numbertype(st::AbstractStructure) = get_numbertype(st.bodies)
-get_numbertype(bodies::AbstractVector{<:AbstractBody}) = get_numbertype(eltype(bodies))
-get_numbertype(bodies::TypeSortedCollection) = get_numbertype(eltype(bodies.data[1]))
-get_numbertype(body::AbstractBody) = get_numbertype(typeof(body))
-get_numbertype(::Type{<:AbstractBody{N,T}}) where {N,T} = T
-get_numbertype(::AbstractBodyProperty{N,T}) where {N,T} = T
+get_numbertype(bodies::AbstractVector) = get_numbertype(bodies[begin])
+get_numbertype(bodies::TypeSortedCollection) = get_numbertype(bodies.data[1])
+get_numbertype(body::BodyType) where {BodyType<:AbstractBody{N,T}} where {N,T} = T
 
 """
-Return System 约束数量。
+Return the system's number of constraints.
 $(TYPEDSIGNATURES)
 """
-get_num_of_cstr(st::Structure) = st.num_of_cstr
+get_num_of_cstr(st::Structure) = st.connectivity.indexed.num_of_cstr
+
+get_num_of_free_coords(st::Structure) = st.connectivity.indexed.num_of_free_coords
+
 
 function get_num_of_cstr(rbs::TypeSortedCollection)
     num_of_intrinsic_cstr = mapreduce(get_num_of_intrinsic_cstr,+,rbs,init=0)
@@ -205,6 +204,10 @@ get_cables_force_density(bot::Robot) = get_cables_force_density(bot.structure)
 
 get_bodies(bot::Robot) = get_bodies(bot.structure)
 get_bodies(st::AbstractStructure) = sort(st.bodies)
+get_apparatuses(bot::Robot) = get_apparatuses(bot.structure)
+get_apparatuses(st::AbstractStructure) = sort(st.apparatuses)
+get_cables(bot::Robot) = get_cables(bot.structure)
+get_cables(st::AbstractStructure) = filter!((x)->x.joint isa CableJoint, sort(st.apparatuses))
 
 get_rigidbars(bot::Robot) = get_rigidbars(bot.structure)
 
@@ -224,31 +227,35 @@ function get_cables_len!(st::Structure,q)
 end
 
 """
-Return System DistanceSpringDamper 刚度。
+Return System DistanceSpringDamper stiffness coefficients
 $(TYPEDSIGNATURES)
 """
 function get_cables_stiffness(st::Structure)
-    [s.k for s in st.apparatuses.cables]
+    cables = get_cables(st)
+    [s.force.k for s in cables]
 end
 
 """
-Return System DistanceSpringDamper 当前Length.
+Return System DistanceSpringDamper current Length.
 $(TYPEDSIGNATURES)
 """
 function get_cables_len(st::Structure)
-    [s.state.length for s in st.apparatuses.cables]
+    cables = get_cables(st)
+    [s.force.state.length for s in cables]
 end
 
 function get_cables_len_dot(st::Structure)
-    [s.state.lengthdot for s in st.apparatuses.cables]
+    cables = get_cables(st)
+    [s.force.state.lengthdot for s in cables]
 end
 
 """
-Return System DistanceSpringDamper 变形量。
+Return System DistanceSpringDamper deformation。
 $(TYPEDSIGNATURES)
 """
 function get_cables_deform(st::Structure)
-    [s.state.length - s.state.restlen for s in st.apparatuses.cables]
+    cables = get_cables(st)
+    [s.force.state.length - s.force.state.restlen for s in cables]
 end
 
 """
@@ -256,7 +263,8 @@ Return System DistanceSpringDamper Restlength。
 $(TYPEDSIGNATURES)
 """
 function get_cables_restlen(st::Structure)
-    [s.state.restlen for s in st.apparatuses.cables]
+    cables = get_cables(st)
+    [s.force.state.restlen for s in cables]
 end
 
 """
@@ -264,7 +272,8 @@ Return System DistanceSpringDamper Tension.
 $(TYPEDSIGNATURES)
 """
 function get_cables_tension(st::Structure)
-    [s.state.tension for s in st.apparatuses.cables]
+    cables = get_cables(st)
+    [s.force.state.tension for s in cables]
 end
 
 """
@@ -272,18 +281,20 @@ Set cables' tension
 $(TYPEDSIGNATURES)
 """
 function set_cables_tension!(st::Structure,fs)
-    for (s,f) in zip(st.apparatuses.cables,fs)
-        s.state.tension = f
+    cables = get_cables(st)
+    for (s,f) in zip(cables,fs)
+        s.force.state.tension = f
     end
 end
 
 
 """
-Return System DistanceSpringDamper 力密度。
+Return System DistanceSpringDamper force density。
 $(TYPEDSIGNATURES)
 """
 function get_cables_force_density(st::Structure)
-    [s.state.tension/s.state.length for s in st.apparatuses.cables]
+    cables = get_cables(st)
+    [s.force.state.tension/s.force.state.length for s in cables]
 end
 
 """
@@ -298,13 +309,14 @@ function get_original_restlen(botinput::Robot)
 end
 
 function force_densities_to_restlen(st::Structure,γs)
+    cables = get_cables(st)
     [
     begin
-        l = s.state.length
-        l̇ = s.state.lengthdot
+        l = s.force.state.length
+        l̇ = s.force.state.lengthdot
         k = s.k
         c = s.c
         u = l-(γ*l-c*l̇)/k
     end
-        for (γ,s) in zip(γs,st.apparatuses.cables)]
+        for (γ,s) in zip(γs,cables)]
 end

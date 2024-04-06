@@ -132,14 +132,6 @@ function Tbars(;θ = 0, coordsType = RB.NCF.NC)
     rbs = [base,slider1,slider2,bar]
     rigdibodies = TypeSortedCollection(rbs)
 
-    j1 = RB.PrismaticJoint(1,RB.Hen2Egg(RB.ID(base,5,1),RB.ID(slider1,1,1)))
-    j2 = RB.PrismaticJoint(2,RB.Hen2Egg(RB.ID(base,5,2),RB.ID(slider2,1,1)))
-
-    j3 = RB.PinJoint(3,RB.Hen2Egg(RB.ID(bar,1,1),RB.ID(slider1,2,1)))
-    j4 = RB.PinJoint(4,RB.Hen2Egg(RB.ID(bar,2,1),RB.ID(slider2,2,1)))
-
-    js = [j1,j2,j3,j4]
-
     ncables = 4
     original_restlens = zeros(ncables)
     original_restlens = zeros(ncables)
@@ -148,7 +140,7 @@ function Tbars(;θ = 0, coordsType = RB.NCF.NC)
     cs = zeros(ncables)
     spring_dampers = [RB.DistanceSpringDamper3D(original_restlens[i],ks[i],cs[i];slack=false) for i = 1:ncables]
 
-    cm = [
+    connecting_matrix = [
         1 -1  0  0;
         2 -1  0  0;
         # 3  0 -1  0;
@@ -157,10 +149,19 @@ function Tbars(;θ = 0, coordsType = RB.NCF.NC)
         7 -1  0  0;
     ]
 
-    cables = RB.connect(rigdibodies, spring_dampers, cm, 4)
+    cables = RB.connect(rigdibodies, spring_dampers; connecting_matrix,)
+
+
+    j1 = RB.PrismaticJoint(ncables+1,RB.Hen2Egg(RB.Signifier(base,5,1),RB.Signifier(slider1,1,1)))
+    j2 = RB.PrismaticJoint(ncables+2,RB.Hen2Egg(RB.Signifier(base,5,2),RB.Signifier(slider2,1,1)))
+
+    j3 = RB.PinJoint(ncables+3,RB.Hen2Egg(RB.Signifier(bar,1,1),RB.Signifier(slider1,2,1)))
+    j4 = RB.PinJoint(ncables+4,RB.Hen2Egg(RB.Signifier(bar,2,1),RB.Signifier(slider2,2,1)))
+
+    js = [j1,j2,j3,j4]
 
     apparatuses = TypeSortedCollection(
-        vcat(js,cables)
+        vcat(cables,js)
     )
     
     # sm = [
@@ -173,5 +174,14 @@ function Tbars(;θ = 0, coordsType = RB.NCF.NC)
     # ]
     # indexed = RB.index(rigdibodies,sm)
     st = RB.Structure(rigdibodies,apparatuses,)
-    RB.Robot(st,)
+    gauges = Int[]
+    actuators = Int[]
+    hub = RB.ControlHub(
+        st,
+        gauges,
+        actuators,
+        RB.Coalition(st,gauges,actuators)
+    )
+
+    RB.Robot(st,hub)
 end

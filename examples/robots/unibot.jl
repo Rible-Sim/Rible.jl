@@ -112,7 +112,7 @@ function uni(c=100.0;
     #
     apparatuses = (cables = cables,)
     acs = [
-    RB.ManualActuator(
+    RB.RegisterActuator(
         i,
         collect(1:6), [original_restlens[6*(i-1)+j] for j = 1:6],
     ) for i = [1]
@@ -134,24 +134,24 @@ function uni(c=100.0;
     # uj = RB.PinJoint(1,
     #     RB.Hen2Egg(
     #         1,
-    #         RB.ID(rb2,4,4),
-    #         RB.ID(rb1,3,3),
+    #         RB.Signifier(rb2,4,4),
+    #         RB.Signifier(rb1,3,3),
     #     )
     # )
 
     # uj = RB.UniversalJoint(1,
     #     RB.Hen2Egg(
     #         1,
-    #         RB.ID(rb2,4,4),
-    #         RB.ID(rb1,3,3),
+    #         RB.Signifier(rb2,4,4),
+    #         RB.Signifier(rb1,3,3),
     #     )
     # )
 
     uj = RB.UniversalPrismaticJoint(1,
         RB.Hen2Egg(
             1,
-            RB.ID(rb2,4,4),
-            RB.ID(rb1,3,3),
+            RB.Signifier(rb2,4,4),
+            RB.Signifier(rb1,3,3),
         )
     )
 

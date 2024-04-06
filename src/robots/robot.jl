@@ -3,12 +3,12 @@
 Robot Type.
 $(TYPEDEF)
 """
-struct Robot{stType,cacheType,hubType,trajType,contacts_trajType}
+struct Robot{stType,hubType,trajType,contacts_trajType,control_trajType}
     structure::stType
-    structure_cache::cacheType
-    control_hub::hubType
+    hub::hubType
     traj::trajType
     contacts_traj::contacts_trajType
+    control_traj::control_trajType
 end
 
 """
@@ -18,7 +18,6 @@ $(TYPEDSIGNATURES)
 function Robot(structure,hub=nothing)
     (;numbered) = structure.connectivity
     (;bodyid2sys_loci_idx) = numbered
-    structure_cache = InertiaCache(structure)
     update!(structure)
     traj = StructArray([deepcopy(structure.state.system)])
     contacts_traj = [
@@ -35,7 +34,8 @@ function Robot(structure,hub=nothing)
             end
         )
     ]
-    Robot(structure,structure_cache,hub,traj,contacts_traj)
+    control_traj = StructArray([deepcopy(hub.state)])
+    Robot(structure,hub,traj,contacts_traj,control_traj)
 end
 
 
@@ -52,12 +52,12 @@ function build_Y(bot)
     ncables = length(cables)
     nact = length(actuators)
     ret = spzeros(Int,ncables,nact)
-    foreach(actuators) do act
-        (;id,coupler,reg) = act
+    foreach(actuators) do actuator
+        (;id,coupler,reg) = actuator
         if coupler isa Serial
-            ret[act.reg.ids,id] .= 1
+            ret[actuator.reg.ids,id] .= 1
         elseif coupler isa Ganged
-            is1,is2 = act.reg.ids
+            is1,is2 = actuator.reg.ids
             ret[is1,id] =  1
             ret[is2,id] = -1
         else
@@ -81,7 +81,7 @@ function reset!(bot::Robot)
 end
 
 """
-更改Initial 条件。
+Set new nitial conditions。
 $(TYPEDSIGNATURES)
 """
 function set_new_initial!(bot::Robot,q,q̇=zero(q))
@@ -92,7 +92,7 @@ function set_new_initial!(bot::Robot,q,q̇=zero(q))
 end
 
 """
-Update System 到指定时间步State.
+Update System State to specific step.
 $(TYPEDSIGNATURES)
 """
 function goto_step!(bot::Robot,that_step;actuate=false)

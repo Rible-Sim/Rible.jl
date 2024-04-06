@@ -96,7 +96,7 @@ elseif loadmesh2
         color=:palegreen3,
     )
 else
-    barmesh = endpoints2mesh(r̄p1,r̄p2;radius,)
+    barmesh = RB.endpoints2mesh(r̄p1,r̄p2;radius,)
 end
 body = RB.RigidBody(prop,state,coords,barmesh)
 end

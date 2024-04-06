@@ -23,6 +23,7 @@ function StructureState(bodies,apparatuses,cnt::Connectivity)
         num_of_intrinsic_cstr,
         num_of_extrinsic_cstr,
         num_of_cstr,
+        num_of_add_var,
         sys_free_coords_idx,
         sys_pres_coords_idx,
         bodyid2sys_intrinsic_cstr_idx,
@@ -43,10 +44,20 @@ function StructureState(bodies,apparatuses,cnt::Connectivity)
     q̈ = zero(q)
     F = zero(q)
     λ = Vector{T}(undef,num_of_cstr)
+    s = Vector{Float64}()
+    foreach(apparatuses) do appar
+        (;joint) = appar
+        if isa(joint, ClusterJoint)
+            for sp in joint.sps
+                append!(s, sp.s⁺)
+                append!(s, sp.s⁻)
+            end
+        end
+    end
     c = get_local_coords(bodies,numbered)
     p = zero(q)
     p̌ = Vector{T}(undef,num_of_free_coords)
-    system = NonminimalCoordinatesState(t,q,q̇,q̈,F,p,p̌,λ,sys_free_coords_idx,sys_pres_coords_idx,c)
+    system = NonminimalCoordinatesState(t,q,q̇,q̈,F,p,p̌,λ,s,sys_free_coords_idx,sys_pres_coords_idx,c)
     members = [
         begin
             qmem = @view q[bodyid2sys_full_coords[bodyid]]
@@ -54,12 +65,13 @@ function StructureState(bodies,apparatuses,cnt::Connectivity)
             q̈mem = @view q̈[bodyid2sys_full_coords[bodyid]]
             Fmem = @view F[bodyid2sys_full_coords[bodyid]]
             λmem = @view λ[bodyid2sys_intrinsic_cstr_idx[bodyid]]
+            smem = @view s[Int[]]
             cmem = @view c[bodyid2sys_loci_coords_idx[bodyid]]
             pmem = zero(p[bodyid2sys_full_coords[bodyid]])
             p̌mem = zero(p[bodyid2sys_free_coords[bodyid]])
             NonminimalCoordinatesState(
                 t,
-                qmem,q̇mem,q̈mem,Fmem,pmem,p̌mem,λmem,
+                qmem,q̇mem,q̈mem,Fmem,pmem,p̌mem,λmem,smem,
                 free_idx_by_body[bodyid],
                 pres_idx_by_body[bodyid],
                 cmem
@@ -111,7 +123,6 @@ function Structure(bodies,cnt::Connectivity)
     Structure(bodies,apparatuses,cnt)
 end
 
-
 function update!(st::AbstractStructure; gravity=false)
     clear_forces!(st)
     stretch_rigids!(st)
@@ -133,11 +144,13 @@ function lazy_update!(st::AbstractStructure; gravity=false)
     assemble_forces!(st)
 end
 
-function update!(st::Structure,q::AbstractVector,q̇::AbstractVector=zero(q))
+function update!(st::Structure,q::AbstractVector,q̇::AbstractVector=zero(q),t::Real=st.state.system.t)
+    st.state.system.t = t
     st.state.system.q .= q
     st.state.system.q̇ .= q̇
     update!(st)
 end
+
 
 function assemble_M!(M,st::AbstractStructure)
     (;num_of_full_coords,bodyid2sys_full_coords) = st.connectivity.indexed
@@ -352,9 +365,12 @@ function cstr_jacobian(structure::AbstractStructure,q,c=get_local_coords(structu
     end
     foreach(apparatuses) do appar
         (;id,) = appar
-        jointexcst = num_of_intrinsic_cstr.+apparid2sys_extrinsic_cstr_idx[id]
-        jointed_sys_free_idx = apparid2sys_free_coords_idx[id]
-        ret[jointexcst,jointed_sys_free_idx] .= cstr_jacobian(appar,structure,q)
+        ext = apparid2sys_extrinsic_cstr_idx[id]
+        if !isempty(ext)
+            jointexcst = num_of_intrinsic_cstr.+apparid2sys_extrinsic_cstr_idx[id]
+            jointed_sys_free_idx = apparid2sys_free_coords_idx[id]
+            ret[jointexcst,jointed_sys_free_idx] .= cstr_jacobian(appar,structure,q)
+        end
     end
     ret
 end
@@ -393,6 +409,57 @@ function make_cstr_jacobian(structure::AbstractStructure,q0::AbstractVector)
         cstr_jacobian(structure,q,c)
     end
     inner_cstr_jacobian
+end
+
+struct FischerBurmeister{T}
+    ϵ::T
+    X₁::T
+    X₂::T
+end
+FischerBurmeister() = FischerBurmeister(1e-14,1.0,1.0)
+function (f::FischerBurmeister)(x,y)
+    √((x/f.X₁)^2+(y*f.X₂)^2+2f.ϵ^2) - (x/f.X₁+y*f.X₂)
+end
+
+function build_ψ(structure::AbstractStructure)
+    (;apparatuses) = structure
+    nclustercables = 0
+    ns = 0
+    FB = FischerBurmeister(1e-14, 10., 10.)
+    foreach(apparatuses) do appar
+        if isa(appar, Apparatus{<:ClusterJoint})
+            nclustercables += 1
+            ns += length(appar.joint.sps)
+        end
+    end
+    function _inner_ψ(s̄)
+        ψ = Vector{eltype(s̄)}(undef,2ns)
+        ψ⁺ = @view ψ[begin:2:end]
+        ψ⁻ = @view ψ[begin+1:2:end]
+        s⁺ = @view s̄[begin:2:end]
+        s⁻ = @view s̄[begin+1:2:end]
+        is = 0
+        foreach(apparatuses) do appar
+            if isa(appar, Apparatus{<:ClusterJoint})
+                (;sps) = appar.joint
+                (;force) = appar
+                nsi = length(sps)
+                for (i, sp) in enumerate(sps)
+                    ζ⁺ = force[i+1].force.state.tension/sp.α - force[i].force.state.tension
+                    ζ⁻ = force[i].force.state.tension - sp.α*force[i+1].force.state.tension
+                    ψ⁺[is+i] = FB(ζ⁺, s⁺[is+i])
+                    ψ⁻[is+i] = FB(ζ⁻, s⁻[is+i])
+                end
+                is += nsi
+            end
+        end
+        ψ
+    end
+
+    function inner_ψ(s̄)
+        _inner_ψ(s̄)
+    end
+    inner_ψ
 end
 
 function build_F̌(st,bodyid,pid,f)
@@ -456,7 +523,7 @@ function check_jacobian_singularity(st)
             A_body = cstr_jacobian(body.coords,q_body)
             body_rank = rank(A_body)
             if body_rank < minimum(size(A_body))
-                @warn "The $(bodyid)th body's Jacobian is singular: rank(A(q))=$(body_rank)<$(minimum(size(A_rb)))"
+                @warn "The $(bodyid)th body's Jacobian is singular: rank(A(q))=$(body_rank)<$(minimum(size(A_body)))"
             end
         end
     end

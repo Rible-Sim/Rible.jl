@@ -118,7 +118,7 @@ indexed = RB.index(rbs,sharing)
 # ks = vcat(fill(k,naux),fill(k,ness))
 # cs = fill(c,ncables)
 # cables = [RB.DistanceSpringDamper2D(restlens[i],ks[i],cs[i];slack) for i = 1:ncables]
-# acs = [RB.ManualActuator(1,collect(1:ncables),restlens[1:ncables])]
+# acs = [RB.RegisterActuator(1,collect(1:ncables),restlens[1:ncables])]
 # apparatuses = (cables = cables,)
 # hub = (actuators = acs,)
 cnt_matrix = [
@@ -133,10 +133,10 @@ cnt_matrix = [
 connected = RB.connect(rbs,cnt_matrix)
 # #
 
-# cst1 = RB.PinJoint(RB.Hen2Egg(RB.ID(rb2,2),RB.ID(rb3,2)))
-# cst2 = RB.PinJoint(RB.Hen2Egg(RB.ID(rb3,3),RB.ID(rb4,1)))
-# cst3 = RB.PinJoint(RB.Hen2Egg(RB.ID(rb4,2),RB.ID(rb5,3)))
-# cst4 = RB.PinJoint(RB.Hen2Egg(RB.ID(rb5,3),RB.ID(rb6,1)))
+# cst1 = RB.PinJoint(RB.Hen2Egg(RB.Signifier(rb2,2),RB.Signifier(rb3,2)))
+# cst2 = RB.PinJoint(RB.Hen2Egg(RB.Signifier(rb3,3),RB.Signifier(rb4,1)))
+# cst3 = RB.PinJoint(RB.Hen2Egg(RB.Signifier(rb4,2),RB.Signifier(rb5,3)))
+# cst4 = RB.PinJoint(RB.Hen2Egg(RB.Signifier(rb5,3),RB.Signifier(rb6,1)))
 # jointedmembers = RB.join((cst1,cst2,cst3,cst4),indexed)
 # # jointedmembers = RB.join((cst1,cst2,cst3),indexed)
 
@@ -148,7 +148,7 @@ else
     cables = [RB.DistanceSpringDamper2D(0.0,k[i],0.0;slack=false) for i = 1:ncables]
 end
 acs = [
-    RB.ManualActuator(i,[i],zeros(1))
+    RB.RegisterActuator(i,[i],zeros(1))
     for i = 1:hncables
 ]
 hub = (actuators = acs,)

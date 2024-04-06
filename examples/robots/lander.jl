@@ -91,7 +91,7 @@ function lander(;k=nothing)
         cables = [RB.DistanceSpringDamper3D(0.0,k[i],0.0;slack=false) for i = 1:ncables]
     end
     acs = [
-        RB.ManualActuator(i,[i],zeros(1))
+        RB.RegisterActuator(i,[i],zeros(1))
         for i = 1:hncables
     ]
     hub = (actuators = acs,)
@@ -99,9 +99,9 @@ function lander(;k=nothing)
     connected = RB.connect(rbs,cnt_matrix)
     # #
     #
-    # cst1 = RB.PinJoint(RB.Hen2Egg(RB.ID(rb1_to_3[1],2),RB.ID(rb4,1)))
-    # cst2 = RB.PinJoint(RB.Hen2Egg(RB.ID(rb1_to_3[2],2),RB.ID(rb4,2)))
-    # cst3 = RB.PinJoint(RB.Hen2Egg(RB.ID(rb1_to_3[3],2),RB.ID(rb4,3)))
+    # cst1 = RB.PinJoint(RB.Hen2Egg(RB.Signifier(rb1_to_3[1],2),RB.Signifier(rb4,1)))
+    # cst2 = RB.PinJoint(RB.Hen2Egg(RB.Signifier(rb1_to_3[2],2),RB.Signifier(rb4,2)))
+    # cst3 = RB.PinJoint(RB.Hen2Egg(RB.Signifier(rb1_to_3[3],2),RB.Signifier(rb4,3)))
     # jointedmembers = RB.join((cst1,cst2,cst3),indexed)
     #
 

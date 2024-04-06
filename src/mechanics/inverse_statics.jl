@@ -25,13 +25,13 @@ function build_Q̃(structure)
     foreach(structure.apparatuses) do appar
         j = appar.id
         if appar.joint isa CableJoint
-            (;hen,egg) = appar.joint
-            C1 = hen.bodysig.cache.Cps[hen.pid]
-            C2 = egg.bodysig.cache.Cps[egg.pid]
-            uci1 = hen.bodysig.coords.free_idx
-            uci2 = egg.bodysig.coords.free_idx
-            m2sf1 = bodyid2sys_free_coords[hen.bodysig.prop.id]
-            m2sf2 = bodyid2sys_free_coords[egg.bodysig.prop.id]
+            (;hen,egg) = appar.joint.hen2egg
+            C1 = hen.body.cache.Cps[hen.pid]
+            C2 = egg.body.cache.Cps[egg.pid]
+            uci1 = hen.body.coords.free_idx
+            uci2 = egg.body.coords.free_idx
+            m2sf1 = bodyid2sys_free_coords[hen.body.prop.id]
+            m2sf2 = bodyid2sys_free_coords[egg.body.prop.id]
             Q̃[m2sf2,(j-1)*num_of_dim+1:j*num_of_dim] .-= transpose(C2)[uci2,:]
             Q̃[m2sf1,(j-1)*num_of_dim+1:j*num_of_dim] .+= transpose(C1)[uci1,:]
         end
@@ -62,16 +62,14 @@ end
 
 function build_L̂(st)
     (;connectivity,num_of_dim) = st
-    (;connected) = connectivity.tensioned
-    (;cables) = st.apparatuses
-    ncables = length(cables)
+    cables = get_cables(st)
+    num_of_cables = length(cables)
     T = get_numbertype(st)
-    L̂ = spzeros(T, ncables*num_of_dim, ncables)
-    foreach(connected) do scnt
-        j = scnt.id
-        scable = cables[j]
+    L̂ = spzeros(T, num_of_cables*num_of_dim, num_of_cables)
+    foreach(cables) do cable
+        j = cable.id
         js = (j-1)*num_of_dim
-        L̂[js+1:js+num_of_dim,j] = scable.state.direction
+        L̂[js+1:js+num_of_dim,j] = cable.force.state.direction
     end
     L̂
 end
@@ -122,7 +120,7 @@ function build_Ǧ(tginput;factor=1.0)
     st = deepcopy(tginput)
     clear_forces!(st)
     apply_gravity!(st;factor)
-    Ǧ = assemble_forces!(st)
+    assemble_forces!(Ǧ,st)
 end
 
 function make_U(st)
@@ -166,8 +164,8 @@ function make_Q̌(st,q0)
         foreach(connected) do scnt
             j = scnt.id
             (;k) = cables[j]
-            rb1 = scnt.hen.bodysig
-            rb2 = scnt.egg.bodysig
+            rb1 = scnt.hen.body
+            rb2 = scnt.egg.body
             rb1id = rb1.prop.id
             rb2id = rb2.prop.id
             ap1id = scnt.hen.pid
@@ -192,8 +190,8 @@ function make_Q̌(st,q0)
         Jj = zeros(eltype(q̌),num_of_dim,num_of_full_coords)
         foreach(connected) do scnt
             j = scnt.id
-            rb1 = scnt.hen.bodysig
-            rb2 = scnt.egg.bodysig
+            rb1 = scnt.hen.body
+            rb2 = scnt.egg.body
             rb1id = rb1.prop.id
             rb2id = rb2.prop.id
             ap1id = scnt.hen.pid
@@ -218,8 +216,8 @@ function make_Q̌(st,q0)
     #     ret = zeros(eltype(γ),nfullcoords)
     #     foreach(string2ap) do scnt
     #         j = scnt.id
-    #         rb1 = scnt.hen.bodysig
-    #         rb2 = scnt.egg.bodysig
+    #         rb1 = scnt.hen.body
+    #         rb2 = scnt.egg.body
     #         rb1id = rb1.prop.id
     #         rb2id = rb2.prop.id
     #         ap1id = scnt.hen.pid
@@ -483,7 +481,7 @@ function check_static_equilibrium_output_multipliers!(st,q,F=nothing;
         # stpt = nothing
     )
     clear_forces!(st)
-    update_bodies!(st)
+    update_bodies!(st,q)
     update_apparatuses!(st)
     # check_restlen(st,get_cables_restlen(st))
     if gravity
@@ -493,7 +491,6 @@ function check_static_equilibrium_output_multipliers!(st,q,F=nothing;
     if !isnothing(F)
         generalized_forces .+= F[:]
     end
-    q = get_coords(st)
     c = get_local_coords(st)
     q̌ = get_free_coords(st)
     A = make_cstr_jacobian(st,q)(q̌,c)

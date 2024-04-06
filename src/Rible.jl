@@ -25,6 +25,8 @@ using CoordinateTransformations
 using EponymTuples
 using Unitful
 import IterTools
+import Lux
+import Zygote
 # solvers
 using RowEchelon
 using NLsolve
@@ -82,7 +84,8 @@ function cstr_velocity_jacobian end
 function make_cstr_function end
 function make_cstr_jacobian end
 function to_local_coords end
-function to_transformation end
+function to_position_jacobian end
+function to_velocity_jacobian end
 function cartesian_frame2coords end
 function find_rotation end
 function find_angular_velocity end
@@ -110,6 +113,8 @@ import .ANCF
 
 include("members/flexibles/flexible_body.jl")
 
+include("members/apparatus.jl")
+
 include("members/forces/spring_dampers.jl")
 
 include("members/joints.jl")
@@ -125,8 +130,6 @@ include("structures/mutate.jl")
 include("structures/linearization.jl")
 
 include("robots/robot.jl")
-
-include("control/control.jl")
 
 include("./get.jl")
 
@@ -145,6 +148,8 @@ include("mechanics/stiffness.jl")
 include("mechanics/solvers.jl")
 
 include("mechanics/dynamics.jl")
+
+include("control/control.jl")
 
 include("postprocess/analysis.jl")
 

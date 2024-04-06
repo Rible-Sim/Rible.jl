@@ -130,7 +130,7 @@ pretty_table(
     )
 )
 cables = [RB.DistanceSpringDamper3D(restlens[i],ks[i],cs[i];slack=true) for i = 1:ncables]
-acs = [RB.ManualActuator(1,collect(1:ncables),restlens[1:ncables])]
+acs = [RB.RegisterActuator(1,collect(1:ncables),restlens[1:ncables])]
 apparatuses = (cables = cables,)
 hub = (actuators = acs,)
 cnt_matrix_cables = [
@@ -170,9 +170,9 @@ cnt_matrix_cables = [
 connected = RB.connect(rbs,cnt_matrix_cables[begin:end,begin:end-1])
 #
 #
-# cst1 = RB.PinJoint(RB.Hen2Egg(RB.ID(rb1_to_3[1],2),RB.ID(rb4,1)))
-# cst2 = RB.PinJoint(RB.Hen2Egg(RB.ID(rb1_to_3[2],2),RB.ID(rb4,2)))
-# cst3 = RB.PinJoint(RB.Hen2Egg(RB.ID(rb1_to_3[3],2),RB.ID(rb4,3)))
+# cst1 = RB.PinJoint(RB.Hen2Egg(RB.Signifier(rb1_to_3[1],2),RB.Signifier(rb4,1)))
+# cst2 = RB.PinJoint(RB.Hen2Egg(RB.Signifier(rb1_to_3[2],2),RB.Signifier(rb4,2)))
+# cst3 = RB.PinJoint(RB.Hen2Egg(RB.Signifier(rb1_to_3[3],2),RB.Signifier(rb4,3)))
 # jointedmembers = RB.join((cst1,cst2,cst3),indexed)
 #
 cnt = RB.Connectivity(numbered,indexed,@eponymtuple(connected,))

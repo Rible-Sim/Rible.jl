@@ -94,13 +94,22 @@ function to_local_coords(nmcs::NC,r̄)
     invX̄*(r̄-r̄i)
 end
 
-function to_transformation(nmcs::NC,q,c)
+function to_position_jacobian(nmcs::NC,q,c)
     num_of_dim = get_num_of_dims(nmcs)
     nlds = get_num_of_local_dims(nmcs)
     ncoords = get_num_of_coords(nmcs)
     conversion = nmcs.conversion_to_std
     C_raw = hcat(1,transpose(SVector{nlds}(c)))
     SMatrix{num_of_dim,ncoords}(kron(C_raw,IMatrix(num_of_dim))*conversion)
+end
+
+function to_velocity_jacobian(nmcs::NC,q,q̇,c)
+    num_of_dim = get_num_of_dims(nmcs)
+    nlds = get_num_of_local_dims(nmcs)
+    ncoords = get_num_of_coords(nmcs)
+    conversion = nmcs.conversion_to_std
+    C_raw = hcat(1,transpose(SVector{nlds}(c)))
+    SMatrix{num_of_dim,ncoords}(kron(C_raw,spzeros(num_of_dim,num_of_dim))*conversion)
 end
 
 """

@@ -53,12 +53,28 @@ function ApproxFrictionalContact(ϵ::T,μ::T,m::Int) where T
 end
 
 abstract type AbstractContactEnvironment end
+abstract type RigidBodyContactEnvironment<: AbstractContactEnvironment end
+struct ContactRigidBodies{bodiesType} <: RigidBodyContactEnvironment
+    contact_bodies::bodiesType
+end
+
+abstract type ContactRigid end 
+mutable struct RigidSphere{T} <: ContactRigid
+    bid::T
+    pid::T
+end
+function RigidSphere(id)
+    return RigidSphere(id, one(id))
+end
 abstract type StaticContactEnvironment <: AbstractContactEnvironment end
 struct StaticContactSurfaces{surfacesType} <: StaticContactEnvironment 
     surfaces::surfacesType
 end
 
 struct EmptySpace <: StaticContactEnvironment end
+struct GravitySpace{T} <: StaticContactEnvironment 
+    gravity::T
+end
 
 abstract type ContactGeometry end
 abstract type ContactPrimitive <: ContactGeometry end
@@ -97,8 +113,13 @@ function Plane(a::T,b::T,c::T,d::T) where T
     Plane(n,d)
 end
 
-struct Sphere{T} <: ConvexContactPrimitive
+struct Sphere{T, N} <: ConvexContactPrimitive
     radius::T
+    r::SArray{Tuple{N},T,1,N}
+end
+
+function Sphere(radius::T, r::AbstractVector{T}) where T
+    Sphere(radius, SVector{3}(r))
 end
 
 struct HalfSpace{T,N} <: ConvexContactPrimitive
@@ -143,6 +164,10 @@ function signed_distance(x::AbstractVector{T},p::Union{Plane,HalfSpace}) where T
     transpose(n)*x + d
 end
 
+function signed_distance(x::AbstractVector{T},p::Sphere) where T
+    norm(x-p.r) - p.radius
+end
+
 function distance(x::AbstractVector{T},p::Plane) where T
     abs(signed_distance(x,p))
 end
@@ -150,6 +175,40 @@ end
 function ison(x::AbstractVector{T},p::Plane;tol=eps(T)) where T
     distance(x,p) < tol
 end
+
+function contact_gap_and_normal(x::AbstractVector,p::Sphere)
+    (; r, radius) = p
+    gap = norm(x-r) - radius
+    normal = (x-r)/norm(x-r)
+    # if gap < 0 
+    #     @show gap, normal, x, r
+    #     @show x-r
+    #     @show norm(x-r)
+    # end
+    gap, normal
+end
+
+function contact_gap_and_normal(x::AbstractVector,spheres::Vector{<:Sphere{T,N}}) where {T,N}
+    nhs = length(spheres)
+    gaps = zeros(T,nhs)
+    normals = Vector{SVector{N,T}}(undef,nhs)
+    for (i,hs) in enumerate(spheres)
+        gap, n = contact_gap_and_normal(x,hs)
+        gaps[i] = gap
+        normals[i] = n
+    end
+    if all(gaps .< 0) # penetration
+        ihs = argmax(gaps)
+        return gaps[ihs], normals[ihs]
+    else
+        idx = findall((x)->x>=0,gaps)
+        postive_gaps = @view gaps[idx]
+        postive_normals = @view normals[idx]
+        ihs = argmin(postive_gaps)
+        return postive_gaps[ihs], postive_normals[ihs]
+    end
+end
+
 
 function contact_gap_and_normal(x::AbstractVector,p::Union{Plane,HalfSpace})
     signed_distance(x,p), p.n
@@ -185,4 +244,58 @@ function contact_gap_and_normal(x::AbstractVector,halvspaces::Vector{<:HalfSpace
         ihs = argmin(postive_gaps)
         return postive_gaps[ihs], postive_normals[ihs]
     end
+end
+
+function contact_gap_and_normal(x::AbstractVector,contact::RigidSphere,bodies)
+    (;bid) = contact
+    foreach(bodies) do body
+        if body.prop.id == bid
+            radius = body.prop.loci[1].position[1]
+            r = body.state.origin_frame.position
+            gap = norm(x-r) - radius
+            normal = (x-r)/norm(x-r)
+            return gap, normal
+        end
+    end
+end
+
+function contact_gap_and_normal(x::AbstractVector, contact_bodies::Vector{<:ContactRigid}, bodies)
+    ncb = length(contact_bodies)
+    gaps = zeros(Float64, ncb)
+    normals = Vector{SVector{3,Float64}}(undef, ncb)
+    contact_ids = Vector{Int}(undef, ncb)
+    for (i, contact) in enumerate(contact_bodies)
+        if isa(contact, RigidSphere)
+            (; bid) = contact
+            foreach(bodies) do body
+                if (body.prop.id == bid)
+                    r = body.state.origin_frame.position
+                    radius = body.prop.loci[1].position[1]
+                    gap = norm(x - r) - radius
+                    normal = (x - r) / norm(x - r)
+                    gaps[i] = gap
+                    normals[i] = normal
+                    contact_ids[i] = i
+                end
+            end
+        end
+        # gap, normal = contact_gap_and_normal(x, contact, bodies)
+        # gaps[i] = gap
+        # normals[i] = normal
+        # contact_ids[i] = i
+        # INFO 1: 不能写成上面的形式，感觉应该是TypeSortedCollections的原因
+    end
+    if all(gaps .< 0)
+        icb = argmax(gaps)
+        contact_bodies[icb].pid += 1
+        return gaps[icb], normals[icb], contact_ids[icb]
+    else
+        idx = findall((x) -> x >= 0, gaps)
+        positive_gaps = @view gaps[idx]
+        positive_normals = @view normals[idx]
+        positive_contact_body_ids = @view contact_ids[idx]
+        icb = argmin(positive_gaps)
+        return positive_gaps[icb], positive_normals[icb], positive_contact_body_ids[icb]
+    end
+
 end

@@ -1,17 +1,17 @@
 
-function cstr_function(appar::Apparatus{<:CableJoint},structure,q,c)
+function cstr_function(appar::Apparatus,structure,q,c)
     T = get_numbertype(structure)
     zeros(T,0)
 end
 
-function cstr_jacobian(appar::Apparatus{<:CableJoint},structure,q)
+function cstr_jacobian(appar::Apparatus,structure,q)
     (;apparid2sys_free_coords_idx) = structure.connectivity.indexed
     jointed_sys_free_idx = apparid2sys_free_coords_idx[appar.id]
     T = get_numbertype(structure)
     zeros(T,0,length(jointed_sys_free_idx))
 end
 
-function cstr_forces_jacobian(appar::Apparatus{<:CableJoint},structure,q,λ)
+function cstr_forces_jacobian(appar::Apparatus,structure,q,λ)
     (;apparid2sys_free_coords_idx) = structure.connectivity.indexed
     jointed_sys_free_idx = apparid2sys_free_coords_idx[appar.id]
     T = get_numbertype(structure)
@@ -19,7 +19,7 @@ function cstr_forces_jacobian(appar::Apparatus{<:CableJoint},structure,q,λ)
 
 end
 
-function cstr_velocity_jacobian(appar::Apparatus{<:CableJoint},structure,q,q̇)
+function cstr_velocity_jacobian(appar::Apparatus,structure,q,q̇)
     (;apparid2sys_free_coords_idx) = structure.connectivity.indexed
     jointed_sys_free_idx = apparid2sys_free_coords_idx[appar.id]
     T = get_numbertype(structure)
@@ -64,10 +64,10 @@ function cstr_function(appar::Apparatus{<:PrototypeJoint},structure::Structure,q
         mask_1st,mask_2nd,mask_3rd,mask_4th
     ) = appar.joint
     (;hen,egg) = hen2egg
-    id_hen = hen.bodysig.prop.id
-    id_egg = egg.bodysig.prop.id
-    nmcs_hen = hen.bodysig.coords.nmcs
-    nmcs_egg = egg.bodysig.coords.nmcs
+    id_hen = hen.body.prop.id
+    id_egg = egg.body.prop.id
+    nmcs_hen = hen.body.coords.nmcs
+    nmcs_egg = egg.body.coords.nmcs
     T = eltype(q)
     ret = zeros(T,num_of_cstr)
     q_hen = @view q[bodyid2sys_full_coords[id_hen]]
@@ -78,8 +78,8 @@ function cstr_function(appar::Apparatus{<:PrototypeJoint},structure::Structure,q
     get_joint_violations!(
         ret,
         nmcs_hen, nmcs_egg,
-        hen.bodysig.prop.loci[hen.pid].position,
-        egg.bodysig.prop.loci[egg.pid].position,
+        hen.body.prop.loci[hen.pid].position,
+        egg.body.prop.loci[egg.pid].position,
         cache,
         mask_1st,mask_2nd,mask_3rd,mask_4th,
         q_hen,q_egg,
@@ -94,8 +94,6 @@ function cstr_jacobian(appar::Apparatus{<:PrototypeJoint},structure::Structure,q
       bodyid2sys_full_coords,
       num_of_free_coords,
       num_of_full_coords,
-      apparid2full_idx,
-      apparid2free_idx,
     ) = indexed
     (;sys_loci2coords_idx,bodyid2sys_loci_idx) = numbered
     (;
@@ -104,13 +102,13 @@ function cstr_jacobian(appar::Apparatus{<:PrototypeJoint},structure::Structure,q
         cache,
         mask_1st,mask_2nd,mask_3rd,mask_4th
     ) = appar.joint
-    full_idx = apparid2full_idx[appar.id]
-    free_idx = apparid2free_idx[appar.id]
+    full_idx = appar.full_coords_idx
+    free_idx = appar.free_coords_idx
     (;hen,egg) = hen2egg
-    id_hen = hen.bodysig.prop.id
-    id_egg = egg.bodysig.prop.id
-    nmcs_hen = hen.bodysig.coords.nmcs
-    nmcs_egg = egg.bodysig.coords.nmcs
+    id_hen = hen.body.prop.id
+    id_egg = egg.body.prop.id
+    nmcs_hen = hen.body.coords.nmcs
+    nmcs_egg = egg.body.coords.nmcs
     T = eltype(q)
     ret = zeros(T,num_of_cstr,length(full_idx))
     q_hen = @view q[bodyid2sys_full_coords[id_hen]]
@@ -119,8 +117,8 @@ function cstr_jacobian(appar::Apparatus{<:PrototypeJoint},structure::Structure,q
     get_joint_jacobian!(
         ret,
         nmcs_hen, nmcs_egg,
-        hen.bodysig.prop.loci[hen.pid].position,
-        egg.bodysig.prop.loci[egg.pid].position,
+        hen.body.prop.loci[hen.pid].position,
+        egg.body.prop.loci[egg.pid].position,
         cache,
         mask_1st,mask_2nd,mask_3rd,mask_4th,
         q_hen,q_egg
@@ -134,8 +132,6 @@ function cstr_forces_jacobian(appar::Apparatus{<:PrototypeJoint},structure,q,λ)
       bodyid2sys_full_coords,
       num_of_free_coords,
       num_of_full_coords,
-      apparid2full_idx,
-      apparid2free_idx
     ) = indexed
     (;
         num_of_cstr,
@@ -143,15 +139,15 @@ function cstr_forces_jacobian(appar::Apparatus{<:PrototypeJoint},structure,q,λ)
         cache,
         mask_1st,mask_2nd,mask_3rd,mask_4th
     ) = appar.joint
-    full_idx = apparid2full_idx[appar.id]
-    free_idx = apparid2free_idx[appar.id]
+    full_idx = appar.full_coords_idx
+    free_idx = appar.free_coords_idx
     (;hen,egg) = hen2egg
-    id_hen = hen.bodysig.prop.id
-    id_egg = egg.bodysig.prop.id
+    id_hen = hen.body.prop.id
+    id_egg = egg.body.prop.id
     q_hen = @view q[bodyid2sys_full_coords[id_hen]]
     q_egg = @view q[bodyid2sys_full_coords[id_egg]]
-    nmcs_hen = hen.bodysig.coords.nmcs
-    nmcs_egg = egg.bodysig.coords.nmcs
+    nmcs_hen = hen.body.coords.nmcs
+    nmcs_egg = egg.body.coords.nmcs
     T = eltype(λ)
     num_of_full_idx = length(full_idx)
     ret = zeros(T,num_of_full_idx,num_of_full_idx)
@@ -159,8 +155,8 @@ function cstr_forces_jacobian(appar::Apparatus{<:PrototypeJoint},structure,q,λ)
         ret,
         num_of_cstr,
         nmcs_hen, nmcs_egg,
-        hen.bodysig.prop.loci[hen.pid].position,
-        egg.bodysig.prop.loci[egg.pid].position,
+        hen.body.prop.loci[hen.pid].position,
+        egg.body.prop.loci[egg.pid].position,
         cache,
         mask_1st,mask_2nd,mask_3rd,mask_4th,
         q_hen,q_egg,
@@ -175,8 +171,6 @@ function cstr_velocity_jacobian(appar::Apparatus{<:PrototypeJoint},structure,q,q
       bodyid2sys_full_coords,
       num_of_free_coords,
       num_of_full_coords,
-      apparid2full_idx,
-      apparid2free_idx
     ) = indexed
     (;
         num_of_cstr,
@@ -184,17 +178,17 @@ function cstr_velocity_jacobian(appar::Apparatus{<:PrototypeJoint},structure,q,q
         cache,
         mask_1st,mask_2nd,mask_3rd,mask_4th
     ) = appar.joint
-    full_idx = apparid2full_idx[appar.id]
-    free_idx = apparid2free_idx[appar.id]
+    full_idx = appar.full_coords_idx
+    free_idx = appar.free_coords_idx
     (;hen,egg) = hen2egg
-    id_hen = hen.bodysig.prop.id
-    id_egg = egg.bodysig.prop.id
+    id_hen = hen.body.prop.id
+    id_egg = egg.body.prop.id
     q_hen = @view q[bodyid2sys_full_coords[id_hen]]
     q_egg = @view q[bodyid2sys_full_coords[id_egg]]
     q̇_hen = @view q̇[bodyid2sys_full_coords[id_hen]]
     q̇_egg = @view q̇[bodyid2sys_full_coords[id_egg]]
-    nmcs_hen = hen.bodysig.coords.nmcs
-    nmcs_egg = egg.bodysig.coords.nmcs
+    nmcs_hen = hen.body.coords.nmcs
+    nmcs_egg = egg.body.coords.nmcs
     T = eltype(q̇)
     num_of_full_idx = length(full_idx)
     ret = zeros(T,num_of_cstr,num_of_full_idx)
@@ -202,8 +196,8 @@ function cstr_velocity_jacobian(appar::Apparatus{<:PrototypeJoint},structure,q,q
         ret,
         num_of_cstr,
         nmcs_hen, nmcs_egg,
-        hen.bodysig.prop.loci[hen.pid].position,
-        egg.bodysig.prop.loci[egg.pid].position,
+        hen.body.prop.loci[hen.pid].position,
+        egg.body.prop.loci[egg.pid].position,
         cache,
         mask_1st,mask_2nd,mask_3rd,mask_4th,
         q_hen,q_egg,

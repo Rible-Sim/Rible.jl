@@ -36,5 +36,22 @@ function new_pointmass(;
     numbered = RB.number(rbs,apparatuses)
     cnt = RB.Connectivity(indexed,numbered,)
     st = RB.Structure(rbs,apparatuses,cnt,)
-    bot = RB.Robot(st)
+
+
+    gauges = Int[]
+    actuators = Int[]
+    ## actuators = [
+    ##     RB.RegisterActuator(
+    ##         1,
+    ##         collect(1:ncables_prism),
+    ##         zeros(ncables_prism)
+    ##     ),
+    ## ]
+    hub = RB.ControlHub(
+        st,
+        gauges,
+        actuators,
+        RB.Coalition(st,gauges,actuators)
+    )
+    bot = RB.Robot(st,hub)
 end

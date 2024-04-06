@@ -6,7 +6,7 @@ function to_position(::QC,x,c)
     ro .+ Rmat(q)*c
 end
 
-function to_transformation(::QC,x,c)
+function to_position_jacobian(::QC,x,c)
     q = @view x[4:7]
     T = eltype(q)
     I3 = SMatrix{3,3}(one(T)*I)
@@ -16,7 +16,7 @@ function to_transformation(::QC,x,c)
     )
 end
 
-function ∂Cẋ∂x(x,ẋ,c)
+function to_velocity_jacobian(::QC,x,ẋ,c)
     η = SA[c[1],c[2],c[3]]
     q̇ = @view ẋ[4:7]
     q̇0 = q̇[1]
@@ -32,7 +32,7 @@ function ∂Cẋ∂x(x,ẋ,c)
     )
 end
 
-function ∂Cᵀf∂x(x,f,c)
+function to_force_jacobian(x,f,c)
     η = SA[c[1],c[2],c[3]]
     T = eltype(x)
     O37 = @SMatrix zeros(T,3,7)
