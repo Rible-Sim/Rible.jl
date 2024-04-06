@@ -25,8 +25,9 @@ function generate_cache(
         prob.options,
         solver.options,
     )
-    F!(F,q,q̇,t) = generalized_force!(F,bot,policy,q,q̇,t;gravity=true)
+    F!(F,q,q̇,t) = generalized_force!(F,bot,policy,q,q̇,t;gravity=options.gravity)
     Jac_F!(∂F∂q̌,∂F∂q̌̇,q,q̇,t) = generalized_force_jacobian!(∂F∂q̌,∂F∂q̌̇,bot,policy,q,q̇,t)
+    ## ∂F∂θ!(∂Fₘ∂θ,q,q̇,t) = generalized_force_jacobian!(∂Fₘ∂θ,structure,policy,q,q̇,t;)
     
     M = Matrix(assemble_M(structure))
     Φ = make_cstr_function(bot)
@@ -51,7 +52,7 @@ function generate_cache(
     ) = prepare_contacts(bot,env)
     
     cache = @eponymtuple(
-        F!,Jac_F!,
+        F!,Jac_F!,#∂F∂θ!,
         M,Φ,A,Ψ,B,∂Ψ∂q,∂Aᵀλ∂q,∂Bᵀμ∂q,
         contacts_bits,
         persistent_bits,
@@ -66,19 +67,19 @@ end
 function make_step_k(
         solver_cache::Zhong06_CCP_Constant_Mass_Mono_Cache,
         nq,nλ,na,
-        qₖ₋₁,vₖ₋₁,pₖ₋₁,tₖ₋₁,
+        step_data,tₖ₋₁,
         pₖ,vₖ,
         invM,
         h,mass_norm)
     (;F!,Jac_F!,M,Φ,A,∂Aᵀλ∂q) = solver_cache.cache
-
+    (;qₖ₋₁,vₖ₋₁,pₖ₋₁) = step_data
     n1 = nq
     n2 = nq+nλ
     nΛ = 3na
     nx = n2
     function ns_stepk!(
-            𝐫𝐞𝐬,𝐉,
-            Fₘ,∂F∂q,∂F∂q̇,
+            𝐫𝐞𝐬,𝐉,𝐉_data,
+            Fₘ,∂F∂q,∂F∂q̇,#∂Fₘ∂θ,
             𝐰,x,Λₖ,y,∂y∂x,
             Λ_split,y_split,
             structure,
@@ -98,6 +99,7 @@ function make_step_k(
         Aₖ₋₁ = A(qₖ₋₁)
         Aₖ   = A(qₖ)
 
+        # pₖ₋₁ = M*vₖ₋₁
         𝐫𝐞𝐬[   1:n1] .= -h.*pₖ₋₁ .+ M*(qₖ.-qₖ₋₁) .-
                         mass_norm.*transpose(Aₖ₋₁)*λₘ .-
                         (h^2)/2 .*Fₘ
@@ -108,6 +110,18 @@ function make_step_k(
         𝐉[   1:n1,n1+1:n2] .= -mass_norm.*transpose(Aₖ₋₁)
 
         𝐉[n1+1:n2,   1:n1] .=  -mass_norm.*Aₖ
+        𝐉_data .= 0.0
+        #position
+        𝐉_data[   1:nq,   1:nq] .= -M .-h^2/2 .*(1/2 .*∂F∂q .- 1/h.*∂F∂q̇) .- mass_norm.*∂Aᵀλ∂q(qₖ₋₁,λₘ)
+        #velocity
+        𝐉_data[   1:nq,nq+1:2nq] .= -h*M
+        #control
+        ## ∂F∂θ!(∂Fₘ∂θ,qₘ,q̇ₘ,tₘ)
+        ## 𝐉_data[   1:nq,2nq+1:nθ] .= -h^2/2*∂Fₘ∂θ
+        #structural
+        ## 𝐉_data[   1:n1,n1+1:n2]
+        #contact
+        ## 𝐉_data[   1:n1,n1+1:n2]
 
         if na != 0
             get_distribution_law!(structure,contact_cache,qₖ)
@@ -178,7 +192,7 @@ function solve!(sim::Simulator,solver_cache::Zhong06_CCP_Constant_Mass_Mono_Cach
         progress=true,exception=true
     )
     (;prob,controller,tspan,restart,totalstep) = sim
-    (;bot,env) = prob
+    (;bot,policy,env) = prob
     (;structure,traj,contacts_traj) = bot
     (;M,A,contacts_bits) = solver_cache.cache
     q0 = traj.q[begin]
@@ -194,11 +208,9 @@ function solve!(sim::Simulator,solver_cache::Zhong06_CCP_Constant_Mass_Mono_Cach
     F = zeros(T,nq)
     ∂F∂q = zeros(T,nq,nq)
     ∂F∂q̇ = zeros(T,nq,nq)
+    nθ = get_num_of_params(policy)
+    ∂Fₘ∂θ = zeros(T,nq,nθ)
     nx = nq + nλ
-    Δx = zeros(T,nx)
-    x = zero(Δx)
-    Res = zero(Δx)
-    Jac = zeros(T,nx,nx)
     mr = norm(M,Inf)
     mass_norm = mr
 
@@ -238,6 +250,7 @@ function solve!(sim::Simulator,solver_cache::Zhong06_CCP_Constant_Mass_Mono_Cach
         x = zero(Δx)
         Res = zero(Δx)
         Jac = zeros(T,nx,nx)
+        Jac_data = zeros(T,nx,nq+nq+nθ)
         Λₖ = @view x[(n2+1):n2+nΛ]
         y  = @view x[n2+nΛ+1:n2+2nΛ]
         𝐰 = zeros(T,nΛ)
@@ -259,13 +272,17 @@ function solve!(sim::Simulator,solver_cache::Zhong06_CCP_Constant_Mass_Mono_Cach
         ΔΛc_split = split_by_lengths(ΔΛc,3)
         Δyc_split = split_by_lengths(Δyc,3)
         get_frictional_directions_and_positions!(structure, contact_cache, qₖ₋₁, q̇ₖ₋₁, Λₖ)
+        step_data = ComponentArray(
+            @eponymtuple(
+                qₖ₋₁,vₖ₋₁=q̇ₖ₋₁,pₖ₋₁,
+            )
+        )
         ns_stepk! = make_step_k(
             solver_cache,
             nq,nλ,na,
-            qₖ₋₁,q̇ₖ₋₁,pₖ₋₁,tₖ₋₁,
+            step_data,tₖ₋₁,
             pₖ,q̇ₖ,
-            invM,
-            dt,mass_norm
+            invM,dt,mass_norm
         )
         restart_count = 0
         Λ_guess = 0.1
@@ -276,8 +293,8 @@ function solve!(sim::Simulator,solver_cache::Zhong06_CCP_Constant_Mass_Mono_Cach
             x[   nq+1:nq+nλ]       .= 0.0
             for iteration = 1:maxiters
                 ns_stepk!(
-                    Res,Jac,
-                    F,∂F∂q,∂F∂q̇,
+                    Res,Jac,Jac_data,
+                    F,∂F∂q,∂F∂q̇,#∂Fₘ∂θ,
                     𝐰,x,Λₖ,y,∂y∂x,
                     Λ_split,y_split,
                     structure,
@@ -351,6 +368,7 @@ function solve!(sim::Simulator,solver_cache::Zhong06_CCP_Constant_Mass_Mono_Cach
                         @show (y_split)⊙(Λ_split)
                         @show (Δyp_split)⊙(ΔΛp_split)
                     end
+                    @show lu𝐉\(-Jac_data)
                     ## @show Λₖ, μ
                 end
             end

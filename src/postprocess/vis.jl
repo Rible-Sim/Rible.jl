@@ -132,7 +132,7 @@ function MakieCore.plot!(viz::Viz{Tuple{S}};
         if cab.force.state.length > cab.force.state.restlen
             return :solid
         else
-            return viz.slack_linestyle[]
+            return :solid
         end
     end
 

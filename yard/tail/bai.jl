@@ -236,9 +236,12 @@ tail = make_bai(meshes,质心,质量,惯量)
 bot = tail
 botvis = deepcopy(bot)
 plot_traj!(
-    bot;
+    botvis;
     fontsize = 14 |> pt2px,
-    showmesh = false,
+    show_axis = false,
+    showmesh = true,
+    showpoints = false,
+    showlabels = false,
     xlims = (-50,50),
     ylims = (-300,40),
     showground = false
@@ -258,8 +261,8 @@ for i = 1:nk
     push!(botvis.traj,deepcopy(botvis.traj[end]))
     botvis.traj.t[end] = i
     δq̌i = δq̌[i]
-    ratio = norm(δq̌i)/norm(q̌)
-    botvis.traj.q̌[end] .= q̌ .+ scaling.*δq̌i/ratio
+    ratio = norm(δq̌i)/norm(botvis.traj.q̌[begin])
+    botvis.traj.q̌[end] .= botvis.traj.q̌[begin] .+ scaling.*δq̌i/ratio
 end
 with_theme(theme_pub;
         fontsize = 16,

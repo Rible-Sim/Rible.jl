@@ -48,9 +48,11 @@ ballbot = superball(
     e = 0.8,
     l,d,
     z0 = l^2/(sqrt(5)*d) + 2.0,
+    visible = true,
     constrained = false,
     loadmesh = false,
 )
+
 # time 
 tspan = (0.0,5.0)
 h = 1e-2
@@ -125,7 +127,7 @@ GM.activate!(;scalefactor); with_theme(theme_pub;
                 meshcolor = Makie.RGBAf(r,g,b,alphas[i]))
             end
             RB.hidey(ax)
-            lines!(ax,r2p1)
+            lines!(ax,Matrix(r2p1))
         end
     )
     ax31 = Axis(gd2[1,1],
@@ -187,6 +189,54 @@ GM.activate!(;scalefactor); with_theme(theme_pub;
     colgap!(gd3,0.5fontsize)
     savefig(fig,"ballbot_rolling")
     fig
+end
+
+GM.activate!(;scalefactor=4,px_per_unit=4); with_theme(theme_pub;
+        figure_padding = (0,0,0,-fontsize),
+        size = (1.0tw,0.30tw),
+        Axis3 = (
+            azimuth = 4.7855306333269805,
+            elevation = 0.03269908169872391,
+            xlabeloffset = fontsize,
+            zlabeloffset = 0.6fontsize,
+        )
+    ) do
+    bot = ballbot
+    (;t) = bot.traj
+    imptimes = [0.25,0.29,0.30,0.34]
+    impstep = RB.time2step(imptimes[1],bot.traj.t)
+    steps = vcat(1,impstep,collect(impstep:50:length(t)))
+    nstep = length(steps)
+    alphas = fill(0.15,nstep)
+    alphas[1:3] = [1,0.2,0.2]
+    alphas[end] = 1
+    cg = cgrad(:winter, nstep, categorical = true, rev = true)
+    step_start = RB.time2step(0.1,bot.traj.t)
+    step_stop = RB.time2step(0.35,bot.traj.t)
+    v2p1 = RB.get_velocity!(bot,2,1,step_start:step_stop)
+    v1p2 = RB.get_velocity!(bot,1,2,step_start:step_stop)
+    v6p2 = RB.get_velocity!(bot,6,2,step_start:step_stop)
+    r2p1 = RB.get_trajectory!(bot,2,1)
+    me = RB.mechanical_energy!(bot,)
+    plot_traj!(bot;
+        AxisType = Axis3,
+        figname = "ballbot_rolling.gif",
+        xlims = [-1,20],
+        ylims = [-1,8],
+        zlims = [-1e-3,3.0],
+        doslide = false,
+        dorecord = true,
+        showinfo = false,
+        showpoints = false,
+        showlabels = false,
+        showmesh = true,
+        showwire = true,
+        showtitle = false,
+        showcables  = true,
+        sup! = (ax,_,_) -> begin
+            RB.hidey(ax)
+        end
+    )
 end
 
 # ## Second Scenario
@@ -272,7 +322,7 @@ GM.activate!(;scalefactor); with_theme(theme_pub;
                 cablecolor=Makie.RGBAf(db.r,db.g,db.b,Makie.N0f8(alphas[i])),
                 meshcolor = Makie.RGBAf(r,g,b,alphas[i]))
             end
-            lines!(ax,r2p1)
+            lines!(ax,Matrix(r2p1))
         end
     )
     ax2 = Axis(gd2[1,1];tellheight=false,xlabel=tlabel,ylabel = "Energy (J)")
@@ -325,7 +375,7 @@ stats_superballs_dt = [
             );
             tspan=(0.0,0.1),dt,ftol=ifelse(dt==5e-6,1e-14,1e-12),
             maxiters=500,exception=false
-        ).prob.bot
+        )[1].prob.bot
     end
     for dt in dts, solver in (RB.Zhong06(),RB.Moreau(0.5))
 ];

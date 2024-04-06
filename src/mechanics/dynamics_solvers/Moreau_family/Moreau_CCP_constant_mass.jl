@@ -6,6 +6,7 @@ end
 function generate_cache(
         simulator::Simulator{<:DynamicsProblem{
             RobotType,
+            policyType,
             EnvType,
             RestitutionFrictionCombined{NewtonRestitution,CoulombFriction}
         }},
@@ -15,12 +16,17 @@ function generate_cache(
         },
         ::Val{true};
         dt,kargs...
-    )   where {RobotType,EnvType}
+    )   where {RobotType,policyType,EnvType}
     (;prob) = simulator
-    (;bot,env) = prob
+    (;bot,policy,env) = prob
     (;structure) = bot
-    F!(F,q,q̇,t) = generalized_force!(F,bot,q,q̇,t;gravity=true)
-    Jac_F!(∂F∂q̌,∂F∂q̌̇,q,q̇,t) = generalized_force_jacobian!(∂F∂q̌,∂F∂q̌̇,bot,q,q̇,t)
+    options = merge(
+        (gravity=true,factor=1,checkpersist=true), #default
+        prob.options,
+        solver.options,
+    )
+    F!(F,q,q̇,t) = generalized_force!(F,bot,policy,q,q̇,t;gravity=options.gravity)
+    Jac_F!(∂F∂q̌,∂F∂q̌̇,q,q̇,t) = generalized_force_jacobian!(∂F∂q̌,∂F∂q̌̇,bot,policy,q,q̇,t)
     
     M = Matrix(assemble_M(structure))
     Φ = make_cstr_function(bot)

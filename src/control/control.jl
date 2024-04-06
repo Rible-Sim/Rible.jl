@@ -323,3 +323,7 @@ function get_num_of_params(policy::AbstractPolicy)
     (;ps) = policy.nt
     length(ps)
 end
+
+function get_num_of_params(policy::NoPolicy)
+    0
+end

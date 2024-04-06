@@ -356,7 +356,7 @@ function plot_traj!(bot::RB.Robot;
                 framerate = 30 
                 skipstep = round(Int,1/framerate/dt*speedup)
                 recordsteps = 1:skipstep:length(traj.t)
-                record(fig, figname, recordsteps;
+                record(fig, figname, recordsteps; px_per_unit = 2,
                     framerate) do this_step
                     if actuate
                         RB.actuate!(bot,[traj.t[this_step]])
@@ -367,7 +367,7 @@ function plot_traj!(bot::RB.Robot;
                     # @show RB.mechanical_energy(structure)
                     #
                     this_time[] = traj.t[this_step]
-                    RB.analyse_slack(structure,true)
+                    ## RB.analyse_slack(structure,true)
                     tgob[] = structure
                 end
             else
@@ -401,7 +401,7 @@ function plot_traj!(bot::RB.Robot;
         colgap!(grid1,colgap)
         rowgap!(grid1,rowgap)
     end
-    if fig isa Figure
+    if (fig isa Figure) && !dorecord
         savefig(fig,figname)
         DataInspector(fig)
     end

@@ -199,7 +199,7 @@ function generate_cache(
     ∂Fₘ∂θ = zeros(T,nq,nθ)
     Jacᵏ⁺¹ₘ = zeros(T,nx,nθ)
     function ∂f∂θ!(Jacᵏ⁺¹ₘ,∂Fₘ∂θ,q,q̇,t,h)
-        generalized_force_jacobian!(∂Fₘ∂θ,bot,policy,q,q̇,t;gravity=options.gravity)
+        generalized_force_jacobian!(∂Fₘ∂θ,structure,policy,q,q̇,t;gravity=options.gravity)
         Jacᵏ⁺¹ₘ[    1: nq,1:nθ] .= -h^2/2*∂Fₘ∂θ
         Jacᵏ⁺¹ₘ[ nq+1:2nq,1:nθ] .= -h^2/2*∂Fₘ∂θ
         Jacᵏ⁺¹ₘ[2nq+1:end,1:nθ] .= 0.0
