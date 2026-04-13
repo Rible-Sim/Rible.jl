@@ -17,34 +17,6 @@ function make_drift_damper(c=0.95,d=20)
     γ(θ) = c + θ/d
 end
 
-function initialize_GDR(structure,F::Nothing;gravity=true)
-    Q̃ = build_Q̃(structure)
-    Γ = build_Γ(structure)
-    # 𝛚(x) =
-    function 𝛚(x)
-        # Q = Q̃*Γ(x)
-        clear_forces!(structure)
-        update_bodies!(structure,x)
-        update_apparatuses!(structure)
-        if gravity
-            apply_gravity!(structure)
-        end
-        assemble_forces!(F,structure)
-        # @show abs.(F-Q) |> maximum
-        -F
-    end
-    𝐛 = make_cstr_function(structure)
-    𝐉 = make_cstr_jacobian(structure)
-    x0 = structure.state.system.q
-    x̌0 = structure.state.system.q̌
-    x0,x̌0,𝛚,𝐛,𝐉
-end
-
-function initialize_GDR(structure,F)
-    x0,x̌0,𝛚_,𝐛,𝐉 = initialize_GDR(structure,nothing)
-    𝛚(x) = - 𝛚_(x) - F
-    x0,x̌0,𝛚,𝐛,𝐉
-end
 
 function get_pseudo_inverse(J)
     J⁺ = transpose(J)*inv(J*transpose(J))
@@ -72,9 +44,9 @@ function compute_θ(ϕ,r)
     θ = transpose(ϕ)*r./(norm(ϕ)*norm(r))
 end
 
-function pull_back!(x,x̌,𝐛,𝐉;N=10,ξ=1e-14)
+function pull_back!(inst_state,structure;N=10,ξ=1e-14)
     for s = 1:N
-        b = 𝐛(x)
+        b = cstr_function(structure,inst_state)
         normb = norm(b,Inf)
         if normb < ξ
             return normb, s
@@ -82,16 +54,15 @@ function pull_back!(x,x̌,𝐛,𝐉;N=10,ξ=1e-14)
             @warn "Max iternation reached for pull back"
             return normb, s
         end
-        J = 𝐉(x)
+        J = cstr_jacobian(structure,inst_state)
         J⁺ = get_pseudo_inverse(J)
-        x̌ .-= J⁺*b
+        inst_state.q̌ .-= J⁺*b
     end
 end
 
 function GDR!(
         bot,
-        F=nothing;
-        gravity=true,
+        field;
         β=1e-3,
         maxiters=Int(1e4),
         res=1e-7,
@@ -103,7 +74,7 @@ function GDR!(
     )
     reset!(bot)
     (;structure,traj) = bot
-    x,x̌,𝛚,𝐛,𝐉 = initialize_GDR(structure,F;gravity)
+    inst_state = deepcopy(structure.state.system)
     if damper isa Val{:kinetic}
         𝛄 = make_kinetic_damper()
     elseif damper isa Val{:viscous}
@@ -112,22 +83,23 @@ function GDR!(
         𝛄 = make_drift_damper(c,d)
     end
     t = zero(β)
-    r = one.(x̌)
+    r = one.(inst_state.q̌)
     q = β.*r
     rs = Vector{eltype(r)}([Inf])
     bs = Vector{eltype(r)}([Inf])
     ss = Int[]
     for itr = 1:maxiters
-        J = 𝐉(x)
-        ω = 𝛚(x)
+        J = cstr_jacobian(structure,inst_state)
+        gen_force!(inst_state, bot, field, NoPolicy())
+        ω = - inst_state.F̌
         proj = get_project(J)
         project_gradient!(r,ω,proj)
         parallel_transport!(q,proj)
         θ = compute_θ(q,r)
         γ = 𝛄(θ)
         q .= γ.*q + β.*r
-        x̌ .+= β.*q
-        normb, spull = pull_back!(x,x̌,𝐛,𝐉;N,ξ)
+        inst_state.q̌ .+= β.*q
+        normb, spull = pull_back!(inst_state,structure;N,ξ)
         push!(bs,normb)
         push!(ss,spull)
 
@@ -136,7 +108,7 @@ function GDR!(
         push!(rs,normr)
         push!(traj,deepcopy(traj[end]))
         traj.t[end] = t
-        traj.q[end] .= x
+        traj.q[end] .= inst_state.q
         # @show itr,normr
         if normr < res
             break

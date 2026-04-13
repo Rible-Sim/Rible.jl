@@ -3,18 +3,18 @@ struct NonOperator <: AbstractOperator end
 struct NaiveOperator <: AbstractOperator 
     num_of_actions::Int
 end
+struct FunctionOperator{F,JF,FV,JV} <: AbstractOperator
+    func!::F
+    jac!::JF
+    func_vals::FV
+    Jac_vals::JV
+end
 
 abstract type AbstractActuator end
 
 get_id(actuator::AbstractActuator) = actuator.id
 get_numbertype(actuator::AbstractActuator) = get_numbertype(actuator.signifier)
-get_num_of_actions(::AbstractActuator) = 0
-function execute!(structure::Structure,actuator)
-    (;id,signifier,operator,force) = actuator
-    structure.state.system.F .+= generalized_force(structure,actuator)
-end
-function generalized_force_jacobian!(∂F∂u,structure::Structure,actuator)
-end
+
 
 struct ExternalForceActuator{sigType,operType,forceType,T} <: AbstractActuator
     id::Int
@@ -24,154 +24,90 @@ struct ExternalForceActuator{sigType,operType,forceType,T} <: AbstractActuator
     action::Vector{T}
 end
 
+
+function measure(structure::AbstractStructure,actuator::ExternalForceActuator,u)
+    transpose(u)*u ./2
+end
+
+function measure_gradient!(∂g∂u,structure::AbstractStructure,actuator::ExternalForceActuator,u)
+    for i in eachindex(u)
+        ∂g∂u[i] = u[i]
+    end
+end
+
+function measure_hessians(structure::AbstractStructure,actuator::ExternalForceActuator,u)
+    nu = get_num_of_actions(actuator)
+    [I(nu)]
+end
+
+function measure_hessians!(∂²g∂q∂u, ∂²g∂q̇∂u, ∂²g∂u²,structure::AbstractStructure,actuator::ExternalForceActuator,u)
+    ∂²g∂u²[:,:] .= I(get_num_of_actions(actuator))
+end
+
+
+"""
+    get_num_of_actions(::AbstractActuator)
+
+Return the number of actions available for the actuator.
+"""
+get_num_of_actions(::AbstractActuator) = 0
+
 get_num_of_actions(actuator::ExternalForceActuator) = length(actuator.action)
 
-function get_actions(structure::Structure,actuator::ExternalForceActuator{sigType,<:NaiveOperator}) where {sigType}
+"""
+    get_initial_actions(structure::AbstractStructure,actuator)
+
+Return a vector of actions on the structure by the actuator.
+"""
+function get_initial_actions(structure::AbstractStructure,actuator::ExternalForceActuator{sigType,<:NaiveOperator}) where {sigType}
     (;signifier,operator,) = actuator
     T = get_numbertype(structure)
     zeros(T,operator.num_of_actions)
 end
 
+"""
+    execute!(structure::AbstractStructure,actuator,u)
 
-# ExternalForceActuator 
-function generalized_force(structure::Structure,actuator::ExternalForceActuator) 
-    (;state) = structure
-    (;signifier,operator,force) = actuator
-    (;body,pid,) = signifier
-    (;prop,coords) = body
-    (;nmcs) = coords
-    bid = body.prop.id
-    (;q) = state.members[bid]
-    c = to_local_coords(nmcs,prop.loci[pid].position)
-    Tbody = build_T(structure,bid)
-    C = to_position_jacobian(nmcs,q,c)*Tbody
-    transpose(C)*force
-end
-
-function generalized_force_jacobian!(∂F∂u, structure::Structure,actuator::ExternalForceActuator)
-    (;state) = structure
-    (;signifier,operator,force) = actuator
-    (;body,pid,) = signifier
-    (;prop,coords) = body
-    (;nmcs) = coords
-    bid = body.prop.id
-    (;q) = state.members[bid]
-    c = to_local_coords(nmcs,prop.loci[pid].position)
-    Tbody = build_T(structure,bid)
-    C = to_position_jacobian(nmcs,q,c)*Tbody
-    ∂F∂u .= transpose(C)*force
-end
-
-function execute!(structure::Structure,actuator::ExternalForceActuator{<:AbstractBody,<:NaiveOperator},u) 
-    (;id,signifier,operator,force) = actuator
-    structure.state.system.F .+= u.*generalized_force(structure,actuator)
-end
-
-function generalized_force(structure::Structure,actuator::ExternalForceActuator{<:AbstractBody,<:NaiveOperator},u) 
-    (;state) = structure
-    (;t) = state.system
-    (;signifier,operator,force) = actuator
-    (;body,pid,) = signifier
-    (;prop,coords) = body
-    (;nmcs) = coords
-    bid = body.prop.id
-    (;q) = state.members[bid]
-    c = to_local_coords(nmcs,prop.loci[pid].position)
-    Tbody = build_T(structure,bid)
-    C = to_position_jacobian(nmcs,q,c)*Tbody
-    u.*transpose(C)*force
-end
-
-function generalized_force_jacobian!(∂F∂u, structure::Structure,actuator::ExternalForceActuator{<:AbstractBody,<:NaiveOperator},u) 
-    (;state) = structure
-    (;t) = state.system
-    (;signifier,operator,force) = actuator
-    (;body,pid,) = signifier
-    (;prop,coords) = body
-    (;nmcs) = coords
-    bid = body.prop.id
-    (;q) = state.members[bid]
-    c = to_local_coords(nmcs,prop.loci[pid].position)
-    Tbody = build_T(structure,bid)
-    C = to_position_jacobian(nmcs,q,c)*Tbody
-    ∂F∂u .= transpose(C)*force
-end
-
-#DONE? 重要的地方
-function execute!(structure::Structure,actuator::ExternalForceActuator{<:Apparatus{<:ClusterJoint},<:NaiveOperator},u) 
-    (;id,signifier,operator,force) = actuator
-    (;state) = structure
-    (;t) = state.system
-    segs = signifier.force
-    #用驱动量u和joint的相关变量和参数， 计算驱动力， 加到系统中
-    segs[1].force.state.restlen = segs[1].force.original_restlen - u[1]
-end
-
-function GravityActuator(id,body::AbstractBody)
-    T = get_numbertype(body)
-    signifier = body
-    operator = NonOperator()
-    action = T[]
-    force = get_gravity(body)
-    ExternalForceActuator(
-        id,
-        signifier,
-        operator,
-        force,
-        action
-    )
-end
-
-struct RegisterActuator{RT,CT,registerType} <: AbstractActuator
-    id::Int
-    signifier::RT
-    operator::CT
-    register::registerType
-end
-
-get_num_of_actions(actuator::RegisterActuator) = size(actuator.register.matrix,2)
-
-function get_actions(structure::Structure,actuator::RegisterActuator)
-    (;signifier,operator,register) = actuator
-    zeros(eltype(register.values),get_num_of_actions(actuator))
-end
-
-function execute!(structure::Structure,actuator::RegisterActuator)
-    (;id,signifier,register) = actuator
-    (;values) = register
-    foreach(signifier) do apparatus
-        apparatus.force.state.restlen = original_restlen + u[id]
+Execute the actuator on the structure with the provided actions `u`.
+"""
+function execute!(structure::AbstractStructure,actuator::ExternalForceActuator{<:Signifier,<:NaiveOperator,<:AbstractMatrix},u) 
+    rows, Clocal = _actuator_rows_and_jac(structure, actuator)
+    local_view = @view structure.state.system.F[rows]
+    Ct = transpose(Clocal)
+    for j in axes(actuator.force, 2)
+        mul!(local_view, Ct, @view(actuator.force[:, j]), u[j], one(eltype(local_view)))
     end
+    structure
 end
 
-# heater
-struct SMAHeater{CT,operType,HT,TT} <:AbstractActuator
-    id::Int
-    signifier::CT
-    operator::operType
-    heating_law::HT
+
+"""
+    gen_force_actu_jacobian!(∂F∂u, structure::AbstractStructure,actuator,u)
+ 
+Compute and store in `∂F∂u` the Jacobian of the generalized force with respect to the actuator's actions, with the provided actions `u`.
+"""
+function gen_force_actu_jacobian!(∂F∂u,structure::AbstractStructure,actuator::AbstractActuator,u)
 end
 
-function SMAHeater(signifier::Signifier,heating_law)
-    SMAHeater(signifier,heating_law,traj)
+@inline function _actuator_rows_and_jac(structure::AbstractStructure, actuator::ExternalForceActuator)
+    (;state, connectivity) = structure
+    (;signifier) = actuator
+    (;body, pid,) = signifier
+    bid = body.prop.id
+    rows = connectivity.bodyid2sys_full_coords[bid]
+    rows, body.cache.Cps[pid]
 end
 
-function execute!(actuator::SMAHeater,structure,u;inc=false,abs=true)
-    (;SMA_cables) = structure.apparatuses
-    (;id_string, original_value, heating_law) = actuator
-    s = (SMA_cables,id_string)
-    if abs
-        s.state.temp = u
-    else
-        if inc
-            s.state.temp += u
-        else
-            s.state.temp = original_value + u
-        end
-    end
-    execute!(s,heating_law)
-end
 
-function execute!(actuator::SMAHeater,heating_law)
-    s.law.F0, s.law.k = heating_law(s.state.temp)
+@inline function gen_force_actu_jacobian!(
+        ∂F∂u::AbstractMatrix,
+        structure::AbstractStructure,
+        actuator::ExternalForceActuator{sigType, operType, forceType, T},
+        u,
+    ) where {sigType, operType, forceType<:AbstractMatrix, T}
+    rows, Clocal = _actuator_rows_and_jac(structure, actuator)
+    fill!(∂F∂u, zero(eltype(∂F∂u)))
+    local_view = @view ∂F∂u[rows, :]
+    mul!(local_view, transpose(Clocal), actuator.force)
+    ∂F∂u
 end

@@ -1,47 +1,67 @@
 
 abstract type Controller end
 
-include("gauges.jl")
 include("actuators.jl")
+include("reg_actuator.jl")
 
-struct Coalition{ntType}
-    nt::ntType
+include("capta.jl")
+include("gauges.jl")
+
+struct Coalition
+    num_of_actuators::Int
+    num_of_capta_gauges::Int
+    num_of_error_gauges::Int
+    num_of_capta::Int
+    num_of_errors::Int
+    captum_gauge_id2sys_capta_idx::Vector{Vector{Int}}
+    error_gauge_id2sys_errors_idx::Vector{Vector{Int}}
+    num_of_actions::Int 
+    actid2sys_actions_idx::Vector{Vector{Int}} 
 end
 
-function Coalition(structure::AbstractStructure,gauges,actuators)
-    gauges_ids,num_of_gauges = check_id_sanity(gauges) 
+function Coalition(structure::AbstractStructure,capta_gauges,error_gauges,actuators)
+    capta_gauges_ids,num_of_capta_gauges = check_id_sanity(capta_gauges) 
+    error_gauges_ids,num_of_error_gauges = check_id_sanity(error_gauges) 
     actuators_ids,num_of_actuators = check_id_sanity(actuators)
-    num_of_error_gauges = 0
-    num_of_capta_gauges = 0
-    sys_errors_idx = Int[]
-    gaugeid2sys_errors_idx = Vector{Vector{Int}}(undef,num_of_gauges)
-    if num_of_gauges > 0
-        foreach(gauges) do gauge
+    
+    # Process captum gauges - for feedback policy (captum -> action)
+    num_of_capta = 0
+    sys_capta_idx = Int[]
+    num_of_capta_per_gauge = Vector{Int}(undef,num_of_capta_gauges)
+    captum_gauge_id2sys_capta_idx = Vector{Vector{Int}}(undef,num_of_capta_gauges)
+    if num_of_capta_gauges > 0
+        foreach(capta_gauges) do gauge
             gid = gauge.id
-            nerr = get_num_of_errors(gauge)
-            gaugeid2sys_errors_idx[gid] = collect(length(sys_errors_idx)+1:length(sys_errors_idx)+nerr)
-            append!(sys_errors_idx,gaugeid2sys_errors_idx[gid])
-            if !(gauge isa ErrorGauge)
-                num_of_error_gauges += 1
-            end
-            if !(gauge isa CaptaGauge)
-                num_of_capta_gauges += 1
-            end
+            # For captum gauges, we track each measurement component (not errors)
+            num_of_capta_per_gauge[gid] = get_num_of_capta(gauge)
+            captum_gauge_id2sys_capta_idx[gid] = collect(
+                length(sys_capta_idx)+1:length(sys_capta_idx)+num_of_capta_per_gauge[gid]
+            )
+            append!(sys_capta_idx,captum_gauge_id2sys_capta_idx[gid])
         end
     end
-
-    num_of_errors = length(sys_errors_idx)
+    num_of_capta = length(sys_capta_idx)
+    
+    # Process error gauges - for cost function (error -> cost)
+    sys_errors_idx = Int[]
+    num_of_errors_ref = Ref(0)
+    error_gauge_id2sys_errors_idx = Vector{Vector{Int}}(undef,num_of_error_gauges)
+    if num_of_error_gauges > 0
+        foreach(error_gauges) do gauge
+            gid = gauge.id
+            # ErrorGauge produces 1 scalar error
+            error_gauge_id2sys_errors_idx[gid] = collect(gid:gid)
+            num_of_errors_ref[] += 1
+        end
+    end
+    num_of_errors = num_of_errors_ref[]
 
     sys_actions_idx = Int[]
     actid2sys_actions_idx = Vector{Int}[]
     ntotal_by_act = zeros(Int,num_of_actuators)
-    pres_idx_by_act = Vector{Vector{Int}}(undef,num_of_actuators)
-    free_idx_by_act = Vector{Vector{Int}}(undef,num_of_actuators)
     foreach(actuators) do actuator
         actid = actuator.id
         ntotal_by_act[actid] = get_num_of_actions(actuator)
-        pres_idx_by_act[actid] = Int[]
-        free_idx_by_act[actid] = collect(1:ntotal_by_act[actid])
     end
     for actid = 1:num_of_actuators
         ntotal = ntotal_by_act[actid]
@@ -55,91 +75,105 @@ function Coalition(structure::AbstractStructure,gauges,actuators)
     num_of_actions = length(sys_actions_idx)
 
     Coalition(
-        @eponymtuple(
-            num_of_actuators, num_of_gauges,
-            num_of_error_gauges, num_of_capta_gauges,
-            num_of_errors,gaugeid2sys_errors_idx,
-            num_of_actions, actid2sys_actions_idx, 
-        )
+        num_of_actuators, 
+        num_of_capta_gauges,
+        num_of_error_gauges,
+        num_of_capta,
+        num_of_errors,
+        captum_gauge_id2sys_capta_idx,
+        error_gauge_id2sys_errors_idx,
+        num_of_actions, 
+        actid2sys_actions_idx, 
     )
 end
 
-struct ControlHub{gaugesType,actuatorsType,coalitionType,stateType,controlType}
-    gauges::gaugesType
+
+struct ControlHub{captumGaugesType,errorGaugesType,actuatorsType,coalitionType,stateType}
+    capta_gauges::captumGaugesType
+    error_gauges::errorGaugesType
     actuators::actuatorsType
     coalition::coalitionType
     state::stateType
-    control::controlType
-    function ControlHub(structure::AbstractStructure,gauges,actuators,coalition::Coalition,control=nothing)
-        e = get_errors(structure,gauges,coalition)
-        if control isa Nothing
-            u = get_actions(structure,actuators,coalition)
-        else
-            q = get_coords(structure)
-            q̇ = get_velocs(structure)
-            u = control(vcat(q,q̇))
+    function ControlHub(structure::AbstractStructure,capta_gauges,error_gauges,actuators,coalition::Coalition,)
+        (;num_of_capta, num_of_errors, captum_gauge_id2sys_capta_idx, error_gauge_id2sys_errors_idx) = coalition
+        T = get_numbertype(structure)
+        
+        # Initialize captum measurements
+        c = zeros(T,num_of_capta)
+        foreach(capta_gauges) do gauge
+            capta_idx = captum_gauge_id2sys_capta_idx[gauge.id]
+            c[capta_idx] .= measure(structure,gauge)
         end
+        
+        # Initialize error measurements  
+        e = zeros(T,num_of_errors)
+        foreach(error_gauges) do gauge
+            err_idx = error_gauge_id2sys_errors_idx[gauge.id]
+            e[err_idx] .= measure(structure,gauge)
+        end
+        
+        u = get_initial_actions(structure,actuators,coalition)
+
         state = @eponymtuple(
+                c,
                 e,
                 u,
             )
-        new{typeof(gauges),typeof(actuators),typeof(coalition),typeof(state),typeof(control)}(
-            gauges,actuators,coalition,state,control
+        new{typeof(capta_gauges),typeof(error_gauges),typeof(actuators),typeof(coalition),typeof(state)}(
+            capta_gauges,error_gauges,actuators,coalition,state,
         )
     end
 end
 
-get_num_of_actions(bot) = bot.hub.coalition.nt.num_of_actions
 
-function get_actions(structure::AbstractStructure,actuators,coalition::Coalition)
-    (;num_of_actions,actid2sys_actions_idx) = coalition.nt
+get_num_of_actions(bot) = bot.hub.coalition.num_of_actions
+
+function get_initial_actions(structure::AbstractStructure,actuators,coalition::Coalition)
+    (;num_of_actions,actid2sys_actions_idx) = coalition
     T = get_numbertype(structure)
     u = zeros(T,num_of_actions)
     foreach(actuators) do actuator
         act_idx = actid2sys_actions_idx[actuator.id]
-        u[act_idx] .= get_actions(structure,actuator)
+        u[act_idx] .= get_initial_actions(structure,actuator)
     end
     u
 end
 
-function get_actions!(bot::Robot,t::Real=bot.structure.state.system.t)
+function get_initial_actions!(bot::Robot,t::Real=bot.structure.state.system.t)
     (;structure,hub) = bot
     (;actuators,coalition) = hub
-    (;num_of_actions,actid2sys_actions_idx) = coalition.nt
+    (;num_of_actions,actid2sys_actions_idx) = coalition
     structure.state.system.t = t
     T = get_numbertype(structure)
     u = zeros(T,num_of_actions)
     foreach(actuators) do actuator
         act_idx = actid2sys_actions_idx[actuator.id]
-        u[act_idx] .= get_actions(structure,actuator)
+        u[act_idx] .= get_initial_actions(structure,actuator)
     end
     u
 end
 
-function actuate!(bot::Robot,u::Nothing) end
-
-function actuate!(bot::Robot,policy::ActorPolicy,q::AbstractVector,q̇::AbstractVector,t::Real,s=nothing)
-    (;structure,hub) = bot
-    (;actuators,state,coalition,) = hub
-    (;actid2sys_actions_idx) = coalition.nt
-    control = (x) -> Lux.apply(policy.nt.actor,x,policy.nt.ps,policy.nt.st)[1]
-    state.u .= control(vcat(q,q̇))
-    foreach(actuators) do actuator
-        idx = actid2sys_actions_idx[actuator.id]
-        execute!(
-            structure,
-            actuator,
-            (@view state.u[idx])
-        )
-    end
+function set_control_params!(bot::Robot,policy::AbstractPolicy,partial_params; idx=:)
+    (;structure, hub, traj) = bot
+    params = get_params(policy)
+    params[idx] .= partial_params
+    set_params!(policy,params)
+    update!(policy)
 end
 
-function actuate!(bot::Robot,policy::TimePolicy,q::AbstractVector,q̇::AbstractVector,t::Real,s=nothing)
+
+function actuate!(bot::Robot,policy::NoPolicy,inst_state::AbstractCoordinatesState)
+end
+
+
+function actuate!(bot::Robot,policy::TimeFunctionPolicy,inst_state::AbstractCoordinatesState)
     (;structure,hub) = bot
-    (;actuators,state,coalition,) = hub
-    (;actid2sys_actions_idx) = coalition.nt
-    control = policy.nt.f
+    (;t) = inst_state
     structure.state.system.t = t
+    (;actuators,state,coalition,) = hub
+    (;actid2sys_actions_idx) = coalition
+    control = policy.f
+    @debug "Actuating TimeFunctionPolicy" length(control(t)) length(state.u)
     state.u .= control(t)
     foreach(actuators) do actuator
         idx = actid2sys_actions_idx[actuator.id]
@@ -151,178 +185,51 @@ function actuate!(bot::Robot,policy::TimePolicy,q::AbstractVector,q̇::AbstractV
     end
 end
 
-function actuate!(bot::Robot,t::Real=bot.structure.state.system.t)
-    (;structure,hub) = bot
-    bot.structure.state.system.t = t
-    (;actuators) = hub
-    foreach(actuators) do actuator
-        execute!(structure,actuator)
-    end
+
+
+
+"""
+    control!(bot::Robot,policy,state::ComponentArray)
+
+For policy that acts directly on discrete solver's discretized states (e.g. iLQR)
+"""
+function control!(bot::Robot,policy,solver_cache,solver_state)
 end
 
-# For now, the cost is simply the sum of errors
-#todo weighted sum
-#todo user-defined cost
-function cost!(bot::Robot,q::AbstractVector,q̇::AbstractVector,t)
-    (;structure,hub) = bot
-    (;gauges) = hub
-    T = get_numbertype(bot)
-    update!(structure,q,q̇,t)
-    ϕ = zero(T)
-    foreach(gauges) do gauge
-        ϕ += measure(structure,gauge)
-    end
-    ϕ
+"""
+    control_jacobian!(workspace,bot::Robot,policy,solver_cache,solver_state)
+Jacobian of the control function w.r.t. the discrete solver's discretized states.
+For policy that acts directly on discrete solver's discretized states (e.g. iLQR)
+"""
+function control_jacobian!(workspace,bot::Robot,policy,solver_cache,solver_state)
 end
 
-function cost!(bot::Robot,)
-    (;q,q̇,t) = bot.structure.state.system
-    cost!(bot,q,q̇,t)
+function vjp_wrt_state(v,policy::NoPolicy,bot::Robot,num_of_actions,solver,solver_state)
+    (;structure) = bot
+    (;tₖ, tₖ₊₁) = solver_state
+    nq = get_num_of_full_coords(structure)
+    nλ = get_num_of_cstr(structure)
+    ns = get_num_of_aux_var(structure)
+    ∂ϕ∂qₖᵀ = spzeros(typeof(tₖ),nq)
+    ∂ϕ∂qₖ₊₁ᵀ = spzeros(typeof(tₖ),nq)
+    ∂ϕ∂pₖᵀ = spzeros(typeof(tₖ),nq)
+    ∂ϕ∂pₖ₊₁ᵀ = spzeros(typeof(tₖ),nq)
+    ∂ϕ∂λᵀ = spzeros(typeof(tₖ),nλ)
+    ∂ϕ∂sₖᵀ = spzeros(typeof(tₖ),ns)
+    ∂ϕ∂sₖ₊₁ᵀ = spzeros(typeof(tₖ),ns)
+    ∂ϕ∂qₖᵀ,  ∂ϕ∂qₖ₊₁ᵀ, ∂ϕ∂pₖᵀ, ∂ϕ∂pₖ₊₁ᵀ, ∂ϕ∂λᵀ, ∂ϕ∂sₖᵀ, ∂ϕ∂sₖ₊₁ᵀ
 end
 
-function cost_jacobian!(∂ϕ∂qᵀ,∂ϕ∂q̇ᵀ,∂ϕ∂pᵀ,bot::Robot,q::AbstractVector,q̇::AbstractVector,t;gravity)
-    (;structure,) = bot
-    structure.state.system.t = t
-    structure.state.system.q .= q
-    structure.state.system.q̇ .= q̇
-    clear_forces!(structure)
-    stretch_rigids!(structure)
-    update_bodies!(structure)
-    update_apparatuses!(structure)
-    if gravity
-        apply_gravity!(structure)
-    end
-    assemble_forces!(structure)
-    M⁻¹ = assemble_M⁻¹(structure)
-    ∂M⁻¹p∂q = assemble_∂M⁻¹p∂q(structure)
-    ∂e∂q, ∂e∂q̇ = errors_jacobian(bot,)
-    ∂ϕ∂qᵀ .= transpose(sum(∂e∂q, dims=1))
-    ∂ϕ∂q̇ᵀ .= transpose(sum(∂e∂q̇, dims=1))
-    # if addable
-    ∂ϕ∂qᵀ .+= transpose(∂M⁻¹p∂q)*∂ϕ∂q̇ᵀ
-    ∂ϕ∂pᵀ .= transpose(M⁻¹)*∂ϕ∂q̇ᵀ
+function accumulate_param_grad!(grad_storage, policy::NoPolicy, v_total, solver_state, bot) end
+
+function get_params(policy::NoPolicy)
+    nothing
 end
 
-function cost_action_jacobian!(∂ϕ∂uᵀ,bot::Robot,q::AbstractVector,q̇::AbstractVector,u::AbstractVector,t)
-    (;structure,hub) = bot
-    (;coalition) = hub
-    actuate!(bot,q,q̇,u,t)
-    (;num_of_errors, gaug_idxeid2sys_error_idx, num_of_actions, actid2sys_actions) = coalition.nt
-    ∂ϕ∂uᵀ .= transpose(sum(∂e∂q,dims=1))
-end
-
-function cost_jacobian!(bot::Robot)
-    (;q,q̇,t) = bot.structure.state.system
-    (;u) = bot.hub.state
-    T = get_numbertype(bot)
-    ∂ϕ∂qᵀ = zeros(T,length(q))
-    ∂ϕ∂q̇ᵀ = zeros(T,length(q̇))
-    ∂ϕ∂uᵀ = zeros(T,length(u))
-    cost_jacobian!(∂ϕ∂qᵀ,∂ϕ∂q̇ᵀ,bot,q,q̇,t)
-    cost_jacobian!(∂ϕ∂uᵀ,bot,q,q̇,u,t)
-end
-
-function generalized_force_jacobian!(∂F∂θ,structure::Structure,hub,policy::AbstractPolicy,q::AbstractVector,q̇::AbstractVector,t::Real;gravity=false)
-    (;actuators,coalition) = hub
-    structure.state.system.t = t
-    structure.state.system.q .= q
-    structure.state.system.q̇ .= q̇
-    clear_forces!(structure)
-    stretch_rigids!(structure)
-    update_bodies!(structure)
-    update_apparatuses!(structure)
-    if gravity
-        apply_gravity!(structure)
-    end
-    control = (x) -> Lux.apply(policy.nt.actor,x,policy.nt.ps,policy.nt.st)[1]
-    actuate!(bot,control,q,q̇,t)
-    assemble_forces!(structure)
-    (;num_of_actions,actid2sys_actions_idx) = coalition.nt
-    T = get_numbertype(structure)
-    nq = get_num_of_free_coords(structure)
-    ∂F∂u = zeros(T,nq,num_of_actions)
-    foreach(actuators) do actuator
-        u_idx = actid2sys_actions_idx[actuator.id]
-        generalized_force_jacobian!(
-            (@view ∂F∂u[:,u_idx]),
-            structure,
-            actuator
-        )
-    end
-    # correct when F(u(q,q̇)) or when F(q,q̇,u), because only `u` depends on `\theta`
-    ∂u∂θ = Zygote.jacobian(
-        (p) -> Lux.apply(policy.nt.actor,vcat(q,q̇),p,policy.nt.st)[1],
-        policy.nt.ps
-    )[1]
-    ∂F∂θ .= ∂F∂u*∂u∂θ
-end
-
-function generalized_force_jacobian!(∂F∂q̌,∂F∂q̌̇,structure::Structure,hub,policy::ActorPolicy,q::AbstractVector,q̇::AbstractVector,t::Real;gravity=false)
-    control = (x) -> Lux.apply(policy.nt.actor,x,policy.nt.ps,policy.nt.st)[1]
-    control_jac = (s) -> Zygote.jacobian(control, s)[1]
-    (;actuators,coalition) = hub
-    T = get_numbertype(structure)
-    nq = get_num_of_free_coords(structure)
-    (;num_of_actions,actid2sys_actions_idx) = coalition.nt
-    ∂F∂u = zeros(T,nq,num_of_actions)
-    foreach(actuators) do actuator
-        u_idx = actid2sys_actions_idx[actuator.id]
-        generalized_force_jacobian!(
-            (@view ∂F∂u[:,u_idx]),
-            structure,
-            actuator
-        )
-    end
-    # only correct when F(u(q,q̇)) but not when F(q,q̇,u)
-    ∂u∂x = control_jac(vcat(q,q̇))
-    ∂u∂q̌ = @view ∂u∂x[:,   1: nq]
-    ∂u∂q̌̇ = @view ∂u∂x[:,nq+1:2nq]
-    ∂F∂q̌ .= ∂F∂u*∂u∂q̌
-    ∂F∂q̌̇ .= ∂F∂u*∂u∂q̌̇
-end
-
-function generalized_force_jacobian!(∂F∂q̌,∂F∂q̌̇,structure::Structure,hub,policy::TimePolicy,q::AbstractVector,q̇::AbstractVector,t::Real;gravity=false)
-end
-
-function generalized_force_jacobian!(∂F∂q̌,∂F∂q̌̇,structure::Structure,hub,policy::NoPolicy,q::AbstractVector,q̇::AbstractVector,t::Real;gravity=false)
-end
-
-function set_restlen!(structure,u)
-    for (i,s) in enumerate(structure.apparatuses.apparatuses)
-        s.state.restlen = u[i]
-    end
-end
-
-function make_pres_actor(μ0,μ1,start,stop)
-    nμ = length(μ0)
-
-    function itp(t)
-        scaled_itps = extrapolate(
-            Interpolations.scale(
-                interpolate(
-                    hcat(μ0,μ1),
-                    (NoInterp(),BSpline(Linear()))
-                    # (NoInterp(),BSpline(Quadratic(Flat(OnGrid()))))
-                ),
-                1:nμ, start:stop-start:stop
-            ),
-            (Throw(),Flat())
-        )
-        [scaled_itps(j,t) for j in 1:nμ]
-    end
-
-    PrescribedActuator(
-        1,
-        RegisterActuator(1,collect(1:nμ),zeros(nμ),Uncoupled()),
-        itp
-    )
-end
-
-function get_num_of_params(policy::AbstractPolicy)
-    (;ps) = policy.nt
-    length(ps)
-end
 
 function get_num_of_params(policy::NoPolicy)
+    0
+end
+function get_num_of_params(policy::TimeFunctionPolicy)
     0
 end

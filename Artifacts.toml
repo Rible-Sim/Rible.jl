@@ -1,0 +1,7 @@
+[rible_extra_meshes]
+git-tree-sha1 = "59493f910f175d92027c2b832a9e9ae14eb38d1c"
+lazy = true
+
+    [[rible_extra_meshes.download]]
+    sha256 = "d56b6514c6f05aed3e341f53c081ee5f6ac6aafa41d621b59762269834e93127"
+    url = "https://github.com/Rible-Sim/Rible.jl/releases/download/assets-v3/rible_extra_meshes_v3.tar.gz"

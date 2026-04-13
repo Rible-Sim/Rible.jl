@@ -1,0 +1,313 @@
+# prevent pipeline from running on branches with merge requests
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS
+      when: never
+    - when: always
+
+stages:
+  - version
+  - build
+  - test
+  - bench
+  - coverage
+  - build_docs
+  - deploy
+
+variables:
+  JULIA_VERSION: "1.12"
+  CI_REGISTRY: "$SELF_HOSTED_REGISTRY"
+  CI_REGISTRY_USER: "gitlab-ci-token"
+  CI_REGISTRY_IMAGE: "$CI_REGISTRY/$CI_PROJECT_PATH"
+  DOCKER_BUILDKIT: "1"
+  BUILDKIT_INLINE_CACHE: "1"
+  CACHE_COMPRESSION_FORMAT: "tarzstd"
+  CACHE_COMPRESSION_LEVEL: "fastest"
+
+default:
+  image:
+    name: julia
+    pull_policy: if-not-present
+  before_script:
+    - echo "Setting up Julia environment..."
+
+.build_image_template:
+  cache: {}
+  stage: build
+  tags:
+    - docker
+  image:
+    name: docker.m.daocloud.io/library/docker:24
+    pull_policy: if-not-present
+  variables:
+    DOCKER_HOST: "unix:///var/run/docker.sock"
+  script:
+    - echo "$CI_JOB_TOKEN" | docker login -u "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
+    - docker pull "$CI_REGISTRY_IMAGE:$JULIA_VERSION" || true
+    - >
+      docker build --pull --progress=plain --target runtime
+      --build-arg JULIA_VERSION=$JULIA_VERSION
+      --build-arg CACHE_SUFFIX=$CI_COMMIT_REF_SLUG
+      --build-arg BUILDKIT_INLINE_CACHE=1
+      --cache-from "$CI_REGISTRY_IMAGE:$JULIA_VERSION"
+      --tag "$CI_REGISTRY_IMAGE:$JULIA_VERSION-$CI_COMMIT_SHA"
+      --tag "$CI_REGISTRY_IMAGE:$JULIA_VERSION"
+      .
+    - docker push "$CI_REGISTRY_IMAGE:$JULIA_VERSION-$CI_COMMIT_SHA"
+    - docker push "$CI_REGISTRY_IMAGE:$JULIA_VERSION"
+
+build_image:1.11:
+  extends: .build_image_template
+  variables:
+    JULIA_VERSION: "1.11"
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH == "dev"'
+
+build_image:1.12:
+  extends: .build_image_template
+  variables:
+    JULIA_VERSION: "1.12"
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: '$CI_COMMIT_BRANCH && $CI_COMMIT_BRANCH != "feature/better_docs"'
+    - if: $CI_COMMIT_TAG
+
+# Below is the template to run your tests in Julia
+.test_template:
+  tags:
+      - docker
+  stage: test
+  image:
+    name: $TEST_IMAGE
+    pull_policy: if-not-present
+  variables:
+    JULIA_NUM_THREADS: "auto"
+    OPENBLAS_NUM_THREADS: "1"
+    TEST_IMAGE: "$CI_REGISTRY_IMAGE:$JULIA_VERSION-$CI_COMMIT_SHA"
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      changes: !reference [.core_changes, file_list]
+    - if: '$CI_COMMIT_BRANCH != "feature/better_docs"'
+  script:
+    - sed -i 's@deb.debian.org@mirrors.ustc.edu.cn@g' /etc/apt/sources.list.d/debian.sources
+    - 'julia -e "import Pkg; Pkg.activate(); Base.active_project() |> println; using InteractiveUtils; versioninfo();"'
+    - julia --project=. -e 'import Pkg; Pkg.instantiate(); Pkg.test(;coverage=true); using LocalCoverage; generate_coverage(;run_test=false);'
+    - mv "coverage/lcov.info" "coverage/lcov-$CI_JOB_NAME_SLUG.info"
+    - mkdir -p coverage-data
+    - cp "coverage/lcov-$CI_JOB_NAME_SLUG.info" coverage-data/
+  artifacts:
+    paths:
+      - coverage-data/*.info
+
+.core_changes:
+  file_list:
+    - src/**/*
+    - test/**/*
+    - ext/**/*
+    - examples/**/*
+    - Project.toml
+    - Manifest.toml
+    - .gitlab-ci.yml
+
+# Template for subpackage tests
+.test_subpkg_template:
+  extends: .test_template
+  variables:
+    PKG_NAME: ""
+    TEST_IMAGE: "$CI_REGISTRY_IMAGE:$JULIA_VERSION-$CI_COMMIT_SHA"
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      changes:
+        - $PKG_NAME/**/*
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      changes: !reference [.core_changes, file_list]
+    - if: '$CI_COMMIT_BRANCH != "feature/better_docs"'
+  needs:
+    - build_image:1.12
+  script:
+    - sed -i 's@deb.debian.org@mirrors.ustc.edu.cn@g' /etc/apt/sources.list.d/debian.sources
+    - 'julia -e "import Pkg; Pkg.activate(); Base.active_project() |> println; using InteractiveUtils; versioninfo();"'
+    - cd $PKG_NAME
+    - julia --project=. -e 'import Pkg; Pkg.instantiate(); Pkg.test(;coverage=true); using LocalCoverage; generate_coverage(;run_test=false);'
+    - mv "coverage/lcov.info" "coverage/lcov-$CI_JOB_NAME_SLUG.info"
+    - mkdir -p coverage-data
+    - cp "coverage/lcov-$CI_JOB_NAME_SLUG.info" coverage-data/
+  artifacts:
+    paths:
+      - $PKG_NAME/coverage-data/*.info
+
+# Name a test and select an appropriate image.
+# images comes from Docker hub
+test:1.11:
+  parallel:
+    matrix:
+      - JULIA_VERSION: ["1.11"]
+        GROUP: ["UNIT", "ADJOINT", "DYNAMICS"]
+  extends: .test_template
+  needs:
+    - build_image:1.11
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      changes: !reference [.core_changes, file_list]
+    - if: '$CI_COMMIT_BRANCH == "dev"'
+
+test:1.12:
+  parallel:
+    matrix:
+      - JULIA_VERSION: ["1.12"]
+        GROUP: ["UNIT", "ADJOINT", "DYNAMICS"]
+  extends: .test_template
+  needs:
+    - build_image:1.12
+
+# Monorepo package tests
+test:RibleTensegrity:
+  extends: .test_subpkg_template
+  variables:
+    PKG_NAME: "RibleTensegrity"
+  parallel:
+    matrix:
+      - GROUP: ["ADJOINT", "STIFFNESS", "DYNAMICS", "ES"]
+
+test:RibleQCF:
+  extends: .test_subpkg_template
+  variables:
+    PKG_NAME: "RibleQCF"
+
+test:RibleExtraIntegrators:
+  extends: .test_subpkg_template
+  variables:
+    PKG_NAME: "RibleExtraIntegrators"
+
+bench:
+  stage: bench
+  allow_failure: true
+  tags:
+    - docker
+  image:
+    name: "$CI_REGISTRY_IMAGE:$JULIA_VERSION-$CI_COMMIT_SHA"
+    pull_policy: if-not-present
+  needs:
+    - build_image:1.12
+  script:
+    - julia --project=. -e 'import Pkg; Pkg.instantiate()'
+    - BENCHMARK=1 julia --project=. -e 'import Pkg; Pkg.test(; coverage=false)'
+  artifacts:
+    when: always
+    paths:
+      - test/benchmark/benchmark_results.md
+      - test/benchmark/benchmark_results.json
+      - test/benchmark/benchmark_judge.md
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: '$CI_COMMIT_BRANCH && $CI_COMMIT_BRANCH != "feature/better_docs"'
+
+merge_coverage:
+  stage: coverage
+  rules:
+    - if: $CI_COMMIT_BRANCH != "feature/better_docs"
+  cache: {}
+  image:
+    name: "$CI_REGISTRY_IMAGE:1.12-$CI_COMMIT_SHA"
+    pull_policy: if-not-present
+  variables:
+    JULIA_DEPOT_PATH: "/app/depot"
+  script:
+    - sed -i 's@deb.debian.org@mirrors.ustc.edu.cn@g' /etc/apt/sources.list.d/debian.sources
+    - mkdir -p coverage
+    - 'julia -e "using InteractiveUtils; versioninfo();"'
+    - 'julia -e "import Pkg; Pkg.activate(); Base.active_project() |> println; using InteractiveUtils; versioninfo();"'
+    - 'julia -e "import CoverageTools; cov = CoverageTools.LCOV.readfolder(\"coverage-data\"); CoverageTools.LCOV.writefile(\"coverage/lcov.info\", cov)";'
+    - 'julia -e "using LocalCoverage; write_lcov_to_xml(\"coverage/coverage.xml\", \"coverage/lcov.info\");"'
+    - 'julia -e "using LocalCoverage; cov = LocalCoverage.CoverageTools.LCOV.readfile(\"coverage/lcov.info\"); show(LocalCoverage.eval_coverage_metrics(cov,\"Rible.jl\"))"'
+  artifacts:
+    paths:
+      - coverage-data/*.info
+      - Rible*/coverage-data/*.info
+    reports:
+      coverage_report:
+        coverage_format: cobertura
+        path: coverage/coverage.xml
+  coverage: '/TOTAL.+ ([0-9]{1,3})%/'
+  needs:
+    - job: test:1.12
+      artifacts: true
+    - job: test:RibleTensegrity
+      artifacts: true
+    - job: test:RibleQCF
+      artifacts: true
+    - job: test:RibleExtraIntegrators
+      artifacts: true
+
+
+pages:
+  cache: {}
+  image:
+    name: julia:$JULIA_VERSION
+    pull_policy: if-not-present
+  tags:
+    - docker
+  stage: build_docs
+  script:
+    - sed -i 's@deb.debian.org@mirrors.ustc.edu.cn@g' /etc/apt/sources.list.d/debian.sources
+    - apt-get update -qq && apt-get install -y git nodejs npm
+    - rm -f Manifest*.toml docs/Manifest*.toml
+    - julia --project=. -e 'import Pkg; Pkg.instantiate(); Pkg.precompile()'
+    - julia --project=docs/ -e 'import Pkg; Pkg.instantiate(); Pkg.precompile()'
+    - bash docs/make_combined.sh
+    - mkdir public && mv docs/build_combined/1/* public/
+  artifacts:
+    paths:
+      - public
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == "feature/better_docs"
+    - if: $CI_COMMIT_BRANCH == "dev"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
+deploy_cloudflare:
+  cache: {}
+  image:
+    name: node:22-alpine
+    pull_policy: if-not-present
+  tags:
+    - docker
+  stage: deploy
+  needs:
+    - pages
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: '$CI_COMMIT_BRANCH == "main"'
+    - if: '$CI_COMMIT_BRANCH == "dev"'
+    - if: '$CI_COMMIT_BRANCH == "feature/better_docs"'
+  script:
+    - npm install --global wrangler
+    - wrangler pages project create riblejl --production-branch=dev || true
+    - BRANCH_NAME="${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME:-$CI_COMMIT_REF_NAME}"
+    - wrangler pages deploy public --project-name=riblejl --branch="$BRANCH_NAME" --commit-hash="$CI_COMMIT_SHA"
+
+
+bump_version_dev:
+  stage: version
+  tags:
+    - docker
+  image:
+    name: julia:$JULIA_VERSION
+    pull_policy: if-not-present
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "dev" && $CI_PIPELINE_SOURCE == "push"'
+      when: manual
+      allow_failure: true
+  script:
+    - sed -i 's@deb.debian.org@mirrors.ustc.edu.cn@g' /etc/apt/sources.list.d/debian.sources
+    - apt-get update -qq && apt-get install -y git
+    - julia --color=yes ci/bump_version.jl
+    - git status --short
+    - 'if git diff --quiet; then echo "No version change needed"; exit 0; fi'
+    - git config user.name "ci-bot"
+    - git config user.email "ci-bot@example.com"
+    - git add Project.toml
+    - "git commit -m \"chore: bump version [skip ci]\""
+    - "git push https://gitlab-ci-token:${CI_JOB_TOKEN}@${CI_SERVER_HOST}/${CI_PROJECT_PATH}.git HEAD:dev"

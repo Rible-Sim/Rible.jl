@@ -1,0 +1,57 @@
+name = "RibleExtraIntegrators"
+uuid = "c7969c89-92f3-49be-9a87-c7d851245c78"
+version = "0.1.0"
+authors = ["Jiahui Luo <luo229@qq.com> and contributors"]
+
+
+[deps]
+EponymTuples = "97e2ac4a-e175-5f49-beb1-4d6866a6cdc3"
+FiniteDiff = "6a86dc24-6348-571c-b903-95158fe2bd41"
+FiniteDifferences = "26cc04aa-876d-5657-8c51-4c34ba976000"
+LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+NLsolve = "2774e3e8-f4cf-5e23-947b-6d7e65073b56"
+Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
+ProgressMeter = "92933f4c-e287-5a05-a399-4b506db050ca"
+Rible = "7320ced1-f959-433f-bc23-ba762b3b6b43"
+StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
+StructArrays = "09ab397b-f2b6-538f-b94a-2f83cf4a842a"
+
+[extras]
+CoordinateTransformations = "150eb455-5306-5404-9cee-2592286d6298"
+DataStructures = "864edb3b-99cc-5e75-8d2d-829cb0a9cfe8"
+FileIO = "5789e2e9-d7fb-5bc7-8068-2c6fae9b9549"
+ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
+MeshIO = "7269a6da-0436-5bbc-96c2-40638cbb6118"
+RibleQCF = "32f6761c-4421-4db0-a77a-1336e4883ae5"
+Rotations = "6038ab10-8711-5258-84ad-4b1120ba62dc"
+SafeTestsets = "1bc83da4-3b8d-516f-aca4-4fe02f6d838f"
+SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
+Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+TypeSortedCollections = "94a5cd58-49a0-5741-bd07-fa4f4be8babf"
+
+[targets]
+test = ["Test", "RibleQCF", "SafeTestsets", "CoordinateTransformations", "DataStructures", "FileIO", "ForwardDiff", "MeshIO", "Rotations", "SparseArrays", "Statistics", "TypeSortedCollections"]
+
+[sources]
+Rible = {path = ".."}
+RibleQCF = {path = "../RibleQCF"}
+
+[compat]
+CoordinateTransformations = "0.6"
+DataStructures = "0.18 - 1"
+EponymTuples = "0.2"
+FileIO = "1"
+FiniteDiff = "2"
+FiniteDifferences = "0.12"
+ForwardDiff = "1"
+MeshIO = "0.5"
+NLsolve = "4"
+ProgressMeter = "1"
+Rible = "0.1.5"
+RibleQCF = "0.1"
+Rotations = "1"
+StaticArrays = "1"
+StructArrays = "0.7"
+TypeSortedCollections = "1"
+julia = "1.11"

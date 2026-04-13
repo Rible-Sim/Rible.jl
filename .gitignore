@@ -1,5 +1,18 @@
-Manifest.toml
-result/
+# Julia-specific files
+Manifest*.toml
+
+# Documentation build and cache files
+.documenter
+docs/.*
+docs/build*
+docs/node_modules
+docs/package-lock.json
+
+# Notebook 
+*-checkpoint.ipynb
+**/.notebook-bbook/.versions/**
+
+# Media files
 *.mp4
 *.png
 *.zip
@@ -9,6 +22,35 @@ result/
 *.eps
 *.agx
 *.csv
-.DS_Store
 *.pdf
-/notebooks/.ipynb_checkpoints
+
+# System files
+.DS_Store
+
+# VSCode files
+/.prettierrc
+.vscode/
+*.code-workspace
+.VSCodeCounter/
+
+# log files
+*.log
+
+# Miscellaneous
+note_files/
+result/
+events.out.*
+**/log.txt
+*.cov
+.claude/
+
+# CondaPkg
+.CondaPkg/
+coverage/
+*.pb.gz
+
+checkpoints
+/Rible*/
+!/RibleQCF/
+!/RibleExtraIntegrators/
+!/RibleTensegrity/

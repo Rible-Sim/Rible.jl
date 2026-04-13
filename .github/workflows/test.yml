@@ -1,44 +1,29 @@
 name: Run tests
 
-on: 
+on:
   push:
-    branches:
-      - main
-      - dev
   pull_request:
 
+permissions:
+  actions: write
+  contents: read
+
 jobs:
-  test:
-    runs-on: self-hosted
-    strategy:
-      fail-fast: false
-      matrix:
-        julia-version: ['1.10']
-        julia-arch: [x64]
-        group:
-          - ALL
+  configure:
+    runs-on: ubuntu-latest
+    outputs:
+      julia_versions: ${{ steps.set-matrix.outputs.julia_versions }}
     steps:
-    - uses: actions/checkout@v4
-    - name: Setup Julia environment
-      uses: julia-actions/setup-julia@v1
-      with:
-        version: ${{ matrix.julia-version }}
-        arch: ${{ matrix.julia-arch }}
-    - uses: actions/cache@v3
-      env:
-        cache-name: cache-artifacts
-      with:
-        path: ~/.julia/artifacts
-        key: ${{ runner.os }}-test-${{ env.cache-name }}-${{ hashFiles('**/Project.toml') }}
-        restore-keys: |
-          ${{ runner.os }}-test-${{ env.cache-name }}-
-          ${{ runner.os }}-test-
-          ${{ runner.os }}-
-    - name: Build Julia Dependency Packages
-      uses: julia-actions/julia-buildpkg@v1
-    - name: Run Julia package tests
-      uses: julia-actions/julia-runtest@v1
-      with:
-        prefix: xvfb-run
-      env:
-        GROUP: ${{ matrix.group }}
+      - id: set-matrix
+        run: |
+          if [[ "${{ github.ref_name }}" == "main" || "${{ github.ref_name }}" == "dev" ]]; then
+            echo 'julia_versions=["1.11", "1.12"]' >> $GITHUB_OUTPUT
+          else
+            echo 'julia_versions=["1.12"]' >> $GITHUB_OUTPUT
+          fi
+
+  call-ci:
+    needs: configure
+    uses: ./.github/workflows/reusable-ci.yml
+    with:
+      julia_versions: ${{ needs.configure.outputs.julia_versions }}

@@ -1,0 +1,96 @@
+name: Reusable CI
+
+on:
+  workflow_call:
+    inputs:
+      julia_versions:
+        description: 'JSON string of Julia versions to test'
+        required: true
+        type: string
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  root-test:
+    name: Root tests (Julia ${{ matrix.julia-version }} / ${{ matrix.group }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        julia-version: ${{ fromJSON(inputs.julia_versions) }}
+        group:
+          - UNIT
+          - DYNAMICS_A
+          - DYNAMICS_B
+          - ADJOINT_A
+          - ADJOINT_B
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: julia-actions/setup-julia@v2
+        with:
+          version: ${{ matrix.julia-version }}
+
+      - uses: julia-actions/cache@v3
+
+      - name: Instantiate root environment
+        env:
+          JULIA_PKG_PRECOMPILE_AUTO: "0"
+        run: julia --color=yes --project=. -e 'using Pkg; Pkg.instantiate(); Pkg.precompile()'
+
+      - name: Run tests
+        env:
+          GROUP: ${{ matrix.group }}
+          JULIA_NUM_THREADS: "auto"
+          OPENBLAS_NUM_THREADS: "1"
+          JULIA_PKG_PRECOMPILE_AUTO: "0"
+        run: julia --color=yes --project=. -e 'using Pkg; Pkg.test(; coverage=true)'
+
+  test-subpackages:
+    name: Test subpackage ${{ matrix.pkg }} ${{ matrix.group || '' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - pkg: RibleTensegrity
+            group: ADJOINT
+          - pkg: RibleTensegrity
+            group: STIFFNESS
+          - pkg: RibleTensegrity
+            group: DYNAMICS_A
+          - pkg: RibleTensegrity
+            group: DYNAMICS_B
+          - pkg: RibleTensegrity
+            group: ES
+          - pkg: RibleQCF
+            group: ALL
+          - pkg: RibleExtraIntegrators
+            group: ALL
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: julia-actions/setup-julia@v2
+        with:
+          version: '1.12'
+
+      - uses: julia-actions/cache@v3
+
+      - name: Instantiate subpackage environment
+        working-directory: ${{ matrix.pkg }}
+        env:
+          JULIA_PKG_PRECOMPILE_AUTO: "0"
+        run: julia --color=yes --project=. -e 'using Pkg; Pkg.instantiate(); Pkg.precompile()'
+
+      - name: Run subpackage tests
+        working-directory: ${{ matrix.pkg }}
+        env:
+          GROUP: ${{ matrix.group || 'ALL' }}
+          JULIA_NUM_THREADS: "auto"
+          OPENBLAS_NUM_THREADS: "1"
+          JULIA_PKG_PRECOMPILE_AUTO: "0"
+        run: julia --color=yes --project=. -e 'using Pkg; Pkg.test(; coverage=true)'

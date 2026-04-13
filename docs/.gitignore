@@ -1,2 +1,9 @@
 build/
-site/
+node_modules/
+package.json
+package-lock.json
+Manifest.toml
+src/en/assets/
+src/cn/assets/
+src/en/get_started.md
+src/cn/get_started.md
