@@ -12,7 +12,6 @@ on:
 
 jobs:
   build:
-    environment: DocEnvironment
     name: Documentation
     permissions:
       actions: write
@@ -38,10 +37,12 @@ jobs:
           DOCUMENTER_KEY: ${{ secrets.DOCUMENTER_KEY }}
         run: bash docs/make_combined.sh
       - name: Stage for deploy
+        if: github.event_name != 'pull_request'
         run: |
           mkdir public
           mv docs/build_combined/1/* public/
       - name: Ensure Cloudflare Pages project
+        if: github.event_name != 'pull_request'
         uses: cloudflare/wrangler-action@v3
         continue-on-error: true
         with:
@@ -49,6 +50,7 @@ jobs:
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           command: pages project create riblejl --production-branch=dev
       - name: Deploy to Cloudflare Pages
+        if: github.event_name != 'pull_request'
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
