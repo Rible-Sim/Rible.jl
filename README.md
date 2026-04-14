@@ -1,23 +1,89 @@
-# Rible 逸步
-A simulator for computational design of **Ri**gid-flexi**ble** robots.
- 
-[![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg?style=flat-square)](https://opensource.org/licenses/Apache-2.0)
+<div align="center">
+  <img src="docs/src/assets/logo.svg" height="120" alt="Rible Logo"/>
+</div>
 
-| **Documentation**                                   |
-|:---------------------------------------------------:|
-| [![docs: main][docs-main-img]][docs-main-url] |
+<div align="center">
+    <h2>Rible.jl</h2>
+    <h3>Towards a differentiable simulator for computational design of rigid-flexible robots.</h3>
+</div>
 
-Related Papers
+<div align="center">
 
-1. J. Luo, X. Xu, X. Liu, and Z. Wu, [“A nonsmooth modified symplectic integration scheme for frictional contact dynamics of rigid–flexible multibody systems,”](https://doi.org/10.1016/j.cma.2023.116726) Comput. Methods Appl. Mech. Eng., vol. 420, p. 116726, Feb. 2024.
-3. J. Luo, X. Xu, Z. Wu, and S. Wu, [“A unified approach for dynamic analysis of tensegrity structures with arbitrary rigid bodies and rigid bars.”](https://doi.org/10.48550/arXiv.2206.06221) arXiv, Jul. 02, 2023.
-4. J. Luo, Z. Wu, X. Xu, Y. Chen, Z. Liu, and L. Ming, [“Forward Statics of Tensegrity Robots With Rigid Bodies Using Homotopy Continuation,”](https://doi.org/10.1109/LRA.2022.3155195) IEEE Robot. Autom. Lett., vol. 7, no. 2, pp. 5183–5190, Apr. 2022.
-5. X. Xu, J. Luo, and Z. Wu, [“The numerical influence of additional parameters of inertia representations for quaternion-based rigid body dynamics,”](https://doi.org/10.1007/s11044-019-09697-x) Multibody Syst. Dyn., vol. 49, no. 3, pp. 237–270, Jul. 2020.
+[![Latest Docs](https://img.shields.io/badge/docs-dev-blue.svg)](https://docs.rible.dev)
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-License
+</div>
+
 ---
 
-Licensed under [the Apache License, Version 2.0](LICENSE)
+## Key Features
 
-[docs-main-img]: https://img.shields.io/badge/docs-main-blue?style=flat-square
-[docs-main-url]: https://Rible-Sim.github.io/Rible.jl
+| Feature | Description |
+|:---:|:---|
+| ⌨️ **Coordinates** | NCF (Natural Coordinates) - 2D/3D variants with nonminimal formulation. |
+| 💥 **Modeling** | Comprehensive library bodies and joints. |
+| ⚡ **Dynamics** | Efficient solvers (default: Zhong06 family), contact handling, and linearization, support for (adjoint) sensitivity analysis. |
+| 🤖 **Visualization** | Integrated and extensible visualization tools (via Makie). |
+| 🛠️ **Extensibility** | Modular design allowing easy extension of new components. |
+
+## Monorepo Structure
+
+Rible.jl is a monorepo structured around a core package and strictly coupled extensions that expand its capabilities.
+
+### 📦 Main Package: Rible.jl
+
+The core package `Rible` provides the fundamental **Multibody Dynamics** engine and essential tools for simulation.
+
+### 🔗 Extensions Architecture
+
+Various extension packages integrate with the core `Rible.jl` ecosystem. 
+
+<div align="center">
+
+| **Package** | **Description** |
+| :--- |  :--- |
+| 📦 **[Rible.jl](./)**  | The core package for rigid-flexible body dynamics. |
+| **Coordinates & Bodies** | | |
+| └ 📦 [RibleQCF.jl](./RibleQCF) | Quaternion-based coordinate formulations. |
+| **Structures** | | |
+| └ 📦 [RibleTensegrity.jl](./RibleTensegrity)  | Tensegrity structures modeling and analysis. |
+| **Dynamics Solvers** | | |
+| └ 📦 [RibleExtraIntegrators.jl](./RibleExtraIntegrators)  | Include extra integrators that build on the core package and shipped extensions. |
+
+
+</div>
+
+## Installation
+
+```julia
+import Pkg
+Pkg.add(url="https://github.com/Rible-Sim/Rible.jl")
+```
+
+## Documentation
+
+See the [Getting Started](https://docs.rible.dev/en/get_started/) guide for a walkthrough of your first simulation, or browse the [full documentation](https://docs.rible.dev) for API reference and advanced topics. 
+
+中文用户请参阅[中文文档](https://docs.rible.dev/cn/)。
+
+## Contributing
+
+
+### Development setup
+
+Clone the repository, enter the checkout, and instantiate the project:
+
+```bash
+git clone https://github.com/Rible-Sim/Rible.jl.git
+cd Rible.jl
+julia --project=. -e 'import Pkg; Pkg.instantiate()'
+```
+
+### Validation before opening a pull request
+
+Run the root test suite from the repository root:
+
+```bash
+julia --project=. -e 'import Pkg; Pkg.test()'
+```
+

@@ -6,8 +6,6 @@ function rigidbar(i,
         e = 0.0,
         contactable = true,
         visible = true,
-        ci = Int[],
-        cstr_idx = [1],
         isbody = false,
         loadmesh = true,
     )
@@ -15,7 +13,9 @@ function rigidbar(i,
     ṙo = (ṙi + ṙj)/2
     u = rj - ri
     u̇ = ṙj - ṙi
-    u /= norm(u)
+    dist = norm(u)
+    u /= dist
+    # u̇ /= dist
     v,w = RB.HouseholderOrthogonalization(u)
     R = SMatrix{3,3}(hcat(u,v,w))
     # if isodd(pos)
@@ -30,46 +30,26 @@ function rigidbar(i,
         0       inertia    0;
         0       0     inertia
     ])
-    loci = [r̄p1,r̄p2]
+    loci = [r̄p1,r̄p2,r̄p3]
     axes = [SVector(1.0,0,0),SVector(1.0,0,0),SVector(1.0,0,0)]
     friction_coefficients = fill(μ,length(loci))
     restitution_coefficients = fill(e,length(loci))
-    prop = RB.RigidBodyProperty(
-        i,
-        contactable,
-        m,
-        Ī,
-        mass_locus,
-        loci,
-        axes,
-        friction_coefficients,
-        restitution_coefficients;
-        visible = visible,
-    )
-    pretty_table(
-        SortedDict(
-            [
-                ("id", i),
-                ("bar length", b),
-            ]
-        )
-    )
+    prop = RB.RigidBodyProperty(i, contactable, m, Ī, RB.Locus(mass_locus), [RB.Locus(pos, ax, mu, e) for (pos,ax,mu,e) in zip(loci, axes, friction_coefficients, restitution_coefficients)]; visible = visible)
+
+    nmcs_1p1v = RB.NCF.NC3D1P1V(ri, u, ro, R)
+    ω = RB.NCF.find_angular_velocity(nmcs_1p1v,vcat(ri,u),vcat(ṙi,u̇))
     if isbody
-        @show isbody
         nmcs = RB.NCF.NC1P3V(ri, ro, R)
-        ω = zero(ṙo)
     else
-        nmcs = RB.NCF.NC3D1P1V(ri, u, ro, R)
-        ω = RB.NCF.find_angular_velocity(nmcs,vcat(ri,u),vcat(ṙi,u̇))
-        # @show ω, ṙi, u̇
+        nmcs = nmcs_1p1v
     end
+    # @show i u̇ ω×u
+    @debug "rigidbar" id=i bar_length=b isbody ri ṙi ω u̇ ω×u
     state = RB.RigidBodyState(prop, ro, R, ṙo, ω)
-    coords = RB.NonminimalCoordinates(
-        nmcs, ci, cstr_idx
-    )
+    coords = nmcs
     # leg_mesh = load("400杆.STL")
     if loadmesh
-        barmesh = load(joinpath(assetdir,"BZ.STL")) |> make_patch(;
+        barmesh = load(RB.assetpath("BZ.STL")) |> RB.make_patch(;
             scale=1/1000,
             rot = RotY(π/2),
         )
@@ -77,4 +57,5 @@ function rigidbar(i,
         barmesh = RB.endpoints2mesh(r̄p1,r̄p2;radius = norm(r̄p2-r̄p1)/40)
     end
     body = RB.RigidBody(prop, state, coords, barmesh)
+
 end

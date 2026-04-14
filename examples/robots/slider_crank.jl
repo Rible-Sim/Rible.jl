@@ -1,4 +1,4 @@
-function slider_crank(;θ = 0, coordsType = RB.NCF.NC)
+function slider_crank(;θ = 0, coordsType = :NCF)
     SVo3 = SVector{3}([0.0,0.0,0.0])
     l = [0.153,0.306]
     mass = [
@@ -14,7 +14,7 @@ function slider_crank(;θ = 0, coordsType = RB.NCF.NC)
     ω0 = [
         150.0,
         -75.0,
-    ]./100
+    ]./100*0.0
     b = 0.05
     a = 0.025
     d = 0.05
@@ -46,26 +46,20 @@ function slider_crank(;θ = 0, coordsType = RB.NCF.NC)
         ro = ri
         ṙo = zero(ro)
 
-        prop = RB.RigidBodyProperty(
-            i,contactable,m,
-            Ī,
-            r̄g,
-            loci_positions,
-            axes_normals;
-            visible
+        prop = RB.RigidBodyProperty(i, contactable, m, Ī, 
+            RB.Locus(r̄g), 
+            [RB.Locus(pos, ax, mu, e) for (pos,ax,mu,e) in zip(
+                loci_positions, 
+                axes_normals, 
+                zeros(length(loci_positions)), 
+                zeros(length(loci_positions)))]
         )
 
         state = RB.RigidBodyState(prop, ri, R, ṙo, ω)
-        if coordsType isa Type{RB.NCF.NC}
-            nmcs = RB.NCF.NC1P3V(ri, ro, R)
-            pres_idx = Int[]
-            cstr_idx = collect(1:6)
-            coords = RB.NonminimalCoordinates(nmcs, pres_idx, cstr_idx)
+        if coordsType == :NCF
+            coords = RB.NCF.NC1P3V(ri, ro, R)
         else
-            qcs = RB.QCF.QC(m,Ī)
-            pres_idx = Int[]
-            cstr_idx = [1]
-            coords = RB.NonminimalCoordinates(qcs, pres_idx, cstr_idx)
+            coords = QCF.QC(m,Ī)
         end
 
         basemesh = load(RB.assetpath("crank_slider/base.STL")) |> RB.make_patch(;
@@ -108,26 +102,20 @@ function slider_crank(;θ = 0, coordsType = RB.NCF.NC)
             ṙo = [0,0,ω0[i-2]*l[i-2] .+ ω0[i-1]*l[i-1]/2]
         end
 
-        prop = RB.RigidBodyProperty(
-            i,contactable,m,
-            Ī,
-            r̄g,
-            loci_positions,
-            axes_normals;
-            visible
+        prop = RB.RigidBodyProperty(i, contactable, m, Ī, 
+            RB.Locus(r̄g), 
+            [RB.Locus(pos, ax, mu, e) for (pos,ax,mu,e) in zip(
+                loci_positions, 
+                axes_normals, 
+                zeros(length(loci_positions)), 
+                zeros(length(loci_positions)))]
         )
 
         state = RB.RigidBodyState(prop, ro, R, ṙo, ω)
-        if coordsType isa Type{RB.NCF.NC}
-            nmcs = RB.NCF.NC1P3V(ri, ro, R)
-            pres_idx = Int[] 
-            cstr_idx = collect(1:6)    
-            coords = RB.NonminimalCoordinates(nmcs, pres_idx, cstr_idx)
+        if coordsType == :NCF
+            coords = RB.NCF.NC1P3V(ri, ro, R)
         else
-            qcs = RB.QCF.QC(m,Ī)
-            pres_idx = Int[]
-            cstr_idx = [1]
-            coords = RB.NonminimalCoordinates(qcs, pres_idx, cstr_idx)
+            coords = QCF.QC(m,Ī)
         end
 
         linkmesh = load(RB.assetpath("crank_slider/crank$(i-1).STL")) |> RB.make_patch(;
@@ -178,15 +166,13 @@ function slider_crank(;θ = 0, coordsType = RB.NCF.NC)
         ṙo = zero(ro)
         ω = zero(ro)
         
-        prop = RB.RigidBodyProperty(
-            i,contactable,m,
-            Ī,
-            r̄g,
-            loci_positions,
-            axes_normals,
-            fill(0.5,length(loci_positions)),
-            fill(0.4,length(loci_positions));
-            visible,
+        prop = RB.RigidBodyProperty(i, contactable, m, Ī, 
+            RB.Locus(r̄g), 
+            [RB.Locus(pos, ax, mu, e) for (pos,ax,mu,e) in zip(
+                loci_positions, 
+                axes_normals, 
+                fill(0.5,length(loci_positions)), 
+                fill(0.4,length(loci_positions)))]
         )
 
         # @show q[1:3]
@@ -194,12 +180,10 @@ function slider_crank(;θ = 0, coordsType = RB.NCF.NC)
         # @show q[7:9]
         # @show q[10:12]
         state = RB.RigidBodyState(prop, ri, R, ṙo, ω)
-        if coordsType isa Type{RB.NCF.NC}
-            nmcs = RB.NCF.NC1P3V(ri, ro, R)
-            coords = RB.NonminimalCoordinates(nmcs,)
+        if coordsType == :NCF
+            coords = RB.NCF.NC1P3V(ri, ro, R)
         else
-            qcs = RB.QCF.QC(m,Ī)
-            coords = RB.NonminimalCoordinates(qcs,)
+            coords = QCF.QC(m,Ī)
         end
         slidermesh = load(RB.assetpath("crank_slider/slider.STL")) |> RB.make_patch(;
             trans=[0.0,0,0],
@@ -220,16 +204,37 @@ function slider_crank(;θ = 0, coordsType = RB.NCF.NC)
     rbs = [base,link1,link2,slider1,]
     rigdibodies = TypeSortedCollection(rbs)
 
-    j1 = RB.FixedBodyConstraint(1,base)
-    j2 = RB.RevoluteJoint(2,RB.Hen2Egg(RB.Signifier(base ,1,1),RB.Signifier(link1,1,1)))
-    j3 = RB.RevoluteJoint(3,RB.Hen2Egg(RB.Signifier(link1,2,2),RB.Signifier(link2,1,1)))
-    j4 = RB.RevoluteJoint(4,RB.Hen2Egg(RB.Signifier(link2,2,2),RB.Signifier(slider1,5,5)))
+    j1 = RB.FixedBodyApparatus(1,base)
+    j2 = RB.RevoluteJoint(2,
+        RB.Hen2Egg(RB.Anchor(base ,1,1),RB.Anchor(link1,1,1)),
+        # RB.TorsionalSpringDamper(0.0,100.0;) #rest_angle::T,k::T,c::T;
+    )
+    j3 = RB.RevoluteJoint(3,
+        RB.Hen2Egg(RB.Anchor(link1,2,2),RB.Anchor(link2,1,1)),
+        ## RB.TorsionalSpringDamper(0.0,100.0;),
+    )
+    j4 = RB.RevoluteJoint(4,
+        RB.Hen2Egg(RB.Anchor(link2,2,2),RB.Anchor(slider1,5,5)),
+        ## RB.TorsionalSpringDamper(0.0,100.0;)
+    )
 
     apparatuses = TypeSortedCollection([j1,j2,j3,j4])
 
-    numbered = RB.number(rigdibodies,apparatuses)
-    indexed = RB.index(rigdibodies,apparatuses)
-    cnt = RB.Connectivity(numbered,indexed)
+    
+    cnt = RB.Connectivity(rigdibodies,apparatuses)
+    
     st = RB.Structure(rigdibodies,apparatuses,cnt)
-    RB.Robot(st,)
+    # Gauges/sensors used to measure errors for cost functions, optimization, or feedback control; currently unused.
+    capta_gauges = Int[]
+    error_gauges = Int[]
+    # Actuators attached to one or more bodies or apparatuses; their types dispatch to execute! for different driving forces.
+    actuators = Int[]
+    hub = RB.ControlHub(
+        st,
+        capta_gauges,
+        error_gauges,
+        actuators,
+        RB.Coalition(st, capta_gauges, error_gauges, actuators,)
+    )
+    RB.Robot(st,hub)
 end

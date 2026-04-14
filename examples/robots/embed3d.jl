@@ -45,7 +45,9 @@ function embed3d(;
                 make_3d_bar(
                     2m*(j-1)+i,
                     bps[j][i],
-                    midps[j][i]; ci = ifelse(j==1,[1,2,3],Int[])
+                    midps[j][i]; pres_idx = ifelse(j==1,[1,2,3],Int[]),
+                    radius_ratio = 1/120,
+                    mat_name = "Teak",
                 ) for i = 1:m
             ],
             [
@@ -53,6 +55,8 @@ function embed3d(;
                     2m*(j-1)+m+i,
                     midps[j][i-1],
                     bps[j+1][i-1];
+                    radius_ratio = 1/120,
+                    mat_name = "Teak",
                 ) for i = 1:m
             ]
         )
@@ -61,22 +65,22 @@ function embed3d(;
     plates = [
         begin
             if j == 1				
-                ci = collect(1:12)
+                pres_idx = collect(1:12)
                 cstr_idx = Int[]
             else
-                ci = Int[]
+                pres_idx = Int[]
                 cstr_idx = collect(1:6)
             end
             id = (2n)*m+j
             ro = SVector(0.0,0.0,(j-1)*2h)
             ri = ro
             R = RotZ(0.0)
-            nodes_raw = bps[1] |> Array
-            nodes_ext = [
+            loci_raw = bps[1] |> Array
+            loci_ext = [
                 SVector(3r̄p[1],3r̄p[2],0.0)
-                for r̄p in nodes_raw
+                for r̄p in loci_raw
             ]
-            loci = vcat(nodes_raw,nodes_ext)
+            loci = vcat(loci_raw,loci_ext)
             make_3d_plate(
                 id,
                 loci,
@@ -87,7 +91,7 @@ function embed3d(;
                 contactable = true,
                 m,
                 height=1e-2,
-                ci,
+                pres_idx,
                 cstr_idx,
                 loadmesh = false,
                 meshvisible = !isprism,
@@ -103,9 +107,9 @@ function embed3d(;
     for j = 1:n
         is = 2m*(j-1)
         for i = 1:m
-            for k = 1:1
+            for k = 1:3
                 row = zeros(Int,nb)
-                row[is+cm[i]  ]   = k+3
+                row[is+  cm[i]  ] = k+3
                 row[is+m+cm[i+1]] = k
                 append!(sharing_elas,row)		
             end
@@ -114,14 +118,15 @@ function embed3d(;
     for j = 2:n
         is = 2m*(j-2)+m
         for i = 1:m
-            for k = 1:1
+            for k = 1:3
                 row = zeros(Int,nb)
-                row[is+cm[i]  ]   = k+3
+                row[is+  cm[i]  ] = k+3
                 row[is+m+cm[i+2]] = k
                 append!(sharing_elas,row)		
             end
         end
     end
+    display(sharing_elas)
     sharing_matrix = Matrix(sharing_elas')
 
     connecting_elas = ElasticArray{Int}(undef, nb, 0)
@@ -204,7 +209,7 @@ function embed3d(;
     connecting_matrix = Matrix(connecting_elas')
     # display(connecting_matrix)
     ncables = size(connecting_matrix,1)
-    # @assert ncables == ncables_prism + ncables_outer
+    @assert ncables == ncables_prism + ncables_outer
 
     mat_cable = filter(
         row->row.name == "Nylon 66",
@@ -227,45 +232,63 @@ function embed3d(;
     )
 
     pin_joints = [
-        RB.PinJoint(i+m*(j-1),RB.Hen2Egg(RB.Signifier(bars[j][m+cm[i]],2),RB.Signifier(plates[j+1],cm[i-1])))
+        RB.PinJoint(i+m*(j-1) + ncables,RB.Hen2Egg(RB.Anchor(bars[j][m+cm[i]],2),RB.Anchor(plates[j+1],cm[i-1])))
         for j = 1:n for i = 1:m
     ]
-
-    cable_joints = RB.connect(bodies,spring_dampers;connecting_matrix,istart=n*m)
+    cm = RT.change_connecting_format(bodies,connecting_matrix)
+    cable_joints = RT.connect_spring(bodies,spring_dampers;cm)
 
     apparatuses = TypeSortedCollection(
         vcat(pin_joints,cable_joints)
     )
-    # display(sharing_matrix)
-    indexed = RB.index(bodies,apparatuses;sharing_matrix)
-    
-    numbered = RB.number(bodies,apparatuses)
+    ## # 
+    cnt = RB.PresFreeConnectivity(bodies,apparatuses;sharing_matrix)
 
-    cnt = RB.Connectivity(numbered,indexed)
-
-    st = RB.Structure(bodies,apparatuses,cnt)
+    st = RT.TensegrityStructure(bodies,apparatuses,cnt)
 
     actuators = [
         RB.RegisterActuator(
             1,
-            cable_joints[1:ncables_prism],
-            RB.ManualOperator(),
-            (values=zeros(ncables_prism),matrix=I(ncables_prism))
-        ),
-        RB.RegisterActuator(
-            2,
-            cable_joints[ncables_prism+1:ncables],
-            RB.ManualOperator(),
-            (values=zeros(ncables_outer),matrix=I(ncables_outer))
-        ),
-    ]
+            [
+                (cable=cable,val_id=cable.id) for cable in cable_joints # signifier
+            ],
+            RB.FunctionOperator(
+                (f, values, u) -> begin
+                    f .= values .+ u
+                end,
+                (Jac, values, u) -> nothing,
+                zeros(ncables), # func_vals
+                Matrix(1.0I(ncables)) #Jac_vals
+            ), # operator
+            (
+                values=zeros(ncables),
+            ) # register
 
-    gauges = Int[]
+        ),
+    ] |> TypeSortedCollection
+    ## actuators = [
+    ##     RB.RegisterActuator(
+    ##         1,
+    ##         cable_joints[1:ncables_prism],
+    ##         RB.ManualOperator(),
+    ##         (values=zeros(ncables_prism),matrix=I(ncables_prism))
+    ##     ),
+    ##     RB.RegisterActuator(
+    ##         2,
+    ##         cable_joints[ncables_prism+1:ncables],
+    ##         RB.ManualOperator(),
+    ##         (values=zeros(ncables_outer),matrix=I(ncables_outer))
+    ##     ),
+    ## ]
+
+    capta_gauges = Int[]
+    error_gauges = Int[]
     hub = RB.ControlHub(
         st,
-        gauges,
+        capta_gauges,
+        error_gauges,
         actuators,
-        RB.Coalition(st,gauges,actuators)
+        RB.Coalition(st,capta_gauges,error_gauges,actuators)
     )
     bot = RB.Robot(st,hub)
 end

@@ -1,98 +1,83 @@
 
 function make_3d_plate(
-    id,
-    nodes_positions,
-    ro,
-    R,
-    ri,
-    rj=nothing,
-    rk=nothing,
-    rl=nothing;
-    contactable = true,
-    m = 3,
-    height=1e-2,
-    radius=1e-3,
-    ci = Int[],
-    cstr_idx = collect(1:6),
-    loadmesh = true,
-    meshvisible = true,
-)
-# free_idx = collect(1:6)	
-visible = ci != Int[]
-mat = filter(
-    row -> row.name == "Teak", 
-    RB.material_properties
-)[1]
-density = mat.density |> ustrip
-if meshvisible
-    if loadmesh
-        platemesh = load("柚木板3.STL") |> make_patch(;rot=RotZ(π/4))
+        id,
+        loci_positions,
+        ro,
+        R,
+        ri,
+        rj=nothing,
+        rk=nothing,
+        rl=nothing;
+        contactable = true,
+        m = 3,
+        height=1e-2,
+        radius=1e-3,
+        pres_idx = Int[],
+        cstr_idx = collect(1:6),
+        loadmesh = true,
+        meshvisible = true,
+    )
+    # free_idx = collect(1:6)	
+    visible = pres_idx != Int[]
+    mat = filter(
+        row -> row.name == "Teak", 
+        RB.material_properties
+    )[1]
+    density = mat.density |> ustrip
+    if meshvisible
+        if loadmesh
+            platemesh = load(RB.assetpath("wood_plate3.STL")) |> RB.make_patch(;rot=RotZ(π/4))
+        else
+            platemesh = RB.endpoints2mesh(
+                SVector(0.0,0.0,-height/2),
+                SVector(0.0,0.0,height/2);
+                radius,n1=m,n2=2)
+        end
     else
-        platemesh = RB.endpoints2mesh(
-            SVector(0.0,0.0,-height/2),
-            SVector(0.0,0.0,height/2);
-            radius,n1=m,n2=2)
+        platemesh = nothing
     end
-else
-    platemesh = nothing
-end
-# mass = density*GB.volume(platemesh)
-if m == 4
-    mass =  0.11008275 #kg
-    Īg = SMatrix{3,3}(
-        Matrix(Diagonal([
-            0.00025403,
-            0.00025403,
-            0.00050623
-        ])
+    # mass = density*GB.volume(platemesh)
+    if m == 4
+        mass =  0.11008275 #kg
+        Īg = SMatrix{3,3}(
+            Matrix(Diagonal([
+                0.00025403,
+                0.00025403,
+                0.00050623
+            ])
+            )
         )
-    )
-else
-    mass = 0.23569851 #kg
-    Īg = SMatrix{3,3}(
-        Matrix(Diagonal([
-            0.00085048,
-            0.00085048,
-            0.00169704				
-        ])
+    else
+        mass = 0.23569851 #kg
+        Īg = SMatrix{3,3}(
+            Matrix(Diagonal([
+                0.00085048,
+                0.00085048,
+                0.00169704				
+            ])
+            )
         )
-    )
-end
-mass_center = SVector(0.0,0.0,0.0)
-pretty_table(
-    SortedDict(
-        [
-            ("id", id),
-            ("shape", "plate"),
-            ("No. vertices",m),
-            ("radius", radius),
-            ("height", height),
-            ("density", density),
-            # ("bar length", bar_length),
-            ("mass", mass),
-            ("inertia", Īg),
-            # ("bar_inertia_exp", bar_inertia_exp)
-        ]
-    )
-)
+    end
+    mass_center = SVector(0.0,0.0,0.0)
+    @debug "make_3d_plate" id mass Īg m radius height density 
 
-axes = [SVector(1.0,0.0,0.0) for _ in eachindex(nodes_positions)]
-prop = RB.RigidBodyProperty(
-    id,
-    contactable,mass,Īg,
-    mass_center,
-    nodes_positions,
-    axes,
-    ;
-    visible=visible
-)
-ṙo = zero(ro)
-ω = zero(ro)
-# u = R*(nodes_positions[2] - nodes_positions[1])
-# v = R*(nodes_positions[3] - nodes_positions[1])
-# w = R*(nodes_positions[4] - nodes_positions[1])
-nmcs = RB.NCF.NC1P3V(ri,ro,R)
-state = RB.RigidBodyState(prop,ro,R,ṙo,ω)
-coords = RB.NonminimalCoordinates(nmcs,ci,cstr_idx)
-body = RB.RigidBody(prop,state,coords,platemesh)
+    prop = RB.RigidBodyProperty(id, contactable, mass, Īg, 
+        RB.Locus(mass_center), 
+        [RB.Locus(SVector{3}(pos), ax, mu, e) for (pos,ax,mu,e) in zip(
+            loci_positions, 
+            [SVector(1.0,0.0,0.0) for _ in eachindex(loci_positions)], 
+            zeros(length(loci_positions)), 
+            zeros(length(loci_positions))
+        )]; 
+        visible=visible
+    )
+    ṙo = zero(ro)
+    ω = zero(ro)
+    # u = R*(loci_positions[2] - loci_positions[1])
+    # v = R*(loci_positions[3] - loci_positions[1])
+    # w = R*(loci_positions[4] - loci_positions[1])
+    nmcs = RB.NCF.NC1P3V(ri,ro,R)
+    state = RB.RigidBodyState(prop,ro,R,ṙo,ω)
+    coords = RB.PresFreeCoordinates(RB.NCF.NC(nmcs; cstr_idx=cstr_idx), pres_idx)
+    body = RB.RigidBody(prop,state,coords,platemesh)
 end
