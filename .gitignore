@@ -36,6 +36,9 @@ docs/package-lock.json
 # log files
 *.log
 
+# release-please
+version.txt
+
 # Miscellaneous
 note_files/
 result/
