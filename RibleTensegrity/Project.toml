@@ -1,7 +1,7 @@
 name = "RibleTensegrity"
 uuid = "7c1ef4fe-e4b4-405e-b452-f570e249b6ed"
-version = "0.1.0"
 authors = ["Jiahui Luo <luo229@qq.com> and contributors"]
+version = "0.2.0"
 
 [deps]
 CDDLib = "3391f64e-dcde-5f30-b752-e11513730f60"

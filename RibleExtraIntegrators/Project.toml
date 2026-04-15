@@ -1,6 +1,6 @@
 name = "RibleExtraIntegrators"
 uuid = "c7969c89-92f3-49be-9a87-c7d851245c78"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["Jiahui Luo <luo229@qq.com> and contributors"]
 
 
@@ -48,8 +48,8 @@ ForwardDiff = "1"
 MeshIO = "0.5"
 NLsolve = "4"
 ProgressMeter = "1"
-Rible = "0.1.5"
-RibleQCF = "0.1"
+Rible = "0.2"
+RibleQCF = "0.2"
 Rotations = "1"
 StaticArrays = "1"
 StructArrays = "0.7"

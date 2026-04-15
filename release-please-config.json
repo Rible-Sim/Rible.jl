@@ -1,0 +1,19 @@
+{
+  "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
+  "packages": {
+    ".": {
+      "release-type": "simple",
+      "package-name": "Rible",
+      "component": "Rible",
+      "bump-minor-pre-major": true,
+      "include-component-in-tag": false,
+      "extra-files": [
+        {
+          "type": "toml",
+          "path": "Project.toml",
+          "jsonpath": "$.version"
+        }
+      ]
+    }
+  }
+}

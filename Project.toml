@@ -1,7 +1,10 @@
 name = "Rible"
 uuid = "7320ced1-f959-433f-bc23-ba762b3b6b43"
-version = "0.1.5"
+version = "0.2.0"
 authors = ["Jiahui Luo <luo229@qq.com> and contributors"]
+
+[workspace]
+projects = ["RibleTensegrity", "RibleQCF", "RibleExtraIntegrators", "docs"]
 
 [deps]
 BlockArrays = "8e7c35d0-a365-5155-bbbb-fb81a777f24e"
@@ -87,7 +90,7 @@ LuxurySparse = "0.8"
 Makie = "0.24"
 MarchingCubes = "0.1"
 Match = "2"
-Meshes = "0.55 - 0.56"
+Meshes = "0.55 - 0.57"
 NLsolve = "4"
 Observables = "0.5"
 Pkg = "1.11"
@@ -107,8 +110,6 @@ TypeSortedCollections = "1"
 TypedTables = "1"
 Unitful = "1"
 julia = "1.11"
-[workspace]
-projects = ["RibleTensegrity", "RibleQCF", "RibleExtraIntegrators", "docs"]
 
 [extras]
 ApproxFun = "28f2ccd6-bb30-5033-b560-165f7b14dc2f"
