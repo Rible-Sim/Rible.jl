@@ -1,6 +1,6 @@
 name = "Rible"
 uuid = "7320ced1-f959-433f-bc23-ba762b3b6b43"
-version = "0.1.5"
+version = "0.2.0"
 authors = ["Jiahui Luo <luo229@qq.com> and contributors"]
 
 [deps]

@@ -1,7 +1,7 @@
 name = "RibleTensegrity"
 uuid = "7c1ef4fe-e4b4-405e-b452-f570e249b6ed"
 authors = ["Jiahui Luo <luo229@qq.com> and contributors"]
-version = "0.1.0"
+version = "0.2.0"
 
 [deps]
 CDDLib = "3391f64e-dcde-5f30-b752-e11513730f60"
@@ -37,7 +37,7 @@ GeometryBasics = "0.5"
 JuMP = "1.29"
 Makie = "0.24"
 Polyhedra = "0.8"
-Rible = "0.1.5"
+Rible = "0.2"
 StaticArrays = "1"
 TypeSortedCollections = "1"
 julia = "1.11"

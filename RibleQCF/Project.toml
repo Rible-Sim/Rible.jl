@@ -1,6 +1,6 @@
 name = "RibleQCF"
 uuid = "32f6761c-4421-4db0-a77a-1336e4883ae5"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["Jiahui Luo <luo229@qq.com> and contributors"]
 
 [deps]
@@ -43,7 +43,7 @@ ForwardDiff = "1"
 LinearAlgebra = "1"
 PreallocationTools = "1"
 Quaternions = "0.7"
-Rible = "0.1.5"
+Rible = "0.2"
 Rotations = "1"
 SparseArrays = "1"
 StaticArrays = "1"
