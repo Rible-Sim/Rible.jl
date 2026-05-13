@@ -43,7 +43,7 @@ jobs:
           mv docs/build_combined/1/* public/
       - name: Ensure Cloudflare Pages project
         if: github.event_name != 'pull_request'
-        uses: cloudflare/wrangler-action@v3
+        uses: cloudflare/wrangler-action@v4
         continue-on-error: true
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -51,7 +51,7 @@ jobs:
           command: pages project create riblejl --production-branch=dev
       - name: Deploy to Cloudflare Pages
         if: github.event_name != 'pull_request'
-        uses: cloudflare/wrangler-action@v3
+        uses: cloudflare/wrangler-action@v4
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
