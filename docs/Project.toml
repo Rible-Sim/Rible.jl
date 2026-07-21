@@ -40,3 +40,6 @@ Rible = {path = ".."}
 RibleExtraIntegrators = {path = "../RibleExtraIntegrators"}
 RibleQCF = {path = "../RibleQCF"}
 RibleTensegrity = {path = "../RibleTensegrity"}
+
+[compat]
+MeshIO = "0.5.3"
