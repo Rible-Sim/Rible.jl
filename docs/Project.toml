@@ -43,4 +43,5 @@ RibleTensegrity = {path = "../RibleTensegrity"}
 
 [compat]
 CircularArrays = "1.5.0"
+LoggingExtras = "1.2.0"
 Meshes = "0.57.25"
