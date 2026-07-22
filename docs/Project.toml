@@ -43,3 +43,4 @@ RibleTensegrity = {path = "../RibleTensegrity"}
 
 [compat]
 MeshIO = "0.5.3"
+Meshes = "0.57.25"
