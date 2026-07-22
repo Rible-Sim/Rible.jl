@@ -42,4 +42,5 @@ RibleQCF = {path = "../RibleQCF"}
 RibleTensegrity = {path = "../RibleTensegrity"}
 
 [compat]
+CircularArrays = "1.5.0"
 Meshes = "0.57.25"
