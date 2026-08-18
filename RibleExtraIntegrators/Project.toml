@@ -3,7 +3,6 @@ uuid = "c7969c89-92f3-49be-9a87-c7d851245c78"
 version = "0.2.0"
 authors = ["Jiahui Luo <luo229@qq.com> and contributors"]
 
-
 [deps]
 EponymTuples = "97e2ac4a-e175-5f49-beb1-4d6866a6cdc3"
 FiniteDiff = "6a86dc24-6348-571c-b903-95158fe2bd41"
@@ -15,6 +14,31 @@ ProgressMeter = "92933f4c-e287-5a05-a399-4b506db050ca"
 Rible = "7320ced1-f959-433f-bc23-ba762b3b6b43"
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 StructArrays = "09ab397b-f2b6-538f-b94a-2f83cf4a842a"
+
+[sources.Rible]
+path = ".."
+
+[sources.RibleQCF]
+path = "../RibleQCF"
+
+[compat]
+CoordinateTransformations = "0.6"
+DataStructures = "0.18 - 1"
+EponymTuples = "0.2"
+FileIO = "1"
+FiniteDiff = "2"
+FiniteDifferences = "0.12"
+ForwardDiff = "1"
+MeshIO = "0.5"
+NLsolve = "4, 5"
+ProgressMeter = "1"
+Rible = "0.2"
+RibleQCF = "0.2"
+Rotations = "1"
+StaticArrays = "1"
+StructArrays = "0.7"
+TypeSortedCollections = "1"
+julia = "1.11"
 
 [extras]
 CoordinateTransformations = "150eb455-5306-5404-9cee-2592286d6298"
@@ -32,26 +56,3 @@ TypeSortedCollections = "94a5cd58-49a0-5741-bd07-fa4f4be8babf"
 
 [targets]
 test = ["Test", "RibleQCF", "SafeTestsets", "CoordinateTransformations", "DataStructures", "FileIO", "ForwardDiff", "MeshIO", "Rotations", "SparseArrays", "Statistics", "TypeSortedCollections"]
-
-[sources]
-Rible = {path = ".."}
-RibleQCF = {path = "../RibleQCF"}
-
-[compat]
-CoordinateTransformations = "0.6"
-DataStructures = "0.18 - 1"
-EponymTuples = "0.2"
-FileIO = "1"
-FiniteDiff = "2"
-FiniteDifferences = "0.12"
-ForwardDiff = "1"
-MeshIO = "0.5"
-NLsolve = "4"
-ProgressMeter = "1"
-Rible = "0.2"
-RibleQCF = "0.2"
-Rotations = "1"
-StaticArrays = "1"
-StructArrays = "0.7"
-TypeSortedCollections = "1"
-julia = "1.11"
